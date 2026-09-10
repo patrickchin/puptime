@@ -28,7 +28,13 @@ jobs:
           CI: "1"
       - run: ./gradlew assembleRelease --no-daemon
         working-directory: android
-      - uses: actions/upload-artifact@v4
+      - name: Verify APK signature and archive
+        run: |
+          puptime_apksigner=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)
+          test -n "$puptime_apksigner"
+          "$puptime_apksigner" verify --verbose --print-certs android/app/build/outputs/apk/release/app-release.apk
+          unzip -tq android/app/build/outputs/apk/release/app-release.apk
+      - uses: actions/upload-artifact@v6
         with:
           name: puptime-android-apk
           path: android/app/build/outputs/apk/release/app-release.apk
