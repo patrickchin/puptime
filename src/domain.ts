@@ -37,7 +37,7 @@ export const EVENT_META: Record<
     label: 'Ate',
     pastLabel: 'Ate a meal',
     icon: 'food-apple-outline',
-    color: '#C05243',
+    color: '#A43F34',
     softColor: '#FBE5E2',
   },
   nap: {

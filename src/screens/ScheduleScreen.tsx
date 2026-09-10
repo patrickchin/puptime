@@ -114,7 +114,10 @@ export function ScheduleScreen({
                 <Pressable
                   accessibilityLabel={`Remove ${meta.label} at ${formatMinutes(entry.minutes)}`}
                   hitSlop={8}
-                  onPress={() => remove(entry)}
+                  onPress={(event) => {
+                    event.stopPropagation();
+                    remove(entry);
+                  }}
                   style={({ pressed }) => [styles.removeButton, pressed && { backgroundColor: theme.primarySoft }]}
                 >
                   <MaterialCommunityIcons name="close" size={20} color={theme.textMuted} />
@@ -131,14 +134,18 @@ export function ScheduleScreen({
             { backgroundColor: pressed ? theme.primaryPressed : theme.primary },
           ]}
         >
-          <MaterialCommunityIcons name="plus" color="#FFFFFF" size={22} />
-          <Text style={styles.addButtonText}>Add a time</Text>
+          <MaterialCommunityIcons name="plus" color={theme.onPrimary} size={22} />
+          <Text style={[styles.addButtonText, { color: theme.onPrimary }]}>Add a time</Text>
         </Pressable>
       </ScrollView>
 
-      <Modal visible={draft !== null} transparent animationType="fade" onRequestClose={() => setDraft(null)}>
+      <Modal visible={draft !== null} transparent animationType="none" onRequestClose={() => setDraft(null)}>
         <View style={styles.scrim}>
-          <View style={[styles.sheet, { backgroundColor: theme.surfaceRaised }]}>
+          <ScrollView
+            bounces={false}
+            style={[styles.sheet, { backgroundColor: theme.surfaceRaised }]}
+            contentContainerStyle={styles.sheetContent}
+          >
             <View style={styles.sheetHeading}>
               <Text style={[styles.sheetTitle, { color: theme.text }]}>{draft?.id ? 'Edit time' : 'Add time'}</Text>
               <Pressable
@@ -204,9 +211,9 @@ export function ScheduleScreen({
               onPress={save}
               style={({ pressed }) => [styles.saveButton, { backgroundColor: pressed ? theme.primaryPressed : theme.primary }]}
             >
-              <Text style={styles.saveText}>Save time</Text>
+              <Text style={[styles.saveText, { color: theme.onPrimary }]}>Save time</Text>
             </Pressable>
-          </View>
+          </ScrollView>
         </View>
       </Modal>
     </>
@@ -214,7 +221,13 @@ export function ScheduleScreen({
 }
 
 const styles = StyleSheet.create({
-  content: { padding: spacing.md, paddingBottom: spacing.xl },
+  content: {
+    width: '100%',
+    maxWidth: 720,
+    alignSelf: 'center',
+    padding: spacing.md,
+    paddingBottom: spacing.xl,
+  },
   eyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 1.6, marginTop: 4 },
   title: { fontSize: 30, lineHeight: 36, fontWeight: '800', letterSpacing: -0.6, marginTop: 4 },
   subtitle: { fontSize: 14, lineHeight: 21, marginTop: 6 },
@@ -233,12 +246,20 @@ const styles = StyleSheet.create({
   rowHint: { fontSize: 12, marginTop: 2 },
   removeButton: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   addButton: { minHeight: 54, borderRadius: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: spacing.md },
-  addButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  addButtonText: { fontSize: 16, fontWeight: '700' },
   empty: { borderWidth: 1, borderStyle: 'dashed', borderRadius: 20, padding: spacing.lg, alignItems: 'center' },
   emptyTitle: { fontSize: 17, fontWeight: '700' },
   emptyBody: { fontSize: 14, lineHeight: 21, marginTop: 4, textAlign: 'center' },
   scrim: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.56)', justifyContent: 'flex-end' },
-  sheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: spacing.lg, paddingBottom: 34 },
+  sheet: {
+    width: '100%',
+    maxWidth: 640,
+    maxHeight: '92%',
+    alignSelf: 'center',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+  },
+  sheetContent: { padding: spacing.lg, paddingBottom: 34 },
   sheetHeading: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg },
   sheetTitle: { flex: 1, fontSize: 23, fontWeight: '800' },
   closeButton: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
@@ -250,5 +271,5 @@ const styles = StyleSheet.create({
   timeButtonText: { flex: 1, fontSize: 18, fontWeight: '700', fontVariant: ['tabular-nums'] },
   changeText: { fontSize: 14, fontWeight: '700' },
   saveButton: { minHeight: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginTop: spacing.lg },
-  saveText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+  saveText: { fontSize: 16, fontWeight: '800' },
 });

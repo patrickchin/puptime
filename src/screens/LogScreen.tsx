@@ -45,7 +45,7 @@ export function LogScreen({
         <>
           <View style={styles.titleBlock}>
             <View style={[styles.mark, { backgroundColor: theme.primary }]}>
-              <MaterialCommunityIcons name="paw" size={23} color="#FFFFFF" />
+              <MaterialCommunityIcons name="paw" size={23} color={theme.onPrimary} />
             </View>
             <View style={styles.titleCopy}>
               <Text style={[styles.eyebrow, { color: theme.primary }]}>PUPTIME</Text>
@@ -76,7 +76,14 @@ export function LogScreen({
 }
 
 const styles = StyleSheet.create({
-  content: { paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.xl },
+  content: {
+    width: '100%',
+    maxWidth: 720,
+    alignSelf: 'center',
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xl,
+  },
   titleBlock: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   mark: { width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   titleCopy: { flex: 1 },

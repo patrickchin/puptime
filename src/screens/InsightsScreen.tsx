@@ -129,7 +129,14 @@ export function InsightsScreen({
 }
 
 const styles = StyleSheet.create({
-  content: { padding: spacing.md, paddingBottom: spacing.xl, gap: spacing.md },
+  content: {
+    width: '100%',
+    maxWidth: 720,
+    alignSelf: 'center',
+    padding: spacing.md,
+    paddingBottom: spacing.xl,
+    gap: spacing.md,
+  },
   eyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 1.6, marginTop: 4 },
   title: { fontSize: 30, lineHeight: 36, fontWeight: '800', letterSpacing: -0.6, marginTop: -8 },
   subtitle: { fontSize: 15, lineHeight: 22, marginTop: -10 },
