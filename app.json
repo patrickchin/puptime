@@ -7,7 +7,6 @@
     "scheme": "puptime",
     "icon": "./assets/puptime-icon.png",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.patrickchin.puptime"
@@ -64,7 +63,9 @@
           ]
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-font",
+      "./plugins/withAndroidWorkManager"
     ]
   }
 }
