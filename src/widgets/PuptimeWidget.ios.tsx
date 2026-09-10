@@ -20,6 +20,7 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
     const at = Date.now();
     return {
       latestLabel: `${label} saved`,
+      // ponytail: bound widget props; move to a shared native DB if 100 unopened taps becomes realistic.
       pending: [...pending, { id: `${at}-${type}`, type, at }].slice(-100),
     };
   };

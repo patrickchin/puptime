@@ -44,3 +44,11 @@ test('reassigns a nearby event when that matches more of the planned routine', (
 
   assert.equal(adherenceForDay(events, schedule, day), 100);
 });
+
+test('does not score today until a schedule window has closed', () => {
+  const schedule: ScheduleEntry[] = [{ id: 'a', type: 'pee', minutes: 7 * 60 }];
+  const events: PuppyEvent[] = [{ id: '1', type: 'pee', at: at(7, 10), source: 'app' }];
+
+  assert.equal(adherenceForDay(events, schedule, day, 30, at(7, 29)), null);
+  assert.equal(adherenceForDay(events, schedule, day, 30, at(7, 31)), 100);
+});

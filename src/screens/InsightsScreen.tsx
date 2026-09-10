@@ -84,7 +84,7 @@ export function InsightsScreen({
 
       <View style={[styles.panel, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
         <Text style={[styles.panelTitle, { color: theme.text }]}>Schedule consistency</Text>
-        <Text style={[styles.panelCaption, { color: theme.textMuted }]}>Within 30 minutes of each planned time</Text>
+        <Text style={[styles.panelCaption, { color: theme.textMuted }]}>Completed windows, within 30 minutes of each planned time</Text>
         <View style={styles.scoreList}>
           {days.map((day) => (
             <View key={day.key} style={styles.scoreRow}>

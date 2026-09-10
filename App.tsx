@@ -92,9 +92,13 @@ export default function App() {
     <SafeAreaProvider>
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top', 'left', 'right']}>
         <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-        <View style={styles.screen}>{screen}</View>
-        <BottomNav tab={tab} onChange={setTab} theme={theme} />
-        {undoEvent ? <Toast message={`${EVENT_META[undoEvent.type].pastLabel} logged`} onUndo={undo} theme={theme} /> : null}
+        <View style={styles.screen}>
+          {screen}
+          {undoEvent ? <Toast message={`${EVENT_META[undoEvent.type].pastLabel} logged`} onUndo={undo} theme={theme} /> : null}
+        </View>
+        <SafeAreaView edges={['bottom']} style={{ backgroundColor: theme.nav }}>
+          <BottomNav tab={tab} onChange={setTab} theme={theme} />
+        </SafeAreaView>
       </SafeAreaView>
     </SafeAreaProvider>
   );

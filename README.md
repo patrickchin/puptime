@@ -24,7 +24,7 @@ npm run prebuild
 npm run android
 ```
 
-The widgets use native extensions, so they require a development or release build rather than Expo Go.
+The widgets use native extensions, so they require a development or release build rather than Expo Go. Interactive iOS widget buttons require iOS 17 or newer.
 
 ## Checks and release build
 

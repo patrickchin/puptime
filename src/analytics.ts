@@ -13,6 +13,7 @@ export function adherenceForDay(
   schedule: ScheduleEntry[],
   day: Date,
   toleranceMinutes = 30,
+  now = Date.now(),
 ): number | null {
   if (schedule.length === 0) return null;
 
@@ -24,7 +25,9 @@ export function adherenceForDay(
       const target = new Date(day);
       target.setHours(Math.floor(entry.minutes / 60), entry.minutes % 60, 0, 0);
       return { ...entry, target: target.getTime() };
-    });
+    })
+    .filter((entry) => dateKey(day) !== dateKey(now) || entry.target + toleranceMinutes * 60_000 <= now);
+  if (planned.length === 0) return null;
   const matches = new Map<string, number>();
   let matched = 0;
 
@@ -78,7 +81,7 @@ export function summarizeDays(
       date,
       counts,
       total: dayEvents.length,
-      adherence: adherenceForDay(events, schedule, date),
+      adherence: adherenceForDay(events, schedule, date, 30, now.getTime()),
     };
   });
 }
