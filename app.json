@@ -14,6 +14,11 @@
     },
     "android": {
       "package": "com.patrickchin.puptime",
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#176B52",
         "foregroundImage": "./assets/puptime-icon.png"
