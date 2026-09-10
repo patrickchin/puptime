@@ -1,0 +1,66 @@
+{
+  "expo": {
+    "name": "Puptime",
+    "slug": "puptime",
+    "version": "1.0.0",
+    "description": "One-tap puppy routine tracking from your app or home screen.",
+    "scheme": "puptime",
+    "icon": "./assets/puptime-icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.patrickchin.puptime"
+    },
+    "android": {
+      "package": "com.patrickchin.puptime",
+      "adaptiveIcon": {
+        "backgroundColor": "#176B52",
+        "foregroundImage": "./assets/puptime-icon.png"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": true
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "PuptimeQuickLog",
+              "label": "Puptime Quick Log",
+              "description": "Log pee, poop, meals, and naps in one tap.",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 2,
+              "resizeMode": "horizontal"
+            }
+          ]
+        }
+      ],
+      [
+        "expo-widgets",
+        {
+          "groupIdentifier": "group.com.patrickchin.puptime",
+          "widgets": [
+            {
+              "name": "PuptimeQuickLog",
+              "displayName": "Puptime Quick Log",
+              "description": "Log puppy activities in one tap.",
+              "ios": {
+                "supportedFamilies": [
+                  "systemMedium"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "@react-native-community/datetimepicker"
+    ]
+  }
+}
