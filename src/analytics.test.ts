@@ -31,3 +31,16 @@ test('summarizes days in chronological order', () => {
   assert.equal(result[1].counts.nap, 1);
   assert.equal(result[1].adherence, null);
 });
+
+test('reassigns a nearby event when that matches more of the planned routine', () => {
+  const schedule: ScheduleEntry[] = [
+    { id: 'a', type: 'pee', minutes: 7 * 60 },
+    { id: 'b', type: 'pee', minutes: 7 * 60 + 20 },
+  ];
+  const events: PuppyEvent[] = [
+    { id: '1', type: 'pee', at: at(7, 10), source: 'app' },
+    { id: '2', type: 'pee', at: at(6, 45), source: 'app' },
+  ];
+
+  assert.equal(adherenceForDay(events, schedule, day), 100);
+});

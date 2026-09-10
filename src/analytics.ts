@@ -18,29 +18,40 @@ export function adherenceForDay(
 
   const key = dateKey(day);
   const candidates = events.filter((event) => dateKey(event.at) === key);
-  const used = new Set<string>();
+  const planned = [...schedule]
+    .sort((a, b) => a.minutes - b.minutes)
+    .map((entry) => {
+      const target = new Date(day);
+      target.setHours(Math.floor(entry.minutes / 60), entry.minutes % 60, 0, 0);
+      return { ...entry, target: target.getTime() };
+    });
+  const matches = new Map<string, number>();
   let matched = 0;
 
-  for (const planned of [...schedule].sort((a, b) => a.minutes - b.minutes)) {
-    const target = new Date(day);
-    target.setHours(Math.floor(planned.minutes / 60), planned.minutes % 60, 0, 0);
+  const tryMatch = (plannedIndex: number, seenEvents: Set<string>): boolean => {
+    const item = planned[plannedIndex];
+    const options = candidates
+      .filter(
+        (event) =>
+          event.type === item.type && Math.abs(event.at - item.target) <= toleranceMinutes * 60_000,
+      )
+      .sort((a, b) => Math.abs(a.at - item.target) - Math.abs(b.at - item.target));
 
-    let nearest: PuppyEvent | undefined;
-    let nearestDistance = Number.POSITIVE_INFINITY;
-
-    for (const event of candidates) {
-      if (event.type !== planned.type || used.has(event.id)) continue;
-      const distance = Math.abs(event.at - target.getTime());
-      if (distance <= toleranceMinutes * 60_000 && distance < nearestDistance) {
-        nearest = event;
-        nearestDistance = distance;
+    for (const event of options) {
+      if (seenEvents.has(event.id)) continue;
+      seenEvents.add(event.id);
+      const previousPlan = matches.get(event.id);
+      if (previousPlan === undefined || tryMatch(previousPlan, seenEvents)) {
+        matches.set(event.id, plannedIndex);
+        return true;
       }
     }
 
-    if (nearest) {
-      used.add(nearest.id);
-      matched += 1;
-    }
+    return false;
+  };
+
+  for (let index = 0; index < planned.length; index += 1) {
+    if (tryMatch(index, new Set())) matched += 1;
   }
 
   return Math.round((matched / schedule.length) * 100);
