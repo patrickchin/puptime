@@ -1,4 +1,6 @@
-export const eventTypes = ['pee', 'poop', 'meal', 'nap'] as const;
+export const eventTypes = ['pee', 'poop', 'meal', 'pottyTrip', 'walk', 'nap', 'custom'] as const;
+
+export const quickEventTypes = ['pee', 'poop', 'meal', 'pottyTrip', 'walk', 'nap'] as const;
 
 export type EventType = (typeof eventTypes)[number];
 
@@ -6,6 +8,8 @@ export type PuppyEvent = {
   id: string;
   type: EventType;
   at: number;
+  endedAt?: number | null;
+  customLabel?: string;
   source: 'app' | 'widget';
 };
 
@@ -40,12 +44,33 @@ export const EVENT_META: Record<
     color: '#A43F34',
     softColor: '#FBE5E2',
   },
+  pottyTrip: {
+    label: 'Potty trip',
+    pastLabel: 'Went out for potty',
+    icon: 'door-open',
+    color: '#31709B',
+    softColor: '#DFEFF8',
+  },
+  walk: {
+    label: 'Walk',
+    pastLabel: 'Went for a walk',
+    icon: 'walk',
+    color: '#6A6422',
+    softColor: '#F3F0D2',
+  },
   nap: {
     label: 'Nap',
-    pastLabel: 'Started a nap',
+    pastLabel: 'Nap',
     icon: 'sleep',
     color: '#5C61A8',
     softColor: '#E8E7FA',
+  },
+  custom: {
+    label: 'Other',
+    pastLabel: 'Other activity',
+    icon: 'tag-outline',
+    color: '#626A66',
+    softColor: '#E9ECEA',
   },
 };
 
@@ -73,13 +98,46 @@ export function createEvent(
   type: EventType,
   source: PuppyEvent['source'] = 'app',
   at = Date.now(),
+  customLabel?: string,
 ): PuppyEvent {
   return {
     id: `${at}-${Math.random().toString(36).slice(2, 9)}`,
     type,
     at,
+    ...(customLabel ? { customLabel } : {}),
     source,
   };
+}
+
+export function createNapEvent(source: PuppyEvent['source'] = 'app', at = Date.now()): PuppyEvent {
+  return { ...createEvent('nap', source, at), endedAt: null };
+}
+
+export function isOpenNap(event: PuppyEvent): boolean {
+  // Old Puptime versions stored nap taps without endedAt. They stay historical point events.
+  return event.type === 'nap' && event.endedAt === null;
+}
+
+export function eventLabel(event: PuppyEvent): string {
+  return event.type === 'custom' && event.customLabel?.trim()
+    ? event.customLabel.trim()
+    : EVENT_META[event.type].label;
+}
+
+export function eventPastLabel(event: PuppyEvent): string {
+  if (event.type === 'custom') return eventLabel(event);
+  if (isOpenNap(event)) return 'Nap in progress';
+  if (event.type === 'nap' && typeof event.endedAt === 'number') return 'Napped';
+  if (event.type === 'nap') return 'Started a nap';
+  return EVENT_META[event.type].pastLabel;
+}
+
+export function formatDuration(milliseconds: number): string {
+  const minutes = Math.max(0, Math.round(milliseconds / 60_000));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return remainder ? `${hours}h ${remainder}m` : `${hours}h`;
 }
 
 export function normalizeBackdateMinutes(value: unknown): number {

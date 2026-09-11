@@ -44,10 +44,17 @@ export function removeEvent(id: string): Promise<PuppyEvent[]> {
 }
 
 export function updateEventTime(id: string, at: number): Promise<PuppyEvent[]> {
+  return updateEvent(id, { at });
+}
+
+export function updateEvent(
+  id: string,
+  changes: Partial<Pick<PuppyEvent, 'at' | 'endedAt'>>,
+): Promise<PuppyEvent[]> {
   let result: PuppyEvent[] = [];
   writeQueue = writeQueue.then(async () => {
     result = (await loadEvents())
-      .map((event) => (event.id === id ? { ...event, at } : event))
+      .map((event) => (event.id === id ? { ...event, ...changes } : event))
       .sort((a, b) => b.at - a.at);
     await AsyncStorage.setItem(EVENTS_KEY, JSON.stringify(result));
   });
