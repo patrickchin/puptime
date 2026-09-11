@@ -5,7 +5,7 @@ Puptime is a private, offline puppy routine tracker for Android and iOS. Log pee
 ## What it includes
 
 - One-tap logging with haptic confirmation and undo
-- A chronological log grouped by day
+- A chronological log grouped by day, with quick backdating and exact time editing
 - An editable daily routine with native time pickers
 - Seven-day activity and schedule-adherence charts
 - Interactive Android and iOS home-screen widgets
@@ -13,6 +13,17 @@ Puptime is a private, offline puppy routine tracker for Android and iOS. Log pee
 - On-device storage—no account, server, ads, or tracking
 
 The starter routine is only an editable example, not veterinary guidance. Change it to fit your puppy and your veterinarian’s advice.
+
+## Install on Android
+
+Download the APK from the [latest GitHub release](https://github.com/patrickchin/puptime/releases/latest), open it on your phone, and allow installation from that source if Android asks.
+
+The Android widget has two useful heights:
+
+- One row: four compact buttons that immediately log the current time.
+- Two rows: tap `−5` or `+5` to choose a time up to one hour ago, then tap the activity. It resets to **Now** after logging.
+
+Long-press the widget to show Android’s resize handles, then drag the vertical handle to switch layouts. Inside the app, tap the pencil beside any logged time for Now, 5/15/30/60-minute shortcuts or the exact native time picker.
 
 ## Run locally
 
@@ -32,6 +43,7 @@ The widgets use native extensions, so they require a development or release buil
 npm run typecheck
 npm test
 npx expo export --platform android
+npx expo export --platform ios
 npm run build:android
 ```
 

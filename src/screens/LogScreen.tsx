@@ -47,6 +47,7 @@ export function LogScreen({
 }) {
   const [draft, setDraft] = useState<{ event: PuppyEvent; at: number } | null>(null);
   const [showAndroidPicker, setShowAndroidPicker] = useState(false);
+  const [saving, setSaving] = useState(false);
   const byDay = new Map<string, PuppyEvent[]>();
   events.forEach((event) => {
     const key = dateKey(event.at);
@@ -66,9 +67,14 @@ export function LogScreen({
   };
 
   const saveTime = async () => {
-    if (!draft) return;
-    await onChangeTime(draft.event, Math.min(draft.at, Date.now()));
-    setDraft(null);
+    if (!draft || saving) return;
+    setSaving(true);
+    try {
+      await onChangeTime(draft.event, Math.min(draft.at, Date.now()));
+      setDraft(null);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -118,7 +124,7 @@ export function LogScreen({
         }
       />
 
-      <Modal visible={draft !== null} transparent animationType="fade" onRequestClose={() => setDraft(null)}>
+      <Modal visible={draft !== null} transparent animationType="none" onRequestClose={() => setDraft(null)}>
         <View accessibilityViewIsModal style={styles.scrim}>
           <ScrollView
             bounces={false}
@@ -201,13 +207,15 @@ export function LogScreen({
 
             <Pressable
               accessibilityRole="button"
+              accessibilityState={{ busy: saving, disabled: saving }}
+              disabled={saving}
               onPress={saveTime}
               style={({ pressed }) => [
                 styles.saveButton,
-                { backgroundColor: pressed ? theme.primaryPressed : theme.primary },
+                { backgroundColor: pressed ? theme.primaryPressed : theme.primary, opacity: saving ? 0.55 : 1 },
               ]}
             >
-              <Text style={[styles.saveText, { color: theme.onPrimary }]}>Save time</Text>
+              <Text style={[styles.saveText, { color: theme.onPrimary }]}>{saving ? 'Saving…' : 'Save time'}</Text>
             </Pressable>
           </ScrollView>
         </View>

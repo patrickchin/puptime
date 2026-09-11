@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
   label: { fontSize: 16, fontWeight: '600' },
   source: { fontSize: 12, lineHeight: 17, marginTop: 2 },
   timeButton: {
-    minHeight: 44,
+    minHeight: 48,
     borderRadius: 13,
     paddingHorizontal: 9,
     flexDirection: 'row',
@@ -89,8 +89,8 @@ const styles = StyleSheet.create({
   },
   time: { fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] },
   deleteButton: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',

@@ -87,7 +87,7 @@ export function QuickLogWidget({
         padding: 6,
       }}
     >
-      <FlexWidget style={{ width: 'match_parent', height: 40, flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+      <FlexWidget style={{ width: 'match_parent', height: 44, flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
         <FlexWidget style={{ flex: 1, height: 'match_parent', justifyContent: 'center' }}>
           <TextWidget text="Puptime" style={{ color: foreground, fontSize: 14, fontWeight: '700' }} />
           <TextWidget text={latestLabel} style={{ color: muted, fontSize: 9 }} />
@@ -96,18 +96,18 @@ export function QuickLogWidget({
           clickAction="ADJUST_TIME"
           clickActionData={{ minutesAgo: normalizeBackdateMinutes(minutesAgo + 5) }}
           accessibilityLabel="Move logged time 5 minutes earlier"
-          style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: control, alignItems: 'center', justifyContent: 'center' }}
+          style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: control, alignItems: 'center', justifyContent: 'center' }}
         >
           <TextWidget text="−5" style={{ color: foreground, fontSize: 12, fontWeight: '700' }} />
         </FlexWidget>
-        <FlexWidget style={{ width: 52, height: 40, alignItems: 'center', justifyContent: 'center' }}>
+        <FlexWidget style={{ width: 52, height: 44, alignItems: 'center', justifyContent: 'center' }}>
           <TextWidget text={timeLabel} style={{ color: foreground, fontSize: 11, fontWeight: '700' }} />
         </FlexWidget>
         <FlexWidget
           clickAction="ADJUST_TIME"
           clickActionData={{ minutesAgo: normalizeBackdateMinutes(minutesAgo - 5) }}
           accessibilityLabel="Move logged time 5 minutes later"
-          style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: control, alignItems: 'center', justifyContent: 'center' }}
+          style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: control, alignItems: 'center', justifyContent: 'center' }}
         >
           <TextWidget text="+5" style={{ color: foreground, fontSize: 12, fontWeight: '700' }} />
         </FlexWidget>
