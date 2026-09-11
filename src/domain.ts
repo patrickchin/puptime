@@ -15,6 +15,10 @@ export type PuppyEvent = {
   source: 'app' | 'widget';
 };
 
+export type PuppyEventChanges = Partial<
+  Pick<PuppyEvent, 'type' | 'at' | 'endedAt' | 'customLabel' | 'note'>
+>;
+
 export type ScheduleEntry = {
   id: string;
   type: EventType;
@@ -107,11 +111,12 @@ export function createEvent(
   at = Date.now(),
   customLabel?: string,
 ): PuppyEvent {
+  const label = type === 'custom' ? normalizeCustomLabel(customLabel) : undefined;
   return {
     id: `${at}-${Math.random().toString(36).slice(2, 9)}`,
     type,
     at,
-    ...(customLabel ? { customLabel } : {}),
+    ...(label ? { customLabel: label } : {}),
     source,
   };
 }
@@ -156,6 +161,15 @@ export function normalizeBackdateMinutes(value: unknown): number {
 export function normalizeNote(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
   return value.trim().slice(0, 300) || undefined;
+}
+
+export function normalizeCustomLabel(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  return value.trim().slice(0, 40) || undefined;
+}
+
+export function normalizeEventTypeChange(event: PuppyEvent, requestedType: EventType): EventType {
+  return event.type === 'nap' || requestedType === 'nap' ? event.type : requestedType;
 }
 
 export function replaceClockTime(value: number, hours: number, minutes: number, now = Date.now()): number {

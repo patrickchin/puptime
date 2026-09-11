@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Modal, Platform, Pressable, ScrollView, SectionList, StyleSheet, Text, View } from 'react-native';
+import { Alert, Modal, Platform, Pressable, ScrollView, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { QuickActions } from '../components/QuickActions';
 import { EventRow } from '../components/EventRow';
@@ -10,19 +10,22 @@ import { TodayRoutineCard } from '../components/TodayRoutineCard';
 import {
   dateKey,
   EVENT_META,
-  eventPastLabel,
+  eventTypes,
   formatDuration,
   formatTime,
+  normalizeCustomLabel,
   relativeTime,
   replaceCalendarDate,
   replaceClockTime,
   type EventType,
   type PuppyEvent,
+  type PuppyEventChanges,
   type ScheduleEntry,
 } from '../domain';
 import { spacing, type Theme } from '../theme';
 
 const quickBackdates = [0, 5, 15, 30, 60] as const;
+const editableEventTypes = eventTypes.filter((type) => type !== 'nap');
 
 const activityFilters = [
   { id: 'all', label: 'All', icon: 'format-list-bulleted', types: [] },
@@ -37,6 +40,8 @@ type ActivityFilter = (typeof activityFilters)[number]['id'];
 
 type Draft = {
   event: PuppyEvent;
+  type: EventType;
+  customLabel: string;
   at: number;
   endedAt?: number | null;
   note: string;
@@ -78,13 +83,14 @@ export function LogScreen({
   editEventId?: string | null;
   onEditRequestHandled?: () => void;
   onLog: (type: EventType, customLabel?: string) => void;
-  onSave: (event: PuppyEvent, at: number, endedAt: number | null | undefined, note: string) => Promise<void>;
+  onSave: (event: PuppyEvent, changes: PuppyEventChanges) => Promise<void>;
   onDelete: (event: PuppyEvent) => void;
   onOpenSchedule: () => void;
   theme: Theme;
 }) {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [pickerMode, setPickerMode] = useState<'date' | 'time' | null>(null);
+  const [customTouched, setCustomTouched] = useState(false);
   const [saving, setSaving] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>('all');
@@ -99,6 +105,8 @@ export function LogScreen({
     if (event) {
       setDraft({
         event,
+        type: event.type,
+        customLabel: event.customLabel ?? '',
         at: event.at,
         endedAt: event.endedAt,
         note: event.note ?? '',
@@ -121,7 +129,11 @@ export function LogScreen({
   const timedNap = draft?.event.type === 'nap' && draft.event.endedAt !== undefined;
   const activeValue = draft?.field === 'end' ? draft.endedAt ?? Date.now() : draft?.at ?? Date.now();
   const pickerDate = new Date(activeValue);
-  const draftMeta = draft ? EVENT_META[draft.event.type] : EVENT_META.pee;
+  const draftMeta = draft ? EVENT_META[draft.type] : EVENT_META.pee;
+  const customInvalid = draft?.type === 'custom' && !normalizeCustomLabel(draft.customLabel);
+  const draftLabel = draft?.type === 'custom'
+    ? normalizeCustomLabel(draft.customLabel) ?? 'Other activity'
+    : draftMeta.pastLabel;
   const selectedFilter = activityFilters.find((item) => item.id === activityFilter) ?? activityFilters[0];
   const todayLabel = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
     .format(now)
@@ -140,6 +152,7 @@ export function LogScreen({
 
   const closeEditor = () => {
     setPickerMode(null);
+    setCustomTouched(false);
     setDraft(null);
   };
 
@@ -153,11 +166,22 @@ export function LogScreen({
     );
   };
 
-  const saveTime = async () => {
+  const saveChanges = async () => {
     if (!draft || saving) return;
+    const customLabel = normalizeCustomLabel(draft.customLabel);
+    if (draft.type === 'custom' && !customLabel) {
+      setCustomTouched(true);
+      return;
+    }
     setSaving(true);
     try {
-      await onSave(draft.event, Math.min(draft.at, Date.now()), draft.endedAt, draft.note.trim());
+      await onSave(draft.event, {
+        type: draft.type,
+        customLabel,
+        at: Math.min(draft.at, Date.now()),
+        endedAt: draft.endedAt,
+        note: draft.note,
+      });
       closeEditor();
     } catch {
       Alert.alert('Couldn’t save changes', 'Your log is unchanged. Please try again.');
@@ -243,7 +267,15 @@ export function LogScreen({
           <EventRow
             event={item}
             now={now}
-            onEditTime={() => setDraft({ event: item, at: item.at, endedAt: item.endedAt, note: item.note ?? '', field: 'start' })}
+            onEdit={() => setDraft({
+              event: item,
+              type: item.type,
+              customLabel: item.customLabel ?? '',
+              at: item.at,
+              endedAt: item.endedAt,
+              note: item.note ?? '',
+              field: 'start',
+            })}
             onDelete={() => onDelete(item)}
             theme={theme}
           />
@@ -281,7 +313,9 @@ export function LogScreen({
                 <Text
                   style={[styles.sheetSubtitle, { color: theme.textMuted }]}
                 >
-                  {draft ? eventPastLabel(draft.event) : draftMeta.pastLabel} · Adjust the time or add a note.
+                  {draft?.event.type === 'nap'
+                    ? `${draftLabel} · Correct the timing or note.`
+                    : `${draftLabel} · Correct the activity, timing, or note.`}
                 </Text>
               </View>
               <Pressable
@@ -293,6 +327,78 @@ export function LogScreen({
                 <MaterialCommunityIcons name="close" size={22} color={theme.text} />
               </Pressable>
             </View>
+
+            {draft && draft.event.type !== 'nap' ? (
+              <>
+                <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>ACTIVITY</Text>
+                <View style={styles.typePicker}>
+                  {editableEventTypes.map((type) => {
+                    const meta = EVENT_META[type];
+                    const selected = draft.type === type;
+                    return (
+                      <Pressable
+                        key={type}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                        accessibilityLabel={`Change activity to ${meta.label}`}
+                        onPress={() => {
+                          setCustomTouched(false);
+                          setDraft((current) => current && ({ ...current, type }));
+                        }}
+                        style={({ pressed }) => [
+                          styles.typeChoice,
+                          {
+                            backgroundColor: selected ? meta.softColor : theme.surface,
+                            borderColor: selected || pressed ? meta.color : theme.border,
+                          },
+                        ]}
+                      >
+                        <MaterialCommunityIcons
+                          name={meta.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+                          color={selected ? meta.color : theme.textMuted}
+                          size={20}
+                        />
+                        <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.typeChoiceText, { color: selected ? meta.color : theme.text }]}>
+                          {meta.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {draft.type === 'custom' ? (
+                  <View style={styles.customField}>
+                    <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>CUSTOM NAME</Text>
+                    <TextInput
+                      accessibilityLabel="Custom activity name"
+                      accessibilityHint="Required before saving"
+                      autoCapitalize="sentences"
+                      maxLength={40}
+                      onBlur={() => setCustomTouched(true)}
+                      onChangeText={(customLabel) => setDraft((current) => current && ({ ...current, customLabel }))}
+                      onSubmitEditing={saveChanges}
+                      placeholder="e.g. Grooming"
+                      placeholderTextColor={theme.textMuted}
+                      returnKeyType="done"
+                      value={draft.customLabel}
+                      style={[
+                        styles.customInput,
+                        {
+                          backgroundColor: theme.surface,
+                          borderColor: customTouched && customInvalid ? theme.danger : theme.border,
+                          color: theme.text,
+                        },
+                      ]}
+                    />
+                    <Text
+                      accessibilityLiveRegion="polite"
+                      style={[styles.customHint, { color: customTouched && customInvalid ? theme.danger : theme.textMuted }]}
+                    >
+                      {customTouched && customInvalid ? 'Enter an activity name.' : 'Use a short name you’ll recognize in the log.'}
+                    </Text>
+                  </View>
+                ) : null}
+              </>
+            ) : null}
 
             <View style={[styles.timePreview, { backgroundColor: theme.surface, borderColor: theme.border }]}>
               <Text style={[styles.previewTime, { color: theme.text }]}>
@@ -431,12 +537,13 @@ export function LogScreen({
 
             <Pressable
               accessibilityRole="button"
-              accessibilityState={{ busy: saving, disabled: saving }}
-              disabled={saving}
-              onPress={saveTime}
+              accessibilityState={{ busy: saving, disabled: saving || customInvalid }}
+              accessibilityHint={customInvalid ? 'Enter a custom activity name before saving' : undefined}
+              disabled={saving || customInvalid}
+              onPress={saveChanges}
               style={({ pressed }) => [
                 styles.saveButton,
-                { backgroundColor: pressed ? theme.primaryPressed : theme.primary, opacity: saving ? 0.55 : 1 },
+                { backgroundColor: pressed ? theme.primaryPressed : theme.primary, opacity: saving || customInvalid ? 0.45 : 1 },
               ]}
             >
               <Text style={[styles.saveText, { color: theme.onPrimary }]}>{saving ? 'Saving…' : 'Save changes'}</Text>
@@ -498,6 +605,12 @@ const styles = StyleSheet.create({
   sheetSubtitle: { fontSize: 13, lineHeight: 18, marginTop: 2 },
   closeButton: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   timePreview: { borderWidth: 1, borderRadius: 18, padding: spacing.md, alignItems: 'center', marginBottom: spacing.lg },
+  typePicker: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.md },
+  typeChoice: { flexBasis: '30%', flexGrow: 1, minWidth: 88, minHeight: 48, borderWidth: 1, borderRadius: 14, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  typeChoiceText: { minWidth: 0, flexShrink: 1, fontSize: 13, lineHeight: 18, fontWeight: '700' },
+  customField: { marginBottom: spacing.lg },
+  customInput: { minHeight: 52, borderWidth: 1, borderRadius: 15, paddingHorizontal: 14, fontSize: 16 },
+  customHint: { minHeight: 18, fontSize: 12, lineHeight: 18, marginTop: 5 },
   previewTime: { fontSize: 34, lineHeight: 40, fontWeight: '800', fontVariant: ['tabular-nums'] },
   previewDate: { fontSize: 13, lineHeight: 18, marginTop: 2 },
   timeFields: { flexDirection: 'row', gap: 8, marginBottom: spacing.lg },

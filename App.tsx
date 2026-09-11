@@ -11,9 +11,12 @@ import {
   createNapEvent,
   eventPastLabel,
   isOpenNap,
+  normalizeCustomLabel,
+  normalizeEventTypeChange,
   normalizeNote,
   type EventType,
   type PuppyEvent,
+  type PuppyEventChanges,
   type ScheduleEntry,
 } from './src/domain';
 import { InsightsScreen } from './src/screens/InsightsScreen';
@@ -99,15 +102,16 @@ export default function App() {
 
   const saveEventDetails = async (
     event: PuppyEvent,
-    at: number,
-    endedAt: number | null | undefined,
-    note: string,
+    changes: PuppyEventChanges,
   ) => {
-    const cleanNote = normalizeNote(note);
-    const nextEvents = await updateEvent(
-      event.id,
-      event.endedAt === undefined ? { at, note: cleanNote } : { at, endedAt, note: cleanNote },
-    );
+    const type = normalizeEventTypeChange(event, changes.type ?? event.type);
+    const nextEvents = await updateEvent(event.id, {
+      ...changes,
+      type,
+      endedAt: type === 'nap' ? changes.endedAt : undefined,
+      customLabel: type === 'custom' ? normalizeCustomLabel(changes.customLabel) : undefined,
+      note: normalizeNote(changes.note),
+    });
     setEvents(nextEvents);
     Haptics.selectionAsync().catch(() => undefined);
     updateHomeWidget(nextEvents).catch(() => undefined);

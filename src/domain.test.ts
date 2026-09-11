@@ -8,6 +8,8 @@ import {
   formatDuration,
   isOpenNap,
   normalizeBackdateMinutes,
+  normalizeCustomLabel,
+  normalizeEventTypeChange,
   normalizeNote,
   replaceCalendarDate,
   replaceClockTime,
@@ -32,6 +34,23 @@ test('normalizes optional log notes', () => {
   assert.equal(normalizeNote('  Just after play  '), 'Just after play');
   assert.equal(normalizeNote('   '), undefined);
   assert.equal(normalizeNote('x'.repeat(301))?.length, 300);
+});
+
+test('normalizes custom activity names at their storage boundary', () => {
+  assert.equal(normalizeCustomLabel('  Training  '), 'Training');
+  assert.equal(normalizeCustomLabel('   '), undefined);
+  assert.equal(normalizeCustomLabel('x'.repeat(41))?.length, 40);
+  assert.equal(createEvent('custom', 'app', 123, '  Grooming  ').customLabel, 'Grooming');
+  assert.equal(createEvent('pee', 'app', 123, 'Not applicable').customLabel, undefined);
+});
+
+test('changes point activities without converting to or from a timed nap', () => {
+  const pee = createEvent('pee', 'app', 100);
+  const nap = createNapEvent('app', 100);
+
+  assert.equal(normalizeEventTypeChange(pee, 'poop'), 'poop');
+  assert.equal(normalizeEventTypeChange(pee, 'nap'), 'pee');
+  assert.equal(normalizeEventTypeChange(nap, 'walk'), 'nap');
 });
 
 test('changes an event clock time without allowing a future log', () => {

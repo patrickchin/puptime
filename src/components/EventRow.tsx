@@ -13,13 +13,13 @@ import { spacing, type Theme } from '../theme';
 
 export function EventRow({
   event,
-  onEditTime,
+  onEdit,
   onDelete,
   now,
   theme,
 }: {
   event: PuppyEvent;
-  onEditTime: () => void;
+  onEdit: () => void;
   onDelete: () => void;
   now: number;
   theme: Theme;
@@ -54,8 +54,10 @@ export function EventRow({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`Edit ${eventPastLabel(event).toLowerCase()} log`}
-        accessibilityHint="Opens time and note controls"
-        onPress={onEditTime}
+        accessibilityHint={event.type === 'nap'
+          ? 'Opens date, time, and note controls'
+          : 'Opens activity, date, time, and note controls'}
+        onPress={onEdit}
         style={({ pressed }) => [styles.editButton, pressed && { backgroundColor: theme.primarySoft }]}
       >
         <MaterialCommunityIcons name="pencil-outline" size={20} color={theme.textMuted} />

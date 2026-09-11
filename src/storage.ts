@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { STARTER_SCHEDULE, type PuppyEvent, type ScheduleEntry } from './domain';
+import { STARTER_SCHEDULE, type PuppyEvent, type PuppyEventChanges, type ScheduleEntry } from './domain';
 
 const EVENTS_KEY = 'puptime.events.v1';
 const SCHEDULE_KEY = 'puptime.schedule.v1';
@@ -49,7 +49,7 @@ export function updateEventTime(id: string, at: number): Promise<PuppyEvent[]> {
 
 export function updateEvent(
   id: string,
-  changes: Partial<Pick<PuppyEvent, 'at' | 'endedAt' | 'note'>>,
+  changes: PuppyEventChanges,
 ): Promise<PuppyEvent[]> {
   let result: PuppyEvent[] = [];
   writeQueue = writeQueue.then(async () => {
