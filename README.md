@@ -64,6 +64,8 @@ npm run build:android
 
 The release APK is written to `android/app/build/outputs/apk/release/app-release.apk`.
 
+GitHub Actions also performs an unsigned native iOS Simulator build of the app and widget, then keeps the compiled `.app` as a short-lived workflow artifact.
+
 ## Stack
 
 - Expo SDK 57 / React Native 0.86 / React 19

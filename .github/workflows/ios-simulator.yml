@@ -1,0 +1,41 @@
+name: iOS Simulator
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx expo prebuild --platform ios --no-install
+        env:
+          CI: "1"
+      - run: pod install --project-directory=ios
+      - name: Build app and widget for iOS Simulator
+        run: |
+          xcodebuild \
+            -workspace ios/Puptime.xcworkspace \
+            -scheme Puptime \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/ios-simulator \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+          test -d build/ios-simulator/Build/Products/Release-iphonesimulator/Puptime.app
+      - uses: actions/upload-artifact@v6
+        with:
+          name: puptime-ios-simulator
+          path: build/ios-simulator/Build/Products/Release-iphonesimulator/Puptime.app
+          if-no-files-found: error
+          retention-days: 7
