@@ -10,7 +10,7 @@ import { EVENT_META, createEvent, type EventType, type PuppyEvent, type Schedule
 import { InsightsScreen } from './src/screens/InsightsScreen';
 import { LogScreen } from './src/screens/LogScreen';
 import { ScheduleScreen } from './src/screens/ScheduleScreen';
-import { appendEvents, loadEvents, loadSchedule, removeEvent, saveSchedule } from './src/storage';
+import { appendEvents, loadEvents, loadSchedule, removeEvent, saveSchedule, updateEventTime } from './src/storage';
 import { darkTheme, lightTheme } from './src/theme';
 import { readPendingWidgetEvents, updateHomeWidget } from './src/widgets/sync';
 
@@ -68,6 +68,13 @@ export default function App() {
     ]);
   };
 
+  const changeEventTime = async (event: PuppyEvent, at: number) => {
+    const nextEvents = await updateEventTime(event.id, at);
+    setEvents(nextEvents);
+    Haptics.selectionAsync().catch(() => undefined);
+    updateHomeWidget(nextEvents).catch(() => undefined);
+  };
+
   const undo = async () => {
     if (!undoEvent) return;
     const nextEvents = await removeEvent(undoEvent.id);
@@ -85,7 +92,7 @@ export default function App() {
   const screen = useMemo(() => {
     if (tab === 'insights') return <InsightsScreen events={events} schedule={schedule} theme={theme} />;
     if (tab === 'schedule') return <ScheduleScreen schedule={schedule} onChange={changeSchedule} theme={theme} />;
-    return <LogScreen events={events} onLog={logEvent} onDelete={confirmDelete} theme={theme} />;
+    return <LogScreen events={events} onLog={logEvent} onChangeTime={changeEventTime} onDelete={confirmDelete} theme={theme} />;
   }, [events, schedule, tab, theme]);
 
   return (

@@ -43,6 +43,17 @@ export function removeEvent(id: string): Promise<PuppyEvent[]> {
   return writeQueue.then(() => result);
 }
 
+export function updateEventTime(id: string, at: number): Promise<PuppyEvent[]> {
+  let result: PuppyEvent[] = [];
+  writeQueue = writeQueue.then(async () => {
+    result = (await loadEvents())
+      .map((event) => (event.id === id ? { ...event, at } : event))
+      .sort((a, b) => b.at - a.at);
+    await AsyncStorage.setItem(EVENTS_KEY, JSON.stringify(result));
+  });
+  return writeQueue.then(() => result);
+}
+
 export async function loadSchedule(): Promise<ScheduleEntry[]> {
   const stored = await AsyncStorage.getItem(SCHEDULE_KEY);
   if (stored === null) {

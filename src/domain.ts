@@ -88,6 +88,12 @@ export function normalizeBackdateMinutes(value: unknown): number {
   return Math.min(60, Math.max(0, Math.round(minutes / 5) * 5));
 }
 
+export function replaceClockTime(value: number, hours: number, minutes: number, now = Date.now()): number {
+  const next = new Date(value);
+  next.setHours(hours, minutes, 0, 0);
+  return Math.min(next.getTime(), now);
+}
+
 export function dateKey(value: number | Date): string {
   const date = value instanceof Date ? value : new Date(value);
   const year = date.getFullYear();

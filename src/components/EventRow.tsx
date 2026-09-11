@@ -4,7 +4,17 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { EVENT_META, formatTime, type PuppyEvent } from '../domain';
 import { spacing, type Theme } from '../theme';
 
-export function EventRow({ event, onDelete, theme }: { event: PuppyEvent; onDelete: () => void; theme: Theme }) {
+export function EventRow({
+  event,
+  onEditTime,
+  onDelete,
+  theme,
+}: {
+  event: PuppyEvent;
+  onEditTime: () => void;
+  onDelete: () => void;
+  theme: Theme;
+}) {
   const meta = EVENT_META[event.type];
   return (
     <View style={[styles.row, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
@@ -21,8 +31,21 @@ export function EventRow({ event, onDelete, theme }: { event: PuppyEvent; onDele
           {event.source === 'widget' ? 'Home-screen widget' : 'In the app'}
         </Text>
       </View>
-      <Text style={[styles.time, { color: theme.text }]}>{formatTime(event.at)}</Text>
       <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Change time for ${meta.pastLabel.toLowerCase()}, currently ${formatTime(event.at)}`}
+        accessibilityHint="Opens quick backdating and an exact time picker"
+        onPress={onEditTime}
+        style={({ pressed }) => [
+          styles.timeButton,
+          { backgroundColor: pressed ? theme.primarySoft : theme.surface },
+        ]}
+      >
+        <Text style={[styles.time, { color: theme.text }]}>{formatTime(event.at)}</Text>
+        <MaterialCommunityIcons name="pencil-outline" size={14} color={theme.textMuted} />
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
         accessibilityLabel={`Delete ${meta.pastLabel.toLowerCase()} at ${formatTime(event.at)}`}
         hitSlop={8}
         onPress={onDelete}
@@ -56,7 +79,15 @@ const styles = StyleSheet.create({
   copy: { flex: 1, minWidth: 0 },
   label: { fontSize: 16, fontWeight: '600' },
   source: { fontSize: 12, lineHeight: 17, marginTop: 2 },
-  time: { fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  timeButton: {
+    minHeight: 44,
+    borderRadius: 13,
+    paddingHorizontal: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  time: { fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] },
   deleteButton: {
     width: 44,
     height: 44,
