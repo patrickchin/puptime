@@ -33,9 +33,13 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
           test -d build/ios-simulator/Build/Products/Release-iphonesimulator/Puptime.app
+          ditto -c -k --sequesterRsrc --keepParent \
+            build/ios-simulator/Build/Products/Release-iphonesimulator/Puptime.app \
+            build/Puptime-iOS-Simulator.zip
+          unzip -tq build/Puptime-iOS-Simulator.zip
       - uses: actions/upload-artifact@v6
         with:
           name: puptime-ios-simulator
-          path: build/ios-simulator/Build/Products/Release-iphonesimulator/Puptime.app
+          path: build/Puptime-iOS-Simulator.zip
           if-no-files-found: error
           retention-days: 7
