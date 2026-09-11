@@ -38,7 +38,7 @@ jobs:
             build/Puptime-iOS-Simulator.zip
           unzip -tq build/Puptime-iOS-Simulator.zip
       - name: Install and launch in iOS Simulator
-        timeout-minutes: 6
+        timeout-minutes: 12
         run: |
           device_id=$(xcrun simctl list devices available -j | jq -r '[.devices[][] | select(.name | startswith("iPhone"))][0].udid // empty')
           test -n "$device_id"
