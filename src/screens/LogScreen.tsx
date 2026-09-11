@@ -414,7 +414,7 @@ const styles = StyleSheet.create({
   count: { fontSize: 13, fontWeight: '600' },
   filters: { gap: 8, paddingBottom: 8 },
   filter: {
-    minHeight: 44,
+    minHeight: 48,
     borderWidth: 1,
     borderRadius: 16,
     paddingHorizontal: 13,
