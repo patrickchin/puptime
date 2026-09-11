@@ -1,8 +1,10 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { summarizeDays } from '../analytics';
 import { dateKey, EVENT_META, eventTypes, formatDuration, type PuppyEvent, type ScheduleEntry } from '../domain';
+import { shareEventsCsv } from '../share-export';
 import { spacing, type Theme } from '../theme';
 
 export function InsightsScreen({
@@ -14,6 +16,7 @@ export function InsightsScreen({
   schedule: ScheduleEntry[];
   theme: Theme;
 }) {
+  const [exporting, setExporting] = useState(false);
   const days = summarizeDays(events, schedule);
   const maxTotal = Math.max(1, ...days.map((day) => day.total));
   const maxNapMinutes = Math.max(1, ...days.map((day) => day.napMinutes));
@@ -25,6 +28,19 @@ export function InsightsScreen({
   const pottyResults = days.reduce((sum, day) => sum + day.counts.pee + day.counts.poop, 0);
   const napTime = days.reduce((sum, day) => sum + day.napMinutes, 0);
   const todayKey = dateKey(Date.now());
+  const exportDisabled = exporting || events.length === 0;
+
+  async function exportActivity() {
+    if (exportDisabled) return;
+    setExporting(true);
+    try {
+      await shareEventsCsv(events);
+    } catch {
+      Alert.alert('Couldn’t export activity', 'Please try again. Your Puptime data is unchanged.');
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
@@ -194,6 +210,51 @@ export function InsightsScreen({
           );
         })}
       </View>
+
+      <View style={[styles.exportCard, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
+        <View style={styles.exportHeading}>
+          <View style={[styles.smallIcon, { backgroundColor: theme.primarySoft }]}>
+            <MaterialCommunityIcons
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              name="file-delimited-outline"
+              size={20}
+              color={theme.primary}
+            />
+          </View>
+          <View style={styles.exportCopy}>
+            <Text style={[styles.panelTitle, { color: theme.text }]}>Your data</Text>
+            <Text style={[styles.panelCaption, { color: theme.textMuted }]}>Share every log as a spreadsheet-ready CSV. Nothing leaves this device until you choose where to send it.</Text>
+          </View>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={events.length ? 'Export all activity as CSV' : 'No activity to export'}
+          accessibilityHint={events.length ? 'Opens the system share sheet' : undefined}
+          accessibilityState={{ busy: exporting, disabled: exportDisabled }}
+          disabled={exportDisabled}
+          onPress={exportActivity}
+          style={({ pressed }) => [
+            styles.exportButton,
+            { backgroundColor: theme.primary, opacity: exportDisabled ? 0.45 : pressed ? 0.82 : 1 },
+          ]}
+        >
+          {exporting ? (
+            <ActivityIndicator color={theme.onPrimary} size="small" />
+          ) : (
+            <MaterialCommunityIcons
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              name="share-variant-outline"
+              size={20}
+              color={theme.onPrimary}
+            />
+          )}
+          <Text style={[styles.exportButtonText, { color: theme.onPrimary }]}>
+            {exporting ? 'Preparing export…' : events.length ? 'Export activity CSV' : 'No activity to export'}
+          </Text>
+        </Pressable>
+      </View>
     </ScrollView>
   );
 }
@@ -247,4 +308,17 @@ const styles = StyleSheet.create({
   typeCard: { minWidth: 148, flexBasis: '48%', flexGrow: 1, borderRadius: 18, padding: spacing.md },
   typeNumber: { fontSize: 24, fontWeight: '800', marginTop: 7 },
   typeLabel: { fontSize: 12, fontWeight: '600', marginTop: 1 },
+  exportCard: { borderWidth: 1, borderRadius: 22, padding: spacing.md, gap: spacing.md },
+  exportHeading: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  exportCopy: { flex: 1, minWidth: 0 },
+  exportButton: {
+    minHeight: 52,
+    borderRadius: 16,
+    paddingHorizontal: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  exportButtonText: { fontSize: 15, lineHeight: 20, fontWeight: '700', textAlign: 'center' },
 });
