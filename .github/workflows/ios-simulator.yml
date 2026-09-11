@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-26
+    runs-on: macos-26-intel
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -38,6 +38,7 @@ jobs:
             build/Puptime-iOS-Simulator.zip
           unzip -tq build/Puptime-iOS-Simulator.zip
       - name: Install and launch in iOS Simulator
+        timeout-minutes: 6
         run: |
           device_id=$(xcrun simctl list devices available -j | jq -r '[.devices[][] | select(.name | startswith("iPhone"))][0].udid // empty')
           test -n "$device_id"
