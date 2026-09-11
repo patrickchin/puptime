@@ -9,6 +9,7 @@ import {
   isOpenNap,
   normalizeBackdateMinutes,
   normalizeNote,
+  replaceCalendarDate,
   replaceClockTime,
 } from './domain.ts';
 import { reminderCopy, reminderIdentifier } from './reminder-config.ts';
@@ -41,6 +42,19 @@ test('changes an event clock time without allowing a future log', () => {
   assert.equal(changed.getHours(), 9);
   assert.equal(changed.getMinutes(), 45);
   assert.equal(replaceClockTime(original, 13, 0, now), now);
+});
+
+test('changes an event date while preserving its time and preventing future logs', () => {
+  const original = new Date(2026, 8, 10, 8, 30).getTime();
+  const now = new Date(2026, 8, 12, 12, 0).getTime();
+  const changed = new Date(replaceCalendarDate(original, new Date(2026, 8, 9), now));
+
+  assert.equal(changed.getFullYear(), 2026);
+  assert.equal(changed.getMonth(), 8);
+  assert.equal(changed.getDate(), 9);
+  assert.equal(changed.getHours(), 8);
+  assert.equal(changed.getMinutes(), 30);
+  assert.equal(replaceCalendarDate(original, new Date(2026, 8, 13), now), now);
 });
 
 test('only new timed naps count as running', () => {

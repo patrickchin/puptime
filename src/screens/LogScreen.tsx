@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useEffect, useMemo, useState } from 'react';
-import { Modal, Platform, Pressable, ScrollView, SectionList, StyleSheet, Text, View } from 'react-native';
+import { Alert, Modal, Platform, Pressable, ScrollView, SectionList, StyleSheet, Text, View } from 'react-native';
 
 import { QuickActions } from '../components/QuickActions';
 import { EventRow } from '../components/EventRow';
@@ -14,6 +14,7 @@ import {
   formatDuration,
   formatTime,
   relativeTime,
+  replaceCalendarDate,
   replaceClockTime,
   type EventType,
   type PuppyEvent,
@@ -43,7 +44,12 @@ type Draft = {
 };
 
 function dateLabel(value: number): string {
-  return new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' }).format(value);
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(value);
 }
 
 function sectionTitle(key: string): string {
@@ -78,7 +84,7 @@ export function LogScreen({
   theme: Theme;
 }) {
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [showAndroidPicker, setShowAndroidPicker] = useState(false);
+  const [pickerMode, setPickerMode] = useState<'date' | 'time' | null>(null);
   const [saving, setSaving] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>('all');
@@ -132,10 +138,19 @@ export function LogScreen({
     });
   };
 
-  const pickTime = (event: DateTimePickerEvent, date?: Date) => {
-    if (Platform.OS === 'android') setShowAndroidPicker(false);
+  const closeEditor = () => {
+    setPickerMode(null);
+    setDraft(null);
+  };
+
+  const pickDateTime = (event: DateTimePickerEvent, date?: Date) => {
+    if (Platform.OS === 'android') setPickerMode(null);
     if (event.type === 'dismissed' || !date || !draft) return;
-    setDraftTime(replaceClockTime(activeValue, date.getHours(), date.getMinutes()));
+    setDraftTime(
+      pickerMode === 'date'
+        ? replaceCalendarDate(activeValue, date)
+        : replaceClockTime(activeValue, date.getHours(), date.getMinutes()),
+    );
   };
 
   const saveTime = async () => {
@@ -143,7 +158,9 @@ export function LogScreen({
     setSaving(true);
     try {
       await onSave(draft.event, Math.min(draft.at, Date.now()), draft.endedAt, draft.note.trim());
-      setDraft(null);
+      closeEditor();
+    } catch {
+      Alert.alert('Couldn’t save changes', 'Your log is unchanged. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -244,7 +261,7 @@ export function LogScreen({
         }
       />
 
-      <Modal visible={draft !== null} transparent animationType="none" onRequestClose={() => setDraft(null)}>
+      <Modal visible={draft !== null} transparent animationType="none" onRequestClose={closeEditor}>
         <View accessibilityViewIsModal style={styles.scrim}>
           <ScrollView
             bounces={false}
@@ -270,7 +287,7 @@ export function LogScreen({
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Close log editor"
-                onPress={() => setDraft(null)}
+                onPress={closeEditor}
                 style={({ pressed }) => [styles.closeButton, pressed && { backgroundColor: theme.primarySoft }]}
               >
                 <MaterialCommunityIcons name="close" size={22} color={theme.text} />
@@ -343,27 +360,64 @@ export function LogScreen({
               ))}
             </View>
 
-            <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>EXACT TIME</Text>
-            {Platform.OS === 'ios' ? (
-              <DateTimePicker value={pickerDate} mode="time" display="spinner" onChange={pickTime} />
-            ) : (
+            <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>DATE & TIME</Text>
+            <View style={styles.exactFields}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: pickerMode === 'date' }}
+                accessibilityLabel={`Choose ${draft?.field ?? 'log'} date, currently ${dateLabel(activeValue)}`}
+                onPress={() => setPickerMode('date')}
+                style={({ pressed }) => [
+                  styles.exactField,
+                  {
+                    backgroundColor: pickerMode === 'date' ? theme.primarySoft : theme.surface,
+                    borderColor: pickerMode === 'date' || pressed ? theme.primary : theme.border,
+                  },
+                ]}
+              >
+                <MaterialCommunityIcons name="calendar-outline" size={21} color={theme.primary} />
+                <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.exactFieldText, { color: theme.text }]}>
+                  {dateLabel(activeValue)}
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: pickerMode === 'time' }}
+                accessibilityLabel={`Choose exact ${draft?.field ?? 'log'} time, currently ${formatTime(activeValue)}`}
+                onPress={() => setPickerMode('time')}
+                style={({ pressed }) => [
+                  styles.exactField,
+                  {
+                    backgroundColor: pickerMode === 'time' ? theme.primarySoft : theme.surface,
+                    borderColor: pickerMode === 'time' || pressed ? theme.primary : theme.border,
+                  },
+                ]}
+              >
+                <MaterialCommunityIcons name="clock-outline" size={21} color={theme.primary} />
+                <Text numberOfLines={1} style={[styles.exactFieldText, { color: theme.text }]}>{formatTime(activeValue)}</Text>
+              </Pressable>
+            </View>
+            {pickerMode ? (
               <>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Choose exact ${draft?.field ?? 'log'} time, currently ${formatTime(activeValue)}`}
-                  onPress={() => setShowAndroidPicker(true)}
-                  style={({ pressed }) => [
-                    styles.exactTime,
-                    { backgroundColor: theme.surface, borderColor: pressed ? theme.primary : theme.border },
-                  ]}
-                >
-                  <MaterialCommunityIcons name="clock-outline" size={22} color={theme.primary} />
-                  <Text style={[styles.exactTimeText, { color: theme.text }]}>{formatTime(activeValue)}</Text>
-                  <Text style={[styles.changeText, { color: theme.primary }]}>Change</Text>
-                </Pressable>
-                {showAndroidPicker ? <DateTimePicker value={pickerDate} mode="time" onChange={pickTime} /> : null}
+                <DateTimePicker
+                  value={pickerDate}
+                  mode={pickerMode}
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  maximumDate={pickerMode === 'date' ? new Date() : undefined}
+                  onChange={pickDateTime}
+                />
+                {Platform.OS === 'ios' ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Finish choosing ${pickerMode}`}
+                    onPress={() => setPickerMode(null)}
+                    style={({ pressed }) => [styles.pickerDone, pressed && { backgroundColor: theme.primarySoft }]}
+                  >
+                    <Text style={[styles.pickerDoneText, { color: theme.primary }]}>Done</Text>
+                  </Pressable>
+                ) : null}
               </>
-            )}
+            ) : null}
 
             <Text style={[styles.fieldLabel, styles.noteLabel, { color: theme.textMuted }]}>NOTE</Text>
             {draft ? (
@@ -455,9 +509,11 @@ const styles = StyleSheet.create({
   quickTimes: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.lg },
   quickTime: { flexGrow: 1, minWidth: 88, minHeight: 48, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   quickTimeText: { fontSize: 14, fontWeight: '700' },
-  exactTime: { minHeight: 58, borderWidth: 1, borderRadius: 16, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, gap: 10 },
-  exactTimeText: { flex: 1, fontSize: 18, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  changeText: { fontSize: 14, fontWeight: '700' },
+  exactFields: { flexDirection: 'row', gap: 8 },
+  exactField: { flex: 1, minWidth: 0, minHeight: 58, borderWidth: 1, borderRadius: 16, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 8 },
+  exactFieldText: { flex: 1, minWidth: 0, fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  pickerDone: { minHeight: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  pickerDoneText: { fontSize: 15, fontWeight: '800' },
   saveButton: { minHeight: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginTop: spacing.lg },
   saveText: { fontSize: 16, fontWeight: '800' },
 });

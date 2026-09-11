@@ -164,6 +164,12 @@ export function replaceClockTime(value: number, hours: number, minutes: number, 
   return Math.min(next.getTime(), now);
 }
 
+export function replaceCalendarDate(value: number, date: Date, now = Date.now()): number {
+  const next = new Date(value);
+  next.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
+  return Math.min(next.getTime(), now);
+}
+
 export function dateKey(value: number | Date): string {
   const date = value instanceof Date ? value : new Date(value);
   const year = date.getFullYear();
