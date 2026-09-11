@@ -12,6 +12,7 @@ export const lightTheme = {
   primaryPressed: '#10533F',
   primarySoft: '#DDEFE7',
   danger: '#B43A35',
+  dangerSoft: '#FBE5E2',
   shadow: '#10251C',
   nav: '#FFFEFA',
 };
@@ -28,6 +29,7 @@ export const darkTheme: Theme = {
   primaryPressed: '#55B992',
   primarySoft: '#253E33',
   danger: '#FF8A83',
+  dangerSoft: '#452926',
   shadow: '#000000',
   nav: '#151E19',
 };

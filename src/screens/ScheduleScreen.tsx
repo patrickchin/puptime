@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -12,22 +12,47 @@ import {
   View,
 } from 'react-native';
 
+import { scheduleStatusesForDay, type ScheduleStatus } from '../analytics';
 import { EVENT_META, formatMinutes, quickEventTypes, type EventType, type ScheduleEntry } from '../domain';
+import type { PuppyEvent } from '../domain';
 import { spacing, type Theme } from '../theme';
 
 type Draft = { id?: string; type: EventType; minutes: number };
 
 export function ScheduleScreen({
+  events,
   schedule,
   onChange,
   theme,
 }: {
+  events: PuppyEvent[];
   schedule: ScheduleEntry[];
   onChange: (schedule: ScheduleEntry[]) => void;
   theme: Theme;
 }) {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [showAndroidPicker, setShowAndroidPicker] = useState(false);
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const statuses = scheduleStatusesForDay(events, schedule, new Date(now), 30, now);
+  const completed = statuses.filter((item) => item.status === 'done').length;
+  const due = statuses.filter((item) => item.status === 'due').length;
+  const missed = statuses.filter((item) => item.status === 'missed').length;
+  const progress: `${number}%` = schedule.length
+    ? `${Math.round((completed / schedule.length) * 100)}%`
+    : '0%';
+
+  const statusPresentation = (status: ScheduleStatus, type: EventType) => {
+    if (status === 'done') return { label: 'Logged', color: theme.primary, background: theme.primarySoft };
+    if (status === 'due') return { label: 'Due now', color: EVENT_META[type].color, background: EVENT_META[type].softColor };
+    if (status === 'missed') return { label: 'Missed', color: theme.danger, background: theme.dangerSoft };
+    return { label: 'Upcoming', color: theme.textMuted, background: theme.surface };
+  };
 
   const openNew = () => {
     const now = new Date();
@@ -69,12 +94,26 @@ export function ScheduleScreen({
           This is an editable example routine, not veterinary guidance. Adjust it to your puppy’s needs.
         </Text>
 
-        <View style={[styles.infoCard, { backgroundColor: theme.primarySoft }]}>
-          <MaterialCommunityIcons name="clock-check-outline" color={theme.primary} size={24} />
-          <Text style={[styles.infoText, { color: theme.text }]}>
-            Insights count a log as on time when it lands within 30 minutes of a planned activity.
-          </Text>
-        </View>
+        {schedule.length ? (
+          <View style={[styles.progressCard, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
+            <View style={styles.progressHeading}>
+              <View>
+                <Text style={[styles.progressEyebrow, { color: theme.primary }]}>TODAY SO FAR</Text>
+                <Text style={[styles.progressTitle, { color: theme.text }]}>{completed} of {schedule.length} logged</Text>
+              </View>
+              <View style={[styles.progressIcon, { backgroundColor: theme.primarySoft }]}>
+                <MaterialCommunityIcons name="calendar-check-outline" color={theme.primary} size={23} />
+              </View>
+            </View>
+            <Text style={[styles.progressDetail, { color: theme.textMuted }]}>
+              {due ? `${due} ${due === 1 ? 'activity is' : 'activities are'} due now` : missed ? `${missed} missed ${missed === 1 ? 'window' : 'windows'}` : completed === schedule.length ? 'Everything planned has been logged' : 'The next activity is still ahead'}
+            </Text>
+            <View style={[styles.progressTrack, { backgroundColor: theme.primarySoft }]}>
+              <View style={[styles.progressFill, { backgroundColor: theme.primary, width: progress }]} />
+            </View>
+            <Text style={[styles.windowHint, { color: theme.textMuted }]}>A log counts on time within 30 minutes of its planned time.</Text>
+          </View>
+        ) : null}
 
         <View style={styles.headingRow}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>Today’s plan</Text>
@@ -89,10 +128,13 @@ export function ScheduleScreen({
         ) : (
           schedule.map((entry, index) => {
             const meta = EVENT_META[entry.type];
+            const status = statuses.find((item) => item.entry.id === entry.id)?.status ?? 'upcoming';
+            const presentation = statusPresentation(status, entry.type);
             return (
               <Pressable
                 key={entry.id}
-                accessibilityLabel={`Edit ${meta.label} at ${formatMinutes(entry.minutes)}`}
+                accessibilityRole="button"
+                accessibilityLabel={`Edit ${meta.label} at ${formatMinutes(entry.minutes)}, ${presentation.label.toLowerCase()}`}
                 onPress={() => setDraft(entry)}
                 style={({ pressed }) => [
                   styles.scheduleRow,
@@ -109,7 +151,10 @@ export function ScheduleScreen({
                 <Text style={[styles.time, { color: theme.text }]}>{formatMinutes(entry.minutes)}</Text>
                 <View style={styles.rowCopy}>
                   <Text style={[styles.rowTitle, { color: theme.text }]}>{meta.label}</Text>
-                  <Text style={[styles.rowHint, { color: theme.textMuted }]}>Tap to edit</Text>
+                  <View style={[styles.statusPill, { backgroundColor: presentation.background }]}>
+                    <View style={[styles.statusDot, { backgroundColor: presentation.color }]} />
+                    <Text style={[styles.statusText, { color: presentation.color }]}>{presentation.label}</Text>
+                  </View>
                 </View>
                 <Pressable
                   accessibilityLabel={`Remove ${meta.label} at ${formatMinutes(entry.minutes)}`}
@@ -231,8 +276,15 @@ const styles = StyleSheet.create({
   eyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 1.6, marginTop: 4 },
   title: { fontSize: 30, lineHeight: 36, fontWeight: '800', letterSpacing: -0.6, marginTop: 4 },
   subtitle: { fontSize: 14, lineHeight: 21, marginTop: 6 },
-  infoCard: { borderRadius: 18, padding: spacing.md, flexDirection: 'row', gap: 12, marginTop: spacing.lg },
-  infoText: { flex: 1, fontSize: 14, lineHeight: 21, fontWeight: '500' },
+  progressCard: { borderWidth: 1, borderRadius: 22, padding: spacing.md, marginTop: spacing.lg },
+  progressHeading: { flexDirection: 'row', alignItems: 'center' },
+  progressEyebrow: { fontSize: 10, lineHeight: 14, fontWeight: '800', letterSpacing: 1.2 },
+  progressTitle: { fontSize: 20, lineHeight: 26, fontWeight: '800', marginTop: 2 },
+  progressIcon: { marginLeft: 'auto', width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  progressDetail: { fontSize: 13, lineHeight: 18, marginTop: 7 },
+  progressTrack: { height: 8, borderRadius: 4, overflow: 'hidden', marginTop: 13 },
+  progressFill: { height: 8, borderRadius: 4 },
+  windowHint: { fontSize: 11, lineHeight: 16, marginTop: 8 },
   headingRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: spacing.xl, marginBottom: 12 },
   sectionTitle: { flex: 1, fontSize: 21, fontWeight: '800' },
   count: { fontSize: 13, fontWeight: '600' },
@@ -243,7 +295,9 @@ const styles = StyleSheet.create({
   time: { width: 78, fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] },
   rowCopy: { flex: 1 },
   rowTitle: { fontSize: 15, fontWeight: '700' },
-  rowHint: { fontSize: 12, marginTop: 2 },
+  statusPill: { alignSelf: 'flex-start', minHeight: 22, borderRadius: 11, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusText: { fontSize: 11, lineHeight: 15, fontWeight: '700' },
   removeButton: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   addButton: { minHeight: 54, borderRadius: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: spacing.md },
   addButtonText: { fontSize: 16, fontWeight: '700' },

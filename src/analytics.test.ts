@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { adherenceForDay, napMinutesForDay, summarizeDays } from './analytics.ts';
+import { adherenceForDay, napMinutesForDay, scheduleStatusesForDay, summarizeDays } from './analytics.ts';
 import type { PuppyEvent, ScheduleEntry } from './domain.ts';
 
 const day = new Date(2026, 8, 10);
@@ -51,6 +51,31 @@ test('does not score today until a schedule window has closed', () => {
 
   assert.equal(adherenceForDay(events, schedule, day, 30, at(7, 29)), null);
   assert.equal(adherenceForDay(events, schedule, day, 30, at(7, 31)), 100);
+});
+
+test('scores only routine windows that have finished today', () => {
+  const schedule: ScheduleEntry[] = [
+    { id: 'a', type: 'pee', minutes: 7 * 60 },
+    { id: 'b', type: 'meal', minutes: 12 * 60 },
+  ];
+  const events: PuppyEvent[] = [{ id: '1', type: 'pee', at: at(7, 10), source: 'app' }];
+
+  assert.equal(adherenceForDay(events, schedule, day, 30, at(8, 0)), 100);
+});
+
+test('describes completed, due, upcoming, and missed routine items', () => {
+  const schedule: ScheduleEntry[] = [
+    { id: 'done', type: 'pee', minutes: 7 * 60 },
+    { id: 'missed', type: 'meal', minutes: 8 * 60 },
+    { id: 'due', type: 'walk', minutes: 9 * 60 },
+    { id: 'later', type: 'nap', minutes: 12 * 60 },
+  ];
+  const events: PuppyEvent[] = [{ id: '1', type: 'pee', at: at(7, 10), source: 'app' }];
+
+  assert.deepEqual(
+    scheduleStatusesForDay(events, schedule, day, 30, at(9, 10)).map((item) => item.status),
+    ['done', 'missed', 'due', 'upcoming'],
+  );
 });
 
 test('counts only the portion of timed naps inside a day', () => {

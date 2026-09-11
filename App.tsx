@@ -126,15 +126,17 @@ export default function App() {
 
   const screen = useMemo(() => {
     if (tab === 'insights') return <InsightsScreen events={events} schedule={schedule} theme={theme} />;
-    if (tab === 'schedule') return <ScheduleScreen schedule={schedule} onChange={changeSchedule} theme={theme} />;
+    if (tab === 'schedule') return <ScheduleScreen events={events} schedule={schedule} onChange={changeSchedule} theme={theme} />;
     return (
       <LogScreen
         events={events}
+        schedule={schedule}
         editEventId={editEventId}
         onEditRequestHandled={() => setEditEventId(null)}
         onLog={logEvent}
         onSave={saveEventDetails}
         onDelete={confirmDelete}
+        onOpenSchedule={() => setTab('schedule')}
         theme={theme}
       />
     );

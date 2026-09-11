@@ -1,11 +1,12 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Modal, Platform, Pressable, ScrollView, SectionList, StyleSheet, Text, View } from 'react-native';
 
 import { QuickActions } from '../components/QuickActions';
 import { EventRow } from '../components/EventRow';
 import { NoteInput } from '../components/NoteInput';
+import { TodayRoutineCard } from '../components/TodayRoutineCard';
 import {
   dateKey,
   EVENT_META,
@@ -16,10 +17,22 @@ import {
   replaceClockTime,
   type EventType,
   type PuppyEvent,
+  type ScheduleEntry,
 } from '../domain';
 import { spacing, type Theme } from '../theme';
 
 const quickBackdates = [0, 5, 15, 30, 60] as const;
+
+const activityFilters = [
+  { id: 'all', label: 'All', icon: 'format-list-bulleted', types: [] },
+  { id: 'potty', label: 'Potty', icon: 'water-outline', types: ['pee', 'poop', 'pottyTrip'] },
+  { id: 'meals', label: 'Meals', icon: 'food-apple-outline', types: ['meal'] },
+  { id: 'walks', label: 'Walks', icon: 'walk', types: ['walk'] },
+  { id: 'naps', label: 'Naps', icon: 'sleep', types: ['nap'] },
+  { id: 'other', label: 'Other', icon: 'tag-outline', types: ['custom'] },
+] as const;
+
+type ActivityFilter = (typeof activityFilters)[number]['id'];
 
 type Draft = {
   event: PuppyEvent;
@@ -45,25 +58,30 @@ function sectionTitle(key: string): string {
 
 export function LogScreen({
   events,
+  schedule,
   editEventId,
   onEditRequestHandled,
   onLog,
   onSave,
   onDelete,
+  onOpenSchedule,
   theme,
 }: {
   events: PuppyEvent[];
+  schedule: ScheduleEntry[];
   editEventId?: string | null;
   onEditRequestHandled?: () => void;
   onLog: (type: EventType, customLabel?: string) => void;
   onSave: (event: PuppyEvent, at: number, endedAt: number | null | undefined, note: string) => Promise<void>;
   onDelete: (event: PuppyEvent) => void;
+  onOpenSchedule: () => void;
   theme: Theme;
 }) {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [showAndroidPicker, setShowAndroidPicker] = useState(false);
   const [saving, setSaving] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const [activityFilter, setActivityFilter] = useState<ActivityFilter>('all');
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30_000);
@@ -83,8 +101,13 @@ export function LogScreen({
     }
     onEditRequestHandled?.();
   }, [editEventId, events, onEditRequestHandled]);
+  const visibleEvents = useMemo(() => {
+    const selected = activityFilters.find((item) => item.id === activityFilter);
+    if (!selected || selected.types.length === 0) return events;
+    return events.filter((event) => (selected.types as readonly EventType[]).includes(event.type));
+  }, [activityFilter, events]);
   const byDay = new Map<string, PuppyEvent[]>();
-  events.forEach((event) => {
+  visibleEvents.forEach((event) => {
     const key = dateKey(event.at);
     byDay.set(key, [...(byDay.get(key) ?? []), event]);
   });
@@ -93,6 +116,10 @@ export function LogScreen({
   const activeValue = draft?.field === 'end' ? draft.endedAt ?? Date.now() : draft?.at ?? Date.now();
   const pickerDate = new Date(activeValue);
   const draftMeta = draft ? EVENT_META[draft.event.type] : EVENT_META.pee;
+  const selectedFilter = activityFilters.find((item) => item.id === activityFilter) ?? activityFilters[0];
+  const todayLabel = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+    .format(now)
+    .toUpperCase();
 
   const setDraftTime = (value: number) => {
     setDraft((current) => {
@@ -137,16 +164,59 @@ export function LogScreen({
                 <MaterialCommunityIcons name="paw" size={23} color={theme.onPrimary} />
               </View>
               <View style={styles.titleCopy}>
-                <Text style={[styles.eyebrow, { color: theme.primary }]}>PUPTIME</Text>
+                <Text style={[styles.eyebrow, { color: theme.primary }]}>PUPTIME · {todayLabel}</Text>
                 <Text style={[styles.title, { color: theme.text }]}>What just happened?</Text>
               </View>
             </View>
             <Text style={[styles.subtitle, { color: theme.textMuted }]}>One tap saves the time. Nap toggles between start and end.</Text>
             <QuickActions events={events} onLog={onLog} now={now} theme={theme} />
+            <TodayRoutineCard
+              events={events}
+              schedule={schedule}
+              now={now}
+              onOpenSchedule={onOpenSchedule}
+              theme={theme}
+            />
             <View style={styles.activityHeading}>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>Activity</Text>
-              <Text style={[styles.count, { color: theme.textMuted }]}>{events.length} total</Text>
+              <Text style={[styles.count, { color: theme.textMuted }]}>
+                {activityFilter === 'all' ? `${events.length} total` : `${visibleEvents.length} shown`}
+              </Text>
             </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filters}
+            >
+              {activityFilters.map((item) => {
+                const selected = activityFilter === item.id;
+                return (
+                  <Pressable
+                    key={item.id}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={`Show ${item.label.toLowerCase()} activity`}
+                    onPress={() => setActivityFilter(item.id)}
+                    style={({ pressed }) => [
+                      styles.filter,
+                      {
+                        backgroundColor: selected || pressed ? theme.primarySoft : theme.surfaceRaised,
+                        borderColor: selected ? theme.primary : theme.border,
+                      },
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name={item.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+                      size={17}
+                      color={selected ? theme.primary : theme.textMuted}
+                    />
+                    <Text style={[styles.filterText, { color: selected ? theme.primary : theme.textMuted }]}>
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
           </>
         }
         renderSectionHeader={({ section }) => (
@@ -163,9 +233,13 @@ export function LogScreen({
         )}
         ListEmptyComponent={
           <View style={[styles.empty, { borderColor: theme.border, backgroundColor: theme.surface }]}>
-            <MaterialCommunityIcons name="paw-outline" size={28} color={theme.textMuted} />
-            <Text style={[styles.emptyTitle, { color: theme.text }]}>Your log starts here</Text>
-            <Text style={[styles.emptyBody, { color: theme.textMuted }]}>Tap an action above when it happens.</Text>
+            <MaterialCommunityIcons name={selectedFilter.icon as keyof typeof MaterialCommunityIcons.glyphMap} size={28} color={theme.textMuted} />
+            <Text style={[styles.emptyTitle, { color: theme.text }]}>
+              {activityFilter === 'all' ? 'Your log starts here' : `No ${selectedFilter.label.toLowerCase()} logged`}
+            </Text>
+            <Text style={[styles.emptyBody, { color: theme.textMuted }]}>
+              {activityFilter === 'all' ? 'Tap an action above when it happens.' : 'Choose another filter or log an activity above.'}
+            </Text>
           </View>
         }
       />
@@ -338,6 +412,17 @@ const styles = StyleSheet.create({
   activityHeading: { marginTop: spacing.xl, marginBottom: 12, flexDirection: 'row', alignItems: 'baseline' },
   sectionTitle: { flex: 1, fontSize: 21, fontWeight: '800' },
   count: { fontSize: 13, fontWeight: '600' },
+  filters: { gap: 8, paddingBottom: 8 },
+  filter: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 13,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  filterText: { fontSize: 13, lineHeight: 18, fontWeight: '700' },
   dayHeading: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2, marginTop: 8, marginBottom: 8 },
   empty: { borderWidth: 1, borderStyle: 'dashed', borderRadius: 20, padding: spacing.lg, alignItems: 'center' },
   emptyTitle: { fontSize: 17, fontWeight: '700', marginTop: 8 },

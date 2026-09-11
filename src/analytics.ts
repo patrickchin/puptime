@@ -9,6 +9,15 @@ export type DaySummary = {
   adherence: number | null;
 };
 
+export type ScheduleStatus = 'done' | 'due' | 'upcoming' | 'missed';
+
+export type ScheduleStatusItem = {
+  entry: ScheduleEntry;
+  target: number;
+  status: ScheduleStatus;
+  event?: PuppyEvent;
+};
+
 export function napMinutesForDay(events: PuppyEvent[], day: Date, now = Date.now()): number {
   const dayStart = new Date(day);
   dayStart.setHours(0, 0, 0, 0);
@@ -33,6 +42,22 @@ export function adherenceForDay(
 ): number | null {
   if (schedule.length === 0) return null;
 
+  const completedWindows = scheduleStatusesForDay(events, schedule, day, toleranceMinutes, now)
+    .filter((item) => item.target + toleranceMinutes * 60_000 <= now);
+  if (completedWindows.length === 0) return null;
+  const matched = completedWindows.filter((item) => item.status === 'done').length;
+  return Math.round((matched / completedWindows.length) * 100);
+}
+
+export function scheduleStatusesForDay(
+  events: PuppyEvent[],
+  schedule: ScheduleEntry[],
+  day: Date,
+  toleranceMinutes = 30,
+  now = Date.now(),
+): ScheduleStatusItem[] {
+  const tolerance = toleranceMinutes * 60_000;
+
   const key = dateKey(day);
   const candidates = events.filter((event) => dateKey(event.at) === key);
   const planned = [...schedule]
@@ -41,18 +66,15 @@ export function adherenceForDay(
       const target = new Date(day);
       target.setHours(Math.floor(entry.minutes / 60), entry.minutes % 60, 0, 0);
       return { ...entry, target: target.getTime() };
-    })
-    .filter((entry) => dateKey(day) !== dateKey(now) || entry.target + toleranceMinutes * 60_000 <= now);
-  if (planned.length === 0) return null;
+    });
   const matches = new Map<string, number>();
-  let matched = 0;
 
   const tryMatch = (plannedIndex: number, seenEvents: Set<string>): boolean => {
     const item = planned[plannedIndex];
     const options = candidates
       .filter(
         (event) =>
-          event.type === item.type && Math.abs(event.at - item.target) <= toleranceMinutes * 60_000,
+          event.type === item.type && Math.abs(event.at - item.target) <= tolerance,
       )
       .sort((a, b) => Math.abs(a.at - item.target) - Math.abs(b.at - item.target));
 
@@ -70,10 +92,26 @@ export function adherenceForDay(
   };
 
   for (let index = 0; index < planned.length; index += 1) {
-    if (tryMatch(index, new Set())) matched += 1;
+    tryMatch(index, new Set());
   }
 
-  return Math.round((matched / schedule.length) * 100);
+  const eventsByPlan = new Map<number, PuppyEvent>();
+  matches.forEach((plannedIndex, eventId) => {
+    const event = candidates.find((candidate) => candidate.id === eventId);
+    if (event) eventsByPlan.set(plannedIndex, event);
+  });
+
+  return planned.map((item, index) => {
+    const event = eventsByPlan.get(index);
+    let status: ScheduleStatus;
+    if (event) status = 'done';
+    else if (now < item.target - tolerance) status = 'upcoming';
+    else if (now <= item.target + tolerance) status = 'due';
+    else status = 'missed';
+
+    const { target, ...entry } = item;
+    return { entry, target, status, ...(event ? { event } : {}) };
+  });
 }
 
 export function summarizeDays(
