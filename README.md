@@ -12,6 +12,7 @@ Puptime is a private, offline puppy routine tracker for Android and iOS. Log pot
 - A chronological log grouped by day, with quick backdating and exact time editing
 - Optional notes on every log, with native speech-to-text dictation
 - An editable daily routine with native time pickers and clear logged, due, upcoming, and missed states
+- Optional per-activity daily reminders, scheduled locally on the device
 - Seven-day activity, nap-duration, and schedule-adherence charts
 - Polished, color-coded Android and iOS home-screen widgets with clear activity icons
 - Automatic light and dark themes
@@ -33,6 +34,8 @@ Long-press the widget to show Android’s resize handles, then drag the vertical
 Puptime never invents a nap end time. If you forgot to stop a nap, tap **End nap** when you remember, then use the pencil on that nap to correct the end. Old nap taps from Puptime 1.1 remain unchanged as historical point events.
 
 Saved notes and activity data stay on your device. Voice dictation uses your phone's Apple or Android speech-recognition service, which may require a network connection depending on the device and downloaded language models.
+
+Routine reminders are optional. Turn one on while editing a planned time and allow notifications when the phone asks. Puptime schedules repeating reminders locally; it does not upload the routine or require a notification server.
 
 ## Run locally
 

@@ -19,9 +19,12 @@ import {
 import { InsightsScreen } from './src/screens/InsightsScreen';
 import { LogScreen } from './src/screens/LogScreen';
 import { ScheduleScreen } from './src/screens/ScheduleScreen';
+import { configureReminderHandling, requestReminderPermission, syncScheduleReminders } from './src/reminders';
 import { appendEvents, loadEvents, loadSchedule, removeEvent, saveSchedule, updateEvent } from './src/storage';
 import { darkTheme, lightTheme } from './src/theme';
 import { readPendingWidgetEvents, updateHomeWidget } from './src/widgets/sync';
+
+configureReminderHandling();
 
 export default function App() {
   const colorScheme = useColorScheme();
@@ -36,7 +39,9 @@ export default function App() {
     const pending = await readPendingWidgetEvents();
     const nextEvents = pending.length ? await appendEvents(pending) : await loadEvents();
     setEvents(nextEvents);
-    setSchedule(await loadSchedule());
+    const nextSchedule = await loadSchedule();
+    setSchedule(nextSchedule);
+    await syncScheduleReminders(nextSchedule).catch(() => undefined);
     await updateHomeWidget(nextEvents).catch(() => undefined);
   }, []);
 
@@ -120,13 +125,31 @@ export default function App() {
   };
 
   const changeSchedule = async (nextSchedule: ScheduleEntry[]) => {
-    setSchedule(nextSchedule);
     await saveSchedule(nextSchedule);
+    setSchedule(nextSchedule);
+    try {
+      const synced = await syncScheduleReminders(nextSchedule);
+      if (!synced && nextSchedule.some((entry) => entry.reminder)) {
+        Alert.alert('Routine saved', 'Notifications are off, so reminders could not be scheduled.');
+      }
+    } catch {
+      Alert.alert('Routine saved', 'Puptime could not update reminders. Try editing the routine again.');
+    }
   };
 
   const screen = useMemo(() => {
     if (tab === 'insights') return <InsightsScreen events={events} schedule={schedule} theme={theme} />;
-    if (tab === 'schedule') return <ScheduleScreen events={events} schedule={schedule} onChange={changeSchedule} theme={theme} />;
+    if (tab === 'schedule') {
+      return (
+        <ScheduleScreen
+          events={events}
+          schedule={schedule}
+          onChange={changeSchedule}
+          onRequestReminderPermission={requestReminderPermission}
+          theme={theme}
+        />
+      );
+    }
     return (
       <LogScreen
         events={events}

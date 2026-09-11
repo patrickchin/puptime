@@ -74,6 +74,14 @@
           "speechRecognitionPermission": "Allow Puptime to turn dictated log notes into text."
         }
       ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#176B52",
+          "defaultChannel": "puptime-routine"
+        }
+      ],
       "@react-native-community/datetimepicker",
       "expo-font",
       "./plugins/withAndroidWorkManager"

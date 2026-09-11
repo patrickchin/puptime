@@ -19,6 +19,7 @@ export type ScheduleEntry = {
   id: string;
   type: EventType;
   minutes: number;
+  reminder?: boolean;
 };
 
 export const EVENT_META: Record<

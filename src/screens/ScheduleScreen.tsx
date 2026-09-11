@@ -3,11 +3,13 @@ import DateTimePicker, { type DateTimePickerEvent } from '@react-native-communit
 import { useEffect, useState } from 'react';
 import {
   Alert,
+  Linking,
   Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from 'react-native';
@@ -17,21 +19,25 @@ import { EVENT_META, formatMinutes, quickEventTypes, type EventType, type Schedu
 import type { PuppyEvent } from '../domain';
 import { spacing, type Theme } from '../theme';
 
-type Draft = { id?: string; type: EventType; minutes: number };
+type Draft = { id?: string; type: EventType; minutes: number; reminder: boolean };
 
 export function ScheduleScreen({
   events,
   schedule,
   onChange,
+  onRequestReminderPermission,
   theme,
 }: {
   events: PuppyEvent[];
   schedule: ScheduleEntry[];
-  onChange: (schedule: ScheduleEntry[]) => void;
+  onChange: (schedule: ScheduleEntry[]) => Promise<void>;
+  onRequestReminderPermission: () => Promise<boolean>;
   theme: Theme;
 }) {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [showAndroidPicker, setShowAndroidPicker] = useState(false);
+  const [requestingPermission, setRequestingPermission] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
@@ -57,24 +63,70 @@ export function ScheduleScreen({
   const openNew = () => {
     const now = new Date();
     const rounded = Math.round((now.getHours() * 60 + now.getMinutes()) / 15) * 15;
-    setDraft({ type: 'pee', minutes: rounded % (24 * 60) });
+    setDraft({ type: 'pee', minutes: rounded % (24 * 60), reminder: false });
   };
 
-  const save = () => {
-    if (!draft) return;
+  const save = async () => {
+    if (!draft || saving) return;
     const entry: ScheduleEntry = {
       id: draft.id ?? `${Date.now()}-${draft.type}`,
       type: draft.type,
       minutes: draft.minutes,
+      reminder: draft.reminder,
     };
-    onChange([...schedule.filter((item) => item.id !== entry.id), entry].sort((a, b) => a.minutes - b.minutes));
-    setDraft(null);
+    setSaving(true);
+    try {
+      await onChange([...schedule.filter((item) => item.id !== entry.id), entry].sort((a, b) => a.minutes - b.minutes));
+      setDraft(null);
+    } catch {
+      Alert.alert('Couldn’t save the routine', 'Your previous routine is still available. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleReminder = async (enabled: boolean) => {
+    if (!draft || requestingPermission) return;
+    if (!enabled) {
+      setDraft({ ...draft, reminder: false });
+      return;
+    }
+
+    setRequestingPermission(true);
+    try {
+      if (await onRequestReminderPermission()) {
+        setDraft((current) => current ? { ...current, reminder: true } : null);
+      } else {
+        Alert.alert(
+          'Notifications are off',
+          'Allow Puptime notifications in system settings to use daily routine reminders.',
+          [
+            { text: 'Not now', style: 'cancel' },
+            { text: 'Open settings', onPress: () => Linking.openSettings() },
+          ],
+        );
+      }
+    } catch {
+      Alert.alert('Couldn’t enable reminders', 'Please try again from this routine entry.');
+    } finally {
+      setRequestingPermission(false);
+    }
   };
 
   const remove = (entry: ScheduleEntry) => {
     Alert.alert('Remove this time?', `${EVENT_META[entry.type].label} at ${formatMinutes(entry.minutes)}`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => onChange(schedule.filter((item) => item.id !== entry.id)) },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await onChange(schedule.filter((item) => item.id !== entry.id));
+          } catch {
+            Alert.alert('Couldn’t remove the time', 'Your routine has not changed. Please try again.');
+          }
+        },
+      },
     ]);
   };
 
@@ -134,8 +186,8 @@ export function ScheduleScreen({
               <Pressable
                 key={entry.id}
                 accessibilityRole="button"
-                accessibilityLabel={`Edit ${meta.label} at ${formatMinutes(entry.minutes)}, ${presentation.label.toLowerCase()}`}
-                onPress={() => setDraft(entry)}
+                accessibilityLabel={`Edit ${meta.label} at ${formatMinutes(entry.minutes)}, ${presentation.label.toLowerCase()}${entry.reminder ? ', daily reminder on' : ''}`}
+                onPress={() => setDraft({ ...entry, reminder: Boolean(entry.reminder) })}
                 style={({ pressed }) => [
                   styles.scheduleRow,
                   {
@@ -156,7 +208,13 @@ export function ScheduleScreen({
                     <Text style={[styles.statusText, { color: presentation.color }]}>{presentation.label}</Text>
                   </View>
                 </View>
+                {entry.reminder ? (
+                  <View accessible={false} style={[styles.reminderIndicator, { backgroundColor: theme.primarySoft }]}>
+                    <MaterialCommunityIcons name="bell-ring-outline" size={17} color={theme.primary} />
+                  </View>
+                ) : null}
                 <Pressable
+                  accessibilityRole="button"
                   accessibilityLabel={`Remove ${meta.label} at ${formatMinutes(entry.minutes)}`}
                   hitSlop={8}
                   onPress={(event) => {
@@ -173,6 +231,8 @@ export function ScheduleScreen({
         )}
 
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Add a routine time"
           onPress={openNew}
           style={({ pressed }) => [
             styles.addButton,
@@ -252,11 +312,36 @@ export function ScheduleScreen({
               </>
             )}
 
+            <Text style={[styles.fieldLabel, styles.reminderLabel, { color: theme.textMuted }]}>REMINDER</Text>
+            <View style={[styles.reminderRow, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <View style={[styles.reminderIcon, { backgroundColor: theme.primarySoft }]}>
+                <MaterialCommunityIcons name="bell-outline" size={21} color={theme.primary} />
+              </View>
+              <View style={styles.reminderCopy}>
+                <Text style={[styles.reminderTitle, { color: theme.text }]}>Daily reminder</Text>
+                <Text style={[styles.reminderHint, { color: theme.textMuted }]}>Alerts at this planned time on this device.</Text>
+              </View>
+              <Switch
+                accessibilityLabel="Daily reminder for this routine entry"
+                disabled={requestingPermission}
+                ios_backgroundColor={theme.border}
+                onValueChange={toggleReminder}
+                trackColor={{ false: theme.border, true: theme.primary }}
+                value={Boolean(draft?.reminder)}
+              />
+            </View>
+
             <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ busy: saving, disabled: saving }}
+              disabled={saving}
               onPress={save}
-              style={({ pressed }) => [styles.saveButton, { backgroundColor: pressed ? theme.primaryPressed : theme.primary }]}
+              style={({ pressed }) => [
+                styles.saveButton,
+                { backgroundColor: pressed ? theme.primaryPressed : theme.primary, opacity: saving ? 0.55 : 1 },
+              ]}
             >
-              <Text style={[styles.saveText, { color: theme.onPrimary }]}>Save time</Text>
+              <Text style={[styles.saveText, { color: theme.onPrimary }]}>{saving ? 'Saving…' : 'Save time'}</Text>
             </Pressable>
           </ScrollView>
         </View>
@@ -298,6 +383,7 @@ const styles = StyleSheet.create({
   statusPill: { alignSelf: 'flex-start', minHeight: 22, borderRadius: 11, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   statusText: { fontSize: 11, lineHeight: 15, fontWeight: '700' },
+  reminderIndicator: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 2 },
   removeButton: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   addButton: { minHeight: 54, borderRadius: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: spacing.md },
   addButtonText: { fontSize: 16, fontWeight: '700' },
@@ -324,6 +410,12 @@ const styles = StyleSheet.create({
   timeButton: { minHeight: 58, borderWidth: 1, borderRadius: 16, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, gap: 10 },
   timeButtonText: { flex: 1, fontSize: 18, fontWeight: '700', fontVariant: ['tabular-nums'] },
   changeText: { fontSize: 14, fontWeight: '700' },
+  reminderLabel: { marginTop: spacing.lg },
+  reminderRow: { minHeight: 72, borderWidth: 1, borderRadius: 17, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 11 },
+  reminderIcon: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  reminderCopy: { flex: 1, minWidth: 0 },
+  reminderTitle: { fontSize: 15, lineHeight: 20, fontWeight: '700' },
+  reminderHint: { fontSize: 12, lineHeight: 17, marginTop: 1 },
   saveButton: { minHeight: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginTop: spacing.lg },
   saveText: { fontSize: 16, fontWeight: '800' },
 });

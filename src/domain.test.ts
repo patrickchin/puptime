@@ -11,6 +11,7 @@ import {
   normalizeNote,
   replaceClockTime,
 } from './domain.ts';
+import { reminderCopy, reminderIdentifier } from './reminder-config.ts';
 
 test('creates a backdated widget event at the supplied time', () => {
   const event = createEvent('pee', 'widget', 123_456);
@@ -54,4 +55,12 @@ test('only new timed naps count as running', () => {
 test('formats a duration for compact log and chart labels', () => {
   assert.equal(formatDuration(42 * 60_000), '42m');
   assert.equal(formatDuration(90 * 60_000), '1h 30m');
+});
+
+test('creates stable daily reminder content for a schedule entry', () => {
+  const entry = { id: 'morning-pee', type: 'pee' as const, minutes: 7 * 60 + 5, reminder: true };
+
+  assert.equal(reminderIdentifier(entry), 'puptime-routine-morning-pee');
+  assert.match(reminderCopy(entry).title, /Pee time/);
+  assert.match(reminderCopy(entry).body, /7:05/);
 });
