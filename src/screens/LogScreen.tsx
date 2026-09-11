@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { useEffect, useMemo, useState } from 'react';
-import { Alert, Modal, Platform, Pressable, ScrollView, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Keyboard, Modal, Platform, Pressable, ScrollView, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { QuickActions } from '../components/QuickActions';
 import { EventRow } from '../components/EventRow';
@@ -94,6 +94,7 @@ export function LogScreen({
   const [saving, setSaving] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>('all');
+  const editorScrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30_000);
@@ -135,6 +136,13 @@ export function LogScreen({
     ? normalizeCustomLabel(draft.customLabel) ?? 'Other activity'
     : draftMeta.pastLabel;
   const selectedFilter = activityFilters.find((item) => item.id === activityFilter) ?? activityFilters[0];
+  const draftHasChanges = Boolean(draft && (
+    draft.type !== draft.event.type
+    || draft.customLabel !== (draft.event.customLabel ?? '')
+    || draft.at !== draft.event.at
+    || draft.endedAt !== draft.event.endedAt
+    || draft.note !== (draft.event.note ?? '')
+  ));
   const todayLabel = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
     .format(now)
     .toUpperCase();
@@ -151,9 +159,30 @@ export function LogScreen({
   };
 
   const closeEditor = () => {
+    Keyboard.dismiss();
     setPickerMode(null);
     setCustomTouched(false);
     setDraft(null);
+  };
+
+  const requestCloseEditor = () => {
+    if (saving) return;
+    if (!draftHasChanges) {
+      closeEditor();
+      return;
+    }
+    Alert.alert('Discard changes?', 'Your edits to this log have not been saved.', [
+      { text: 'Keep editing', style: 'cancel' },
+      { text: 'Discard', style: 'destructive', onPress: closeEditor },
+    ]);
+  };
+
+  const handleSystemClose = () => {
+    if (Keyboard.isVisible()) {
+      Keyboard.dismiss();
+      return;
+    }
+    requestCloseEditor();
   };
 
   const pickDateTime = (event: DateTimePickerEvent, date?: Date) => {
@@ -293,10 +322,13 @@ export function LogScreen({
         }
       />
 
-      <Modal visible={draft !== null} transparent animationType="none" onRequestClose={closeEditor}>
+      <Modal visible={draft !== null} transparent animationType="none" onRequestClose={handleSystemClose}>
         <View accessibilityViewIsModal style={styles.scrim}>
           <ScrollView
+            ref={editorScrollRef}
             bounces={false}
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+            keyboardShouldPersistTaps="handled"
             style={[styles.sheet, { backgroundColor: theme.surfaceRaised }]}
             contentContainerStyle={styles.sheetContent}
           >
@@ -321,7 +353,7 @@ export function LogScreen({
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Close log editor"
-                onPress={closeEditor}
+                onPress={requestCloseEditor}
                 style={({ pressed }) => [styles.closeButton, pressed && { backgroundColor: theme.primarySoft }]}
               >
                 <MaterialCommunityIcons name="close" size={22} color={theme.text} />
@@ -531,6 +563,7 @@ export function LogScreen({
                 key={draft.event.id}
                 value={draft.note}
                 onChangeText={(note) => setDraft((current) => current && ({ ...current, note }))}
+                onFocus={() => editorScrollRef.current?.scrollToEnd({ animated: true })}
                 theme={theme}
               />
             ) : null}

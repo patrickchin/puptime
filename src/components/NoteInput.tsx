@@ -19,10 +19,12 @@ import { type Theme } from '../theme';
 export function NoteInput({
   value,
   onChangeText,
+  onFocus,
   theme,
 }: {
   value: string;
   onChangeText: (value: string) => void;
+  onFocus?: () => void;
   theme: Theme;
 }) {
   const [listening, setListening] = useState(false);
@@ -104,6 +106,7 @@ export function NoteInput({
           maxLength={300}
           multiline
           onChangeText={onChangeText}
+          onFocus={onFocus}
           placeholder="e.g. Just after a play session"
           placeholderTextColor={theme.textMuted}
           textAlignVertical="top"
