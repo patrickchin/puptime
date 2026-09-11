@@ -2,7 +2,7 @@
   "expo": {
     "name": "Puptime",
     "slug": "puptime",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "One-tap puppy routine tracking from your app or home screen.",
     "scheme": "puptime",
     "icon": "./assets/puptime-icon.png",
@@ -10,11 +10,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.patrickchin.puptime",
-      "buildNumber": "2"
+      "buildNumber": "3"
     },
     "android": {
       "package": "com.patrickchin.puptime",
-      "versionCode": 2,
+      "versionCode": 3,
       "blockedPermissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
@@ -37,7 +37,7 @@
             {
               "name": "PuptimeQuickLog",
               "label": "Puptime Quick Log",
-              "description": "Log in one tap. Resize taller to backdate up to an hour.",
+              "description": "Log potty, walks, meals, and timed naps. Resize taller to backdate.",
               "minWidth": "250dp",
               "minHeight": "40dp",
               "targetCellWidth": 4,
@@ -57,7 +57,7 @@
             {
               "name": "PuptimeQuickLog",
               "displayName": "Puptime Quick Log",
-              "description": "Log now or backdate puppy activities by up to an hour.",
+              "description": "Log potty, walks, meals, and timed naps now or up to an hour ago.",
               "ios": {
                 "supportedFamilies": [
                   "systemMedium"
