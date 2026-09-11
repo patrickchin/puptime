@@ -1,4 +1,4 @@
-import type { PuppyEvent } from '../domain';
+import { isOpenNap, type PuppyEvent } from '../domain';
 import PuptimeWidget, { type PuptimeWidgetProps } from './PuptimeWidget.ios';
 
 export async function readPendingWidgetEvents(): Promise<PuppyEvent[]> {
@@ -13,9 +13,11 @@ export async function readPendingWidgetEvents(): Promise<PuppyEvent[]> {
 
 export async function updateHomeWidget(events: PuppyEvent[]): Promise<void> {
   const latest = events[0];
+  const openNap = events.find(isOpenNap);
   await PuptimeWidget.updateSnapshot({
     pending: [],
     backdateMinutes: 0,
+    openNap: openNap ? { id: openNap.id, type: 'nap', at: openNap.at, endedAt: null } : null,
     latestLabel: latest ? `${new Date(latest.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'Tap to log',
   });
 }

@@ -5,8 +5,24 @@ export type DaySummary = {
   date: Date;
   counts: Record<EventType, number>;
   total: number;
+  napMinutes: number;
   adherence: number | null;
 };
+
+export function napMinutesForDay(events: PuppyEvent[], day: Date, now = Date.now()): number {
+  const dayStart = new Date(day);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+
+  const milliseconds = events
+    .filter((event) => event.type === 'nap' && event.endedAt !== undefined)
+    .reduce((sum, event) => {
+      const end = event.endedAt ?? now;
+      return sum + Math.max(0, Math.min(end, dayEnd.getTime(), now) - Math.max(event.at, dayStart.getTime()));
+    }, 0);
+  return Math.round(milliseconds / 60_000);
+}
 
 export function adherenceForDay(
   events: PuppyEvent[],
@@ -81,6 +97,7 @@ export function summarizeDays(
       date,
       counts,
       total: dayEvents.length,
+      napMinutes: napMinutesForDay(events, date, now.getTime()),
       adherence: adherenceForDay(events, schedule, date, 30, now.getTime()),
     };
   });

@@ -8,6 +8,8 @@ import { EventRow } from '../components/EventRow';
 import {
   dateKey,
   EVENT_META,
+  eventPastLabel,
+  formatDuration,
   formatTime,
   relativeTime,
   replaceClockTime,
@@ -17,6 +19,13 @@ import {
 import { spacing, type Theme } from '../theme';
 
 const quickBackdates = [0, 5, 15, 30, 60] as const;
+
+type Draft = {
+  event: PuppyEvent;
+  at: number;
+  endedAt?: number | null;
+  field: 'start' | 'end';
+};
 
 function dateLabel(value: number): string {
   return new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' }).format(value);
@@ -40,12 +49,12 @@ export function LogScreen({
   theme,
 }: {
   events: PuppyEvent[];
-  onLog: (type: EventType) => void;
-  onChangeTime: (event: PuppyEvent, at: number) => Promise<void>;
+  onLog: (type: EventType, customLabel?: string) => void;
+  onChangeTime: (event: PuppyEvent, at: number, endedAt?: number | null) => Promise<void>;
   onDelete: (event: PuppyEvent) => void;
   theme: Theme;
 }) {
-  const [draft, setDraft] = useState<{ event: PuppyEvent; at: number } | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(null);
   const [showAndroidPicker, setShowAndroidPicker] = useState(false);
   const [saving, setSaving] = useState(false);
   const byDay = new Map<string, PuppyEvent[]>();
@@ -54,23 +63,33 @@ export function LogScreen({
     byDay.set(key, [...(byDay.get(key) ?? []), event]);
   });
   const sections = [...byDay.entries()].map(([key, data]) => ({ key, title: sectionTitle(key), data }));
-  const pickerDate = new Date(draft?.at ?? Date.now());
+  const timedNap = draft?.event.type === 'nap' && draft.event.endedAt !== undefined;
+  const activeValue = draft?.field === 'end' ? draft.endedAt ?? Date.now() : draft?.at ?? Date.now();
+  const pickerDate = new Date(activeValue);
   const draftMeta = draft ? EVENT_META[draft.event.type] : EVENT_META.pee;
+
+  const setDraftTime = (value: number) => {
+    setDraft((current) => {
+      if (!current) return null;
+      if (current.field === 'end') {
+        return { ...current, endedAt: Math.max(current.at, Math.min(value, Date.now())) };
+      }
+      const latestStart = typeof current.endedAt === 'number' ? current.endedAt : Date.now();
+      return { ...current, at: Math.min(value, latestStart) };
+    });
+  };
 
   const pickTime = (event: DateTimePickerEvent, date?: Date) => {
     if (Platform.OS === 'android') setShowAndroidPicker(false);
     if (event.type === 'dismissed' || !date || !draft) return;
-    setDraft({
-      ...draft,
-      at: replaceClockTime(draft.at, date.getHours(), date.getMinutes()),
-    });
+    setDraftTime(replaceClockTime(activeValue, date.getHours(), date.getMinutes()));
   };
 
   const saveTime = async () => {
     if (!draft || saving) return;
     setSaving(true);
     try {
-      await onChangeTime(draft.event, Math.min(draft.at, Date.now()));
+      await onChangeTime(draft.event, Math.min(draft.at, Date.now()), draft.endedAt);
       setDraft(null);
     } finally {
       setSaving(false);
@@ -96,7 +115,7 @@ export function LogScreen({
                 <Text style={[styles.title, { color: theme.text }]}>What just happened?</Text>
               </View>
             </View>
-            <Text style={[styles.subtitle, { color: theme.textMuted }]}>One tap saves the current time.</Text>
+            <Text style={[styles.subtitle, { color: theme.textMuted }]}>One tap saves the time. Nap toggles between start and end.</Text>
             <QuickActions events={events} onLog={onLog} theme={theme} />
             <View style={styles.activityHeading}>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>Activity</Text>
@@ -110,7 +129,7 @@ export function LogScreen({
         renderItem={({ item }) => (
           <EventRow
             event={item}
-            onEditTime={() => setDraft({ event: item, at: item.at })}
+            onEditTime={() => setDraft({ event: item, at: item.at, endedAt: item.endedAt, field: 'start' })}
             onDelete={() => onDelete(item)}
             theme={theme}
           />
@@ -140,9 +159,9 @@ export function LogScreen({
                 />
               </View>
               <View style={styles.editorHeadingCopy}>
-                <Text style={[styles.sheetTitle, { color: theme.text }]}>Edit log time</Text>
+                <Text style={[styles.sheetTitle, { color: theme.text }]}>{timedNap ? 'Edit nap times' : 'Edit log time'}</Text>
                 <Text style={[styles.sheetSubtitle, { color: theme.textMuted }]}>
-                  {draftMeta.pastLabel} · Choose a shortcut or exact time.
+                  {draft ? eventPastLabel(draft.event) : draftMeta.pastLabel} · Choose a shortcut or exact time.
                 </Text>
               </View>
               <Pressable
@@ -156,20 +175,58 @@ export function LogScreen({
             </View>
 
             <View style={[styles.timePreview, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-              <Text style={[styles.previewTime, { color: theme.text }]}>{formatTime(draft?.at ?? Date.now())}</Text>
+              <Text style={[styles.previewTime, { color: theme.text }]}>
+                {timedNap
+                  ? `${formatTime(draft?.at ?? Date.now())}–${typeof draft?.endedAt === 'number' ? formatTime(draft.endedAt) : 'now'}`
+                  : formatTime(draft?.at ?? Date.now())}
+              </Text>
               <Text style={[styles.previewDate, { color: theme.textMuted }]}>
-                {dateLabel(draft?.at ?? Date.now())} · {relativeTime(draft?.at ?? Date.now())}
+                {timedNap
+                  ? `${formatDuration((draft?.endedAt ?? Date.now()) - (draft?.at ?? Date.now()))}${draft?.endedAt === null ? ' · in progress' : ''}`
+                  : `${dateLabel(draft?.at ?? Date.now())} · ${relativeTime(draft?.at ?? Date.now())}`}
               </Text>
             </View>
 
-            <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>QUICK BACKDATE</Text>
+            {timedNap ? (
+              <View style={styles.timeFields}>
+                {(['start', 'end'] as const).map((field) => {
+                  const selected = draft?.field === field;
+                  const value = field === 'start' ? draft?.at : draft?.endedAt;
+                  return (
+                    <Pressable
+                      key={field}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      accessibilityLabel={`Edit nap ${field} time`}
+                      onPress={() => setDraft((current) => current && ({ ...current, field }))}
+                      style={({ pressed }) => [
+                        styles.timeField,
+                        {
+                          backgroundColor: selected ? draftMeta.softColor : theme.surface,
+                          borderColor: selected || pressed ? draftMeta.color : theme.border,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.timeFieldLabel, { color: theme.textMuted }]}>{field.toUpperCase()}</Text>
+                      <Text style={[styles.timeFieldValue, { color: theme.text }]}>
+                        {typeof value === 'number' ? formatTime(value) : 'In progress'}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
+
+            <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>
+              {timedNap ? `SET ${draft?.field?.toUpperCase() ?? 'START'}` : 'QUICK BACKDATE'}
+            </Text>
             <View style={styles.quickTimes}>
               {quickBackdates.map((minutes) => (
                 <Pressable
                   key={minutes}
                   accessibilityRole="button"
                   accessibilityLabel={minutes ? `Set time to ${minutes} minutes ago` : 'Set time to now'}
-                  onPress={() => setDraft((current) => current && ({ ...current, at: Date.now() - minutes * 60_000 }))}
+                  onPress={() => setDraftTime(Date.now() - minutes * 60_000)}
                   style={({ pressed }) => [
                     styles.quickTime,
                     {
@@ -190,7 +247,7 @@ export function LogScreen({
               <>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`Choose exact time, currently ${formatTime(draft?.at ?? Date.now())}`}
+                  accessibilityLabel={`Choose exact ${draft?.field ?? 'log'} time, currently ${formatTime(activeValue)}`}
                   onPress={() => setShowAndroidPicker(true)}
                   style={({ pressed }) => [
                     styles.exactTime,
@@ -198,7 +255,7 @@ export function LogScreen({
                   ]}
                 >
                   <MaterialCommunityIcons name="clock-outline" size={22} color={theme.primary} />
-                  <Text style={[styles.exactTimeText, { color: theme.text }]}>{formatTime(draft?.at ?? Date.now())}</Text>
+                  <Text style={[styles.exactTimeText, { color: theme.text }]}>{formatTime(activeValue)}</Text>
                   <Text style={[styles.changeText, { color: theme.primary }]}>Change</Text>
                 </Pressable>
                 {showAndroidPicker ? <DateTimePicker value={pickerDate} mode="time" onChange={pickTime} /> : null}
@@ -265,6 +322,10 @@ const styles = StyleSheet.create({
   timePreview: { borderWidth: 1, borderRadius: 18, padding: spacing.md, alignItems: 'center', marginBottom: spacing.lg },
   previewTime: { fontSize: 34, lineHeight: 40, fontWeight: '800', fontVariant: ['tabular-nums'] },
   previewDate: { fontSize: 13, lineHeight: 18, marginTop: 2 },
+  timeFields: { flexDirection: 'row', gap: 8, marginBottom: spacing.lg },
+  timeField: { flex: 1, minHeight: 64, borderWidth: 1, borderRadius: 16, paddingHorizontal: 14, justifyContent: 'center' },
+  timeFieldLabel: { fontSize: 10, lineHeight: 14, fontWeight: '800', letterSpacing: 1.1 },
+  timeFieldValue: { fontSize: 17, lineHeight: 23, fontWeight: '700', fontVariant: ['tabular-nums'] },
   fieldLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2, marginBottom: 8 },
   quickTimes: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.lg },
   quickTime: { flexGrow: 1, minWidth: 88, minHeight: 48, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },

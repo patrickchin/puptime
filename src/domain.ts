@@ -3,6 +3,7 @@ export const eventTypes = ['pee', 'poop', 'meal', 'pottyTrip', 'walk', 'nap', 'c
 export const quickEventTypes = ['pee', 'poop', 'meal', 'pottyTrip', 'walk', 'nap'] as const;
 
 export type EventType = (typeof eventTypes)[number];
+export type QuickEventType = (typeof quickEventTypes)[number];
 
 export type PuppyEvent = {
   id: string;
@@ -92,6 +93,10 @@ export const STARTER_SCHEDULE: ScheduleEntry[] = [
 
 export function isEventType(value: unknown): value is EventType {
   return typeof value === 'string' && eventTypes.includes(value as EventType);
+}
+
+export function isQuickEventType(value: unknown): value is QuickEventType {
+  return typeof value === 'string' && quickEventTypes.includes(value as QuickEventType);
 }
 
 export function createEvent(

@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { summarizeDays } from '../analytics';
-import { EVENT_META, eventTypes, type PuppyEvent, type ScheduleEntry } from '../domain';
+import { EVENT_META, eventTypes, formatDuration, type PuppyEvent, type ScheduleEntry } from '../domain';
 import { spacing, type Theme } from '../theme';
 
 export function InsightsScreen({
@@ -16,6 +16,7 @@ export function InsightsScreen({
 }) {
   const days = summarizeDays(events, schedule);
   const maxTotal = Math.max(1, ...days.map((day) => day.total));
+  const maxNapMinutes = Math.max(1, ...days.map((day) => day.napMinutes));
   const weekEvents = days.reduce((sum, day) => sum + day.total, 0);
   const scoredDays = days.filter((day) => day.adherence !== null);
   const averageScore = scoredDays.length
@@ -36,6 +37,38 @@ export function InsightsScreen({
         <View style={[styles.summaryCard, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
           <Text style={[styles.summaryNumber, { color: theme.text }]}>{averageScore === null ? '—' : `${averageScore}%`}</Text>
           <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>on schedule</Text>
+        </View>
+      </View>
+
+      <View style={[styles.panel, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
+        <View style={styles.panelHeading}>
+          <View style={[styles.smallIcon, { backgroundColor: EVENT_META.nap.softColor }]}>
+            <MaterialCommunityIcons name="sleep" size={20} color={EVENT_META.nap.color} />
+          </View>
+          <View>
+            <Text style={[styles.panelTitle, { color: theme.text }]}>Nap time</Text>
+            <Text style={[styles.panelCaption, { color: theme.textMuted }]}>Completed and currently running naps</Text>
+          </View>
+        </View>
+        <View style={styles.napChart}>
+          {days.map((day) => (
+            <View key={day.key} style={styles.napBarColumn}>
+              <Text style={[styles.barValue, { color: theme.textMuted }]}>
+                {day.napMinutes ? formatDuration(day.napMinutes * 60_000) : ''}
+              </Text>
+              <View style={[styles.napBarTrack, { backgroundColor: EVENT_META.nap.softColor }]}>
+                <View
+                  style={{
+                    height: day.napMinutes ? Math.max(4, (day.napMinutes / maxNapMinutes) * 88) : 0,
+                    backgroundColor: EVENT_META.nap.color,
+                  }}
+                />
+              </View>
+              <Text style={[styles.dayLabel, { color: theme.textMuted }]}>
+                {new Intl.DateTimeFormat(undefined, { weekday: 'narrow' }).format(day.date)}
+              </Text>
+            </View>
+          ))}
         </View>
       </View>
 
@@ -111,6 +144,9 @@ export function InsightsScreen({
         {eventTypes.map((type) => {
           const total = days.reduce((sum, day) => sum + day.counts[type], 0);
           const meta = EVENT_META[type];
+          const value = type === 'nap'
+            ? formatDuration(days.reduce((sum, day) => sum + day.napMinutes, 0) * 60_000)
+            : total;
           return (
             <View key={type} style={[styles.typeCard, { backgroundColor: meta.softColor }]}>
               <MaterialCommunityIcons
@@ -118,8 +154,8 @@ export function InsightsScreen({
                 size={22}
                 color={meta.color}
               />
-              <Text style={[styles.typeNumber, { color: meta.color }]}>{total}</Text>
-              <Text style={[styles.typeLabel, { color: meta.color }]}>{meta.label} this week</Text>
+              <Text style={[styles.typeNumber, { color: meta.color }]}>{value}</Text>
+              <Text style={[styles.typeLabel, { color: meta.color }]}>{type === 'nap' ? 'nap time this week' : `${meta.label} this week`}</Text>
             </View>
           );
         })}
@@ -150,9 +186,12 @@ const styles = StyleSheet.create({
   panelTitle: { fontSize: 18, fontWeight: '700' },
   panelCaption: { fontSize: 12, lineHeight: 17, marginTop: 1 },
   chart: { height: 158, flexDirection: 'row', alignItems: 'flex-end', gap: 7, marginTop: 10 },
+  napChart: { height: 134, flexDirection: 'row', alignItems: 'flex-end', gap: 7, marginTop: 10 },
   barColumn: { flex: 1, height: 158, alignItems: 'center', justifyContent: 'flex-end' },
+  napBarColumn: { flex: 1, height: 134, alignItems: 'center', justifyContent: 'flex-end' },
   barValue: { height: 20, fontSize: 11, fontWeight: '600', fontVariant: ['tabular-nums'] },
   barTrack: { width: '72%', height: 112, borderRadius: 7, overflow: 'hidden', justifyContent: 'flex-end' },
+  napBarTrack: { width: '72%', height: 88, borderRadius: 7, overflow: 'hidden', justifyContent: 'flex-end' },
   barStack: { width: '100%', justifyContent: 'flex-end' },
   dayLabel: { height: 22, fontSize: 12, fontWeight: '700', marginTop: 4 },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center', marginTop: 8 },

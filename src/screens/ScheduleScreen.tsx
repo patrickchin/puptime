@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 
-import { EVENT_META, eventTypes, formatMinutes, type EventType, type ScheduleEntry } from '../domain';
+import { EVENT_META, formatMinutes, quickEventTypes, type EventType, type ScheduleEntry } from '../domain';
 import { spacing, type Theme } from '../theme';
 
 type Draft = { id?: string; type: EventType; minutes: number };
@@ -159,7 +159,7 @@ export function ScheduleScreen({
 
             <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>ACTIVITY</Text>
             <View style={styles.typePicker}>
-              {eventTypes.map((type) => {
+              {quickEventTypes.map((type) => {
                 const selected = draft?.type === type;
                 const meta = EVENT_META[type];
                 return (

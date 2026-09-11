@@ -2,15 +2,17 @@
 
 import { FlexWidget, TextWidget } from 'react-native-android-widget';
 
-import { normalizeBackdateMinutes, type EventType } from '../domain';
+import { normalizeBackdateMinutes, type QuickEventType } from '../domain';
 
 const buttons = [
   { type: 'pee', label: 'Pee', light: '#DDF4E9', dark: '#284A3D' },
   { type: 'poop', label: 'Poop', light: '#F6E8D8', dark: '#513923' },
   { type: 'meal', label: 'Ate', light: '#FBE5E2', dark: '#53302D' },
+  { type: 'pottyTrip', label: 'Out', light: '#DFEFF8', dark: '#243E50' },
+  { type: 'walk', label: 'Walk', light: '#F3F0D2', dark: '#45431F' },
   { type: 'nap', label: 'Nap', light: '#E8E7FA', dark: '#34355C' },
 ] as const satisfies readonly {
-  type: EventType;
+  type: QuickEventType;
   label: string;
   light: `#${string}`;
   dark: `#${string}`;
@@ -21,6 +23,7 @@ type Props = {
   dark?: boolean;
   compact?: boolean;
   backdateMinutes?: number;
+  activeNap?: boolean;
 };
 
 export function QuickLogWidget({
@@ -28,6 +31,7 @@ export function QuickLogWidget({
   dark = false,
   compact = false,
   backdateMinutes = 0,
+  activeNap = false,
 }: Props) {
   const background = dark ? '#17211C' : '#FFFEFA';
   const foreground = dark ? '#F2F6F3' : '#17231E';
@@ -35,14 +39,17 @@ export function QuickLogWidget({
   const control = dark ? '#253E33' : '#DDEFE7';
   const minutesAgo = normalizeBackdateMinutes(backdateMinutes);
   const timeLabel = minutesAgo ? `${minutesAgo}m ago` : 'Now';
+  const visibleButtons = compact ? buttons.filter((button) => ['pee', 'poop', 'meal', 'nap'].includes(button.type)) : buttons;
   const actions = (
     <FlexWidget style={{ width: 'match_parent', flex: 1, flexDirection: 'row' }}>
-      {buttons.map((button, index) => (
+      {visibleButtons.map((button, index) => {
+        const label = button.type === 'nap' && activeNap ? (compact ? 'Wake' : 'End nap') : button.label;
+        return (
         <FlexWidget
           key={button.type}
           clickAction="LOG_EVENT"
           clickActionData={{ type: button.type, minutesAgo }}
-          accessibilityLabel={`Log ${button.label.toLowerCase()} ${minutesAgo ? `${minutesAgo} minutes ago` : 'now'}`}
+          accessibilityLabel={`${button.type === 'nap' && activeNap ? 'End nap' : `Log ${button.label.toLowerCase()}`} ${minutesAgo ? `${minutesAgo} minutes ago` : 'now'}`}
           style={{
             flex: 1,
             height: 'match_parent',
@@ -50,12 +57,13 @@ export function QuickLogWidget({
             justifyContent: 'center',
             backgroundColor: dark ? button.dark : button.light,
             borderRadius: compact ? 11 : 14,
-            marginRight: index < buttons.length - 1 ? (compact ? 4 : 6) : 0,
+            marginRight: index < visibleButtons.length - 1 ? (compact ? 4 : 5) : 0,
           }}
         >
-          <TextWidget text={button.label} style={{ color: foreground, fontSize: compact ? 12 : 14, fontWeight: '700' }} />
+          <TextWidget text={label} style={{ color: foreground, fontSize: compact ? 12 : 10, fontWeight: '700' }} />
         </FlexWidget>
-      ))}
+        );
+      })}
     </FlexWidget>
   );
 

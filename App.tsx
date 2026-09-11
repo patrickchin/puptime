@@ -6,11 +6,19 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { BottomNav, type Tab } from './src/components/BottomNav';
 import { Toast } from './src/components/Toast';
-import { EVENT_META, createEvent, type EventType, type PuppyEvent, type ScheduleEntry } from './src/domain';
+import {
+  createEvent,
+  createNapEvent,
+  eventPastLabel,
+  isOpenNap,
+  type EventType,
+  type PuppyEvent,
+  type ScheduleEntry,
+} from './src/domain';
 import { InsightsScreen } from './src/screens/InsightsScreen';
 import { LogScreen } from './src/screens/LogScreen';
 import { ScheduleScreen } from './src/screens/ScheduleScreen';
-import { appendEvents, loadEvents, loadSchedule, removeEvent, saveSchedule, updateEventTime } from './src/storage';
+import { appendEvents, loadEvents, loadSchedule, removeEvent, saveSchedule, updateEvent } from './src/storage';
 import { darkTheme, lightTheme } from './src/theme';
 import { readPendingWidgetEvents, updateHomeWidget } from './src/widgets/sync';
 
@@ -20,7 +28,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('log');
   const [events, setEvents] = useState<PuppyEvent[]>([]);
   const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
-  const [undoEvent, setUndoEvent] = useState<PuppyEvent | null>(null);
+  const [undoState, setUndoState] = useState<{ event: PuppyEvent; message: string; restore?: PuppyEvent } | null>(null);
 
   const refresh = useCallback(async () => {
     const pending = await readPendingWidgetEvents();
@@ -39,22 +47,36 @@ export default function App() {
   }, [refresh]);
 
   useEffect(() => {
-    if (!undoEvent) return;
-    const timer = setTimeout(() => setUndoEvent(null), 4_500);
+    if (!undoState) return;
+    const timer = setTimeout(() => setUndoState(null), 4_500);
     return () => clearTimeout(timer);
-  }, [undoEvent]);
+  }, [undoState]);
 
-  const logEvent = async (type: EventType) => {
-    const event = createEvent(type);
+  const logEvent = async (type: EventType, customLabel?: string) => {
+    const now = Date.now();
+    if (type === 'nap') {
+      const openNap = (await loadEvents()).find(isOpenNap);
+      if (openNap) {
+        const event = { ...openNap, endedAt: Math.max(openNap.at, now) };
+        const nextEvents = await updateEvent(openNap.id, { endedAt: event.endedAt });
+        setEvents(nextEvents);
+        setUndoState({ event, restore: openNap, message: 'Nap ended' });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+        updateHomeWidget(nextEvents).catch(() => undefined);
+        return;
+      }
+    }
+
+    const event = type === 'nap' ? createNapEvent('app', now) : createEvent(type, 'app', now, customLabel);
     const nextEvents = await appendEvents([event]);
     setEvents(nextEvents);
-    setUndoEvent(event);
+    setUndoState({ event, message: type === 'nap' ? 'Nap started' : `${eventPastLabel(event)} logged` });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
     updateHomeWidget(nextEvents).catch(() => undefined);
   };
 
   const confirmDelete = (event: PuppyEvent) => {
-    Alert.alert('Delete this log?', `${EVENT_META[event.type].pastLabel} at ${new Date(event.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`, [
+    Alert.alert('Delete this log?', `${eventPastLabel(event)} at ${new Date(event.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -68,18 +90,23 @@ export default function App() {
     ]);
   };
 
-  const changeEventTime = async (event: PuppyEvent, at: number) => {
-    const nextEvents = await updateEventTime(event.id, at);
+  const changeEventTime = async (event: PuppyEvent, at: number, endedAt?: number | null) => {
+    const nextEvents = await updateEvent(
+      event.id,
+      event.endedAt === undefined ? { at } : { at, endedAt },
+    );
     setEvents(nextEvents);
     Haptics.selectionAsync().catch(() => undefined);
     updateHomeWidget(nextEvents).catch(() => undefined);
   };
 
   const undo = async () => {
-    if (!undoEvent) return;
-    const nextEvents = await removeEvent(undoEvent.id);
+    if (!undoState) return;
+    const nextEvents = undoState.restore
+      ? await appendEvents([undoState.restore])
+      : await removeEvent(undoState.event.id);
     setEvents(nextEvents);
-    setUndoEvent(null);
+    setUndoState(null);
     Haptics.selectionAsync().catch(() => undefined);
     updateHomeWidget(nextEvents).catch(() => undefined);
   };
@@ -101,7 +128,7 @@ export default function App() {
         <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
         <View style={styles.screen}>
           {screen}
-          {undoEvent ? <Toast message={`${EVENT_META[undoEvent.type].pastLabel} logged`} onUndo={undo} theme={theme} /> : null}
+          {undoState ? <Toast message={undoState.message} onUndo={undo} theme={theme} /> : null}
         </View>
         <SafeAreaView edges={['bottom']} style={{ backgroundColor: theme.nav }}>
           <BottomNav tab={tab} onChange={setTab} theme={theme} />

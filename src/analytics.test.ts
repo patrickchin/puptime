@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { adherenceForDay, summarizeDays } from './analytics.ts';
+import { adherenceForDay, napMinutesForDay, summarizeDays } from './analytics.ts';
 import type { PuppyEvent, ScheduleEntry } from './domain.ts';
 
 const day = new Date(2026, 8, 10);
@@ -51,4 +51,14 @@ test('does not score today until a schedule window has closed', () => {
 
   assert.equal(adherenceForDay(events, schedule, day, 30, at(7, 29)), null);
   assert.equal(adherenceForDay(events, schedule, day, 30, at(7, 31)), 100);
+});
+
+test('counts only the portion of timed naps inside a day', () => {
+  const events: PuppyEvent[] = [
+    { id: '1', type: 'nap', at: new Date(2026, 8, 9, 23, 30).getTime(), endedAt: at(1, 15), source: 'app' },
+    { id: '2', type: 'nap', at: at(10, 0), endedAt: null, source: 'app' },
+    { id: 'old', type: 'nap', at: at(9, 0), source: 'app' },
+  ];
+
+  assert.equal(napMinutesForDay(events, day, at(10, 45)), 120);
 });
