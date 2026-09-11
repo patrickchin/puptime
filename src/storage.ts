@@ -49,7 +49,7 @@ export function updateEventTime(id: string, at: number): Promise<PuppyEvent[]> {
 
 export function updateEvent(
   id: string,
-  changes: Partial<Pick<PuppyEvent, 'at' | 'endedAt'>>,
+  changes: Partial<Pick<PuppyEvent, 'at' | 'endedAt' | 'note'>>,
 ): Promise<PuppyEvent[]> {
   let result: PuppyEvent[] = [];
   writeQueue = writeQueue.then(async () => {

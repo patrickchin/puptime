@@ -2,16 +2,39 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { type Theme } from '../theme';
 
-export function Toast({ message, onUndo, theme }: { message: string; onUndo: () => void; theme: Theme }) {
+export function Toast({
+  message,
+  onNote,
+  onUndo,
+  theme,
+}: {
+  message: string;
+  onNote?: () => void;
+  onUndo: () => void;
+  theme: Theme;
+}) {
   return (
-    <View accessibilityLiveRegion="polite" style={[styles.toast, { backgroundColor: theme.text }]}>
+    <View
+      accessibilityLiveRegion="polite"
+      style={[styles.toast, { backgroundColor: theme.text }]}
+    >
       <Text style={[styles.message, { color: theme.background }]}>{message}</Text>
+      {onNote ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Add a note to this log"
+          onPress={onNote}
+          style={({ pressed }) => [styles.action, pressed && { opacity: 0.6 }]}
+        >
+          <Text style={[styles.actionText, { color: theme.primarySoft }]}>Add note</Text>
+        </Pressable>
+      ) : null}
       <Pressable
         accessibilityRole="button"
         onPress={onUndo}
-        style={({ pressed }) => [styles.undo, pressed && { opacity: 0.6 }]}
+        style={({ pressed }) => [styles.action, pressed && { opacity: 0.6 }]}
       >
-        <Text style={[styles.undoText, { color: theme.primarySoft }]}>Undo</Text>
+        <Text style={[styles.actionText, { color: theme.primarySoft }]}>Undo</Text>
       </Pressable>
     </View>
   );
@@ -36,6 +59,6 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   message: { flex: 1, fontSize: 15, fontWeight: '600' },
-  undo: { minWidth: 56, minHeight: 48, alignItems: 'flex-end', justifyContent: 'center' },
-  undoText: { fontSize: 15, fontWeight: '800' },
+  action: { minHeight: 48, paddingLeft: 16, alignItems: 'flex-end', justifyContent: 'center' },
+  actionText: { fontSize: 14, fontWeight: '800' },
 });

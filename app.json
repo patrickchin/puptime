@@ -67,6 +67,13 @@
           ]
         }
       ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow Puptime to use the microphone when you dictate a log note.",
+          "speechRecognitionPermission": "Allow Puptime to turn dictated log notes into text."
+        }
+      ],
       "@react-native-community/datetimepicker",
       "expo-font",
       "./plugins/withAndroidWorkManager"

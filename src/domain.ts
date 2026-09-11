@@ -11,6 +11,7 @@ export type PuppyEvent = {
   at: number;
   endedAt?: number | null;
   customLabel?: string;
+  note?: string;
   source: 'app' | 'widget';
 };
 
@@ -149,6 +150,11 @@ export function normalizeBackdateMinutes(value: unknown): number {
   const minutes = Number(value);
   if (!Number.isFinite(minutes)) return 0;
   return Math.min(60, Math.max(0, Math.round(minutes / 5) * 5));
+}
+
+export function normalizeNote(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  return value.trim().slice(0, 300) || undefined;
 }
 
 export function replaceClockTime(value: number, hours: number, minutes: number, now = Date.now()): number {

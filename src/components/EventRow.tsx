@@ -25,6 +25,7 @@ export function EventRow({
   theme: Theme;
 }) {
   const meta = EVENT_META[event.type];
+  const note = event.note?.trim();
   const timedNap = event.type === 'nap' && event.endedAt !== undefined;
   const running = isOpenNap(event);
   const duration = timedNap ? formatDuration((event.endedAt ?? now) - event.at) : null;
@@ -43,11 +44,17 @@ export function EventRow({
       <View style={styles.copy}>
         <Text numberOfLines={1} style={[styles.label, { color: theme.text }]}>{eventPastLabel(event)}</Text>
         <Text numberOfLines={1} style={[styles.source, { color: theme.textMuted }]}>{timeSummary}</Text>
+        {note ? (
+          <View style={styles.noteRow}>
+            <MaterialCommunityIcons name="note-text-outline" size={14} color={theme.primary} />
+            <Text numberOfLines={2} style={[styles.note, { color: theme.text }]}>{note}</Text>
+          </View>
+        ) : null}
       </View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Edit times for ${eventPastLabel(event).toLowerCase()}`}
-        accessibilityHint={timedNap ? 'Opens start and end time controls' : 'Opens quick backdating and an exact time picker'}
+        accessibilityLabel={`Edit ${eventPastLabel(event).toLowerCase()} log`}
+        accessibilityHint="Opens time and note controls"
         onPress={onEditTime}
         style={({ pressed }) => [styles.editButton, pressed && { backgroundColor: theme.primarySoft }]}
       >
@@ -88,6 +95,8 @@ const styles = StyleSheet.create({
   copy: { flex: 1, minWidth: 0 },
   label: { fontSize: 16, fontWeight: '600' },
   source: { fontSize: 12, lineHeight: 17, marginTop: 2 },
+  noteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 5, marginTop: 6 },
+  note: { flex: 1, fontSize: 13, lineHeight: 18 },
   editButton: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   deleteButton: {
     width: 48,

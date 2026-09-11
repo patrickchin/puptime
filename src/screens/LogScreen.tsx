@@ -5,6 +5,7 @@ import { Modal, Platform, Pressable, ScrollView, SectionList, StyleSheet, Text, 
 
 import { QuickActions } from '../components/QuickActions';
 import { EventRow } from '../components/EventRow';
+import { NoteInput } from '../components/NoteInput';
 import {
   dateKey,
   EVENT_META,
@@ -24,6 +25,7 @@ type Draft = {
   event: PuppyEvent;
   at: number;
   endedAt?: number | null;
+  note: string;
   field: 'start' | 'end';
 };
 
@@ -43,14 +45,18 @@ function sectionTitle(key: string): string {
 
 export function LogScreen({
   events,
+  editEventId,
+  onEditRequestHandled,
   onLog,
-  onChangeTime,
+  onSave,
   onDelete,
   theme,
 }: {
   events: PuppyEvent[];
+  editEventId?: string | null;
+  onEditRequestHandled?: () => void;
   onLog: (type: EventType, customLabel?: string) => void;
-  onChangeTime: (event: PuppyEvent, at: number, endedAt?: number | null) => Promise<void>;
+  onSave: (event: PuppyEvent, at: number, endedAt: number | null | undefined, note: string) => Promise<void>;
   onDelete: (event: PuppyEvent) => void;
   theme: Theme;
 }) {
@@ -63,6 +69,20 @@ export function LogScreen({
     const timer = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(timer);
   }, []);
+  useEffect(() => {
+    if (!editEventId) return;
+    const event = events.find((candidate) => candidate.id === editEventId);
+    if (event) {
+      setDraft({
+        event,
+        at: event.at,
+        endedAt: event.endedAt,
+        note: event.note ?? '',
+        field: 'start',
+      });
+    }
+    onEditRequestHandled?.();
+  }, [editEventId, events, onEditRequestHandled]);
   const byDay = new Map<string, PuppyEvent[]>();
   events.forEach((event) => {
     const key = dateKey(event.at);
@@ -95,7 +115,7 @@ export function LogScreen({
     if (!draft || saving) return;
     setSaving(true);
     try {
-      await onChangeTime(draft.event, Math.min(draft.at, Date.now()), draft.endedAt);
+      await onSave(draft.event, Math.min(draft.at, Date.now()), draft.endedAt, draft.note.trim());
       setDraft(null);
     } finally {
       setSaving(false);
@@ -136,7 +156,7 @@ export function LogScreen({
           <EventRow
             event={item}
             now={now}
-            onEditTime={() => setDraft({ event: item, at: item.at, endedAt: item.endedAt, field: 'start' })}
+            onEditTime={() => setDraft({ event: item, at: item.at, endedAt: item.endedAt, note: item.note ?? '', field: 'start' })}
             onDelete={() => onDelete(item)}
             theme={theme}
           />
@@ -166,14 +186,16 @@ export function LogScreen({
                 />
               </View>
               <View style={styles.editorHeadingCopy}>
-                <Text style={[styles.sheetTitle, { color: theme.text }]}>{timedNap ? 'Edit nap times' : 'Edit log time'}</Text>
-                <Text style={[styles.sheetSubtitle, { color: theme.textMuted }]}>
-                  {draft ? eventPastLabel(draft.event) : draftMeta.pastLabel} · Choose a shortcut or exact time.
+                <Text style={[styles.sheetTitle, { color: theme.text }]}>{timedNap ? 'Edit nap' : 'Edit log'}</Text>
+                <Text
+                  style={[styles.sheetSubtitle, { color: theme.textMuted }]}
+                >
+                  {draft ? eventPastLabel(draft.event) : draftMeta.pastLabel} · Adjust the time or add a note.
                 </Text>
               </View>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Close time editor"
+                accessibilityLabel="Close log editor"
                 onPress={() => setDraft(null)}
                 style={({ pressed }) => [styles.closeButton, pressed && { backgroundColor: theme.primarySoft }]}
               >
@@ -269,6 +291,16 @@ export function LogScreen({
               </>
             )}
 
+            <Text style={[styles.fieldLabel, styles.noteLabel, { color: theme.textMuted }]}>NOTE</Text>
+            {draft ? (
+              <NoteInput
+                key={draft.event.id}
+                value={draft.note}
+                onChangeText={(note) => setDraft((current) => current && ({ ...current, note }))}
+                theme={theme}
+              />
+            ) : null}
+
             <Pressable
               accessibilityRole="button"
               accessibilityState={{ busy: saving, disabled: saving }}
@@ -279,7 +311,7 @@ export function LogScreen({
                 { backgroundColor: pressed ? theme.primaryPressed : theme.primary, opacity: saving ? 0.55 : 1 },
               ]}
             >
-              <Text style={[styles.saveText, { color: theme.onPrimary }]}>{saving ? 'Saving…' : 'Save time'}</Text>
+              <Text style={[styles.saveText, { color: theme.onPrimary }]}>{saving ? 'Saving…' : 'Save changes'}</Text>
             </Pressable>
           </ScrollView>
         </View>
@@ -334,6 +366,7 @@ const styles = StyleSheet.create({
   timeFieldLabel: { fontSize: 10, lineHeight: 14, fontWeight: '800', letterSpacing: 1.1 },
   timeFieldValue: { fontSize: 17, lineHeight: 23, fontWeight: '700', fontVariant: ['tabular-nums'] },
   fieldLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2, marginBottom: 8 },
+  noteLabel: { marginTop: spacing.lg },
   quickTimes: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.lg },
   quickTime: { flexGrow: 1, minWidth: 88, minHeight: 48, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   quickTimeText: { fontSize: 14, fontWeight: '700' },

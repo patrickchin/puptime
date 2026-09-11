@@ -8,6 +8,7 @@ import {
   formatDuration,
   isOpenNap,
   normalizeBackdateMinutes,
+  normalizeNote,
   replaceClockTime,
 } from './domain.ts';
 
@@ -23,6 +24,12 @@ test('normalizes widget backdating to five-minute steps within an hour', () => {
   assert.equal(normalizeBackdateMinutes(-5), 0);
   assert.equal(normalizeBackdateMinutes(90), 60);
   assert.equal(normalizeBackdateMinutes('not-a-time'), 0);
+});
+
+test('normalizes optional log notes', () => {
+  assert.equal(normalizeNote('  Just after play  '), 'Just after play');
+  assert.equal(normalizeNote('   '), undefined);
+  assert.equal(normalizeNote('x'.repeat(301))?.length, 300);
 });
 
 test('changes an event clock time without allowing a future log', () => {

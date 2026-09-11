@@ -11,6 +11,7 @@ import {
   createNapEvent,
   eventPastLabel,
   isOpenNap,
+  normalizeNote,
   type EventType,
   type PuppyEvent,
   type ScheduleEntry,
@@ -29,6 +30,7 @@ export default function App() {
   const [events, setEvents] = useState<PuppyEvent[]>([]);
   const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
   const [undoState, setUndoState] = useState<{ event: PuppyEvent; message: string; restore?: PuppyEvent } | null>(null);
+  const [editEventId, setEditEventId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const pending = await readPendingWidgetEvents();
@@ -90,10 +92,16 @@ export default function App() {
     ]);
   };
 
-  const changeEventTime = async (event: PuppyEvent, at: number, endedAt?: number | null) => {
+  const saveEventDetails = async (
+    event: PuppyEvent,
+    at: number,
+    endedAt: number | null | undefined,
+    note: string,
+  ) => {
+    const cleanNote = normalizeNote(note);
     const nextEvents = await updateEvent(
       event.id,
-      event.endedAt === undefined ? { at } : { at, endedAt },
+      event.endedAt === undefined ? { at, note: cleanNote } : { at, endedAt, note: cleanNote },
     );
     setEvents(nextEvents);
     Haptics.selectionAsync().catch(() => undefined);
@@ -119,8 +127,18 @@ export default function App() {
   const screen = useMemo(() => {
     if (tab === 'insights') return <InsightsScreen events={events} schedule={schedule} theme={theme} />;
     if (tab === 'schedule') return <ScheduleScreen schedule={schedule} onChange={changeSchedule} theme={theme} />;
-    return <LogScreen events={events} onLog={logEvent} onChangeTime={changeEventTime} onDelete={confirmDelete} theme={theme} />;
-  }, [events, schedule, tab, theme]);
+    return (
+      <LogScreen
+        events={events}
+        editEventId={editEventId}
+        onEditRequestHandled={() => setEditEventId(null)}
+        onLog={logEvent}
+        onSave={saveEventDetails}
+        onDelete={confirmDelete}
+        theme={theme}
+      />
+    );
+  }, [editEventId, events, schedule, tab, theme]);
 
   return (
     <SafeAreaProvider>
@@ -128,7 +146,18 @@ export default function App() {
         <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
         <View style={styles.screen}>
           {screen}
-          {undoState ? <Toast message={undoState.message} onUndo={undo} theme={theme} /> : null}
+          {undoState ? (
+            <Toast
+              message={undoState.message}
+              onNote={() => {
+                setTab('log');
+                setEditEventId(undoState.event.id);
+                setUndoState(null);
+              }}
+              onUndo={undo}
+              theme={theme}
+            />
+          ) : null}
         </View>
         <SafeAreaView edges={['bottom']} style={{ backgroundColor: theme.nav }}>
           <BottomNav tab={tab} onChange={setTab} theme={theme} />
