@@ -12,9 +12,9 @@ export async function updateHomeWidget(events: PuppyEvent[]): Promise<void> {
   const latestLabel = latest ? `${EVENT_META[latest.type].label} · ${relativeTime(latest.at)}` : 'Tap to log';
   await requestWidgetUpdate({
     widgetName: 'PuptimeQuickLog',
-    renderWidget: () => ({
-      light: <QuickLogWidget latestLabel={latestLabel} />,
-      dark: <QuickLogWidget latestLabel={latestLabel} dark />,
+    renderWidget: ({ height }) => ({
+      light: <QuickLogWidget latestLabel={latestLabel} compact={height < 90} />,
+      dark: <QuickLogWidget latestLabel={latestLabel} compact={height < 90} dark />,
     }),
   });
 }

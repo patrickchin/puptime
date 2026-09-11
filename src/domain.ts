@@ -69,14 +69,23 @@ export function isEventType(value: unknown): value is EventType {
   return typeof value === 'string' && eventTypes.includes(value as EventType);
 }
 
-export function createEvent(type: EventType, source: PuppyEvent['source'] = 'app'): PuppyEvent {
-  const at = Date.now();
+export function createEvent(
+  type: EventType,
+  source: PuppyEvent['source'] = 'app',
+  at = Date.now(),
+): PuppyEvent {
   return {
     id: `${at}-${Math.random().toString(36).slice(2, 9)}`,
     type,
     at,
     source,
   };
+}
+
+export function normalizeBackdateMinutes(value: unknown): number {
+  const minutes = Number(value);
+  if (!Number.isFinite(minutes)) return 0;
+  return Math.min(60, Math.max(0, Math.round(minutes / 5) * 5));
 }
 
 export function dateKey(value: number | Date): string {

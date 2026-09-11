@@ -35,12 +35,13 @@
             {
               "name": "PuptimeQuickLog",
               "label": "Puptime Quick Log",
-              "description": "Log pee, poop, meals, and naps in one tap.",
+              "description": "Log in one tap. Resize taller to backdate up to an hour.",
               "minWidth": "250dp",
-              "minHeight": "110dp",
+              "minHeight": "40dp",
               "targetCellWidth": 4,
               "targetCellHeight": 2,
-              "resizeMode": "horizontal"
+              "maxResizeHeight": "110dp",
+              "resizeMode": "horizontal|vertical"
             }
           ]
         }

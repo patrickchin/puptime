@@ -15,6 +15,7 @@ export async function updateHomeWidget(events: PuppyEvent[]): Promise<void> {
   const latest = events[0];
   await PuptimeWidget.updateSnapshot({
     pending: [],
+    backdateMinutes: 0,
     latestLabel: latest ? `${new Date(latest.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'Tap to log',
   });
 }

@@ -29,7 +29,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/analytics.test.ts",
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/*.test.ts",
     "prebuild": "expo prebuild",
     "build:android": "cd android && ./gradlew assembleRelease"
   },
