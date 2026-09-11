@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { summarizeDays } from '../analytics';
-import { EVENT_META, eventTypes, formatDuration, type PuppyEvent, type ScheduleEntry } from '../domain';
+import { dateKey, EVENT_META, eventTypes, formatDuration, type PuppyEvent, type ScheduleEntry } from '../domain';
 import { spacing, type Theme } from '../theme';
 
 export function InsightsScreen({
@@ -22,11 +22,14 @@ export function InsightsScreen({
   const averageScore = scoredDays.length
     ? Math.round(scoredDays.reduce((sum, day) => sum + (day.adherence ?? 0), 0) / scoredDays.length)
     : null;
+  const pottyResults = days.reduce((sum, day) => sum + day.counts.pee + day.counts.poop, 0);
+  const napTime = days.reduce((sum, day) => sum + day.napMinutes, 0);
+  const todayKey = dateKey(Date.now());
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <Text style={[styles.eyebrow, { color: theme.primary }]}>LAST 7 DAYS</Text>
-      <Text style={[styles.title, { color: theme.text }]}>See the rhythm</Text>
+      <Text style={[styles.title, { color: theme.text }]}>Your puppy’s rhythm</Text>
       <Text style={[styles.subtitle, { color: theme.textMuted }]}>Patterns get clearer as you keep logging.</Text>
 
       <View style={styles.summaryRow}>
@@ -37,6 +40,22 @@ export function InsightsScreen({
         <View style={[styles.summaryCard, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
           <Text style={[styles.summaryNumber, { color: theme.text }]}>{averageScore === null ? '—' : `${averageScore}%`}</Text>
           <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>on schedule</Text>
+        </View>
+      </View>
+
+      <View style={[styles.insightCard, { backgroundColor: theme.primarySoft }]}>
+        <View style={[styles.insightIcon, { backgroundColor: theme.surfaceRaised }]}>
+          <MaterialCommunityIcons name="lightbulb-on-outline" size={21} color={theme.primary} />
+        </View>
+        <View style={styles.insightCopy}>
+          <Text style={[styles.insightTitle, { color: theme.text }]}>
+            {weekEvents ? 'This week is taking shape' : 'Your first pattern starts with one tap'}
+          </Text>
+          <Text style={[styles.insightBody, { color: theme.textMuted }]}>
+            {weekEvents
+              ? `${pottyResults} potty ${pottyResults === 1 ? 'result' : 'results'} and ${formatDuration(napTime * 60_000)} of nap time logged. Routine scores use only schedule windows that have finished.`
+              : 'Log a few activities and Puptime will turn them into daily comparisons here.'}
+          </Text>
         </View>
       </View>
 
@@ -52,7 +71,12 @@ export function InsightsScreen({
         </View>
         <View style={styles.napChart}>
           {days.map((day) => (
-            <View key={day.key} style={styles.napBarColumn}>
+            <View
+              key={day.key}
+              accessible
+              accessibilityLabel={`${new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(day.date)}: ${formatDuration(day.napMinutes * 60_000)} of nap time`}
+              style={styles.napBarColumn}
+            >
               <Text style={[styles.barValue, { color: theme.textMuted }]}>
                 {day.napMinutes ? formatDuration(day.napMinutes * 60_000) : ''}
               </Text>
@@ -64,7 +88,7 @@ export function InsightsScreen({
                   }}
                 />
               </View>
-              <Text style={[styles.dayLabel, { color: theme.textMuted }]}>
+              <Text style={[styles.dayLabel, { color: day.key === todayKey ? theme.primary : theme.textMuted }]}>
                 {new Intl.DateTimeFormat(undefined, { weekday: 'narrow' }).format(day.date)}
               </Text>
             </View>
@@ -84,7 +108,12 @@ export function InsightsScreen({
         </View>
         <View style={styles.chart}>
           {days.map((day) => (
-            <View key={day.key} style={styles.barColumn}>
+            <View
+              key={day.key}
+              accessible
+              accessibilityLabel={`${new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(day.date)}: ${day.total} activities logged`}
+              style={styles.barColumn}
+            >
               <Text style={[styles.barValue, { color: theme.textMuted }]}>{day.total || ''}</Text>
               <View style={[styles.barTrack, { backgroundColor: theme.primarySoft }]}>
                 <View style={styles.barStack}>
@@ -99,7 +128,7 @@ export function InsightsScreen({
                   })}
                 </View>
               </View>
-              <Text style={[styles.dayLabel, { color: theme.textMuted }]}>
+              <Text style={[styles.dayLabel, { color: day.key === todayKey ? theme.primary : theme.textMuted }]}>
                 {new Intl.DateTimeFormat(undefined, { weekday: 'narrow' }).format(day.date)}
               </Text>
             </View>
@@ -120,7 +149,12 @@ export function InsightsScreen({
         <Text style={[styles.panelCaption, { color: theme.textMuted }]}>Completed windows, within 30 minutes of each planned time</Text>
         <View style={styles.scoreList}>
           {days.map((day) => (
-            <View key={day.key} style={styles.scoreRow}>
+            <View
+              key={day.key}
+              accessible
+              accessibilityLabel={`${new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(day.date)}: ${day.adherence === null ? 'no finished schedule windows' : `${day.adherence} percent on schedule`}`}
+              style={styles.scoreRow}
+            >
               <Text style={[styles.scoreDay, { color: theme.textMuted }]}>
                 {new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(day.date)}
               </Text>
@@ -180,6 +214,11 @@ const styles = StyleSheet.create({
   summaryCard: { flex: 1, minHeight: 104, borderWidth: 1, borderRadius: 20, padding: spacing.md, justifyContent: 'center' },
   summaryNumber: { fontSize: 28, lineHeight: 34, fontWeight: '800', fontVariant: ['tabular-nums'] },
   summaryLabel: { fontSize: 13, marginTop: 2 },
+  insightCard: { borderRadius: 20, padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: 11 },
+  insightIcon: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  insightCopy: { flex: 1, minWidth: 0 },
+  insightTitle: { fontSize: 15, lineHeight: 20, fontWeight: '700' },
+  insightBody: { fontSize: 12, lineHeight: 18, marginTop: 2 },
   panel: { borderWidth: 1, borderRadius: 22, padding: spacing.md },
   panelHeading: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: spacing.sm },
   smallIcon: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },

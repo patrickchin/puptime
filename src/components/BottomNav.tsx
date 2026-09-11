@@ -6,7 +6,7 @@ import { type Theme } from '../theme';
 export type Tab = 'log' | 'insights' | 'schedule';
 
 const tabs: { id: Tab; label: string; icon: keyof typeof MaterialCommunityIcons.glyphMap }[] = [
-  { id: 'log', label: 'Log', icon: 'format-list-bulleted' },
+  { id: 'log', label: 'Today', icon: 'home-variant-outline' },
   { id: 'insights', label: 'Insights', icon: 'chart-bar' },
   { id: 'schedule', label: 'Schedule', icon: 'calendar-clock-outline' },
 ];
