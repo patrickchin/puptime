@@ -18,10 +18,11 @@ const suggestions = ['Water', 'Accident', 'Play', 'Training', 'Crate', 'Medicine
 type Props = {
   events: PuppyEvent[];
   onLog: (type: EventType, customLabel?: string) => void;
+  now: number;
   theme: Theme;
 };
 
-export function QuickActions({ events, onLog, theme }: Props) {
+export function QuickActions({ events, onLog, now, theme }: Props) {
   const [showMore, setShowMore] = useState(false);
   const [customLabel, setCustomLabel] = useState('');
   const openNap = events.find(isOpenNap);
@@ -77,8 +78,8 @@ export function QuickActions({ events, onLog, theme }: Props) {
               <Text numberOfLines={1} style={[styles.actionTime, { color: theme.textMuted }]}>
                 {latest
                   ? isEndingNap
-                    ? `${relativeTime(latest.at).replace(' ago', '')} running`
-                    : relativeTime(latest.endedAt ?? latest.at)
+                    ? `${relativeTime(latest.at, now).replace(' ago', '')} running`
+                    : relativeTime(latest.endedAt ?? latest.at, now)
                   : 'Not yet'}
               </Text>
             </Pressable>

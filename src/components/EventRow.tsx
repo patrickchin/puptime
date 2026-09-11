@@ -15,17 +15,19 @@ export function EventRow({
   event,
   onEditTime,
   onDelete,
+  now,
   theme,
 }: {
   event: PuppyEvent;
   onEditTime: () => void;
   onDelete: () => void;
+  now: number;
   theme: Theme;
 }) {
   const meta = EVENT_META[event.type];
   const timedNap = event.type === 'nap' && event.endedAt !== undefined;
   const running = isOpenNap(event);
-  const duration = timedNap ? formatDuration((event.endedAt ?? Date.now()) - event.at) : null;
+  const duration = timedNap ? formatDuration((event.endedAt ?? now) - event.at) : null;
   const timeSummary = timedNap
     ? `${formatTime(event.at)}–${running ? 'now' : formatTime(event.endedAt as number)} · ${duration}${running ? ' running' : ''}`
     : `${formatTime(event.at)} · ${event.source === 'widget' ? 'Widget' : 'App'}`;

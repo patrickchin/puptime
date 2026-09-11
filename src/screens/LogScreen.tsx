@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal, Platform, Pressable, ScrollView, SectionList, StyleSheet, Text, View } from 'react-native';
 
 import { QuickActions } from '../components/QuickActions';
@@ -57,6 +57,12 @@ export function LogScreen({
   const [draft, setDraft] = useState<Draft | null>(null);
   const [showAndroidPicker, setShowAndroidPicker] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
   const byDay = new Map<string, PuppyEvent[]>();
   events.forEach((event) => {
     const key = dateKey(event.at);
@@ -116,7 +122,7 @@ export function LogScreen({
               </View>
             </View>
             <Text style={[styles.subtitle, { color: theme.textMuted }]}>One tap saves the time. Nap toggles between start and end.</Text>
-            <QuickActions events={events} onLog={onLog} theme={theme} />
+            <QuickActions events={events} onLog={onLog} now={now} theme={theme} />
             <View style={styles.activityHeading}>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>Activity</Text>
               <Text style={[styles.count, { color: theme.textMuted }]}>{events.length} total</Text>
@@ -129,6 +135,7 @@ export function LogScreen({
         renderItem={({ item }) => (
           <EventRow
             event={item}
+            now={now}
             onEditTime={() => setDraft({ event: item, at: item.at, endedAt: item.endedAt, field: 'start' })}
             onDelete={() => onDelete(item)}
             theme={theme}
