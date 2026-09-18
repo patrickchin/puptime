@@ -2,32 +2,141 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { summarizeDays } from '../analytics';
-import { dateKey, EVENT_META, eventTypes, formatDuration, type PuppyEvent, type ScheduleEntry } from '../domain';
+import {
+  buildTimelineDays,
+  TIMELINE_BUCKET_MINUTES,
+  TIMELINE_BUCKETS,
+  type TimelineDay,
+  type TimelineMark,
+} from '../analytics';
+import { dateKey, EVENT_META, eventTypes, type EventType, type PuppyEvent } from '../domain';
 import { shareEventsCsv } from '../share-export';
 import { spacing, type Theme } from '../theme';
 
+type ActivityFilter = EventType | 'all';
+
+const activityFilters: ActivityFilter[] = ['all', ...eventTypes];
+const shortDay = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
+const shortDate = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
+const fullDate = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+const bucketTime = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+
+function formatBucket(bucket: number): string {
+  return bucketTime.format(new Date(2000, 0, 1, 0, bucket * TIMELINE_BUCKET_MINUTES));
+}
+
+function describeMark(mark: TimelineMark): string {
+  return mark.endBucket === undefined
+    ? `${mark.label} in the ${formatBucket(mark.startBucket)} to ${formatBucket(mark.startBucket + 1)} window`
+    : `${mark.label} from about ${formatBucket(mark.startBucket)} to ${formatBucket(mark.endBucket)}`;
+}
+
+function filterName(filter: ActivityFilter): string {
+  return filter === 'all' ? 'activity' : EVENT_META[filter].label.toLowerCase();
+}
+
+function eventColor(type: EventType, theme: Theme): string {
+  return theme.isDark ? EVENT_META[type].darkColor : EVENT_META[type].color;
+}
+
+function TimelineRow({
+  day,
+  filter,
+  isToday,
+  theme,
+}: {
+  day: TimelineDay;
+  filter: ActivityFilter;
+  isToday: boolean;
+  theme: Theme;
+}) {
+  const marks = filter === 'all' ? day.marks : day.marks.filter((mark) => mark.type === filter);
+  const description = marks.length
+    ? marks.map(describeMark).join('. ')
+    : `No ${filterName(filter)} logged`;
+
+  return (
+    <View
+      accessible
+      accessibilityLabel={`${fullDate.format(day.date)}. ${description}.`}
+      style={styles.timelineRow}
+    >
+      <View style={styles.dateLabel}>
+        <Text maxFontSizeMultiplier={1.5} style={[styles.weekday, { color: isToday ? theme.primary : theme.text }]}>
+          {isToday ? 'TODAY' : shortDay.format(day.date).toUpperCase()}
+        </Text>
+        <Text maxFontSizeMultiplier={1.5} style={[styles.calendarDate, { color: theme.textMuted }]}>
+          {shortDate.format(day.date)}
+        </Text>
+      </View>
+      <View
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={[
+          styles.timelineTrack,
+          {
+            backgroundColor: isToday ? theme.primarySoft : theme.surface,
+            borderColor: isToday ? theme.primary : theme.border,
+          },
+        ]}
+      >
+        {[0.25, 0.5, 0.75].map((position) => (
+          <View
+            key={position}
+            style={[styles.gridLine, { backgroundColor: theme.border, left: `${position * 100}%` }]}
+          />
+        ))}
+        {marks.map((mark) => {
+          const color = eventColor(mark.type, theme);
+          if (mark.endBucket !== undefined) {
+            return (
+              <View
+                key={mark.id}
+                style={[
+                  styles.durationMark,
+                  {
+                    backgroundColor: color,
+                    left: `${(mark.startBucket / TIMELINE_BUCKETS) * 100}%`,
+                    width: `${((mark.endBucket - mark.startBucket) / TIMELINE_BUCKETS) * 100}%`,
+                  },
+                ]}
+              />
+            );
+          }
+          return (
+            <View
+              key={mark.id}
+              style={[
+                styles.pointMark,
+                {
+                  backgroundColor: color,
+                  left: `${((mark.startBucket + 0.5) / TIMELINE_BUCKETS) * 100}%`,
+                },
+              ]}
+            />
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 export function InsightsScreen({
   events,
-  schedule,
   theme,
 }: {
   events: PuppyEvent[];
-  schedule: ScheduleEntry[];
   theme: Theme;
 }) {
+  const [filter, setFilter] = useState<ActivityFilter>('all');
   const [exporting, setExporting] = useState(false);
-  const days = summarizeDays(events, schedule);
-  const maxTotal = Math.max(1, ...days.map((day) => day.total));
-  const maxNapMinutes = Math.max(1, ...days.map((day) => day.napMinutes));
-  const weekEvents = days.reduce((sum, day) => sum + day.total, 0);
-  const scoredDays = days.filter((day) => day.adherence !== null);
-  const averageScore = scoredDays.length
-    ? Math.round(scoredDays.reduce((sum, day) => sum + (day.adherence ?? 0), 0) / scoredDays.length)
-    : null;
-  const pottyResults = days.reduce((sum, day) => sum + day.counts.pee + day.counts.poop, 0);
-  const napTime = days.reduce((sum, day) => sum + day.napMinutes, 0);
-  const todayKey = dateKey(Date.now());
+  const now = new Date();
+  const days = buildTimelineDays(events, 14, now);
+  const todayKey = dateKey(now);
+  const visibleEventCount = days.reduce(
+    (sum, day) => sum + day.marks.filter((mark) => filter === 'all' || mark.type === filter).length,
+    0,
+  );
   const exportDisabled = exporting || events.length === 0;
 
   async function exportActivity() {
@@ -44,171 +153,111 @@ export function InsightsScreen({
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
-      <Text style={[styles.eyebrow, { color: theme.primary }]}>LAST 7 DAYS</Text>
-      <Text style={[styles.title, { color: theme.text }]}>Your puppy’s rhythm</Text>
-      <Text style={[styles.subtitle, { color: theme.textMuted }]}>Patterns get clearer as you keep logging.</Text>
+      <Text style={[styles.eyebrow, { color: theme.primary }]}>DAILY RHYTHM · 15 MINUTE WINDOWS</Text>
+      <Text style={[styles.title, { color: theme.text }]}>When things happen</Text>
+      <Text style={[styles.subtitle, { color: theme.textMuted }]}>
+        Compare timing across days—not totals or targets.
+      </Text>
 
-      <View style={styles.summaryRow}>
-        <View style={[styles.summaryCard, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
-          <Text style={[styles.summaryNumber, { color: theme.text }]}>{weekEvents}</Text>
-          <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>events logged</Text>
-        </View>
-        <View style={[styles.summaryCard, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
-          <Text style={[styles.summaryNumber, { color: theme.text }]}>{averageScore === null ? '—' : `${averageScore}%`}</Text>
-          <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>on schedule</Text>
-        </View>
-      </View>
-
-      <View style={[styles.insightCard, { backgroundColor: theme.primarySoft }]}>
-        <View style={[styles.insightIcon, { backgroundColor: theme.surfaceRaised }]}>
-          <MaterialCommunityIcons name="lightbulb-on-outline" size={21} color={theme.primary} />
-        </View>
-        <View style={styles.insightCopy}>
-          <Text style={[styles.insightTitle, { color: theme.text }]}>
-            {weekEvents ? 'This week is taking shape' : 'Your first pattern starts with one tap'}
-          </Text>
-          <Text style={[styles.insightBody, { color: theme.textMuted }]}>
-            {weekEvents
-              ? `${pottyResults} potty ${pottyResults === 1 ? 'result' : 'results'} and ${formatDuration(napTime * 60_000)} of nap time logged. Routine scores use only schedule windows that have finished.`
-              : 'Log a few activities and Puptime will turn them into daily comparisons here.'}
-          </Text>
-        </View>
-      </View>
-
-      <View style={[styles.panel, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
-        <View style={styles.panelHeading}>
-          <View style={[styles.smallIcon, { backgroundColor: EVENT_META.nap.softColor }]}>
-            <MaterialCommunityIcons name="sleep" size={20} color={EVENT_META.nap.color} />
-          </View>
-          <View>
-            <Text style={[styles.panelTitle, { color: theme.text }]}>Nap time</Text>
-            <Text style={[styles.panelCaption, { color: theme.textMuted }]}>Completed and currently running naps</Text>
-          </View>
-        </View>
-        <View style={styles.napChart}>
-          {days.map((day) => (
-            <View
-              key={day.key}
-              accessible
-              accessibilityLabel={`${new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(day.date)}: ${formatDuration(day.napMinutes * 60_000)} of nap time`}
-              style={styles.napBarColumn}
+      <View style={styles.filters} accessibilityRole="radiogroup">
+        {activityFilters.map((type) => {
+          const selected = type === filter;
+          const meta = type === 'all'
+            ? { label: 'All', icon: 'layers-outline' }
+            : EVENT_META[type];
+          const color = type === 'all' ? theme.primary : eventColor(type, theme);
+          const softColor = type === 'all'
+            ? theme.primarySoft
+            : theme.isDark ? EVENT_META[type].darkSoftColor : EVENT_META[type].softColor;
+          return (
+            <Pressable
+              key={type}
+              accessibilityRole="radio"
+              accessibilityLabel={`Show ${meta.label} timing`}
+              accessibilityState={{ selected }}
+              onPress={() => setFilter(type)}
+              style={({ pressed }) => [
+                styles.filterChip,
+                {
+                  backgroundColor: selected ? softColor : theme.surfaceRaised,
+                  borderColor: selected ? color : theme.border,
+                  opacity: pressed ? 0.72 : 1,
+                },
+              ]}
             >
-              <Text style={[styles.barValue, { color: theme.textMuted }]}>
-                {day.napMinutes ? formatDuration(day.napMinutes * 60_000) : ''}
+              <MaterialCommunityIcons
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+                name={meta.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+                size={18}
+                color={color}
+              />
+              <Text style={[styles.filterLabel, { color: selected ? color : theme.textMuted }]}>
+                {meta.label}
               </Text>
-              <View style={[styles.napBarTrack, { backgroundColor: EVENT_META.nap.softColor }]}>
-                <View
-                  style={{
-                    height: day.napMinutes ? Math.max(4, (day.napMinutes / maxNapMinutes) * 88) : 0,
-                    backgroundColor: EVENT_META.nap.color,
-                  }}
-                />
-              </View>
-              <Text style={[styles.dayLabel, { color: day.key === todayKey ? theme.primary : theme.textMuted }]}>
-                {new Intl.DateTimeFormat(undefined, { weekday: 'narrow' }).format(day.date)}
-              </Text>
-            </View>
-          ))}
-        </View>
+            </Pressable>
+          );
+        })}
       </View>
 
       <View style={[styles.panel, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
         <View style={styles.panelHeading}>
           <View style={[styles.smallIcon, { backgroundColor: theme.primarySoft }]}>
-            <MaterialCommunityIcons name="chart-timeline-variant" size={20} color={theme.primary} />
+            <MaterialCommunityIcons
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              name="chart-timeline-variant"
+              size={21}
+              color={theme.primary}
+            />
           </View>
-          <View>
-            <Text style={[styles.panelTitle, { color: theme.text }]}>Daily activity</Text>
-            <Text style={[styles.panelCaption, { color: theme.textMuted }]}>All logged events</Text>
+          <View style={styles.panelHeadingCopy}>
+            <Text style={[styles.panelTitle, { color: theme.text }]}>
+              {filter === 'all' ? 'All activity' : `${EVENT_META[filter].label} timing`}
+            </Text>
+            <Text style={[styles.panelCaption, { color: theme.textMuted }]}>
+              14 calendar days · oldest at top · today at bottom
+            </Text>
           </View>
         </View>
-        <View style={styles.chart}>
-          {days.map((day) => (
-            <View
-              key={day.key}
-              accessible
-              accessibilityLabel={`${new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(day.date)}: ${day.total} activities logged`}
-              style={styles.barColumn}
-            >
-              <Text style={[styles.barValue, { color: theme.textMuted }]}>{day.total || ''}</Text>
-              <View style={[styles.barTrack, { backgroundColor: theme.primarySoft }]}>
-                <View style={styles.barStack}>
-                  {[...eventTypes].reverse().map((type) => {
-                    const count = day.counts[type];
-                    return count > 0 ? (
-                      <View
-                        key={type}
-                        style={{ height: Math.max(4, (count / maxTotal) * 112), backgroundColor: EVENT_META[type].color }}
-                      />
-                    ) : null;
-                  })}
-                </View>
-              </View>
-              <Text style={[styles.dayLabel, { color: day.key === todayKey ? theme.primary : theme.textMuted }]}>
-                {new Intl.DateTimeFormat(undefined, { weekday: 'narrow' }).format(day.date)}
-              </Text>
-            </View>
-          ))}
-        </View>
-        <View style={styles.legend}>
-          {eventTypes.map((type) => (
-            <View key={type} style={styles.legendItem}>
-              <View style={[styles.dot, { backgroundColor: EVENT_META[type].color }]} />
-              <Text style={[styles.legendLabel, { color: theme.textMuted }]}>{EVENT_META[type].label}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
 
-      <View style={[styles.panel, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
-        <Text style={[styles.panelTitle, { color: theme.text }]}>Schedule consistency</Text>
-        <Text style={[styles.panelCaption, { color: theme.textMuted }]}>Completed windows, within 30 minutes of each planned time</Text>
-        <View style={styles.scoreList}>
+        <View style={styles.axisRow} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <View style={styles.axisSpacer} />
+          <View style={styles.axisTrack}>
+            <Text maxFontSizeMultiplier={1.5} style={[styles.axisLabel, styles.axisStart, { color: theme.textMuted }]}>12a</Text>
+            <Text maxFontSizeMultiplier={1.5} style={[styles.axisLabel, styles.axisQuarter, { color: theme.textMuted }]}>6a</Text>
+            <Text maxFontSizeMultiplier={1.5} style={[styles.axisLabel, styles.axisHalf, { color: theme.textMuted }]}>12p</Text>
+            <Text maxFontSizeMultiplier={1.5} style={[styles.axisLabel, styles.axisThreeQuarter, { color: theme.textMuted }]}>6p</Text>
+            <Text maxFontSizeMultiplier={1.5} style={[styles.axisLabel, styles.axisEnd, { color: theme.textMuted }]}>12a</Text>
+          </View>
+        </View>
+
+        <View style={styles.timeline}>
           {days.map((day) => (
-            <View
+            <TimelineRow
               key={day.key}
-              accessible
-              accessibilityLabel={`${new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(day.date)}: ${day.adherence === null ? 'no finished schedule windows' : `${day.adherence} percent on schedule`}`}
-              style={styles.scoreRow}
-            >
-              <Text style={[styles.scoreDay, { color: theme.textMuted }]}>
-                {new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(day.date)}
-              </Text>
-              <View style={[styles.scoreTrack, { backgroundColor: theme.primarySoft }]}>
-                <View
-                  style={[
-                    styles.scoreFill,
-                    { backgroundColor: theme.primary, width: `${day.adherence ?? 0}%` },
-                  ]}
-                />
-              </View>
-              <Text style={[styles.scoreValue, { color: theme.text }]}>
-                {day.adherence === null ? '—' : `${day.adherence}%`}
-              </Text>
-            </View>
+              day={day}
+              filter={filter}
+              isToday={day.key === todayKey}
+              theme={theme}
+            />
           ))}
         </View>
-      </View>
 
-      <View style={styles.typeGrid}>
-        {eventTypes.map((type) => {
-          const total = days.reduce((sum, day) => sum + day.counts[type], 0);
-          const meta = EVENT_META[type];
-          const value = type === 'nap'
-            ? formatDuration(days.reduce((sum, day) => sum + day.napMinutes, 0) * 60_000)
-            : total;
-          return (
-            <View key={type} style={[styles.typeCard, { backgroundColor: meta.softColor }]}>
-              <MaterialCommunityIcons
-                name={meta.icon as keyof typeof MaterialCommunityIcons.glyphMap}
-                size={22}
-                color={meta.color}
-              />
-              <Text style={[styles.typeNumber, { color: meta.color }]}>{value}</Text>
-              <Text style={[styles.typeLabel, { color: meta.color }]}>{type === 'nap' ? 'nap time this week' : `${meta.label} this week`}</Text>
-            </View>
-          );
-        })}
+        {visibleEventCount === 0 ? (
+          <View style={[styles.emptyNote, { backgroundColor: theme.surface }]}>
+            <MaterialCommunityIcons
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              name="clock-outline"
+              size={19}
+              color={theme.textMuted}
+            />
+            <Text style={[styles.emptyText, { color: theme.textMuted }]}>
+              No {filterName(filter)} logged in these 14 days yet.
+            </Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={[styles.exportCard, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
@@ -224,7 +273,9 @@ export function InsightsScreen({
           </View>
           <View style={styles.exportCopy}>
             <Text style={[styles.panelTitle, { color: theme.text }]}>Your data</Text>
-            <Text style={[styles.panelCaption, { color: theme.textMuted }]}>Share every log as a spreadsheet-ready CSV. Nothing leaves this device until you choose where to send it.</Text>
+            <Text style={[styles.panelCaption, { color: theme.textMuted }]}>
+              Share every log as a spreadsheet-ready CSV. Nothing leaves this device until you choose where to send it.
+            </Text>
           </View>
         </View>
         <Pressable
@@ -268,46 +319,74 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
     gap: spacing.md,
   },
-  eyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 1.6, marginTop: 4 },
+  eyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 1.5, marginTop: 4 },
   title: { fontSize: 30, lineHeight: 36, fontWeight: '800', letterSpacing: -0.6, marginTop: -8 },
   subtitle: { fontSize: 15, lineHeight: 22, marginTop: -10 },
-  summaryRow: { flexDirection: 'row', gap: spacing.sm },
-  summaryCard: { flex: 1, minHeight: 104, borderWidth: 1, borderRadius: 20, padding: spacing.md, justifyContent: 'center' },
-  summaryNumber: { fontSize: 28, lineHeight: 34, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  summaryLabel: { fontSize: 13, marginTop: 2 },
-  insightCard: { borderRadius: 20, padding: spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: 11 },
-  insightIcon: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  insightCopy: { flex: 1, minWidth: 0 },
-  insightTitle: { fontSize: 15, lineHeight: 20, fontWeight: '700' },
-  insightBody: { fontSize: 12, lineHeight: 18, marginTop: 2 },
-  panel: { borderWidth: 1, borderRadius: 22, padding: spacing.md },
-  panelHeading: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: spacing.sm },
+  filters: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  filterChip: {
+    minHeight: 48,
+    borderWidth: 1,
+    borderRadius: 15,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  filterLabel: { fontSize: 13, lineHeight: 18, fontWeight: '700' },
+  panel: { borderWidth: 1, borderRadius: 22, padding: 12 },
+  panelHeading: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 4, marginBottom: spacing.sm },
+  panelHeadingCopy: { flex: 1, minWidth: 0 },
   smallIcon: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  panelTitle: { fontSize: 18, fontWeight: '700' },
+  panelTitle: { fontSize: 18, lineHeight: 23, fontWeight: '700' },
   panelCaption: { fontSize: 12, lineHeight: 17, marginTop: 1 },
-  chart: { height: 158, flexDirection: 'row', alignItems: 'flex-end', gap: 7, marginTop: 10 },
-  napChart: { height: 134, flexDirection: 'row', alignItems: 'flex-end', gap: 7, marginTop: 10 },
-  barColumn: { flex: 1, height: 158, alignItems: 'center', justifyContent: 'flex-end' },
-  napBarColumn: { flex: 1, height: 134, alignItems: 'center', justifyContent: 'flex-end' },
-  barValue: { height: 20, fontSize: 11, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  barTrack: { width: '72%', height: 112, borderRadius: 7, overflow: 'hidden', justifyContent: 'flex-end' },
-  napBarTrack: { width: '72%', height: 88, borderRadius: 7, overflow: 'hidden', justifyContent: 'flex-end' },
-  barStack: { width: '100%', justifyContent: 'flex-end' },
-  dayLabel: { height: 22, fontSize: 12, fontWeight: '700', marginTop: 4 },
-  legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center', marginTop: 8 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  legendLabel: { fontSize: 12, fontWeight: '600' },
-  scoreList: { gap: 12, marginTop: spacing.md },
-  scoreRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  scoreDay: { width: 34, fontSize: 12, fontWeight: '700' },
-  scoreTrack: { flex: 1, height: 10, borderRadius: 5, overflow: 'hidden' },
-  scoreFill: { height: 10, borderRadius: 5 },
-  scoreValue: { width: 40, textAlign: 'right', fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  typeCard: { minWidth: 148, flexBasis: '48%', flexGrow: 1, borderRadius: 18, padding: spacing.md },
-  typeNumber: { fontSize: 24, fontWeight: '800', marginTop: 7 },
-  typeLabel: { fontSize: 12, fontWeight: '600', marginTop: 1 },
+  axisRow: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 5 },
+  axisSpacer: { width: 58 },
+  axisTrack: { flex: 1, height: 16, position: 'relative' },
+  axisLabel: { position: 'absolute', width: 34, fontSize: 10, lineHeight: 14, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  axisStart: { left: 0, textAlign: 'left' },
+  axisQuarter: { left: '25%', marginLeft: -17, textAlign: 'center' },
+  axisHalf: { left: '50%', marginLeft: -17, textAlign: 'center' },
+  axisThreeQuarter: { left: '75%', marginLeft: -17, textAlign: 'center' },
+  axisEnd: { right: 0, textAlign: 'right' },
+  timeline: { gap: 5 },
+  timelineRow: { minHeight: 38, flexDirection: 'row', alignItems: 'center' },
+  dateLabel: { width: 58, paddingRight: 7 },
+  weekday: { fontSize: 10, lineHeight: 13, fontWeight: '800', letterSpacing: 0.35 },
+  calendarDate: { fontSize: 10, lineHeight: 13, fontWeight: '600', marginTop: 1 },
+  timelineTrack: {
+    flex: 1,
+    height: 32,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 8,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  gridLine: { position: 'absolute', top: 0, bottom: 0, width: StyleSheet.hairlineWidth },
+  pointMark: {
+    position: 'absolute',
+    top: 6,
+    width: 5,
+    height: 20,
+    marginLeft: -2.5,
+    borderRadius: 3,
+  },
+  durationMark: {
+    position: 'absolute',
+    top: 11,
+    minWidth: 3,
+    height: 10,
+    borderRadius: 5,
+  },
+  emptyNote: {
+    minHeight: 44,
+    marginTop: spacing.sm,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  emptyText: { flex: 1, fontSize: 12, lineHeight: 17 },
   exportCard: { borderWidth: 1, borderRadius: 22, padding: spacing.md, gap: spacing.md },
   exportHeading: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   exportCopy: { flex: 1, minWidth: 0 },

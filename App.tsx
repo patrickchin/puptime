@@ -142,7 +142,7 @@ export default function App() {
   };
 
   const screen = useMemo(() => {
-    if (tab === 'insights') return <InsightsScreen events={events} schedule={schedule} theme={theme} />;
+    if (tab === 'insights') return <InsightsScreen events={events} theme={theme} />;
     if (tab === 'schedule') {
       return (
         <ScheduleScreen

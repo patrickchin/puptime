@@ -7,7 +7,7 @@ export type Tab = 'log' | 'insights' | 'schedule';
 
 const tabs: { id: Tab; label: string; icon: keyof typeof MaterialCommunityIcons.glyphMap }[] = [
   { id: 'log', label: 'Today', icon: 'home-variant-outline' },
-  { id: 'insights', label: 'Insights', icon: 'chart-bar' },
+  { id: 'insights', label: 'Insights', icon: 'chart-timeline-variant' },
   { id: 'schedule', label: 'Schedule', icon: 'calendar-clock-outline' },
 ];
 

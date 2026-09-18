@@ -1,12 +1,20 @@
-import { dateKey, eventTypes, type EventType, type PuppyEvent, type ScheduleEntry } from './domain.ts';
+import { dateKey, eventLabel, type EventType, type PuppyEvent, type ScheduleEntry } from './domain.ts';
 
-export type DaySummary = {
+export const TIMELINE_BUCKET_MINUTES = 15;
+export const TIMELINE_BUCKETS = (24 * 60) / TIMELINE_BUCKET_MINUTES;
+
+export type TimelineMark = {
+  id: string;
+  type: EventType;
+  label: string;
+  startBucket: number;
+  endBucket?: number;
+};
+
+export type TimelineDay = {
   key: string;
   date: Date;
-  counts: Record<EventType, number>;
-  total: number;
-  napMinutes: number;
-  adherence: number | null;
+  marks: TimelineMark[];
 };
 
 export type ScheduleStatus = 'done' | 'due' | 'upcoming' | 'missed';
@@ -17,37 +25,6 @@ export type ScheduleStatusItem = {
   status: ScheduleStatus;
   event?: PuppyEvent;
 };
-
-export function napMinutesForDay(events: PuppyEvent[], day: Date, now = Date.now()): number {
-  const dayStart = new Date(day);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(dayStart);
-  dayEnd.setDate(dayEnd.getDate() + 1);
-
-  const milliseconds = events
-    .filter((event) => event.type === 'nap' && event.endedAt !== undefined)
-    .reduce((sum, event) => {
-      const end = event.endedAt ?? now;
-      return sum + Math.max(0, Math.min(end, dayEnd.getTime(), now) - Math.max(event.at, dayStart.getTime()));
-    }, 0);
-  return Math.round(milliseconds / 60_000);
-}
-
-export function adherenceForDay(
-  events: PuppyEvent[],
-  schedule: ScheduleEntry[],
-  day: Date,
-  toleranceMinutes = 30,
-  now = Date.now(),
-): number | null {
-  if (schedule.length === 0) return null;
-
-  const completedWindows = scheduleStatusesForDay(events, schedule, day, toleranceMinutes, now)
-    .filter((item) => item.target + toleranceMinutes * 60_000 <= now);
-  if (completedWindows.length === 0) return null;
-  const matched = completedWindows.filter((item) => item.status === 'done').length;
-  return Math.round((matched / completedWindows.length) * 100);
-}
 
 export function scheduleStatusesForDay(
   events: PuppyEvent[],
@@ -114,29 +91,72 @@ export function scheduleStatusesForDay(
   });
 }
 
-export function summarizeDays(
+function minutesIntoDay(value: number): number {
+  const date = new Date(value);
+  return date.getHours() * 60 + date.getMinutes() + date.getSeconds() / 60 + date.getMilliseconds() / 60_000;
+}
+
+export function timelineBucket(value: number): number {
+  return Math.min(TIMELINE_BUCKETS - 1, Math.floor(minutesIntoDay(value) / TIMELINE_BUCKET_MINUTES));
+}
+
+export function buildTimelineDays(
   events: PuppyEvent[],
-  schedule: ScheduleEntry[],
-  days = 7,
+  days = 14,
   now = new Date(),
-): DaySummary[] {
-  return Array.from({ length: days }, (_, index) => {
+): TimelineDay[] {
+  const dayCount = Math.max(0, Math.floor(days));
+  const nowTime = now.getTime();
+
+  return Array.from({ length: dayCount }, (_, index) => {
     const date = new Date(now);
     date.setHours(0, 0, 0, 0);
-    date.setDate(date.getDate() - (days - index - 1));
+    date.setDate(date.getDate() - (dayCount - index - 1));
     const key = dateKey(date);
-    const dayEvents = events.filter((event) => dateKey(event.at) === key);
-    const counts = Object.fromEntries(
-      eventTypes.map((type) => [type, dayEvents.filter((event) => event.type === type).length]),
-    ) as Record<EventType, number>;
+    const dayStart = date.getTime();
+    const dayEndDate = new Date(date);
+    dayEndDate.setDate(dayEndDate.getDate() + 1);
+    const dayEnd = dayEndDate.getTime();
+
+    const marks = events.flatMap<TimelineMark>((event) => {
+      if (event.type === 'nap' && event.endedAt !== undefined) {
+        const napEnd = Math.max(event.at, Math.min(event.endedAt ?? nowTime, nowTime));
+        const start = Math.max(event.at, dayStart);
+        const end = Math.min(napEnd, dayEnd);
+        if (end <= start) return [];
+
+        const startBucket = start === dayStart ? 0 : timelineBucket(start);
+        const endBucket = end === dayEnd
+          ? TIMELINE_BUCKETS
+          : Math.min(
+              TIMELINE_BUCKETS,
+              Math.max(startBucket + 1, Math.ceil(minutesIntoDay(end) / TIMELINE_BUCKET_MINUTES)),
+            );
+        return [{
+          id: event.id,
+          type: event.type,
+          label: eventLabel(event),
+          startBucket,
+          endBucket,
+        }];
+      }
+
+      if (dateKey(event.at) !== key) return [];
+      return [{
+        id: event.id,
+        type: event.type,
+        label: eventLabel(event),
+        startBucket: timelineBucket(event.at),
+      }];
+    }).sort((a, b) =>
+      a.startBucket - b.startBucket
+      || Number(a.endBucket === undefined) - Number(b.endBucket === undefined),
+    );
 
     return {
       key,
       date,
-      counts,
-      total: dayEvents.length,
-      napMinutes: napMinutesForDay(events, date, now.getTime()),
-      adherence: adherenceForDay(events, schedule, date, 30, now.getTime()),
+      marks,
     };
   });
 }

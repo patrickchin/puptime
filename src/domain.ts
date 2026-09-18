@@ -28,7 +28,15 @@ export type ScheduleEntry = {
 
 export const EVENT_META: Record<
   EventType,
-  { label: string; pastLabel: string; icon: string; color: string; softColor: string }
+  {
+    label: string;
+    pastLabel: string;
+    icon: string;
+    color: string;
+    softColor: string;
+    darkColor: string;
+    darkSoftColor: string;
+  }
 > = {
   pee: {
     label: 'Pee',
@@ -36,6 +44,8 @@ export const EVENT_META: Record<
     icon: 'water-outline',
     color: '#167A5A',
     softColor: '#DDF4E9',
+    darkColor: '#73D3AD',
+    darkSoftColor: '#253E33',
   },
   poop: {
     label: 'Poop',
@@ -43,6 +53,8 @@ export const EVENT_META: Record<
     icon: 'emoticon-poop-outline',
     color: '#9A5A24',
     softColor: '#F6E8D8',
+    darkColor: '#D99A61',
+    darkSoftColor: '#3B2D22',
   },
   meal: {
     label: 'Ate',
@@ -50,6 +62,8 @@ export const EVENT_META: Record<
     icon: 'food-apple-outline',
     color: '#A43F34',
     softColor: '#FBE5E2',
+    darkColor: '#EE887C',
+    darkSoftColor: '#432927',
   },
   pottyTrip: {
     label: 'Potty trip',
@@ -57,6 +71,8 @@ export const EVENT_META: Record<
     icon: 'door-open',
     color: '#31709B',
     softColor: '#DFEFF8',
+    darkColor: '#72B7E6',
+    darkSoftColor: '#203745',
   },
   walk: {
     label: 'Walk',
@@ -64,6 +80,8 @@ export const EVENT_META: Record<
     icon: 'walk',
     color: '#6A6422',
     softColor: '#F3F0D2',
+    darkColor: '#C5BA5A',
+    darkSoftColor: '#37351F',
   },
   nap: {
     label: 'Nap',
@@ -71,6 +89,8 @@ export const EVENT_META: Record<
     icon: 'sleep',
     color: '#5C61A8',
     softColor: '#E8E7FA',
+    darkColor: '#A1A5EB',
+    darkSoftColor: '#2F3048',
   },
   custom: {
     label: 'Other',
@@ -78,6 +98,8 @@ export const EVENT_META: Record<
     icon: 'tag-outline',
     color: '#626A66',
     softColor: '#E9ECEA',
+    darkColor: '#B9C5BE',
+    darkSoftColor: '#2D3531',
   },
 };
 

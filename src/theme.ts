@@ -1,6 +1,7 @@
 export type Theme = typeof lightTheme;
 
 export const lightTheme = {
+  isDark: false as boolean,
   background: '#F5F3EC',
   surface: '#FFFEFA',
   surfaceRaised: '#FFFFFF',
@@ -18,6 +19,7 @@ export const lightTheme = {
 };
 
 export const darkTheme: Theme = {
+  isDark: true,
   background: '#101713',
   surface: '#17211C',
   surfaceRaised: '#1D2923',
