@@ -2,7 +2,7 @@
   "expo": {
     "name": "Puptime",
     "slug": "puptime",
-    "version": "1.10.0",
+    "version": "1.10.1",
     "description": "One-tap puppy routine tracking from your app or home screen.",
     "scheme": "puptime",
     "icon": "./assets/puptime-icon.png",
@@ -10,11 +10,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.patrickchin.puptime",
-      "buildNumber": "13"
+      "buildNumber": "14"
     },
     "android": {
       "package": "com.patrickchin.puptime",
-      "versionCode": 13,
+      "versionCode": 14,
       "blockedPermissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
