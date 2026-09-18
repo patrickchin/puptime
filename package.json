@@ -1,6 +1,6 @@
 {
   "name": "puptime",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "main": "index.ts",
   "dependencies": {
     "@expo/ui": "~57.0.18",

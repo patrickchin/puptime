@@ -14,6 +14,8 @@ Puptime is a private, offline puppy routine tracker for Android and iOS. Log pot
 - An editable daily routine with native time pickers and clear logged, due, upcoming, and missed states
 - Optional per-activity daily reminders, scheduled locally on the device
 - A 14-day timing timeline with one row per calendar day, 15-minute windows, activity filters, and visible nap spans
+- Pee and poop frequency summaries with per-recorded-day averages, observed ranges, and typical gaps between logs
+- A reviewable routine suggestion built from recurring activity times across at least three recorded days
 - A spreadsheet-ready CSV export of the complete activity history, including notes and exact timestamps
 - Polished, color-coded Android and iOS home-screen widgets with clear activity icons
 - Automatic light and dark themes
@@ -39,6 +41,8 @@ Saved notes and activity data stay on your device. Voice dictation uses your pho
 From **Insights**, use **Export activity CSV** to open the system share sheet. Puptime creates the file in temporary app storage; your data goes nowhere until you choose an app or destination.
 
 Routine reminders are optional. Turn one on while editing a planned time and allow notifications when the phone asks. Puptime schedules repeating reminders locally; it does not upload the routine or require a notification server.
+
+The routine suggestion also stays entirely on the device. It looks at the last 14 days, keeps activities that recur on most recorded days, and rounds their typical times to 15 minutes. You can preview the complete suggestion before replacing the current routine, and generated reminders start off.
 
 ## Run locally
 
