@@ -14,7 +14,7 @@ import {
   View,
 } from 'react-native';
 
-import { scheduleStatusesForDay, type ScheduleStatus } from '../analytics';
+import { scheduleStatusesForDay, suggestScheduleFromEvents, type ScheduleStatus } from '../analytics';
 import { EVENT_META, formatMinutes, quickEventTypes, type EventType, type ScheduleEntry } from '../domain';
 import type { PuppyEvent } from '../domain';
 import { spacing, type Theme } from '../theme';
@@ -38,6 +38,8 @@ export function ScheduleScreen({
   const [showAndroidPicker, setShowAndroidPicker] = useState(false);
   const [requestingPermission, setRequestingPermission] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [reviewingSuggestion, setReviewingSuggestion] = useState(false);
+  const [applyingSuggestion, setApplyingSuggestion] = useState(false);
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
@@ -46,6 +48,8 @@ export function ScheduleScreen({
   }, []);
 
   const statuses = scheduleStatusesForDay(events, schedule, new Date(now), 30, now);
+  const suggestion = suggestScheduleFromEvents(events, 14, new Date(now));
+  const canSuggest = suggestion.entries.length > 0;
   const completed = statuses.filter((item) => item.status === 'done').length;
   const due = statuses.filter((item) => item.status === 'due').length;
   const missed = statuses.filter((item) => item.status === 'missed').length;
@@ -137,14 +141,89 @@ export function ScheduleScreen({
     setDraft({ ...draft, minutes: date.getHours() * 60 + date.getMinutes() });
   };
 
+  const applySuggestion = async () => {
+    if (!canSuggest || applyingSuggestion) return;
+    setApplyingSuggestion(true);
+    try {
+      await onChange(suggestion.entries);
+      setReviewingSuggestion(false);
+    } catch {
+      Alert.alert('Couldn’t use the suggested routine', 'Your current routine is still available. Please try again.');
+    } finally {
+      setApplyingSuggestion(false);
+    }
+  };
+
   return (
     <>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={[styles.eyebrow, { color: theme.primary }]}>DAILY ROUTINE</Text>
         <Text style={[styles.title, { color: theme.text }]}>Make the day predictable</Text>
         <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-          This is an editable example routine, not veterinary guidance. Adjust it to your puppy’s needs.
+          Start from patterns in your logs or edit times yourself. This is routine planning, not veterinary guidance.
         </Text>
+
+        <View style={[styles.learnCard, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
+          <View style={styles.learnHeading}>
+            <View style={[styles.learnIcon, { backgroundColor: theme.primarySoft }]}>
+              <MaterialCommunityIcons
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+                name="chart-timeline-variant"
+                color={theme.primary}
+                size={23}
+              />
+            </View>
+            <View style={styles.learnCopy}>
+              <Text style={[styles.learnTitle, { color: theme.text }]}>Build from your logs</Text>
+              <Text style={[styles.learnBody, { color: theme.textMuted }]}>
+                Finds activities that recur on most recorded days and rounds their typical times to 15 minutes.
+              </Text>
+            </View>
+          </View>
+          <View style={[styles.learnStatus, { backgroundColor: theme.surface }]}>
+            <MaterialCommunityIcons
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              name={canSuggest ? 'check-circle-outline' : 'information-outline'}
+              color={canSuggest ? theme.primary : theme.textMuted}
+              size={18}
+            />
+            <Text style={[styles.learnStatusText, { color: theme.textMuted }]}>
+              {canSuggest
+                ? `${suggestion.entries.length} suggested times from ${suggestion.daysAnalyzed} recorded days`
+                : suggestion.daysAnalyzed < 3
+                  ? `Log activity on ${3 - suggestion.daysAnalyzed} more ${3 - suggestion.daysAnalyzed === 1 ? 'day' : 'days'} to find a routine`
+                  : 'No repeated daily pattern is clear yet—keep logging'}
+            </Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={canSuggest ? `Preview ${suggestion.entries.length} suggested routine times` : 'Not enough repeated logs to suggest a routine'}
+            accessibilityState={{ disabled: !canSuggest }}
+            disabled={!canSuggest}
+            onPress={() => setReviewingSuggestion(true)}
+            style={({ pressed }) => [
+              styles.learnButton,
+              {
+                backgroundColor: canSuggest ? theme.primary : theme.surface,
+                borderColor: canSuggest ? theme.primary : theme.border,
+                opacity: pressed ? 0.8 : 1,
+              },
+            ]}
+          >
+            <MaterialCommunityIcons
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              name="eye-outline"
+              color={canSuggest ? theme.onPrimary : theme.textMuted}
+              size={20}
+            />
+            <Text style={[styles.learnButtonText, { color: canSuggest ? theme.onPrimary : theme.textMuted }]}>
+              {canSuggest ? 'Preview suggested routine' : 'Keep logging to unlock'}
+            </Text>
+          </Pressable>
+        </View>
 
         {schedule.length ? (
           <View style={[styles.progressCard, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
@@ -243,6 +322,108 @@ export function ScheduleScreen({
           <Text style={[styles.addButtonText, { color: theme.onPrimary }]}>Add a time</Text>
         </Pressable>
       </ScrollView>
+
+      <Modal
+        visible={reviewingSuggestion}
+        transparent
+        animationType="none"
+        onRequestClose={() => setReviewingSuggestion(false)}
+      >
+        <View style={styles.scrim}>
+          <ScrollView
+            bounces={false}
+            style={[styles.sheet, { backgroundColor: theme.surfaceRaised }]}
+            contentContainerStyle={styles.sheetContent}
+          >
+            <View style={styles.sheetHeading}>
+              <View style={styles.learnCopy}>
+                <Text style={[styles.sheetTitle, { color: theme.text }]}>Routine from your logs</Text>
+                <Text style={[styles.previewSubtitle, { color: theme.textMuted }]}>
+                  Based on {suggestion.daysAnalyzed} recorded days from the last {suggestion.periodDays}. Review every time before using it.
+                </Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close suggested routine"
+                onPress={() => setReviewingSuggestion(false)}
+                style={({ pressed }) => [styles.closeButton, pressed && { backgroundColor: theme.primarySoft }]}
+              >
+                <MaterialCommunityIcons name="close" size={22} color={theme.text} />
+              </Pressable>
+            </View>
+
+            <View style={[styles.previewList, { borderColor: theme.border }]}>
+              {suggestion.entries.map((entry, index) => {
+                const meta = EVENT_META[entry.type];
+                const color = theme.isDark ? meta.darkColor : meta.color;
+                const background = theme.isDark ? meta.darkSoftColor : meta.softColor;
+                return (
+                  <View
+                    key={entry.id}
+                    accessible
+                    accessibilityLabel={`${meta.label} at ${formatMinutes(entry.minutes)}`}
+                    style={[
+                      styles.previewRow,
+                      index > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
+                    ]}
+                  >
+                    <View style={[styles.previewIcon, { backgroundColor: background }]}>
+                      <MaterialCommunityIcons
+                        accessibilityElementsHidden
+                        importantForAccessibility="no"
+                        name={meta.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+                        size={19}
+                        color={color}
+                      />
+                    </View>
+                    <Text style={[styles.previewActivity, { color: theme.text }]}>{meta.label}</Text>
+                    <Text style={[styles.previewTime, { color: theme.text }]}>{formatMinutes(entry.minutes)}</Text>
+                  </View>
+                );
+              })}
+            </View>
+
+            <View style={[styles.replaceNote, { backgroundColor: theme.surface }]}>
+              <MaterialCommunityIcons
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+                name="information-outline"
+                size={19}
+                color={theme.textMuted}
+              />
+              <Text style={[styles.replaceNoteText, { color: theme.textMuted }]}>
+                {schedule.length
+                  ? `Using this replaces your ${schedule.length} current times. `
+                  : 'Using this creates your routine. '}
+                Reminders stay off until you enable them on individual times.
+              </Text>
+            </View>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ busy: applyingSuggestion, disabled: applyingSuggestion }}
+              disabled={applyingSuggestion}
+              onPress={applySuggestion}
+              style={({ pressed }) => [
+                styles.saveButton,
+                { backgroundColor: pressed ? theme.primaryPressed : theme.primary, opacity: applyingSuggestion ? 0.55 : 1 },
+              ]}
+            >
+              <Text style={[styles.saveText, { color: theme.onPrimary }]}>
+                {applyingSuggestion ? 'Using routine…' : 'Use this routine'}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              disabled={applyingSuggestion}
+              onPress={() => setReviewingSuggestion(false)}
+              style={({ pressed }) => [styles.cancelButton, pressed && { backgroundColor: theme.surface }]}
+            >
+              <Text style={[styles.cancelText, { color: theme.textMuted }]}>Keep current routine</Text>
+            </Pressable>
+          </ScrollView>
+        </View>
+      </Modal>
 
       <Modal visible={draft !== null} transparent animationType="none" onRequestClose={() => setDraft(null)}>
         <View style={styles.scrim}>
@@ -361,6 +542,16 @@ const styles = StyleSheet.create({
   eyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 1.6, marginTop: 4 },
   title: { fontSize: 30, lineHeight: 36, fontWeight: '800', letterSpacing: -0.6, marginTop: 4 },
   subtitle: { fontSize: 14, lineHeight: 21, marginTop: 6 },
+  learnCard: { borderWidth: 1, borderRadius: 22, padding: spacing.md, marginTop: spacing.lg },
+  learnHeading: { flexDirection: 'row', alignItems: 'flex-start', gap: 11 },
+  learnIcon: { width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  learnCopy: { flex: 1, minWidth: 0 },
+  learnTitle: { fontSize: 18, lineHeight: 23, fontWeight: '800' },
+  learnBody: { fontSize: 13, lineHeight: 19, marginTop: 2 },
+  learnStatus: { minHeight: 43, borderRadius: 13, paddingHorizontal: 11, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 13 },
+  learnStatusText: { flex: 1, fontSize: 12, lineHeight: 17, fontWeight: '600' },
+  learnButton: { minHeight: 50, borderRadius: 16, borderWidth: 1, marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 14 },
+  learnButtonText: { fontSize: 15, lineHeight: 20, fontWeight: '800', textAlign: 'center' },
   progressCard: { borderWidth: 1, borderRadius: 22, padding: spacing.md, marginTop: spacing.lg },
   progressHeading: { flexDirection: 'row', alignItems: 'center' },
   progressEyebrow: { fontSize: 10, lineHeight: 14, fontWeight: '800', letterSpacing: 1.2 },
@@ -402,6 +593,16 @@ const styles = StyleSheet.create({
   sheetContent: { padding: spacing.lg, paddingBottom: 34 },
   sheetHeading: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg },
   sheetTitle: { flex: 1, fontSize: 23, fontWeight: '800' },
+  previewSubtitle: { fontSize: 13, lineHeight: 19, marginTop: 4 },
+  previewList: { borderWidth: 1, borderRadius: 17, paddingHorizontal: 12, overflow: 'hidden' },
+  previewRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  previewIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  previewActivity: { flex: 1, fontSize: 15, lineHeight: 20, fontWeight: '700' },
+  previewTime: { fontSize: 15, lineHeight: 20, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  replaceNote: { borderRadius: 14, padding: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 9, marginTop: spacing.md },
+  replaceNoteText: { flex: 1, fontSize: 12, lineHeight: 18 },
+  cancelButton: { minHeight: 48, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginTop: spacing.sm },
+  cancelText: { fontSize: 15, lineHeight: 20, fontWeight: '700' },
   closeButton: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   fieldLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2, marginBottom: 8 },
   typePicker: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.lg },

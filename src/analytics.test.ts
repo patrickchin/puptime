@@ -4,8 +4,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  activityFrequencyStats,
   buildTimelineDays,
   scheduleStatusesForDay,
+  suggestScheduleFromEvents,
   TIMELINE_BUCKETS,
   timelineBucket,
 } from './analytics.ts';
@@ -103,4 +105,79 @@ test('shows an open nap only up to now and keeps legacy nap taps as points', () 
     { id: 'open', type: 'nap', label: 'Nap', startBucket: 40, endBucket: 43 },
     { id: 'legacy', type: 'nap', label: 'Nap', startBucket: 48 },
   ]);
+});
+
+test('summarizes daily frequency across recorded days and consecutive gaps', () => {
+  const events: PuppyEvent[] = [
+    { id: 'p1', type: 'pee', at: new Date(2026, 8, 8, 7).getTime(), source: 'app' },
+    { id: 'p2', type: 'pee', at: new Date(2026, 8, 8, 9).getTime(), source: 'app' },
+    { id: 'o1', type: 'poop', at: new Date(2026, 8, 8, 8).getTime(), source: 'app' },
+    { id: 'p3', type: 'pee', at: new Date(2026, 8, 9, 7).getTime(), source: 'app' },
+    { id: 'p4', type: 'pee', at: new Date(2026, 8, 9, 9).getTime(), source: 'app' },
+    { id: 'p5', type: 'pee', at: new Date(2026, 8, 9, 11).getTime(), source: 'app' },
+    { id: 'm1', type: 'meal', at: new Date(2026, 8, 9, 12).getTime(), source: 'app' },
+    { id: 'p6', type: 'pee', at: new Date(2026, 8, 10, 8).getTime(), source: 'app' },
+    { id: 'o2', type: 'poop', at: new Date(2026, 8, 10, 8, 30).getTime(), source: 'app' },
+  ];
+  const result = activityFrequencyStats(events, ['pee', 'poop'], 14, new Date(2026, 8, 10, 18));
+
+  assert.equal(result.recordedDays, 3);
+  assert.deepEqual(
+    result.stats.map((stat) => ({
+      type: stat.type,
+      total: stat.total,
+      average: stat.averagePerRecordedDay,
+      minimum: stat.minimumPerRecordedDay,
+      maximum: stat.maximumPerRecordedDay,
+      typicalGap: stat.medianIntervalMinutes,
+    })),
+    [
+      { type: 'pee', total: 6, average: 2, minimum: 1, maximum: 3, typicalGap: 120 },
+      { type: 'poop', total: 2, average: 2 / 3, minimum: 0, maximum: 1, typicalGap: 2910 },
+    ],
+  );
+});
+
+test('learns a 15-minute routine from repeated daily log positions', () => {
+  const jitters = [0, 10, -5, 5];
+  const events: PuppyEvent[] = [];
+  jitters.forEach((jitter, dayIndex) => {
+    const dayOfMonth = 7 + dayIndex;
+    const add = (id: string, type: PuppyEvent['type'], minutes: number) => {
+      events.push({
+        id: `${id}-${dayIndex}`,
+        type,
+        at: new Date(2026, 8, dayOfMonth, Math.floor(minutes / 60), minutes % 60).getTime(),
+        source: 'app',
+      });
+    };
+    add('pee-morning', 'pee', 7 * 60 + jitter);
+    add('meal', 'meal', 8 * 60 + jitter);
+    add('pee-midday', 'pee', 11 * 60 + jitter);
+    if (dayIndex === 0) add('walk', 'walk', 17 * 60);
+  });
+
+  const result = suggestScheduleFromEvents(events, 14, new Date(2026, 8, 10, 20));
+
+  assert.equal(result.daysAnalyzed, 4);
+  assert.equal(result.sourceEvents, 13);
+  assert.deepEqual(
+    result.entries.map(({ type, minutes, reminder }) => ({ type, minutes, reminder })),
+    [
+      { type: 'pee', minutes: 7 * 60, reminder: false },
+      { type: 'meal', minutes: 8 * 60, reminder: false },
+      { type: 'pee', minutes: 11 * 60, reminder: false },
+    ],
+  );
+});
+
+test('waits for three recorded days before suggesting a routine', () => {
+  const events: PuppyEvent[] = [
+    { id: '1', type: 'pee', at: new Date(2026, 8, 9, 7).getTime(), source: 'app' },
+    { id: '2', type: 'pee', at: new Date(2026, 8, 10, 7).getTime(), source: 'app' },
+  ];
+
+  const result = suggestScheduleFromEvents(events, 14, new Date(2026, 8, 10, 20));
+  assert.equal(result.daysAnalyzed, 2);
+  assert.deepEqual(result.entries, []);
 });

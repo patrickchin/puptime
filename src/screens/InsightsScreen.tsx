@@ -3,13 +3,15 @@ import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
+  activityFrequencyStats,
   buildTimelineDays,
   TIMELINE_BUCKET_MINUTES,
   TIMELINE_BUCKETS,
+  type ActivityFrequencyStat,
   type TimelineDay,
   type TimelineMark,
 } from '../analytics';
-import { dateKey, EVENT_META, eventTypes, type EventType, type PuppyEvent } from '../domain';
+import { dateKey, EVENT_META, eventTypes, formatDuration, type EventType, type PuppyEvent } from '../domain';
 import { shareEventsCsv } from '../share-export';
 import { spacing, type Theme } from '../theme';
 
@@ -37,6 +39,62 @@ function filterName(filter: ActivityFilter): string {
 
 function eventColor(type: EventType, theme: Theme): string {
   return theme.isDark ? EVENT_META[type].darkColor : EVENT_META[type].color;
+}
+
+function durationFromMinutes(minutes?: number): string {
+  return minutes === undefined ? '—' : formatDuration(minutes * 60_000);
+}
+
+function FrequencyRow({ stat, theme }: { stat: ActivityFrequencyStat; theme: Theme }) {
+  const meta = EVENT_META[stat.type];
+  const color = eventColor(stat.type, theme);
+  const dailyValue = stat.total ? `${stat.averagePerRecordedDay.toFixed(1)}/day` : '—';
+  const dailyDetail = stat.total
+    ? stat.minimumPerRecordedDay === stat.maximumPerRecordedDay
+      ? `${stat.minimumPerRecordedDay} on each recorded day`
+      : `${stat.minimumPerRecordedDay}–${stat.maximumPerRecordedDay} per recorded day`
+    : `No ${meta.label.toLowerCase()} logs yet`;
+  const intervalValue = durationFromMinutes(stat.medianIntervalMinutes);
+  const intervalDetail = stat.medianIntervalMinutes === undefined
+    ? 'Need another log'
+    : stat.intervalSamples >= 4
+      ? `Middle half: ${durationFromMinutes(stat.lowerIntervalMinutes)}–${durationFromMinutes(stat.upperIntervalMinutes)}`
+      : `${stat.intervalSamples} ${stat.intervalSamples === 1 ? 'gap' : 'gaps'} observed`;
+
+  return (
+    <View
+      accessible
+      accessibilityLabel={`${meta.label}. ${dailyValue}, ${dailyDetail}. Typical gap ${intervalValue}. ${intervalDetail}.`}
+      style={[styles.frequencyRow, { borderColor: theme.border }]}
+    >
+      <View style={styles.activityHeading}>
+        <View style={[styles.activityIcon, { backgroundColor: theme.isDark ? meta.darkSoftColor : meta.softColor }]}>
+          <MaterialCommunityIcons
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+            name={meta.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+            size={20}
+            color={color}
+          />
+        </View>
+        <Text style={[styles.activityName, { color: theme.text }]}>{meta.label}</Text>
+        <Text style={[styles.logCount, { color: theme.textMuted }]}>{stat.total} logs</Text>
+      </View>
+      <View style={styles.metrics}>
+        <View style={styles.metric}>
+          <Text style={[styles.metricValue, { color: theme.text }]}>{dailyValue}</Text>
+          <Text style={[styles.metricLabel, { color: theme.textMuted }]}>AVERAGE FREQUENCY</Text>
+          <Text style={[styles.metricDetail, { color: theme.textMuted }]}>{dailyDetail}</Text>
+        </View>
+        <View style={[styles.metricDivider, { backgroundColor: theme.border }]} />
+        <View style={styles.metric}>
+          <Text style={[styles.metricValue, { color: theme.text }]}>{intervalValue}</Text>
+          <Text style={[styles.metricLabel, { color: theme.textMuted }]}>TYPICAL GAP</Text>
+          <Text style={[styles.metricDetail, { color: theme.textMuted }]}>{intervalDetail}</Text>
+        </View>
+      </View>
+    </View>
+  );
 }
 
 function TimelineRow({
@@ -132,6 +190,7 @@ export function InsightsScreen({
   const [exporting, setExporting] = useState(false);
   const now = new Date();
   const days = buildTimelineDays(events, 14, now);
+  const frequency = activityFrequencyStats(events, ['pee', 'poop'], 14, now);
   const todayKey = dateKey(now);
   const visibleEventCount = days.reduce(
     (sum, day) => sum + day.marks.filter((mark) => filter === 'all' || mark.type === filter).length,
@@ -158,6 +217,32 @@ export function InsightsScreen({
       <Text style={[styles.subtitle, { color: theme.textMuted }]}>
         Compare timing across days—not totals or targets.
       </Text>
+
+      <View style={[styles.frequencyCard, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
+        <View style={styles.frequencyHeading}>
+          <View style={[styles.smallIcon, { backgroundColor: theme.primarySoft }]}>
+            <MaterialCommunityIcons
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              name="timer-sand"
+              size={21}
+              color={theme.primary}
+            />
+          </View>
+          <View style={styles.panelHeadingCopy}>
+            <Text style={[styles.panelTitle, { color: theme.text }]}>Frequency from your logs</Text>
+            <Text style={[styles.panelCaption, { color: theme.textMuted }]}>
+              Last {frequency.periodDays} days · {frequency.recordedDays} {frequency.recordedDays === 1 ? 'day' : 'days'} with activity · observations, not goals
+            </Text>
+          </View>
+        </View>
+        <Text style={[styles.frequencyNote, { color: theme.textMuted, backgroundColor: theme.surface }]}>
+          Daily averages include zeroes on days where you logged something else. Completely blank days are excluded because they may be unlogged.
+        </Text>
+        <View>
+          {frequency.stats.map((stat) => <FrequencyRow key={stat.type} stat={stat} theme={theme} />)}
+        </View>
+      </View>
 
       <View style={styles.filters} accessibilityRole="radiogroup">
         {activityFilters.map((type) => {
@@ -333,6 +418,20 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   filterLabel: { fontSize: 13, lineHeight: 18, fontWeight: '700' },
+  frequencyCard: { borderWidth: 1, borderRadius: 22, padding: 12 },
+  frequencyHeading: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 4 },
+  frequencyNote: { fontSize: 11, lineHeight: 16, borderRadius: 12, paddingHorizontal: 11, paddingVertical: 9, marginTop: 10 },
+  frequencyRow: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 4, paddingTop: 13, paddingBottom: 11, marginTop: 12 },
+  activityHeading: { flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: 11 },
+  activityIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  activityName: { flex: 1, fontSize: 16, lineHeight: 21, fontWeight: '800' },
+  logCount: { fontSize: 12, lineHeight: 17, fontWeight: '600' },
+  metrics: { flexDirection: 'row', alignItems: 'stretch' },
+  metric: { flex: 1, minWidth: 0, paddingHorizontal: 6 },
+  metricDivider: { width: StyleSheet.hairlineWidth, marginHorizontal: 6 },
+  metricValue: { fontSize: 21, lineHeight: 27, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  metricLabel: { fontSize: 9, lineHeight: 13, fontWeight: '800', letterSpacing: 0.8, marginTop: 2 },
+  metricDetail: { fontSize: 11, lineHeight: 16, marginTop: 4 },
   panel: { borderWidth: 1, borderRadius: 22, padding: 12 },
   panelHeading: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 4, marginBottom: spacing.sm },
   panelHeadingCopy: { flex: 1, minWidth: 0 },
