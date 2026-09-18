@@ -20,11 +20,13 @@ export function NoteInput({
   value,
   onChangeText,
   onFocus,
+  onBlur,
   theme,
 }: {
   value: string;
   onChangeText: (value: string) => void;
   onFocus?: () => void;
+  onBlur?: () => void;
   theme: Theme;
 }) {
   const [listening, setListening] = useState(false);
@@ -105,6 +107,7 @@ export function NoteInput({
           autoCapitalize="sentences"
           maxLength={300}
           multiline
+          onBlur={onBlur}
           onChangeText={onChangeText}
           onFocus={onFocus}
           placeholder="e.g. Just after a play session"

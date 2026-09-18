@@ -26,6 +26,7 @@ import { spacing, type Theme } from '../theme';
 
 const quickBackdates = [0, 5, 15, 30, 60] as const;
 const editableEventTypes = eventTypes.filter((type) => type !== 'nap');
+const autoSaveDelayMs = 450;
 
 const activityFilters = [
   { id: 'all', label: 'All', icon: 'format-list-bulleted', types: [] },
@@ -47,6 +48,38 @@ type Draft = {
   note: string;
   field: 'start' | 'end';
 };
+
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+
+function createDraft(event: PuppyEvent): Draft {
+  return {
+    event,
+    type: event.type,
+    customLabel: event.customLabel ?? '',
+    at: event.at,
+    endedAt: event.endedAt,
+    note: event.note ?? '',
+    field: 'start',
+  };
+}
+
+function samePersistedDraft(left: Draft, right: Draft): boolean {
+  return left.type === right.type
+    && left.customLabel === right.customLabel
+    && left.at === right.at
+    && left.endedAt === right.endedAt
+    && left.note === right.note;
+}
+
+function draftChanges(draft: Draft): PuppyEventChanges {
+  return {
+    type: draft.type,
+    customLabel: normalizeCustomLabel(draft.customLabel),
+    at: Math.min(draft.at, Date.now()),
+    endedAt: draft.endedAt,
+    note: draft.note,
+  };
+}
 
 function dateLabel(value: number): string {
   return new Intl.DateTimeFormat(undefined, {
@@ -91,29 +124,121 @@ export function LogScreen({
   const [draft, setDraft] = useState<Draft | null>(null);
   const [pickerMode, setPickerMode] = useState<'date' | 'time' | null>(null);
   const [customTouched, setCustomTouched] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [closing, setClosing] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>('all');
   const editorScrollRef = useRef<ScrollView>(null);
+  const draftRef = useRef<Draft | null>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const revisionRef = useRef(0);
+  const savedRevisionRef = useRef(0);
+  const inFlightRevisionRef = useRef(-1);
+  const sessionRef = useRef(0);
+  const latestSaveRef = useRef<Promise<boolean>>(Promise.resolve(true));
+  const closingRef = useRef(false);
+
+  const clearSaveTimer = () => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+  };
+
+  const startEditing = (event: PuppyEvent) => {
+    clearSaveTimer();
+    sessionRef.current += 1;
+    revisionRef.current = 0;
+    savedRevisionRef.current = 0;
+    inFlightRevisionRef.current = -1;
+    latestSaveRef.current = Promise.resolve(true);
+    closingRef.current = false;
+    setSaveStatus('idle');
+    setClosing(false);
+    setCustomTouched(false);
+    const next = createDraft(event);
+    draftRef.current = next;
+    setDraft(next);
+  };
+
+  const persistDraft = (next: Draft, revision: number, session: number): Promise<boolean> => {
+    setSaveStatus('saving');
+    inFlightRevisionRef.current = revision;
+    const save = onSave(next.event, draftChanges(next))
+      .then(() => {
+        if (sessionRef.current === session) {
+          savedRevisionRef.current = Math.max(savedRevisionRef.current, revision);
+          if (revisionRef.current === revision) setSaveStatus('saved');
+        }
+        return true;
+      })
+      .catch(() => {
+        if (sessionRef.current === session && revisionRef.current === revision) {
+          setSaveStatus('error');
+        }
+        return false;
+      })
+      .finally(() => {
+        if (sessionRef.current === session && inFlightRevisionRef.current === revision) {
+          inFlightRevisionRef.current = -1;
+        }
+      });
+    latestSaveRef.current = save;
+    return save;
+  };
+
+  const scheduleSave = (next: Draft) => {
+    clearSaveTimer();
+    revisionRef.current += 1;
+    const revision = revisionRef.current;
+    const session = sessionRef.current;
+    if (next.type === 'custom' && !normalizeCustomLabel(next.customLabel)) {
+      setSaveStatus('idle');
+      return;
+    }
+    setSaveStatus('saving');
+    saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null;
+      void persistDraft(next, revision, session);
+    }, autoSaveDelayMs);
+  };
+
+  const updateDraft = (updater: (current: Draft) => Draft, shouldSave = true) => {
+    const current = draftRef.current;
+    if (!current) return;
+    const next = updater(current);
+    draftRef.current = next;
+    setDraft(next);
+    if (shouldSave && !samePersistedDraft(current, next)) scheduleSave(next);
+  };
+
+  const flushAutoSave = async (forceRetry = false): Promise<boolean> => {
+    const current = draftRef.current;
+    if (!current) return true;
+    if (current.type === 'custom' && !normalizeCustomLabel(current.customLabel)) {
+      setCustomTouched(true);
+      return false;
+    }
+    const revision = revisionRef.current;
+    const session = sessionRef.current;
+    const hadTimer = saveTimerRef.current !== null;
+    clearSaveTimer();
+    if (!forceRetry && savedRevisionRef.current >= revision) return true;
+    if (!forceRetry && !hadTimer && inFlightRevisionRef.current === revision) {
+      return latestSaveRef.current;
+    }
+    return persistDraft(current, revision, session);
+  };
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(timer);
   }, []);
+  useEffect(() => () => clearSaveTimer(), []);
   useEffect(() => {
     if (!editEventId) return;
     const event = events.find((candidate) => candidate.id === editEventId);
-    if (event) {
-      setDraft({
-        event,
-        type: event.type,
-        customLabel: event.customLabel ?? '',
-        at: event.at,
-        endedAt: event.endedAt,
-        note: event.note ?? '',
-        field: 'start',
-      });
-    }
+    if (event) startEditing(event);
     onEditRequestHandled?.();
   }, [editEventId, events, onEditRequestHandled]);
   const visibleEvents = useMemo(() => {
@@ -136,20 +261,22 @@ export function LogScreen({
     ? normalizeCustomLabel(draft.customLabel) ?? 'Other activity'
     : draftMeta.pastLabel;
   const selectedFilter = activityFilters.find((item) => item.id === activityFilter) ?? activityFilters[0];
-  const draftHasChanges = Boolean(draft && (
-    draft.type !== draft.event.type
-    || draft.customLabel !== (draft.event.customLabel ?? '')
-    || draft.at !== draft.event.at
-    || draft.endedAt !== draft.event.endedAt
-    || draft.note !== (draft.event.note ?? '')
-  ));
   const todayLabel = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
     .format(now)
     .toUpperCase();
 
+  const statusPresentation = customInvalid
+    ? { icon: 'alert-circle-outline', text: 'Add a custom name to save this activity.', color: theme.danger }
+    : saveStatus === 'saving'
+      ? { icon: 'cloud-upload-outline', text: 'Saving changes…', color: theme.primary }
+      : saveStatus === 'saved'
+        ? { icon: 'check-circle-outline', text: 'Saved automatically', color: theme.primary }
+        : saveStatus === 'error'
+          ? { icon: 'alert-circle-outline', text: 'Couldn’t save. Tap to retry.', color: theme.danger }
+          : { icon: 'cloud-check-outline', text: 'Changes save automatically', color: theme.textMuted };
+
   const setDraftTime = (value: number) => {
-    setDraft((current) => {
-      if (!current) return null;
+    updateDraft((current) => {
       if (current.field === 'end') {
         return { ...current, endedAt: Math.max(current.at, Math.min(value, Date.now())) };
       }
@@ -159,22 +286,34 @@ export function LogScreen({
   };
 
   const closeEditor = () => {
+    clearSaveTimer();
+    sessionRef.current += 1;
+    draftRef.current = null;
     Keyboard.dismiss();
     setPickerMode(null);
     setCustomTouched(false);
+    setSaveStatus('idle');
+    closingRef.current = false;
+    setClosing(false);
     setDraft(null);
   };
 
-  const requestCloseEditor = () => {
-    if (saving) return;
-    if (!draftHasChanges) {
+  const requestCloseEditor = async () => {
+    if (closingRef.current) return;
+    if (customInvalid) {
+      setCustomTouched(true);
+      return;
+    }
+    closingRef.current = true;
+    setClosing(true);
+    const saved = await flushAutoSave();
+    if (saved) {
       closeEditor();
       return;
     }
-    Alert.alert('Discard changes?', 'Your edits to this log have not been saved.', [
-      { text: 'Keep editing', style: 'cancel' },
-      { text: 'Discard', style: 'destructive', onPress: closeEditor },
-    ]);
+    closingRef.current = false;
+    setClosing(false);
+    Alert.alert('Couldn’t save changes', 'Keep the editor open and tap the save status to try again.');
   };
 
   const handleSystemClose = () => {
@@ -182,7 +321,7 @@ export function LogScreen({
       Keyboard.dismiss();
       return;
     }
-    requestCloseEditor();
+    void requestCloseEditor();
   };
 
   const pickDateTime = (event: DateTimePickerEvent, date?: Date) => {
@@ -193,30 +332,6 @@ export function LogScreen({
         ? replaceCalendarDate(activeValue, date)
         : replaceClockTime(activeValue, date.getHours(), date.getMinutes()),
     );
-  };
-
-  const saveChanges = async () => {
-    if (!draft || saving) return;
-    const customLabel = normalizeCustomLabel(draft.customLabel);
-    if (draft.type === 'custom' && !customLabel) {
-      setCustomTouched(true);
-      return;
-    }
-    setSaving(true);
-    try {
-      await onSave(draft.event, {
-        type: draft.type,
-        customLabel,
-        at: Math.min(draft.at, Date.now()),
-        endedAt: draft.endedAt,
-        note: draft.note,
-      });
-      closeEditor();
-    } catch {
-      Alert.alert('Couldn’t save changes', 'Your log is unchanged. Please try again.');
-    } finally {
-      setSaving(false);
-    }
   };
 
   return (
@@ -296,15 +411,7 @@ export function LogScreen({
           <EventRow
             event={item}
             now={now}
-            onEdit={() => setDraft({
-              event: item,
-              type: item.type,
-              customLabel: item.customLabel ?? '',
-              at: item.at,
-              endedAt: item.endedAt,
-              note: item.note ?? '',
-              field: 'start',
-            })}
+            onEdit={() => startEditing(item)}
             onDelete={() => onDelete(item)}
             theme={theme}
           />
@@ -353,12 +460,43 @@ export function LogScreen({
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Close log editor"
-                onPress={requestCloseEditor}
-                style={({ pressed }) => [styles.closeButton, pressed && { backgroundColor: theme.primarySoft }]}
+                accessibilityState={{ busy: closing, disabled: closing }}
+                disabled={closing}
+                onPress={() => void requestCloseEditor()}
+                style={({ pressed }) => [styles.closeButton, { opacity: closing ? 0.55 : 1 }, pressed && { backgroundColor: theme.primarySoft }]}
               >
                 <MaterialCommunityIcons name="close" size={22} color={theme.text} />
               </Pressable>
             </View>
+
+            {saveStatus === 'error' ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Couldn’t save changes. Retry now"
+                onPress={() => void flushAutoSave(true)}
+                style={({ pressed }) => [
+                  styles.saveStatus,
+                  { backgroundColor: theme.surface, borderColor: theme.danger, opacity: pressed ? 0.72 : 1 },
+                ]}
+              >
+                <MaterialCommunityIcons name="alert-circle-outline" color={theme.danger} size={18} />
+                <Text style={[styles.saveStatusText, { color: theme.danger }]}>Couldn’t save. Tap to retry.</Text>
+              </Pressable>
+            ) : (
+              <View
+                accessible
+                accessibilityLiveRegion="polite"
+                accessibilityLabel={statusPresentation.text}
+                style={[styles.saveStatus, { backgroundColor: theme.surface, borderColor: theme.border }]}
+              >
+                <MaterialCommunityIcons
+                  name={statusPresentation.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+                  color={statusPresentation.color}
+                  size={18}
+                />
+                <Text style={[styles.saveStatusText, { color: statusPresentation.color }]}>{statusPresentation.text}</Text>
+              </View>
+            )}
 
             {draft && draft.event.type !== 'nap' ? (
               <>
@@ -375,7 +513,7 @@ export function LogScreen({
                         accessibilityLabel={`Change activity to ${meta.label}`}
                         onPress={() => {
                           setCustomTouched(false);
-                          setDraft((current) => current && ({ ...current, type }));
+                          updateDraft((current) => ({ ...current, type }));
                         }}
                         style={({ pressed }) => [
                           styles.typeChoice,
@@ -402,12 +540,18 @@ export function LogScreen({
                     <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>CUSTOM NAME</Text>
                     <TextInput
                       accessibilityLabel="Custom activity name"
-                      accessibilityHint="Required before saving"
+                      accessibilityHint="Required. Changes save automatically after you type."
                       autoCapitalize="sentences"
                       maxLength={40}
-                      onBlur={() => setCustomTouched(true)}
-                      onChangeText={(customLabel) => setDraft((current) => current && ({ ...current, customLabel }))}
-                      onSubmitEditing={saveChanges}
+                      onBlur={() => {
+                        setCustomTouched(true);
+                        void flushAutoSave();
+                      }}
+                      onChangeText={(customLabel) => updateDraft((current) => ({ ...current, customLabel }))}
+                      onSubmitEditing={() => {
+                        Keyboard.dismiss();
+                        void flushAutoSave();
+                      }}
                       placeholder="e.g. Grooming"
                       placeholderTextColor={theme.textMuted}
                       returnKeyType="done"
@@ -456,7 +600,7 @@ export function LogScreen({
                       accessibilityRole="button"
                       accessibilityState={{ selected }}
                       accessibilityLabel={`Edit nap ${field} time`}
-                      onPress={() => setDraft((current) => current && ({ ...current, field }))}
+                      onPress={() => updateDraft((current) => ({ ...current, field }), false)}
                       style={({ pressed }) => [
                         styles.timeField,
                         {
@@ -548,7 +692,10 @@ export function LogScreen({
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={`Finish choosing ${pickerMode}`}
-                    onPress={() => setPickerMode(null)}
+                    onPress={() => {
+                      setPickerMode(null);
+                      void flushAutoSave();
+                    }}
                     style={({ pressed }) => [styles.pickerDone, pressed && { backgroundColor: theme.primarySoft }]}
                   >
                     <Text style={[styles.pickerDoneText, { color: theme.primary }]}>Done</Text>
@@ -562,25 +709,12 @@ export function LogScreen({
               <NoteInput
                 key={draft.event.id}
                 value={draft.note}
-                onChangeText={(note) => setDraft((current) => current && ({ ...current, note }))}
+                onBlur={() => void flushAutoSave()}
+                onChangeText={(note) => updateDraft((current) => ({ ...current, note }))}
                 onFocus={() => editorScrollRef.current?.scrollToEnd({ animated: true })}
                 theme={theme}
               />
             ) : null}
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ busy: saving, disabled: saving || customInvalid }}
-              accessibilityHint={customInvalid ? 'Enter a custom activity name before saving' : undefined}
-              disabled={saving || customInvalid}
-              onPress={saveChanges}
-              style={({ pressed }) => [
-                styles.saveButton,
-                { backgroundColor: pressed ? theme.primaryPressed : theme.primary, opacity: saving || customInvalid ? 0.45 : 1 },
-              ]}
-            >
-              <Text style={[styles.saveText, { color: theme.onPrimary }]}>{saving ? 'Saving…' : 'Save changes'}</Text>
-            </Pressable>
           </ScrollView>
         </View>
       </Modal>
@@ -637,6 +771,8 @@ const styles = StyleSheet.create({
   sheetTitle: { fontSize: 20, lineHeight: 25, fontWeight: '800' },
   sheetSubtitle: { fontSize: 13, lineHeight: 18, marginTop: 2 },
   closeButton: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  saveStatus: { minHeight: 48, borderWidth: 1, borderRadius: 14, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: spacing.md },
+  saveStatusText: { flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '700' },
   timePreview: { borderWidth: 1, borderRadius: 18, padding: spacing.md, alignItems: 'center', marginBottom: spacing.lg },
   typePicker: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.md },
   typeChoice: { flexBasis: '30%', flexGrow: 1, minWidth: 88, minHeight: 48, borderWidth: 1, borderRadius: 14, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
@@ -660,6 +796,4 @@ const styles = StyleSheet.create({
   exactFieldText: { flex: 1, minWidth: 0, fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] },
   pickerDone: { minHeight: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   pickerDoneText: { fontSize: 15, fontWeight: '800' },
-  saveButton: { minHeight: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginTop: spacing.lg },
-  saveText: { fontSize: 16, fontWeight: '800' },
 });
