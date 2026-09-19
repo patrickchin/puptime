@@ -6,6 +6,7 @@ import test from 'node:test';
 import {
   activityFrequencyStats,
   buildTimelineDays,
+  monthlyActivityStats,
   scheduleStatusesForDay,
   suggestScheduleFromEvents,
   TIMELINE_BUCKETS,
@@ -170,6 +171,28 @@ test('summarizes daily frequency across recorded days and consecutive gaps', () 
     [
       { type: 'pee', total: 6, average: 2, minimum: 1, maximum: 3, typicalGap: 120 },
       { type: 'poop', total: 2, average: 2 / 3, minimum: 0, maximum: 1, typicalGap: 2910 },
+    ],
+  );
+});
+
+test('summarizes every recorded month while applying an activity filter', () => {
+  const events: PuppyEvent[] = [
+    { id: 'sep-poop', type: 'poop', at: new Date(2026, 8, 2, 8).getTime(), source: 'app' },
+    { id: 'aug-pee', type: 'pee', at: new Date(2026, 7, 1, 7).getTime(), source: 'app' },
+    { id: 'aug-meal', type: 'meal', at: new Date(2026, 7, 1, 8).getTime(), source: 'app' },
+    { id: 'aug-meal-2', type: 'meal', at: new Date(2026, 7, 3, 8).getTime(), source: 'app' },
+  ];
+
+  assert.deepEqual(
+    monthlyActivityStats(events, ['pee']).map(({ key, total, recordedDays, averagePerRecordedDay }) => ({
+      key,
+      total,
+      recordedDays,
+      averagePerRecordedDay,
+    })),
+    [
+      { key: '2026-09', total: 0, recordedDays: 1, averagePerRecordedDay: 0 },
+      { key: '2026-08', total: 1, recordedDays: 2, averagePerRecordedDay: 0.5 },
     ],
   );
 });

@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -14,9 +14,11 @@ import {
 import {
   activityFrequencyStats,
   buildTimelineDays,
+  monthlyActivityStats,
   TIMELINE_BUCKET_MINUTES,
   TIMELINE_BUCKETS,
   type ActivityFrequencyStat,
+  type MonthlyActivityStat,
   type TimelineDay,
   type TimelineMark,
 } from '../analytics';
@@ -24,7 +26,7 @@ import { dateKey, EVENT_META, eventTypes, formatDuration, type EventType, type P
 import { shareEventsCsv } from '../share-export';
 import { spacing, type Theme } from '../theme';
 
-const TIMELINE_DAYS = 14;
+const TIMELINE_DAYS = 10;
 const activityFilters = ['all', ...eventTypes] as const;
 const horizontalZoomLevels = [1, 1.5, 2] as const;
 const verticalZoomLevels = [38, 52, 68] as const;
@@ -33,7 +35,9 @@ const shortDay = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
 const shortDate = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
 const fullDate = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 const rangeDate = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+const longMonth = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
 const bucketTime = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+const MONTH_PREVIEW_COUNT = 6;
 
 function formatBucket(bucket: number): string {
   return bucketTime.format(new Date(2000, 0, 1, 0, bucket * TIMELINE_BUCKET_MINUTES));
@@ -359,6 +363,51 @@ function ZoomControl({
   );
 }
 
+function MonthlyRow({
+  stat,
+  maxAverage,
+  activityLabel,
+  isCurrent,
+  color,
+  theme,
+}: {
+  stat: MonthlyActivityStat;
+  maxAverage: number;
+  activityLabel: string;
+  isCurrent: boolean;
+  color: string;
+  theme: Theme;
+}) {
+  const average = stat.averagePerRecordedDay.toFixed(1);
+  const month = longMonth.format(stat.date);
+  const barWidth = (stat.total ? `${Math.max(4, (stat.averagePerRecordedDay / maxAverage) * 100)}%` : '0%') as `${number}%`;
+
+  return (
+    <View
+      accessible
+      accessibilityLabel={`${month}. ${average} ${activityLabel} logs per recorded day. ${stat.total} logs across ${stat.recordedDays} recorded ${stat.recordedDays === 1 ? 'day' : 'days'}.`}
+      style={[styles.monthRow, { borderColor: theme.border }, isCurrent && { backgroundColor: theme.primarySoft }]}
+    >
+      <View style={styles.monthHeading}>
+        <Text style={[styles.monthName, { color: isCurrent ? theme.primary : theme.text }]}>
+          {isCurrent ? 'This month' : month}
+        </Text>
+        <Text style={[styles.monthAverage, { color: isCurrent ? theme.primary : theme.text }]}>{average}/day</Text>
+      </View>
+      <View
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+        style={[styles.monthTrack, { backgroundColor: theme.surface }]}
+      >
+        <View style={[styles.monthBar, { backgroundColor: color, width: barWidth }]} />
+      </View>
+      <Text style={[styles.monthDetail, { color: theme.textMuted }]}>
+        {isCurrent ? `${month} · ` : ''}{stat.total} {stat.total === 1 ? 'log' : 'logs'} · {stat.recordedDays} {stat.recordedDays === 1 ? 'day' : 'days'} with activity
+      </Text>
+    </View>
+  );
+}
+
 export function InsightsScreen({
   events,
   theme,
@@ -372,6 +421,7 @@ export function InsightsScreen({
   const [verticalZoom, setVerticalZoom] = useState(1);
   const [historyPage, setHistoryPage] = useState(0);
   const [exporting, setExporting] = useState(false);
+  const [showAllMonths, setShowAllMonths] = useState(false);
   const now = new Date();
   const earliestEventAt = events.reduce((earliest, event) => Math.min(earliest, event.at), now.getTime());
   const historyDays = events.length ? calendarDayDistance(new Date(earliestEventAt), now) : 0;
@@ -397,6 +447,17 @@ export function InsightsScreen({
   const rangeLabel = days.length
     ? formatDateRange(days[0].date, days[days.length - 1].date)
     : '';
+  const monthly = useMemo(
+    () => monthlyActivityStats(
+      events,
+      selectedTypes.length === eventTypes.length ? undefined : selectedTypes,
+    ),
+    [events, selectedTypes],
+  );
+  const visibleMonths = showAllMonths ? monthly : monthly.slice(0, MONTH_PREVIEW_COUNT);
+  const maxMonthlyAverage = Math.max(1, ...monthly.map((stat) => stat.averagePerRecordedDay));
+  const currentMonthKey = todayKey.slice(0, 7);
+  const historyColor = selectedTypes.length === 1 ? eventColor(selectedTypes[0], theme) : theme.primary;
   const exportDisabled = exporting || events.length === 0;
 
   function toggleActivity(type: EventType) {
@@ -592,7 +653,7 @@ export function InsightsScreen({
           <View style={styles.rangeCopy}>
             <Text style={[styles.rangeLabel, { color: theme.text }]}>{rangeLabel}</Text>
             <Text style={[styles.rangeStatus, { color: theme.textMuted }]}>
-              {currentHistoryPage === 0 ? 'Latest 14 days' : 'Older 14-day window'}
+              {currentHistoryPage === 0 ? `Latest ${TIMELINE_DAYS} days` : `Older ${TIMELINE_DAYS}-day window`}
             </Text>
           </View>
           <Pressable
@@ -676,6 +737,66 @@ export function InsightsScreen({
           </View>
         ) : null}
       </View>
+
+      {selectedTypes.length > 0 && monthly.length > 1 ? (
+        <View style={[styles.historyCard, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
+          <View style={styles.panelHeading}>
+            <View style={[styles.smallIcon, { backgroundColor: theme.primarySoft }]}>
+              <MaterialCommunityIcons
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+                name="calendar-range-outline"
+                size={21}
+                color={theme.primary}
+              />
+            </View>
+            <View style={styles.panelHeadingCopy}>
+              <Text style={[styles.panelTitle, { color: theme.text }]}>Month-by-month context</Text>
+              <Text style={[styles.panelCaption, { color: theme.textMuted }]}>
+                {selectionTitle(selectedTypes)} · newest first · recent {TIMELINE_DAYS}-day detail stays above
+              </Text>
+            </View>
+          </View>
+          <Text style={[styles.historyNote, { color: theme.textMuted, backgroundColor: theme.surface }]}>
+            Monthly pace uses days where you recorded any activity, so incomplete or missed months are not treated as zeroes.
+          </Text>
+          <View style={styles.months}>
+            {visibleMonths.map((stat) => (
+              <MonthlyRow
+                key={stat.key}
+                stat={stat}
+                maxAverage={maxMonthlyAverage}
+                activityLabel={filterName(selectedTypes)}
+                isCurrent={stat.key === currentMonthKey}
+                color={historyColor}
+                theme={theme}
+              />
+            ))}
+          </View>
+          {monthly.length > MONTH_PREVIEW_COUNT ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: showAllMonths }}
+              onPress={() => setShowAllMonths((shown) => !shown)}
+              style={({ pressed }) => [
+                styles.historyToggle,
+                { borderColor: theme.border, backgroundColor: pressed ? theme.primarySoft : theme.surface },
+              ]}
+            >
+              <Text style={[styles.historyToggleText, { color: theme.primary }]}>
+                {showAllMonths ? 'Show recent months' : `Show all ${monthly.length} months`}
+              </Text>
+              <MaterialCommunityIcons
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+                name={showAllMonths ? 'chevron-up' : 'chevron-down'}
+                size={21}
+                color={theme.primary}
+              />
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
 
       <View style={[styles.exportCard, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
         <View style={styles.exportHeading}>
@@ -840,6 +961,28 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   emptyText: { flex: 1, fontSize: 12, lineHeight: 17 },
+  historyCard: { borderWidth: 1, borderRadius: 22, padding: 12 },
+  historyNote: { fontSize: 11, lineHeight: 16, borderRadius: 12, paddingHorizontal: 11, paddingVertical: 9 },
+  months: { marginTop: 4 },
+  monthRow: { borderTopWidth: StyleSheet.hairlineWidth, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 11 },
+  monthHeading: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm },
+  monthName: { flex: 1, fontSize: 14, lineHeight: 19, fontWeight: '700' },
+  monthAverage: { fontSize: 15, lineHeight: 20, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  monthTrack: { height: 7, borderRadius: 4, overflow: 'hidden', marginTop: 7 },
+  monthBar: { height: 7, borderRadius: 4 },
+  monthDetail: { fontSize: 11, lineHeight: 16, marginTop: 5 },
+  historyToggle: {
+    minHeight: 48,
+    borderWidth: 1,
+    borderRadius: 15,
+    paddingHorizontal: 14,
+    marginTop: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+  },
+  historyToggleText: { fontSize: 14, lineHeight: 19, fontWeight: '700' },
   exportCard: { borderWidth: 1, borderRadius: 22, padding: spacing.md, gap: spacing.md },
   exportHeading: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   exportCopy: { flex: 1, minWidth: 0 },
