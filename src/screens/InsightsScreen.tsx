@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -14,19 +14,22 @@ import {
 import {
   activityFrequencyStats,
   buildTimelineDays,
+  estimateMissingLogs,
   monthlyActivityStats,
   TIMELINE_BUCKET_MINUTES,
   TIMELINE_BUCKETS,
   type ActivityFrequencyStat,
+  type MissingLogEstimate,
   type MonthlyActivityStat,
   type TimelineDay,
   type TimelineMark,
 } from '../analytics';
-import { dateKey, EVENT_META, eventTypes, formatDuration, type EventType, type PuppyEvent } from '../domain';
+import { dateKey, EVENT_META, eventTypes, formatDuration, formatTime, type EventType, type PuppyEvent } from '../domain';
 import { shareEventsCsv } from '../share-export';
 import { spacing, type Theme } from '../theme';
 
 const TIMELINE_DAYS = 10;
+const MISSING_LOG_DAYS = 14;
 const activityFilters = ['all', ...eventTypes] as const;
 const horizontalZoomLevels = [1, 1.5, 2] as const;
 const verticalZoomLevels = [38, 52, 68] as const;
@@ -36,6 +39,7 @@ const shortDate = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'num
 const fullDate = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 const rangeDate = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 const longMonth = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
+const estimateDate = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 const bucketTime = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
 const MONTH_PREVIEW_COUNT = 6;
 
@@ -410,9 +414,11 @@ function MonthlyRow({
 
 export function InsightsScreen({
   events,
+  onAddEstimate,
   theme,
 }: {
   events: PuppyEvent[];
+  onAddEstimate: (estimate: MissingLogEstimate) => Promise<void>;
   theme: Theme;
 }) {
   const { width } = useWindowDimensions();
@@ -422,7 +428,13 @@ export function InsightsScreen({
   const [historyPage, setHistoryPage] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [showAllMonths, setShowAllMonths] = useState(false);
-  const now = new Date();
+  const [addingEstimateId, setAddingEstimateId] = useState<string | null>(null);
+  const [nowTime, setNowTime] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNowTime(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+  const now = new Date(nowTime);
   const earliestEventAt = events.reduce((earliest, event) => Math.min(earliest, event.at), now.getTime());
   const historyDays = events.length ? calendarDayDistance(new Date(earliestEventAt), now) : 0;
   const maxHistoryOffset = Math.max(0, historyDays - (TIMELINE_DAYS - 1));
@@ -433,6 +445,7 @@ export function InsightsScreen({
   rangeEnd.setDate(rangeEnd.getDate() - historyOffset);
   const days = buildTimelineDays(events, TIMELINE_DAYS, rangeEnd, now);
   const frequency = activityFrequencyStats(events, ['pee', 'poop'], TIMELINE_DAYS, now);
+  const missingLogs = estimateMissingLogs(events, MISSING_LOG_DAYS, now);
   const todayKey = dateKey(now);
   const visibleEventCount = new Set(
     days.flatMap((day) => day.marks.filter((mark) => selectedTypes.includes(mark.type)).map((mark) => mark.id)),
@@ -478,6 +491,18 @@ export function InsightsScreen({
     }
   }
 
+  async function addEstimate(estimate: MissingLogEstimate) {
+    if (addingEstimateId) return;
+    setAddingEstimateId(estimate.id);
+    try {
+      await onAddEstimate(estimate);
+    } catch {
+      Alert.alert('Couldn’t add this estimate', 'Your activity history is unchanged. Please try again.');
+    } finally {
+      setAddingEstimateId(null);
+    }
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <Text style={[styles.eyebrow, { color: theme.primary }]}>DAILY RHYTHM · 15 MINUTE WINDOWS</Text>
@@ -510,6 +535,122 @@ export function InsightsScreen({
         <View>
           {frequency.stats.map((stat) => <FrequencyRow key={stat.type} stat={stat} theme={theme} />)}
         </View>
+      </View>
+
+      <View style={[styles.missingCard, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
+        <View style={styles.frequencyHeading}>
+          <View style={[styles.smallIcon, { backgroundColor: theme.primarySoft }]}>
+            <MaterialCommunityIcons
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              name="magnify"
+              size={21}
+              color={theme.primary}
+            />
+          </View>
+          <View style={styles.panelHeadingCopy}>
+            <Text style={[styles.panelTitle, { color: theme.text }]}>Possible gaps</Text>
+            <Text style={[styles.panelCaption, { color: theme.textMuted }]}>
+              Repeated times from {missingLogs.daysAnalyzed} active {missingLogs.daysAnalyzed === 1 ? 'day' : 'days'}
+            </Text>
+          </View>
+        </View>
+        <Text style={[styles.missingNote, { color: theme.textMuted, backgroundColor: theme.surface }]}>
+          A suggestion appears only when the same activity was logged near that time on at least 3 other days and logging continued afterward. Nothing is added automatically.
+        </Text>
+        {missingLogs.estimates.length ? (
+          <View style={styles.estimateList}>
+            {missingLogs.estimates.map((estimate) => {
+              const meta = EVENT_META[estimate.type];
+              const activityName = estimate.type === 'meal' ? 'Meal' : meta.label;
+              const color = eventColor(estimate.type, theme);
+              const softColor = theme.isDark ? meta.darkSoftColor : meta.softColor;
+              const adding = addingEstimateId === estimate.id;
+              const time = estimate.endedAt === undefined
+                ? `around ${formatTime(estimate.at)}`
+                : `about ${formatTime(estimate.at)}–${formatTime(estimate.endedAt)}`;
+              const title = estimate.type === 'nap' ? 'Possible unlogged nap' : `${activityName} may be unlogged`;
+              return (
+                <View
+                  key={estimate.id}
+                  style={[styles.estimateRow, { borderColor: theme.border }]}
+                >
+                  <View
+                    accessibilityElementsHidden
+                    importantForAccessibility="no-hide-descendants"
+                    style={[styles.estimateIcon, { backgroundColor: softColor }]}
+                  >
+                    <MaterialCommunityIcons
+                      accessibilityElementsHidden
+                      importantForAccessibility="no"
+                      name={meta.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+                      size={20}
+                      color={color}
+                    />
+                    <View style={[styles.questionBadge, { backgroundColor: theme.surfaceRaised, borderColor: color }]}>
+                      <Text style={[styles.questionMark, { color }]}>?</Text>
+                    </View>
+                  </View>
+                  <View
+                    accessible
+                    accessibilityLabel={`${title}. ${estimateDate.format(estimate.at)}, ${time}. Seen on ${estimate.observedDays} of ${estimate.comparedDays} other active days.`}
+                    style={styles.estimateCopy}
+                  >
+                    <Text style={[styles.estimateTitle, { color: theme.text }]}>{title}</Text>
+                    <Text style={[styles.estimateTime, { color }]}>{estimateDate.format(estimate.at)} · {time}</Text>
+                    <Text style={[styles.estimateEvidence, { color: theme.textMuted }]}>
+                      Seen near this time on {estimate.observedDays} of {estimate.comparedDays} other active days.
+                    </Text>
+                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Add ${activityName.toLowerCase()} at the estimated time`}
+                    accessibilityState={{ busy: adding, disabled: addingEstimateId !== null }}
+                    disabled={addingEstimateId !== null}
+                    onPress={() => void addEstimate(estimate)}
+                    style={({ pressed }) => [
+                      styles.addEstimateButton,
+                      { backgroundColor: pressed ? theme.primaryPressed : theme.primary, opacity: addingEstimateId && !adding ? 0.45 : 1 },
+                    ]}
+                  >
+                    {adding ? (
+                      <ActivityIndicator
+                        accessibilityElementsHidden
+                        importantForAccessibility="no"
+                        color={theme.onPrimary}
+                        size="small"
+                      />
+                    ) : (
+                      <MaterialCommunityIcons
+                        accessibilityElementsHidden
+                        importantForAccessibility="no"
+                        name="plus"
+                        size={19}
+                        color={theme.onPrimary}
+                      />
+                    )}
+                    <Text style={[styles.addEstimateText, { color: theme.onPrimary }]}>{adding ? 'Adding…' : 'Add log'}</Text>
+                  </Pressable>
+                </View>
+              );
+            })}
+          </View>
+        ) : (
+          <View style={[styles.noEstimate, { borderColor: theme.border }]}>
+            <MaterialCommunityIcons
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              name={missingLogs.daysAnalyzed < 4 ? 'chart-timeline-variant' : 'check-circle-outline'}
+              size={19}
+              color={theme.textMuted}
+            />
+            <Text style={[styles.noEstimateText, { color: theme.textMuted }]}>
+              {missingLogs.daysAnalyzed < 4
+                ? `Log activity on ${4 - missingLogs.daysAnalyzed} more ${4 - missingLogs.daysAnalyzed === 1 ? 'day' : 'days'} to check for gaps.`
+                : `No strong gaps found in the last ${missingLogs.periodDays} days.`}
+            </Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.filterHeading}>
@@ -875,8 +1016,23 @@ const styles = StyleSheet.create({
   },
   filterLabel: { fontSize: 13, lineHeight: 18, fontWeight: '700' },
   frequencyCard: { borderWidth: 1, borderRadius: 22, padding: 12 },
+  missingCard: { borderWidth: 1, borderRadius: 22, padding: 12 },
   frequencyHeading: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 4 },
   frequencyNote: { fontSize: 11, lineHeight: 16, borderRadius: 12, paddingHorizontal: 11, paddingVertical: 9, marginTop: 10 },
+  missingNote: { fontSize: 11, lineHeight: 16, borderRadius: 12, paddingHorizontal: 11, paddingVertical: 9, marginTop: 10 },
+  estimateList: { marginTop: 12 },
+  estimateRow: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 4, paddingTop: 13, paddingBottom: 11, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  estimateIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  questionBadge: { position: 'absolute', right: -3, bottom: -3, width: 17, height: 17, borderRadius: 9, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  questionMark: { fontSize: 10, lineHeight: 12, fontWeight: '900' },
+  estimateCopy: { flex: 1, minWidth: 0 },
+  estimateTitle: { fontSize: 14, lineHeight: 19, fontWeight: '800' },
+  estimateTime: { fontSize: 12, lineHeight: 17, fontWeight: '700', marginTop: 1 },
+  estimateEvidence: { fontSize: 11, lineHeight: 16, marginTop: 2 },
+  addEstimateButton: { minWidth: 86, minHeight: 48, borderRadius: 14, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  addEstimateText: { fontSize: 12, lineHeight: 16, fontWeight: '800' },
+  noEstimate: { minHeight: 48, borderTopWidth: StyleSheet.hairlineWidth, marginTop: 12, paddingHorizontal: 4, paddingTop: 12, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  noEstimateText: { flex: 1, fontSize: 12, lineHeight: 17 },
   frequencyRow: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 4, paddingTop: 13, paddingBottom: 11, marginTop: 12 },
   activityHeading: { flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: 11 },
   activityIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },

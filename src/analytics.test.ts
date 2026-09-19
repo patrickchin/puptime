@@ -6,6 +6,7 @@ import test from 'node:test';
 import {
   activityFrequencyStats,
   buildTimelineDays,
+  estimateMissingLogs,
   monthlyActivityStats,
   scheduleStatusesForDay,
   suggestScheduleFromEvents,
@@ -239,4 +240,76 @@ test('waits for three recorded days before suggesting a routine', () => {
   const result = suggestScheduleFromEvents(events, 14, new Date(2026, 8, 10, 20));
   assert.equal(result.daysAnalyzed, 2);
   assert.deepEqual(result.entries, []);
+});
+
+test('flags a repeated meal slot when logging continued after the gap', () => {
+  const events: PuppyEvent[] = [];
+  for (let dayOfMonth = 4; dayOfMonth <= 10; dayOfMonth += 1) {
+    const add = (id: string, type: PuppyEvent['type'], hour: number) => events.push({
+      id: `${id}-${dayOfMonth}`,
+      type,
+      at: new Date(2026, 8, dayOfMonth, hour).getTime(),
+      source: 'app',
+    });
+    add('breakfast', 'meal', 8);
+    if (dayOfMonth !== 9) add('lunch', 'meal', 12);
+    add('dinner', 'meal', 18);
+    add('evening-pee', 'pee', 20);
+  }
+
+  const result = estimateMissingLogs(events, 14, new Date(2026, 8, 10, 22));
+
+  assert.deepEqual(
+    result.estimates.map(({ type, at, observedDays, comparedDays }) => ({
+      type,
+      day: new Date(at).getDate(),
+      hour: new Date(at).getHours(),
+      observedDays,
+      comparedDays,
+    })),
+    [{ type: 'meal', day: 9, hour: 12, observedDays: 6, comparedDays: 6 }],
+  );
+});
+
+test('estimates a missing nap span from completed naps at the same daily slot', () => {
+  const events: PuppyEvent[] = [];
+  for (let dayOfMonth = 6; dayOfMonth <= 10; dayOfMonth += 1) {
+    events.push({
+      id: `morning-${dayOfMonth}`,
+      type: 'pee',
+      at: new Date(2026, 8, dayOfMonth, 9).getTime(),
+      source: 'app',
+    });
+    if (dayOfMonth !== 9) {
+      const start = new Date(2026, 8, dayOfMonth, 13).getTime();
+      events.push({ id: `nap-${dayOfMonth}`, type: 'nap', at: start, endedAt: start + 90 * 60_000, source: 'app' });
+    }
+    events.push({
+      id: `afternoon-${dayOfMonth}`,
+      type: 'pee',
+      at: new Date(2026, 8, dayOfMonth, 16).getTime(),
+      source: 'app',
+    });
+  }
+
+  const result = estimateMissingLogs(events, 14, new Date(2026, 8, 10, 22));
+  const nap = result.estimates.find((estimate) => estimate.type === 'nap');
+
+  assert.ok(nap);
+  assert.equal(new Date(nap.at).getDate(), 9);
+  assert.equal(new Date(nap.at).getHours(), 13);
+  assert.equal(nap.endedAt, nap.at + 90 * 60_000);
+});
+
+test('does not guess on a blank day or before a possible slot has passed', () => {
+  const events: PuppyEvent[] = [];
+  for (let dayOfMonth = 6; dayOfMonth <= 9; dayOfMonth += 1) {
+    events.push({ id: `meal-${dayOfMonth}`, type: 'meal', at: new Date(2026, 8, dayOfMonth, 18).getTime(), source: 'app' });
+    events.push({ id: `pee-${dayOfMonth}`, type: 'pee', at: new Date(2026, 8, dayOfMonth, 20).getTime(), source: 'app' });
+  }
+  events.push({ id: 'today-pee', type: 'pee', at: new Date(2026, 8, 10, 10).getTime(), source: 'app' });
+
+  const result = estimateMissingLogs(events, 14, new Date(2026, 8, 10, 12));
+
+  assert.deepEqual(result.estimates, []);
 });
