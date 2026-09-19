@@ -29,6 +29,15 @@ import { spacing, type Theme } from '../theme';
 const quickBackdates = [0, 5, 15, 30, 60] as const;
 const editableEventTypes = eventTypes.filter((type) => type !== 'nap');
 const autoSaveDelayMs = 450;
+const recentHistoryDays = 10;
+const sectionDate = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+const sectionDateWithYear = new Intl.DateTimeFormat(undefined, {
+  weekday: 'long',
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+});
+const archiveMonth = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
 
 const activityFilters = [
   { id: 'all', label: 'All', icon: 'format-list-bulleted', types: [] },
@@ -40,6 +49,7 @@ const activityFilters = [
 ] as const;
 
 type ActivityFilter = (typeof activityFilters)[number]['id'];
+type HistoryScope = 'recent' | 'all';
 
 type Draft = {
   event: PuppyEvent;
@@ -92,14 +102,15 @@ function dateLabel(value: number): string {
   }).format(value);
 }
 
-function sectionTitle(key: string): string {
+function sectionTitle(key: string, todayKey: string, yesterdayKey: string, currentYear: number): string {
   const date = new Date(`${key}T12:00:00`);
-  const today = new Date();
-  const yesterday = new Date();
-  yesterday.setDate(today.getDate() - 1);
-  if (key === dateKey(today)) return 'Today';
-  if (key === dateKey(yesterday)) return 'Yesterday';
-  return new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'short', day: 'numeric' }).format(date);
+  if (key === todayKey) return 'Today';
+  if (key === yesterdayKey) return 'Yesterday';
+  return (date.getFullYear() === currentYear ? sectionDate : sectionDateWithYear).format(date);
+}
+
+function monthTitle(key: string): string {
+  return archiveMonth.format(new Date(`${key}-01T12:00:00`));
 }
 
 export function LogScreen({
@@ -139,6 +150,7 @@ export function LogScreen({
   const [showWidgetSettings, setShowWidgetSettings] = useState(false);
   const [widgetDraft, setWidgetDraft] = useState<QuickEventType[]>(widgetActions);
   const [savingWidgetSettings, setSavingWidgetSettings] = useState(false);
+  const [historyScope, setHistoryScope] = useState<HistoryScope>('recent');
   const editorScrollRef = useRef<ScrollView>(null);
   const draftRef = useRef<Draft | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -252,17 +264,47 @@ export function LogScreen({
     if (event) startEditing(event);
     onEditRequestHandled?.();
   }, [editEventId, events, onEditRequestHandled]);
-  const visibleEvents = useMemo(() => {
+  const filteredEvents = useMemo(() => {
     const selected = activityFilters.find((item) => item.id === activityFilter);
     if (!selected || selected.types.length === 0) return events;
     return events.filter((event) => (selected.types as readonly EventType[]).includes(event.type));
   }, [activityFilter, events]);
-  const byDay = new Map<string, PuppyEvent[]>();
-  visibleEvents.forEach((event) => {
-    const key = dateKey(event.at);
-    byDay.set(key, [...(byDay.get(key) ?? []), event]);
-  });
-  const sections = [...byDay.entries()].map(([key, data]) => ({ key, title: sectionTitle(key), data }));
+  const todayKey = dateKey(now);
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayKey = dateKey(yesterday);
+  const currentYear = new Date(now).getFullYear();
+  const recentStartDate = new Date(now);
+  recentStartDate.setHours(0, 0, 0, 0);
+  recentStartDate.setDate(recentStartDate.getDate() - (recentHistoryDays - 1));
+  const recentStart = recentStartDate.getTime();
+  const recentEvents = useMemo(
+    () => filteredEvents.filter((event) => event.at >= recentStart),
+    [filteredEvents, recentStart],
+  );
+  const visibleEvents = historyScope === 'all' ? filteredEvents : recentEvents;
+  const olderEventCount = filteredEvents.length - recentEvents.length;
+  const sections = useMemo(() => {
+    const byDay = new Map<string, PuppyEvent[]>();
+    visibleEvents.forEach((event) => {
+      const key = dateKey(event.at);
+      const day = byDay.get(key);
+      if (day) day.push(event);
+      else byDay.set(key, [event]);
+    });
+    let previousMonth = '';
+    return [...byDay.entries()].map(([key, data]) => {
+      const monthKey = key.slice(0, 7);
+      const startsMonth = historyScope === 'all' && monthKey !== previousMonth;
+      previousMonth = monthKey;
+      return {
+        key,
+        title: sectionTitle(key, todayKey, yesterdayKey, currentYear),
+        data,
+        monthTitle: startsMonth ? monthTitle(monthKey) : undefined,
+      };
+    });
+  }, [currentYear, historyScope, todayKey, visibleEvents, yesterdayKey]);
   const timedNap = draft?.event.type === 'nap' && draft.event.endedAt !== undefined;
   const activeValue = draft?.field === 'end' ? draft.endedAt ?? Date.now() : draft?.at ?? Date.now();
   const pickerDate = new Date(activeValue);
@@ -444,7 +486,7 @@ export function LogScreen({
             <View style={styles.activityHeading}>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>Activity</Text>
               <Text style={[styles.count, { color: theme.textMuted }]}>
-                {activityFilter === 'all' ? `${events.length} total` : `${visibleEvents.length} shown`}
+                {historyScope === 'all' ? `${visibleEvents.length} total` : `${visibleEvents.length} recent`}
               </Text>
             </View>
             <ScrollView
@@ -481,10 +523,61 @@ export function LogScreen({
                 );
               })}
             </ScrollView>
+            {olderEventCount > 0 || historyScope === 'all' ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={historyScope === 'all'
+                  ? `Show activity from the last ${recentHistoryDays} days`
+                  : `View all activity history, including ${olderEventCount} older ${olderEventCount === 1 ? 'log' : 'logs'}`}
+                onPress={() => setHistoryScope((scope) => scope === 'recent' ? 'all' : 'recent')}
+                style={({ pressed }) => [
+                  styles.historyScope,
+                  {
+                    backgroundColor: pressed ? theme.primarySoft : theme.surfaceRaised,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <View style={[styles.historyScopeIcon, { backgroundColor: theme.primarySoft }]}>
+                  <MaterialCommunityIcons
+                    accessibilityElementsHidden
+                    importantForAccessibility="no"
+                    name={historyScope === 'all' ? 'calendar-today-outline' : 'history'}
+                    size={20}
+                    color={theme.primary}
+                  />
+                </View>
+                <View style={styles.historyScopeCopy}>
+                  <Text style={[styles.historyScopeTitle, { color: theme.text }]}>
+                    {historyScope === 'all' ? `Show recent ${recentHistoryDays} days` : 'View all history'}
+                  </Text>
+                  <Text style={[styles.historyScopeDetail, { color: theme.textMuted }]}>
+                    {historyScope === 'all'
+                      ? 'Return to the activity that matters most now'
+                      : `${olderEventCount} older ${olderEventCount === 1 ? 'log' : 'logs'} grouped by month`}
+                  </Text>
+                </View>
+                <MaterialCommunityIcons
+                  accessibilityElementsHidden
+                  importantForAccessibility="no"
+                  name="chevron-right"
+                  size={22}
+                  color={theme.textMuted}
+                />
+              </Pressable>
+            ) : null}
           </>
         }
         renderSectionHeader={({ section }) => (
-          <Text style={[styles.dayHeading, { color: theme.textMuted }]}>{section.title.toUpperCase()}</Text>
+          <View>
+            {section.monthTitle ? (
+              <View style={styles.archiveMonthHeading}>
+                <Text style={[styles.archiveMonthText, { color: theme.primary }]}>{section.monthTitle.toUpperCase()}</Text>
+                <View style={[styles.archiveMonthLine, { backgroundColor: theme.border }]} />
+              </View>
+            ) : null}
+            <Text style={[styles.dayHeading, { color: theme.textMuted }]}>{section.title.toUpperCase()}</Text>
+          </View>
         )}
         renderItem={({ item }) => (
           <EventRow
@@ -914,6 +1007,24 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   filterText: { fontSize: 13, lineHeight: 18, fontWeight: '700' },
+  historyScope: {
+    minHeight: 64,
+    borderWidth: 1,
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    marginTop: 4,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  historyScopeIcon: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  historyScopeCopy: { flex: 1, minWidth: 0 },
+  historyScopeTitle: { fontSize: 14, lineHeight: 19, fontWeight: '700' },
+  historyScopeDetail: { fontSize: 11, lineHeight: 16, marginTop: 1 },
+  archiveMonthHeading: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18, marginBottom: 2 },
+  archiveMonthText: { fontSize: 12, lineHeight: 17, fontWeight: '800', letterSpacing: 1.2 },
+  archiveMonthLine: { flex: 1, height: StyleSheet.hairlineWidth },
   dayHeading: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2, marginTop: 8, marginBottom: 8 },
   empty: { borderWidth: 1, borderStyle: 'dashed', borderRadius: 20, padding: spacing.lg, alignItems: 'center' },
   emptyTitle: { fontSize: 17, fontWeight: '700', marginTop: 8 },

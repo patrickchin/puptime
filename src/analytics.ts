@@ -44,6 +44,14 @@ export type ActivityFrequencySnapshot = {
   stats: ActivityFrequencyStat[];
 };
 
+export type MonthlyActivityStat = {
+  key: string;
+  date: Date;
+  total: number;
+  recordedDays: number;
+  averagePerRecordedDay: number;
+};
+
 export type ScheduleSuggestion = {
   entries: ScheduleEntry[];
   daysAnalyzed: number;
@@ -123,6 +131,41 @@ export function activityFrequencyStats(
       };
     }),
   };
+}
+
+export function monthlyActivityStats(
+  events: PuppyEvent[],
+  types?: readonly EventType[],
+): MonthlyActivityStat[] {
+  const selectedTypes = types ? new Set(types) : null;
+  const months = new Map<string, {
+    date: Date;
+    total: number;
+    recordedDays: Set<string>;
+  }>();
+
+  events.forEach((event) => {
+    const date = new Date(event.at);
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    const month = months.get(key) ?? {
+      date: new Date(date.getFullYear(), date.getMonth(), 1, 12),
+      total: 0,
+      recordedDays: new Set<string>(),
+    };
+    month.recordedDays.add(dateKey(event.at));
+    if (!selectedTypes || selectedTypes.has(event.type)) month.total += 1;
+    months.set(key, month);
+  });
+
+  return [...months.entries()]
+    .sort(([left], [right]) => right.localeCompare(left))
+    .map(([key, month]) => ({
+      key,
+      date: month.date,
+      total: month.total,
+      recordedDays: month.recordedDays.size,
+      averagePerRecordedDay: month.recordedDays.size ? month.total / month.recordedDays.size : 0,
+    }));
 }
 
 export function suggestScheduleFromEvents(
