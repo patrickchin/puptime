@@ -10,7 +10,9 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.patrickchin.puptime",
-      "buildNumber": "15"
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.patrickchin.puptime",
@@ -86,6 +88,12 @@
       "expo-font",
       "./plugins/withAndroidWorkManager",
       "expo-sharing"
-    ]
+    ],
+    "owner": "patchin",
+    "extra": {
+      "eas": {
+        "projectId": "00a097cd-d35d-47dd-8c9a-89e9b3bf8fa3"
+      }
+    }
   }
 }

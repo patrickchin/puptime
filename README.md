@@ -81,3 +81,7 @@ GitHub Actions also performs an unsigned native iOS Simulator build of the app a
 ## License
 
 MIT
+
+## Privacy
+
+See the [Puptime privacy policy](PRIVACY.md).
