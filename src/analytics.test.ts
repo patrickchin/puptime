@@ -107,6 +107,42 @@ test('shows an open nap only up to now and keeps legacy nap taps as points', () 
   ]);
 });
 
+test('can anchor a timeline in history while open naps still use the real current time', () => {
+  const events: PuppyEvent[] = [
+    {
+      id: 'open',
+      type: 'nap',
+      at: new Date(2026, 8, 4, 23, 45).getTime(),
+      endedAt: null,
+      source: 'app',
+    },
+    {
+      id: 'evening',
+      type: 'walk',
+      at: new Date(2026, 8, 5, 20).getTime(),
+      source: 'app',
+    },
+  ];
+  const result = buildTimelineDays(
+    events,
+    2,
+    new Date(2026, 8, 5, 9),
+    new Date(2026, 8, 10, 18),
+  );
+
+  assert.deepEqual(result.map((item) => item.key), ['2026-09-04', '2026-09-05']);
+  assert.deepEqual(
+    result.map((item) => item.marks.map(({ id, startBucket, endBucket }) => ({ id, startBucket, endBucket }))),
+    [
+      [{ id: 'open', startBucket: 95, endBucket: 96 }],
+      [
+        { id: 'open', startBucket: 0, endBucket: 96 },
+        { id: 'evening', startBucket: 80, endBucket: undefined },
+      ],
+    ],
+  );
+});
+
 test('summarizes daily frequency across recorded days and consecutive gaps', () => {
   const events: PuppyEvent[] = [
     { id: 'p1', type: 'pee', at: new Date(2026, 8, 8, 7).getTime(), source: 'app' },
