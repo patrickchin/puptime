@@ -1,0 +1,6 @@
+Puptime requires no account or sign-in. All activity data is stored locally on the device.
+
+To test voice dictation, allow Microphone and Speech Recognition when prompted. To test reminders, enable a routine reminder and allow notifications.
+
+The Puptime Quick Log widget can be added from the Home Screen widget gallery. Its interactive logging buttons require iOS 17 or later.
+
