@@ -34,16 +34,9 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
   const muted = dark ? '#B9C5BE' : '#56635D';
   const primary = dark ? '#73D3AD' : '#176B52';
   const background = dark
-    ? { type: 'linearGradient' as const, colors: ['#1A2821', '#111A15'], startPoint: { x: 0, y: 0 }, endPoint: { x: 1, y: 1 } }
-    : { type: 'linearGradient' as const, colors: ['#FFFEFA', '#EDF4EF'], startPoint: { x: 0, y: 0 }, endPoint: { x: 1, y: 1 } };
-  const actionTints = {
-    pee: dark ? '#92E3C2' : '#176B52',
-    poop: dark ? '#F2C48F' : '#865425',
-    meal: dark ? '#F5B5AE' : '#A34840',
-    pottyTrip: dark ? '#A6D7F3' : '#286A91',
-    walk: dark ? '#E7DF82' : '#716B18',
-    nap: props.openNap ? (dark ? '#E0D8FF' : '#4C3D92') : dark ? '#C8C3F3' : '#6156A5',
-  };
+    ? { type: 'linearGradient' as const, colors: ['rgba(26, 40, 33, 0.92)', 'rgba(17, 26, 21, 0.86)'], startPoint: { x: 0, y: 0 }, endPoint: { x: 1, y: 1 } }
+    : { type: 'linearGradient' as const, colors: ['rgba(255, 254, 250, 0.92)', 'rgba(237, 244, 239, 0.86)'], startPoint: { x: 0, y: 0 }, endPoint: { x: 1, y: 1 } };
+  const napTint = props.openNap ? (dark ? '#E0D8FF' : '#4C3D92') : primary;
   const add = (type: QuickEventType, label: string): PuptimeWidgetProps => {
     const at = Date.now() - backdateMinutes * 60_000;
     if (type === 'nap' && props.openNap) {
@@ -81,11 +74,11 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
     buttonBorderShape('roundedRectangle' as const, 11),
     controlSize('small' as const),
     tint(color),
-    frame({ width: 46, height: 46 }),
+    frame({ width: 46, height: 60 }),
   ];
 
   return (
-    <VStack spacing={7} modifiers={[padding({ all: 10 }), containerBackground(background, 'widget')]}>
+    <VStack spacing={6} modifiers={[padding({ all: 8 }), containerBackground(background, 'widget')]}>
       <HStack spacing={7}>
         <Image systemName="pawprint.fill" size={22} color={primary} />
         <VStack spacing={0}>
@@ -94,33 +87,33 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
         </VStack>
         <Spacer minLength={3} />
         <Button
-          label="−5"
+          label="−15"
           target="earlier"
-          onPress={() => adjust(5)}
+          onPress={() => adjust(15)}
           modifiers={[buttonStyle('bordered'), buttonBorderShape('roundedRectangle', 10), controlSize('small'), tint(primary)]}
         />
         <Text modifiers={[font({ weight: 'bold', size: 10 }), foregroundStyle(foreground), frame({ minWidth: 38 })]}>
           {backdateMinutes ? `${backdateMinutes}m` : 'Now'}
         </Text>
         <Button
-          label="+5"
+          label="+15"
           target="later"
-          onPress={() => adjust(-5)}
+          onPress={() => adjust(-15)}
           modifiers={[buttonStyle('bordered'), buttonBorderShape('roundedRectangle', 10), controlSize('small'), tint(primary)]}
         />
       </HStack>
       <HStack spacing={5}>
-        <Button label="Pee" systemImage="drop.fill" target="pee" onPress={() => add('pee', 'Pee')} modifiers={actionModifiers(actionTints.pee)} />
-        <Button label="Poop" systemImage="circle.hexagongrid.fill" target="poop" onPress={() => add('poop', 'Poop')} modifiers={actionModifiers(actionTints.poop)} />
-        <Button label="Ate" systemImage="fork.knife" target="meal" onPress={() => add('meal', 'Meal')} modifiers={actionModifiers(actionTints.meal)} />
-        <Button label="Out" systemImage="door.left.hand.open" target="pottyTrip" onPress={() => add('pottyTrip', 'Potty trip')} modifiers={actionModifiers(actionTints.pottyTrip)} />
-        <Button label="Walk" systemImage="figure.walk" target="walk" onPress={() => add('walk', 'Walk')} modifiers={actionModifiers(actionTints.walk)} />
+        <Button label="Pee" systemImage="drop.fill" target="pee" onPress={() => add('pee', 'Pee')} modifiers={actionModifiers(primary)} />
+        <Button label="Poop" systemImage="circle.hexagongrid.fill" target="poop" onPress={() => add('poop', 'Poop')} modifiers={actionModifiers(primary)} />
+        <Button label="Ate" systemImage="fork.knife" target="meal" onPress={() => add('meal', 'Meal')} modifiers={actionModifiers(primary)} />
+        <Button label="Out" systemImage="door.left.hand.open" target="pottyTrip" onPress={() => add('pottyTrip', 'Potty trip')} modifiers={actionModifiers(primary)} />
+        <Button label="Walk" systemImage="figure.walk" target="walk" onPress={() => add('walk', 'Walk')} modifiers={actionModifiers(primary)} />
         <Button
           label={props.openNap ? 'End' : 'Nap'}
           systemImage={props.openNap ? 'stop.fill' : 'moon.zzz.fill'}
           target="nap"
           onPress={() => add('nap', 'Nap')}
-          modifiers={actionModifiers(actionTints.nap)}
+          modifiers={actionModifiers(napTint)}
         />
       </HStack>
     </VStack>

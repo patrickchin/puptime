@@ -7,19 +7,15 @@ import { normalizeBackdateMinutes, type QuickEventType } from '../domain';
 type ActionButton = {
   type: QuickEventType;
   label: string;
-  light: `#${string}`;
-  dark: `#${string}`;
-  inkLight: `#${string}`;
-  inkDark: `#${string}`;
 };
 
 const buttons = [
-  { type: 'pee', label: 'Pee', light: '#DDF4E9', dark: '#284A3D', inkLight: '#176B52', inkDark: '#92E3C2' },
-  { type: 'poop', label: 'Poop', light: '#F6E8D8', dark: '#513923', inkLight: '#865425', inkDark: '#F2C48F' },
-  { type: 'meal', label: 'Ate', light: '#FBE5E2', dark: '#53302D', inkLight: '#A34840', inkDark: '#F5B5AE' },
-  { type: 'pottyTrip', label: 'Out', light: '#DFEFF8', dark: '#243E50', inkLight: '#286A91', inkDark: '#A6D7F3' },
-  { type: 'walk', label: 'Walk', light: '#F3F0D2', dark: '#45431F', inkLight: '#716B18', inkDark: '#E7DF82' },
-  { type: 'nap', label: 'Nap', light: '#E8E7FA', dark: '#34355C', inkLight: '#6156A5', inkDark: '#C8C3F3' },
+  { type: 'pee', label: 'Pee' },
+  { type: 'poop', label: 'Poop' },
+  { type: 'meal', label: 'Ate' },
+  { type: 'pottyTrip', label: 'Out' },
+  { type: 'walk', label: 'Walk' },
+  { type: 'nap', label: 'Nap' },
 ] as const satisfies readonly ActionButton[];
 
 const iconPaths: Record<QuickEventType | 'brand' | 'stop', string> = {
@@ -51,13 +47,14 @@ export function QuickLogWidget({
   backdateMinutes = 0,
   activeNap = false,
 }: Props) {
-  const background = dark ? '#17211C' : '#FFFEFA';
-  const backgroundEnd = dark ? '#111A15' : '#EDF4EF';
+  const background = dark ? 'rgba(23, 33, 28, 0.92)' : 'rgba(255, 254, 250, 0.92)';
+  const backgroundEnd = dark ? 'rgba(17, 26, 21, 0.86)' : 'rgba(237, 244, 239, 0.86)';
   const foreground = dark ? '#F2F6F3' : '#17231E';
   const muted = dark ? '#B9C5BE' : '#56635D';
   const border = dark ? '#35443C' : '#D7E2DA';
   const primary = dark ? '#73D3AD' : '#176B52';
-  const primarySurface = dark ? '#253E33' : '#DDEFE7';
+  const primarySurface = dark ? 'rgba(115, 211, 173, 0.12)' : 'rgba(23, 107, 82, 0.08)';
+  const primaryBorder = dark ? 'rgba(115, 211, 173, 0.30)' : 'rgba(23, 107, 82, 0.18)';
   const minutesAgo = normalizeBackdateMinutes(backdateMinutes);
   const timeLabel = minutesAgo ? `${minutesAgo}m ago` : 'Now';
   const visibleButtons = compact
@@ -68,8 +65,17 @@ export function QuickLogWidget({
       {visibleButtons.map((button) => {
         const isActiveNap = button.type === 'nap' && activeNap;
         const label = isActiveNap ? (compact ? 'Wake' : 'End nap') : button.label;
-        const actionBackground = isActiveNap ? (dark ? '#493C70' : '#DED7FA') : dark ? button.dark : button.light;
-        const actionInk = isActiveNap ? (dark ? '#E0D8FF' : '#4C3D92') : dark ? button.inkDark : button.inkLight;
+        const actionBackground = isActiveNap
+          ? dark
+            ? 'rgba(224, 216, 255, 0.14)'
+            : 'rgba(76, 61, 146, 0.10)'
+          : primarySurface;
+        const actionInk = isActiveNap ? (dark ? '#E0D8FF' : '#4C3D92') : primary;
+        const actionBorder = isActiveNap
+          ? dark
+            ? 'rgba(224, 216, 255, 0.34)'
+            : 'rgba(76, 61, 146, 0.22)'
+          : primaryBorder;
         return (
           <FlexWidget
             key={button.type}
@@ -83,7 +89,7 @@ export function QuickLogWidget({
               alignItems: 'center',
               justifyContent: 'center',
               backgroundColor: actionBackground,
-              borderColor: isActiveNap ? actionInk : dark ? button.inkLight : button.inkDark,
+              borderColor: actionBorder,
               borderWidth: 1,
               borderRadius: compact ? 12 : 14,
               paddingHorizontal: compact ? 4 : 2,
@@ -140,9 +146,9 @@ export function QuickLogWidget({
     >
       <FlexWidget style={{ width: 'match_parent', height: 42, flexDirection: 'row', alignItems: 'center', marginBottom: 7 }}>
         <FlexWidget
-          style={{ width: 34, height: 34, borderRadius: 11, backgroundColor: primary, alignItems: 'center', justifyContent: 'center', marginRight: 7 }}
+          style={{ width: 34, height: 34, borderRadius: 11, backgroundColor: primarySurface, borderColor: primaryBorder, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginRight: 7 }}
         >
-          <SvgWidget svg={makeIcon('brand', dark ? '#142019' : '#FFFFFF')} style={{ width: 22, height: 22 }} />
+          <SvgWidget svg={makeIcon('brand', primary)} style={{ width: 22, height: 22 }} />
         </FlexWidget>
         <FlexWidget style={{ flex: 1, height: 'match_parent', justifyContent: 'center' }}>
           <TextWidget text="Puptime" style={{ color: foreground, fontSize: 14, fontWeight: '800', letterSpacing: -0.2 }} />
@@ -153,11 +159,11 @@ export function QuickLogWidget({
         >
           <FlexWidget
             clickAction="ADJUST_TIME"
-            clickActionData={{ minutesAgo: normalizeBackdateMinutes(minutesAgo + 5) }}
-            accessibilityLabel="Move logged time 5 minutes earlier"
+            clickActionData={{ minutesAgo: normalizeBackdateMinutes(minutesAgo + 15) }}
+            accessibilityLabel="Move logged time 15 minutes earlier"
             style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}
           >
-            <TextWidget text="−5" style={{ color: primary, fontSize: 11, fontWeight: '800' }} />
+            <TextWidget text="−15" style={{ color: primary, fontSize: 10, fontWeight: '800' }} />
           </FlexWidget>
           <FlexWidget
             style={{ width: 52, height: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: dark ? '#172A21' : '#FFFFFF', borderColor: border, borderLeftWidth: 1, borderRightWidth: 1 }}
@@ -166,11 +172,11 @@ export function QuickLogWidget({
           </FlexWidget>
           <FlexWidget
             clickAction="ADJUST_TIME"
-            clickActionData={{ minutesAgo: normalizeBackdateMinutes(minutesAgo - 5) }}
-            accessibilityLabel="Move logged time 5 minutes later"
+            clickActionData={{ minutesAgo: normalizeBackdateMinutes(minutesAgo - 15) }}
+            accessibilityLabel="Move logged time 15 minutes later"
             style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}
           >
-            <TextWidget text="+5" style={{ color: primary, fontSize: 11, fontWeight: '800' }} />
+            <TextWidget text="+15" style={{ color: primary, fontSize: 10, fontWeight: '800' }} />
           </FlexWidget>
         </FlexWidget>
       </FlexWidget>

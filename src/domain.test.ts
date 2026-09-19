@@ -23,8 +23,9 @@ test('creates a backdated widget event at the supplied time', () => {
   assert.equal(event.source, 'widget');
 });
 
-test('normalizes widget backdating to five-minute steps within an hour', () => {
-  assert.equal(normalizeBackdateMinutes('13'), 15);
+test('normalizes widget backdating to 15-minute steps within an hour', () => {
+  assert.equal(normalizeBackdateMinutes('8'), 15);
+  assert.equal(normalizeBackdateMinutes(7), 0);
   assert.equal(normalizeBackdateMinutes(-5), 0);
   assert.equal(normalizeBackdateMinutes(90), 60);
   assert.equal(normalizeBackdateMinutes('not-a-time'), 0);

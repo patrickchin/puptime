@@ -177,7 +177,7 @@ export function formatDuration(milliseconds: number): string {
 export function normalizeBackdateMinutes(value: unknown): number {
   const minutes = Number(value);
   if (!Number.isFinite(minutes)) return 0;
-  return Math.min(60, Math.max(0, Math.round(minutes / 5) * 5));
+  return Math.min(60, Math.max(0, Math.round(minutes / 15) * 15));
 }
 
 export function normalizeNote(value: unknown): string | undefined {

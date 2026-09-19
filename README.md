@@ -30,7 +30,7 @@ Download the APK from the [latest GitHub release](https://github.com/patrickchin
 The Android widget has two useful heights:
 
 - One row: four compact buttons that immediately log pee, poop, meals, or the nap start/end state.
-- Two rows: adds **Out** and **Walk**. Tap `−5` or `+5` to choose a time up to one hour ago, then tap the activity. It resets to **Now** after logging.
+- Two rows: adds **Out** and **Walk**. Tap `−15` or `+15` to choose a time up to one hour ago, then tap the activity. It resets to **Now** after logging.
 
 Long-press the widget to show Android’s resize handles, then drag the vertical handle to switch layouts. Inside the app, tap the pencil beside any point-in-time log to correct its activity, custom name, date, time, or note. Edits save automatically, including when you close the editor. Nap logs expose editable start and end dates and times.
 
