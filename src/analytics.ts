@@ -5,6 +5,7 @@ import {
   quickEventTypes,
   type EventType,
   type PuppyEvent,
+  type QuickEventType,
   type ScheduleEntry,
 } from './domain.ts';
 
@@ -57,6 +58,21 @@ export type ScheduleSuggestion = {
   daysAnalyzed: number;
   periodDays: number;
   sourceEvents: number;
+};
+
+export type MissingLogEstimate = {
+  id: string;
+  type: QuickEventType;
+  at: number;
+  endedAt?: number;
+  observedDays: number;
+  comparedDays: number;
+};
+
+export type MissingLogSnapshot = {
+  estimates: MissingLogEstimate[];
+  daysAnalyzed: number;
+  periodDays: number;
 };
 
 export type ScheduleStatus = 'done' | 'due' | 'upcoming' | 'missed';
@@ -295,6 +311,86 @@ export function scheduleStatusesForDay(
     const { target, ...entry } = item;
     return { entry, target, status, ...(event ? { event } : {}) };
   });
+}
+
+export function estimateMissingLogs(
+  events: PuppyEvent[],
+  days = 14,
+  now = new Date(),
+): MissingLogSnapshot {
+  const suggestion = suggestScheduleFromEvents(events, days, now);
+  const recent = windowedEvents(events, suggestion.periodDays, now);
+  const eventsByDay = new Map<string, PuppyEvent[]>();
+  recent.forEach((event) => {
+    const key = dateKey(event.at);
+    eventsByDay.set(key, [...(eventsByDay.get(key) ?? []), event]);
+  });
+  const activeDays = [...eventsByDay.keys()].sort();
+  if (activeDays.length < 4 || suggestion.entries.length === 0) {
+    return { estimates: [], daysAnalyzed: activeDays.length, periodDays: suggestion.periodDays };
+  }
+
+  // ponytail: use a transparent routine heuristic; calibrate a statistical model only if real usage outgrows it.
+  const toleranceMinutes = 90;
+  const statusesByDay = new Map<string, ScheduleStatusItem[]>();
+  activeDays.forEach((key) => {
+    const day = new Date(`${key}T12:00:00`);
+    const endOfDay = new Date(day);
+    endOfDay.setHours(23, 59, 59, 999);
+    statusesByDay.set(
+      key,
+      scheduleStatusesForDay(recent, suggestion.entries, day, toleranceMinutes, Math.min(now.getTime(), endOfDay.getTime())),
+    );
+  });
+
+  const estimates = activeDays.flatMap<MissingLogEstimate>((key) => {
+    const dayEvents = eventsByDay.get(key) ?? [];
+    const statuses = statusesByDay.get(key) ?? [];
+
+    return statuses.flatMap<MissingLogEstimate>((status) => {
+      if (status.status !== 'missed' || !isQuickEventType(status.entry.type)) return [];
+      if (!dayEvents.some((event) => event.at > status.target)) return [];
+
+      const comparison = activeDays
+        .filter((otherKey) => otherKey !== key)
+        .map((otherKey) => statusesByDay.get(otherKey)?.find((item) => item.entry.id === status.entry.id))
+        .filter((item): item is ScheduleStatusItem => Boolean(item));
+      const observed = comparison.filter((item) => item.status === 'done' && item.event);
+      if (comparison.length < 3 || observed.length < 3 || observed.length / comparison.length < 0.75) return [];
+
+      let endedAt: number | undefined;
+      if (status.entry.type === 'nap') {
+        const durations = observed.flatMap((item) => {
+          const event = item.event;
+          if (!event || typeof event.endedAt !== 'number') return [];
+          const duration = event.endedAt - event.at;
+          return duration >= 10 * 60_000 && duration <= 6 * 60 * 60_000 ? [duration] : [];
+        });
+        const duration = percentile(durations, 0.5);
+        if (durations.length < 3 || duration === undefined) return [];
+        const estimatedEnd = status.target + duration;
+        if (estimatedEnd > now.getTime()) return [];
+        if (dayEvents.some((event) => event.at > status.target && event.at < estimatedEnd)) return [];
+        if (!dayEvents.some((event) => event.at >= estimatedEnd)) return [];
+        endedAt = estimatedEnd;
+      }
+
+      return [{
+        id: `estimate-${key}-${status.entry.id}`,
+        type: status.entry.type,
+        at: status.target,
+        ...(endedAt === undefined ? {} : { endedAt }),
+        observedDays: observed.length,
+        comparedDays: comparison.length,
+      }];
+    });
+  });
+
+  return {
+    estimates: estimates.sort((left, right) => right.at - left.at),
+    daysAnalyzed: activeDays.length,
+    periodDays: suggestion.periodDays,
+  };
 }
 
 function minutesIntoDay(value: number): number {

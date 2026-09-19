@@ -17,6 +17,7 @@ Puptime is a private, offline puppy routine tracker for Android and iOS. Log pot
 - A compact month-by-month pace view for scanning older patterns without crowding out recent activity
 - Pee and poop frequency summaries with per-recorded-day averages, observed ranges, and typical gaps between logs
 - A reviewable routine suggestion built from recurring activity times across at least three recorded days
+- Reviewable possible missed logs learned from strong repeated patterns, including estimated nap spans when prior durations are consistent
 - A spreadsheet-ready CSV export of the complete activity history, including notes and exact timestamps
 - Customizable, color-coded Android and iOS home-screen widgets with clear activity icons
 - System-matched, Meadow, Sunrise, and Midnight themes with an on-device appearance picker
@@ -37,7 +38,7 @@ The Android widget has two useful heights:
 
 Long-press the widget to show Android’s resize handles, then drag the vertical handle to switch layouts. Inside the app, tap the pencil beside any point-in-time log to correct its activity, custom name, date, time, or note. Edits save automatically, including when you close the editor. Nap logs expose editable start and end dates and times.
 
-Puptime never invents a nap end time. If you forgot to stop a nap, tap **End nap** when you remember, then use the pencil on that nap to correct the end. Old nap taps from Puptime 1.1 remain unchanged as historical point events.
+Puptime never closes an open nap or silently adds estimated sleep. If you forgot to stop a nap, tap **End nap** when you remember, then use the pencil on that nap to correct the end. A possible-gap suggestion may offer a reviewable nap span learned from prior durations; it becomes an editable log only after you tap **Add log**. Old nap taps from Puptime 1.1 remain unchanged as historical point events.
 
 Saved notes and activity data stay on your device. Voice dictation uses your phone's Apple or Android speech-recognition service, which may require a network connection depending on the device and downloaded language models.
 
@@ -46,6 +47,8 @@ From **Insights**, use **Export activity CSV** to open the system share sheet. P
 Routine reminders are optional. Turn one on while editing a planned time and allow notifications when the phone asks. Puptime schedules repeating reminders locally; it does not upload the routine or require a notification server.
 
 The routine suggestion also stays entirely on the device. It looks at the last 14 days, keeps activities that recur on most recorded days, and rounds their typical times to 15 minutes. You can preview the complete suggestion before replacing the current routine, and generated reminders start off.
+
+See [How Puptime learns patterns](LEARNING.md) for the exact routine-learning, event-matching, missing-log, and nap-estimation algorithms and their limits.
 
 ## Run locally
 

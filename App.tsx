@@ -7,6 +7,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { BottomNav, type Tab } from './src/components/BottomNav';
 import { ThemePicker } from './src/components/ThemePicker';
 import { Toast } from './src/components/Toast';
+import type { MissingLogEstimate } from './src/analytics';
 import {
   createEvent,
   createNapEvent,
@@ -111,6 +112,18 @@ export default function App() {
     updateHomeWidget(nextEvents).catch(() => undefined);
   };
 
+  const addEstimatedEvent = async (estimate: MissingLogEstimate) => {
+    const event: PuppyEvent = {
+      ...createEvent(estimate.type, 'app', estimate.at),
+      ...(estimate.endedAt === undefined ? {} : { endedAt: estimate.endedAt }),
+    };
+    const nextEvents = await appendEvents([event]);
+    setEvents(nextEvents);
+    setUndoState({ event, message: `${eventPastLabel(event)} added at estimated time` });
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+    updateHomeWidget(nextEvents).catch(() => undefined);
+  };
+
   const confirmDelete = (event: PuppyEvent) => {
     Alert.alert('Delete this log?', `${eventPastLabel(event)} at ${new Date(event.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`, [
       { text: 'Cancel', style: 'cancel' },
@@ -181,7 +194,7 @@ export default function App() {
   }, [events]);
 
   const screen = useMemo(() => {
-    if (tab === 'insights') return <InsightsScreen events={events} theme={theme} />;
+    if (tab === 'insights') return <InsightsScreen events={events} onAddEstimate={addEstimatedEvent} theme={theme} />;
     if (tab === 'schedule') {
       return (
         <ScheduleScreen
