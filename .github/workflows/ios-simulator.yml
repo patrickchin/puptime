@@ -37,19 +37,29 @@ jobs:
             build/ios-simulator/Build/Products/Release-iphonesimulator/Puptime.app \
             build/Puptime-iOS-Simulator.zip
           unzip -tq build/Puptime-iOS-Simulator.zip
-      - name: Install and launch in iOS Simulator
+      - name: Capture App Store screenshots
         timeout-minutes: 12
         run: |
-          device_id=$(xcrun simctl list devices available -j | jq -r '[.devices[][] | select(.name | startswith("iPhone"))][0].udid // empty')
-          test -n "$device_id"
-          trap 'xcrun simctl shutdown "$device_id" >/dev/null 2>&1 || true' EXIT
-          xcrun simctl boot "$device_id" 2>/dev/null || true
-          xcrun simctl bootstatus "$device_id" -b
-          xcrun simctl install "$device_id" build/ios-simulator/Build/Products/Release-iphonesimulator/Puptime.app
-          xcrun simctl launch "$device_id" com.patrickchin.puptime | grep -E '^com\.patrickchin\.puptime: [0-9]+$'
+          devices=$(xcrun simctl list devices available -j)
+          iphone_id=$(printf '%s' "$devices" | jq -r '[.devices[][] | select(.name | test("iPhone.*(Pro Max|Plus)"))][0].udid // [.devices[][] | select(.name | startswith("iPhone"))][0].udid // empty')
+          ipad_id=$(printf '%s' "$devices" | jq -r '[.devices[][] | select(.name | test("iPad Pro.*(13-inch|12.9-inch)"))][0].udid // [.devices[][] | select(.name | startswith("iPad"))][0].udid // empty')
+          test -n "$iphone_id"
+          test -n "$ipad_id"
+
+          for device_id in "$iphone_id" "$ipad_id"; do
+            xcrun simctl boot "$device_id" 2>/dev/null || true
+            xcrun simctl bootstatus "$device_id" -b
+            xcrun simctl install "$device_id" build/ios-simulator/Build/Products/Release-iphonesimulator/Puptime.app
+            xcrun simctl launch "$device_id" com.patrickchin.puptime | grep -E '^com\.patrickchin\.puptime: [0-9]+$'
+          done
+
           sleep 5
-          xcrun simctl io "$device_id" screenshot build/Puptime-iOS-Simulator.png
-          file build/Puptime-iOS-Simulator.png | grep 'PNG image data'
+          xcrun simctl io "$iphone_id" screenshot build/Puptime-iPhone.png
+          xcrun simctl io "$ipad_id" screenshot build/Puptime-iPad.png
+          xcrun simctl shutdown "$iphone_id"
+          xcrun simctl shutdown "$ipad_id"
+          file build/Puptime-iPhone.png | grep 'PNG image data'
+          file build/Puptime-iPad.png | grep 'PNG image data'
       - uses: actions/upload-artifact@v6
         with:
           name: puptime-ios-simulator
@@ -58,7 +68,9 @@ jobs:
           retention-days: 7
       - uses: actions/upload-artifact@v6
         with:
-          name: puptime-ios-smoke-screenshot
-          path: build/Puptime-iOS-Simulator.png
+          name: puptime-app-store-screenshots
+          path: |
+            build/Puptime-iPhone.png
+            build/Puptime-iPad.png
           if-no-files-found: error
           retention-days: 7
