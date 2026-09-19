@@ -40,7 +40,7 @@
             {
               "name": "PuptimeQuickLog",
               "label": "Puptime Quick Log",
-              "description": "Log potty, walks, meals, and timed naps. Resize taller to backdate.",
+              "description": "Choose your favorite activities for one-tap logging. Resize taller to backdate.",
               "minWidth": "250dp",
               "minHeight": "40dp",
               "targetCellWidth": 4,
@@ -60,7 +60,7 @@
             {
               "name": "PuptimeQuickLog",
               "displayName": "Puptime Quick Log",
-              "description": "Log potty, walks, meals, and timed naps now or up to an hour ago.",
+              "description": "Choose your favorite activities for one-tap logging, with optional backdating.",
               "ios": {
                 "supportedFamilies": [
                   "systemMedium"

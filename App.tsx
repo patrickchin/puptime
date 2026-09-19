@@ -10,11 +10,13 @@ import { Toast } from './src/components/Toast';
 import {
   createEvent,
   createNapEvent,
+  DEFAULT_WIDGET_ACTIONS,
   eventPastLabel,
   isOpenNap,
   normalizeCustomLabel,
   normalizeEventTypeChange,
   normalizeNote,
+  type QuickEventType,
   type EventType,
   type PuppyEvent,
   type PuppyEventChanges,
@@ -29,9 +31,11 @@ import {
   loadEvents,
   loadSchedule,
   loadThemePreference,
+  loadWidgetActions,
   removeEvent,
   saveSchedule,
   saveThemePreference,
+  saveWidgetActions,
   updateEvent,
 } from './src/storage';
 import { resolveTheme, type ThemePreference } from './src/theme';
@@ -47,6 +51,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('log');
   const [events, setEvents] = useState<PuppyEvent[]>([]);
   const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
+  const [widgetActions, setWidgetActions] = useState<QuickEventType[]>([...DEFAULT_WIDGET_ACTIONS]);
   const [undoState, setUndoState] = useState<{ event: PuppyEvent; message: string; restore?: PuppyEvent } | null>(null);
   const [editEventId, setEditEventId] = useState<string | null>(null);
 
@@ -56,6 +61,7 @@ export default function App() {
     setEvents(nextEvents);
     const nextSchedule = await loadSchedule();
     setSchedule(nextSchedule);
+    setWidgetActions(await loadWidgetActions());
     await syncScheduleReminders(nextSchedule).catch(() => undefined);
     await updateHomeWidget(nextEvents).catch(() => undefined);
   }, []);
@@ -168,6 +174,12 @@ export default function App() {
     saveThemePreference(preference).catch(() => undefined);
   };
 
+  const changeWidgetActions = useCallback(async (nextActions: QuickEventType[]) => {
+    await saveWidgetActions(nextActions);
+    setWidgetActions(nextActions);
+    await updateHomeWidget(events).catch(() => undefined);
+  }, [events]);
+
   const screen = useMemo(() => {
     if (tab === 'insights') return <InsightsScreen events={events} theme={theme} />;
     if (tab === 'schedule') {
@@ -192,10 +204,12 @@ export default function App() {
         onDelete={confirmDelete}
         onOpenSchedule={() => setTab('schedule')}
         onOpenThemePicker={() => setThemePickerVisible(true)}
+        widgetActions={widgetActions}
+        onWidgetActionsChange={changeWidgetActions}
         theme={theme}
       />
     );
-  }, [editEventId, events, schedule, tab, theme]);
+  }, [changeWidgetActions, editEventId, events, schedule, tab, theme, widgetActions]);
 
   return (
     <SafeAreaProvider>

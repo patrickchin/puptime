@@ -5,6 +5,19 @@ export const quickEventTypes = ['pee', 'poop', 'meal', 'pottyTrip', 'walk', 'nap
 export type EventType = (typeof eventTypes)[number];
 export type QuickEventType = (typeof quickEventTypes)[number];
 
+export const DEFAULT_WIDGET_ACTIONS = ['pee', 'poop', 'meal'] as const satisfies readonly QuickEventType[];
+
+export function normalizeWidgetActions(value: unknown): QuickEventType[] {
+  const requested = Array.isArray(value) ? value.filter(isQuickEventType) : [];
+  const unique = [...new Set(requested)] as QuickEventType[];
+  return unique.length >= 2 ? unique.slice(0, 4) : [...DEFAULT_WIDGET_ACTIONS];
+}
+
+export function widgetActionsForState(value: unknown, activeNap: boolean): QuickEventType[] {
+  const actions = normalizeWidgetActions(value);
+  return activeNap && !actions.includes('nap') ? [...actions.slice(0, 3), 'nap'] : actions;
+}
+
 export type PuppyEvent = {
   id: string;
   type: EventType;

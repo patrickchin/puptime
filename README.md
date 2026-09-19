@@ -17,7 +17,7 @@ Puptime is a private, offline puppy routine tracker for Android and iOS. Log pot
 - Pee and poop frequency summaries with per-recorded-day averages, observed ranges, and typical gaps between logs
 - A reviewable routine suggestion built from recurring activity times across at least three recorded days
 - A spreadsheet-ready CSV export of the complete activity history, including notes and exact timestamps
-- Polished, color-coded Android and iOS home-screen widgets with clear activity icons
+- Customizable, color-coded Android and iOS home-screen widgets with clear activity icons
 - System-matched, Meadow, Sunrise, and Midnight themes with an on-device appearance picker
 - On-device storage—no account, subscription, server, ads, or tracking
 
@@ -27,10 +27,12 @@ The starter routine is only an editable example, not veterinary guidance. Change
 
 Download the APK from the [latest GitHub release](https://github.com/patrickchin/puptime/releases/latest), open it on your phone, and allow installation from that source if Android asks.
 
+Tap the widget button on the Today screen to choose the two to four actions shown on your home screen. Pee, poop, and meals are the default; an active nap temporarily appears so it can always be ended.
+
 The Android widget has two useful heights:
 
-- One row: four compact buttons that immediately log pee, poop, meals, or the nap start/end state.
-- Two rows: adds **Out** and **Walk**. Tap `−15` or `+15` to choose a time up to one hour ago, then tap the activity. It resets to **Now** after logging.
+- One row: only the chosen action buttons, without latest-activity or time text.
+- Two rows: the same chosen actions plus `−15` and `+15` controls for logging up to one hour ago. The time resets to **Now** after logging.
 
 Long-press the widget to show Android’s resize handles, then drag the vertical handle to switch layouts. Inside the app, tap the pencil beside any point-in-time log to correct its activity, custom name, date, time, or note. Edits save automatically, including when you close the editor. Nap logs expose editable start and end dates and times.
 
