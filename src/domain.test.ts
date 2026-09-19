@@ -11,8 +11,10 @@ import {
   normalizeCustomLabel,
   normalizeEventTypeChange,
   normalizeNote,
+  normalizeWidgetActions,
   replaceCalendarDate,
   replaceClockTime,
+  widgetActionsForState,
 } from './domain.ts';
 import { reminderCopy, reminderIdentifier } from './reminder-config.ts';
 
@@ -29,6 +31,18 @@ test('normalizes widget backdating to 15-minute steps within an hour', () => {
   assert.equal(normalizeBackdateMinutes(-5), 0);
   assert.equal(normalizeBackdateMinutes(90), 60);
   assert.equal(normalizeBackdateMinutes('not-a-time'), 0);
+});
+
+test('normalizes widget actions to a useful two-to-four action set', () => {
+  assert.deepEqual(normalizeWidgetActions(['walk', 'walk', 'nap', 'meal', 'poop']), ['walk', 'nap', 'meal', 'poop']);
+  assert.deepEqual(normalizeWidgetActions(['pee']), ['pee', 'poop', 'meal']);
+  assert.deepEqual(normalizeWidgetActions(['not-an-action']), ['pee', 'poop', 'meal']);
+});
+
+test('keeps an active nap reachable without overflowing the widget', () => {
+  assert.deepEqual(widgetActionsForState(['pee', 'poop', 'meal'], true), ['pee', 'poop', 'meal', 'nap']);
+  assert.deepEqual(widgetActionsForState(['pee', 'poop', 'meal', 'walk'], true), ['pee', 'poop', 'meal', 'nap']);
+  assert.deepEqual(widgetActionsForState(['pee', 'nap'], true), ['pee', 'nap']);
 });
 
 test('normalizes optional log notes', () => {

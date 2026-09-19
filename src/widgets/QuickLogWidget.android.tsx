@@ -2,7 +2,7 @@
 
 import { FlexWidget, SvgWidget, TextWidget } from 'react-native-android-widget';
 
-import { normalizeBackdateMinutes, type QuickEventType } from '../domain';
+import { DEFAULT_WIDGET_ACTIONS, EVENT_META, normalizeBackdateMinutes, widgetActionsForState, type QuickEventType } from '../domain';
 
 type ActionButton = {
   type: QuickEventType;
@@ -33,49 +33,42 @@ const makeIcon = (name: QuickEventType | 'brand' | 'stop', color: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${iconPaths[name]}</svg>`;
 
 type Props = {
-  latestLabel?: string;
   dark?: boolean;
   compact?: boolean;
   backdateMinutes?: number;
   activeNap?: boolean;
+  actions?: readonly QuickEventType[];
 };
 
 export function QuickLogWidget({
-  latestLabel = 'Tap to log',
   dark = false,
   compact = false,
   backdateMinutes = 0,
   activeNap = false,
+  actions: configuredActions = DEFAULT_WIDGET_ACTIONS,
 }: Props) {
   const background = dark ? 'rgba(23, 33, 28, 0.92)' : 'rgba(255, 254, 250, 0.92)';
   const backgroundEnd = dark ? 'rgba(17, 26, 21, 0.86)' : 'rgba(237, 244, 239, 0.86)';
   const foreground = dark ? '#F2F6F3' : '#17231E';
-  const muted = dark ? '#B9C5BE' : '#56635D';
   const border = dark ? '#35443C' : '#D7E2DA';
   const primary = dark ? '#73D3AD' : '#176B52';
   const primarySurface = dark ? 'rgba(115, 211, 173, 0.12)' : 'rgba(23, 107, 82, 0.08)';
   const primaryBorder = dark ? 'rgba(115, 211, 173, 0.30)' : 'rgba(23, 107, 82, 0.18)';
   const minutesAgo = normalizeBackdateMinutes(backdateMinutes);
   const timeLabel = minutesAgo ? `${minutesAgo}m ago` : 'Now';
-  const visibleButtons = compact
-    ? buttons.filter((button) => ['pee', 'poop', 'meal', 'nap'].includes(button.type))
-    : buttons;
-  const actions = (
+  const visibleTypes = widgetActionsForState(configuredActions, activeNap);
+  const visibleButtons = visibleTypes
+    .map((type) => buttons.find((button) => button.type === type))
+    .filter((button): button is (typeof buttons)[number] => Boolean(button));
+  const actionButtons = (
     <FlexWidget style={{ width: 'match_parent', flex: 1, flexDirection: 'row', flexGap: compact ? 4 : 5 }}>
       {visibleButtons.map((button) => {
         const isActiveNap = button.type === 'nap' && activeNap;
         const label = isActiveNap ? (compact ? 'Wake' : 'End nap') : button.label;
-        const actionBackground = isActiveNap
-          ? dark
-            ? 'rgba(224, 216, 255, 0.14)'
-            : 'rgba(76, 61, 146, 0.10)'
-          : primarySurface;
-        const actionInk = isActiveNap ? (dark ? '#E0D8FF' : '#4C3D92') : primary;
-        const actionBorder = isActiveNap
-          ? dark
-            ? 'rgba(224, 216, 255, 0.34)'
-            : 'rgba(76, 61, 146, 0.22)'
-          : primaryBorder;
+        const meta = EVENT_META[button.type];
+        const actionInk = (dark ? meta.darkColor : meta.color) as `#${string}`;
+        const actionBackground = (dark ? meta.darkSoftColor : meta.softColor) as `#${string}`;
+        const actionBorder = actionInk;
         return (
           <FlexWidget
             key={button.type}
@@ -125,7 +118,7 @@ export function QuickLogWidget({
           padding: 4,
         }}
       >
-        {actions}
+        {actionButtons}
       </FlexWidget>
     );
   }
@@ -152,7 +145,6 @@ export function QuickLogWidget({
         </FlexWidget>
         <FlexWidget style={{ flex: 1, height: 'match_parent', justifyContent: 'center' }}>
           <TextWidget text="Puptime" style={{ color: foreground, fontSize: 14, fontWeight: '800', letterSpacing: -0.2 }} />
-          <TextWidget text={latestLabel} maxLines={1} truncate="END" style={{ color: muted, fontSize: 9 }} />
         </FlexWidget>
         <FlexWidget
           style={{ height: 34, flexDirection: 'row', alignItems: 'center', backgroundColor: primarySurface, borderColor: border, borderWidth: 1, borderRadius: 12, overflow: 'hidden' }}
@@ -180,7 +172,7 @@ export function QuickLogWidget({
           </FlexWidget>
         </FlexWidget>
       </FlexWidget>
-      {actions}
+      {actionButtons}
     </FlexWidget>
   );
 }

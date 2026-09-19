@@ -1,6 +1,7 @@
 import { requestWidgetUpdate } from 'react-native-android-widget';
 
-import { eventLabel, isOpenNap, relativeTime, type PuppyEvent } from '../domain';
+import { isOpenNap, type PuppyEvent } from '../domain';
+import { loadWidgetActions } from '../storage';
 import { QuickLogWidget } from './QuickLogWidget.android';
 
 export async function readPendingWidgetEvents(): Promise<PuppyEvent[]> {
@@ -8,14 +9,13 @@ export async function readPendingWidgetEvents(): Promise<PuppyEvent[]> {
 }
 
 export async function updateHomeWidget(events: PuppyEvent[]): Promise<void> {
-  const latest = events[0];
-  const latestLabel = latest ? `${eventLabel(latest)} · ${relativeTime(latest.endedAt ?? latest.at)}` : 'Tap to log';
   const activeNap = events.some(isOpenNap);
+  const actions = await loadWidgetActions();
   await requestWidgetUpdate({
     widgetName: 'PuptimeQuickLog',
     renderWidget: ({ height }) => ({
-      light: <QuickLogWidget latestLabel={latestLabel} compact={height < 90} activeNap={activeNap} />,
-      dark: <QuickLogWidget latestLabel={latestLabel} compact={height < 90} activeNap={activeNap} dark />,
+      light: <QuickLogWidget compact={height < 90} activeNap={activeNap} actions={actions} />,
+      dark: <QuickLogWidget compact={height < 90} activeNap={activeNap} actions={actions} dark />,
     }),
   });
 }

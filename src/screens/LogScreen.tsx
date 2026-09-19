@@ -14,10 +14,12 @@ import {
   formatDuration,
   formatTime,
   normalizeCustomLabel,
+  quickEventTypes,
   relativeTime,
   replaceCalendarDate,
   replaceClockTime,
   type EventType,
+  type QuickEventType,
   type PuppyEvent,
   type PuppyEventChanges,
   type ScheduleEntry,
@@ -110,6 +112,8 @@ export function LogScreen({
   onDelete,
   onOpenSchedule,
   onOpenThemePicker,
+  widgetActions,
+  onWidgetActionsChange,
   theme,
 }: {
   events: PuppyEvent[];
@@ -121,6 +125,8 @@ export function LogScreen({
   onDelete: (event: PuppyEvent) => void;
   onOpenSchedule: () => void;
   onOpenThemePicker: () => void;
+  widgetActions: QuickEventType[];
+  onWidgetActionsChange: (actions: QuickEventType[]) => Promise<void>;
   theme: Theme;
 }) {
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -130,6 +136,9 @@ export function LogScreen({
   const [closing, setClosing] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>('all');
+  const [showWidgetSettings, setShowWidgetSettings] = useState(false);
+  const [widgetDraft, setWidgetDraft] = useState<QuickEventType[]>(widgetActions);
+  const [savingWidgetSettings, setSavingWidgetSettings] = useState(false);
   const editorScrollRef = useRef<ScrollView>(null);
   const draftRef = useRef<Draft | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -326,6 +335,32 @@ export function LogScreen({
     void requestCloseEditor();
   };
 
+  const openWidgetSettings = () => {
+    setWidgetDraft(widgetActions);
+    setShowWidgetSettings(true);
+  };
+
+  const toggleWidgetAction = (type: QuickEventType) => {
+    setWidgetDraft((current) => {
+      if (current.includes(type)) {
+        return current.length > 2 ? current.filter((item) => item !== type) : current;
+      }
+      return current.length < 4 ? [...current, type] : current;
+    });
+  };
+
+  const saveWidgetSettings = async () => {
+    setSavingWidgetSettings(true);
+    try {
+      await onWidgetActionsChange(widgetDraft);
+      setShowWidgetSettings(false);
+    } catch {
+      Alert.alert('Couldn’t save widget settings', 'Try again.');
+    } finally {
+      setSavingWidgetSettings(false);
+    }
+  };
+
   const pickDateTime = (event: DateTimePickerEvent, date?: Date) => {
     if (Platform.OS === 'android') setPickerMode(null);
     if (event.type === 'dismissed' || !date || !draft) return;
@@ -354,26 +389,48 @@ export function LogScreen({
                 <Text style={[styles.eyebrow, { color: theme.primary }]}>PUPTIME · {todayLabel}</Text>
                 <Text style={[styles.title, { color: theme.text }]}>What just happened?</Text>
               </View>
-              <Pressable
-                accessibilityLabel="Change color theme"
-                accessibilityRole="button"
-                onPress={onOpenThemePicker}
-                style={({ pressed }) => [
-                  styles.themeButton,
-                  {
-                    backgroundColor: pressed ? theme.primarySoft : theme.surfaceRaised,
-                    borderColor: pressed ? theme.primary : theme.border,
-                  },
-                ]}
-              >
-                <MaterialCommunityIcons
-                  accessibilityElementsHidden
-                  importantForAccessibility="no"
-                  name="palette-outline"
-                  size={22}
-                  color={theme.primary}
-                />
-              </Pressable>
+              <View style={styles.headerActions}>
+                <Pressable
+                  accessibilityLabel="Customize home-screen widget"
+                  accessibilityRole="button"
+                  onPress={openWidgetSettings}
+                  style={({ pressed }) => [
+                    styles.headerButton,
+                    {
+                      backgroundColor: pressed ? theme.primarySoft : theme.surfaceRaised,
+                      borderColor: pressed ? theme.primary : theme.border,
+                    },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    accessibilityElementsHidden
+                    importantForAccessibility="no"
+                    name="widgets-outline"
+                    size={21}
+                    color={theme.primary}
+                  />
+                </Pressable>
+                <Pressable
+                  accessibilityLabel="Change color theme"
+                  accessibilityRole="button"
+                  onPress={onOpenThemePicker}
+                  style={({ pressed }) => [
+                    styles.headerButton,
+                    {
+                      backgroundColor: pressed ? theme.primarySoft : theme.surfaceRaised,
+                      borderColor: pressed ? theme.primary : theme.border,
+                    },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    accessibilityElementsHidden
+                    importantForAccessibility="no"
+                    name="palette-outline"
+                    size={21}
+                    color={theme.primary}
+                  />
+                </Pressable>
+              </View>
             </View>
             <Text style={[styles.subtitle, { color: theme.textMuted }]}>One tap saves the time. Nap toggles between start and end.</Text>
             <QuickActions events={events} onLog={onLog} now={now} theme={theme} />
@@ -740,6 +797,81 @@ export function LogScreen({
           </ScrollView>
         </View>
       </Modal>
+
+      <Modal visible={showWidgetSettings} transparent animationType="none" onRequestClose={() => setShowWidgetSettings(false)}>
+        <View accessibilityViewIsModal style={styles.scrim}>
+          <ScrollView
+            bounces={false}
+            style={[styles.sheet, { backgroundColor: theme.surfaceRaised }]}
+            contentContainerStyle={styles.sheetContent}
+          >
+            <View style={styles.sheetHeading}>
+              <View style={[styles.editorIcon, { backgroundColor: theme.primarySoft }]}>
+                <MaterialCommunityIcons name="widgets-outline" color={theme.primary} size={23} />
+              </View>
+              <View style={styles.editorHeadingCopy}>
+                <Text style={[styles.sheetTitle, { color: theme.text }]}>Customize widget</Text>
+                <Text style={[styles.sheetSubtitle, { color: theme.textMuted }]}>Choose 2–4 actions. Small widgets show them in one row.</Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close widget settings"
+                onPress={() => setShowWidgetSettings(false)}
+                style={({ pressed }) => [styles.closeButton, pressed && { backgroundColor: theme.primarySoft }]}
+              >
+                <MaterialCommunityIcons name="close" size={22} color={theme.text} />
+              </Pressable>
+            </View>
+
+            <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>WIDGET ACTIONS · {widgetDraft.length} OF 4</Text>
+            <View style={styles.widgetActionList}>
+              {quickEventTypes.map((type) => {
+                const meta = EVENT_META[type];
+                const selected = widgetDraft.includes(type);
+                const locked = (selected && widgetDraft.length === 2) || (!selected && widgetDraft.length === 4);
+                const actionColor = theme.isDark ? meta.darkColor : meta.color;
+                const actionSoftColor = theme.isDark ? meta.darkSoftColor : meta.softColor;
+                return (
+                  <Pressable
+                    key={type}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: selected, disabled: locked }}
+                    accessibilityLabel={`${selected ? 'Remove' : 'Add'} ${meta.label.toLowerCase()} ${selected ? 'from' : 'to'} the widget`}
+                    accessibilityHint={locked ? (selected ? 'Keep at least two widget actions.' : 'Remove another action first.') : undefined}
+                    disabled={locked}
+                    onPress={() => toggleWidgetAction(type)}
+                    style={({ pressed }) => [
+                      styles.widgetAction,
+                      {
+                        backgroundColor: selected ? actionSoftColor : theme.surface,
+                        borderColor: selected || pressed ? actionColor : theme.border,
+                        opacity: locked ? 0.5 : 1,
+                      },
+                    ]}
+                  >
+                    <View style={[styles.widgetActionIcon, { backgroundColor: actionSoftColor }]}>
+                      <MaterialCommunityIcons name={meta.icon as keyof typeof MaterialCommunityIcons.glyphMap} size={21} color={actionColor} />
+                    </View>
+                    <Text style={[styles.widgetActionText, { color: theme.text }]}>{meta.label}</Text>
+                    <MaterialCommunityIcons name={selected ? 'check-circle' : 'circle-outline'} size={22} color={selected ? actionColor : theme.textMuted} />
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text style={[styles.widgetHint, { color: theme.textMuted }]}>Nap stays available while a nap is running, even if you hide it from the default set.</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Save widget settings"
+              accessibilityState={{ busy: savingWidgetSettings, disabled: savingWidgetSettings }}
+              disabled={savingWidgetSettings}
+              onPress={() => void saveWidgetSettings()}
+              style={({ pressed }) => [styles.widgetSaveButton, { backgroundColor: pressed ? theme.primaryPressed : theme.primary, opacity: savingWidgetSettings ? 0.55 : 1 }]}
+            >
+              <Text style={[styles.widgetSaveButtonText, { color: theme.onPrimary }]}>{savingWidgetSettings ? 'Saving…' : 'Done'}</Text>
+            </Pressable>
+          </ScrollView>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -756,11 +888,12 @@ const styles = StyleSheet.create({
   titleBlock: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   mark: { width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   titleCopy: { flex: 1 },
-  themeButton: {
-    width: 48,
-    height: 48,
+  headerActions: { flexDirection: 'row', gap: 8 },
+  headerButton: {
+    width: 44,
+    height: 44,
     borderWidth: 1,
-    borderRadius: 16,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -826,4 +959,11 @@ const styles = StyleSheet.create({
   exactFieldText: { flex: 1, minWidth: 0, fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] },
   pickerDone: { minHeight: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   pickerDoneText: { fontSize: 15, fontWeight: '800' },
+  widgetActionList: { gap: 8, marginBottom: spacing.md },
+  widgetAction: { minHeight: 56, borderWidth: 1, borderRadius: 16, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  widgetActionIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  widgetActionText: { flex: 1, fontSize: 15, fontWeight: '700' },
+  widgetHint: { fontSize: 12, lineHeight: 18, marginBottom: spacing.lg },
+  widgetSaveButton: { minHeight: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  widgetSaveButtonText: { fontSize: 15, fontWeight: '800' },
 });
