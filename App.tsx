@@ -1,10 +1,11 @@
 import * as Haptics from 'expo-haptics';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, AppState, StyleSheet, useColorScheme, View } from 'react-native';
+import { Alert, Appearance, AppState, StyleSheet, useColorScheme, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { BottomNav, type Tab } from './src/components/BottomNav';
+import { ThemePicker } from './src/components/ThemePicker';
 import { Toast } from './src/components/Toast';
 import {
   createEvent,
@@ -23,15 +24,26 @@ import { InsightsScreen } from './src/screens/InsightsScreen';
 import { LogScreen } from './src/screens/LogScreen';
 import { ScheduleScreen } from './src/screens/ScheduleScreen';
 import { configureReminderHandling, requestReminderPermission, syncScheduleReminders } from './src/reminders';
-import { appendEvents, loadEvents, loadSchedule, removeEvent, saveSchedule, updateEvent } from './src/storage';
-import { darkTheme, lightTheme } from './src/theme';
+import {
+  appendEvents,
+  loadEvents,
+  loadSchedule,
+  loadThemePreference,
+  removeEvent,
+  saveSchedule,
+  saveThemePreference,
+  updateEvent,
+} from './src/storage';
+import { resolveTheme, type ThemePreference } from './src/theme';
 import { readPendingWidgetEvents, updateHomeWidget } from './src/widgets/sync';
 
 configureReminderHandling();
 
 export default function App() {
   const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? darkTheme : lightTheme;
+  const [themePreference, setThemePreference] = useState<ThemePreference>('system');
+  const [themePickerVisible, setThemePickerVisible] = useState(false);
+  const theme = resolveTheme(themePreference, colorScheme);
   const [tab, setTab] = useState<Tab>('log');
   const [events, setEvents] = useState<PuppyEvent[]>([]);
   const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
@@ -55,6 +67,14 @@ export default function App() {
     });
     return () => subscription.remove();
   }, [refresh]);
+
+  useEffect(() => {
+    loadThemePreference().then(setThemePreference).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    Appearance.setColorScheme(themePreference === 'system' ? 'unspecified' : theme.isDark ? 'dark' : 'light');
+  }, [theme.isDark, themePreference]);
 
   useEffect(() => {
     if (!undoState) return;
@@ -141,6 +161,13 @@ export default function App() {
     }
   };
 
+  const chooseTheme = (preference: ThemePreference) => {
+    setThemePreference(preference);
+    setThemePickerVisible(false);
+    Haptics.selectionAsync().catch(() => undefined);
+    saveThemePreference(preference).catch(() => undefined);
+  };
+
   const screen = useMemo(() => {
     if (tab === 'insights') return <InsightsScreen events={events} theme={theme} />;
     if (tab === 'schedule') {
@@ -164,6 +191,7 @@ export default function App() {
         onSave={saveEventDetails}
         onDelete={confirmDelete}
         onOpenSchedule={() => setTab('schedule')}
+        onOpenThemePicker={() => setThemePickerVisible(true)}
         theme={theme}
       />
     );
@@ -172,7 +200,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top', 'left', 'right']}>
-        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+        <StatusBar style={theme.isDark ? 'light' : 'dark'} />
         <View style={styles.screen}>
           {screen}
           {undoState ? (
@@ -191,6 +219,14 @@ export default function App() {
         <SafeAreaView edges={['bottom']} style={{ backgroundColor: theme.nav }}>
           <BottomNav tab={tab} onChange={setTab} theme={theme} />
         </SafeAreaView>
+        <ThemePicker
+          visible={themePickerVisible}
+          selected={themePreference}
+          colorScheme={colorScheme}
+          theme={theme}
+          onSelect={chooseTheme}
+          onClose={() => setThemePickerVisible(false)}
+        />
       </SafeAreaView>
     </SafeAreaProvider>
   );
