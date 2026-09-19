@@ -109,6 +109,7 @@ export function LogScreen({
   onSave,
   onDelete,
   onOpenSchedule,
+  onOpenThemePicker,
   theme,
 }: {
   events: PuppyEvent[];
@@ -119,6 +120,7 @@ export function LogScreen({
   onSave: (event: PuppyEvent, changes: PuppyEventChanges) => Promise<void>;
   onDelete: (event: PuppyEvent) => void;
   onOpenSchedule: () => void;
+  onOpenThemePicker: () => void;
   theme: Theme;
 }) {
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -352,6 +354,26 @@ export function LogScreen({
                 <Text style={[styles.eyebrow, { color: theme.primary }]}>PUPTIME · {todayLabel}</Text>
                 <Text style={[styles.title, { color: theme.text }]}>What just happened?</Text>
               </View>
+              <Pressable
+                accessibilityLabel="Change color theme"
+                accessibilityRole="button"
+                onPress={onOpenThemePicker}
+                style={({ pressed }) => [
+                  styles.themeButton,
+                  {
+                    backgroundColor: pressed ? theme.primarySoft : theme.surfaceRaised,
+                    borderColor: pressed ? theme.primary : theme.border,
+                  },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  accessibilityElementsHidden
+                  importantForAccessibility="no"
+                  name="palette-outline"
+                  size={22}
+                  color={theme.primary}
+                />
+              </Pressable>
             </View>
             <Text style={[styles.subtitle, { color: theme.textMuted }]}>One tap saves the time. Nap toggles between start and end.</Text>
             <QuickActions events={events} onLog={onLog} now={now} theme={theme} />
@@ -734,6 +756,14 @@ const styles = StyleSheet.create({
   titleBlock: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   mark: { width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   titleCopy: { flex: 1 },
+  themeButton: {
+    width: 48,
+    height: 48,
+    borderWidth: 1,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   eyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 1.6 },
   title: { fontSize: 27, lineHeight: 33, fontWeight: '800', letterSpacing: -0.5 },
   subtitle: { fontSize: 15, lineHeight: 22, marginTop: 8, marginBottom: spacing.md },

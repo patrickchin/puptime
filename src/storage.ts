@@ -1,9 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { STARTER_SCHEDULE, type PuppyEvent, type PuppyEventChanges, type ScheduleEntry } from './domain';
+import { isThemePreference, type ThemePreference } from './theme';
 
 const EVENTS_KEY = 'puptime.events.v1';
 const SCHEDULE_KEY = 'puptime.schedule.v1';
+const THEME_KEY = 'puptime.theme.v1';
 
 let writeQueue = Promise.resolve();
 
@@ -75,4 +77,13 @@ export async function saveSchedule(schedule: ScheduleEntry[]): Promise<void> {
     SCHEDULE_KEY,
     JSON.stringify([...schedule].sort((a, b) => a.minutes - b.minutes)),
   );
+}
+
+export async function loadThemePreference(): Promise<ThemePreference> {
+  const stored = await AsyncStorage.getItem(THEME_KEY);
+  return isThemePreference(stored) ? stored : 'system';
+}
+
+export function saveThemePreference(preference: ThemePreference): Promise<void> {
+  return AsyncStorage.setItem(THEME_KEY, preference);
 }
