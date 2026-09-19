@@ -24,7 +24,8 @@
       ],
       "adaptiveIcon": {
         "backgroundColor": "#176B52",
-        "foregroundImage": "./assets/puptime-icon.png"
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": true
     },
