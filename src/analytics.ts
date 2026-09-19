@@ -266,13 +266,14 @@ export function timelineBucket(value: number): number {
 export function buildTimelineDays(
   events: PuppyEvent[],
   days = 14,
-  now = new Date(),
+  endDate = new Date(),
+  now = endDate,
 ): TimelineDay[] {
   const dayCount = Math.max(0, Math.floor(days));
   const nowTime = now.getTime();
 
   return Array.from({ length: dayCount }, (_, index) => {
-    const date = new Date(now);
+    const date = new Date(endDate);
     date.setHours(0, 0, 0, 0);
     date.setDate(date.getDate() - (dayCount - index - 1));
     const key = dateKey(date);
