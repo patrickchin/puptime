@@ -14,7 +14,7 @@ export type ThemeVoice =
 
 export type ThemeIconProfile = Exclude<ThemePreference, 'system'>;
 export type ThemeEventIcon = 'pee' | 'poop' | 'meal' | 'pottyTrip' | 'walk' | 'nap' | 'custom';
-export type ThemeNavigationIcon = 'log' | 'insights' | 'schedule';
+export type ThemeNavigationIcon = 'log' | 'timeline' | 'insights' | 'schedule';
 
 export type Theme = typeof lightTheme;
 
@@ -457,61 +457,61 @@ const iconProfiles: Record<
 > = {
   meadow: {
     events: { pee: 'water-outline', poop: 'emoticon-poop-outline', meal: 'food-apple-outline', pottyTrip: 'door-open', walk: 'walk', nap: 'sleep', custom: 'tag-outline' },
-    navigation: { log: 'home-variant-outline', insights: 'chart-timeline-variant', schedule: 'calendar-clock-outline' },
+    navigation: { log: 'home-variant-outline', timeline: 'timeline-clock-outline', insights: 'chart-line-variant', schedule: 'calendar-clock-outline' },
     more: 'plus-circle-outline',
     routine: 'calendar-clock-outline',
   },
   sunrise: {
     events: { pee: 'water', poop: 'emoticon-poop', meal: 'silverware-fork-knife', pottyTrip: 'door-open', walk: 'shoe-sneaker', nap: 'bed-clock', custom: 'tag' },
-    navigation: { log: 'home-variant', insights: 'chart-line', schedule: 'calendar-clock' },
+    navigation: { log: 'home-variant', timeline: 'timeline-clock', insights: 'chart-line', schedule: 'calendar-clock' },
     more: 'plus-circle',
     routine: 'calendar-clock',
   },
   midnight: {
     events: { pee: 'cup-water', poop: 'emoticon-poop-outline', meal: 'bowl-mix-outline', pottyTrip: 'door-open', walk: 'foot-print', nap: 'weather-night', custom: 'bookmark-outline' },
-    navigation: { log: 'moon-waning-crescent', insights: 'chart-areaspline', schedule: 'calendar-month-outline' },
+    navigation: { log: 'moon-waning-crescent', timeline: 'timeline-clock-outline', insights: 'chart-areaspline', schedule: 'calendar-month-outline' },
     more: 'plus-circle-multiple-outline',
     routine: 'calendar-month-outline',
   },
   paper: {
     events: { pee: 'water-opacity', poop: 'emoticon-poop', meal: 'silverware', pottyTrip: 'exit-run', walk: 'shoe-print', nap: 'bed-outline', custom: 'label-outline' },
-    navigation: { log: 'notebook-outline', insights: 'chart-box-outline', schedule: 'calendar-blank-outline' },
+    navigation: { log: 'notebook-outline', timeline: 'timeline-text-outline', insights: 'chart-box-outline', schedule: 'calendar-blank-outline' },
     more: 'note-plus-outline',
     routine: 'calendar-blank-outline',
   },
   bubblegum: {
     events: { pee: 'water-circle', poop: 'emoticon-poop', meal: 'cupcake', pottyTrip: 'door-open', walk: 'dog', nap: 'power-sleep', custom: 'sticker-emoji' },
-    navigation: { log: 'home-heart', insights: 'chart-bubble', schedule: 'calendar-heart' },
+    navigation: { log: 'home-heart', timeline: 'timeline-outline', insights: 'chart-bubble', schedule: 'calendar-heart' },
     more: 'shape-circle-plus',
     routine: 'calendar-heart',
   },
   blueprint: {
     events: { pee: 'water-sync', poop: 'emoticon-poop-outline', meal: 'food-outline', pottyTrip: 'door-sliding-open', walk: 'run-fast', nap: 'timer-sand', custom: 'vector-square' },
-    navigation: { log: 'view-dashboard-outline', insights: 'chart-timeline-variant-shimmer', schedule: 'calendar-sync-outline' },
+    navigation: { log: 'view-dashboard-outline', timeline: 'chart-timeline-variant-shimmer', insights: 'chart-line-variant', schedule: 'calendar-sync-outline' },
     more: 'plus-box-outline',
     routine: 'calendar-sync-outline',
   },
   trail: {
     events: { pee: 'cup-water', poop: 'emoticon-poop-outline', meal: 'food-apple', pottyTrip: 'door-open', walk: 'map-marker-path', nap: 'tent', custom: 'pine-tree' },
-    navigation: { log: 'home-outline', insights: 'chart-line-variant', schedule: 'calendar-range-outline' },
+    navigation: { log: 'home-outline', timeline: 'timeline-clock-outline', insights: 'chart-line-variant', schedule: 'calendar-range-outline' },
     more: 'plus-box',
     routine: 'calendar-range-outline',
   },
   tide: {
     events: { pee: 'water-outline', poop: 'emoticon-poop-outline', meal: 'bowl-mix-outline', pottyTrip: 'door-open', walk: 'walk', nap: 'weather-night', custom: 'tag-heart-outline' },
-    navigation: { log: 'home-variant-outline', insights: 'chart-bell-curve-cumulative', schedule: 'calendar-outline' },
+    navigation: { log: 'home-variant-outline', timeline: 'timeline-clock-outline', insights: 'chart-bell-curve-cumulative', schedule: 'calendar-outline' },
     more: 'plus-circle-outline',
     routine: 'calendar-outline',
   },
   plum: {
     events: { pee: 'water-outline', poop: 'emoticon-poop-outline', meal: 'silverware-fork-knife', pottyTrip: 'door-open', walk: 'walk', nap: 'bed-outline', custom: 'bookmark-outline' },
-    navigation: { log: 'newspaper-variant-outline', insights: 'chart-box-outline', schedule: 'calendar-month-outline' },
+    navigation: { log: 'newspaper-variant-outline', timeline: 'timeline-text-outline', insights: 'chart-box-outline', schedule: 'calendar-month-outline' },
     more: 'bookmark-plus-outline',
     routine: 'calendar-month-outline',
   },
   contrast: {
     events: { pee: 'water', poop: 'emoticon-poop', meal: 'food', pottyTrip: 'door-open', walk: 'walk', nap: 'sleep', custom: 'tag' },
-    navigation: { log: 'home', insights: 'chart-bar', schedule: 'calendar' },
+    navigation: { log: 'home', timeline: 'timeline-clock', insights: 'chart-bar', schedule: 'calendar' },
     more: 'plus-box',
     routine: 'calendar',
   },
