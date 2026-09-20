@@ -99,6 +99,8 @@ export function NoteInput({
           {
             backgroundColor: theme.surface,
             borderColor: listening ? theme.danger : theme.border,
+            borderRadius: theme.presentation.cardRadius,
+            borderWidth: theme.presentation.borderWidth,
           },
         ]}
       >
@@ -126,6 +128,8 @@ export function NoteInput({
             {
               backgroundColor: listening ? theme.danger : pressed ? theme.primarySoft : theme.surfaceRaised,
               borderColor: listening ? theme.danger : theme.border,
+              borderRadius: theme.presentation.controlRadius,
+              borderWidth: theme.presentation.borderWidth,
             },
           ]}
         >

@@ -26,7 +26,7 @@ import {
 } from '../analytics';
 import { dateKey, EVENT_META, eventTypes, formatDuration, formatTime, type EventType, type PuppyEvent } from '../domain';
 import { shareEventsCsv } from '../share-export';
-import { spacing, type Theme } from '../theme';
+import { spacing, surfaceTreatment, type Theme } from '../theme';
 
 const TIMELINE_DAYS = 10;
 const MISSING_LOG_DAYS = 14;
@@ -115,7 +115,15 @@ function FrequencyRow({ stat, theme }: { stat: ActivityFrequencyStat; theme: The
       style={[styles.frequencyRow, { borderColor: theme.border }]}
     >
       <View style={styles.activityHeading}>
-        <View style={[styles.activityIcon, { backgroundColor: theme.isDark ? meta.darkSoftColor : meta.softColor }]}>
+        <View
+          style={[
+            styles.activityIcon,
+            {
+              backgroundColor: theme.isDark ? meta.darkSoftColor : meta.softColor,
+              borderRadius: theme.presentation.iconRadius,
+            },
+          ]}
+        >
           <MaterialCommunityIcons
             accessibilityElementsHidden
             importantForAccessibility="no"
@@ -211,6 +219,7 @@ function TimelineTrack({
             height: trackHeight,
             backgroundColor: isToday ? theme.primarySoft : theme.surface,
             borderColor: isToday ? theme.primary : theme.border,
+            borderRadius: Math.min(theme.presentation.controlRadius, 12),
           },
         ]}
       >
@@ -314,12 +323,23 @@ function ZoomControl({
     {
       backgroundColor: theme.surfaceRaised,
       borderColor: theme.border,
+      borderRadius: theme.presentation.controlRadius,
+      borderWidth: theme.presentation.borderWidth,
       opacity: enabled ? (pressed ? 0.7 : 1) : 0.35,
     },
   ];
 
   return (
-    <View style={[styles.zoomControl, { borderColor: theme.border }]}>
+    <View
+      style={[
+        styles.zoomControl,
+        {
+          borderColor: theme.border,
+          borderRadius: theme.presentation.controlRadius,
+          borderWidth: theme.presentation.borderWidth,
+        },
+      ]}
+    >
       <Text style={[styles.controlLabel, { color: theme.textMuted }]}>{label.toUpperCase()}</Text>
       <View style={styles.stepper}>
         <Pressable
@@ -505,15 +525,50 @@ export function InsightsScreen({
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
-      <Text style={[styles.eyebrow, { color: theme.primary }]}>DAILY RHYTHM · 15 MINUTE WINDOWS</Text>
-      <Text style={[styles.title, { color: theme.text }]}>When things happen</Text>
+      <Text
+        style={[
+          styles.eyebrow,
+          { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking },
+        ]}
+      >
+        DAILY RHYTHM · 15 MINUTE WINDOWS
+      </Text>
+      <Text
+        style={[
+          styles.title,
+          {
+            color: theme.text,
+            fontSize: theme.presentation.titleSize,
+            lineHeight: theme.presentation.titleLineHeight,
+            fontWeight: theme.presentation.titleWeight,
+            letterSpacing: theme.presentation.titleTracking,
+          },
+        ]}
+      >
+        When things happen
+      </Text>
       <Text style={[styles.subtitle, { color: theme.textMuted }]}>
         Compare timing across days—not totals or targets.
       </Text>
 
-      <View style={[styles.frequencyCard, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
+      <View
+        style={[
+          styles.frequencyCard,
+          surfaceTreatment(theme),
+          {
+            backgroundColor: theme.surfaceRaised,
+            borderColor: theme.border,
+            padding: theme.presentation.cardPadding,
+          },
+        ]}
+      >
         <View style={styles.frequencyHeading}>
-          <View style={[styles.smallIcon, { backgroundColor: theme.primarySoft }]}>
+          <View
+            style={[
+              styles.smallIcon,
+              { backgroundColor: theme.primarySoft, borderRadius: theme.presentation.iconRadius },
+            ]}
+          >
             <MaterialCommunityIcons
               accessibilityElementsHidden
               importantForAccessibility="no"
@@ -529,7 +584,16 @@ export function InsightsScreen({
             </Text>
           </View>
         </View>
-        <Text style={[styles.frequencyNote, { color: theme.textMuted, backgroundColor: theme.surface }]}>
+        <Text
+          style={[
+            styles.frequencyNote,
+            {
+              color: theme.textMuted,
+              backgroundColor: theme.surface,
+              borderRadius: theme.presentation.controlRadius,
+            },
+          ]}
+        >
           Daily averages include zeroes on days where you logged something else. Completely blank days are excluded because they may be unlogged.
         </Text>
         <View>
@@ -537,9 +601,24 @@ export function InsightsScreen({
         </View>
       </View>
 
-      <View style={[styles.missingCard, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
+      <View
+        style={[
+          styles.missingCard,
+          surfaceTreatment(theme),
+          {
+            backgroundColor: theme.surfaceRaised,
+            borderColor: theme.border,
+            padding: theme.presentation.cardPadding,
+          },
+        ]}
+      >
         <View style={styles.frequencyHeading}>
-          <View style={[styles.smallIcon, { backgroundColor: theme.primarySoft }]}>
+          <View
+            style={[
+              styles.smallIcon,
+              { backgroundColor: theme.primarySoft, borderRadius: theme.presentation.iconRadius },
+            ]}
+          >
             <MaterialCommunityIcons
               accessibilityElementsHidden
               importantForAccessibility="no"
@@ -555,7 +634,16 @@ export function InsightsScreen({
             </Text>
           </View>
         </View>
-        <Text style={[styles.missingNote, { color: theme.textMuted, backgroundColor: theme.surface }]}>
+        <Text
+          style={[
+            styles.missingNote,
+            {
+              color: theme.textMuted,
+              backgroundColor: theme.surface,
+              borderRadius: theme.presentation.controlRadius,
+            },
+          ]}
+        >
           A suggestion appears only when the same activity was logged near that time on at least 3 other days and logging continued afterward. Nothing is added automatically.
         </Text>
         {missingLogs.estimates.length ? (
@@ -578,7 +666,10 @@ export function InsightsScreen({
                   <View
                     accessibilityElementsHidden
                     importantForAccessibility="no-hide-descendants"
-                    style={[styles.estimateIcon, { backgroundColor: softColor }]}
+                    style={[
+                      styles.estimateIcon,
+                      { backgroundColor: softColor, borderRadius: theme.presentation.iconRadius },
+                    ]}
                   >
                     <MaterialCommunityIcons
                       accessibilityElementsHidden
@@ -587,7 +678,16 @@ export function InsightsScreen({
                       size={20}
                       color={color}
                     />
-                    <View style={[styles.questionBadge, { backgroundColor: theme.surfaceRaised, borderColor: color }]}>
+                    <View
+                      style={[
+                        styles.questionBadge,
+                        {
+                          backgroundColor: theme.surfaceRaised,
+                          borderColor: color,
+                          borderRadius: theme.presentation.iconRadius,
+                        },
+                      ]}
+                    >
                       <Text style={[styles.questionMark, { color }]}>?</Text>
                     </View>
                   </View>
@@ -610,7 +710,11 @@ export function InsightsScreen({
                     onPress={() => void addEstimate(estimate)}
                     style={({ pressed }) => [
                       styles.addEstimateButton,
-                      { backgroundColor: pressed ? theme.primaryPressed : theme.primary, opacity: addingEstimateId && !adding ? 0.45 : 1 },
+                      {
+                        backgroundColor: pressed ? theme.primaryPressed : theme.primary,
+                        borderRadius: theme.presentation.controlRadius,
+                        opacity: addingEstimateId && !adding ? 0.45 : 1,
+                      },
                     ]}
                   >
                     {adding ? (
@@ -692,6 +796,8 @@ export function InsightsScreen({
                 {
                   backgroundColor: selected ? softColor : theme.surfaceRaised,
                   borderColor: active ? color : theme.border,
+                  borderRadius: theme.presentation.controlRadius,
+                  borderWidth: theme.presentation.borderWidth,
                   opacity: pressed ? 0.72 : 1,
                 },
               ]}
@@ -720,9 +826,24 @@ export function InsightsScreen({
         })}
       </View>
 
-      <View style={[styles.panel, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
+      <View
+        style={[
+          styles.panel,
+          surfaceTreatment(theme),
+          {
+            backgroundColor: theme.surfaceRaised,
+            borderColor: theme.border,
+            padding: theme.presentation.cardPadding,
+          },
+        ]}
+      >
         <View style={styles.panelHeading}>
-          <View style={[styles.smallIcon, { backgroundColor: theme.primarySoft }]}>
+          <View
+            style={[
+              styles.smallIcon,
+              { backgroundColor: theme.primarySoft, borderRadius: theme.presentation.iconRadius },
+            ]}
+          >
             <MaterialCommunityIcons
               accessibilityElementsHidden
               importantForAccessibility="no"
@@ -741,7 +862,17 @@ export function InsightsScreen({
           </View>
         </View>
 
-        <View style={[styles.zoomPanel, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+        <View
+          style={[
+            styles.zoomPanel,
+            {
+              backgroundColor: theme.surface,
+              borderColor: theme.border,
+              borderRadius: theme.presentation.cardRadius,
+              borderWidth: theme.presentation.borderWidth,
+            },
+          ]}
+        >
           <View style={styles.zoomControls}>
             <ZoomControl
               label="Time width"
@@ -778,6 +909,8 @@ export function InsightsScreen({
               styles.rangeButton,
               {
                 borderColor: theme.border,
+                borderRadius: theme.presentation.controlRadius,
+                borderWidth: theme.presentation.borderWidth,
                 opacity: currentHistoryPage >= maxHistoryPage ? 0.35 : pressed ? 0.7 : 1,
               },
             ]}
@@ -807,6 +940,8 @@ export function InsightsScreen({
               styles.rangeButton,
               {
                 borderColor: theme.border,
+                borderRadius: theme.presentation.controlRadius,
+                borderWidth: theme.presentation.borderWidth,
                 opacity: currentHistoryPage === 0 ? 0.35 : pressed ? 0.7 : 1,
               },
             ]}
@@ -862,7 +997,12 @@ export function InsightsScreen({
         </View>
 
         {selectedTypes.length === 0 || visibleEventCount === 0 ? (
-          <View style={[styles.emptyNote, { backgroundColor: theme.surface }]}>
+          <View
+            style={[
+              styles.emptyNote,
+              { backgroundColor: theme.surface, borderRadius: theme.presentation.controlRadius },
+            ]}
+          >
             <MaterialCommunityIcons
               accessibilityElementsHidden
               importantForAccessibility="no"
@@ -880,9 +1020,24 @@ export function InsightsScreen({
       </View>
 
       {selectedTypes.length > 0 && monthly.length > 1 ? (
-        <View style={[styles.historyCard, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
+        <View
+          style={[
+            styles.historyCard,
+            surfaceTreatment(theme),
+            {
+              backgroundColor: theme.surfaceRaised,
+              borderColor: theme.border,
+              padding: theme.presentation.cardPadding,
+            },
+          ]}
+        >
           <View style={styles.panelHeading}>
-            <View style={[styles.smallIcon, { backgroundColor: theme.primarySoft }]}>
+            <View
+              style={[
+                styles.smallIcon,
+                { backgroundColor: theme.primarySoft, borderRadius: theme.presentation.iconRadius },
+              ]}
+            >
               <MaterialCommunityIcons
                 accessibilityElementsHidden
                 importantForAccessibility="no"
@@ -898,7 +1053,16 @@ export function InsightsScreen({
               </Text>
             </View>
           </View>
-          <Text style={[styles.historyNote, { color: theme.textMuted, backgroundColor: theme.surface }]}>
+          <Text
+            style={[
+              styles.historyNote,
+              {
+                color: theme.textMuted,
+                backgroundColor: theme.surface,
+                borderRadius: theme.presentation.controlRadius,
+              },
+            ]}
+          >
             Monthly pace uses days where you recorded any activity, so incomplete or missed months are not treated as zeroes.
           </Text>
           <View style={styles.months}>
@@ -921,7 +1085,12 @@ export function InsightsScreen({
               onPress={() => setShowAllMonths((shown) => !shown)}
               style={({ pressed }) => [
                 styles.historyToggle,
-                { borderColor: theme.border, backgroundColor: pressed ? theme.primarySoft : theme.surface },
+                {
+                  borderColor: theme.border,
+                  backgroundColor: pressed ? theme.primarySoft : theme.surface,
+                  borderRadius: theme.presentation.controlRadius,
+                  borderWidth: theme.presentation.borderWidth,
+                },
               ]}
             >
               <Text style={[styles.historyToggleText, { color: theme.primary }]}>
@@ -939,9 +1108,24 @@ export function InsightsScreen({
         </View>
       ) : null}
 
-      <View style={[styles.exportCard, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
+      <View
+        style={[
+          styles.exportCard,
+          surfaceTreatment(theme),
+          {
+            backgroundColor: theme.surfaceRaised,
+            borderColor: theme.border,
+            padding: theme.presentation.cardPadding,
+          },
+        ]}
+      >
         <View style={styles.exportHeading}>
-          <View style={[styles.smallIcon, { backgroundColor: theme.primarySoft }]}>
+          <View
+            style={[
+              styles.smallIcon,
+              { backgroundColor: theme.primarySoft, borderRadius: theme.presentation.iconRadius },
+            ]}
+          >
             <MaterialCommunityIcons
               accessibilityElementsHidden
               importantForAccessibility="no"
@@ -966,7 +1150,11 @@ export function InsightsScreen({
           onPress={exportActivity}
           style={({ pressed }) => [
             styles.exportButton,
-            { backgroundColor: theme.primary, opacity: exportDisabled ? 0.45 : pressed ? 0.82 : 1 },
+            {
+              backgroundColor: theme.primary,
+              borderRadius: theme.presentation.controlRadius,
+              opacity: exportDisabled ? 0.45 : pressed ? 0.82 : 1,
+            },
           ]}
         >
           {exporting ? (

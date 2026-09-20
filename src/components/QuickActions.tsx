@@ -11,7 +11,7 @@ import {
   type EventType,
   type PuppyEvent,
 } from '../domain';
-import { spacing, type Theme } from '../theme';
+import { spacing, surfaceTreatment, type Theme } from '../theme';
 
 const suggestions = ['Water', 'Accident', 'Play', 'Training', 'Crate', 'Medicine'];
 
@@ -41,7 +41,7 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
 
   return (
     <>
-      <View style={styles.grid}>
+      <View style={[styles.grid, { gap: theme.presentation.gridGap }]}>
         {quickEventTypes.map((type) => {
           const meta = EVENT_META[type];
           const latest = type === 'nap' && openNap
@@ -58,14 +58,22 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
               onPress={() => onLog(type)}
               style={({ pressed }) => [
                 styles.action,
+                surfaceTreatment(theme),
                 {
                   backgroundColor: isEndingNap ? meta.softColor : theme.surfaceRaised,
                   borderColor: pressed || isEndingNap ? meta.color : theme.border,
+                  minHeight: theme.presentation.actionHeight,
+                  padding: theme.presentation.cardPadding - 4,
                   opacity: pressed ? 0.76 : 1,
                 },
               ]}
             >
-              <View style={[styles.iconCircle, { backgroundColor: meta.softColor }]}>
+              <View
+                style={[
+                  styles.iconCircle,
+                  { backgroundColor: meta.softColor, borderRadius: theme.presentation.iconRadius },
+                ]}
+              >
                 <MaterialCommunityIcons
                   name={(isEndingNap ? 'stop' : meta.icon) as keyof typeof MaterialCommunityIcons.glyphMap}
                   color={meta.color}
@@ -93,6 +101,7 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
           onPress={() => setShowMore(true)}
           style={({ pressed }) => [
             styles.moreAction,
+            surfaceTreatment(theme),
             {
               backgroundColor: pressed ? theme.primarySoft : theme.surfaceRaised,
               borderColor: pressed ? theme.primary : theme.border,
@@ -110,19 +119,41 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
           <ScrollView
             bounces={false}
             keyboardShouldPersistTaps="handled"
-            style={[styles.sheet, { backgroundColor: theme.surfaceRaised }]}
+            style={[
+              styles.sheet,
+              {
+                backgroundColor: theme.surfaceRaised,
+                borderTopLeftRadius: theme.presentation.cardRadius + 6,
+                borderTopRightRadius: theme.presentation.cardRadius + 6,
+              },
+            ]}
             contentContainerStyle={styles.sheetContent}
           >
             <View style={styles.sheetHeading}>
               <View style={styles.sheetHeadingCopy}>
-                <Text style={[styles.sheetTitle, { color: theme.text }]}>Log another activity</Text>
+                <Text
+                  style={[
+                    styles.sheetTitle,
+                    {
+                      color: theme.text,
+                      fontWeight: theme.presentation.titleWeight,
+                      letterSpacing: theme.presentation.titleTracking,
+                    },
+                  ]}
+                >
+                  Log another activity
+                </Text>
                 <Text style={[styles.sheetSubtitle, { color: theme.textMuted }]}>Common choices stay one tap away.</Text>
               </View>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Close activity picker"
                 onPress={() => setShowMore(false)}
-                style={({ pressed }) => [styles.closeButton, pressed && { backgroundColor: theme.primarySoft }]}
+                style={({ pressed }) => [
+                  styles.closeButton,
+                  { borderRadius: theme.presentation.controlRadius },
+                  pressed && { backgroundColor: theme.primarySoft },
+                ]}
               >
                 <MaterialCommunityIcons name="close" size={22} color={theme.text} />
               </Pressable>
@@ -140,6 +171,8 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
                     {
                       backgroundColor: pressed ? theme.primarySoft : theme.surface,
                       borderColor: pressed ? theme.primary : theme.border,
+                      borderRadius: theme.presentation.controlRadius,
+                      borderWidth: theme.presentation.borderWidth,
                     },
                   ]}
                 >
@@ -161,7 +194,16 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
                 placeholderTextColor={theme.textMuted}
                 returnKeyType="done"
                 value={customLabel}
-                style={[styles.input, { backgroundColor: theme.surface, borderColor: theme.border, color: theme.text }]}
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.surface,
+                    borderColor: theme.border,
+                    borderRadius: theme.presentation.controlRadius,
+                    borderWidth: theme.presentation.borderWidth,
+                    color: theme.text,
+                  },
+                ]}
               />
               <Pressable
                 accessibilityRole="button"
@@ -173,6 +215,7 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
                   styles.logButton,
                   {
                     backgroundColor: pressed ? theme.primaryPressed : theme.primary,
+                    borderRadius: theme.presentation.controlRadius,
                     opacity: customLabel.trim() ? 1 : 0.45,
                   },
                 ]}
@@ -188,26 +231,20 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
 }
 
 const styles = StyleSheet.create({
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
   action: {
-    minHeight: 112,
     minWidth: 96,
     flexBasis: '30%',
     flexGrow: 1,
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconCircle: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  iconCircle: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
   actionLabel: { maxWidth: '100%', fontSize: 15, lineHeight: 20, fontWeight: '700', marginTop: 7 },
   actionTime: { maxWidth: '100%', fontSize: 11, lineHeight: 16, marginTop: 1 },
   moreAction: {
     width: '100%',
     minHeight: 56,
-    borderRadius: 18,
-    borderWidth: 1,
     paddingHorizontal: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
@@ -220,23 +257,19 @@ const styles = StyleSheet.create({
     maxWidth: 640,
     maxHeight: '92%',
     alignSelf: 'center',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
   },
   sheetContent: { padding: spacing.lg, paddingBottom: 34 },
   sheetHeading: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg },
   sheetHeadingCopy: { flex: 1, minWidth: 0 },
   sheetTitle: { fontSize: 22, lineHeight: 28, fontWeight: '800' },
   sheetSubtitle: { fontSize: 13, lineHeight: 19, marginTop: 2 },
-  closeButton: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  closeButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
   otherGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.lg },
   otherChoice: {
     minHeight: 50,
     minWidth: 128,
     flexBasis: '47%',
     flexGrow: 1,
-    borderWidth: 1,
-    borderRadius: 15,
     paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
@@ -245,7 +278,7 @@ const styles = StyleSheet.create({
   otherChoiceText: { flex: 1, fontSize: 14, fontWeight: '700' },
   fieldLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2, marginBottom: 8 },
   customRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  input: { flex: 1, minHeight: 54, borderWidth: 1, borderRadius: 16, paddingHorizontal: 14, fontSize: 16 },
-  logButton: { minHeight: 54, borderRadius: 16, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
+  input: { flex: 1, minHeight: 54, paddingHorizontal: 14, fontSize: 16 },
+  logButton: { minHeight: 54, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
   logButtonText: { fontSize: 14, fontWeight: '800' },
 });

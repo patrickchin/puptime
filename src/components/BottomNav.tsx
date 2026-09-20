@@ -13,7 +13,16 @@ const tabs: { id: Tab; label: string; icon: keyof typeof MaterialCommunityIcons.
 
 export function BottomNav({ tab, onChange, theme }: { tab: Tab; onChange: (tab: Tab) => void; theme: Theme }) {
   return (
-    <View style={[styles.container, { backgroundColor: theme.nav, borderColor: theme.border }]}>
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: theme.nav,
+          borderColor: theme.border,
+          borderTopWidth: theme.presentation.borderWidth,
+        },
+      ]}
+    >
       {tabs.map((item) => {
         const selected = item.id === tab;
         return (
@@ -24,7 +33,16 @@ export function BottomNav({ tab, onChange, theme }: { tab: Tab; onChange: (tab: 
             onPress={() => onChange(item.id)}
             style={({ pressed }) => [styles.tab, pressed && { opacity: 0.62 }]}
           >
-            <View style={[styles.iconWrap, selected && { backgroundColor: theme.primarySoft }]}>
+            <View
+              style={[
+                styles.iconWrap,
+                {
+                  minWidth: theme.presentation.navIndicatorWidth,
+                  borderRadius: theme.presentation.controlRadius,
+                },
+                selected && { backgroundColor: theme.primarySoft },
+              ]}
+            >
               <MaterialCommunityIcons
                 name={item.icon}
                 size={23}
@@ -42,7 +60,6 @@ export function BottomNav({ tab, onChange, theme }: { tab: Tab; onChange: (tab: 
 const styles = StyleSheet.create({
   container: {
     minHeight: 72,
-    borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     paddingTop: 6,
   },
@@ -54,9 +71,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   iconWrap: {
-    minWidth: 52,
     height: 30,
-    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
   },
