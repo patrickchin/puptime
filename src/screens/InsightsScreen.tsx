@@ -1378,17 +1378,19 @@ const styles = StyleSheet.create({
   gridLine: { position: 'absolute', top: 0, bottom: 0, width: StyleSheet.hairlineWidth },
   pointMark: {
     position: 'absolute',
-    top: 0,
-    bottom: 0,
+    top: 2,
+    bottom: 2,
     width: 6,
     marginLeft: -3,
+    borderRadius: 3,
     zIndex: 2,
   },
   durationMark: {
     position: 'absolute',
-    top: 0,
-    bottom: 0,
+    top: 2,
+    bottom: 2,
     minWidth: 3,
+    borderRadius: 3,
     zIndex: 1,
   },
   currentTimeMarker: {
