@@ -1,5 +1,5 @@
 import { isOpenNap, type PuppyEvent } from '../domain';
-import { loadWidgetActions } from '../storage';
+import { loadThemePreference, loadWidgetActions } from '../storage';
 import PuptimeWidget, { type PuptimeWidgetProps } from './PuptimeWidget.ios';
 
 export async function readPendingWidgetEvents(): Promise<PuppyEvent[]> {
@@ -15,10 +15,11 @@ export async function readPendingWidgetEvents(): Promise<PuppyEvent[]> {
 export async function updateHomeWidget(events: PuppyEvent[]): Promise<void> {
   const openNap = events.find(isOpenNap);
   const actions = await loadWidgetActions();
+  const themePreference = await loadThemePreference();
   await PuptimeWidget.updateSnapshot({
     pending: [],
-    backdateMinutes: 0,
     openNap: openNap ? { id: openNap.id, type: 'nap', at: openNap.at, endedAt: null } : null,
     actions,
+    themePreference,
   });
 }

@@ -209,7 +209,9 @@ export default function App() {
     setThemePreference(preference);
     setThemePickerVisible(false);
     Haptics.selectionAsync().catch(() => undefined);
-    saveThemePreference(preference).catch(() => undefined);
+    saveThemePreference(preference)
+      .then(() => updateHomeWidget(events))
+      .catch(() => undefined);
   };
 
   const chooseLanguage = (preference: LanguagePreference) => {

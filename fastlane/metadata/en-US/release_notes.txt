@@ -1,3 +1,2 @@
-• Refined iPhone and iPad Home Screen widgets with clearer, denser controls.
-• Added 15-minute backdating controls for widget logs, up to one hour.
+• Refined iPhone and iPad Home Screen widgets with themed, full-height one-tap controls.
 • Improved visual polish and reliability throughout the app.

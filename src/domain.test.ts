@@ -7,7 +7,6 @@ import {
   eventPastLabel,
   formatDuration,
   isOpenNap,
-  normalizeBackdateMinutes,
   normalizeCustomLabel,
   normalizeEventTypeChange,
   normalizeNote,
@@ -18,19 +17,11 @@ import {
 } from './domain.ts';
 import { reminderCopy, reminderIdentifier } from './reminder-config.ts';
 
-test('creates a backdated widget event at the supplied time', () => {
+test('creates a widget event at the supplied time', () => {
   const event = createEvent('pee', 'widget', 123_456);
 
   assert.equal(event.at, 123_456);
   assert.equal(event.source, 'widget');
-});
-
-test('normalizes widget backdating to 15-minute steps within an hour', () => {
-  assert.equal(normalizeBackdateMinutes('8'), 15);
-  assert.equal(normalizeBackdateMinutes(7), 0);
-  assert.equal(normalizeBackdateMinutes(-5), 0);
-  assert.equal(normalizeBackdateMinutes(90), 60);
-  assert.equal(normalizeBackdateMinutes('not-a-time'), 0);
 });
 
 test('normalizes widget actions to a useful two-to-four action set', () => {

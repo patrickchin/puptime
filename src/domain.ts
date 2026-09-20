@@ -187,12 +187,6 @@ export function formatDuration(milliseconds: number): string {
   return remainder ? `${hours}h ${remainder}m` : `${hours}h`;
 }
 
-export function normalizeBackdateMinutes(value: unknown): number {
-  const minutes = Number(value);
-  if (!Number.isFinite(minutes)) return 0;
-  return Math.min(60, Math.max(0, Math.round(minutes / 15) * 15));
-}
-
 export function normalizeNote(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
   return value.trim().slice(0, 300) || undefined;
