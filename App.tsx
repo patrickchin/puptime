@@ -32,6 +32,7 @@ import {
 import { InsightsScreen } from './src/screens/InsightsScreen';
 import { LogScreen } from './src/screens/LogScreen';
 import { ScheduleScreen } from './src/screens/ScheduleScreen';
+import { TimelineScreen } from './src/screens/TimelineScreen';
 import { configureReminderHandling, requestReminderPermission, syncScheduleReminders } from './src/reminders';
 import {
   appendEvents,
@@ -224,6 +225,7 @@ export default function App() {
   }, [events]);
 
   const screen = useMemo(() => {
+    if (tab === 'timeline') return <TimelineScreen events={events} theme={theme} />;
     if (tab === 'insights') return <InsightsScreen events={events} onAddEstimate={addEstimatedEvent} theme={theme} />;
     if (tab === 'schedule') {
       return (

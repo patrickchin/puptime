@@ -59,6 +59,7 @@ test('every theme has a distinct semantic icon profile', () => {
     eventIcon(theme, 'walk'),
     eventIcon(theme, 'nap'),
     navigationIcon(theme, 'log'),
+    navigationIcon(theme, 'timeline'),
     navigationIcon(theme, 'insights'),
     navigationIcon(theme, 'schedule'),
   ].join(':'));

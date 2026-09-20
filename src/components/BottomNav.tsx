@@ -4,9 +4,9 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalization } from '../localization-context';
 import { navigationIcon, type Theme } from '../theme';
 
-export type Tab = 'log' | 'insights' | 'schedule';
+export type Tab = 'log' | 'timeline' | 'insights' | 'schedule';
 
-const tabs: Tab[] = ['log', 'insights', 'schedule'];
+const tabs: Tab[] = ['log', 'timeline', 'insights', 'schedule'];
 
 export function BottomNav({ tab, onChange, theme }: { tab: Tab; onChange: (tab: Tab) => void; theme: Theme }) {
   const { t } = useLocalization();
