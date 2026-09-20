@@ -177,12 +177,14 @@ function TimelineDateLabel({
   day,
   selectedTypes,
   isToday,
+  currentTime,
   rowHeight,
   theme,
 }: {
   day: TimelineDay;
   selectedTypes: readonly EventType[];
   isToday: boolean;
+  currentTime?: Date;
   rowHeight: number;
   theme: Theme;
 }) {
@@ -196,12 +198,17 @@ function TimelineDateLabel({
   const fullDate = new Intl.DateTimeFormat(language, { weekday: 'long', month: 'long', day: 'numeric' });
   const shortDay = new Intl.DateTimeFormat(language, { weekday: 'short' });
   const shortDate = new Intl.DateTimeFormat(language, { month: 'short', day: 'numeric' });
+  const currentTimeDescription = currentTime
+    ? t('insights.currentTime', {
+      time: new Intl.DateTimeFormat(language, { hour: 'numeric', minute: '2-digit' }).format(currentTime),
+    })
+    : undefined;
 
   return (
     <View
       accessible
-      accessibilityLabel={`${fullDate.format(day.date)}. ${description}.`}
-      style={[styles.dateCell, { height: rowHeight }]}
+      accessibilityLabel={`${[fullDate.format(day.date), currentTimeDescription, description].filter(Boolean).join('. ')}.`}
+      style={[styles.dateCell, { borderBottomColor: theme.border, height: rowHeight }]}
     >
       <Text maxFontSizeMultiplier={1.5} style={[styles.weekday, { color: isToday ? theme.primary : theme.text }]}>
         {isToday ? t('insights.today') : shortDay.format(day.date).toUpperCase()}
@@ -217,6 +224,7 @@ function TimelineTrack({
   day,
   selectedTypes,
   isToday,
+  currentTime,
   rowHeight,
   gridHours,
   theme,
@@ -224,14 +232,15 @@ function TimelineTrack({
   day: TimelineDay;
   selectedTypes: readonly EventType[];
   isToday: boolean;
+  currentTime?: Date;
   rowHeight: number;
   gridHours: readonly number[];
   theme: Theme;
 }) {
   const marks = day.marks.filter((mark) => selectedTypes.includes(mark.type));
-  const trackHeight = rowHeight - 6;
-  const pointHeight = Math.min(20, trackHeight - 4);
-  const durationHeight = Math.min(10, trackHeight - 4);
+  const currentTimePosition = currentTime
+    ? ((currentTime.getHours() * 60 + currentTime.getMinutes()) / (24 * 60)) * 100
+    : undefined;
 
   return (
     <View style={[styles.trackRow, { height: rowHeight }]}>
@@ -241,10 +250,9 @@ function TimelineTrack({
         style={[
           styles.timelineTrack,
           {
-            height: trackHeight,
+            height: rowHeight,
             backgroundColor: isToday ? theme.primarySoft : theme.surface,
-            borderColor: isToday ? theme.primary : theme.border,
-            borderRadius: Math.min(theme.presentation.controlRadius, 12),
+            borderBottomColor: theme.border,
           },
         ]}
       >
@@ -264,9 +272,7 @@ function TimelineTrack({
                   styles.durationMark,
                   {
                     backgroundColor: color,
-                    height: durationHeight,
                     left: `${(mark.startBucket / TIMELINE_BUCKETS) * 100}%`,
-                    top: (trackHeight - durationHeight) / 2,
                     width: `${((mark.endBucket - mark.startBucket) / TIMELINE_BUCKETS) * 100}%`,
                   },
                 ]}
@@ -280,14 +286,31 @@ function TimelineTrack({
                 styles.pointMark,
                 {
                   backgroundColor: color,
-                  height: pointHeight,
                   left: `${((mark.startBucket + 0.5) / TIMELINE_BUCKETS) * 100}%`,
-                  top: (trackHeight - pointHeight) / 2,
                 },
               ]}
             />
           );
         })}
+        {currentTimePosition !== undefined ? (
+          <View
+            style={[
+              styles.currentTimeMarker,
+              {
+                backgroundColor: theme.text,
+                borderColor: theme.surfaceRaised,
+                left: `${currentTimePosition}%`,
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.currentTimeMarkerHead,
+                { backgroundColor: theme.text, borderColor: theme.surfaceRaised },
+              ]}
+            />
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -1018,6 +1041,7 @@ export function InsightsScreen({
                 day={day}
                 selectedTypes={selectedTypes}
                 isToday={day.key === todayKey}
+                currentTime={day.key === todayKey ? now : undefined}
                 rowHeight={rowHeight}
                 theme={theme}
               />
@@ -1039,6 +1063,7 @@ export function InsightsScreen({
                   day={day}
                   selectedTypes={selectedTypes}
                   isToday={day.key === todayKey}
+                  currentTime={day.key === todayKey ? now : undefined}
                   rowHeight={rowHeight}
                   gridHours={gridHours}
                   theme={theme}
@@ -1331,7 +1356,11 @@ const styles = StyleSheet.create({
   chart: { flexDirection: 'row', alignItems: 'flex-start' },
   dateColumn: { width: DATE_COLUMN_WIDTH, flexShrink: 0 },
   axisSpacer: { height: 22 },
-  dateCell: { justifyContent: 'center', paddingRight: 8 },
+  dateCell: {
+    justifyContent: 'center',
+    paddingRight: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
   trackScroller: { flex: 1, minWidth: 0 },
   axisTrack: { height: 22, position: 'relative' },
   axisLabel: { position: 'absolute', width: 34, fontSize: 10, lineHeight: 14, fontWeight: '600', fontVariant: ['tabular-nums'] },
@@ -1342,22 +1371,44 @@ const styles = StyleSheet.create({
   calendarDate: { fontSize: 10, lineHeight: 13, fontWeight: '600', marginTop: 1 },
   timelineTrack: {
     width: '100%',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     position: 'relative',
     overflow: 'hidden',
   },
   gridLine: { position: 'absolute', top: 0, bottom: 0, width: StyleSheet.hairlineWidth },
   pointMark: {
     position: 'absolute',
+    top: 0,
+    bottom: 0,
     width: 6,
     marginLeft: -3,
-    borderRadius: 3,
+    zIndex: 2,
   },
   durationMark: {
     position: 'absolute',
+    top: 0,
+    bottom: 0,
     minWidth: 3,
-    borderRadius: 5,
+    zIndex: 1,
+  },
+  currentTimeMarker: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 4,
+    marginLeft: -2,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    zIndex: 3,
+  },
+  currentTimeMarkerHead: {
+    position: 'absolute',
+    top: 3,
+    left: -2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    borderWidth: 2,
   },
   emptyNote: {
     minHeight: 44,
