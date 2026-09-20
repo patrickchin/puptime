@@ -1,2 +1,1 @@
-puppy,dog,potty,routine,tracker,walk,meal,nap,training
-
+dog,routine,training,housebreaking,toilet,feeding,schedule,reminder,history,offline,widget,log
