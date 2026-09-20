@@ -148,7 +148,7 @@ export function LogScreen({
   onWidgetActionsChange: (actions: QuickEventType[]) => Promise<void>;
   theme: Theme;
 }) {
-  const { eventLabel, eventPastLabel, locale, relativeTime, t, voiceCopy } = useLocalization();
+  const { eventLabel, locale, relativeTime, t, voiceCopy } = useLocalization();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [pickerMode, setPickerMode] = useState<'date' | 'time' | null>(null);
   const [customTouched, setCustomTouched] = useState(false);
@@ -327,11 +327,6 @@ export function LogScreen({
   const pickerDate = new Date(activeValue);
   const draftMeta = draft ? EVENT_META[draft.type] : EVENT_META.pee;
   const customInvalid = draft?.type === 'custom' && !normalizeCustomLabel(draft.customLabel);
-  const draftLabel = !draft
-    ? ''
-    : draft.type === 'custom'
-      ? normalizeCustomLabel(draft.customLabel) ?? eventPastLabel({ ...draft.event, type: 'custom', customLabel: undefined })
-      : eventPastLabel({ ...draft.event, type: draft.type });
   const selectedFilter = activityFilters.find((item) => item.id === activityFilter) ?? activityFilters[0];
   const todayLabel = new Intl.DateTimeFormat(locale, { weekday: 'short', month: 'short', day: 'numeric' })
     .format(now)
@@ -342,11 +337,7 @@ export function LogScreen({
     ? { icon: 'alert-circle-outline', text: t('editor.customNameStatus'), color: theme.danger }
     : saveStatus === 'saving'
       ? { icon: 'cloud-upload-outline', text: t('editor.saving'), color: theme.primary }
-      : saveStatus === 'saved'
-        ? { icon: 'check-circle-outline', text: t('editor.saved'), color: theme.primary }
-        : saveStatus === 'error'
-          ? { icon: 'alert-circle-outline', text: t('editor.retry'), color: theme.danger }
-          : { icon: 'cloud-check-outline', text: t('editor.autoSave'), color: theme.textMuted };
+      : null;
 
   const setDraftTime = (value: number) => {
     updateDraft((current) => {
@@ -459,14 +450,6 @@ export function LogScreen({
               <View style={styles.titleCopy}>
                 <Text
                   style={[
-                    styles.eyebrow,
-                    { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking },
-                  ]}
-                >
-                  {homeCopy.eyebrow}
-                </Text>
-                <Text
-                  style={[
                     styles.title,
                     {
                       color: theme.text,
@@ -527,7 +510,6 @@ export function LogScreen({
                 </Pressable>
               </View>
             </View>
-            <Text style={[styles.subtitle, { color: theme.textMuted }]}>{homeCopy.subtitle}</Text>
             <QuickActions events={events} onLog={onLog} now={now} theme={theme} />
             <TodayRoutineCard
               events={events}
@@ -538,9 +520,6 @@ export function LogScreen({
             />
             <View style={styles.activityHeading}>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('log.activity')}</Text>
-              <Text style={[styles.count, { color: theme.textMuted }]}>
-                {t(historyScope === 'all' ? 'log.totalCount' : 'log.recentCount', { count: visibleEvents.length })}
-              </Text>
             </View>
             <ScrollView
               horizontal
@@ -610,18 +589,11 @@ export function LogScreen({
                     color={theme.primary}
                   />
                 </View>
-                <View style={styles.historyScopeCopy}>
-                  <Text style={[styles.historyScopeTitle, { color: theme.text }]}>
-                    {historyScope === 'all'
-                      ? t('log.showRecent', { count: recentHistoryDays })
-                      : t('log.viewAll')}
-                  </Text>
-                  <Text style={[styles.historyScopeDetail, { color: theme.textMuted }]}>
-                    {historyScope === 'all'
-                      ? t('log.recentDetail')
-                      : t('log.olderDetail', { count: olderEventCount })}
-                  </Text>
-                </View>
+                <Text style={[styles.historyScopeTitle, { color: theme.text }]}>
+                  {historyScope === 'all'
+                    ? t('log.showRecent', { count: recentHistoryDays })
+                    : t('log.viewAll', { count: olderEventCount })}
+                </Text>
                 <MaterialCommunityIcons
                   accessibilityElementsHidden
                   importantForAccessibility="no"
@@ -685,9 +657,6 @@ export function LogScreen({
                 ? t('log.emptyTitle')
                 : t('log.emptyFilteredTitle', { filter: t(selectedFilter.labelKey).toLocaleLowerCase(locale) })}
             </Text>
-            <Text style={[styles.emptyBody, { color: theme.textMuted }]}>
-              {t(activityFilter === 'all' ? 'log.emptyBody' : 'log.emptyFilteredBody')}
-            </Text>
           </View>
         }
       />
@@ -735,13 +704,6 @@ export function LogScreen({
                 >
                   {t(timedNap ? 'editor.editNap' : 'editor.editLog')}
                 </Text>
-                <Text
-                  style={[styles.sheetSubtitle, { color: theme.textMuted }]}
-                >
-                  {draft?.event.type === 'nap'
-                    ? t('editor.napSubtitle', { activity: draftLabel })
-                    : t('editor.logSubtitle', { activity: draftLabel })}
-                </Text>
               </View>
               <Pressable
                 accessibilityRole="button"
@@ -778,7 +740,7 @@ export function LogScreen({
                 <MaterialCommunityIcons name="alert-circle-outline" color={theme.danger} size={18} />
                 <Text style={[styles.saveStatusText, { color: theme.danger }]}>{t('editor.retry')}</Text>
               </Pressable>
-            ) : (
+            ) : statusPresentation ? (
               <View
                 accessible
                 accessibilityLiveRegion="polite"
@@ -800,7 +762,7 @@ export function LogScreen({
                 />
                 <Text style={[styles.saveStatusText, { color: statusPresentation.color }]}>{statusPresentation.text}</Text>
               </View>
-            )}
+            ) : null}
 
             {draft && draft.event.type !== 'nap' ? (
               <>
@@ -874,12 +836,14 @@ export function LogScreen({
                         },
                       ]}
                     />
-                    <Text
-                      accessibilityLiveRegion="polite"
-                      style={[styles.customHint, { color: customTouched && customInvalid ? theme.danger : theme.textMuted }]}
-                    >
-                      {t(customTouched && customInvalid ? 'editor.customInvalid' : 'editor.customValid')}
-                    </Text>
+                    {customTouched && customInvalid ? (
+                      <Text
+                        accessibilityLiveRegion="polite"
+                        style={[styles.customHint, { color: theme.danger }]}
+                      >
+                        {t('editor.customInvalid')}
+                      </Text>
+                    ) : null}
                   </View>
                 ) : null}
               </>
@@ -1109,9 +1073,6 @@ export function LogScreen({
               </Pressable>
             </View>
 
-            <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>
-              {t('widget.actions', { count: widgetDraft.length })}
-            </Text>
             <View style={styles.widgetActionList}>
               {quickEventTypes.map((type) => {
                 const meta = EVENT_META[type];
@@ -1158,7 +1119,9 @@ export function LogScreen({
                 );
               })}
             </View>
-            <Text style={[styles.widgetHint, { color: theme.textMuted }]}>{t('widget.napHint')}</Text>
+            {!widgetDraft.includes('nap') ? (
+              <Text style={[styles.widgetHint, { color: theme.textMuted }]}>{t('widget.napHint')}</Text>
+            ) : null}
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t('widget.save')}
@@ -1206,12 +1169,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  eyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 1.6 },
   title: { fontSize: 27, lineHeight: 33, fontWeight: '800', letterSpacing: -0.5 },
-  subtitle: { fontSize: 15, lineHeight: 22, marginTop: 8, marginBottom: spacing.md },
   activityHeading: { marginTop: spacing.xl, marginBottom: 12, flexDirection: 'row', alignItems: 'baseline' },
   sectionTitle: { flex: 1, fontSize: 21, fontWeight: '800' },
-  count: { fontSize: 13, fontWeight: '600' },
   filters: { gap: 8, paddingBottom: 8 },
   filter: {
     minHeight: 48,
@@ -1235,16 +1195,13 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   historyScopeIcon: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  historyScopeCopy: { flex: 1, minWidth: 0 },
-  historyScopeTitle: { fontSize: 14, lineHeight: 19, fontWeight: '700' },
-  historyScopeDetail: { fontSize: 11, lineHeight: 16, marginTop: 1 },
+  historyScopeTitle: { flex: 1, fontSize: 14, lineHeight: 19, fontWeight: '700' },
   archiveMonthHeading: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18, marginBottom: 2 },
   archiveMonthText: { fontSize: 12, lineHeight: 17, fontWeight: '800', letterSpacing: 1.2 },
   archiveMonthLine: { flex: 1, height: StyleSheet.hairlineWidth },
   dayHeading: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2, marginTop: 8, marginBottom: 8 },
   empty: { borderWidth: 1, borderStyle: 'dashed', borderRadius: 20, padding: spacing.lg, alignItems: 'center' },
   emptyTitle: { fontSize: 17, fontWeight: '700', marginTop: 8 },
-  emptyBody: { fontSize: 14, textAlign: 'center', lineHeight: 21, marginTop: 4 },
   scrim: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.56)', justifyContent: 'flex-end' },
   sheet: {
     width: '100%',
@@ -1290,7 +1247,7 @@ const styles = StyleSheet.create({
   widgetAction: { minHeight: 56, borderWidth: 1, borderRadius: 16, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
   widgetActionIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   widgetActionText: { flex: 1, fontSize: 15, fontWeight: '700' },
-  widgetHint: { fontSize: 12, lineHeight: 18, marginBottom: spacing.lg },
+  widgetHint: { fontSize: 12, lineHeight: 18, marginBottom: spacing.md },
   widgetSaveButton: { minHeight: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   widgetSaveButtonText: { fontSize: 15, fontWeight: '800' },
 });
