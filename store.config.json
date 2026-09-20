@@ -3,35 +3,38 @@
   "apple": {
     "version": "1.11.0",
     "copyright": "2026 Patrick Chin",
-    "categories": [
-      "LIFESTYLE",
-      "UTILITIES"
-    ],
     "release": {
       "automaticRelease": true
     },
     "info": {
       "en-US": {
+        "description": "Puptime is a private, offline puppy routine tracker built for quick logging. Record what happened in one tap, then understand your puppy's day and patterns without creating an account.\n\nQUICK, FLEXIBLE LOGGING\n• Log pee, poop, meals, potty trips, walks, naps, and custom activities\n• Start and stop timed naps without inventing an end time\n• Add notes by typing or optional voice dictation\n• Correct activity details, dates, and times whenever you need to\n\nA ROUTINE THAT FITS YOUR PUPPY\n• Plan an editable daily routine with optional on-device reminders\n• See the next activity and daily progress at a glance\n• Review filterable history, timing patterns, frequency summaries, and routine suggestions\n• Export your complete activity history as a spreadsheet-ready CSV file\n\nHOME-SCREEN WIDGETS\nLog common activities from your iPhone or iPad Home Screen. Backdate a widget entry in 15-minute steps when you could not log it right away.\n\nPRIVATE BY DESIGN\nYour activity data stays on your device. Puptime has no account, subscription, server, ads, analytics, or tracking. Voice dictation uses Apple's speech-recognition service and may require a network connection.\n\nThe starter routine is an editable example, not veterinary guidance. Adjust it to fit your puppy and your veterinarian's advice.",
+        "keywords": [
+          "dog",
+          "routine",
+          "training",
+          "housebreaking",
+          "toilet",
+          "feeding",
+          "schedule",
+          "reminder",
+          "history",
+          "offline",
+          "widget",
+          "log"
+        ],
+        "marketingUrl": "https://github.com/patrickchin/puptime",
+        "promoText": "Private, one-tap puppy routine logging for potty breaks, meals, walks and naps—plus widgets, reminders and offline insights.",
+        "supportUrl": "https://github.com/patrickchin/puptime/issues",
         "title": "Puptime: Puppy Tracker",
         "subtitle": "Potty, meals, walks & naps",
-        "description": "Puptime is a private, offline puppy routine tracker built for quick logging. Record what happened in one tap, then see your puppy's day and patterns without creating an account.\n\n• Log pee, poop, meals, potty trips, walks, naps, and custom activities\n• Start and stop timed naps without inventing an end time\n• Add notes by typing or optional voice dictation\n• Edit dates and times when you need to correct a log\n• Plan an editable daily routine with optional local reminders\n• Review history, timing patterns, frequency summaries, and routine suggestions\n• Log common activities from the iOS home-screen widget\n• Export your complete activity history as a CSV file\n• Use automatic light and dark themes\n\nYour activity data stays on your device. Puptime has no account, subscription, ads, analytics, or tracking.\n\nThe starter routine is an editable example, not veterinary guidance. Adjust it to fit your puppy and your veterinarian's advice.",
-        "keywords": [
-          "puppy",
-          "dog",
-          "potty",
-          "routine",
-          "tracker",
-          "walk",
-          "meal",
-          "nap",
-          "training"
-        ],
-        "promoText": "One-tap, private puppy routine tracking—with home-screen widgets and no account.",
-        "marketingUrl": "https://github.com/patrickchin/puptime",
-        "supportUrl": "https://github.com/patrickchin/puptime/issues",
         "privacyPolicyUrl": "https://github.com/patrickchin/puptime/blob/master/PRIVACY.md"
       }
     },
+    "categories": [
+      "LIFESTYLE",
+      "UTILITIES"
+    ],
     "advisory": {
       "ageRatingOverride": "NONE",
       "alcoholTobaccoOrDrugUseOrReferences": "NONE",
