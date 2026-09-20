@@ -30,12 +30,16 @@ import { localizedEventLabel, translate, type AppLanguage } from '../localizatio
 import { shareEventsCsv } from '../share-export';
 import { eventIcon, spacing, surfaceTreatment, type Theme } from '../theme';
 
-const TIMELINE_DAYS = 10;
+const FREQUENCY_DAYS = 10;
 const MISSING_LOG_DAYS = 14;
 const activityFilters = ['all', ...eventTypes] as const;
 const horizontalZoomLevels = [1, 1.5, 2] as const;
-const verticalZoomLevels = [38, 52, 68] as const;
-const verticalZoomLabels = ['75%', '100%', '130%'] as const;
+const verticalZoomLevels = [
+  { days: 10, rowHeight: 48 },
+  { days: 20, rowHeight: 38 },
+  { days: 30, rowHeight: 32 },
+] as const;
+const DATE_COLUMN_WIDTH = 64;
 const MONTH_PREVIEW_COUNT = 6;
 
 function formatBucket(bucket: number, language: AppLanguage): string {
@@ -226,8 +230,8 @@ function TimelineTrack({
 }) {
   const marks = day.marks.filter((mark) => selectedTypes.includes(mark.type));
   const trackHeight = rowHeight - 6;
-  const laneCount = Math.max(1, selectedTypes.length);
-  const laneHeight = trackHeight / laneCount;
+  const pointHeight = Math.min(20, trackHeight - 4);
+  const durationHeight = Math.min(10, trackHeight - 4);
 
   return (
     <View style={[styles.trackRow, { height: rowHeight }]}>
@@ -252,11 +256,6 @@ function TimelineTrack({
         ))}
         {marks.map((mark) => {
           const color = eventColor(mark.type, theme);
-          const laneIndex = Math.max(0, selectedTypes.indexOf(mark.type));
-          const markHeight = selectedTypes.length === 1
-            ? Math.min(22, trackHeight - 8)
-            : Math.max(4, Math.min(9, laneHeight - 1.5));
-          const top = laneIndex * laneHeight + (laneHeight - markHeight) / 2;
           if (mark.endBucket !== undefined) {
             return (
               <View
@@ -265,16 +264,15 @@ function TimelineTrack({
                   styles.durationMark,
                   {
                     backgroundColor: color,
-                    height: markHeight,
+                    height: durationHeight,
                     left: `${(mark.startBucket / TIMELINE_BUCKETS) * 100}%`,
-                    top,
+                    top: (trackHeight - durationHeight) / 2,
                     width: `${((mark.endBucket - mark.startBucket) / TIMELINE_BUCKETS) * 100}%`,
                   },
                 ]}
               />
             );
           }
-          const pointWidth = selectedTypes.length === 1 ? 6 : markHeight;
           return (
             <View
               key={mark.id}
@@ -282,12 +280,9 @@ function TimelineTrack({
                 styles.pointMark,
                 {
                   backgroundColor: color,
-                  borderRadius: pointWidth / 2,
-                  height: markHeight,
+                  height: pointHeight,
                   left: `${((mark.startBucket + 0.5) / TIMELINE_BUCKETS) * 100}%`,
-                  marginLeft: -pointWidth / 2,
-                  top,
-                  width: pointWidth,
+                  top: (trackHeight - pointHeight) / 2,
                 },
               ]}
             />
@@ -346,8 +341,8 @@ function ZoomControl({
     {
       backgroundColor: theme.surfaceRaised,
       borderColor: theme.border,
-      borderRadius: theme.presentation.controlRadius,
-      borderWidth: theme.presentation.borderWidth,
+      borderRadius: Math.min(theme.presentation.controlRadius, 14),
+      borderWidth: Math.min(theme.presentation.borderWidth, 2),
       opacity: enabled ? (pressed ? 0.7 : 1) : 0.35,
     },
   ];
@@ -358,8 +353,8 @@ function ZoomControl({
         styles.zoomControl,
         {
           borderColor: theme.border,
-          borderRadius: theme.presentation.controlRadius,
-          borderWidth: theme.presentation.borderWidth,
+          borderRadius: Math.min(theme.presentation.controlRadius, 16),
+          borderWidth: Math.min(theme.presentation.borderWidth, 2),
         },
       ]}
     >
@@ -474,11 +469,11 @@ export function InsightsScreen({
   theme: Theme;
 }) {
   const { eventLabel, language, t } = useLocalization();
-  const { width } = useWindowDimensions();
+  const { fontScale, width } = useWindowDimensions();
   const [selectedTypes, setSelectedTypes] = useState<EventType[]>([...eventTypes]);
   const [horizontalZoom, setHorizontalZoom] = useState(0);
-  const [verticalZoom, setVerticalZoom] = useState(1);
-  const [historyPage, setHistoryPage] = useState(0);
+  const [verticalZoom, setVerticalZoom] = useState(0);
+  const [historyOffset, setHistoryOffset] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [showAllMonths, setShowAllMonths] = useState(false);
   const [addingEstimateId, setAddingEstimateId] = useState<string | null>(null);
@@ -488,24 +483,30 @@ export function InsightsScreen({
     return () => clearInterval(timer);
   }, []);
   const now = new Date(nowTime);
+  const { days: timelineDays, rowHeight: baseRowHeight } = verticalZoomLevels[verticalZoom];
+  const rowHeight = Math.round(baseRowHeight * Math.min(fontScale, 1.5));
   const earliestEventAt = events.reduce((earliest, event) => Math.min(earliest, event.at), now.getTime());
   const historyDays = events.length ? calendarDayDistance(new Date(earliestEventAt), now) : 0;
-  const maxHistoryOffset = Math.max(0, historyDays - (TIMELINE_DAYS - 1));
-  const maxHistoryPage = Math.ceil(maxHistoryOffset / TIMELINE_DAYS);
-  const currentHistoryPage = Math.min(historyPage, maxHistoryPage);
-  const historyOffset = Math.min(currentHistoryPage * TIMELINE_DAYS, maxHistoryOffset);
+  const maxHistoryOffset = Math.max(0, historyDays - (timelineDays - 1));
+  const currentHistoryOffset = Math.min(historyOffset, maxHistoryOffset);
   const rangeEnd = new Date(now);
-  rangeEnd.setDate(rangeEnd.getDate() - historyOffset);
-  const days = buildTimelineDays(events, TIMELINE_DAYS, rangeEnd, now);
-  const frequency = activityFrequencyStats(events, ['pee', 'poop'], TIMELINE_DAYS, now);
+  rangeEnd.setDate(rangeEnd.getDate() - currentHistoryOffset);
+  const days = buildTimelineDays(events, timelineDays, rangeEnd, now);
+  const frequency = activityFrequencyStats(events, ['pee', 'poop'], FREQUENCY_DAYS, now);
   const missingLogs = estimateMissingLogs(events, MISSING_LOG_DAYS, now);
   const todayKey = dateKey(now);
   const visibleEventCount = new Set(
     days.flatMap((day) => day.marks.filter((mark) => selectedTypes.includes(mark.type)).map((mark) => mark.id)),
   ).size;
   const allSelected = selectedTypes.length === eventTypes.length;
-  const rowHeight = verticalZoomLevels[verticalZoom];
-  const baseTrackWidth = Math.max(220, Math.min(width, 960) - 122);
+  const baseTrackWidth = Math.max(
+    220,
+    Math.min(width, 960)
+      - spacing.md * 2
+      - theme.presentation.cardPadding * 2
+      - theme.presentation.borderWidth * 2
+      - DATE_COLUMN_WIDTH,
+  );
   const trackWidth = Math.round(baseTrackWidth * horizontalZoomLevels[horizontalZoom]);
   const tickStep = trackWidth >= 480 ? 3 : 6;
   const tickHours = Array.from({ length: 24 / tickStep + 1 }, (_, index) => index * tickStep);
@@ -919,8 +920,8 @@ export function InsightsScreen({
             {
               backgroundColor: theme.surface,
               borderColor: theme.border,
-              borderRadius: theme.presentation.cardRadius,
-              borderWidth: theme.presentation.borderWidth,
+              borderRadius: Math.min(theme.presentation.cardRadius, 20),
+              borderWidth: Math.min(theme.presentation.borderWidth, 2),
             },
           ]}
         >
@@ -936,7 +937,7 @@ export function InsightsScreen({
             />
             <ZoomControl
               label={t('insights.dayHeight')}
-              value={verticalZoomLabels[verticalZoom]}
+              value={t('time.days', { count: timelineDays })}
               canDecrease={verticalZoom > 0}
               canIncrease={verticalZoom < verticalZoomLevels.length - 1}
               onDecrease={() => setVerticalZoom((value) => Math.max(0, value - 1))}
@@ -953,16 +954,16 @@ export function InsightsScreen({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('insights.showEarlier')}
-            accessibilityState={{ disabled: currentHistoryPage >= maxHistoryPage }}
-            disabled={currentHistoryPage >= maxHistoryPage}
-            onPress={() => setHistoryPage(Math.min(maxHistoryPage, currentHistoryPage + 1))}
+            accessibilityState={{ disabled: currentHistoryOffset >= maxHistoryOffset }}
+            disabled={currentHistoryOffset >= maxHistoryOffset}
+            onPress={() => setHistoryOffset(Math.min(maxHistoryOffset, currentHistoryOffset + timelineDays))}
             style={({ pressed }) => [
               styles.rangeButton,
               {
                 borderColor: theme.border,
                 borderRadius: theme.presentation.controlRadius,
                 borderWidth: theme.presentation.borderWidth,
-                opacity: currentHistoryPage >= maxHistoryPage ? 0.35 : pressed ? 0.7 : 1,
+                opacity: currentHistoryOffset >= maxHistoryOffset ? 0.35 : pressed ? 0.7 : 1,
               },
             ]}
           >
@@ -978,22 +979,22 @@ export function InsightsScreen({
           <View style={styles.rangeCopy}>
             <Text style={[styles.rangeLabel, { color: theme.text }]}>{rangeLabel}</Text>
             <Text style={[styles.rangeStatus, { color: theme.textMuted }]}>
-              {t(currentHistoryPage === 0 ? 'insights.latestDays' : 'insights.olderWindow', { count: TIMELINE_DAYS })}
+              {t(currentHistoryOffset === 0 ? 'insights.latestDays' : 'insights.olderWindow', { count: timelineDays })}
             </Text>
           </View>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('insights.showNewer')}
-            accessibilityState={{ disabled: currentHistoryPage === 0 }}
-            disabled={currentHistoryPage === 0}
-            onPress={() => setHistoryPage(Math.max(0, currentHistoryPage - 1))}
+            accessibilityState={{ disabled: currentHistoryOffset === 0 }}
+            disabled={currentHistoryOffset === 0}
+            onPress={() => setHistoryOffset(Math.max(0, currentHistoryOffset - timelineDays))}
             style={({ pressed }) => [
               styles.rangeButton,
               {
                 borderColor: theme.border,
                 borderRadius: theme.presentation.controlRadius,
                 borderWidth: theme.presentation.borderWidth,
-                opacity: currentHistoryPage === 0 ? 0.35 : pressed ? 0.7 : 1,
+                opacity: currentHistoryOffset === 0 ? 0.35 : pressed ? 0.7 : 1,
               },
             ]}
           >
@@ -1102,7 +1103,7 @@ export function InsightsScreen({
               <Text style={[styles.panelCaption, { color: theme.textMuted }]}>
                 {t('insights.historyCaption', {
                   selection: selectionTitle(selectedTypes, language),
-                  count: TIMELINE_DAYS,
+                  count: timelineDays,
                 })}
               </Text>
             </View>
@@ -1328,7 +1329,7 @@ const styles = StyleSheet.create({
   rangeLabel: { fontSize: 11, lineHeight: 15, fontWeight: '700', textAlign: 'center', fontVariant: ['tabular-nums'] },
   rangeStatus: { fontSize: 10, lineHeight: 14, textAlign: 'center', marginTop: 1 },
   chart: { flexDirection: 'row', alignItems: 'flex-start' },
-  dateColumn: { width: 64, flexShrink: 0 },
+  dateColumn: { width: DATE_COLUMN_WIDTH, flexShrink: 0 },
   axisSpacer: { height: 22 },
   dateCell: { justifyContent: 'center', paddingRight: 8 },
   trackScroller: { flex: 1, minWidth: 0 },
@@ -1349,6 +1350,9 @@ const styles = StyleSheet.create({
   gridLine: { position: 'absolute', top: 0, bottom: 0, width: StyleSheet.hairlineWidth },
   pointMark: {
     position: 'absolute',
+    width: 6,
+    marginLeft: -3,
+    borderRadius: 3,
   },
   durationMark: {
     position: 'absolute',

@@ -13,7 +13,7 @@ Puptime is a private, offline puppy routine tracker for Android and iOS. Log pot
 - Optional notes on every log, with native speech-to-text dictation
 - An editable daily routine with native time pickers and clear logged, due, upcoming, and missed states
 - Optional per-activity daily reminders, scheduled locally on the device
-- A 10-day timing timeline with one row per calendar day, 15-minute windows, activity filters, and visible nap spans
+- A 10-, 20-, or 30-day timing timeline with one compressed row per calendar day, 15-minute windows, overlaid activity marks, and visible nap spans
 - A compact month-by-month pace view for scanning older patterns without crowding out recent activity
 - Pee and poop frequency summaries with per-recorded-day averages, observed ranges, and typical gaps between logs
 - A reviewable routine suggestion built from recurring activity times across at least three recorded days
