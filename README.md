@@ -2,6 +2,31 @@
 
 Puptime is a private, offline puppy routine tracker for Android and iOS. Log potty results, outside trips, walks, meals, and timed naps from the app or a home-screen widget, then compare when each activity happens from day to day.
 
+## Screenshots
+
+<table>
+  <tr>
+    <th>Today</th>
+    <th>Activity history</th>
+    <th>Insights</th>
+  </tr>
+  <tr>
+    <td><img src="assets/screenshots/today.png" width="260" alt="Puptime Today screen with quick logging and routine progress"></td>
+    <td><img src="assets/screenshots/activity.png" width="260" alt="Puptime activity history with notes and timed naps"></td>
+    <td><img src="assets/screenshots/insights-summary.png" width="260" alt="Puptime insights with frequency summaries and possible missing logs"></td>
+  </tr>
+  <tr>
+    <th>Timing patterns</th>
+    <th>Daily routine</th>
+    <th>Appearance</th>
+  </tr>
+  <tr>
+    <td><img src="assets/screenshots/insights-timeline.png" width="260" alt="Puptime timing timeline comparing activity across ten days"></td>
+    <td><img src="assets/screenshots/schedule.png" width="260" alt="Puptime editable daily routine with suggested times and progress"></td>
+    <td><img src="assets/screenshots/appearance.png" width="260" alt="Puptime appearance picker showing its visual themes"></td>
+  </tr>
+</table>
+
 ## What it includes
 
 - One-tap logging for pee, poop, meals, potty trips, walks, and naps, with haptic confirmation and undo
