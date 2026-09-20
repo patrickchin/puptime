@@ -17,7 +17,7 @@ import {
 import { scheduleStatusesForDay, suggestScheduleFromEvents, type ScheduleStatus } from '../analytics';
 import { EVENT_META, formatMinutes, quickEventTypes, type EventType, type ScheduleEntry } from '../domain';
 import type { PuppyEvent } from '../domain';
-import { spacing, type Theme } from '../theme';
+import { spacing, surfaceTreatment, type Theme } from '../theme';
 
 type Draft = { id?: string; type: EventType; minutes: number; reminder: boolean };
 
@@ -157,15 +157,50 @@ export function ScheduleScreen({
   return (
     <>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.eyebrow, { color: theme.primary }]}>DAILY ROUTINE</Text>
-        <Text style={[styles.title, { color: theme.text }]}>Make the day predictable</Text>
+        <Text
+          style={[
+            styles.eyebrow,
+            { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking },
+          ]}
+        >
+          DAILY ROUTINE
+        </Text>
+        <Text
+          style={[
+            styles.title,
+            {
+              color: theme.text,
+              fontSize: theme.presentation.titleSize,
+              lineHeight: theme.presentation.titleLineHeight,
+              fontWeight: theme.presentation.titleWeight,
+              letterSpacing: theme.presentation.titleTracking,
+            },
+          ]}
+        >
+          Make the day predictable
+        </Text>
         <Text style={[styles.subtitle, { color: theme.textMuted }]}>
           Start from patterns in your logs or edit times yourself. This is routine planning, not veterinary guidance.
         </Text>
 
-        <View style={[styles.learnCard, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
+        <View
+          style={[
+            styles.learnCard,
+            surfaceTreatment(theme),
+            {
+              backgroundColor: theme.surfaceRaised,
+              borderColor: theme.border,
+              padding: theme.presentation.cardPadding,
+            },
+          ]}
+        >
           <View style={styles.learnHeading}>
-            <View style={[styles.learnIcon, { backgroundColor: theme.primarySoft }]}>
+            <View
+              style={[
+                styles.learnIcon,
+                { backgroundColor: theme.primarySoft, borderRadius: theme.presentation.iconRadius },
+              ]}
+            >
               <MaterialCommunityIcons
                 accessibilityElementsHidden
                 importantForAccessibility="no"
@@ -181,7 +216,12 @@ export function ScheduleScreen({
               </Text>
             </View>
           </View>
-          <View style={[styles.learnStatus, { backgroundColor: theme.surface }]}>
+          <View
+            style={[
+              styles.learnStatus,
+              { backgroundColor: theme.surface, borderRadius: theme.presentation.controlRadius },
+            ]}
+          >
             <MaterialCommunityIcons
               accessibilityElementsHidden
               importantForAccessibility="no"
@@ -208,6 +248,8 @@ export function ScheduleScreen({
               {
                 backgroundColor: canSuggest ? theme.primary : theme.surface,
                 borderColor: canSuggest ? theme.primary : theme.border,
+                borderRadius: theme.presentation.controlRadius,
+                borderWidth: theme.presentation.borderWidth,
                 opacity: pressed ? 0.8 : 1,
               },
             ]}
@@ -226,21 +268,46 @@ export function ScheduleScreen({
         </View>
 
         {schedule.length ? (
-          <View style={[styles.progressCard, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
+          <View
+            style={[
+              styles.progressCard,
+              surfaceTreatment(theme),
+              {
+                backgroundColor: theme.surfaceRaised,
+                borderColor: theme.border,
+                padding: theme.presentation.cardPadding,
+              },
+            ]}
+          >
             <View style={styles.progressHeading}>
               <View>
                 <Text style={[styles.progressEyebrow, { color: theme.primary }]}>TODAY SO FAR</Text>
                 <Text style={[styles.progressTitle, { color: theme.text }]}>{completed} of {schedule.length} logged</Text>
               </View>
-              <View style={[styles.progressIcon, { backgroundColor: theme.primarySoft }]}>
+              <View
+                style={[
+                  styles.progressIcon,
+                  { backgroundColor: theme.primarySoft, borderRadius: theme.presentation.iconRadius },
+                ]}
+              >
                 <MaterialCommunityIcons name="calendar-check-outline" color={theme.primary} size={23} />
               </View>
             </View>
             <Text style={[styles.progressDetail, { color: theme.textMuted }]}>
               {due ? `${due} ${due === 1 ? 'activity is' : 'activities are'} due now` : missed ? `${missed} missed ${missed === 1 ? 'window' : 'windows'}` : completed === schedule.length ? 'Everything planned has been logged' : 'The next activity is still ahead'}
             </Text>
-            <View style={[styles.progressTrack, { backgroundColor: theme.primarySoft }]}>
-              <View style={[styles.progressFill, { backgroundColor: theme.primary, width: progress }]} />
+            <View
+              style={[
+                styles.progressTrack,
+                { backgroundColor: theme.primarySoft, borderRadius: theme.presentation.controlRadius },
+              ]}
+            >
+              <View
+                style={[
+                  styles.progressFill,
+                  { backgroundColor: theme.primary, borderRadius: theme.presentation.controlRadius, width: progress },
+                ]}
+              />
             </View>
             <Text style={[styles.windowHint, { color: theme.textMuted }]}>A log counts on time within 30 minutes of its planned time.</Text>
           </View>
@@ -252,7 +319,17 @@ export function ScheduleScreen({
         </View>
 
         {schedule.length === 0 ? (
-          <View style={[styles.empty, { borderColor: theme.border, backgroundColor: theme.surface }]}>
+          <View
+            style={[
+              styles.empty,
+              {
+                borderColor: theme.border,
+                backgroundColor: theme.surface,
+                borderRadius: theme.presentation.cardRadius,
+                borderWidth: theme.presentation.borderWidth,
+              },
+            ]}
+          >
             <Text style={[styles.emptyTitle, { color: theme.text }]}>No planned times</Text>
             <Text style={[styles.emptyBody, { color: theme.textMuted }]}>Add the moments you want to repeat each day.</Text>
           </View>
@@ -269,6 +346,7 @@ export function ScheduleScreen({
                 onPress={() => setDraft({ ...entry, reminder: Boolean(entry.reminder) })}
                 style={({ pressed }) => [
                   styles.scheduleRow,
+                  surfaceTreatment(theme),
                   {
                     backgroundColor: theme.surfaceRaised,
                     borderColor: pressed ? theme.primary : theme.border,
@@ -282,13 +360,30 @@ export function ScheduleScreen({
                 <Text style={[styles.time, { color: theme.text }]}>{formatMinutes(entry.minutes)}</Text>
                 <View style={styles.rowCopy}>
                   <Text style={[styles.rowTitle, { color: theme.text }]}>{meta.label}</Text>
-                  <View style={[styles.statusPill, { backgroundColor: presentation.background }]}>
+                  <View
+                    style={[
+                      styles.statusPill,
+                      {
+                        backgroundColor: presentation.background,
+                        borderRadius: theme.presentation.controlRadius,
+                      },
+                    ]}
+                  >
                     <View style={[styles.statusDot, { backgroundColor: presentation.color }]} />
                     <Text style={[styles.statusText, { color: presentation.color }]}>{presentation.label}</Text>
                   </View>
                 </View>
                 {entry.reminder ? (
-                  <View accessible={false} style={[styles.reminderIndicator, { backgroundColor: theme.primarySoft }]}>
+                  <View
+                    accessible={false}
+                    style={[
+                      styles.reminderIndicator,
+                      {
+                        backgroundColor: theme.primarySoft,
+                        borderRadius: theme.presentation.iconRadius,
+                      },
+                    ]}
+                  >
                     <MaterialCommunityIcons name="bell-ring-outline" size={17} color={theme.primary} />
                   </View>
                 ) : null}
@@ -300,7 +395,11 @@ export function ScheduleScreen({
                     event.stopPropagation();
                     remove(entry);
                   }}
-                  style={({ pressed }) => [styles.removeButton, pressed && { backgroundColor: theme.primarySoft }]}
+                  style={({ pressed }) => [
+                    styles.removeButton,
+                    { borderRadius: theme.presentation.controlRadius },
+                    pressed && { backgroundColor: theme.primarySoft },
+                  ]}
                 >
                   <MaterialCommunityIcons name="close" size={20} color={theme.textMuted} />
                 </Pressable>
@@ -315,7 +414,10 @@ export function ScheduleScreen({
           onPress={openNew}
           style={({ pressed }) => [
             styles.addButton,
-            { backgroundColor: pressed ? theme.primaryPressed : theme.primary },
+            {
+              backgroundColor: pressed ? theme.primaryPressed : theme.primary,
+              borderRadius: theme.presentation.controlRadius,
+            },
           ]}
         >
           <MaterialCommunityIcons name="plus" color={theme.onPrimary} size={22} />

@@ -9,7 +9,7 @@ import {
   isOpenNap,
   type PuppyEvent,
 } from '../domain';
-import { spacing, type Theme } from '../theme';
+import { spacing, surfaceTreatment, type Theme } from '../theme';
 
 export function EventRow({
   event,
@@ -33,8 +33,19 @@ export function EventRow({
     ? `${formatTime(event.at)}–${running ? 'now' : formatTime(event.endedAt as number)} · ${duration}${running ? ' running' : ''}`
     : `${formatTime(event.at)} · ${event.source === 'widget' ? 'Widget' : 'App'}`;
   return (
-    <View style={[styles.row, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
-      <View style={[styles.iconCircle, { backgroundColor: meta.softColor }]}>
+    <View
+      style={[
+        styles.row,
+        surfaceTreatment(theme),
+        { backgroundColor: theme.surfaceRaised, borderColor: theme.border },
+      ]}
+    >
+      <View
+        style={[
+          styles.iconCircle,
+          { backgroundColor: meta.softColor, borderRadius: theme.presentation.iconRadius },
+        ]}
+      >
         <MaterialCommunityIcons
           name={meta.icon as keyof typeof MaterialCommunityIcons.glyphMap}
           color={meta.color}
@@ -58,7 +69,11 @@ export function EventRow({
           ? 'Opens date, time, and note controls'
           : 'Opens activity, date, time, and note controls'}
         onPress={onEdit}
-        style={({ pressed }) => [styles.editButton, pressed && { backgroundColor: theme.primarySoft }]}
+        style={({ pressed }) => [
+          styles.editButton,
+          { borderRadius: theme.presentation.controlRadius },
+          pressed && { backgroundColor: theme.primarySoft },
+        ]}
       >
         <MaterialCommunityIcons name="pencil-outline" size={20} color={theme.textMuted} />
       </Pressable>
@@ -67,7 +82,11 @@ export function EventRow({
         accessibilityLabel={`Delete ${eventPastLabel(event).toLowerCase()} at ${formatTime(event.at)}`}
         hitSlop={8}
         onPress={onDelete}
-        style={({ pressed }) => [styles.deleteButton, pressed && { backgroundColor: theme.primarySoft }]}
+        style={({ pressed }) => [
+          styles.deleteButton,
+          { borderRadius: theme.presentation.controlRadius },
+          pressed && { backgroundColor: theme.primarySoft },
+        ]}
       >
         <MaterialCommunityIcons name="trash-can-outline" size={20} color={theme.textMuted} />
       </Pressable>
@@ -78,8 +97,6 @@ export function EventRow({
 const styles = StyleSheet.create({
   row: {
     minHeight: 72,
-    borderWidth: 1,
-    borderRadius: 18,
     paddingHorizontal: 12,
     paddingVertical: 10,
     flexDirection: 'row',
@@ -90,7 +107,6 @@ const styles = StyleSheet.create({
   iconCircle: {
     width: 42,
     height: 42,
-    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -99,11 +115,10 @@ const styles = StyleSheet.create({
   source: { fontSize: 12, lineHeight: 17, marginTop: 2 },
   noteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 5, marginTop: 6 },
   note: { flex: 1, fontSize: 13, lineHeight: 18 },
-  editButton: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  editButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
   deleteButton: {
     width: 48,
     height: 48,
-    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },

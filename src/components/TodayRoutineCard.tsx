@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { scheduleStatusesForDay } from '../analytics';
 import { EVENT_META, formatMinutes, type PuppyEvent, type ScheduleEntry } from '../domain';
-import { spacing, type Theme } from '../theme';
+import { spacing, surfaceTreatment, type Theme } from '../theme';
 
 function untilLabel(target: number, now: number): string {
   const minutes = Math.max(0, Math.ceil((target - now) / 60_000));
@@ -58,14 +58,23 @@ export function TodayRoutineCard({
       onPress={onOpenSchedule}
       style={({ pressed }) => [
         styles.card,
+        surfaceTreatment(theme),
         {
           backgroundColor: pressed ? theme.primarySoft : theme.surfaceRaised,
           borderColor: pressed ? theme.primary : theme.border,
+          padding: theme.presentation.cardPadding,
         },
       ]}
     >
       <View style={styles.headingRow}>
-        <Text style={[styles.eyebrow, { color: theme.primary }]}>TODAY’S RHYTHM</Text>
+        <Text
+          style={[
+            styles.eyebrow,
+            { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking },
+          ]}
+        >
+          TODAY’S RHYTHM
+        </Text>
         {schedule.length ? (
           <Text style={[styles.progressLabel, { color: theme.textMuted }]}>{completed}/{schedule.length}</Text>
         ) : null}
@@ -75,7 +84,10 @@ export function TodayRoutineCard({
         <View
           style={[
             styles.icon,
-            { backgroundColor: nextMeta?.softColor ?? theme.primarySoft },
+            {
+              backgroundColor: nextMeta?.softColor ?? theme.primarySoft,
+              borderRadius: theme.presentation.iconRadius,
+            },
           ]}
         >
           <MaterialCommunityIcons
@@ -92,8 +104,18 @@ export function TodayRoutineCard({
       </View>
 
       {schedule.length ? (
-        <View style={[styles.track, { backgroundColor: theme.primarySoft }]}>
-          <View style={[styles.fill, { backgroundColor: theme.primary, width: progress }]} />
+        <View
+          style={[
+            styles.track,
+            { backgroundColor: theme.primarySoft, borderRadius: theme.presentation.controlRadius },
+          ]}
+        >
+          <View
+            style={[
+              styles.fill,
+              { backgroundColor: theme.primary, borderRadius: theme.presentation.controlRadius, width: progress },
+            ]}
+          />
         </View>
       ) : null}
     </Pressable>
@@ -103,19 +125,16 @@ export function TodayRoutineCard({
 const styles = StyleSheet.create({
   card: {
     minHeight: 126,
-    borderWidth: 1,
-    borderRadius: 22,
-    padding: spacing.md,
     marginTop: spacing.md,
   },
   headingRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  eyebrow: { flex: 1, fontSize: 11, lineHeight: 15, fontWeight: '800', letterSpacing: 1.2 },
+  eyebrow: { flex: 1, fontSize: 11, lineHeight: 15, fontWeight: '800' },
   progressLabel: { fontSize: 12, lineHeight: 16, fontWeight: '700', fontVariant: ['tabular-nums'] },
   bodyRow: { flexDirection: 'row', alignItems: 'center', gap: 11 },
-  icon: { width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  icon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   copy: { flex: 1, minWidth: 0 },
   title: { fontSize: 16, lineHeight: 21, fontWeight: '700' },
   detail: { fontSize: 12, lineHeight: 17, marginTop: 2 },
-  track: { height: 7, borderRadius: 4, overflow: 'hidden', marginTop: 13 },
-  fill: { height: 7, borderRadius: 4 },
+  track: { height: 7, overflow: 'hidden', marginTop: 13 },
+  fill: { height: 7 },
 });

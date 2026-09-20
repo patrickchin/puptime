@@ -24,7 +24,7 @@ import {
   type PuppyEventChanges,
   type ScheduleEntry,
 } from '../domain';
-import { spacing, type Theme } from '../theme';
+import { spacing, surfaceTreatment, type Theme } from '../theme';
 
 const quickBackdates = [0, 5, 15, 30, 60] as const;
 const editableEventTypes = eventTypes.filter((type) => type !== 'nap');
@@ -424,12 +424,41 @@ export function LogScreen({
         ListHeaderComponent={
           <>
             <View style={styles.titleBlock}>
-              <View style={[styles.mark, { backgroundColor: theme.primary }]}>
-                <MaterialCommunityIcons name="paw" size={23} color={theme.onPrimary} />
+              <View
+                style={[
+                  styles.mark,
+                  { backgroundColor: theme.primary, borderRadius: theme.presentation.iconRadius },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name={theme.presentation.markIcon as keyof typeof MaterialCommunityIcons.glyphMap}
+                  size={23}
+                  color={theme.onPrimary}
+                />
               </View>
               <View style={styles.titleCopy}>
-                <Text style={[styles.eyebrow, { color: theme.primary }]}>PUPTIME · {todayLabel}</Text>
-                <Text style={[styles.title, { color: theme.text }]}>What just happened?</Text>
+                <Text
+                  style={[
+                    styles.eyebrow,
+                    { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking },
+                  ]}
+                >
+                  PUPTIME · {todayLabel}
+                </Text>
+                <Text
+                  style={[
+                    styles.title,
+                    {
+                      color: theme.text,
+                      fontSize: theme.presentation.titleSize,
+                      lineHeight: theme.presentation.titleLineHeight,
+                      fontWeight: theme.presentation.titleWeight,
+                      letterSpacing: theme.presentation.titleTracking,
+                    },
+                  ]}
+                >
+                  What just happened?
+                </Text>
               </View>
               <View style={styles.headerActions}>
                 <Pressable
@@ -441,6 +470,8 @@ export function LogScreen({
                     {
                       backgroundColor: pressed ? theme.primarySoft : theme.surfaceRaised,
                       borderColor: pressed ? theme.primary : theme.border,
+                      borderRadius: theme.presentation.controlRadius,
+                      borderWidth: theme.presentation.borderWidth,
                     },
                   ]}
                 >
@@ -453,7 +484,7 @@ export function LogScreen({
                   />
                 </Pressable>
                 <Pressable
-                  accessibilityLabel="Change color theme"
+                  accessibilityLabel="Change appearance theme"
                   accessibilityRole="button"
                   onPress={onOpenThemePicker}
                   style={({ pressed }) => [
@@ -461,6 +492,8 @@ export function LogScreen({
                     {
                       backgroundColor: pressed ? theme.primarySoft : theme.surfaceRaised,
                       borderColor: pressed ? theme.primary : theme.border,
+                      borderRadius: theme.presentation.controlRadius,
+                      borderWidth: theme.presentation.borderWidth,
                     },
                   ]}
                 >
@@ -508,6 +541,8 @@ export function LogScreen({
                       {
                         backgroundColor: selected || pressed ? theme.primarySoft : theme.surfaceRaised,
                         borderColor: selected ? theme.primary : theme.border,
+                        borderRadius: theme.presentation.controlRadius,
+                        borderWidth: theme.presentation.borderWidth,
                       },
                     ]}
                   >
@@ -535,10 +570,17 @@ export function LogScreen({
                   {
                     backgroundColor: pressed ? theme.primarySoft : theme.surfaceRaised,
                     borderColor: theme.border,
+                    borderRadius: theme.presentation.cardRadius,
+                    borderWidth: theme.presentation.borderWidth,
                   },
                 ]}
               >
-                <View style={[styles.historyScopeIcon, { backgroundColor: theme.primarySoft }]}>
+                <View
+                  style={[
+                    styles.historyScopeIcon,
+                    { backgroundColor: theme.primarySoft, borderRadius: theme.presentation.iconRadius },
+                  ]}
+                >
                   <MaterialCommunityIcons
                     accessibilityElementsHidden
                     importantForAccessibility="no"
@@ -572,11 +614,25 @@ export function LogScreen({
           <View>
             {section.monthTitle ? (
               <View style={styles.archiveMonthHeading}>
-                <Text style={[styles.archiveMonthText, { color: theme.primary }]}>{section.monthTitle.toUpperCase()}</Text>
+                <Text
+                  style={[
+                    styles.archiveMonthText,
+                    { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking },
+                  ]}
+                >
+                  {section.monthTitle.toUpperCase()}
+                </Text>
                 <View style={[styles.archiveMonthLine, { backgroundColor: theme.border }]} />
               </View>
             ) : null}
-            <Text style={[styles.dayHeading, { color: theme.textMuted }]}>{section.title.toUpperCase()}</Text>
+            <Text
+              style={[
+                styles.dayHeading,
+                { color: theme.textMuted, letterSpacing: theme.presentation.eyebrowTracking },
+              ]}
+            >
+              {section.title.toUpperCase()}
+            </Text>
           </View>
         )}
         renderItem={({ item }) => (
@@ -589,7 +645,17 @@ export function LogScreen({
           />
         )}
         ListEmptyComponent={
-          <View style={[styles.empty, { borderColor: theme.border, backgroundColor: theme.surface }]}>
+          <View
+            style={[
+              styles.empty,
+              {
+                borderColor: theme.border,
+                backgroundColor: theme.surface,
+                borderRadius: theme.presentation.cardRadius,
+                borderWidth: theme.presentation.borderWidth,
+              },
+            ]}
+          >
             <MaterialCommunityIcons name={selectedFilter.icon as keyof typeof MaterialCommunityIcons.glyphMap} size={28} color={theme.textMuted} />
             <Text style={[styles.emptyTitle, { color: theme.text }]}>
               {activityFilter === 'all' ? 'Your log starts here' : `No ${selectedFilter.label.toLowerCase()} logged`}
@@ -608,11 +674,23 @@ export function LogScreen({
             bounces={false}
             keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
             keyboardShouldPersistTaps="handled"
-            style={[styles.sheet, { backgroundColor: theme.surfaceRaised }]}
+            style={[
+              styles.sheet,
+              {
+                backgroundColor: theme.surfaceRaised,
+                borderTopLeftRadius: theme.presentation.cardRadius + 6,
+                borderTopRightRadius: theme.presentation.cardRadius + 6,
+              },
+            ]}
             contentContainerStyle={styles.sheetContent}
           >
             <View style={styles.sheetHeading}>
-              <View style={[styles.editorIcon, { backgroundColor: draftMeta.softColor }]}>
+              <View
+                style={[
+                  styles.editorIcon,
+                  { backgroundColor: draftMeta.softColor, borderRadius: theme.presentation.iconRadius },
+                ]}
+              >
                 <MaterialCommunityIcons
                   name={draftMeta.icon as keyof typeof MaterialCommunityIcons.glyphMap}
                   color={draftMeta.color}
@@ -620,7 +698,18 @@ export function LogScreen({
                 />
               </View>
               <View style={styles.editorHeadingCopy}>
-                <Text style={[styles.sheetTitle, { color: theme.text }]}>{timedNap ? 'Edit nap' : 'Edit log'}</Text>
+                <Text
+                  style={[
+                    styles.sheetTitle,
+                    {
+                      color: theme.text,
+                      fontWeight: theme.presentation.titleWeight,
+                      letterSpacing: theme.presentation.titleTracking,
+                    },
+                  ]}
+                >
+                  {timedNap ? 'Edit nap' : 'Edit log'}
+                </Text>
                 <Text
                   style={[styles.sheetSubtitle, { color: theme.textMuted }]}
                 >
@@ -635,7 +724,11 @@ export function LogScreen({
                 accessibilityState={{ busy: closing, disabled: closing }}
                 disabled={closing}
                 onPress={() => void requestCloseEditor()}
-                style={({ pressed }) => [styles.closeButton, { opacity: closing ? 0.55 : 1 }, pressed && { backgroundColor: theme.primarySoft }]}
+                style={({ pressed }) => [
+                  styles.closeButton,
+                  { borderRadius: theme.presentation.controlRadius, opacity: closing ? 0.55 : 1 },
+                  pressed && { backgroundColor: theme.primarySoft },
+                ]}
               >
                 <MaterialCommunityIcons name="close" size={22} color={theme.text} />
               </Pressable>
@@ -648,7 +741,13 @@ export function LogScreen({
                 onPress={() => void flushAutoSave(true)}
                 style={({ pressed }) => [
                   styles.saveStatus,
-                  { backgroundColor: theme.surface, borderColor: theme.danger, opacity: pressed ? 0.72 : 1 },
+                  {
+                    backgroundColor: theme.surface,
+                    borderColor: theme.danger,
+                    borderRadius: theme.presentation.controlRadius,
+                    borderWidth: theme.presentation.borderWidth,
+                    opacity: pressed ? 0.72 : 1,
+                  },
                 ]}
               >
                 <MaterialCommunityIcons name="alert-circle-outline" color={theme.danger} size={18} />
@@ -659,7 +758,15 @@ export function LogScreen({
                 accessible
                 accessibilityLiveRegion="polite"
                 accessibilityLabel={statusPresentation.text}
-                style={[styles.saveStatus, { backgroundColor: theme.surface, borderColor: theme.border }]}
+                style={[
+                  styles.saveStatus,
+                  {
+                    backgroundColor: theme.surface,
+                    borderColor: theme.border,
+                    borderRadius: theme.presentation.controlRadius,
+                    borderWidth: theme.presentation.borderWidth,
+                  },
+                ]}
               >
                 <MaterialCommunityIcons
                   name={statusPresentation.icon as keyof typeof MaterialCommunityIcons.glyphMap}
@@ -692,6 +799,8 @@ export function LogScreen({
                           {
                             backgroundColor: selected ? meta.softColor : theme.surface,
                             borderColor: selected || pressed ? meta.color : theme.border,
+                            borderRadius: theme.presentation.controlRadius,
+                            borderWidth: theme.presentation.borderWidth,
                           },
                         ]}
                       >
@@ -733,6 +842,8 @@ export function LogScreen({
                         {
                           backgroundColor: theme.surface,
                           borderColor: customTouched && customInvalid ? theme.danger : theme.border,
+                          borderRadius: theme.presentation.controlRadius,
+                          borderWidth: theme.presentation.borderWidth,
                           color: theme.text,
                         },
                       ]}
@@ -748,7 +859,13 @@ export function LogScreen({
               </>
             ) : null}
 
-            <View style={[styles.timePreview, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <View
+              style={[
+                styles.timePreview,
+                surfaceTreatment(theme),
+                { backgroundColor: theme.surface, borderColor: theme.border },
+              ]}
+            >
               <Text style={[styles.previewTime, { color: theme.text }]}>
                 {timedNap
                   ? `${formatTime(draft?.at ?? Date.now())}–${typeof draft?.endedAt === 'number' ? formatTime(draft.endedAt) : 'now'}`
@@ -778,6 +895,8 @@ export function LogScreen({
                         {
                           backgroundColor: selected ? draftMeta.softColor : theme.surface,
                           borderColor: selected || pressed ? draftMeta.color : theme.border,
+                          borderRadius: theme.presentation.controlRadius,
+                          borderWidth: theme.presentation.borderWidth,
                         },
                       ]}
                     >
@@ -806,6 +925,8 @@ export function LogScreen({
                     {
                       backgroundColor: pressed ? theme.primarySoft : theme.surface,
                       borderColor: theme.border,
+                      borderRadius: theme.presentation.controlRadius,
+                      borderWidth: theme.presentation.borderWidth,
                     },
                   ]}
                 >
@@ -826,6 +947,8 @@ export function LogScreen({
                   {
                     backgroundColor: pickerMode === 'date' ? theme.primarySoft : theme.surface,
                     borderColor: pickerMode === 'date' || pressed ? theme.primary : theme.border,
+                    borderRadius: theme.presentation.controlRadius,
+                    borderWidth: theme.presentation.borderWidth,
                   },
                 ]}
               >
@@ -844,6 +967,8 @@ export function LogScreen({
                   {
                     backgroundColor: pickerMode === 'time' ? theme.primarySoft : theme.surface,
                     borderColor: pickerMode === 'time' || pressed ? theme.primary : theme.border,
+                    borderRadius: theme.presentation.controlRadius,
+                    borderWidth: theme.presentation.borderWidth,
                   },
                 ]}
               >
@@ -895,22 +1020,49 @@ export function LogScreen({
         <View accessibilityViewIsModal style={styles.scrim}>
           <ScrollView
             bounces={false}
-            style={[styles.sheet, { backgroundColor: theme.surfaceRaised }]}
+            style={[
+              styles.sheet,
+              {
+                backgroundColor: theme.surfaceRaised,
+                borderTopLeftRadius: theme.presentation.cardRadius + 6,
+                borderTopRightRadius: theme.presentation.cardRadius + 6,
+              },
+            ]}
             contentContainerStyle={styles.sheetContent}
           >
             <View style={styles.sheetHeading}>
-              <View style={[styles.editorIcon, { backgroundColor: theme.primarySoft }]}>
+              <View
+                style={[
+                  styles.editorIcon,
+                  { backgroundColor: theme.primarySoft, borderRadius: theme.presentation.iconRadius },
+                ]}
+              >
                 <MaterialCommunityIcons name="widgets-outline" color={theme.primary} size={23} />
               </View>
               <View style={styles.editorHeadingCopy}>
-                <Text style={[styles.sheetTitle, { color: theme.text }]}>Customize widget</Text>
+                <Text
+                  style={[
+                    styles.sheetTitle,
+                    {
+                      color: theme.text,
+                      fontWeight: theme.presentation.titleWeight,
+                      letterSpacing: theme.presentation.titleTracking,
+                    },
+                  ]}
+                >
+                  Customize widget
+                </Text>
                 <Text style={[styles.sheetSubtitle, { color: theme.textMuted }]}>Choose 2–4 actions. Small widgets show them in one row.</Text>
               </View>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Close widget settings"
                 onPress={() => setShowWidgetSettings(false)}
-                style={({ pressed }) => [styles.closeButton, pressed && { backgroundColor: theme.primarySoft }]}
+                style={({ pressed }) => [
+                  styles.closeButton,
+                  { borderRadius: theme.presentation.controlRadius },
+                  pressed && { backgroundColor: theme.primarySoft },
+                ]}
               >
                 <MaterialCommunityIcons name="close" size={22} color={theme.text} />
               </Pressable>
@@ -938,11 +1090,18 @@ export function LogScreen({
                       {
                         backgroundColor: selected ? actionSoftColor : theme.surface,
                         borderColor: selected || pressed ? actionColor : theme.border,
+                        borderRadius: theme.presentation.controlRadius,
+                        borderWidth: theme.presentation.borderWidth,
                         opacity: locked ? 0.5 : 1,
                       },
                     ]}
                   >
-                    <View style={[styles.widgetActionIcon, { backgroundColor: actionSoftColor }]}>
+                    <View
+                      style={[
+                        styles.widgetActionIcon,
+                        { backgroundColor: actionSoftColor, borderRadius: theme.presentation.iconRadius },
+                      ]}
+                    >
                       <MaterialCommunityIcons name={meta.icon as keyof typeof MaterialCommunityIcons.glyphMap} size={21} color={actionColor} />
                     </View>
                     <Text style={[styles.widgetActionText, { color: theme.text }]}>{meta.label}</Text>
@@ -958,7 +1117,14 @@ export function LogScreen({
               accessibilityState={{ busy: savingWidgetSettings, disabled: savingWidgetSettings }}
               disabled={savingWidgetSettings}
               onPress={() => void saveWidgetSettings()}
-              style={({ pressed }) => [styles.widgetSaveButton, { backgroundColor: pressed ? theme.primaryPressed : theme.primary, opacity: savingWidgetSettings ? 0.55 : 1 }]}
+              style={({ pressed }) => [
+                styles.widgetSaveButton,
+                {
+                  backgroundColor: pressed ? theme.primaryPressed : theme.primary,
+                  borderRadius: theme.presentation.controlRadius,
+                  opacity: savingWidgetSettings ? 0.55 : 1,
+                },
+              ]}
             >
               <Text style={[styles.widgetSaveButtonText, { color: theme.onPrimary }]}>{savingWidgetSettings ? 'Saving…' : 'Done'}</Text>
             </Pressable>
@@ -983,8 +1149,8 @@ const styles = StyleSheet.create({
   titleCopy: { flex: 1 },
   headerActions: { flexDirection: 'row', gap: 8 },
   headerButton: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderWidth: 1,
     borderRadius: 15,
     alignItems: 'center',

@@ -20,7 +20,7 @@ Puptime is a private, offline puppy routine tracker for Android and iOS. Log pot
 - Reviewable possible missed logs learned from strong repeated patterns, including estimated nap spans when prior durations are consistent
 - A spreadsheet-ready CSV export of the complete activity history, including notes and exact timestamps
 - Customizable, color-coded Android and iOS home-screen widgets with clear activity icons
-- System-matched, Meadow, Sunrise, and Midnight themes with an on-device appearance picker
+- Ten named themes—Meadow, Sunrise, Midnight, Paper, Bubblegum, Blueprint, Trail, Tide, Plum, and Contrast—with distinct color, shape, spacing, type, and surface treatments
 - On-device storage—no account, subscription, server, ads, or tracking
 
 The starter routine is only an editable example, not veterinary guidance. Change it to fit your puppy and your veterinarian’s advice.

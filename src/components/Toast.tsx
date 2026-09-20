@@ -16,7 +16,10 @@ export function Toast({
   return (
     <View
       accessibilityLiveRegion="polite"
-      style={[styles.toast, { backgroundColor: theme.text }]}
+      style={[
+        styles.toast,
+        { backgroundColor: theme.text, borderRadius: theme.presentation.controlRadius },
+      ]}
     >
       <Text style={[styles.message, { color: theme.background }]}>{message}</Text>
       {onNote ? (
