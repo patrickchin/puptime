@@ -143,9 +143,9 @@ export function NoteInput({
         </Pressable>
       </View>
       <View style={styles.noteMeta}>
-        <Text style={[styles.hint, { color: listening ? theme.danger : theme.textMuted }]}>
-          {listening ? t('note.listeningHint') : t('note.idleHint')}
-        </Text>
+        {listening ? (
+          <Text style={[styles.hint, { color: theme.danger }]}>{t('note.listeningHint')}</Text>
+        ) : null}
         <Text style={[styles.count, { color: theme.textMuted }]}>{value.length}/300</Text>
       </View>
     </View>
@@ -176,5 +176,5 @@ const styles = StyleSheet.create({
   },
   noteMeta: { flexDirection: 'row', gap: 8, marginTop: 6 },
   hint: { flex: 1, fontSize: 12, lineHeight: 17 },
-  count: { fontSize: 11, lineHeight: 17, fontVariant: ['tabular-nums'] },
+  count: { marginLeft: 'auto', fontSize: 11, lineHeight: 17, fontVariant: ['tabular-nums'] },
 });

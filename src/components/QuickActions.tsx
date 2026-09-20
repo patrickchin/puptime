@@ -91,13 +91,13 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
               <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.actionLabel, { color: theme.text }]}>
                 {label}
               </Text>
-              <Text numberOfLines={1} style={[styles.actionTime, { color: theme.textMuted }]}>
-                {latest
-                  ? isEndingNap
+              {latest ? (
+                <Text numberOfLines={1} style={[styles.actionTime, { color: theme.textMuted }]}>
+                  {isEndingNap
                     ? t('quick.running', { time: elapsedTime(latest.at, now) })
-                    : relativeTime(latest.endedAt ?? latest.at, now)
-                  : t('quick.notYet')}
-              </Text>
+                    : relativeTime(latest.endedAt ?? latest.at, now)}
+                </Text>
+              ) : null}
             </Pressable>
           );
         })}
@@ -155,7 +155,6 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
                 >
                   {t('quick.logAnother')}
                 </Text>
-                <Text style={[styles.sheetSubtitle, { color: theme.textMuted }]}>{t('quick.commonChoices')}</Text>
               </View>
               <Pressable
                 accessibilityRole="button"
@@ -278,7 +277,6 @@ const styles = StyleSheet.create({
   sheetHeading: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg },
   sheetHeadingCopy: { flex: 1, minWidth: 0 },
   sheetTitle: { fontSize: 22, lineHeight: 28, fontWeight: '800' },
-  sheetSubtitle: { fontSize: 13, lineHeight: 19, marginTop: 2 },
   closeButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
   otherGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.lg },
   otherChoice: {

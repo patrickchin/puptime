@@ -159,7 +159,6 @@ function FrequencyRow({ stat, theme }: { stat: ActivityFrequencyStat; theme: The
       <View style={styles.metrics}>
         <View style={styles.metric}>
           <Text style={[styles.metricValue, { color: theme.text }]}>{dailyValue}</Text>
-          <Text style={[styles.metricLabel, { color: theme.textMuted }]}>{t('insights.averageFrequency')}</Text>
           <Text style={[styles.metricDetail, { color: theme.textMuted }]}>{dailyDetail}</Text>
         </View>
         <View style={[styles.metricDivider, { backgroundColor: theme.border }]} />
@@ -570,14 +569,6 @@ export function InsightsScreen({
     <ScrollView contentContainerStyle={styles.content}>
       <Text
         style={[
-          styles.eyebrow,
-          { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking },
-        ]}
-      >
-        {t('insights.eyebrow')}
-      </Text>
-      <Text
-        style={[
           styles.title,
           {
             color: theme.text,
@@ -589,9 +580,6 @@ export function InsightsScreen({
         ]}
       >
         {t('insights.title')}
-      </Text>
-      <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-        {t('insights.subtitle')}
       </Text>
 
       <View style={[styles.section, { borderColor: theme.border }]}>
@@ -615,14 +603,6 @@ export function InsightsScreen({
             </Text>
           </View>
         </View>
-        <Text
-          style={[
-            styles.frequencyNote,
-            { color: theme.textMuted },
-          ]}
-        >
-          {t('insights.frequencyNote')}
-        </Text>
         <View>
           {frequency.stats.map((stat) => <FrequencyRow key={stat.type} stat={stat} theme={theme} />)}
         </View>
@@ -646,14 +626,6 @@ export function InsightsScreen({
             </Text>
           </View>
         </View>
-        <Text
-          style={[
-            styles.missingNote,
-            { color: theme.textMuted },
-          ]}
-        >
-          {t('insights.gapsNote')}
-        </Text>
         {missingLogs.estimates.length ? (
           <View style={styles.estimateList}>
             {missingLogs.estimates.map((estimate) => {
@@ -781,10 +753,6 @@ export function InsightsScreen({
         )}
       </View>
 
-      <View style={[styles.filterHeading, { borderColor: theme.border }]}>
-        <Text style={[styles.filterTitle, { color: theme.text }]}>{t('insights.timelineActivities')}</Text>
-        <Text style={[styles.filterHint, { color: theme.textMuted }]}>{t('insights.selectCombination')}</Text>
-      </View>
       <View style={styles.filters}>
         {activityFilters.map((type) => {
           const isAll = type === 'all';
@@ -891,9 +859,6 @@ export function InsightsScreen({
               theme={theme}
             />
           </View>
-          <Text style={[styles.zoomHint, { color: theme.textMuted }]}>
-            {t('insights.zoomHint')}
-          </Text>
         </View>
 
         <View style={styles.rangeNavigator}>
@@ -922,9 +887,6 @@ export function InsightsScreen({
           </Pressable>
           <View style={styles.rangeCopy}>
             <Text style={[styles.rangeLabel, { color: theme.text }]}>{rangeLabel}</Text>
-            <Text style={[styles.rangeStatus, { color: theme.textMuted }]}>
-              {t(currentHistoryOffset === 0 ? 'insights.latestDays' : 'insights.olderWindow', { count: timelineDays })}
-            </Text>
           </View>
           <Pressable
             accessibilityRole="button"
@@ -1037,14 +999,6 @@ export function InsightsScreen({
               </Text>
             </View>
           </View>
-          <Text
-            style={[
-              styles.historyNote,
-              { color: theme.textMuted },
-            ]}
-          >
-            {t('insights.historyNote')}
-          </Text>
           <View style={styles.months}>
             {visibleMonths.map((stat) => (
               <MonthlyRow
@@ -1088,23 +1042,9 @@ export function InsightsScreen({
       ) : null}
 
       <View style={[styles.section, styles.exportSection, { borderColor: theme.border }]}>
-        <View style={styles.exportHeading}>
-          <View style={styles.smallIcon}>
-            <MaterialCommunityIcons
-              accessibilityElementsHidden
-              importantForAccessibility="no"
-              name="file-delimited-outline"
-              size={20}
-              color={theme.primary}
-            />
-          </View>
-          <View style={styles.exportCopy}>
-            <Text style={[styles.panelTitle, { color: theme.text }]}>{t('insights.dataTitle')}</Text>
-            <Text style={[styles.panelCaption, { color: theme.textMuted }]}>
-              {t('insights.dataBody')}
-            </Text>
-          </View>
-        </View>
+        <Text style={[styles.exportNote, { color: theme.textMuted }]}>
+          {t('insights.dataBody')}
+        </Text>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t(events.length ? 'insights.exportA11y' : 'insights.noExport')}
@@ -1154,21 +1094,8 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
     gap: spacing.md,
   },
-  eyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 1.5, marginTop: 4 },
-  title: { fontSize: 30, lineHeight: 36, fontWeight: '800', letterSpacing: -0.6, marginTop: -8 },
-  subtitle: { fontSize: 15, lineHeight: 22, marginTop: -10 },
+  title: { fontSize: 30, lineHeight: 36, fontWeight: '800', letterSpacing: -0.6, marginTop: 4 },
   section: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: spacing.md },
-  filterHeading: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingTop: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-    marginBottom: -8,
-  },
-  filterTitle: { fontSize: 15, lineHeight: 20, fontWeight: '800' },
-  filterHint: { fontSize: 12, lineHeight: 17, textAlign: 'right' },
   filters: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   filterChip: {
     minHeight: 48,
@@ -1179,8 +1106,6 @@ const styles = StyleSheet.create({
   },
   filterLabel: { fontSize: 13, lineHeight: 18, fontWeight: '700' },
   frequencyHeading: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 4 },
-  frequencyNote: { fontSize: 11, lineHeight: 16, paddingHorizontal: 4, marginTop: 8 },
-  missingNote: { fontSize: 11, lineHeight: 16, paddingHorizontal: 4, marginTop: 8 },
   estimateList: { marginTop: 12 },
   estimateRow: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 4, paddingTop: 13, paddingBottom: 11, flexDirection: 'row', alignItems: 'center', gap: 10 },
   estimateIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
@@ -1228,7 +1153,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   zoomValue: { flex: 1, minWidth: 42, fontSize: 12, lineHeight: 17, fontWeight: '800', textAlign: 'center', fontVariant: ['tabular-nums'] },
-  zoomHint: { fontSize: 11, lineHeight: 16, paddingHorizontal: 3 },
   rangeNavigator: { flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 12 },
   rangeButton: {
     minHeight: 48,
@@ -1241,7 +1165,6 @@ const styles = StyleSheet.create({
   rangeButtonText: { fontSize: 12, lineHeight: 17, fontWeight: '700' },
   rangeCopy: { flex: 1, minWidth: 0, alignItems: 'center' },
   rangeLabel: { fontSize: 11, lineHeight: 15, fontWeight: '700', textAlign: 'center', fontVariant: ['tabular-nums'] },
-  rangeStatus: { fontSize: 10, lineHeight: 14, textAlign: 'center', marginTop: 1 },
   chart: { flexDirection: 'row', alignItems: 'flex-start' },
   dateColumn: { width: DATE_COLUMN_WIDTH, flexShrink: 0 },
   axisSpacer: { height: 22 },
@@ -1311,7 +1234,6 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   emptyText: { flex: 1, fontSize: 12, lineHeight: 17 },
-  historyNote: { fontSize: 11, lineHeight: 16, paddingHorizontal: 4 },
   months: { marginTop: 4 },
   monthRow: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 8, paddingVertical: 11 },
   monthHeading: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm },
@@ -1332,8 +1254,7 @@ const styles = StyleSheet.create({
   },
   historyToggleText: { fontSize: 14, lineHeight: 19, fontWeight: '700' },
   exportSection: { gap: spacing.md },
-  exportHeading: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  exportCopy: { flex: 1, minWidth: 0 },
+  exportNote: { fontSize: 12, lineHeight: 17 },
   exportButton: {
     minHeight: 52,
     borderRadius: 16,
