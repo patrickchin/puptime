@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 
+import { useLocalization } from '../localization-context';
 import { type Theme } from '../theme';
 
 export function NoteInput({
@@ -29,6 +30,7 @@ export function NoteInput({
   onBlur?: () => void;
   theme: Theme;
 }) {
+  const { locale, t } = useLocalization();
   const [listening, setListening] = useState(false);
   const baseNote = useRef('');
   const listeningRef = useRef(false);
@@ -36,7 +38,7 @@ export function NoteInput({
   useSpeechRecognitionEvent('start', () => {
     listeningRef.current = true;
     setListening(true);
-    AccessibilityInfo.announceForAccessibility('Listening for note');
+    AccessibilityInfo.announceForAccessibility(t('note.listeningAnnouncement'));
   });
   useSpeechRecognitionEvent('end', () => {
     listeningRef.current = false;
@@ -52,10 +54,10 @@ export function NoteInput({
     setListening(false);
     if (event.error === 'aborted') return;
     Alert.alert(
-      'Couldn’t transcribe that',
+      t('note.transcribeErrorTitle'),
       event.error === 'not-allowed'
-        ? 'Microphone or speech access is off. You can enable it in Settings, or type the note instead.'
-        : 'Try the microphone again, or type the note instead.',
+        ? t('note.accessOff')
+        : t('note.tryAgain'),
     );
   });
 
@@ -70,24 +72,24 @@ export function NoteInput({
         return;
       }
       if (!ExpoSpeechRecognitionModule.isRecognitionAvailable()) {
-        Alert.alert('Voice notes unavailable', 'Speech recognition is not available on this phone. You can still type the note.');
+        Alert.alert(t('note.unavailableTitle'), t('note.unavailableBody'));
         return;
       }
       const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('Microphone access needed', 'Allow microphone and speech access to dictate notes. You can still type the note.');
+        Alert.alert(t('note.permissionTitle'), t('note.permissionBody'));
         return;
       }
       baseNote.current = value.trim();
       ExpoSpeechRecognitionModule.start({
-        lang: Intl.DateTimeFormat().resolvedOptions().locale || 'en-US',
+        lang: locale,
         interimResults: true,
         continuous: false,
         addsPunctuation: true,
         contextualStrings: ['pee', 'poop', 'potty', 'walk', 'meal', 'nap', 'play session', 'training', 'crate'],
       });
     } catch {
-      Alert.alert('Voice notes unavailable', 'The speech recognizer could not start. You can still type the note.');
+      Alert.alert(t('note.unavailableTitle'), t('note.startError'));
     }
   };
 
@@ -105,14 +107,14 @@ export function NoteInput({
         ]}
       >
         <TextInput
-          accessibilityLabel="Note for this log"
+          accessibilityLabel={t('note.label')}
           autoCapitalize="sentences"
           maxLength={300}
           multiline
           onBlur={onBlur}
           onChangeText={onChangeText}
           onFocus={onFocus}
-          placeholder="e.g. Just after a play session"
+          placeholder={t('note.placeholder')}
           placeholderTextColor={theme.textMuted}
           textAlignVertical="top"
           value={value}
@@ -120,7 +122,7 @@ export function NoteInput({
         />
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={listening ? 'Stop dictating note' : 'Dictate note'}
+          accessibilityLabel={listening ? t('note.stopDictating') : t('note.dictate')}
           accessibilityState={{ selected: listening }}
           onPress={toggleListening}
           style={({ pressed }) => [
@@ -142,7 +144,7 @@ export function NoteInput({
       </View>
       <View style={styles.noteMeta}>
         <Text style={[styles.hint, { color: listening ? theme.danger : theme.textMuted }]}>
-          {listening ? 'Listening… Tap stop when you’re done.' : 'Type a note or tap the microphone to dictate.'}
+          {listening ? t('note.listeningHint') : t('note.idleHint')}
         </Text>
         <Text style={[styles.count, { color: theme.textMuted }]}>{value.length}/300</Text>
       </View>

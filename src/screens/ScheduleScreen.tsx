@@ -17,7 +17,8 @@ import {
 import { scheduleStatusesForDay, suggestScheduleFromEvents, type ScheduleStatus } from '../analytics';
 import { EVENT_META, formatMinutes, quickEventTypes, type EventType, type ScheduleEntry } from '../domain';
 import type { PuppyEvent } from '../domain';
-import { spacing, surfaceTreatment, type Theme } from '../theme';
+import { useLocalization } from '../localization-context';
+import { eventIcon, spacing, surfaceTreatment, type Theme } from '../theme';
 
 type Draft = { id?: string; type: EventType; minutes: number; reminder: boolean };
 
@@ -34,6 +35,7 @@ export function ScheduleScreen({
   onRequestReminderPermission: () => Promise<boolean>;
   theme: Theme;
 }) {
+  const { eventLabel, t } = useLocalization();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [showAndroidPicker, setShowAndroidPicker] = useState(false);
   const [requestingPermission, setRequestingPermission] = useState(false);
@@ -58,10 +60,10 @@ export function ScheduleScreen({
     : '0%';
 
   const statusPresentation = (status: ScheduleStatus, type: EventType) => {
-    if (status === 'done') return { label: 'Logged', color: theme.primary, background: theme.primarySoft };
-    if (status === 'due') return { label: 'Due now', color: EVENT_META[type].color, background: EVENT_META[type].softColor };
-    if (status === 'missed') return { label: 'Missed', color: theme.danger, background: theme.dangerSoft };
-    return { label: 'Upcoming', color: theme.textMuted, background: theme.surface };
+    if (status === 'done') return { label: t('schedule.status.logged'), color: theme.primary, background: theme.primarySoft };
+    if (status === 'due') return { label: t('schedule.status.due'), color: EVENT_META[type].color, background: EVENT_META[type].softColor };
+    if (status === 'missed') return { label: t('schedule.status.missed'), color: theme.danger, background: theme.dangerSoft };
+    return { label: t('schedule.status.upcoming'), color: theme.textMuted, background: theme.surface };
   };
 
   const openNew = () => {
@@ -83,7 +85,7 @@ export function ScheduleScreen({
       await onChange([...schedule.filter((item) => item.id !== entry.id), entry].sort((a, b) => a.minutes - b.minutes));
       setDraft(null);
     } catch {
-      Alert.alert('Couldn’t save the routine', 'Your previous routine is still available. Please try again.');
+      Alert.alert(t('schedule.saveErrorTitle'), t('schedule.saveErrorBody'));
     } finally {
       setSaving(false);
     }
@@ -102,32 +104,35 @@ export function ScheduleScreen({
         setDraft((current) => current ? { ...current, reminder: true } : null);
       } else {
         Alert.alert(
-          'Notifications are off',
-          'Allow Puptime notifications in system settings to use daily routine reminders.',
+          t('schedule.notificationsOff'),
+          t('schedule.notificationsBody'),
           [
-            { text: 'Not now', style: 'cancel' },
-            { text: 'Open settings', onPress: () => Linking.openSettings() },
+            { text: t('schedule.notNow'), style: 'cancel' },
+            { text: t('schedule.openSettings'), onPress: () => Linking.openSettings() },
           ],
         );
       }
     } catch {
-      Alert.alert('Couldn’t enable reminders', 'Please try again from this routine entry.');
+      Alert.alert(t('schedule.reminderErrorTitle'), t('schedule.reminderErrorBody'));
     } finally {
       setRequestingPermission(false);
     }
   };
 
   const remove = (entry: ScheduleEntry) => {
-    Alert.alert('Remove this time?', `${EVENT_META[entry.type].label} at ${formatMinutes(entry.minutes)}`, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('schedule.removeTitle'), t('schedule.entryAt', {
+      activity: eventLabel(entry.type),
+      time: formatMinutes(entry.minutes),
+    }), [
+      { text: t('app.cancel'), style: 'cancel' },
       {
-        text: 'Remove',
+        text: t('schedule.remove'),
         style: 'destructive',
         onPress: async () => {
           try {
             await onChange(schedule.filter((item) => item.id !== entry.id));
           } catch {
-            Alert.alert('Couldn’t remove the time', 'Your routine has not changed. Please try again.');
+            Alert.alert(t('schedule.removeErrorTitle'), t('schedule.removeErrorBody'));
           }
         },
       },
@@ -148,7 +153,7 @@ export function ScheduleScreen({
       await onChange(suggestion.entries);
       setReviewingSuggestion(false);
     } catch {
-      Alert.alert('Couldn’t use the suggested routine', 'Your current routine is still available. Please try again.');
+      Alert.alert(t('schedule.suggestionErrorTitle'), t('schedule.suggestionErrorBody'));
     } finally {
       setApplyingSuggestion(false);
     }
@@ -163,7 +168,7 @@ export function ScheduleScreen({
             { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking },
           ]}
         >
-          DAILY ROUTINE
+          {t('schedule.eyebrow')}
         </Text>
         <Text
           style={[
@@ -177,10 +182,10 @@ export function ScheduleScreen({
             },
           ]}
         >
-          Make the day predictable
+          {t('schedule.title')}
         </Text>
         <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-          Start from patterns in your logs or edit times yourself. This is routine planning, not veterinary guidance.
+          {t('schedule.subtitle')}
         </Text>
 
         <View
@@ -210,9 +215,9 @@ export function ScheduleScreen({
               />
             </View>
             <View style={styles.learnCopy}>
-              <Text style={[styles.learnTitle, { color: theme.text }]}>Build from your logs</Text>
+              <Text style={[styles.learnTitle, { color: theme.text }]}>{t('schedule.learnTitle')}</Text>
               <Text style={[styles.learnBody, { color: theme.textMuted }]}>
-                Finds activities that recur on most recorded days and rounds their typical times to 15 minutes.
+                {t('schedule.learnBody')}
               </Text>
             </View>
           </View>
@@ -231,15 +236,17 @@ export function ScheduleScreen({
             />
             <Text style={[styles.learnStatusText, { color: theme.textMuted }]}>
               {canSuggest
-                ? `${suggestion.entries.length} suggested times from ${suggestion.daysAnalyzed} recorded days`
+                ? t('schedule.suggestedTimes', { count: suggestion.entries.length, days: suggestion.daysAnalyzed })
                 : suggestion.daysAnalyzed < 3
-                  ? `Log activity on ${3 - suggestion.daysAnalyzed} more ${3 - suggestion.daysAnalyzed === 1 ? 'day' : 'days'} to find a routine`
-                  : 'No repeated daily pattern is clear yet—keep logging'}
+                  ? t('schedule.needDays', { count: 3 - suggestion.daysAnalyzed })
+                  : t('schedule.noPattern')}
             </Text>
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={canSuggest ? `Preview ${suggestion.entries.length} suggested routine times` : 'Not enough repeated logs to suggest a routine'}
+            accessibilityLabel={canSuggest
+              ? t('schedule.previewA11y', { count: suggestion.entries.length })
+              : t('schedule.notEnoughA11y')}
             accessibilityState={{ disabled: !canSuggest }}
             disabled={!canSuggest}
             onPress={() => setReviewingSuggestion(true)}
@@ -262,7 +269,7 @@ export function ScheduleScreen({
               size={20}
             />
             <Text style={[styles.learnButtonText, { color: canSuggest ? theme.onPrimary : theme.textMuted }]}>
-              {canSuggest ? 'Preview suggested routine' : 'Keep logging to unlock'}
+              {t(canSuggest ? 'schedule.previewButton' : 'schedule.keepLogging')}
             </Text>
           </Pressable>
         </View>
@@ -281,8 +288,10 @@ export function ScheduleScreen({
           >
             <View style={styles.progressHeading}>
               <View>
-                <Text style={[styles.progressEyebrow, { color: theme.primary }]}>TODAY SO FAR</Text>
-                <Text style={[styles.progressTitle, { color: theme.text }]}>{completed} of {schedule.length} logged</Text>
+                <Text style={[styles.progressEyebrow, { color: theme.primary }]}>{t('schedule.todaySoFar')}</Text>
+                <Text style={[styles.progressTitle, { color: theme.text }]}>
+                  {t('schedule.loggedProgress', { completed, total: schedule.length })}
+                </Text>
               </View>
               <View
                 style={[
@@ -294,7 +303,11 @@ export function ScheduleScreen({
               </View>
             </View>
             <Text style={[styles.progressDetail, { color: theme.textMuted }]}>
-              {due ? `${due} ${due === 1 ? 'activity is' : 'activities are'} due now` : missed ? `${missed} missed ${missed === 1 ? 'window' : 'windows'}` : completed === schedule.length ? 'Everything planned has been logged' : 'The next activity is still ahead'}
+              {due
+                ? t(due === 1 ? 'schedule.dueOne' : 'schedule.dueMany', { count: due })
+                : missed
+                  ? t(missed === 1 ? 'schedule.missedOne' : 'schedule.missedMany', { count: missed })
+                  : t(completed === schedule.length ? 'schedule.everythingLogged' : 'schedule.nextAhead')}
             </Text>
             <View
               style={[
@@ -309,13 +322,13 @@ export function ScheduleScreen({
                 ]}
               />
             </View>
-            <Text style={[styles.windowHint, { color: theme.textMuted }]}>A log counts on time within 30 minutes of its planned time.</Text>
+            <Text style={[styles.windowHint, { color: theme.textMuted }]}>{t('schedule.windowHint')}</Text>
           </View>
         ) : null}
 
         <View style={styles.headingRow}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Today’s plan</Text>
-          <Text style={[styles.count, { color: theme.textMuted }]}>{schedule.length} times</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('schedule.todayPlan')}</Text>
+          <Text style={[styles.count, { color: theme.textMuted }]}>{t('schedule.timeCount', { count: schedule.length })}</Text>
         </View>
 
         {schedule.length === 0 ? (
@@ -330,19 +343,25 @@ export function ScheduleScreen({
               },
             ]}
           >
-            <Text style={[styles.emptyTitle, { color: theme.text }]}>No planned times</Text>
-            <Text style={[styles.emptyBody, { color: theme.textMuted }]}>Add the moments you want to repeat each day.</Text>
+            <Text style={[styles.emptyTitle, { color: theme.text }]}>{t('schedule.emptyTitle')}</Text>
+            <Text style={[styles.emptyBody, { color: theme.textMuted }]}>{t('schedule.emptyBody')}</Text>
           </View>
         ) : (
           schedule.map((entry, index) => {
             const meta = EVENT_META[entry.type];
+            const label = eventLabel(entry.type);
             const status = statuses.find((item) => item.entry.id === entry.id)?.status ?? 'upcoming';
             const presentation = statusPresentation(status, entry.type);
             return (
               <Pressable
                 key={entry.id}
                 accessibilityRole="button"
-                accessibilityLabel={`Edit ${meta.label} at ${formatMinutes(entry.minutes)}, ${presentation.label.toLowerCase()}${entry.reminder ? ', daily reminder on' : ''}`}
+                accessibilityLabel={t('schedule.editA11y', {
+                  activity: label,
+                  time: formatMinutes(entry.minutes),
+                  status: presentation.label,
+                  reminder: entry.reminder ? t('schedule.reminderOn') : '',
+                })}
                 onPress={() => setDraft({ ...entry, reminder: Boolean(entry.reminder) })}
                 style={({ pressed }) => [
                   styles.scheduleRow,
@@ -359,7 +378,7 @@ export function ScheduleScreen({
                 </View>
                 <Text style={[styles.time, { color: theme.text }]}>{formatMinutes(entry.minutes)}</Text>
                 <View style={styles.rowCopy}>
-                  <Text style={[styles.rowTitle, { color: theme.text }]}>{meta.label}</Text>
+                  <Text style={[styles.rowTitle, { color: theme.text }]}>{label}</Text>
                   <View
                     style={[
                       styles.statusPill,
@@ -389,7 +408,7 @@ export function ScheduleScreen({
                 ) : null}
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`Remove ${meta.label} at ${formatMinutes(entry.minutes)}`}
+                  accessibilityLabel={t('schedule.removeA11y', { activity: label, time: formatMinutes(entry.minutes) })}
                   hitSlop={8}
                   onPress={(event) => {
                     event.stopPropagation();
@@ -410,7 +429,7 @@ export function ScheduleScreen({
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Add a routine time"
+          accessibilityLabel={t('schedule.addA11y')}
           onPress={openNew}
           style={({ pressed }) => [
             styles.addButton,
@@ -421,7 +440,7 @@ export function ScheduleScreen({
           ]}
         >
           <MaterialCommunityIcons name="plus" color={theme.onPrimary} size={22} />
-          <Text style={[styles.addButtonText, { color: theme.onPrimary }]}>Add a time</Text>
+          <Text style={[styles.addButtonText, { color: theme.onPrimary }]}>{t('schedule.addTime')}</Text>
         </Pressable>
       </ScrollView>
 
@@ -439,14 +458,17 @@ export function ScheduleScreen({
           >
             <View style={styles.sheetHeading}>
               <View style={styles.learnCopy}>
-                <Text style={[styles.sheetTitle, { color: theme.text }]}>Routine from your logs</Text>
+                <Text style={[styles.sheetTitle, { color: theme.text }]}>{t('schedule.suggestionTitle')}</Text>
                 <Text style={[styles.previewSubtitle, { color: theme.textMuted }]}>
-                  Based on {suggestion.daysAnalyzed} recorded days from the last {suggestion.periodDays}. Review every time before using it.
+                  {t('schedule.suggestionSubtitle', {
+                    days: suggestion.daysAnalyzed,
+                    period: suggestion.periodDays,
+                  })}
                 </Text>
               </View>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Close suggested routine"
+                accessibilityLabel={t('schedule.closeSuggestion')}
                 onPress={() => setReviewingSuggestion(false)}
                 style={({ pressed }) => [styles.closeButton, pressed && { backgroundColor: theme.primarySoft }]}
               >
@@ -457,13 +479,14 @@ export function ScheduleScreen({
             <View style={[styles.previewList, { borderColor: theme.border }]}>
               {suggestion.entries.map((entry, index) => {
                 const meta = EVENT_META[entry.type];
+                const label = eventLabel(entry.type);
                 const color = theme.isDark ? meta.darkColor : meta.color;
                 const background = theme.isDark ? meta.darkSoftColor : meta.softColor;
                 return (
                   <View
                     key={entry.id}
                     accessible
-                    accessibilityLabel={`${meta.label} at ${formatMinutes(entry.minutes)}`}
+                    accessibilityLabel={t('schedule.entryAt', { activity: label, time: formatMinutes(entry.minutes) })}
                     style={[
                       styles.previewRow,
                       index > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
@@ -473,12 +496,12 @@ export function ScheduleScreen({
                       <MaterialCommunityIcons
                         accessibilityElementsHidden
                         importantForAccessibility="no"
-                        name={meta.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+                        name={eventIcon(theme, entry.type) as keyof typeof MaterialCommunityIcons.glyphMap}
                         size={19}
                         color={color}
                       />
                     </View>
-                    <Text style={[styles.previewActivity, { color: theme.text }]}>{meta.label}</Text>
+                    <Text style={[styles.previewActivity, { color: theme.text }]}>{label}</Text>
                     <Text style={[styles.previewTime, { color: theme.text }]}>{formatMinutes(entry.minutes)}</Text>
                   </View>
                 );
@@ -495,9 +518,9 @@ export function ScheduleScreen({
               />
               <Text style={[styles.replaceNoteText, { color: theme.textMuted }]}>
                 {schedule.length
-                  ? `Using this replaces your ${schedule.length} current times. `
-                  : 'Using this creates your routine. '}
-                Reminders stay off until you enable them on individual times.
+                  ? t('schedule.replaceCurrent', { count: schedule.length })
+                  : t('schedule.createRoutine')}
+                {t('schedule.remindersStayOff')}
               </Text>
             </View>
 
@@ -512,7 +535,7 @@ export function ScheduleScreen({
               ]}
             >
               <Text style={[styles.saveText, { color: theme.onPrimary }]}>
-                {applyingSuggestion ? 'Using routine…' : 'Use this routine'}
+                {t(applyingSuggestion ? 'schedule.usingRoutine' : 'schedule.useRoutine')}
               </Text>
             </Pressable>
             <Pressable
@@ -521,7 +544,7 @@ export function ScheduleScreen({
               onPress={() => setReviewingSuggestion(false)}
               style={({ pressed }) => [styles.cancelButton, pressed && { backgroundColor: theme.surface }]}
             >
-              <Text style={[styles.cancelText, { color: theme.textMuted }]}>Keep current routine</Text>
+              <Text style={[styles.cancelText, { color: theme.textMuted }]}>{t('schedule.keepRoutine')}</Text>
             </Pressable>
           </ScrollView>
         </View>
@@ -535,9 +558,11 @@ export function ScheduleScreen({
             contentContainerStyle={styles.sheetContent}
           >
             <View style={styles.sheetHeading}>
-              <Text style={[styles.sheetTitle, { color: theme.text }]}>{draft?.id ? 'Edit time' : 'Add time'}</Text>
+              <Text style={[styles.sheetTitle, { color: theme.text }]}>
+                {t(draft?.id ? 'schedule.editTime' : 'schedule.addTime')}
+              </Text>
               <Pressable
-                accessibilityLabel="Close"
+                accessibilityLabel={t('schedule.close')}
                 onPress={() => setDraft(null)}
                 style={({ pressed }) => [styles.closeButton, pressed && { backgroundColor: theme.primarySoft }]}
               >
@@ -545,11 +570,12 @@ export function ScheduleScreen({
               </Pressable>
             </View>
 
-            <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>ACTIVITY</Text>
+            <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{t('schedule.activity')}</Text>
             <View style={styles.typePicker}>
               {quickEventTypes.map((type) => {
                 const selected = draft?.type === type;
                 const meta = EVENT_META[type];
+                const label = eventLabel(type);
                 return (
                   <Pressable
                     key={type}
@@ -565,17 +591,17 @@ export function ScheduleScreen({
                     ]}
                   >
                     <MaterialCommunityIcons
-                      name={meta.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+                      name={eventIcon(theme, type) as keyof typeof MaterialCommunityIcons.glyphMap}
                       color={selected ? meta.color : theme.textMuted}
                       size={21}
                     />
-                    <Text style={[styles.typeChoiceText, { color: selected ? meta.color : theme.text }]}>{meta.label}</Text>
+                    <Text style={[styles.typeChoiceText, { color: selected ? meta.color : theme.text }]}>{label}</Text>
                   </Pressable>
                 );
               })}
             </View>
 
-            <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>TIME</Text>
+            <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{t('schedule.time')}</Text>
             {Platform.OS === 'ios' ? (
               <DateTimePicker value={pickerDate} mode="time" display="spinner" onChange={onPick} />
             ) : (
@@ -589,23 +615,23 @@ export function ScheduleScreen({
                 >
                   <MaterialCommunityIcons name="clock-outline" size={22} color={theme.primary} />
                   <Text style={[styles.timeButtonText, { color: theme.text }]}>{formatMinutes(draft?.minutes ?? 0)}</Text>
-                  <Text style={[styles.changeText, { color: theme.primary }]}>Change</Text>
+                  <Text style={[styles.changeText, { color: theme.primary }]}>{t('schedule.change')}</Text>
                 </Pressable>
                 {showAndroidPicker ? <DateTimePicker value={pickerDate} mode="time" onChange={onPick} /> : null}
               </>
             )}
 
-            <Text style={[styles.fieldLabel, styles.reminderLabel, { color: theme.textMuted }]}>REMINDER</Text>
+            <Text style={[styles.fieldLabel, styles.reminderLabel, { color: theme.textMuted }]}>{t('schedule.reminder')}</Text>
             <View style={[styles.reminderRow, { backgroundColor: theme.surface, borderColor: theme.border }]}>
               <View style={[styles.reminderIcon, { backgroundColor: theme.primarySoft }]}>
                 <MaterialCommunityIcons name="bell-outline" size={21} color={theme.primary} />
               </View>
               <View style={styles.reminderCopy}>
-                <Text style={[styles.reminderTitle, { color: theme.text }]}>Daily reminder</Text>
-                <Text style={[styles.reminderHint, { color: theme.textMuted }]}>Alerts at this planned time on this device.</Text>
+                <Text style={[styles.reminderTitle, { color: theme.text }]}>{t('schedule.dailyReminder')}</Text>
+                <Text style={[styles.reminderHint, { color: theme.textMuted }]}>{t('schedule.reminderHint')}</Text>
               </View>
               <Switch
-                accessibilityLabel="Daily reminder for this routine entry"
+                accessibilityLabel={t('schedule.reminderA11y')}
                 disabled={requestingPermission}
                 ios_backgroundColor={theme.border}
                 onValueChange={toggleReminder}
@@ -624,7 +650,9 @@ export function ScheduleScreen({
                 { backgroundColor: pressed ? theme.primaryPressed : theme.primary, opacity: saving ? 0.55 : 1 },
               ]}
             >
-              <Text style={[styles.saveText, { color: theme.onPrimary }]}>{saving ? 'Saving…' : 'Save time'}</Text>
+              <Text style={[styles.saveText, { color: theme.onPrimary }]}>
+                {t(saving ? 'common.saving' : 'schedule.saveTime')}
+              </Text>
             </Pressable>
           </ScrollView>
         </View>

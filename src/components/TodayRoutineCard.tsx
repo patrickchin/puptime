@@ -3,16 +3,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { scheduleStatusesForDay } from '../analytics';
 import { EVENT_META, formatMinutes, type PuppyEvent, type ScheduleEntry } from '../domain';
-import { spacing, surfaceTreatment, type Theme } from '../theme';
-
-function untilLabel(target: number, now: number): string {
-  const minutes = Math.max(0, Math.ceil((target - now) / 60_000));
-  if (minutes < 1) return 'now';
-  if (minutes < 60) return `in ${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  const remainder = minutes % 60;
-  return remainder ? `in ${hours}h ${remainder}m` : `in ${hours}h`;
-}
+import { useLocalization } from '../localization-context';
+import { eventIcon, spacing, supportingIcon, surfaceTreatment, type Theme } from '../theme';
 
 export function TodayRoutineCard({
   events,
@@ -27,6 +19,7 @@ export function TodayRoutineCard({
   onOpenSchedule: () => void;
   theme: Theme;
 }) {
+  const { eventLabel, t } = useLocalization();
   const statuses = scheduleStatusesForDay(events, schedule, new Date(now), 30, now);
   const completed = statuses.filter((item) => item.status === 'done').length;
   const missed = statuses.filter((item) => item.status === 'missed').length;
@@ -36,25 +29,40 @@ export function TodayRoutineCard({
     ? `${Math.round((completed / statuses.length) * 100)}%`
     : '0%';
   const nextMeta = next ? EVENT_META[next.entry.type] : null;
+  const nextLabel = next ? eventLabel(next.entry.type) : '';
+  const until = next ? (() => {
+    const minutes = Math.max(0, Math.ceil((next.target - now) / 60_000));
+    if (minutes < 1) return t('routine.now');
+    if (minutes < 60) return t('routine.inMinutes', { count: minutes });
+    const hours = Math.floor(minutes / 60);
+    const remainder = minutes % 60;
+    return remainder
+      ? t('routine.inHoursMinutes', { hours, minutes: remainder })
+      : t('routine.inHours', { count: hours });
+  })() : '';
 
   const title = schedule.length === 0
-    ? 'Build a daily rhythm'
+    ? t('routine.build')
     : next
-      ? `${nextMeta?.label}${next.status === 'due' ? ' is due' : ` at ${formatMinutes(next.entry.minutes)}`}`
+      ? next.status === 'due'
+        ? t('routine.due', { activity: nextLabel })
+        : t('routine.at', { activity: nextLabel, time: formatMinutes(next.entry.minutes) })
       : missed
-        ? `${missed} routine ${missed === 1 ? 'window needs' : 'windows need'} attention`
-        : 'Today’s routine is complete';
+        ? t(missed === 1 ? 'routine.missedOne' : 'routine.missedMany', { count: missed })
+        : t('routine.complete');
   const detail = schedule.length === 0
-    ? 'Add the times you want to repeat each day.'
+    ? t('routine.buildDetail')
     : next
-      ? `${next.status === 'due' ? `Planned for ${formatMinutes(next.entry.minutes)}` : untilLabel(next.target, now)} · ${completed} of ${schedule.length} done`
-      : `${completed} of ${schedule.length} planned activities logged`;
+      ? `${next.status === 'due'
+        ? t('routine.plannedFor', { time: formatMinutes(next.entry.minutes) })
+        : until} · ${t('routine.progress', { completed, total: schedule.length })}`
+      : t('routine.logged', { completed, total: schedule.length });
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${title}. ${detail}`}
-      accessibilityHint="Opens the daily schedule"
+      accessibilityHint={t('routine.openHint')}
       onPress={onOpenSchedule}
       style={({ pressed }) => [
         styles.card,
@@ -73,7 +81,7 @@ export function TodayRoutineCard({
             { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking },
           ]}
         >
-          TODAY’S RHYTHM
+          {t('routine.eyebrow')}
         </Text>
         {schedule.length ? (
           <Text style={[styles.progressLabel, { color: theme.textMuted }]}>{completed}/{schedule.length}</Text>
@@ -91,7 +99,7 @@ export function TodayRoutineCard({
           ]}
         >
           <MaterialCommunityIcons
-            name={(nextMeta?.icon ?? 'calendar-clock-outline') as keyof typeof MaterialCommunityIcons.glyphMap}
+            name={(next ? eventIcon(theme, next.entry.type) : supportingIcon(theme, 'routine')) as keyof typeof MaterialCommunityIcons.glyphMap}
             color={nextMeta?.color ?? theme.primary}
             size={23}
           />

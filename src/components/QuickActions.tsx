@@ -4,16 +4,13 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 
 import {
   EVENT_META,
-  eventLabel,
   isOpenNap,
   quickEventTypes,
-  relativeTime,
   type EventType,
   type PuppyEvent,
 } from '../domain';
-import { spacing, surfaceTreatment, type Theme } from '../theme';
-
-const suggestions = ['Water', 'Accident', 'Play', 'Training', 'Crate', 'Medicine'];
+import { useLocalization } from '../localization-context';
+import { eventIcon, spacing, supportingIcon, surfaceTreatment, type Theme } from '../theme';
 
 type Props = {
   events: PuppyEvent[];
@@ -23,13 +20,24 @@ type Props = {
 };
 
 export function QuickActions({ events, onLog, now, theme }: Props) {
+  const { elapsedTime, eventLabel, relativeTime, t } = useLocalization();
   const [showMore, setShowMore] = useState(false);
   const [customLabel, setCustomLabel] = useState('');
   const openNap = events.find(isOpenNap);
+  const suggestions = useMemo(() => [
+    t('quick.water'),
+    t('quick.accident'),
+    t('quick.play'),
+    t('quick.training'),
+    t('quick.crate'),
+    t('quick.medicine'),
+  ], [t]);
   const otherActivities = useMemo(() => {
-    const previous = events.filter((event) => event.type === 'custom').map(eventLabel);
+    const previous = events
+      .filter((event) => event.type === 'custom')
+      .map((event) => event.customLabel?.trim() || eventLabel('custom'));
     return [...new Set([...suggestions, ...previous])];
-  }, [events]);
+  }, [eventLabel, events, suggestions]);
 
   const logOther = (label: string) => {
     const clean = label.trim();
@@ -48,13 +56,13 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
             ? openNap
             : events.find((event) => event.type === type);
           const isEndingNap = type === 'nap' && Boolean(openNap);
-          const label = isEndingNap ? 'End nap' : meta.label;
+          const label = isEndingNap ? t('quick.endNap') : eventLabel(type);
           return (
             <Pressable
               key={type}
               accessibilityRole="button"
-              accessibilityLabel={isEndingNap ? 'End the current nap' : `Log ${label.toLowerCase()}`}
-              accessibilityHint={isEndingNap ? 'Saves the nap end time' : 'Adds the current time to the activity log'}
+              accessibilityLabel={isEndingNap ? t('quick.endNapA11y') : t('quick.logAction', { activity: label })}
+              accessibilityHint={isEndingNap ? t('quick.endNapHint') : t('quick.logHint')}
               onPress={() => onLog(type)}
               style={({ pressed }) => [
                 styles.action,
@@ -75,7 +83,7 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
                 ]}
               >
                 <MaterialCommunityIcons
-                  name={(isEndingNap ? 'stop' : meta.icon) as keyof typeof MaterialCommunityIcons.glyphMap}
+                  name={(isEndingNap ? 'stop' : eventIcon(theme, type)) as keyof typeof MaterialCommunityIcons.glyphMap}
                   color={meta.color}
                   size={25}
                 />
@@ -86,9 +94,9 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
               <Text numberOfLines={1} style={[styles.actionTime, { color: theme.textMuted }]}>
                 {latest
                   ? isEndingNap
-                    ? `${relativeTime(latest.at, now).replace(' ago', '')} running`
+                    ? t('quick.running', { time: elapsedTime(latest.at, now) })
                     : relativeTime(latest.endedAt ?? latest.at, now)
-                  : 'Not yet'}
+                  : t('quick.notYet')}
               </Text>
             </Pressable>
           );
@@ -96,8 +104,8 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Log another type of activity"
-          accessibilityHint="Opens common and custom activities"
+          accessibilityLabel={t('quick.logAnother')}
+          accessibilityHint={t('quick.anotherHint')}
           onPress={() => setShowMore(true)}
           style={({ pressed }) => [
             styles.moreAction,
@@ -108,8 +116,12 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
             },
           ]}
         >
-          <MaterialCommunityIcons name="plus-circle-outline" color={theme.primary} size={23} />
-          <Text style={[styles.moreLabel, { color: theme.text }]}>Another activity</Text>
+          <MaterialCommunityIcons
+            name={supportingIcon(theme, 'more') as keyof typeof MaterialCommunityIcons.glyphMap}
+            color={theme.primary}
+            size={23}
+          />
+          <Text style={[styles.moreLabel, { color: theme.text }]}>{t('quick.another')}</Text>
           <MaterialCommunityIcons name="chevron-right" color={theme.textMuted} size={22} />
         </Pressable>
       </View>
@@ -141,13 +153,13 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
                     },
                   ]}
                 >
-                  Log another activity
+                  {t('quick.logAnother')}
                 </Text>
-                <Text style={[styles.sheetSubtitle, { color: theme.textMuted }]}>Common choices stay one tap away.</Text>
+                <Text style={[styles.sheetSubtitle, { color: theme.textMuted }]}>{t('quick.commonChoices')}</Text>
               </View>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Close activity picker"
+                accessibilityLabel={t('quick.close')}
                 onPress={() => setShowMore(false)}
                 style={({ pressed }) => [
                   styles.closeButton,
@@ -164,7 +176,7 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
                 <Pressable
                   key={label.toLocaleLowerCase()}
                   accessibilityRole="button"
-                  accessibilityLabel={`Log ${label.toLowerCase()}`}
+                  accessibilityLabel={t('quick.logAction', { activity: label })}
                   onPress={() => logOther(label)}
                   style={({ pressed }) => [
                     styles.otherChoice,
@@ -176,21 +188,25 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
                     },
                   ]}
                 >
-                  <MaterialCommunityIcons name="tag-outline" size={19} color={theme.primary} />
+                  <MaterialCommunityIcons
+                    name={eventIcon(theme, 'custom') as keyof typeof MaterialCommunityIcons.glyphMap}
+                    size={19}
+                    color={theme.primary}
+                  />
                   <Text numberOfLines={1} style={[styles.otherChoiceText, { color: theme.text }]}>{label}</Text>
                 </Pressable>
               ))}
             </View>
 
-            <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>CUSTOM ACTIVITY</Text>
+            <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{t('quick.customActivity')}</Text>
             <View style={styles.customRow}>
               <TextInput
-                accessibilityLabel="Custom activity name"
+                accessibilityLabel={t('quick.customName')}
                 autoCapitalize="sentences"
                 maxLength={40}
                 onChangeText={setCustomLabel}
                 onSubmitEditing={() => logOther(customLabel)}
-                placeholder="e.g. Grooming"
+                placeholder={t('quick.customPlaceholder')}
                 placeholderTextColor={theme.textMuted}
                 returnKeyType="done"
                 value={customLabel}
@@ -207,7 +223,7 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
               />
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Log custom activity now"
+                accessibilityLabel={t('quick.customLogA11y')}
                 accessibilityState={{ disabled: !customLabel.trim() }}
                 disabled={!customLabel.trim()}
                 onPress={() => logOther(customLabel)}
@@ -220,7 +236,7 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
                   },
                 ]}
               >
-                <Text style={[styles.logButtonText, { color: theme.onPrimary }]}>Log now</Text>
+                <Text style={[styles.logButtonText, { color: theme.onPrimary }]}>{t('quick.logNow')}</Text>
               </Pressable>
             </View>
           </ScrollView>

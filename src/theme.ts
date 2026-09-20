@@ -1,5 +1,21 @@
 type DisplayWeight = '700' | '800' | '900';
 
+export type ThemeVoice =
+  | 'gentle'
+  | 'brisk'
+  | 'quiet'
+  | 'notebook'
+  | 'playful'
+  | 'technical'
+  | 'outdoors'
+  | 'calm'
+  | 'editorial'
+  | 'direct';
+
+export type ThemeIconProfile = Exclude<ThemePreference, 'system'>;
+export type ThemeEventIcon = 'pee' | 'poop' | 'meal' | 'pottyTrip' | 'walk' | 'nap' | 'custom';
+export type ThemeNavigationIcon = 'log' | 'insights' | 'schedule';
+
 export type Theme = typeof lightTheme;
 
 export type ThemePreference =
@@ -34,6 +50,8 @@ export const lightTheme = {
   shadow: '#10251C',
   nav: '#FFFEFA',
   presentation: {
+    voice: 'gentle' as ThemeVoice,
+    iconProfile: 'meadow' as ThemeIconProfile,
     markIcon: 'paw' as string,
     cardRadius: 22,
     controlRadius: 16,
@@ -72,6 +90,8 @@ export const darkTheme: Theme = {
   shadow: '#000000',
   nav: '#151E19',
   presentation: {
+    voice: 'quiet',
+    iconProfile: 'midnight',
     markIcon: 'weather-night',
     cardRadius: 28,
     controlRadius: 24,
@@ -110,6 +130,8 @@ export const sunriseTheme: Theme = {
   shadow: '#3C1E14',
   nav: '#FFF9F4',
   presentation: {
+    voice: 'brisk',
+    iconProfile: 'sunrise',
     markIcon: 'weather-sunset-up',
     cardRadius: 10,
     controlRadius: 8,
@@ -148,6 +170,8 @@ export const paperTheme: Theme = {
   shadow: '#191918',
   nav: '#F8F7F1',
   presentation: {
+    voice: 'notebook',
+    iconProfile: 'paper',
     markIcon: 'book-open-page-variant-outline',
     cardRadius: 2,
     controlRadius: 2,
@@ -186,6 +210,8 @@ export const bubblegumTheme: Theme = {
   shadow: '#7A174A',
   nav: '#FFF7FB',
   presentation: {
+    voice: 'playful',
+    iconProfile: 'bubblegum',
     markIcon: 'heart-outline',
     cardRadius: 30,
     controlRadius: 999,
@@ -224,6 +250,8 @@ export const blueprintTheme: Theme = {
   shadow: '#000000',
   nav: '#081F30',
   presentation: {
+    voice: 'technical',
+    iconProfile: 'blueprint',
     markIcon: 'vector-square',
     cardRadius: 4,
     controlRadius: 4,
@@ -262,6 +290,8 @@ export const trailTheme: Theme = {
   shadow: '#2B2418',
   nav: '#FAF4E8',
   presentation: {
+    voice: 'outdoors',
+    iconProfile: 'trail',
     markIcon: 'pine-tree',
     cardRadius: 8,
     controlRadius: 6,
@@ -300,6 +330,8 @@ export const tideTheme: Theme = {
   shadow: '#0C4A4F',
   nav: '#F6FCFC',
   presentation: {
+    voice: 'calm',
+    iconProfile: 'tide',
     markIcon: 'waves',
     cardRadius: 26,
     controlRadius: 999,
@@ -338,6 +370,8 @@ export const plumTheme: Theme = {
   shadow: '#2A1733',
   nav: '#FAF7FC',
   presentation: {
+    voice: 'editorial',
+    iconProfile: 'plum',
     markIcon: 'flower-outline',
     cardRadius: 0,
     controlRadius: 999,
@@ -376,6 +410,8 @@ export const contrastTheme: Theme = {
   shadow: '#000000',
   nav: '#FFFFFF',
   presentation: {
+    voice: 'direct',
+    iconProfile: 'contrast',
     markIcon: 'contrast-circle',
     cardRadius: 0,
     controlRadius: 0,
@@ -409,6 +445,89 @@ export const namedThemes: Record<NamedThemePreference, Theme> = {
   plum: plumTheme,
   contrast: contrastTheme,
 };
+
+const iconProfiles: Record<
+  ThemeIconProfile,
+  {
+    events: Record<ThemeEventIcon, string>;
+    navigation: Record<ThemeNavigationIcon, string>;
+    more: string;
+    routine: string;
+  }
+> = {
+  meadow: {
+    events: { pee: 'water-outline', poop: 'emoticon-poop-outline', meal: 'food-apple-outline', pottyTrip: 'door-open', walk: 'walk', nap: 'sleep', custom: 'tag-outline' },
+    navigation: { log: 'home-variant-outline', insights: 'chart-timeline-variant', schedule: 'calendar-clock-outline' },
+    more: 'plus-circle-outline',
+    routine: 'calendar-clock-outline',
+  },
+  sunrise: {
+    events: { pee: 'water', poop: 'emoticon-poop', meal: 'silverware-fork-knife', pottyTrip: 'door-open', walk: 'shoe-sneaker', nap: 'bed-clock', custom: 'tag' },
+    navigation: { log: 'home-variant', insights: 'chart-line', schedule: 'calendar-clock' },
+    more: 'plus-circle',
+    routine: 'calendar-clock',
+  },
+  midnight: {
+    events: { pee: 'cup-water', poop: 'emoticon-poop-outline', meal: 'bowl-mix-outline', pottyTrip: 'door-open', walk: 'foot-print', nap: 'weather-night', custom: 'bookmark-outline' },
+    navigation: { log: 'moon-waning-crescent', insights: 'chart-areaspline', schedule: 'calendar-month-outline' },
+    more: 'plus-circle-multiple-outline',
+    routine: 'calendar-month-outline',
+  },
+  paper: {
+    events: { pee: 'water-opacity', poop: 'emoticon-poop', meal: 'silverware', pottyTrip: 'exit-run', walk: 'shoe-print', nap: 'bed-outline', custom: 'label-outline' },
+    navigation: { log: 'notebook-outline', insights: 'chart-box-outline', schedule: 'calendar-blank-outline' },
+    more: 'note-plus-outline',
+    routine: 'calendar-blank-outline',
+  },
+  bubblegum: {
+    events: { pee: 'water-circle', poop: 'emoticon-poop', meal: 'cupcake', pottyTrip: 'door-open', walk: 'dog', nap: 'power-sleep', custom: 'sticker-emoji' },
+    navigation: { log: 'home-heart', insights: 'chart-bubble', schedule: 'calendar-heart' },
+    more: 'shape-circle-plus',
+    routine: 'calendar-heart',
+  },
+  blueprint: {
+    events: { pee: 'water-sync', poop: 'emoticon-poop-outline', meal: 'food-outline', pottyTrip: 'door-sliding-open', walk: 'run-fast', nap: 'timer-sand', custom: 'vector-square' },
+    navigation: { log: 'view-dashboard-outline', insights: 'chart-timeline-variant-shimmer', schedule: 'calendar-sync-outline' },
+    more: 'plus-box-outline',
+    routine: 'calendar-sync-outline',
+  },
+  trail: {
+    events: { pee: 'cup-water', poop: 'emoticon-poop-outline', meal: 'food-apple', pottyTrip: 'door-open', walk: 'map-marker-path', nap: 'tent', custom: 'pine-tree' },
+    navigation: { log: 'home-outline', insights: 'chart-line-variant', schedule: 'calendar-range-outline' },
+    more: 'plus-box',
+    routine: 'calendar-range-outline',
+  },
+  tide: {
+    events: { pee: 'water-outline', poop: 'emoticon-poop-outline', meal: 'bowl-mix-outline', pottyTrip: 'door-open', walk: 'walk', nap: 'weather-night', custom: 'tag-heart-outline' },
+    navigation: { log: 'home-variant-outline', insights: 'chart-bell-curve-cumulative', schedule: 'calendar-outline' },
+    more: 'plus-circle-outline',
+    routine: 'calendar-outline',
+  },
+  plum: {
+    events: { pee: 'water-outline', poop: 'emoticon-poop-outline', meal: 'silverware-fork-knife', pottyTrip: 'door-open', walk: 'walk', nap: 'bed-outline', custom: 'bookmark-outline' },
+    navigation: { log: 'newspaper-variant-outline', insights: 'chart-box-outline', schedule: 'calendar-month-outline' },
+    more: 'bookmark-plus-outline',
+    routine: 'calendar-month-outline',
+  },
+  contrast: {
+    events: { pee: 'water', poop: 'emoticon-poop', meal: 'food', pottyTrip: 'door-open', walk: 'walk', nap: 'sleep', custom: 'tag' },
+    navigation: { log: 'home', insights: 'chart-bar', schedule: 'calendar' },
+    more: 'plus-box',
+    routine: 'calendar',
+  },
+};
+
+export function eventIcon(theme: Theme, type: ThemeEventIcon): string {
+  return iconProfiles[theme.presentation.iconProfile].events[type];
+}
+
+export function navigationIcon(theme: Theme, tab: ThemeNavigationIcon): string {
+  return iconProfiles[theme.presentation.iconProfile].navigation[tab];
+}
+
+export function supportingIcon(theme: Theme, icon: 'more' | 'routine'): string {
+  return iconProfiles[theme.presentation.iconProfile][icon];
+}
 
 export function surfaceTreatment(theme: Theme) {
   return {
