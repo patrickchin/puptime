@@ -96,7 +96,6 @@ function FrequencyRow({ stat, theme }: { stat: ActivityFrequencyStat; theme: The
       <View style={styles.metrics}>
         <View style={styles.metric}>
           <Text style={[styles.metricValue, { color: theme.text }]}>{dailyValue}</Text>
-          <Text style={[styles.metricLabel, { color: theme.textMuted }]}>{t('insights.averageFrequency')}</Text>
           <Text style={[styles.metricDetail, { color: theme.textMuted }]}>{dailyDetail}</Text>
         </View>
         <View style={[styles.metricDivider, { backgroundColor: theme.border }]} />
@@ -212,14 +211,6 @@ export function InsightsScreen({
     <ScrollView contentContainerStyle={styles.content}>
       <Text
         style={[
-          styles.eyebrow,
-          { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking },
-        ]}
-      >
-        {t('insights.eyebrow')}
-      </Text>
-      <Text
-        style={[
           styles.title,
           {
             color: theme.text,
@@ -232,7 +223,6 @@ export function InsightsScreen({
       >
         {t('insights.title')}
       </Text>
-      <Text style={[styles.subtitle, { color: theme.textMuted }]}>{t('insights.subtitle')}</Text>
 
       <View style={[styles.section, { borderColor: theme.border }]}>
         <View style={styles.sectionHeading}>
@@ -255,8 +245,9 @@ export function InsightsScreen({
             </Text>
           </View>
         </View>
-        <Text style={[styles.sectionNote, { color: theme.textMuted }]}>{t('insights.frequencyNote')}</Text>
-        {frequency.stats.map((stat) => <FrequencyRow key={stat.type} stat={stat} theme={theme} />)}
+        <View>
+          {frequency.stats.map((stat) => <FrequencyRow key={stat.type} stat={stat} theme={theme} />)}
+        </View>
       </View>
 
       <View style={[styles.section, { borderColor: theme.border }]}>
@@ -277,7 +268,6 @@ export function InsightsScreen({
             </Text>
           </View>
         </View>
-        <Text style={[styles.sectionNote, { color: theme.textMuted }]}>{t('insights.gapsNote')}</Text>
         {missingLogs.estimates.length ? (
           <View style={styles.estimateList}>
             {missingLogs.estimates.map((estimate) => {
@@ -405,7 +395,6 @@ export function InsightsScreen({
               <Text style={[styles.panelCaption, { color: theme.textMuted }]}>{t('insights.historyCaption')}</Text>
             </View>
           </View>
-          <Text style={[styles.sectionNote, { color: theme.textMuted }]}>{t('insights.historyNote')}</Text>
           <View style={styles.months}>
             {visibleMonths.map((stat) => (
               <MonthlyRow
@@ -446,21 +435,9 @@ export function InsightsScreen({
       ) : null}
 
       <View style={[styles.section, styles.exportSection, { borderColor: theme.border }]}>
-        <View style={styles.exportHeading}>
-          <View style={styles.smallIcon}>
-            <MaterialCommunityIcons
-              accessibilityElementsHidden
-              importantForAccessibility="no"
-              name="file-delimited-outline"
-              size={20}
-              color={theme.primary}
-            />
-          </View>
-          <View style={styles.exportCopy}>
-            <Text style={[styles.panelTitle, { color: theme.text }]}>{t('insights.dataTitle')}</Text>
-            <Text style={[styles.panelCaption, { color: theme.textMuted }]}>{t('insights.dataBody')}</Text>
-          </View>
-        </View>
+        <Text style={[styles.exportNote, { color: theme.textMuted }]}>
+          {t('insights.dataBody')}
+        </Text>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t(events.length ? 'insights.exportA11y' : 'insights.noExport')}
@@ -504,12 +481,9 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
     gap: spacing.md,
   },
-  eyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 1.5, marginTop: 4 },
   title: { fontSize: 30, lineHeight: 36, fontWeight: '800', letterSpacing: -0.6, marginTop: -8 },
-  subtitle: { fontSize: 15, lineHeight: 22, marginTop: -10 },
   section: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: spacing.md },
   sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 4 },
-  sectionNote: { fontSize: 11, lineHeight: 16, paddingHorizontal: 4, marginTop: 8 },
   panelHeadingCopy: { flex: 1, minWidth: 0 },
   smallIcon: { width: 28, height: 40, alignItems: 'center', justifyContent: 'center' },
   panelTitle: { fontSize: 18, lineHeight: 23, fontWeight: '700' },
@@ -598,8 +572,7 @@ const styles = StyleSheet.create({
   },
   historyToggleText: { fontSize: 14, lineHeight: 19, fontWeight: '700' },
   exportSection: { gap: spacing.md },
-  exportHeading: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  exportCopy: { flex: 1, minWidth: 0 },
+  exportNote: { fontSize: 12, lineHeight: 17 },
   exportButton: {
     minHeight: 52,
     paddingHorizontal: spacing.md,

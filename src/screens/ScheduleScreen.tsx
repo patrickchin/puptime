@@ -164,14 +164,6 @@ export function ScheduleScreen({
       <ScrollView contentContainerStyle={styles.content}>
         <Text
           style={[
-            styles.eyebrow,
-            { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking },
-          ]}
-        >
-          {t('schedule.eyebrow')}
-        </Text>
-        <Text
-          style={[
             styles.title,
             {
               color: theme.text,
@@ -183,9 +175,6 @@ export function ScheduleScreen({
           ]}
         >
           {t('schedule.title')}
-        </Text>
-        <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-          {t('schedule.subtitle')}
         </Text>
 
         <View
@@ -216,9 +205,6 @@ export function ScheduleScreen({
             </View>
             <View style={styles.learnCopy}>
               <Text style={[styles.learnTitle, { color: theme.text }]}>{t('schedule.learnTitle')}</Text>
-              <Text style={[styles.learnBody, { color: theme.textMuted }]}>
-                {t('schedule.learnBody')}
-              </Text>
             </View>
           </View>
           <View
@@ -242,36 +228,34 @@ export function ScheduleScreen({
                   : t('schedule.noPattern')}
             </Text>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={canSuggest
-              ? t('schedule.previewA11y', { count: suggestion.entries.length })
-              : t('schedule.notEnoughA11y')}
-            accessibilityState={{ disabled: !canSuggest }}
-            disabled={!canSuggest}
-            onPress={() => setReviewingSuggestion(true)}
-            style={({ pressed }) => [
-              styles.learnButton,
-              {
-                backgroundColor: canSuggest ? theme.primary : theme.surface,
-                borderColor: canSuggest ? theme.primary : theme.border,
-                borderRadius: theme.presentation.controlRadius,
-                borderWidth: theme.presentation.borderWidth,
-                opacity: pressed ? 0.8 : 1,
-              },
-            ]}
-          >
-            <MaterialCommunityIcons
-              accessibilityElementsHidden
-              importantForAccessibility="no"
-              name="eye-outline"
-              color={canSuggest ? theme.onPrimary : theme.textMuted}
-              size={20}
-            />
-            <Text style={[styles.learnButtonText, { color: canSuggest ? theme.onPrimary : theme.textMuted }]}>
-              {t(canSuggest ? 'schedule.previewButton' : 'schedule.keepLogging')}
-            </Text>
-          </Pressable>
+          {canSuggest ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('schedule.previewA11y', { count: suggestion.entries.length })}
+              onPress={() => setReviewingSuggestion(true)}
+              style={({ pressed }) => [
+                styles.learnButton,
+                {
+                  backgroundColor: theme.primary,
+                  borderColor: theme.primary,
+                  borderRadius: theme.presentation.controlRadius,
+                  borderWidth: theme.presentation.borderWidth,
+                  opacity: pressed ? 0.8 : 1,
+                },
+              ]}
+            >
+              <MaterialCommunityIcons
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+                name="eye-outline"
+                color={theme.onPrimary}
+                size={20}
+              />
+              <Text style={[styles.learnButtonText, { color: theme.onPrimary }]}>
+                {t('schedule.previewButton')}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
 
         {schedule.length ? (
@@ -287,12 +271,9 @@ export function ScheduleScreen({
             ]}
           >
             <View style={styles.progressHeading}>
-              <View>
-                <Text style={[styles.progressEyebrow, { color: theme.primary }]}>{t('schedule.todaySoFar')}</Text>
-                <Text style={[styles.progressTitle, { color: theme.text }]}>
-                  {t('schedule.loggedProgress', { completed, total: schedule.length })}
-                </Text>
-              </View>
+              <Text style={[styles.progressTitle, { color: theme.text }]}>
+                {t('schedule.loggedProgress', { completed, total: schedule.length })}
+              </Text>
               <View
                 style={[
                   styles.progressIcon,
@@ -326,10 +307,11 @@ export function ScheduleScreen({
           </View>
         ) : null}
 
-        <View style={styles.headingRow}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('schedule.todayPlan')}</Text>
-          <Text style={[styles.count, { color: theme.textMuted }]}>{t('schedule.timeCount', { count: schedule.length })}</Text>
-        </View>
+        {schedule.length ? (
+          <View style={styles.headingRow}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('schedule.todayPlan')}</Text>
+          </View>
+        ) : null}
 
         {schedule.length === 0 ? (
           <View
@@ -344,7 +326,6 @@ export function ScheduleScreen({
             ]}
           >
             <Text style={[styles.emptyTitle, { color: theme.text }]}>{t('schedule.emptyTitle')}</Text>
-            <Text style={[styles.emptyBody, { color: theme.textMuted }]}>{t('schedule.emptyBody')}</Text>
           </View>
         ) : (
           schedule.map((entry, index) => {
@@ -615,13 +596,11 @@ export function ScheduleScreen({
                 >
                   <MaterialCommunityIcons name="clock-outline" size={22} color={theme.primary} />
                   <Text style={[styles.timeButtonText, { color: theme.text }]}>{formatMinutes(draft?.minutes ?? 0)}</Text>
-                  <Text style={[styles.changeText, { color: theme.primary }]}>{t('schedule.change')}</Text>
                 </Pressable>
                 {showAndroidPicker ? <DateTimePicker value={pickerDate} mode="time" onChange={onPick} /> : null}
               </>
             )}
 
-            <Text style={[styles.fieldLabel, styles.reminderLabel, { color: theme.textMuted }]}>{t('schedule.reminder')}</Text>
             <View style={[styles.reminderRow, { backgroundColor: theme.surface, borderColor: theme.border }]}>
               <View style={[styles.reminderIcon, { backgroundColor: theme.primarySoft }]}>
                 <MaterialCommunityIcons name="bell-outline" size={21} color={theme.primary} />
@@ -669,23 +648,19 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     paddingBottom: spacing.xl,
   },
-  eyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 1.6, marginTop: 4 },
   title: { fontSize: 30, lineHeight: 36, fontWeight: '800', letterSpacing: -0.6, marginTop: 4 },
-  subtitle: { fontSize: 14, lineHeight: 21, marginTop: 6 },
   learnCard: { borderWidth: 1, borderRadius: 22, padding: spacing.md, marginTop: spacing.lg },
   learnHeading: { flexDirection: 'row', alignItems: 'flex-start', gap: 11 },
   learnIcon: { width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   learnCopy: { flex: 1, minWidth: 0 },
   learnTitle: { fontSize: 18, lineHeight: 23, fontWeight: '800' },
-  learnBody: { fontSize: 13, lineHeight: 19, marginTop: 2 },
   learnStatus: { minHeight: 43, borderRadius: 13, paddingHorizontal: 11, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 13 },
   learnStatusText: { flex: 1, fontSize: 12, lineHeight: 17, fontWeight: '600' },
   learnButton: { minHeight: 50, borderRadius: 16, borderWidth: 1, marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 14 },
   learnButtonText: { fontSize: 15, lineHeight: 20, fontWeight: '800', textAlign: 'center' },
   progressCard: { borderWidth: 1, borderRadius: 22, padding: spacing.md, marginTop: spacing.lg },
   progressHeading: { flexDirection: 'row', alignItems: 'center' },
-  progressEyebrow: { fontSize: 10, lineHeight: 14, fontWeight: '800', letterSpacing: 1.2 },
-  progressTitle: { fontSize: 20, lineHeight: 26, fontWeight: '800', marginTop: 2 },
+  progressTitle: { flex: 1, fontSize: 20, lineHeight: 26, fontWeight: '800' },
   progressIcon: { marginLeft: 'auto', width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   progressDetail: { fontSize: 13, lineHeight: 18, marginTop: 7 },
   progressTrack: { height: 8, borderRadius: 4, overflow: 'hidden', marginTop: 13 },
@@ -693,7 +668,6 @@ const styles = StyleSheet.create({
   windowHint: { fontSize: 11, lineHeight: 16, marginTop: 8 },
   headingRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: spacing.xl, marginBottom: 12 },
   sectionTitle: { flex: 1, fontSize: 21, fontWeight: '800' },
-  count: { fontSize: 13, fontWeight: '600' },
   scheduleRow: { minHeight: 68, borderWidth: 1, borderRadius: 18, marginBottom: 8, flexDirection: 'row', alignItems: 'center', paddingRight: 10 },
   timelineRail: { alignSelf: 'stretch', width: 32, alignItems: 'center' },
   timelineDot: { width: 10, height: 10, borderRadius: 5, marginTop: 28 },
@@ -708,9 +682,8 @@ const styles = StyleSheet.create({
   removeButton: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   addButton: { minHeight: 54, borderRadius: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: spacing.md },
   addButtonText: { fontSize: 16, fontWeight: '700' },
-  empty: { borderWidth: 1, borderStyle: 'dashed', borderRadius: 20, padding: spacing.lg, alignItems: 'center' },
+  empty: { borderWidth: 1, borderStyle: 'dashed', borderRadius: 20, padding: spacing.lg, marginTop: spacing.xl, alignItems: 'center' },
   emptyTitle: { fontSize: 17, fontWeight: '700' },
-  emptyBody: { fontSize: 14, lineHeight: 21, marginTop: 4, textAlign: 'center' },
   scrim: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.56)', justifyContent: 'flex-end' },
   sheet: {
     width: '100%',
@@ -740,9 +713,7 @@ const styles = StyleSheet.create({
   typeChoiceText: { fontSize: 14, fontWeight: '700' },
   timeButton: { minHeight: 58, borderWidth: 1, borderRadius: 16, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, gap: 10 },
   timeButtonText: { flex: 1, fontSize: 18, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  changeText: { fontSize: 14, fontWeight: '700' },
-  reminderLabel: { marginTop: spacing.lg },
-  reminderRow: { minHeight: 72, borderWidth: 1, borderRadius: 17, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 11 },
+  reminderRow: { minHeight: 72, borderWidth: 1, borderRadius: 17, padding: 12, marginTop: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: 11 },
   reminderIcon: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   reminderCopy: { flex: 1, minWidth: 0 },
   reminderTitle: { fontSize: 15, lineHeight: 20, fontWeight: '700' },

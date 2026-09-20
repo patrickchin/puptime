@@ -74,20 +74,6 @@ export function TodayRoutineCard({
         },
       ]}
     >
-      <View style={styles.headingRow}>
-        <Text
-          style={[
-            styles.eyebrow,
-            { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking },
-          ]}
-        >
-          {t('routine.eyebrow')}
-        </Text>
-        {schedule.length ? (
-          <Text style={[styles.progressLabel, { color: theme.textMuted }]}>{completed}/{schedule.length}</Text>
-        ) : null}
-      </View>
-
       <View style={styles.bodyRow}>
         <View
           style={[
@@ -135,9 +121,6 @@ const styles = StyleSheet.create({
     minHeight: 126,
     marginTop: spacing.md,
   },
-  headingRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  eyebrow: { flex: 1, fontSize: 11, lineHeight: 15, fontWeight: '800' },
-  progressLabel: { fontSize: 12, lineHeight: 16, fontWeight: '700', fontVariant: ['tabular-nums'] },
   bodyRow: { flexDirection: 'row', alignItems: 'center', gap: 11 },
   icon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   copy: { flex: 1, minWidth: 0 },

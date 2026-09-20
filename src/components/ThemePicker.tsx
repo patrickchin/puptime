@@ -112,7 +112,6 @@ export function ThemePicker({
               >
                 {t('appearance.title')}
               </Text>
-              <Text style={[styles.subtitle, { color: theme.textMuted }]}>{t('appearance.subtitle')}</Text>
             </View>
             <Pressable
               accessibilityLabel={t('appearance.close')}
@@ -247,7 +246,6 @@ export function ThemePicker({
               >
                 {t('appearance.languageHeading')}
               </Text>
-              <Text style={[styles.languageHint, { color: theme.textMuted }]}>{t('appearance.languageHint')}</Text>
             </View>
             {languageChoices.map((preference) => {
               const active = selectedLanguage === preference;
@@ -314,7 +312,6 @@ const styles = StyleSheet.create({
   heading: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
   headingCopy: { flex: 1, minWidth: 0 },
   title: { fontSize: 22, lineHeight: 28, fontWeight: '800', letterSpacing: -0.3 },
-  subtitle: { fontSize: 14, lineHeight: 20, marginTop: 2 },
   closeButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
   choiceScroll: { flexShrink: 1 },
   choices: { gap: spacing.sm, paddingTop: spacing.lg, paddingBottom: spacing.md },
@@ -335,8 +332,7 @@ const styles = StyleSheet.create({
   previewCard: { flex: 1, paddingHorizontal: 5, flexDirection: 'row', alignItems: 'center', gap: 4 },
   previewMark: { width: 8, height: 8 },
   previewLine: { width: 17, height: 3, borderRadius: 2, opacity: 0.65 },
-  languageHeading: { marginTop: spacing.md, gap: 3 },
-  languageHint: { fontSize: 12, lineHeight: 17, marginBottom: spacing.xs },
+  languageHeading: { marginTop: spacing.md },
   languageChoice: {
     minHeight: 58,
     paddingHorizontal: 14,
