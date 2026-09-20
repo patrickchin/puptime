@@ -13,7 +13,7 @@ A ROUTINE THAT FITS YOUR PUPPY
 • Export your complete activity history as a spreadsheet-ready CSV file
 
 HOME-SCREEN WIDGETS
-Log common activities from your iPhone or iPad Home Screen. Backdate a widget entry in 15-minute steps when you could not log it right away.
+Log common activities from your iPhone or iPad Home Screen with one tap.
 
 PRIVATE BY DESIGN
 Your activity data stays on your device. Puptime has no account, subscription, server, ads, analytics, or tracking. Voice dictation uses Apple's speech-recognition service and may require a network connection.

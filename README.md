@@ -57,12 +57,7 @@ Download the APK from the [latest GitHub release](https://github.com/patrickchin
 
 Tap the widget button on the Today screen to choose the two to four actions shown on your home screen. Pee, poop, and meals are the default; an active nap temporarily appears so it can always be ended.
 
-The Android widget has two useful heights:
-
-- One row: only the chosen action buttons, without latest-activity or time text.
-- Two rows: the same chosen actions plus `−15` and `+15` controls for logging up to one hour ago. The time resets to **Now** after logging.
-
-Long-press the widget to show Android’s resize handles, then drag the vertical handle to switch layouts. Inside the app, tap the pencil beside any point-in-time log to correct its activity, custom name, date, time, or note. Edits save automatically, including when you close the editor. Nap logs expose editable start and end dates and times.
+The Android widget uses the available height for its action buttons. Long-press it to resize the widget, or tap the pencil beside any point-in-time log in the app to correct its activity, custom name, date, time, or note. Edits save automatically, including when you close the editor. Nap logs expose editable start and end dates and times.
 
 Puptime never closes an open nap or silently adds estimated sleep. If you forgot to stop a nap, tap **End nap** when you remember, then use the pencil on that nap to correct the end. A possible-gap suggestion may offer a reviewable nap span learned from prior durations; it becomes an editable log only after you tap **Add log**. Old nap taps from Puptime 1.1 remain unchanged as historical point events.
 
