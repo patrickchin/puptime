@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { useLocalization } from '../localization-context';
 import { type Theme } from '../theme';
 
 export function Toast({
@@ -13,6 +14,8 @@ export function Toast({
   onUndo: () => void;
   theme: Theme;
 }) {
+  const { t } = useLocalization();
+
   return (
     <View
       accessibilityLiveRegion="polite"
@@ -25,11 +28,11 @@ export function Toast({
       {onNote ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Add a note to this log"
+          accessibilityLabel={t('common.addNoteA11y')}
           onPress={onNote}
           style={({ pressed }) => [styles.action, pressed && { opacity: 0.6 }]}
         >
-          <Text style={[styles.actionText, { color: theme.primarySoft }]}>Add note</Text>
+          <Text style={[styles.actionText, { color: theme.primarySoft }]}>{t('common.addNote')}</Text>
         </Pressable>
       ) : null}
       <Pressable
@@ -37,7 +40,7 @@ export function Toast({
         onPress={onUndo}
         style={({ pressed }) => [styles.action, pressed && { opacity: 0.6 }]}
       >
-        <Text style={[styles.actionText, { color: theme.primarySoft }]}>Undo</Text>
+        <Text style={[styles.actionText, { color: theme.primarySoft }]}>{t('common.undo')}</Text>
       </Pressable>
     </View>
   );

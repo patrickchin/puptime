@@ -8,11 +8,17 @@ import { BottomNav, type Tab } from './src/components/BottomNav';
 import { ThemePicker } from './src/components/ThemePicker';
 import { Toast } from './src/components/Toast';
 import type { MissingLogEstimate } from './src/analytics';
+import { LocalizationProvider } from './src/localization-context';
+import {
+  localizedEventPastLabel,
+  resolveLanguage,
+  translate,
+  type LanguagePreference,
+} from './src/localization';
 import {
   createEvent,
   createNapEvent,
   DEFAULT_WIDGET_ACTIONS,
-  eventPastLabel,
   isOpenNap,
   normalizeCustomLabel,
   normalizeEventTypeChange,
@@ -30,11 +36,13 @@ import { configureReminderHandling, requestReminderPermission, syncScheduleRemin
 import {
   appendEvents,
   loadEvents,
+  loadLanguagePreference,
   loadSchedule,
   loadThemePreference,
   loadWidgetActions,
   removeEvent,
   saveSchedule,
+  saveLanguagePreference,
   saveThemePreference,
   saveWidgetActions,
   updateEvent,
@@ -47,8 +55,10 @@ configureReminderHandling();
 export default function App() {
   const colorScheme = useColorScheme();
   const [themePreference, setThemePreference] = useState<ThemePreference>('system');
+  const [languagePreference, setLanguagePreference] = useState<LanguagePreference>('system');
   const [themePickerVisible, setThemePickerVisible] = useState(false);
   const theme = resolveTheme(themePreference, colorScheme);
+  const language = resolveLanguage(languagePreference);
   const [tab, setTab] = useState<Tab>('log');
   const [events, setEvents] = useState<PuppyEvent[]>([]);
   const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
@@ -77,6 +87,7 @@ export default function App() {
 
   useEffect(() => {
     loadThemePreference().then(setThemePreference).catch(() => undefined);
+    loadLanguagePreference().then(setLanguagePreference).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -97,7 +108,7 @@ export default function App() {
         const event = { ...openNap, endedAt: Math.max(openNap.at, now) };
         const nextEvents = await updateEvent(openNap.id, { endedAt: event.endedAt });
         setEvents(nextEvents);
-        setUndoState({ event, restore: openNap, message: 'Nap ended' });
+        setUndoState({ event, restore: openNap, message: translate(language, 'app.napEnded') });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
         updateHomeWidget(nextEvents).catch(() => undefined);
         return;
@@ -107,7 +118,12 @@ export default function App() {
     const event = type === 'nap' ? createNapEvent('app', now) : createEvent(type, 'app', now, customLabel);
     const nextEvents = await appendEvents([event]);
     setEvents(nextEvents);
-    setUndoState({ event, message: type === 'nap' ? 'Nap started' : `${eventPastLabel(event)} logged` });
+    setUndoState({
+      event,
+      message: type === 'nap'
+        ? translate(language, 'app.napStarted')
+        : translate(language, 'app.logged', { activity: localizedEventPastLabel(language, event) }),
+    });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
     updateHomeWidget(nextEvents).catch(() => undefined);
   };
@@ -119,16 +135,24 @@ export default function App() {
     };
     const nextEvents = await appendEvents([event]);
     setEvents(nextEvents);
-    setUndoState({ event, message: `${eventPastLabel(event)} added at estimated time` });
+    setUndoState({
+      event,
+      message: translate(language, 'app.estimateAdded', {
+        activity: localizedEventPastLabel(language, event),
+      }),
+    });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
     updateHomeWidget(nextEvents).catch(() => undefined);
   };
 
   const confirmDelete = (event: PuppyEvent) => {
-    Alert.alert('Delete this log?', `${eventPastLabel(event)} at ${new Date(event.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(translate(language, 'app.deleteTitle'), translate(language, 'app.deleteMessage', {
+      activity: localizedEventPastLabel(language, event),
+      time: new Date(event.at).toLocaleTimeString(language, { hour: 'numeric', minute: '2-digit' }),
+    }), [
+      { text: translate(language, 'app.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: translate(language, 'app.delete'),
         style: 'destructive',
         onPress: async () => {
           const nextEvents = await removeEvent(event.id);
@@ -173,10 +197,10 @@ export default function App() {
     try {
       const synced = await syncScheduleReminders(nextSchedule);
       if (!synced && nextSchedule.some((entry) => entry.reminder)) {
-        Alert.alert('Routine saved', 'Notifications are off, so reminders could not be scheduled.');
+        Alert.alert(translate(language, 'app.routineSaved'), translate(language, 'app.notificationsOff'));
       }
     } catch {
-      Alert.alert('Routine saved', 'Puptime could not update reminders. Try editing the routine again.');
+      Alert.alert(translate(language, 'app.routineSaved'), translate(language, 'app.reminderError'));
     }
   };
 
@@ -185,6 +209,12 @@ export default function App() {
     setThemePickerVisible(false);
     Haptics.selectionAsync().catch(() => undefined);
     saveThemePreference(preference).catch(() => undefined);
+  };
+
+  const chooseLanguage = (preference: LanguagePreference) => {
+    setLanguagePreference(preference);
+    Haptics.selectionAsync().catch(() => undefined);
+    saveLanguagePreference(preference).catch(() => undefined);
   };
 
   const changeWidgetActions = useCallback(async (nextActions: QuickEventType[]) => {
@@ -222,39 +252,43 @@ export default function App() {
         theme={theme}
       />
     );
-  }, [changeWidgetActions, editEventId, events, schedule, tab, theme, widgetActions]);
+  }, [changeWidgetActions, editEventId, events, language, schedule, tab, theme, widgetActions]);
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top', 'left', 'right']}>
-        <StatusBar style={theme.isDark ? 'light' : 'dark'} />
-        <View style={styles.screen}>
-          {screen}
-          {undoState ? (
-            <Toast
-              message={undoState.message}
-              onNote={() => {
-                setTab('log');
-                setEditEventId(undoState.event.id);
-                setUndoState(null);
-              }}
-              onUndo={undo}
-              theme={theme}
-            />
-          ) : null}
-        </View>
-        <SafeAreaView edges={['bottom']} style={{ backgroundColor: theme.nav }}>
-          <BottomNav tab={tab} onChange={setTab} theme={theme} />
+      <LocalizationProvider language={language} voice={theme.presentation.voice}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top', 'left', 'right']}>
+          <StatusBar style={theme.isDark ? 'light' : 'dark'} />
+          <View style={styles.screen}>
+            {screen}
+            {undoState ? (
+              <Toast
+                message={undoState.message}
+                onNote={() => {
+                  setTab('log');
+                  setEditEventId(undoState.event.id);
+                  setUndoState(null);
+                }}
+                onUndo={undo}
+                theme={theme}
+              />
+            ) : null}
+          </View>
+          <SafeAreaView edges={['bottom']} style={{ backgroundColor: theme.nav }}>
+            <BottomNav tab={tab} onChange={setTab} theme={theme} />
+          </SafeAreaView>
+          <ThemePicker
+            visible={themePickerVisible}
+            selected={themePreference}
+            selectedLanguage={languagePreference}
+            colorScheme={colorScheme}
+            theme={theme}
+            onSelect={chooseTheme}
+            onSelectLanguage={chooseLanguage}
+            onClose={() => setThemePickerVisible(false)}
+          />
         </SafeAreaView>
-        <ThemePicker
-          visible={themePickerVisible}
-          selected={themePreference}
-          colorScheme={colorScheme}
-          theme={theme}
-          onSelect={chooseTheme}
-          onClose={() => setThemePickerVisible(false)}
-        />
-      </SafeAreaView>
+      </LocalizationProvider>
     </SafeAreaProvider>
   );
 }

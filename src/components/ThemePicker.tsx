@@ -2,6 +2,12 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useLocalization } from '../localization-context';
+import {
+  languageChoices,
+  type LanguagePreference,
+  type MessageKey,
+} from '../localization';
 import {
   namedThemes,
   resolveTheme,
@@ -13,21 +19,27 @@ import {
 const choices: {
   id: ThemePreference;
   label: string;
-  description: string;
+  descriptionKey: MessageKey;
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
 }[] = [
-  { id: 'system', label: 'System', description: 'Follow this device', icon: 'cellphone-cog' },
-  { id: 'meadow', label: 'Meadow', description: 'Soft journal · relaxed', icon: 'sprout-outline' },
-  { id: 'sunrise', label: 'Sunrise', description: 'Crisp checklist · compact', icon: 'weather-sunset-up' },
-  { id: 'midnight', label: 'Midnight', description: 'Floating cards · spacious', icon: 'weather-night' },
-  { id: 'paper', label: 'Paper', description: 'Monochrome notebook · square', icon: 'book-open-page-variant-outline' },
-  { id: 'bubblegum', label: 'Bubblegum', description: 'Playful bubbles · chunky', icon: 'heart-outline' },
-  { id: 'blueprint', label: 'Blueprint', description: 'Technical grid · dense', icon: 'vector-square' },
-  { id: 'trail', label: 'Trail', description: 'Rugged cards · sturdy', icon: 'pine-tree' },
-  { id: 'tide', label: 'Tide', description: 'Airy capsules · calm', icon: 'waves' },
-  { id: 'plum', label: 'Plum', description: 'Editorial blocks · dramatic', icon: 'flower-outline' },
-  { id: 'contrast', label: 'Contrast', description: 'Bold outlines · maximum clarity', icon: 'contrast-circle' },
+  { id: 'system', label: 'System', descriptionKey: 'language.systemDetail', icon: 'cellphone-cog' },
+  { id: 'meadow', label: 'Meadow', descriptionKey: 'theme.meadow.detail', icon: 'sprout-outline' },
+  { id: 'sunrise', label: 'Sunrise', descriptionKey: 'theme.sunrise.detail', icon: 'weather-sunset-up' },
+  { id: 'midnight', label: 'Midnight', descriptionKey: 'theme.midnight.detail', icon: 'weather-night' },
+  { id: 'paper', label: 'Paper', descriptionKey: 'theme.paper.detail', icon: 'book-open-page-variant-outline' },
+  { id: 'bubblegum', label: 'Bubblegum', descriptionKey: 'theme.bubblegum.detail', icon: 'heart-outline' },
+  { id: 'blueprint', label: 'Blueprint', descriptionKey: 'theme.blueprint.detail', icon: 'vector-square' },
+  { id: 'trail', label: 'Trail', descriptionKey: 'theme.trail.detail', icon: 'pine-tree' },
+  { id: 'tide', label: 'Tide', descriptionKey: 'theme.tide.detail', icon: 'waves' },
+  { id: 'plum', label: 'Plum', descriptionKey: 'theme.plum.detail', icon: 'flower-outline' },
+  { id: 'contrast', label: 'Contrast', descriptionKey: 'theme.contrast.detail', icon: 'contrast-circle' },
 ];
+
+const languageLabels: Record<Exclude<LanguagePreference, 'system'>, string> = {
+  en: 'English',
+  'zh-Hans': '简体中文',
+  es: 'Español',
+};
 
 function previewTheme(
   preference: ThemePreference,
@@ -40,18 +52,24 @@ function previewTheme(
 export function ThemePicker({
   visible,
   selected,
+  selectedLanguage,
   colorScheme,
   theme,
   onSelect,
+  onSelectLanguage,
   onClose,
 }: {
   visible: boolean;
   selected: ThemePreference;
+  selectedLanguage: LanguagePreference;
   colorScheme: 'light' | 'dark' | 'unspecified' | null;
   theme: Theme;
   onSelect: (preference: ThemePreference) => void;
+  onSelectLanguage: (preference: LanguagePreference) => void;
   onClose: () => void;
 }) {
+  const { t } = useLocalization();
+
   return (
     <Modal
       animationType="slide"
@@ -62,7 +80,7 @@ export function ThemePicker({
     >
       <View style={styles.modal}>
         <Pressable
-          accessibilityLabel="Close theme picker"
+          accessibilityLabel={t('appearance.close')}
           onPress={onClose}
           style={[StyleSheet.absoluteFill, styles.backdrop]}
         />
@@ -92,12 +110,12 @@ export function ThemePicker({
                   },
                 ]}
               >
-                Choose a theme
+                {t('appearance.title')}
               </Text>
-              <Text style={[styles.subtitle, { color: theme.textMuted }]}>10 styles to compare · saved on this device.</Text>
+              <Text style={[styles.subtitle, { color: theme.textMuted }]}>{t('appearance.subtitle')}</Text>
             </View>
             <Pressable
-              accessibilityLabel="Close theme picker"
+              accessibilityLabel={t('appearance.close')}
               accessibilityRole="button"
               onPress={onClose}
               style={({ pressed }) => [
@@ -123,13 +141,23 @@ export function ThemePicker({
             showsVerticalScrollIndicator={false}
             style={styles.choiceScroll}
           >
+            <Text
+              style={[
+                styles.sectionLabel,
+                { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking },
+              ]}
+            >
+              {t('appearance.themeHeading')}
+            </Text>
             {choices.map((choice) => {
               const active = selected === choice.id;
               const preview = previewTheme(choice.id, colorScheme);
+              const label = choice.id === 'system' ? t('language.system') : choice.label;
+              const description = t(choice.descriptionKey);
               return (
                 <Pressable
                   key={choice.id}
-                  accessibilityLabel={`${choice.label}. ${choice.description}`}
+                  accessibilityLabel={`${label}. ${description}`}
                   accessibilityRole="radio"
                   accessibilityState={{ checked: active }}
                   onPress={() => onSelect(choice.id)}
@@ -161,8 +189,8 @@ export function ThemePicker({
                     />
                   </View>
                   <View style={styles.choiceCopy}>
-                    <Text style={[styles.choiceLabel, { color: theme.text }]}>{choice.label}</Text>
-                    <Text style={[styles.choiceDescription, { color: theme.textMuted }]}>{choice.description}</Text>
+                    <Text style={[styles.choiceLabel, { color: theme.text }]}>{label}</Text>
+                    <Text style={[styles.choiceDescription, { color: theme.textMuted }]}>{description}</Text>
                   </View>
                   <View
                     accessibilityElementsHidden
@@ -209,6 +237,62 @@ export function ThemePicker({
                 </Pressable>
               );
             })}
+
+            <View style={styles.languageHeading}>
+              <Text
+                style={[
+                  styles.sectionLabel,
+                  { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking },
+                ]}
+              >
+                {t('appearance.languageHeading')}
+              </Text>
+              <Text style={[styles.languageHint, { color: theme.textMuted }]}>{t('appearance.languageHint')}</Text>
+            </View>
+            {languageChoices.map((preference) => {
+              const active = selectedLanguage === preference;
+              const label = preference === 'system' ? t('language.system') : languageLabels[preference];
+              const detail = preference === 'system' ? t('language.systemDetail') : t(`language.${preference}`);
+              return (
+                <Pressable
+                  key={preference}
+                  accessibilityLabel={`${label}. ${detail}`}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: active }}
+                  onPress={() => onSelectLanguage(preference)}
+                  style={({ pressed }) => [
+                    styles.languageChoice,
+                    {
+                      backgroundColor: active || pressed ? theme.primarySoft : theme.surface,
+                      borderColor: active ? theme.primary : theme.border,
+                      borderRadius: theme.presentation.controlRadius,
+                      borderWidth: theme.presentation.borderWidth,
+                    },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    accessibilityElementsHidden
+                    importantForAccessibility="no"
+                    name={preference === 'system' ? 'cellphone-cog' : 'translate'}
+                    size={21}
+                    color={active ? theme.primary : theme.textMuted}
+                  />
+                  <View style={styles.choiceCopy}>
+                    <Text style={[styles.choiceLabel, { color: theme.text }]}>{label}</Text>
+                    {preference === 'system' ? (
+                      <Text style={[styles.choiceDescription, { color: theme.textMuted }]}>{detail}</Text>
+                    ) : null}
+                  </View>
+                  <MaterialCommunityIcons
+                    accessibilityElementsHidden
+                    importantForAccessibility="no"
+                    name={active ? 'check-circle' : 'circle-outline'}
+                    size={22}
+                    color={active ? theme.primary : theme.border}
+                  />
+                </Pressable>
+              );
+            })}
           </ScrollView>
         </SafeAreaView>
       </View>
@@ -234,6 +318,7 @@ const styles = StyleSheet.create({
   closeButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
   choiceScroll: { flexShrink: 1 },
   choices: { gap: spacing.sm, paddingTop: spacing.lg, paddingBottom: spacing.md },
+  sectionLabel: { fontSize: 11, lineHeight: 15, fontWeight: '800', marginBottom: 2 },
   choice: {
     minHeight: 68,
     paddingHorizontal: 12,
@@ -250,4 +335,14 @@ const styles = StyleSheet.create({
   previewCard: { flex: 1, paddingHorizontal: 5, flexDirection: 'row', alignItems: 'center', gap: 4 },
   previewMark: { width: 8, height: 8 },
   previewLine: { width: 17, height: 3, borderRadius: 2, opacity: 0.65 },
+  languageHeading: { marginTop: spacing.md, gap: 3 },
+  languageHint: { fontSize: 12, lineHeight: 17, marginBottom: spacing.xs },
+  languageChoice: {
+    minHeight: 58,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+  },
 });

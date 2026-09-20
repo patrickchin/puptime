@@ -1,17 +1,16 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { type Theme } from '../theme';
+import { useLocalization } from '../localization-context';
+import { navigationIcon, type Theme } from '../theme';
 
 export type Tab = 'log' | 'insights' | 'schedule';
 
-const tabs: { id: Tab; label: string; icon: keyof typeof MaterialCommunityIcons.glyphMap }[] = [
-  { id: 'log', label: 'Today', icon: 'home-variant-outline' },
-  { id: 'insights', label: 'Insights', icon: 'chart-timeline-variant' },
-  { id: 'schedule', label: 'Schedule', icon: 'calendar-clock-outline' },
-];
+const tabs: Tab[] = ['log', 'insights', 'schedule'];
 
 export function BottomNav({ tab, onChange, theme }: { tab: Tab; onChange: (tab: Tab) => void; theme: Theme }) {
+  const { t } = useLocalization();
+
   return (
     <View
       style={[
@@ -24,13 +23,15 @@ export function BottomNav({ tab, onChange, theme }: { tab: Tab; onChange: (tab: 
       ]}
     >
       {tabs.map((item) => {
-        const selected = item.id === tab;
+        const selected = item === tab;
+        const label = t(`nav.${item}`);
         return (
           <Pressable
-            key={item.id}
+            key={item}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
-            onPress={() => onChange(item.id)}
+            accessibilityLabel={label}
+            onPress={() => onChange(item)}
             style={({ pressed }) => [styles.tab, pressed && { opacity: 0.62 }]}
           >
             <View
@@ -44,12 +45,12 @@ export function BottomNav({ tab, onChange, theme }: { tab: Tab; onChange: (tab: 
               ]}
             >
               <MaterialCommunityIcons
-                name={item.icon}
+                name={navigationIcon(theme, item) as keyof typeof MaterialCommunityIcons.glyphMap}
                 size={23}
                 color={selected ? theme.primary : theme.textMuted}
               />
             </View>
-            <Text style={[styles.label, { color: selected ? theme.primary : theme.textMuted }]}>{item.label}</Text>
+            <Text style={[styles.label, { color: selected ? theme.primary : theme.textMuted }]}>{label}</Text>
           </Pressable>
         );
       })}

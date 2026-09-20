@@ -15,7 +15,6 @@ import {
   formatTime,
   normalizeCustomLabel,
   quickEventTypes,
-  relativeTime,
   replaceCalendarDate,
   replaceClockTime,
   type EventType,
@@ -24,28 +23,26 @@ import {
   type PuppyEventChanges,
   type ScheduleEntry,
 } from '../domain';
-import { spacing, surfaceTreatment, type Theme } from '../theme';
+import { useLocalization } from '../localization-context';
+import type { MessageKey } from '../localization';
+import { eventIcon, spacing, surfaceTreatment, type Theme } from '../theme';
 
 const quickBackdates = [0, 5, 15, 30, 60] as const;
 const editableEventTypes = eventTypes.filter((type) => type !== 'nap');
 const autoSaveDelayMs = 450;
 const recentHistoryDays = 10;
-const sectionDate = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
-const sectionDateWithYear = new Intl.DateTimeFormat(undefined, {
-  weekday: 'long',
-  month: 'short',
-  day: 'numeric',
-  year: 'numeric',
-});
-const archiveMonth = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
-
-const activityFilters = [
-  { id: 'all', label: 'All', icon: 'format-list-bulleted', types: [] },
-  { id: 'potty', label: 'Potty', icon: 'water-outline', types: ['pee', 'poop', 'pottyTrip'] },
-  { id: 'meals', label: 'Meals', icon: 'food-apple-outline', types: ['meal'] },
-  { id: 'walks', label: 'Walks', icon: 'walk', types: ['walk'] },
-  { id: 'naps', label: 'Naps', icon: 'sleep', types: ['nap'] },
-  { id: 'other', label: 'Other', icon: 'tag-outline', types: ['custom'] },
+const activityFilters: readonly {
+  id: string;
+  labelKey: MessageKey;
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  types: readonly EventType[];
+}[] = [
+  { id: 'all', labelKey: 'log.filter.all', icon: 'format-list-bulleted', types: [] },
+  { id: 'potty', labelKey: 'log.filter.potty', icon: 'water-outline', types: ['pee', 'poop', 'pottyTrip'] },
+  { id: 'meals', labelKey: 'log.filter.meals', icon: 'food-apple-outline', types: ['meal'] },
+  { id: 'walks', labelKey: 'log.filter.walks', icon: 'walk', types: ['walk'] },
+  { id: 'naps', labelKey: 'log.filter.naps', icon: 'sleep', types: ['nap'] },
+  { id: 'other', labelKey: 'log.filter.other', icon: 'tag-outline', types: ['custom'] },
 ] as const;
 
 type ActivityFilter = (typeof activityFilters)[number]['id'];
@@ -93,8 +90,8 @@ function draftChanges(draft: Draft): PuppyEventChanges {
   };
 }
 
-function dateLabel(value: number): string {
-  return new Intl.DateTimeFormat(undefined, {
+function dateLabel(value: number, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
@@ -102,15 +99,26 @@ function dateLabel(value: number): string {
   }).format(value);
 }
 
-function sectionTitle(key: string, todayKey: string, yesterdayKey: string, currentYear: number): string {
+function sectionTitle(
+  key: string,
+  todayKey: string,
+  yesterdayKey: string,
+  currentYear: number,
+  locale: string,
+  today: string,
+  yesterday: string,
+): string {
   const date = new Date(`${key}T12:00:00`);
-  if (key === todayKey) return 'Today';
-  if (key === yesterdayKey) return 'Yesterday';
-  return (date.getFullYear() === currentYear ? sectionDate : sectionDateWithYear).format(date);
+  if (key === todayKey) return today;
+  if (key === yesterdayKey) return yesterday;
+  const options: Intl.DateTimeFormatOptions = { weekday: 'long', month: 'short', day: 'numeric' };
+  if (date.getFullYear() !== currentYear) options.year = 'numeric';
+  return new Intl.DateTimeFormat(locale, options).format(date);
 }
 
-function monthTitle(key: string): string {
-  return archiveMonth.format(new Date(`${key}-01T12:00:00`));
+function monthTitle(key: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' })
+    .format(new Date(`${key}-01T12:00:00`));
 }
 
 export function LogScreen({
@@ -140,6 +148,7 @@ export function LogScreen({
   onWidgetActionsChange: (actions: QuickEventType[]) => Promise<void>;
   theme: Theme;
 }) {
+  const { eventLabel, eventPastLabel, locale, relativeTime, t, voiceCopy } = useLocalization();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [pickerMode, setPickerMode] = useState<'date' | 'time' | null>(null);
   const [customTouched, setCustomTouched] = useState(false);
@@ -299,34 +308,45 @@ export function LogScreen({
       previousMonth = monthKey;
       return {
         key,
-        title: sectionTitle(key, todayKey, yesterdayKey, currentYear),
+        title: sectionTitle(
+          key,
+          todayKey,
+          yesterdayKey,
+          currentYear,
+          locale,
+          t('log.today'),
+          t('log.yesterday'),
+        ),
         data,
-        monthTitle: startsMonth ? monthTitle(monthKey) : undefined,
+        monthTitle: startsMonth ? monthTitle(monthKey, locale) : undefined,
       };
     });
-  }, [currentYear, historyScope, todayKey, visibleEvents, yesterdayKey]);
+  }, [currentYear, historyScope, locale, t, todayKey, visibleEvents, yesterdayKey]);
   const timedNap = draft?.event.type === 'nap' && draft.event.endedAt !== undefined;
   const activeValue = draft?.field === 'end' ? draft.endedAt ?? Date.now() : draft?.at ?? Date.now();
   const pickerDate = new Date(activeValue);
   const draftMeta = draft ? EVENT_META[draft.type] : EVENT_META.pee;
   const customInvalid = draft?.type === 'custom' && !normalizeCustomLabel(draft.customLabel);
-  const draftLabel = draft?.type === 'custom'
-    ? normalizeCustomLabel(draft.customLabel) ?? 'Other activity'
-    : draftMeta.pastLabel;
+  const draftLabel = !draft
+    ? ''
+    : draft.type === 'custom'
+      ? normalizeCustomLabel(draft.customLabel) ?? eventPastLabel({ ...draft.event, type: 'custom', customLabel: undefined })
+      : eventPastLabel({ ...draft.event, type: draft.type });
   const selectedFilter = activityFilters.find((item) => item.id === activityFilter) ?? activityFilters[0];
-  const todayLabel = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+  const todayLabel = new Intl.DateTimeFormat(locale, { weekday: 'short', month: 'short', day: 'numeric' })
     .format(now)
     .toUpperCase();
+  const homeCopy = voiceCopy(todayLabel);
 
   const statusPresentation = customInvalid
-    ? { icon: 'alert-circle-outline', text: 'Add a custom name to save this activity.', color: theme.danger }
+    ? { icon: 'alert-circle-outline', text: t('editor.customNameStatus'), color: theme.danger }
     : saveStatus === 'saving'
-      ? { icon: 'cloud-upload-outline', text: 'Saving changes…', color: theme.primary }
+      ? { icon: 'cloud-upload-outline', text: t('editor.saving'), color: theme.primary }
       : saveStatus === 'saved'
-        ? { icon: 'check-circle-outline', text: 'Saved automatically', color: theme.primary }
+        ? { icon: 'check-circle-outline', text: t('editor.saved'), color: theme.primary }
         : saveStatus === 'error'
-          ? { icon: 'alert-circle-outline', text: 'Couldn’t save. Tap to retry.', color: theme.danger }
-          : { icon: 'cloud-check-outline', text: 'Changes save automatically', color: theme.textMuted };
+          ? { icon: 'alert-circle-outline', text: t('editor.retry'), color: theme.danger }
+          : { icon: 'cloud-check-outline', text: t('editor.autoSave'), color: theme.textMuted };
 
   const setDraftTime = (value: number) => {
     updateDraft((current) => {
@@ -366,7 +386,7 @@ export function LogScreen({
     }
     closingRef.current = false;
     setClosing(false);
-    Alert.alert('Couldn’t save changes', 'Keep the editor open and tap the save status to try again.');
+    Alert.alert(t('log.saveErrorTitle'), t('log.saveErrorBody'));
   };
 
   const handleSystemClose = () => {
@@ -397,7 +417,7 @@ export function LogScreen({
       await onWidgetActionsChange(widgetDraft);
       setShowWidgetSettings(false);
     } catch {
-      Alert.alert('Couldn’t save widget settings', 'Try again.');
+      Alert.alert(t('log.widgetErrorTitle'), t('log.tryAgain'));
     } finally {
       setSavingWidgetSettings(false);
     }
@@ -443,7 +463,7 @@ export function LogScreen({
                     { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking },
                   ]}
                 >
-                  PUPTIME · {todayLabel}
+                  {homeCopy.eyebrow}
                 </Text>
                 <Text
                   style={[
@@ -457,12 +477,12 @@ export function LogScreen({
                     },
                   ]}
                 >
-                  What just happened?
+                  {homeCopy.title}
                 </Text>
               </View>
               <View style={styles.headerActions}>
                 <Pressable
-                  accessibilityLabel="Customize home-screen widget"
+                  accessibilityLabel={t('log.customizeWidgetA11y')}
                   accessibilityRole="button"
                   onPress={openWidgetSettings}
                   style={({ pressed }) => [
@@ -484,7 +504,7 @@ export function LogScreen({
                   />
                 </Pressable>
                 <Pressable
-                  accessibilityLabel="Change appearance theme"
+                  accessibilityLabel={t('log.changeAppearanceA11y')}
                   accessibilityRole="button"
                   onPress={onOpenThemePicker}
                   style={({ pressed }) => [
@@ -507,7 +527,7 @@ export function LogScreen({
                 </Pressable>
               </View>
             </View>
-            <Text style={[styles.subtitle, { color: theme.textMuted }]}>One tap saves the time. Nap toggles between start and end.</Text>
+            <Text style={[styles.subtitle, { color: theme.textMuted }]}>{homeCopy.subtitle}</Text>
             <QuickActions events={events} onLog={onLog} now={now} theme={theme} />
             <TodayRoutineCard
               events={events}
@@ -517,9 +537,9 @@ export function LogScreen({
               theme={theme}
             />
             <View style={styles.activityHeading}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>Activity</Text>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('log.activity')}</Text>
               <Text style={[styles.count, { color: theme.textMuted }]}>
-                {historyScope === 'all' ? `${visibleEvents.length} total` : `${visibleEvents.length} recent`}
+                {t(historyScope === 'all' ? 'log.totalCount' : 'log.recentCount', { count: visibleEvents.length })}
               </Text>
             </View>
             <ScrollView
@@ -529,12 +549,13 @@ export function LogScreen({
             >
               {activityFilters.map((item) => {
                 const selected = activityFilter === item.id;
+                const label = t(item.labelKey);
                 return (
                   <Pressable
                     key={item.id}
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
-                    accessibilityLabel={`Show ${item.label.toLowerCase()} activity`}
+                    accessibilityLabel={t('log.showFilter', { filter: label })}
                     onPress={() => setActivityFilter(item.id)}
                     style={({ pressed }) => [
                       styles.filter,
@@ -552,7 +573,7 @@ export function LogScreen({
                       color={selected ? theme.primary : theme.textMuted}
                     />
                     <Text style={[styles.filterText, { color: selected ? theme.primary : theme.textMuted }]}>
-                      {item.label}
+                      {label}
                     </Text>
                   </Pressable>
                 );
@@ -562,8 +583,8 @@ export function LogScreen({
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={historyScope === 'all'
-                  ? `Show activity from the last ${recentHistoryDays} days`
-                  : `View all activity history, including ${olderEventCount} older ${olderEventCount === 1 ? 'log' : 'logs'}`}
+                  ? t('log.showRecentA11y', { count: recentHistoryDays })
+                  : t('log.viewAllA11y', { count: olderEventCount })}
                 onPress={() => setHistoryScope((scope) => scope === 'recent' ? 'all' : 'recent')}
                 style={({ pressed }) => [
                   styles.historyScope,
@@ -591,12 +612,14 @@ export function LogScreen({
                 </View>
                 <View style={styles.historyScopeCopy}>
                   <Text style={[styles.historyScopeTitle, { color: theme.text }]}>
-                    {historyScope === 'all' ? `Show recent ${recentHistoryDays} days` : 'View all history'}
+                    {historyScope === 'all'
+                      ? t('log.showRecent', { count: recentHistoryDays })
+                      : t('log.viewAll')}
                   </Text>
                   <Text style={[styles.historyScopeDetail, { color: theme.textMuted }]}>
                     {historyScope === 'all'
-                      ? 'Return to the activity that matters most now'
-                      : `${olderEventCount} older ${olderEventCount === 1 ? 'log' : 'logs'} grouped by month`}
+                      ? t('log.recentDetail')
+                      : t('log.olderDetail', { count: olderEventCount })}
                   </Text>
                 </View>
                 <MaterialCommunityIcons
@@ -658,10 +681,12 @@ export function LogScreen({
           >
             <MaterialCommunityIcons name={selectedFilter.icon as keyof typeof MaterialCommunityIcons.glyphMap} size={28} color={theme.textMuted} />
             <Text style={[styles.emptyTitle, { color: theme.text }]}>
-              {activityFilter === 'all' ? 'Your log starts here' : `No ${selectedFilter.label.toLowerCase()} logged`}
+              {activityFilter === 'all'
+                ? t('log.emptyTitle')
+                : t('log.emptyFilteredTitle', { filter: t(selectedFilter.labelKey).toLocaleLowerCase(locale) })}
             </Text>
             <Text style={[styles.emptyBody, { color: theme.textMuted }]}>
-              {activityFilter === 'all' ? 'Tap an action above when it happens.' : 'Choose another filter or log an activity above.'}
+              {t(activityFilter === 'all' ? 'log.emptyBody' : 'log.emptyFilteredBody')}
             </Text>
           </View>
         }
@@ -692,7 +717,7 @@ export function LogScreen({
                 ]}
               >
                 <MaterialCommunityIcons
-                  name={draftMeta.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+                  name={eventIcon(theme, draft?.type ?? 'pee') as keyof typeof MaterialCommunityIcons.glyphMap}
                   color={draftMeta.color}
                   size={23}
                 />
@@ -708,19 +733,19 @@ export function LogScreen({
                     },
                   ]}
                 >
-                  {timedNap ? 'Edit nap' : 'Edit log'}
+                  {t(timedNap ? 'editor.editNap' : 'editor.editLog')}
                 </Text>
                 <Text
                   style={[styles.sheetSubtitle, { color: theme.textMuted }]}
                 >
                   {draft?.event.type === 'nap'
-                    ? `${draftLabel} · Correct the timing or note.`
-                    : `${draftLabel} · Correct the activity, timing, or note.`}
+                    ? t('editor.napSubtitle', { activity: draftLabel })
+                    : t('editor.logSubtitle', { activity: draftLabel })}
                 </Text>
               </View>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Close log editor"
+                accessibilityLabel={t('editor.close')}
                 accessibilityState={{ busy: closing, disabled: closing }}
                 disabled={closing}
                 onPress={() => void requestCloseEditor()}
@@ -737,7 +762,7 @@ export function LogScreen({
             {saveStatus === 'error' ? (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Couldn’t save changes. Retry now"
+                accessibilityLabel={t('editor.retryA11y')}
                 onPress={() => void flushAutoSave(true)}
                 style={({ pressed }) => [
                   styles.saveStatus,
@@ -751,7 +776,7 @@ export function LogScreen({
                 ]}
               >
                 <MaterialCommunityIcons name="alert-circle-outline" color={theme.danger} size={18} />
-                <Text style={[styles.saveStatusText, { color: theme.danger }]}>Couldn’t save. Tap to retry.</Text>
+                <Text style={[styles.saveStatusText, { color: theme.danger }]}>{t('editor.retry')}</Text>
               </Pressable>
             ) : (
               <View
@@ -779,17 +804,18 @@ export function LogScreen({
 
             {draft && draft.event.type !== 'nap' ? (
               <>
-                <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>ACTIVITY</Text>
+                <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{t('editor.activity')}</Text>
                 <View style={styles.typePicker}>
                   {editableEventTypes.map((type) => {
                     const meta = EVENT_META[type];
                     const selected = draft.type === type;
+                    const label = eventLabel(type);
                     return (
                       <Pressable
                         key={type}
                         accessibilityRole="button"
                         accessibilityState={{ selected }}
-                        accessibilityLabel={`Change activity to ${meta.label}`}
+                        accessibilityLabel={t('editor.changeActivity', { activity: label })}
                         onPress={() => {
                           setCustomTouched(false);
                           updateDraft((current) => ({ ...current, type }));
@@ -805,12 +831,12 @@ export function LogScreen({
                         ]}
                       >
                         <MaterialCommunityIcons
-                          name={meta.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+                          name={eventIcon(theme, type) as keyof typeof MaterialCommunityIcons.glyphMap}
                           color={selected ? meta.color : theme.textMuted}
                           size={20}
                         />
                         <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.typeChoiceText, { color: selected ? meta.color : theme.text }]}>
-                          {meta.label}
+                          {label}
                         </Text>
                       </Pressable>
                     );
@@ -818,10 +844,10 @@ export function LogScreen({
                 </View>
                 {draft.type === 'custom' ? (
                   <View style={styles.customField}>
-                    <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>CUSTOM NAME</Text>
+                    <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{t('editor.customName')}</Text>
                     <TextInput
-                      accessibilityLabel="Custom activity name"
-                      accessibilityHint="Required. Changes save automatically after you type."
+                      accessibilityLabel={t('editor.customNameA11y')}
+                      accessibilityHint={t('editor.customNameHint')}
                       autoCapitalize="sentences"
                       maxLength={40}
                       onBlur={() => {
@@ -833,7 +859,7 @@ export function LogScreen({
                         Keyboard.dismiss();
                         void flushAutoSave();
                       }}
-                      placeholder="e.g. Grooming"
+                      placeholder={t('editor.customPlaceholder')}
                       placeholderTextColor={theme.textMuted}
                       returnKeyType="done"
                       value={draft.customLabel}
@@ -852,7 +878,7 @@ export function LogScreen({
                       accessibilityLiveRegion="polite"
                       style={[styles.customHint, { color: customTouched && customInvalid ? theme.danger : theme.textMuted }]}
                     >
-                      {customTouched && customInvalid ? 'Enter an activity name.' : 'Use a short name you’ll recognize in the log.'}
+                      {t(customTouched && customInvalid ? 'editor.customInvalid' : 'editor.customValid')}
                     </Text>
                   </View>
                 ) : null}
@@ -868,13 +894,13 @@ export function LogScreen({
             >
               <Text style={[styles.previewTime, { color: theme.text }]}>
                 {timedNap
-                  ? `${formatTime(draft?.at ?? Date.now())}–${typeof draft?.endedAt === 'number' ? formatTime(draft.endedAt) : 'now'}`
+                  ? `${formatTime(draft?.at ?? Date.now())}–${typeof draft?.endedAt === 'number' ? formatTime(draft.endedAt) : t('editor.now')}`
                   : formatTime(draft?.at ?? Date.now())}
               </Text>
               <Text style={[styles.previewDate, { color: theme.textMuted }]}>
                 {timedNap
-                  ? `${formatDuration((draft?.endedAt ?? Date.now()) - (draft?.at ?? Date.now()))}${draft?.endedAt === null ? ' · in progress' : ''}`
-                  : `${dateLabel(draft?.at ?? Date.now())} · ${relativeTime(draft?.at ?? Date.now())}`}
+                  ? `${formatDuration((draft?.endedAt ?? Date.now()) - (draft?.at ?? Date.now()))}${draft?.endedAt === null ? ` · ${t('editor.inProgress')}` : ''}`
+                  : `${dateLabel(draft?.at ?? Date.now(), locale)} · ${relativeTime(draft?.at ?? Date.now())}`}
               </Text>
             </View>
 
@@ -883,12 +909,13 @@ export function LogScreen({
                 {(['start', 'end'] as const).map((field) => {
                   const selected = draft?.field === field;
                   const value = field === 'start' ? draft?.at : draft?.endedAt;
+                  const fieldLabel = t(field === 'start' ? 'editor.start' : 'editor.end');
                   return (
                     <Pressable
                       key={field}
                       accessibilityRole="button"
                       accessibilityState={{ selected }}
-                      accessibilityLabel={`Edit nap ${field} time`}
+                      accessibilityLabel={t('editor.editNapTime', { field: fieldLabel })}
                       onPress={() => updateDraft((current) => ({ ...current, field }), false)}
                       style={({ pressed }) => [
                         styles.timeField,
@@ -900,9 +927,9 @@ export function LogScreen({
                         },
                       ]}
                     >
-                      <Text style={[styles.timeFieldLabel, { color: theme.textMuted }]}>{field.toUpperCase()}</Text>
+                      <Text style={[styles.timeFieldLabel, { color: theme.textMuted }]}>{fieldLabel}</Text>
                       <Text style={[styles.timeFieldValue, { color: theme.text }]}>
-                        {typeof value === 'number' ? formatTime(value) : 'In progress'}
+                        {typeof value === 'number' ? formatTime(value) : t('editor.inProgress')}
                       </Text>
                     </Pressable>
                   );
@@ -911,14 +938,18 @@ export function LogScreen({
             ) : null}
 
             <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>
-              {timedNap ? `SET ${draft?.field?.toUpperCase() ?? 'START'}` : 'QUICK BACKDATE'}
+              {timedNap
+                ? t('editor.setField', { field: t(draft?.field === 'end' ? 'editor.end' : 'editor.start') })
+                : t('editor.quickBackdate')}
             </Text>
             <View style={styles.quickTimes}>
               {quickBackdates.map((minutes) => (
                 <Pressable
                   key={minutes}
                   accessibilityRole="button"
-                  accessibilityLabel={minutes ? `Set time to ${minutes} minutes ago` : 'Set time to now'}
+                  accessibilityLabel={minutes
+                    ? t('editor.backdate', { count: minutes })
+                    : t('editor.setNow')}
                   onPress={() => setDraftTime(Date.now() - minutes * 60_000)}
                   style={({ pressed }) => [
                     styles.quickTime,
@@ -930,17 +961,22 @@ export function LogScreen({
                     },
                   ]}
                 >
-                  <Text style={[styles.quickTimeText, { color: theme.text }]}>{minutes ? `${minutes}m ago` : 'Now'}</Text>
+                  <Text style={[styles.quickTimeText, { color: theme.text }]}>
+                    {minutes ? t('editor.minutesAgo', { count: minutes }) : t('editor.now')}
+                  </Text>
                 </Pressable>
               ))}
             </View>
 
-            <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>DATE & TIME</Text>
+            <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{t('editor.dateTime')}</Text>
             <View style={styles.exactFields}>
               <Pressable
                 accessibilityRole="button"
                 accessibilityState={{ selected: pickerMode === 'date' }}
-                accessibilityLabel={`Choose ${draft?.field ?? 'log'} date, currently ${dateLabel(activeValue)}`}
+                accessibilityLabel={t('editor.chooseDate', {
+                  field: t(draft?.field === 'end' ? 'editor.end' : 'editor.start'),
+                  date: dateLabel(activeValue, locale),
+                })}
                 onPress={() => setPickerMode('date')}
                 style={({ pressed }) => [
                   styles.exactField,
@@ -954,13 +990,16 @@ export function LogScreen({
               >
                 <MaterialCommunityIcons name="calendar-outline" size={21} color={theme.primary} />
                 <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.exactFieldText, { color: theme.text }]}>
-                  {dateLabel(activeValue)}
+                  {dateLabel(activeValue, locale)}
                 </Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
                 accessibilityState={{ selected: pickerMode === 'time' }}
-                accessibilityLabel={`Choose exact ${draft?.field ?? 'log'} time, currently ${formatTime(activeValue)}`}
+                accessibilityLabel={t('editor.chooseTime', {
+                  field: t(draft?.field === 'end' ? 'editor.end' : 'editor.start'),
+                  time: formatTime(activeValue),
+                })}
                 onPress={() => setPickerMode('time')}
                 style={({ pressed }) => [
                   styles.exactField,
@@ -988,20 +1027,22 @@ export function LogScreen({
                 {Platform.OS === 'ios' ? (
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`Finish choosing ${pickerMode}`}
+                    accessibilityLabel={t('editor.finishPicker', {
+                      picker: t(pickerMode === 'date' ? 'editor.date' : 'editor.time'),
+                    })}
                     onPress={() => {
                       setPickerMode(null);
                       void flushAutoSave();
                     }}
                     style={({ pressed }) => [styles.pickerDone, pressed && { backgroundColor: theme.primarySoft }]}
                   >
-                    <Text style={[styles.pickerDoneText, { color: theme.primary }]}>Done</Text>
+                    <Text style={[styles.pickerDoneText, { color: theme.primary }]}>{t('common.done')}</Text>
                   </Pressable>
                 ) : null}
               </>
             ) : null}
 
-            <Text style={[styles.fieldLabel, styles.noteLabel, { color: theme.textMuted }]}>NOTE</Text>
+            <Text style={[styles.fieldLabel, styles.noteLabel, { color: theme.textMuted }]}>{t('editor.note')}</Text>
             {draft ? (
               <NoteInput
                 key={draft.event.id}
@@ -1050,13 +1091,13 @@ export function LogScreen({
                     },
                   ]}
                 >
-                  Customize widget
+                  {t('widget.title')}
                 </Text>
-                <Text style={[styles.sheetSubtitle, { color: theme.textMuted }]}>Choose 2–4 actions. Small widgets show them in one row.</Text>
+                <Text style={[styles.sheetSubtitle, { color: theme.textMuted }]}>{t('widget.subtitle')}</Text>
               </View>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Close widget settings"
+                accessibilityLabel={t('widget.close')}
                 onPress={() => setShowWidgetSettings(false)}
                 style={({ pressed }) => [
                   styles.closeButton,
@@ -1068,7 +1109,9 @@ export function LogScreen({
               </Pressable>
             </View>
 
-            <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>WIDGET ACTIONS · {widgetDraft.length} OF 4</Text>
+            <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>
+              {t('widget.actions', { count: widgetDraft.length })}
+            </Text>
             <View style={styles.widgetActionList}>
               {quickEventTypes.map((type) => {
                 const meta = EVENT_META[type];
@@ -1076,13 +1119,14 @@ export function LogScreen({
                 const locked = (selected && widgetDraft.length === 2) || (!selected && widgetDraft.length === 4);
                 const actionColor = theme.isDark ? meta.darkColor : meta.color;
                 const actionSoftColor = theme.isDark ? meta.darkSoftColor : meta.softColor;
+                const label = eventLabel(type);
                 return (
                   <Pressable
                     key={type}
                     accessibilityRole="checkbox"
                     accessibilityState={{ checked: selected, disabled: locked }}
-                    accessibilityLabel={`${selected ? 'Remove' : 'Add'} ${meta.label.toLowerCase()} ${selected ? 'from' : 'to'} the widget`}
-                    accessibilityHint={locked ? (selected ? 'Keep at least two widget actions.' : 'Remove another action first.') : undefined}
+                    accessibilityLabel={t(selected ? 'widget.removeAction' : 'widget.addAction', { activity: label })}
+                    accessibilityHint={locked ? t(selected ? 'widget.keepTwo' : 'widget.removeFirst') : undefined}
                     disabled={locked}
                     onPress={() => toggleWidgetAction(type)}
                     style={({ pressed }) => [
@@ -1102,18 +1146,22 @@ export function LogScreen({
                         { backgroundColor: actionSoftColor, borderRadius: theme.presentation.iconRadius },
                       ]}
                     >
-                      <MaterialCommunityIcons name={meta.icon as keyof typeof MaterialCommunityIcons.glyphMap} size={21} color={actionColor} />
+                      <MaterialCommunityIcons
+                        name={eventIcon(theme, type) as keyof typeof MaterialCommunityIcons.glyphMap}
+                        size={21}
+                        color={actionColor}
+                      />
                     </View>
-                    <Text style={[styles.widgetActionText, { color: theme.text }]}>{meta.label}</Text>
+                    <Text style={[styles.widgetActionText, { color: theme.text }]}>{label}</Text>
                     <MaterialCommunityIcons name={selected ? 'check-circle' : 'circle-outline'} size={22} color={selected ? actionColor : theme.textMuted} />
                   </Pressable>
                 );
               })}
             </View>
-            <Text style={[styles.widgetHint, { color: theme.textMuted }]}>Nap stays available while a nap is running, even if you hide it from the default set.</Text>
+            <Text style={[styles.widgetHint, { color: theme.textMuted }]}>{t('widget.napHint')}</Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Save widget settings"
+              accessibilityLabel={t('widget.save')}
               accessibilityState={{ busy: savingWidgetSettings, disabled: savingWidgetSettings }}
               disabled={savingWidgetSettings}
               onPress={() => void saveWidgetSettings()}
@@ -1126,7 +1174,9 @@ export function LogScreen({
                 },
               ]}
             >
-              <Text style={[styles.widgetSaveButtonText, { color: theme.onPrimary }]}>{savingWidgetSettings ? 'Saving…' : 'Done'}</Text>
+              <Text style={[styles.widgetSaveButtonText, { color: theme.onPrimary }]}>
+                {t(savingWidgetSettings ? 'common.saving' : 'common.done')}
+              </Text>
             </Pressable>
           </ScrollView>
         </View>

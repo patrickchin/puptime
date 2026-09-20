@@ -3,13 +3,13 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
   EVENT_META,
-  eventPastLabel,
   formatDuration,
   formatTime,
   isOpenNap,
   type PuppyEvent,
 } from '../domain';
-import { spacing, surfaceTreatment, type Theme } from '../theme';
+import { useLocalization } from '../localization-context';
+import { eventIcon, spacing, surfaceTreatment, type Theme } from '../theme';
 
 export function EventRow({
   event,
@@ -24,14 +24,16 @@ export function EventRow({
   now: number;
   theme: Theme;
 }) {
+  const { eventPastLabel, t } = useLocalization();
   const meta = EVENT_META[event.type];
   const note = event.note?.trim();
   const timedNap = event.type === 'nap' && event.endedAt !== undefined;
   const running = isOpenNap(event);
   const duration = timedNap ? formatDuration((event.endedAt ?? now) - event.at) : null;
   const timeSummary = timedNap
-    ? `${formatTime(event.at)}–${running ? 'now' : formatTime(event.endedAt as number)} · ${duration}${running ? ' running' : ''}`
-    : `${formatTime(event.at)} · ${event.source === 'widget' ? 'Widget' : 'App'}`;
+    ? `${formatTime(event.at)}–${running ? t('eventRow.now') : formatTime(event.endedAt as number)} · ${duration}${running ? ` ${t('eventRow.running')}` : ''}`
+    : `${formatTime(event.at)} · ${t(event.source === 'widget' ? 'eventRow.widget' : 'eventRow.app')}`;
+  const pastLabel = eventPastLabel(event);
   return (
     <View
       style={[
@@ -47,13 +49,13 @@ export function EventRow({
         ]}
       >
         <MaterialCommunityIcons
-          name={meta.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+          name={eventIcon(theme, event.type) as keyof typeof MaterialCommunityIcons.glyphMap}
           color={meta.color}
           size={22}
         />
       </View>
       <View style={styles.copy}>
-        <Text numberOfLines={1} style={[styles.label, { color: theme.text }]}>{eventPastLabel(event)}</Text>
+        <Text numberOfLines={1} style={[styles.label, { color: theme.text }]}>{pastLabel}</Text>
         <Text numberOfLines={1} style={[styles.source, { color: theme.textMuted }]}>{timeSummary}</Text>
         {note ? (
           <View style={styles.noteRow}>
@@ -64,10 +66,10 @@ export function EventRow({
       </View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Edit ${eventPastLabel(event).toLowerCase()} log`}
+        accessibilityLabel={t('eventRow.edit', { activity: pastLabel })}
         accessibilityHint={event.type === 'nap'
-          ? 'Opens date, time, and note controls'
-          : 'Opens activity, date, time, and note controls'}
+          ? t('eventRow.editNapHint')
+          : t('eventRow.editHint')}
         onPress={onEdit}
         style={({ pressed }) => [
           styles.editButton,
@@ -79,7 +81,7 @@ export function EventRow({
       </Pressable>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Delete ${eventPastLabel(event).toLowerCase()} at ${formatTime(event.at)}`}
+        accessibilityLabel={t('eventRow.delete', { activity: pastLabel, time: formatTime(event.at) })}
         hitSlop={8}
         onPress={onDelete}
         style={({ pressed }) => [

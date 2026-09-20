@@ -9,11 +9,13 @@ import {
   type QuickEventType,
   type ScheduleEntry,
 } from './domain';
+import { isLanguagePreference, type LanguagePreference } from './localization';
 import { isThemePreference, type ThemePreference } from './theme';
 
 const EVENTS_KEY = 'puptime.events.v1';
 const SCHEDULE_KEY = 'puptime.schedule.v1';
 const THEME_KEY = 'puptime.theme.v1';
+const LANGUAGE_KEY = 'puptime.language.v1';
 const WIDGET_ACTIONS_KEY = 'puptime.widgetActions.v1';
 
 let writeQueue = Promise.resolve();
@@ -95,6 +97,15 @@ export async function loadThemePreference(): Promise<ThemePreference> {
 
 export function saveThemePreference(preference: ThemePreference): Promise<void> {
   return AsyncStorage.setItem(THEME_KEY, preference);
+}
+
+export async function loadLanguagePreference(): Promise<LanguagePreference> {
+  const stored = await AsyncStorage.getItem(LANGUAGE_KEY);
+  return isLanguagePreference(stored) ? stored : 'system';
+}
+
+export function saveLanguagePreference(preference: LanguagePreference): Promise<void> {
+  return AsyncStorage.setItem(LANGUAGE_KEY, preference);
 }
 
 export async function loadWidgetActions(): Promise<QuickEventType[]> {

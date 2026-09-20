@@ -25,8 +25,10 @@ import {
   type TimelineMark,
 } from '../analytics';
 import { dateKey, EVENT_META, eventTypes, formatDuration, formatTime, type EventType, type PuppyEvent } from '../domain';
+import { useLocalization } from '../localization-context';
+import { localizedEventLabel, translate, type AppLanguage } from '../localization';
 import { shareEventsCsv } from '../share-export';
-import { spacing, surfaceTreatment, type Theme } from '../theme';
+import { eventIcon, spacing, surfaceTreatment, type Theme } from '../theme';
 
 const TIMELINE_DAYS = 10;
 const MISSING_LOG_DAYS = 14;
@@ -34,36 +36,43 @@ const activityFilters = ['all', ...eventTypes] as const;
 const horizontalZoomLevels = [1, 1.5, 2] as const;
 const verticalZoomLevels = [38, 52, 68] as const;
 const verticalZoomLabels = ['75%', '100%', '130%'] as const;
-const shortDay = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
-const shortDate = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
-const fullDate = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
-const rangeDate = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-const longMonth = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
-const estimateDate = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-const bucketTime = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
 const MONTH_PREVIEW_COUNT = 6;
 
-function formatBucket(bucket: number): string {
-  return bucketTime.format(new Date(2000, 0, 1, 0, bucket * TIMELINE_BUCKET_MINUTES));
+function formatBucket(bucket: number, language: AppLanguage): string {
+  return new Intl.DateTimeFormat(language, { hour: 'numeric', minute: '2-digit' })
+    .format(new Date(2000, 0, 1, 0, bucket * TIMELINE_BUCKET_MINUTES));
 }
 
-function describeMark(mark: TimelineMark): string {
+function describeMark(mark: TimelineMark, language: AppLanguage): string {
+  const activity = localizedEventLabel(language, mark.type);
   return mark.endBucket === undefined
-    ? `${mark.label} in the ${formatBucket(mark.startBucket)} to ${formatBucket(mark.startBucket + 1)} window`
-    : `${mark.label} from about ${formatBucket(mark.startBucket)} to ${formatBucket(mark.endBucket)}`;
+    ? translate(language, 'insights.pointWindow', {
+      activity,
+      start: formatBucket(mark.startBucket, language),
+      end: formatBucket(mark.startBucket + 1, language),
+    })
+    : translate(language, 'insights.durationWindow', {
+      activity,
+      start: formatBucket(mark.startBucket, language),
+      end: formatBucket(mark.endBucket, language),
+    });
 }
 
-function filterName(types: readonly EventType[]): string {
-  if (types.length === eventTypes.length) return 'activity';
-  if (types.length === 1) return EVENT_META[types[0]].label.toLowerCase();
-  return 'selected activity';
+function filterName(types: readonly EventType[], language: AppLanguage): string {
+  if (types.length === eventTypes.length) return translate(language, 'insights.activity');
+  if (types.length === 1) return localizedEventLabel(language, types[0]).toLocaleLowerCase(language);
+  return translate(language, 'insights.selectedActivity');
 }
 
-function selectionTitle(types: readonly EventType[]): string {
-  if (types.length === 0) return 'No activities selected';
-  if (types.length === eventTypes.length) return 'All activity';
-  if (types.length <= 2) return `${types.map((type) => EVENT_META[type].label).join(' + ')} timing`;
-  return `${types.length} activities`;
+function selectionTitle(types: readonly EventType[], language: AppLanguage): string {
+  if (types.length === 0) return translate(language, 'insights.noSelected');
+  if (types.length === eventTypes.length) return translate(language, 'insights.allActivity');
+  if (types.length <= 2) {
+    return translate(language, 'insights.timing', {
+      activities: types.map((type) => localizedEventLabel(language, type)).join(' + '),
+    });
+  }
+  return translate(language, 'insights.activityCount', { count: types.length });
 }
 
 function calendarDayDistance(older: Date, newer: Date): number {
@@ -71,14 +80,14 @@ function calendarDayDistance(older: Date, newer: Date): number {
   return Math.max(0, Math.round((utc(newer) - utc(older)) / 86_400_000));
 }
 
-function formatHour(hour: number): string {
-  if (hour === 0 || hour === 24) return '12a';
-  if (hour < 12) return `${hour}a`;
-  if (hour === 12) return '12p';
-  return `${hour - 12}p`;
+function formatHour(hour: number, language: AppLanguage): string {
+  return new Intl.DateTimeFormat(language, { hour: 'numeric' })
+    .format(new Date(2000, 0, 1, hour % 24));
 }
 
-function formatDateRange(start: Date, end: Date): string {
+function formatDateRange(start: Date, end: Date, language: AppLanguage): string {
+  const shortDate = new Intl.DateTimeFormat(language, { month: 'short', day: 'numeric' });
+  const rangeDate = new Intl.DateTimeFormat(language, { month: 'short', day: 'numeric', year: 'numeric' });
   return start.getFullYear() === end.getFullYear()
     ? `${shortDate.format(start)} – ${rangeDate.format(end)}`
     : `${rangeDate.format(start)} – ${rangeDate.format(end)}`;
@@ -93,25 +102,33 @@ function durationFromMinutes(minutes?: number): string {
 }
 
 function FrequencyRow({ stat, theme }: { stat: ActivityFrequencyStat; theme: Theme }) {
+  const { eventLabel, t } = useLocalization();
   const meta = EVENT_META[stat.type];
+  const label = eventLabel(stat.type);
   const color = eventColor(stat.type, theme);
-  const dailyValue = stat.total ? `${stat.averagePerRecordedDay.toFixed(1)}/day` : '—';
+  const dailyValue = stat.total ? t('insights.perDay', { value: stat.averagePerRecordedDay.toFixed(1) }) : '—';
   const dailyDetail = stat.total
     ? stat.minimumPerRecordedDay === stat.maximumPerRecordedDay
-      ? `${stat.minimumPerRecordedDay} on each recorded day`
-      : `${stat.minimumPerRecordedDay}–${stat.maximumPerRecordedDay} per recorded day`
-    : `No ${meta.label.toLowerCase()} logs yet`;
+      ? t('insights.eachRecordedDay', { count: stat.minimumPerRecordedDay })
+      : t('insights.rangePerDay', {
+        minimum: stat.minimumPerRecordedDay,
+        maximum: stat.maximumPerRecordedDay,
+      })
+    : t('insights.noLogsYet', { activity: label.toLocaleLowerCase() });
   const intervalValue = durationFromMinutes(stat.medianIntervalMinutes);
   const intervalDetail = stat.medianIntervalMinutes === undefined
-    ? 'Need another log'
+    ? t('insights.needAnotherLog')
     : stat.intervalSamples >= 4
-      ? `Middle half: ${durationFromMinutes(stat.lowerIntervalMinutes)}–${durationFromMinutes(stat.upperIntervalMinutes)}`
-      : `${stat.intervalSamples} ${stat.intervalSamples === 1 ? 'gap' : 'gaps'} observed`;
+      ? t('insights.middleHalf', {
+        lower: durationFromMinutes(stat.lowerIntervalMinutes),
+        upper: durationFromMinutes(stat.upperIntervalMinutes),
+      })
+      : t('insights.gapsObserved', { count: stat.intervalSamples });
 
   return (
     <View
       accessible
-      accessibilityLabel={`${meta.label}. ${dailyValue}, ${dailyDetail}. Typical gap ${intervalValue}. ${intervalDetail}.`}
+      accessibilityLabel={`${label}. ${dailyValue}, ${dailyDetail}. ${t('insights.typicalGap')} ${intervalValue}. ${intervalDetail}.`}
       style={[styles.frequencyRow, { borderColor: theme.border }]}
     >
       <View style={styles.activityHeading}>
@@ -127,24 +144,24 @@ function FrequencyRow({ stat, theme }: { stat: ActivityFrequencyStat; theme: The
           <MaterialCommunityIcons
             accessibilityElementsHidden
             importantForAccessibility="no"
-            name={meta.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+            name={eventIcon(theme, stat.type) as keyof typeof MaterialCommunityIcons.glyphMap}
             size={20}
             color={color}
           />
         </View>
-        <Text style={[styles.activityName, { color: theme.text }]}>{meta.label}</Text>
-        <Text style={[styles.logCount, { color: theme.textMuted }]}>{stat.total} logs</Text>
+        <Text style={[styles.activityName, { color: theme.text }]}>{label}</Text>
+        <Text style={[styles.logCount, { color: theme.textMuted }]}>{t('insights.logCount', { count: stat.total })}</Text>
       </View>
       <View style={styles.metrics}>
         <View style={styles.metric}>
           <Text style={[styles.metricValue, { color: theme.text }]}>{dailyValue}</Text>
-          <Text style={[styles.metricLabel, { color: theme.textMuted }]}>AVERAGE FREQUENCY</Text>
+          <Text style={[styles.metricLabel, { color: theme.textMuted }]}>{t('insights.averageFrequency')}</Text>
           <Text style={[styles.metricDetail, { color: theme.textMuted }]}>{dailyDetail}</Text>
         </View>
         <View style={[styles.metricDivider, { backgroundColor: theme.border }]} />
         <View style={styles.metric}>
           <Text style={[styles.metricValue, { color: theme.text }]}>{intervalValue}</Text>
-          <Text style={[styles.metricLabel, { color: theme.textMuted }]}>TYPICAL GAP</Text>
+          <Text style={[styles.metricLabel, { color: theme.textMuted }]}>{t('insights.typicalGap')}</Text>
           <Text style={[styles.metricDetail, { color: theme.textMuted }]}>{intervalDetail}</Text>
         </View>
       </View>
@@ -165,12 +182,16 @@ function TimelineDateLabel({
   rowHeight: number;
   theme: Theme;
 }) {
+  const { language, t } = useLocalization();
   const marks = day.marks.filter((mark) => selectedTypes.includes(mark.type));
   const description = marks.length
-    ? marks.map(describeMark).join('. ')
+    ? marks.map((mark) => describeMark(mark, language)).join('. ')
     : selectedTypes.length
-      ? `No ${filterName(selectedTypes)} logged`
-      : 'No activity selected';
+      ? t('insights.noLogged', { activity: filterName(selectedTypes, language) })
+      : t('insights.noActivitySelected');
+  const fullDate = new Intl.DateTimeFormat(language, { weekday: 'long', month: 'long', day: 'numeric' });
+  const shortDay = new Intl.DateTimeFormat(language, { weekday: 'short' });
+  const shortDate = new Intl.DateTimeFormat(language, { month: 'short', day: 'numeric' });
 
   return (
     <View
@@ -179,7 +200,7 @@ function TimelineDateLabel({
       style={[styles.dateCell, { height: rowHeight }]}
     >
       <Text maxFontSizeMultiplier={1.5} style={[styles.weekday, { color: isToday ? theme.primary : theme.text }]}>
-        {isToday ? 'TODAY' : shortDay.format(day.date).toUpperCase()}
+        {isToday ? t('insights.today') : shortDay.format(day.date).toUpperCase()}
       </Text>
       <Text maxFontSizeMultiplier={1.5} style={[styles.calendarDate, { color: theme.textMuted }]}>
         {shortDate.format(day.date)}
@@ -278,6 +299,7 @@ function TimelineTrack({
 }
 
 function TimelineAxis({ hours, theme }: { hours: readonly number[]; theme: Theme }) {
+  const { language } = useLocalization();
   return (
     <View style={styles.axisTrack} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       {hours.map((hour) => (
@@ -294,7 +316,7 @@ function TimelineAxis({ hours, theme }: { hours: readonly number[]; theme: Theme
             { color: theme.textMuted },
           ]}
         >
-          {formatHour(hour)}
+          {formatHour(hour, language)}
         </Text>
       ))}
     </View>
@@ -318,6 +340,7 @@ function ZoomControl({
   onIncrease: () => void;
   theme: Theme;
 }) {
+  const { t } = useLocalization();
   const buttonStyle = (pressed: boolean, enabled: boolean) => [
     styles.zoomButton,
     {
@@ -344,7 +367,7 @@ function ZoomControl({
       <View style={styles.stepper}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Decrease ${label.toLowerCase()}`}
+          accessibilityLabel={t('insights.decrease', { control: label.toLocaleLowerCase() })}
           accessibilityState={{ disabled: !canDecrease }}
           disabled={!canDecrease}
           onPress={onDecrease}
@@ -368,7 +391,7 @@ function ZoomControl({
         </Text>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Increase ${label.toLowerCase()}`}
+          accessibilityLabel={t('insights.increase', { control: label.toLocaleLowerCase() })}
           accessibilityState={{ disabled: !canIncrease }}
           disabled={!canIncrease}
           onPress={onIncrease}
@@ -402,21 +425,30 @@ function MonthlyRow({
   color: string;
   theme: Theme;
 }) {
+  const { language, t } = useLocalization();
   const average = stat.averagePerRecordedDay.toFixed(1);
-  const month = longMonth.format(stat.date);
+  const month = new Intl.DateTimeFormat(language, { month: 'long', year: 'numeric' }).format(stat.date);
   const barWidth = (stat.total ? `${Math.max(4, (stat.averagePerRecordedDay / maxAverage) * 100)}%` : '0%') as `${number}%`;
 
   return (
     <View
       accessible
-      accessibilityLabel={`${month}. ${average} ${activityLabel} logs per recorded day. ${stat.total} logs across ${stat.recordedDays} recorded ${stat.recordedDays === 1 ? 'day' : 'days'}.`}
+      accessibilityLabel={t('insights.monthA11y', {
+        month,
+        average,
+        activity: activityLabel,
+        logs: stat.total,
+        days: stat.recordedDays,
+      })}
       style={[styles.monthRow, { borderColor: theme.border }, isCurrent && { backgroundColor: theme.primarySoft }]}
     >
       <View style={styles.monthHeading}>
         <Text style={[styles.monthName, { color: isCurrent ? theme.primary : theme.text }]}>
-          {isCurrent ? 'This month' : month}
+          {isCurrent ? t('insights.thisMonth') : month}
         </Text>
-        <Text style={[styles.monthAverage, { color: isCurrent ? theme.primary : theme.text }]}>{average}/day</Text>
+        <Text style={[styles.monthAverage, { color: isCurrent ? theme.primary : theme.text }]}>
+          {t('insights.perDay', { value: average })}
+        </Text>
       </View>
       <View
         accessibilityElementsHidden
@@ -426,7 +458,7 @@ function MonthlyRow({
         <View style={[styles.monthBar, { backgroundColor: color, width: barWidth }]} />
       </View>
       <Text style={[styles.monthDetail, { color: theme.textMuted }]}>
-        {isCurrent ? `${month} · ` : ''}{stat.total} {stat.total === 1 ? 'log' : 'logs'} · {stat.recordedDays} {stat.recordedDays === 1 ? 'day' : 'days'} with activity
+        {isCurrent ? `${month} · ` : ''}{t('insights.monthDetail', { logs: stat.total, days: stat.recordedDays })}
       </Text>
     </View>
   );
@@ -441,6 +473,7 @@ export function InsightsScreen({
   onAddEstimate: (estimate: MissingLogEstimate) => Promise<void>;
   theme: Theme;
 }) {
+  const { eventLabel, language, t } = useLocalization();
   const { width } = useWindowDimensions();
   const [selectedTypes, setSelectedTypes] = useState<EventType[]>([...eventTypes]);
   const [horizontalZoom, setHorizontalZoom] = useState(0);
@@ -478,7 +511,7 @@ export function InsightsScreen({
   const tickHours = Array.from({ length: 24 / tickStep + 1 }, (_, index) => index * tickStep);
   const gridHours = tickHours.slice(1, -1);
   const rangeLabel = days.length
-    ? formatDateRange(days[0].date, days[days.length - 1].date)
+    ? formatDateRange(days[0].date, days[days.length - 1].date, language)
     : '';
   const monthly = useMemo(
     () => monthlyActivityStats(
@@ -505,7 +538,7 @@ export function InsightsScreen({
     try {
       await shareEventsCsv(events);
     } catch {
-      Alert.alert('Couldn’t export activity', 'Please try again. Your Puptime data is unchanged.');
+      Alert.alert(t('insights.exportErrorTitle'), t('insights.exportErrorBody'));
     } finally {
       setExporting(false);
     }
@@ -517,7 +550,7 @@ export function InsightsScreen({
     try {
       await onAddEstimate(estimate);
     } catch {
-      Alert.alert('Couldn’t add this estimate', 'Your activity history is unchanged. Please try again.');
+      Alert.alert(t('insights.estimateErrorTitle'), t('insights.estimateErrorBody'));
     } finally {
       setAddingEstimateId(null);
     }
@@ -531,7 +564,7 @@ export function InsightsScreen({
           { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking },
         ]}
       >
-        DAILY RHYTHM · 15 MINUTE WINDOWS
+        {t('insights.eyebrow')}
       </Text>
       <Text
         style={[
@@ -545,10 +578,10 @@ export function InsightsScreen({
           },
         ]}
       >
-        When things happen
+        {t('insights.title')}
       </Text>
       <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-        Compare timing across days—not totals or targets.
+        {t('insights.subtitle')}
       </Text>
 
       <View
@@ -578,9 +611,12 @@ export function InsightsScreen({
             />
           </View>
           <View style={styles.panelHeadingCopy}>
-            <Text style={[styles.panelTitle, { color: theme.text }]}>Frequency from your logs</Text>
+            <Text style={[styles.panelTitle, { color: theme.text }]}>{t('insights.frequencyTitle')}</Text>
             <Text style={[styles.panelCaption, { color: theme.textMuted }]}>
-              Last {frequency.periodDays} days · {frequency.recordedDays} {frequency.recordedDays === 1 ? 'day' : 'days'} with activity · observations, not goals
+              {t('insights.frequencyCaption', {
+                period: frequency.periodDays,
+                recorded: frequency.recordedDays,
+              })}
             </Text>
           </View>
         </View>
@@ -594,7 +630,7 @@ export function InsightsScreen({
             },
           ]}
         >
-          Daily averages include zeroes on days where you logged something else. Completely blank days are excluded because they may be unlogged.
+          {t('insights.frequencyNote')}
         </Text>
         <View>
           {frequency.stats.map((stat) => <FrequencyRow key={stat.type} stat={stat} theme={theme} />)}
@@ -628,9 +664,9 @@ export function InsightsScreen({
             />
           </View>
           <View style={styles.panelHeadingCopy}>
-            <Text style={[styles.panelTitle, { color: theme.text }]}>Possible gaps</Text>
+            <Text style={[styles.panelTitle, { color: theme.text }]}>{t('insights.gapsTitle')}</Text>
             <Text style={[styles.panelCaption, { color: theme.textMuted }]}>
-              Repeated times from {missingLogs.daysAnalyzed} active {missingLogs.daysAnalyzed === 1 ? 'day' : 'days'}
+              {t('insights.gapsCaption', { count: missingLogs.daysAnalyzed })}
             </Text>
           </View>
         </View>
@@ -644,20 +680,34 @@ export function InsightsScreen({
             },
           ]}
         >
-          A suggestion appears only when the same activity was logged near that time on at least 3 other days and logging continued afterward. Nothing is added automatically.
+          {t('insights.gapsNote')}
         </Text>
         {missingLogs.estimates.length ? (
           <View style={styles.estimateList}>
             {missingLogs.estimates.map((estimate) => {
               const meta = EVENT_META[estimate.type];
-              const activityName = estimate.type === 'meal' ? 'Meal' : meta.label;
+              const activityName = estimate.type === 'meal' ? t('insights.mealName') : eventLabel(estimate.type);
               const color = eventColor(estimate.type, theme);
               const softColor = theme.isDark ? meta.darkSoftColor : meta.softColor;
               const adding = addingEstimateId === estimate.id;
               const time = estimate.endedAt === undefined
-                ? `around ${formatTime(estimate.at)}`
-                : `about ${formatTime(estimate.at)}–${formatTime(estimate.endedAt)}`;
-              const title = estimate.type === 'nap' ? 'Possible unlogged nap' : `${activityName} may be unlogged`;
+                ? t('insights.around', { time: formatTime(estimate.at) })
+                : t('insights.aboutRange', {
+                  start: formatTime(estimate.at),
+                  end: formatTime(estimate.endedAt),
+                });
+              const title = estimate.type === 'nap'
+                ? t('insights.possibleNap')
+                : t('insights.mayBeUnlogged', { activity: activityName });
+              const estimateDate = new Intl.DateTimeFormat(language, {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+              });
+              const evidence = t('insights.seenEvidence', {
+                observed: estimate.observedDays,
+                compared: estimate.comparedDays,
+              });
               return (
                 <View
                   key={estimate.id}
@@ -674,7 +724,7 @@ export function InsightsScreen({
                     <MaterialCommunityIcons
                       accessibilityElementsHidden
                       importantForAccessibility="no"
-                      name={meta.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+                      name={eventIcon(theme, estimate.type) as keyof typeof MaterialCommunityIcons.glyphMap}
                       size={20}
                       color={color}
                     />
@@ -693,18 +743,18 @@ export function InsightsScreen({
                   </View>
                   <View
                     accessible
-                    accessibilityLabel={`${title}. ${estimateDate.format(estimate.at)}, ${time}. Seen on ${estimate.observedDays} of ${estimate.comparedDays} other active days.`}
+                    accessibilityLabel={`${title}. ${estimateDate.format(estimate.at)}, ${time}. ${evidence}`}
                     style={styles.estimateCopy}
                   >
                     <Text style={[styles.estimateTitle, { color: theme.text }]}>{title}</Text>
                     <Text style={[styles.estimateTime, { color }]}>{estimateDate.format(estimate.at)} · {time}</Text>
                     <Text style={[styles.estimateEvidence, { color: theme.textMuted }]}>
-                      Seen near this time on {estimate.observedDays} of {estimate.comparedDays} other active days.
+                      {evidence}
                     </Text>
                   </View>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`Add ${activityName.toLowerCase()} at the estimated time`}
+                    accessibilityLabel={t('insights.addEstimateA11y', { activity: activityName })}
                     accessibilityState={{ busy: adding, disabled: addingEstimateId !== null }}
                     disabled={addingEstimateId !== null}
                     onPress={() => void addEstimate(estimate)}
@@ -733,7 +783,9 @@ export function InsightsScreen({
                         color={theme.onPrimary}
                       />
                     )}
-                    <Text style={[styles.addEstimateText, { color: theme.onPrimary }]}>{adding ? 'Adding…' : 'Add log'}</Text>
+                    <Text style={[styles.addEstimateText, { color: theme.onPrimary }]}>
+                      {t(adding ? 'insights.adding' : 'insights.addLog')}
+                    </Text>
                   </Pressable>
                 </View>
               );
@@ -750,16 +802,16 @@ export function InsightsScreen({
             />
             <Text style={[styles.noEstimateText, { color: theme.textMuted }]}>
               {missingLogs.daysAnalyzed < 4
-                ? `Log activity on ${4 - missingLogs.daysAnalyzed} more ${4 - missingLogs.daysAnalyzed === 1 ? 'day' : 'days'} to check for gaps.`
-                : `No strong gaps found in the last ${missingLogs.periodDays} days.`}
+                ? t('insights.needGapDays', { count: 4 - missingLogs.daysAnalyzed })
+                : t('insights.noGaps', { count: missingLogs.periodDays })}
             </Text>
           </View>
         )}
       </View>
 
       <View style={styles.filterHeading}>
-        <Text style={[styles.filterTitle, { color: theme.text }]}>Timeline activities</Text>
-        <Text style={[styles.filterHint, { color: theme.textMuted }]}>Select any combination</Text>
+        <Text style={[styles.filterTitle, { color: theme.text }]}>{t('insights.timelineActivities')}</Text>
+        <Text style={[styles.filterHint, { color: theme.textMuted }]}>{t('insights.selectCombination')}</Text>
       </View>
       <View style={styles.filters}>
         {activityFilters.map((type) => {
@@ -773,9 +825,8 @@ export function InsightsScreen({
             : selectedTypes.includes(type);
           const active = checked !== false;
           const selected = checked === true;
-          const meta = type === 'all'
-            ? { label: 'All', icon: 'layers-outline' }
-            : EVENT_META[type];
+          const label = isAll ? t('insights.all') : eventLabel(type);
+          const icon = isAll ? 'layers-outline' : eventIcon(theme, type);
           const color = type === 'all' ? theme.primary : eventColor(type, theme);
           const softColor = type === 'all'
             ? theme.primarySoft
@@ -785,8 +836,8 @@ export function InsightsScreen({
               key={type}
               accessibilityRole="checkbox"
               accessibilityLabel={isAll
-                ? allSelected ? 'Clear all activity filters' : 'Select all activity filters'
-                : `${selected ? 'Hide' : 'Show'} ${meta.label} timing`}
+                ? t(allSelected ? 'insights.clearFilters' : 'insights.selectFilters')
+                : t(selected ? 'insights.hideTiming' : 'insights.showTiming', { activity: label })}
               accessibilityState={{ checked }}
               onPress={() => isAll
                 ? setSelectedTypes(allSelected ? [] : [...eventTypes])
@@ -805,12 +856,12 @@ export function InsightsScreen({
               <MaterialCommunityIcons
                 accessibilityElementsHidden
                 importantForAccessibility="no"
-                name={meta.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+                name={icon as keyof typeof MaterialCommunityIcons.glyphMap}
                 size={18}
                 color={color}
               />
               <Text style={[styles.filterLabel, { color: active ? color : theme.textMuted }]}>
-                {meta.label}
+                {label}
               </Text>
               {active ? (
                 <MaterialCommunityIcons
@@ -854,10 +905,10 @@ export function InsightsScreen({
           </View>
           <View style={styles.panelHeadingCopy}>
             <Text style={[styles.panelTitle, { color: theme.text }]}>
-              {selectionTitle(selectedTypes)}
+              {selectionTitle(selectedTypes, language)}
             </Text>
             <Text style={[styles.panelCaption, { color: theme.textMuted }]}>
-              {rangeLabel} · {visibleEventCount} {visibleEventCount === 1 ? 'log' : 'logs'} · oldest at top
+              {t('insights.panelCaption', { range: rangeLabel, count: visibleEventCount })}
             </Text>
           </View>
         </View>
@@ -875,7 +926,7 @@ export function InsightsScreen({
         >
           <View style={styles.zoomControls}>
             <ZoomControl
-              label="Time width"
+              label={t('insights.timeWidth')}
               value={`${Math.round(horizontalZoomLevels[horizontalZoom] * 100)}%`}
               canDecrease={horizontalZoom > 0}
               canIncrease={horizontalZoom < horizontalZoomLevels.length - 1}
@@ -884,7 +935,7 @@ export function InsightsScreen({
               theme={theme}
             />
             <ZoomControl
-              label="Day height"
+              label={t('insights.dayHeight')}
               value={verticalZoomLabels[verticalZoom]}
               canDecrease={verticalZoom > 0}
               canIncrease={verticalZoom < verticalZoomLevels.length - 1}
@@ -894,14 +945,14 @@ export function InsightsScreen({
             />
           </View>
           <Text style={[styles.zoomHint, { color: theme.textMuted }]}>
-            Enlarge the time width, then swipe the chart sideways to inspect busy periods.
+            {t('insights.zoomHint')}
           </Text>
         </View>
 
         <View style={styles.rangeNavigator}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Show earlier dates"
+            accessibilityLabel={t('insights.showEarlier')}
             accessibilityState={{ disabled: currentHistoryPage >= maxHistoryPage }}
             disabled={currentHistoryPage >= maxHistoryPage}
             onPress={() => setHistoryPage(Math.min(maxHistoryPage, currentHistoryPage + 1))}
@@ -922,17 +973,17 @@ export function InsightsScreen({
               size={19}
               color={theme.text}
             />
-            <Text style={[styles.rangeButtonText, { color: theme.text }]}>Earlier</Text>
+            <Text style={[styles.rangeButtonText, { color: theme.text }]}>{t('insights.earlier')}</Text>
           </Pressable>
           <View style={styles.rangeCopy}>
             <Text style={[styles.rangeLabel, { color: theme.text }]}>{rangeLabel}</Text>
             <Text style={[styles.rangeStatus, { color: theme.textMuted }]}>
-              {currentHistoryPage === 0 ? `Latest ${TIMELINE_DAYS} days` : `Older ${TIMELINE_DAYS}-day window`}
+              {t(currentHistoryPage === 0 ? 'insights.latestDays' : 'insights.olderWindow', { count: TIMELINE_DAYS })}
             </Text>
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Show newer dates"
+            accessibilityLabel={t('insights.showNewer')}
             accessibilityState={{ disabled: currentHistoryPage === 0 }}
             disabled={currentHistoryPage === 0}
             onPress={() => setHistoryPage(Math.max(0, currentHistoryPage - 1))}
@@ -946,7 +997,7 @@ export function InsightsScreen({
               },
             ]}
           >
-            <Text style={[styles.rangeButtonText, { color: theme.text }]}>Newer</Text>
+            <Text style={[styles.rangeButtonText, { color: theme.text }]}>{t('insights.newer')}</Text>
             <MaterialCommunityIcons
               accessibilityElementsHidden
               importantForAccessibility="no"
@@ -1012,8 +1063,8 @@ export function InsightsScreen({
             />
             <Text style={[styles.emptyText, { color: theme.textMuted }]}>
               {selectedTypes.length === 0
-                ? 'Choose at least one activity above to show it on the timeline.'
-                : `No ${filterName(selectedTypes)} logged in this date range.`}
+                ? t('insights.chooseActivity')
+                : t('insights.noRangeLogs', { activity: filterName(selectedTypes, language) })}
             </Text>
           </View>
         ) : null}
@@ -1047,9 +1098,12 @@ export function InsightsScreen({
               />
             </View>
             <View style={styles.panelHeadingCopy}>
-              <Text style={[styles.panelTitle, { color: theme.text }]}>Month-by-month context</Text>
+              <Text style={[styles.panelTitle, { color: theme.text }]}>{t('insights.historyTitle')}</Text>
               <Text style={[styles.panelCaption, { color: theme.textMuted }]}>
-                {selectionTitle(selectedTypes)} · newest first · recent {TIMELINE_DAYS}-day detail stays above
+                {t('insights.historyCaption', {
+                  selection: selectionTitle(selectedTypes, language),
+                  count: TIMELINE_DAYS,
+                })}
               </Text>
             </View>
           </View>
@@ -1063,7 +1117,7 @@ export function InsightsScreen({
               },
             ]}
           >
-            Monthly pace uses days where you recorded any activity, so incomplete or missed months are not treated as zeroes.
+            {t('insights.historyNote')}
           </Text>
           <View style={styles.months}>
             {visibleMonths.map((stat) => (
@@ -1071,7 +1125,7 @@ export function InsightsScreen({
                 key={stat.key}
                 stat={stat}
                 maxAverage={maxMonthlyAverage}
-                activityLabel={filterName(selectedTypes)}
+                activityLabel={filterName(selectedTypes, language)}
                 isCurrent={stat.key === currentMonthKey}
                 color={historyColor}
                 theme={theme}
@@ -1094,7 +1148,9 @@ export function InsightsScreen({
               ]}
             >
               <Text style={[styles.historyToggleText, { color: theme.primary }]}>
-                {showAllMonths ? 'Show recent months' : `Show all ${monthly.length} months`}
+                {showAllMonths
+                  ? t('insights.showRecentMonths')
+                  : t('insights.showAllMonths', { count: monthly.length })}
               </Text>
               <MaterialCommunityIcons
                 accessibilityElementsHidden
@@ -1135,16 +1191,16 @@ export function InsightsScreen({
             />
           </View>
           <View style={styles.exportCopy}>
-            <Text style={[styles.panelTitle, { color: theme.text }]}>Your data</Text>
+            <Text style={[styles.panelTitle, { color: theme.text }]}>{t('insights.dataTitle')}</Text>
             <Text style={[styles.panelCaption, { color: theme.textMuted }]}>
-              Share every log as a spreadsheet-ready CSV. Nothing leaves this device until you choose where to send it.
+              {t('insights.dataBody')}
             </Text>
           </View>
         </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={events.length ? 'Export all activity as CSV' : 'No activity to export'}
-          accessibilityHint={events.length ? 'Opens the system share sheet' : undefined}
+          accessibilityLabel={t(events.length ? 'insights.exportA11y' : 'insights.noExport')}
+          accessibilityHint={events.length ? t('insights.exportHint') : undefined}
           accessibilityState={{ busy: exporting, disabled: exportDisabled }}
           disabled={exportDisabled}
           onPress={exportActivity}
@@ -1169,7 +1225,11 @@ export function InsightsScreen({
             />
           )}
           <Text style={[styles.exportButtonText, { color: theme.onPrimary }]}>
-            {exporting ? 'Preparing export…' : events.length ? 'Export activity CSV' : 'No activity to export'}
+            {t(exporting
+              ? 'insights.preparingExport'
+              : events.length
+                ? 'insights.exportButton'
+                : 'insights.noExport')}
           </Text>
         </Pressable>
       </View>
