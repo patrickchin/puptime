@@ -28,7 +28,7 @@ import { dateKey, EVENT_META, eventTypes, formatDuration, formatTime, type Event
 import { useLocalization } from '../localization-context';
 import { localizedEventLabel, translate, type AppLanguage } from '../localization';
 import { shareEventsCsv } from '../share-export';
-import { eventIcon, spacing, surfaceTreatment, type Theme } from '../theme';
+import { eventIcon, spacing, type Theme } from '../theme';
 
 const FREQUENCY_DAYS = 10;
 const MISSING_LOG_DAYS = 14;
@@ -362,25 +362,13 @@ function ZoomControl({
   const buttonStyle = (pressed: boolean, enabled: boolean) => [
     styles.zoomButton,
     {
-      backgroundColor: theme.surfaceRaised,
-      borderColor: theme.border,
-      borderRadius: Math.min(theme.presentation.controlRadius, 14),
-      borderWidth: Math.min(theme.presentation.borderWidth, 2),
+      backgroundColor: pressed && enabled ? theme.primarySoft : 'transparent',
       opacity: enabled ? (pressed ? 0.7 : 1) : 0.35,
     },
   ];
 
   return (
-    <View
-      style={[
-        styles.zoomControl,
-        {
-          borderColor: theme.border,
-          borderRadius: Math.min(theme.presentation.controlRadius, 16),
-          borderWidth: Math.min(theme.presentation.borderWidth, 2),
-        },
-      ]}
-    >
+    <View style={styles.zoomControl}>
       <Text style={[styles.controlLabel, { color: theme.textMuted }]}>{label.toUpperCase()}</Text>
       <View style={styles.stepper}>
         <Pressable
@@ -526,8 +514,6 @@ export function InsightsScreen({
     220,
     Math.min(width, 960)
       - spacing.md * 2
-      - theme.presentation.cardPadding * 2
-      - theme.presentation.borderWidth * 2
       - DATE_COLUMN_WIDTH,
   );
   const trackWidth = Math.round(baseTrackWidth * horizontalZoomLevels[horizontalZoom]);
@@ -608,24 +594,9 @@ export function InsightsScreen({
         {t('insights.subtitle')}
       </Text>
 
-      <View
-        style={[
-          styles.frequencyCard,
-          surfaceTreatment(theme),
-          {
-            backgroundColor: theme.surfaceRaised,
-            borderColor: theme.border,
-            padding: theme.presentation.cardPadding,
-          },
-        ]}
-      >
+      <View style={[styles.section, { borderColor: theme.border }]}>
         <View style={styles.frequencyHeading}>
-          <View
-            style={[
-              styles.smallIcon,
-              { backgroundColor: theme.primarySoft, borderRadius: theme.presentation.iconRadius },
-            ]}
-          >
+          <View style={styles.smallIcon}>
             <MaterialCommunityIcons
               accessibilityElementsHidden
               importantForAccessibility="no"
@@ -647,11 +618,7 @@ export function InsightsScreen({
         <Text
           style={[
             styles.frequencyNote,
-            {
-              color: theme.textMuted,
-              backgroundColor: theme.surface,
-              borderRadius: theme.presentation.controlRadius,
-            },
+            { color: theme.textMuted },
           ]}
         >
           {t('insights.frequencyNote')}
@@ -661,24 +628,9 @@ export function InsightsScreen({
         </View>
       </View>
 
-      <View
-        style={[
-          styles.missingCard,
-          surfaceTreatment(theme),
-          {
-            backgroundColor: theme.surfaceRaised,
-            borderColor: theme.border,
-            padding: theme.presentation.cardPadding,
-          },
-        ]}
-      >
+      <View style={[styles.section, { borderColor: theme.border }]}>
         <View style={styles.frequencyHeading}>
-          <View
-            style={[
-              styles.smallIcon,
-              { backgroundColor: theme.primarySoft, borderRadius: theme.presentation.iconRadius },
-            ]}
-          >
+          <View style={styles.smallIcon}>
             <MaterialCommunityIcons
               accessibilityElementsHidden
               importantForAccessibility="no"
@@ -697,11 +649,7 @@ export function InsightsScreen({
         <Text
           style={[
             styles.missingNote,
-            {
-              color: theme.textMuted,
-              backgroundColor: theme.surface,
-              borderRadius: theme.presentation.controlRadius,
-            },
+            { color: theme.textMuted },
           ]}
         >
           {t('insights.gapsNote')}
@@ -833,7 +781,7 @@ export function InsightsScreen({
         )}
       </View>
 
-      <View style={styles.filterHeading}>
+      <View style={[styles.filterHeading, { borderColor: theme.border }]}>
         <Text style={[styles.filterTitle, { color: theme.text }]}>{t('insights.timelineActivities')}</Text>
         <Text style={[styles.filterHint, { color: theme.textMuted }]}>{t('insights.selectCombination')}</Text>
       </View>
@@ -852,9 +800,6 @@ export function InsightsScreen({
           const label = isAll ? t('insights.all') : eventLabel(type);
           const icon = isAll ? 'layers-outline' : eventIcon(theme, type);
           const color = type === 'all' ? theme.primary : eventColor(type, theme);
-          const softColor = type === 'all'
-            ? theme.primarySoft
-            : theme.isDark ? EVENT_META[type].darkSoftColor : EVENT_META[type].softColor;
           return (
             <Pressable
               key={type}
@@ -869,10 +814,8 @@ export function InsightsScreen({
               style={({ pressed }) => [
                 styles.filterChip,
                 {
-                  backgroundColor: selected ? softColor : theme.surfaceRaised,
-                  borderColor: active ? color : theme.border,
-                  borderRadius: theme.presentation.controlRadius,
-                  borderWidth: theme.presentation.borderWidth,
+                  borderBottomColor: active ? color : theme.border,
+                  borderBottomWidth: active ? 2 : StyleSheet.hairlineWidth,
                   opacity: pressed ? 0.72 : 1,
                 },
               ]}
@@ -901,24 +844,9 @@ export function InsightsScreen({
         })}
       </View>
 
-      <View
-        style={[
-          styles.panel,
-          surfaceTreatment(theme),
-          {
-            backgroundColor: theme.surfaceRaised,
-            borderColor: theme.border,
-            padding: theme.presentation.cardPadding,
-          },
-        ]}
-      >
+      <View style={[styles.section, { borderColor: theme.border }]}>
         <View style={styles.panelHeading}>
-          <View
-            style={[
-              styles.smallIcon,
-              { backgroundColor: theme.primarySoft, borderRadius: theme.presentation.iconRadius },
-            ]}
-          >
+          <View style={styles.smallIcon}>
             <MaterialCommunityIcons
               accessibilityElementsHidden
               importantForAccessibility="no"
@@ -940,12 +868,7 @@ export function InsightsScreen({
         <View
           style={[
             styles.zoomPanel,
-            {
-              backgroundColor: theme.surface,
-              borderColor: theme.border,
-              borderRadius: Math.min(theme.presentation.cardRadius, 20),
-              borderWidth: Math.min(theme.presentation.borderWidth, 2),
-            },
+            { borderColor: theme.border },
           ]}
         >
           <View style={styles.zoomControls}>
@@ -983,9 +906,7 @@ export function InsightsScreen({
             style={({ pressed }) => [
               styles.rangeButton,
               {
-                borderColor: theme.border,
-                borderRadius: theme.presentation.controlRadius,
-                borderWidth: theme.presentation.borderWidth,
+                backgroundColor: pressed ? theme.primarySoft : 'transparent',
                 opacity: currentHistoryOffset >= maxHistoryOffset ? 0.35 : pressed ? 0.7 : 1,
               },
             ]}
@@ -1014,9 +935,7 @@ export function InsightsScreen({
             style={({ pressed }) => [
               styles.rangeButton,
               {
-                borderColor: theme.border,
-                borderRadius: theme.presentation.controlRadius,
-                borderWidth: theme.presentation.borderWidth,
+                backgroundColor: pressed ? theme.primarySoft : 'transparent',
                 opacity: currentHistoryOffset === 0 ? 0.35 : pressed ? 0.7 : 1,
               },
             ]}
@@ -1097,24 +1016,9 @@ export function InsightsScreen({
       </View>
 
       {selectedTypes.length > 0 && monthly.length > 1 ? (
-        <View
-          style={[
-            styles.historyCard,
-            surfaceTreatment(theme),
-            {
-              backgroundColor: theme.surfaceRaised,
-              borderColor: theme.border,
-              padding: theme.presentation.cardPadding,
-            },
-          ]}
-        >
+        <View style={[styles.section, { borderColor: theme.border }]}>
           <View style={styles.panelHeading}>
-            <View
-              style={[
-                styles.smallIcon,
-                { backgroundColor: theme.primarySoft, borderRadius: theme.presentation.iconRadius },
-              ]}
-            >
+            <View style={styles.smallIcon}>
               <MaterialCommunityIcons
                 accessibilityElementsHidden
                 importantForAccessibility="no"
@@ -1136,11 +1040,7 @@ export function InsightsScreen({
           <Text
             style={[
               styles.historyNote,
-              {
-                color: theme.textMuted,
-                backgroundColor: theme.surface,
-                borderRadius: theme.presentation.controlRadius,
-              },
+              { color: theme.textMuted },
             ]}
           >
             {t('insights.historyNote')}
@@ -1166,10 +1066,7 @@ export function InsightsScreen({
               style={({ pressed }) => [
                 styles.historyToggle,
                 {
-                  borderColor: theme.border,
-                  backgroundColor: pressed ? theme.primarySoft : theme.surface,
-                  borderRadius: theme.presentation.controlRadius,
-                  borderWidth: theme.presentation.borderWidth,
+                  backgroundColor: pressed ? theme.primarySoft : 'transparent',
                 },
               ]}
             >
@@ -1190,24 +1087,9 @@ export function InsightsScreen({
         </View>
       ) : null}
 
-      <View
-        style={[
-          styles.exportCard,
-          surfaceTreatment(theme),
-          {
-            backgroundColor: theme.surfaceRaised,
-            borderColor: theme.border,
-            padding: theme.presentation.cardPadding,
-          },
-        ]}
-      >
+      <View style={[styles.section, styles.exportSection, { borderColor: theme.border }]}>
         <View style={styles.exportHeading}>
-          <View
-            style={[
-              styles.smallIcon,
-              { backgroundColor: theme.primarySoft, borderRadius: theme.presentation.iconRadius },
-            ]}
-          >
+          <View style={styles.smallIcon}>
             <MaterialCommunityIcons
               accessibilityElementsHidden
               importantForAccessibility="no"
@@ -1275,25 +1157,30 @@ const styles = StyleSheet.create({
   eyebrow: { fontSize: 11, fontWeight: '800', letterSpacing: 1.5, marginTop: 4 },
   title: { fontSize: 30, lineHeight: 36, fontWeight: '800', letterSpacing: -0.6, marginTop: -8 },
   subtitle: { fontSize: 15, lineHeight: 22, marginTop: -10 },
-  filterHeading: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: spacing.sm, marginBottom: -8 },
+  section: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: spacing.md },
+  filterHeading: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginBottom: -8,
+  },
   filterTitle: { fontSize: 15, lineHeight: 20, fontWeight: '800' },
   filterHint: { fontSize: 12, lineHeight: 17, textAlign: 'right' },
   filters: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   filterChip: {
     minHeight: 48,
-    borderWidth: 1,
-    borderRadius: 15,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
   filterLabel: { fontSize: 13, lineHeight: 18, fontWeight: '700' },
-  frequencyCard: { borderWidth: 1, borderRadius: 22, padding: 12 },
-  missingCard: { borderWidth: 1, borderRadius: 22, padding: 12 },
   frequencyHeading: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 4 },
-  frequencyNote: { fontSize: 11, lineHeight: 16, borderRadius: 12, paddingHorizontal: 11, paddingVertical: 9, marginTop: 10 },
-  missingNote: { fontSize: 11, lineHeight: 16, borderRadius: 12, paddingHorizontal: 11, paddingVertical: 9, marginTop: 10 },
+  frequencyNote: { fontSize: 11, lineHeight: 16, paddingHorizontal: 4, marginTop: 8 },
+  missingNote: { fontSize: 11, lineHeight: 16, paddingHorizontal: 4, marginTop: 8 },
   estimateList: { marginTop: 12 },
   estimateRow: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 4, paddingTop: 13, paddingBottom: 11, flexDirection: 'row', alignItems: 'center', gap: 10 },
   estimateIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
@@ -1318,22 +1205,25 @@ const styles = StyleSheet.create({
   metricValue: { fontSize: 21, lineHeight: 27, fontWeight: '800', fontVariant: ['tabular-nums'] },
   metricLabel: { fontSize: 9, lineHeight: 13, fontWeight: '800', letterSpacing: 0.8, marginTop: 2 },
   metricDetail: { fontSize: 11, lineHeight: 16, marginTop: 4 },
-  panel: { borderWidth: 1, borderRadius: 22, padding: 12 },
   panelHeading: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 4, marginBottom: spacing.sm },
   panelHeadingCopy: { flex: 1, minWidth: 0 },
-  smallIcon: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  smallIcon: { width: 28, height: 40, alignItems: 'center', justifyContent: 'center' },
   panelTitle: { fontSize: 18, lineHeight: 23, fontWeight: '700' },
   panelCaption: { fontSize: 12, lineHeight: 17, marginTop: 1 },
-  zoomPanel: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, padding: 8, gap: 7 },
+  zoomPanel: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 8,
+    gap: 7,
+  },
   zoomControls: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  zoomControl: { flex: 1, minWidth: 145, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, padding: 7 },
+  zoomControl: { flex: 1, minWidth: 145, paddingHorizontal: 4, paddingVertical: 2 },
   controlLabel: { fontSize: 9, lineHeight: 13, fontWeight: '800', letterSpacing: 0.7, marginBottom: 4 },
   stepper: { flexDirection: 'row', alignItems: 'center' },
   zoomButton: {
     width: 48,
     height: 48,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 11,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1342,8 +1232,7 @@ const styles = StyleSheet.create({
   rangeNavigator: { flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 12 },
   rangeButton: {
     minHeight: 48,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 12,
+    borderRadius: 24,
     paddingHorizontal: 7,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1422,10 +1311,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   emptyText: { flex: 1, fontSize: 12, lineHeight: 17 },
-  historyCard: { borderWidth: 1, borderRadius: 22, padding: 12 },
-  historyNote: { fontSize: 11, lineHeight: 16, borderRadius: 12, paddingHorizontal: 11, paddingVertical: 9 },
+  historyNote: { fontSize: 11, lineHeight: 16, paddingHorizontal: 4 },
   months: { marginTop: 4 },
-  monthRow: { borderTopWidth: StyleSheet.hairlineWidth, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 11 },
+  monthRow: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 8, paddingVertical: 11 },
   monthHeading: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm },
   monthName: { flex: 1, fontSize: 14, lineHeight: 19, fontWeight: '700' },
   monthAverage: { fontSize: 15, lineHeight: 20, fontWeight: '800', fontVariant: ['tabular-nums'] },
@@ -1434,8 +1322,7 @@ const styles = StyleSheet.create({
   monthDetail: { fontSize: 11, lineHeight: 16, marginTop: 5 },
   historyToggle: {
     minHeight: 48,
-    borderWidth: 1,
-    borderRadius: 15,
+    borderRadius: 24,
     paddingHorizontal: 14,
     marginTop: spacing.sm,
     flexDirection: 'row',
@@ -1444,7 +1331,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   historyToggleText: { fontSize: 14, lineHeight: 19, fontWeight: '700' },
-  exportCard: { borderWidth: 1, borderRadius: 22, padding: spacing.md, gap: spacing.md },
+  exportSection: { gap: spacing.md },
   exportHeading: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   exportCopy: { flex: 1, minWidth: 0 },
   exportButton: {
