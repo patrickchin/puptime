@@ -2,18 +2,65 @@ name: Android APK
 
 on:
   workflow_dispatch:
+  pull_request:
+    types:
+      - closed
   push:
     tags:
       - "v*"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == github.event.repository.default_branch)
     runs-on: ubuntu-latest
+    concurrency:
+      group: puptime-release
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.ref }}
+      - name: Choose release version
+        id: release
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            tag="$GITHUB_REF_NAME"
+            base_tag=""
+          else
+            base_tag=$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' HEAD^)
+            if [[ ! "$base_tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+              echo "Unsupported release tag: $base_tag" >&2
+              exit 1
+            fi
+            tag="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.$((BASH_REMATCH[3] + 1))"
+          fi
+          if [[ ! "$tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "Unsupported release tag: $tag" >&2
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          echo "base_tag=$base_tag" >> "$GITHUB_OUTPUT"
+      - name: Set APK version
+        env:
+          PUPTIME_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const config = require('./app.json');
+          const [major, minor, patch] = process.env.PUPTIME_VERSION.split('.').map(Number);
+          config.expo.version = process.env.PUPTIME_VERSION;
+          config.expo.android.versionCode = major * 1000000 + minor * 1000 + patch;
+          fs.writeFileSync('app.json', `${JSON.stringify(config, null, 2)}\n`);
+          NODE
       - uses: actions/setup-node@v6
         with:
           node-version: 22
@@ -34,8 +81,36 @@ jobs:
           test -n "$puptime_apksigner"
           "$puptime_apksigner" verify --verbose --print-certs android/app/build/outputs/apk/release/app-release.apk
           unzip -tq android/app/build/outputs/apk/release/app-release.apk
+      - name: Prepare release files
+        env:
+          PUPTIME_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          mkdir release
+          cp android/app/build/outputs/apk/release/app-release.apk "release/Puptime-${PUPTIME_VERSION}.apk"
+          cd release
+          sha256sum "Puptime-${PUPTIME_VERSION}.apk" > SHA256SUMS.txt
       - uses: actions/upload-artifact@v6
         with:
           name: puptime-android-apk
           path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
+      - name: Publish GitHub release
+        if: github.event_name != 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUPTIME_BASE_TAG: ${{ steps.release.outputs.base_tag }}
+          PUPTIME_RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          PUPTIME_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          if gh release view "$PUPTIME_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "$PUPTIME_RELEASE_TAG is already published"
+            exit 0
+          fi
+          gh release create "$PUPTIME_RELEASE_TAG" \
+            "release/Puptime-${PUPTIME_VERSION}.apk#Puptime-${PUPTIME_VERSION}.apk" \
+            "release/SHA256SUMS.txt#SHA256SUMS.txt" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$(git rev-parse HEAD)" \
+            --title "Puptime $PUPTIME_RELEASE_TAG" \
+            --generate-notes \
+            --notes-start-tag "$PUPTIME_BASE_TAG"
