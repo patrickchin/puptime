@@ -20,13 +20,11 @@ import { type Theme } from '../theme';
 export function NoteInput({
   value,
   onChangeText,
-  onFocus,
   onBlur,
   theme,
 }: {
   value: string;
   onChangeText: (value: string) => void;
-  onFocus?: () => void;
   onBlur?: () => void;
   theme: Theme;
 }) {
@@ -113,7 +111,6 @@ export function NoteInput({
           multiline
           onBlur={onBlur}
           onChangeText={onChangeText}
-          onFocus={onFocus}
           placeholder={t('note.placeholder')}
           placeholderTextColor={theme.textMuted}
           textAlignVertical="top"

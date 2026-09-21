@@ -347,13 +347,15 @@ export function InsightsScreen({
                       },
                     ]}
                   >
-                    {adding ? (
-                      <ActivityIndicator color={theme.onPrimary} size="small" />
-                    ) : (
-                      <MaterialCommunityIcons name="plus" size={19} color={theme.onPrimary} />
-                    )}
+                    <View style={styles.addEstimateIcon}>
+                      {adding ? (
+                        <ActivityIndicator color={theme.onPrimary} size="small" />
+                      ) : (
+                        <MaterialCommunityIcons name="plus" size={19} color={theme.onPrimary} />
+                      )}
+                    </View>
                     <Text style={[styles.addEstimateText, { color: theme.onPrimary }]}>
-                      {t(adding ? 'insights.adding' : 'insights.addLog')}
+                      {t('insights.addLog')}
                     </Text>
                   </Pressable>
                 </View>
@@ -460,11 +462,7 @@ export function InsightsScreen({
             <MaterialCommunityIcons name="share-variant-outline" size={20} color={theme.onPrimary} />
           )}
           <Text style={[styles.exportButtonText, { color: theme.onPrimary }]}>
-            {t(exporting
-              ? 'insights.preparingExport'
-              : events.length
-                ? 'insights.exportButton'
-                : 'insights.noExport')}
+            {t(events.length ? 'insights.exportButton' : 'insights.noExport')}
           </Text>
         </Pressable>
       </View>
@@ -540,6 +538,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 5,
   },
+  addEstimateIcon: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
   addEstimateText: { fontSize: 12, lineHeight: 16, fontWeight: '800' },
   noEstimate: {
     minHeight: 48,

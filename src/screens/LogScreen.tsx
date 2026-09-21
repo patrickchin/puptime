@@ -160,7 +160,6 @@ export function LogScreen({
   const [widgetDraft, setWidgetDraft] = useState<QuickEventType[]>(widgetActions);
   const [savingWidgetSettings, setSavingWidgetSettings] = useState(false);
   const [historyScope, setHistoryScope] = useState<HistoryScope>('recent');
-  const editorScrollRef = useRef<ScrollView>(null);
   const draftRef = useRef<Draft | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const revisionRef = useRef(0);
@@ -332,12 +331,6 @@ export function LogScreen({
     .format(now)
     .toUpperCase();
   const homeCopy = voiceCopy(todayLabel);
-
-  const statusPresentation = customInvalid
-    ? { icon: 'alert-circle-outline', text: t('editor.customNameStatus'), color: theme.danger }
-    : saveStatus === 'saving'
-      ? { icon: 'cloud-upload-outline', text: t('editor.saving'), color: theme.primary }
-      : null;
 
   const setDraftTime = (value: number) => {
     updateDraft((current) => {
@@ -668,7 +661,6 @@ export function LogScreen({
           style={styles.scrim}
         >
           <ScrollView
-            ref={editorScrollRef}
             bounces={false}
             keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
             keyboardShouldPersistTaps="handled"
@@ -744,28 +736,6 @@ export function LogScreen({
                 <MaterialCommunityIcons name="alert-circle-outline" color={theme.danger} size={18} />
                 <Text style={[styles.saveStatusText, { color: theme.danger }]}>{t('editor.retry')}</Text>
               </Pressable>
-            ) : statusPresentation ? (
-              <View
-                accessible
-                accessibilityLiveRegion="polite"
-                accessibilityLabel={statusPresentation.text}
-                style={[
-                  styles.saveStatus,
-                  {
-                    backgroundColor: theme.surface,
-                    borderColor: theme.border,
-                    borderRadius: theme.presentation.controlRadius,
-                    borderWidth: theme.presentation.borderWidth,
-                  },
-                ]}
-              >
-                <MaterialCommunityIcons
-                  name={statusPresentation.icon as keyof typeof MaterialCommunityIcons.glyphMap}
-                  color={statusPresentation.color}
-                  size={18}
-                />
-                <Text style={[styles.saveStatusText, { color: statusPresentation.color }]}>{statusPresentation.text}</Text>
-              </View>
             ) : null}
 
             {draft && draft.event.type !== 'nap' ? (
@@ -1017,7 +987,6 @@ export function LogScreen({
                 value={draft.note}
                 onBlur={() => void flushAutoSave()}
                 onChangeText={(note) => updateDraft((current) => ({ ...current, note }))}
-                onFocus={() => editorScrollRef.current?.scrollToEnd({ animated: true })}
                 theme={theme}
               />
             ) : null}

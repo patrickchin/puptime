@@ -431,7 +431,7 @@ export function ScheduleScreen({
         animationType="none"
         onRequestClose={() => setReviewingSuggestion(false)}
       >
-        <View style={styles.scrim}>
+        <View accessibilityViewIsModal style={styles.scrim}>
           <ScrollView
             bounces={false}
             style={[styles.sheet, { backgroundColor: theme.surfaceRaised }]}
@@ -532,7 +532,7 @@ export function ScheduleScreen({
       </Modal>
 
       <Modal visible={draft !== null} transparent animationType="none" onRequestClose={() => setDraft(null)}>
-        <View style={styles.scrim}>
+        <View accessibilityViewIsModal style={styles.scrim}>
           <ScrollView
             bounces={false}
             style={[styles.sheet, { backgroundColor: theme.surfaceRaised }]}
