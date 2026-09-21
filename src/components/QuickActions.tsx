@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
   EVENT_META,
@@ -127,9 +127,14 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
       </View>
 
       <Modal visible={showMore} transparent animationType="none" onRequestClose={() => setShowMore(false)}>
-        <View accessibilityViewIsModal style={styles.scrim}>
+        <KeyboardAvoidingView
+          accessibilityViewIsModal
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.scrim}
+        >
           <ScrollView
             bounces={false}
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
             keyboardShouldPersistTaps="handled"
             style={[
               styles.sheet,
@@ -239,7 +244,7 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
               </Pressable>
             </View>
           </ScrollView>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </>
   );

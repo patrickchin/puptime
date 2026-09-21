@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Keyboard, Modal, Platform, Pressable, ScrollView, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { QuickActions } from '../components/QuickActions';
 import { EventRow } from '../components/EventRow';
@@ -662,7 +662,11 @@ export function LogScreen({
       />
 
       <Modal visible={draft !== null} transparent animationType="none" onRequestClose={handleSystemClose}>
-        <View accessibilityViewIsModal style={styles.scrim}>
+        <KeyboardAvoidingView
+          accessibilityViewIsModal
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.scrim}
+        >
           <ScrollView
             ref={editorScrollRef}
             bounces={false}
@@ -1018,7 +1022,7 @@ export function LogScreen({
               />
             ) : null}
           </ScrollView>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal visible={showWidgetSettings} transparent animationType="none" onRequestClose={() => setShowWidgetSettings(false)}>
