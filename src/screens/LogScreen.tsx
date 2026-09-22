@@ -144,7 +144,7 @@ export function LogScreen({
   onOpenSettings: () => void;
   theme: Theme;
 }) {
-  const { eventLabel, locale, relativeTime, t, voiceCopy } = useLocalization();
+  const { eventLabel, locale, relativeTime, t } = useLocalization();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [pickerMode, setPickerMode] = useState<'date' | 'time' | null>(null);
   const [customTouched, setCustomTouched] = useState(false);
@@ -322,11 +322,6 @@ export function LogScreen({
   const draftMeta = draft ? EVENT_META[draft.type] : EVENT_META.pee;
   const customInvalid = draft?.type === 'custom' && !normalizeCustomLabel(draft.customLabel);
   const selectedFilter = activityFilters.find((item) => item.id === activityFilter) ?? activityFilters[0];
-  const todayLabel = new Intl.DateTimeFormat(locale, { weekday: 'short', month: 'short', day: 'numeric' })
-    .format(now)
-    .toUpperCase();
-  const homeCopy = voiceCopy(todayLabel);
-
   const setDraftTime = (value: number) => {
     updateDraft((current) => {
       if (current.field === 'end') {
@@ -412,6 +407,7 @@ export function LogScreen({
               </View>
               <View style={styles.titleCopy}>
                 <Text
+                  numberOfLines={1}
                   style={[
                     styles.title,
                     {
@@ -423,7 +419,7 @@ export function LogScreen({
                     },
                   ]}
                 >
-                  {homeCopy.title}
+                  {t('nav.log')}
                 </Text>
               </View>
               <View style={styles.headerActions}>

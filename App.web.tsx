@@ -12,7 +12,7 @@ import {
 
 const releaseUrl = 'https://github.com/patrickchin/puptime/releases/latest';
 const sourceUrl = 'https://github.com/patrickchin/puptime';
-const privacyUrl = 'https://github.com/patrickchin/puptime/blob/master/PRIVACY.md';
+const privacyUrl = 'https://github.com/patrickchin/puptime/blob/main/PRIVACY.md';
 
 const colors = {
   paper: '#F6F4ED',
@@ -34,15 +34,15 @@ const day = [
 ];
 
 const details = [
-  ['Log', 'Log pee, poop, meals, trips, walks and naps with one tap.'],
-  ['Look back', 'Review your activity log, routine and timing patterns.'],
-  ['Keep private', 'Everything stays on your device. No account, ads or tracking.'],
+  ['Activity', 'Pee, poop, meals, potty trips, walks, naps, and custom logs.'],
+  ['History', 'Edit logs, compare timing, or export CSV.'],
+  ['Schedule', 'Set routine times and optional reminders.'],
 ];
 
 const previews = [
   ['Today', require('./assets/screenshots/today.png')],
   ['History', require('./assets/screenshots/activity.png')],
-  ['Patterns', require('./assets/screenshots/insights-summary.png')],
+  ['Insights', require('./assets/screenshots/insights-summary.png')],
 ];
 
 function LinkButton({
@@ -75,7 +75,7 @@ export default function MarketingSite() {
   const narrow = width < 1040;
 
   useEffect(() => {
-    document.title = 'Puptime — Puppy routine tracker';
+    document.title = 'Puptime — Puppy activity log';
   }, []);
 
   return (
@@ -91,33 +91,32 @@ export default function MarketingSite() {
               <Text style={styles.textLink}>Privacy</Text>
             </Pressable>
           )}
-          <LinkButton href={releaseUrl}>Get the app</LinkButton>
+          <LinkButton href={releaseUrl}>Download</LinkButton>
         </View>
       </View>
 
       <View style={[styles.hero, compact && styles.heroCompact]}>
         <View style={[styles.heroCopy, compact && styles.heroCopyCompact]}>
-          <Text style={styles.eyebrow}>PRIVATE · OFFLINE · NO ACCOUNT</Text>
           <Text
             accessibilityRole="header"
             style={[styles.title, narrow && styles.titleNarrow, compact && styles.titleCompact]}
           >
-            Keep track of your puppy’s day.
+            Puppy log
           </Text>
           <Text style={[styles.intro, compact && styles.introCompact]}>
-            Log potty breaks, meals, walks and naps with one tap. Your activity history stays on
-            your phone.
+            Record potty breaks, meals, walks, naps, and other activities. Data stays on your
+            device.
           </Text>
           <View style={[styles.actions, compact && styles.actionsCompact]}>
             <LinkButton href={releaseUrl}>Download for Android</LinkButton>
             <LinkButton href={sourceUrl} quiet>View the source</LinkButton>
           </View>
-          <Text style={styles.note}>Free and open source · iPhone and Android</Text>
+          <Text style={styles.note}>Open source · iPhone and Android</Text>
         </View>
 
         <View style={[styles.dayCard, compact && styles.dayCardCompact]}>
           <View style={[styles.dayRail, compact && styles.dayRailCompact]}>
-            <Text style={styles.dayLabel}>A DAY WITH YOUR PUP</Text>
+            <Text style={styles.dayLabel}>EXAMPLE DAY</Text>
             {day.map(([time, label], index) => (
               <View key={time} style={styles.dayEvent}>
                 <View style={[styles.dot, index === 2 && styles.dotCoral]} />
@@ -138,19 +137,6 @@ export default function MarketingSite() {
       </View>
 
       <View style={[styles.mainSection, compact && styles.mainSectionCompact]}>
-        <View style={[styles.sectionIntro, compact && styles.sectionIntroCompact]}>
-          <Text
-            accessibilityRole="header"
-            style={[styles.sectionTitle, compact && styles.sectionTitleCompact]}
-          >
-            Log activities and review the history.
-          </Text>
-          <Text style={styles.sectionCopy}>
-            Use the home-screen widget for common logs, adjust the routine as your puppy changes,
-            and export the full history.
-          </Text>
-        </View>
-
         <View style={[styles.detailGrid, compact && styles.detailGridCompact]}>
           {details.map(([label, copy]) => (
             <View key={label} style={[styles.detail, compact && styles.detailCompact]}>
@@ -276,14 +262,6 @@ const styles = StyleSheet.create({
   },
   heroCopyCompact: {
     width: '100%',
-  },
-  eyebrow: {
-    color: colors.green,
-    fontFamily: 'Avenir Next, Avenir, system-ui, sans-serif',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 2.2,
-    marginBottom: 20,
   },
   title: {
     maxWidth: 620,
@@ -465,40 +443,6 @@ const styles = StyleSheet.create({
     paddingTop: 68,
     paddingBottom: 72,
   },
-  sectionIntro: {
-    width: '100%',
-    maxWidth: 1160,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 56,
-  },
-  sectionIntroCompact: {
-    flexDirection: 'column',
-    gap: 20,
-  },
-  sectionTitle: {
-    flex: 1,
-    color: colors.ink,
-    fontFamily: 'Arial Rounded MT Bold, ui-rounded, system-ui, sans-serif',
-    fontSize: 46,
-    fontWeight: '800',
-    letterSpacing: -2,
-    lineHeight: 52,
-  },
-  sectionTitleCompact: {
-    fontSize: 37,
-    lineHeight: 43,
-    letterSpacing: -1.5,
-  },
-  sectionCopy: {
-    flex: 1,
-    maxWidth: 520,
-    color: colors.muted,
-    fontFamily: 'Avenir Next, Avenir, system-ui, sans-serif',
-    fontSize: 18,
-    lineHeight: 29,
-  },
   detailGrid: {
     width: '100%',
     maxWidth: 1160,
@@ -508,11 +452,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderTopColor: colors.line,
     borderTopWidth: 1,
-    marginTop: 64,
   },
   detailGridCompact: {
     flexDirection: 'column',
-    marginTop: 48,
   },
   detail: {
     flex: 1,

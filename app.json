@@ -3,7 +3,7 @@
     "name": "Puptime",
     "slug": "puptime",
     "version": "1.11.0",
-    "description": "One-tap puppy routine tracking from your app or home screen.",
+    "description": "Log puppy activities from the app or Home Screen.",
     "scheme": "puptime",
     "icon": "./assets/puptime-icon.png",
     "userInterfaceStyle": "automatic",
@@ -43,7 +43,7 @@
             {
               "name": "PuptimeQuickLog",
               "label": "Puptime Quick Log",
-              "description": "Choose your favorite activities for one-tap logging.",
+              "description": "Pick 2–4 activities to log from the Home Screen.",
               "minWidth": "250dp",
               "minHeight": "40dp",
               "targetCellWidth": 4,
@@ -64,7 +64,7 @@
             {
               "name": "PuptimeQuickLog",
               "displayName": "Puptime Quick Log",
-              "description": "Choose your favorite activities for one-tap logging.",
+              "description": "Pick 2–4 activities to log from the Home Screen.",
               "ios": {
                 "supportedFamilies": [
                   "systemMedium"

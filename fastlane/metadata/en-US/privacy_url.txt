@@ -1,2 +1,1 @@
-https://github.com/patrickchin/puptime/blob/master/PRIVACY.md
-
+https://github.com/patrickchin/puptime/blob/main/PRIVACY.md

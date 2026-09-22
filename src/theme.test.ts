@@ -54,7 +54,6 @@ test('named themes have distinct presentation systems', () => {
     presentation.titleWeight,
     presentation.shadowRadius,
     presentation.markIcon,
-    presentation.voice,
     presentation.iconProfile,
   ].join(':'));
 
