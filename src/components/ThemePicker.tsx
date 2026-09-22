@@ -80,7 +80,7 @@ export function ThemePicker({
       transparent
       visible={visible}
     >
-      <View style={styles.modal}>
+      <View testID="appearance.modal" style={styles.modal}>
         <Pressable
           accessibilityLabel={t('settings.closePicker')}
           onPress={onClose}
@@ -117,6 +117,7 @@ export function ThemePicker({
               </Text>
             </View>
             <Pressable
+              testID="appearance.close"
               accessibilityLabel={t('settings.closePicker')}
               accessibilityRole="button"
               onPress={onClose}
@@ -151,6 +152,7 @@ export function ThemePicker({
               return (
                 <Pressable
                   key={choice.id}
+                  testID={`appearance.theme.${choice.id}`}
                   accessibilityLabel={`${label}. ${description}`}
                   accessibilityRole="radio"
                   accessibilityState={{ checked: active }}
@@ -239,6 +241,7 @@ export function ThemePicker({
               return (
                 <Pressable
                   key={preference}
+                  testID={`appearance.language.${preference}`}
                   accessibilityLabel={`${label}. ${detail}`}
                   accessibilityRole="radio"
                   accessibilityState={{ checked: active }}

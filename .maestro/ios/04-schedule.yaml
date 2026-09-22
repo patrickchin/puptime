@@ -1,0 +1,103 @@
+appId: com.patrickchin.puptime
+name: iOS routine create, edit, reminder permission, and remove
+tags:
+  - ios
+  - critical
+---
+- launchApp:
+    clearState: true
+- setPermissions:
+    permissions:
+      notifications: deny
+- extendedWaitUntil:
+    visible:
+      id: nav.schedule
+    timeout: 90000
+- tapOn:
+    id: nav.schedule
+    retryTapIfNoChange: true
+- scrollUntilVisible:
+    centerElement: true
+    element:
+      id: schedule.add
+    direction: DOWN
+    visibilityPercentage: 50
+- tapOn:
+    id: schedule.add
+- assertVisible:
+    id: schedule.editor
+- tapOn:
+    id: schedule.editor.type.meal
+- assertVisible:
+    id: schedule.editor.reminder
+    checked: false
+- tapOn:
+    id: schedule.editor.reminder
+- assertVisible: ^(Notifications are off|通知已关闭|Las notificaciones están desactivadas)$
+- tapOn: ^(Not now|暂不|Ahora no)$
+- assertVisible:
+    id: schedule.editor.reminder
+    checked: false
+- scrollUntilVisible:
+    centerElement: true
+    element:
+      id: schedule.editor.save
+    direction: DOWN
+    visibilityPercentage: 50
+- tapOn:
+    id: schedule.editor.save
+- scrollUntilVisible:
+    centerElement: true
+    element:
+      id: schedule.entry.meal
+    direction: DOWN
+    visibilityPercentage: 50
+- tapOn:
+    id: schedule.entry.meal
+- assertVisible:
+    id: schedule.editor.reminder
+    checked: false
+- tapOn:
+    id: schedule.editor.type.walk
+- scrollUntilVisible:
+    centerElement: true
+    element:
+      id: schedule.editor.save
+    direction: DOWN
+    visibilityPercentage: 50
+- tapOn:
+    id: schedule.editor.save
+- assertVisible:
+    id: schedule.entry.walk
+- tapOn:
+    id: nav.log
+- scrollUntilVisible:
+    element:
+      id: routine.card
+    direction: DOWN
+    visibilityPercentage: 50
+- assertVisible:
+    id: routine.card
+- tapOn:
+    id: nav.schedule
+- scrollUntilVisible:
+    centerElement: true
+    element:
+      id: schedule.entry.walk.remove
+    direction: DOWN
+    visibilityPercentage: 50
+- tapOn:
+    id: schedule.entry.walk.remove
+- tapOn: ^(Cancel|取消|Cancelar)$
+- assertVisible:
+    id: schedule.entry.walk
+- tapOn:
+    id: schedule.entry.walk.remove
+- tapOn: ^(Remove|移除|Quitar)$
+- scrollUntilVisible:
+    element:
+      id: schedule.empty
+    direction: UP
+    visibilityPercentage: 50
+- assertVisible:
+    id: schedule.empty

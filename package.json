@@ -36,6 +36,7 @@
     "build:web": "expo export --platform web --output-dir dist-web",
     "typecheck": "tsc --noEmit",
     "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/*.test.ts",
+    "test:e2e:ios": "maestro test --platform ios --config .maestro/config.yaml .maestro",
     "prebuild": "expo prebuild",
     "build:android": "cd android && ./gradlew assembleRelease"
   },

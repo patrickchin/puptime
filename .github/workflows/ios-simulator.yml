@@ -16,6 +16,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
       - run: npm ci
       - run: npx expo prebuild --platform ios --no-install
         env:
@@ -37,12 +41,51 @@ jobs:
             build/ios-simulator/Build/Products/Release-iphonesimulator/Puptime.app \
             build/Puptime-iOS-Simulator.zip
           unzip -tq build/Puptime-iOS-Simulator.zip
+      - name: Install Maestro
+        env:
+          MAESTRO_VERSION: "2.8.0"
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Run Maestro end-to-end tests
+        timeout-minutes: 35
+        env:
+          MAESTRO_CLI_NO_ANALYTICS: "1"
+        run: |
+          devices=$(xcrun simctl list devices available -j)
+          iphone_id=$(printf '%s' "$devices" | jq -r '[.devices | to_entries[] | select(.key | contains("iOS-26")) | .value[] | select(.name | test("iPhone.*Pro$"))][0].udid // [.devices | to_entries[] | select(.key | contains("iOS-26")) | .value[] | select(.name | startswith("iPhone"))][0].udid // empty')
+          test -n "$iphone_id"
+          trap 'xcrun simctl shutdown "$iphone_id" >/dev/null 2>&1 || true' EXIT
+          xcrun simctl boot "$iphone_id" 2>/dev/null || true
+          xcrun simctl bootstatus "$iphone_id" -b
+          xcrun simctl install "$iphone_id" build/ios-simulator/Build/Products/Release-iphonesimulator/Puptime.app
+          xcrun simctl launch "$iphone_id" com.patrickchin.puptime >/dev/null
+          sleep 5
+          xcrun simctl terminate "$iphone_id" com.patrickchin.puptime
+          maestro test \
+            --platform ios \
+            --device "$iphone_id" \
+            --config .maestro/config.yaml \
+            --format JUNIT \
+            --output build/maestro-report.xml \
+            --test-output-dir build/maestro-results \
+            .maestro
+      - name: Upload Maestro results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: puptime-ios-maestro-results
+          path: |
+            build/maestro-report.xml
+            build/maestro-results
+          if-no-files-found: warn
+          retention-days: 7
       - name: Capture App Store screenshots
         timeout-minutes: 20
         run: |
           devices=$(xcrun simctl list devices available -j)
-          iphone_id=$(printf '%s' "$devices" | jq -r '[.devices[][] | select(.name | test("iPhone.*(Pro Max|Plus)"))][0].udid // [.devices[][] | select(.name | startswith("iPhone"))][0].udid // empty')
-          ipad_id=$(printf '%s' "$devices" | jq -r '[.devices[][] | select(.name | test("iPad Pro.*(13-inch|12.9-inch)"))][0].udid // [.devices[][] | select(.name | startswith("iPad"))][0].udid // empty')
+          iphone_id=$(printf '%s' "$devices" | jq -r '[.devices | to_entries[] | select(.key | contains("iOS-26")) | .value[] | select(.name | test("iPhone.*(Pro Max|Plus)"))][0].udid // [.devices | to_entries[] | select(.key | contains("iOS-26")) | .value[] | select(.name | startswith("iPhone"))][0].udid // empty')
+          ipad_id=$(printf '%s' "$devices" | jq -r '[.devices | to_entries[] | select(.key | contains("iOS-26")) | .value[] | select(.name | test("iPad Pro.*(13-inch|12.9-inch)"))][0].udid // [.devices | to_entries[] | select(.key | contains("iOS-26")) | .value[] | select(.name | startswith("iPad"))][0].udid // empty')
           test -n "$iphone_id"
           test -n "$ipad_id"
           trap 'xcrun simctl shutdown "$iphone_id" >/dev/null 2>&1 || true; xcrun simctl shutdown "$ipad_id" >/dev/null 2>&1 || true' EXIT

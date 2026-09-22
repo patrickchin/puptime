@@ -36,6 +36,7 @@ export function EventRow({
   const pastLabel = eventPastLabel(event);
   return (
     <View
+      testID={`event.${event.type}`}
       style={[
         styles.row,
         surfaceTreatment(theme),
@@ -55,16 +56,17 @@ export function EventRow({
         />
       </View>
       <View style={styles.copy}>
-        <Text numberOfLines={1} style={[styles.label, { color: theme.text }]}>{pastLabel}</Text>
+        <Text testID={`event.${event.type}.label`} numberOfLines={1} style={[styles.label, { color: theme.text }]}>{pastLabel}</Text>
         <Text numberOfLines={1} style={[styles.source, { color: theme.textMuted }]}>{timeSummary}</Text>
         {note ? (
           <View style={styles.noteRow}>
             <MaterialCommunityIcons name="note-text-outline" size={14} color={theme.primary} />
-            <Text numberOfLines={2} style={[styles.note, { color: theme.text }]}>{note}</Text>
+            <Text testID={`event.${event.type}.note`} numberOfLines={2} style={[styles.note, { color: theme.text }]}>{note}</Text>
           </View>
         ) : null}
       </View>
       <Pressable
+        testID={`event.${event.type}.edit`}
         accessibilityRole="button"
         accessibilityLabel={t('eventRow.edit', { activity: pastLabel })}
         accessibilityHint={event.type === 'nap'
@@ -80,6 +82,7 @@ export function EventRow({
         <MaterialCommunityIcons name="pencil-outline" size={20} color={theme.textMuted} />
       </Pressable>
       <Pressable
+        testID={`event.${event.type}.delete`}
         accessibilityRole="button"
         accessibilityLabel={t('eventRow.delete', { activity: pastLabel, time: formatTime(event.at) })}
         hitSlop={8}

@@ -498,7 +498,7 @@ export function TimelineScreen({ events, theme }: { events: PuppyEvent[]; theme:
   }
 
   return (
-    <View style={[styles.screen, { backgroundColor: theme.background }]}>
+    <View testID="screen.timeline" style={[styles.screen, { backgroundColor: theme.background }]}>
       <View
         style={[
           styles.header,
@@ -536,6 +536,7 @@ export function TimelineScreen({ events, theme }: { events: PuppyEvent[]; theme:
             ]}
           >
             <Pressable
+              testID="timeline.zoom.out"
               accessibilityRole="button"
               accessibilityLabel={t('timeline.zoomOut')}
               accessibilityState={{ disabled: timeScale <= MIN_TIME_SCALE }}
@@ -549,12 +550,14 @@ export function TimelineScreen({ events, theme }: { events: PuppyEvent[]; theme:
               <MaterialCommunityIcons name="minus" size={20} color={theme.text} />
             </Pressable>
             <Text
+              testID="timeline.zoom.value"
               accessibilityLabel={`${t('insights.timeWidth')}: ${timeScale.toFixed(1)}×`}
               style={[styles.zoomValue, { color: theme.text }]}
             >
               {timeScale.toFixed(1)}×
             </Text>
             <Pressable
+              testID="timeline.zoom.in"
               accessibilityRole="button"
               accessibilityLabel={t('timeline.zoomIn')}
               accessibilityState={{ disabled: timeScale >= MAX_TIME_SCALE }}
@@ -571,7 +574,7 @@ export function TimelineScreen({ events, theme }: { events: PuppyEvent[]; theme:
         </View>
 
         <View style={styles.timelineMeta}>
-          <Text numberOfLines={1} style={[styles.rangeText, { color: theme.text }]}>
+          <Text testID="timeline.range" numberOfLines={1} style={[styles.rangeText, { color: theme.text }]}>
             {t('timeline.range', { range: rangeLabel, count: visibleEventCount })}
           </Text>
         </View>
@@ -603,6 +606,7 @@ export function TimelineScreen({ events, theme }: { events: PuppyEvent[]; theme:
             return (
               <Pressable
                 key={type}
+                testID={`timeline.filter.${type}`}
                 accessibilityRole="checkbox"
                 accessibilityLabel={isAll
                   ? t(allSelected ? 'insights.clearFilters' : 'insights.selectFilters')
@@ -644,7 +648,7 @@ export function TimelineScreen({ events, theme }: { events: PuppyEvent[]; theme:
         </ScrollView>
 
         {!isCompactHeight && (selectedTypes.length === 0 || visibleEventCount === 0) ? (
-          <View style={[styles.emptyNote, { backgroundColor: theme.surface, borderRadius: theme.presentation.controlRadius }]}>
+          <View testID="timeline.empty" style={[styles.emptyNote, { backgroundColor: theme.surface, borderRadius: theme.presentation.controlRadius }]}>
             <MaterialCommunityIcons name="clock-outline" size={18} color={theme.textMuted} />
             <Text style={[styles.emptyText, { color: theme.textMuted }]}>
               {selectedTypes.length === 0

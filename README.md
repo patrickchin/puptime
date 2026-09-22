@@ -85,6 +85,18 @@ npx expo export --platform ios
 npm run build:android
 ```
 
+## iOS end-to-end tests
+
+The Maestro suite covers navigation, activity CRUD and persistence, naps, custom activities, routine editing and reminder permission handling, widget and appearance settings, localization, Insights, and Timeline controls.
+
+Install [Maestro](https://docs.maestro.dev/maestro-cli/how-to-install-maestro-cli), boot an iOS 26 Simulator, and install a local Puptime build with `npm run ios`. Keep Expo running, then run this in another terminal:
+
+```sh
+npm run test:e2e:ios
+```
+
+Every flow clears app state before it starts. GitHub Actions also runs the complete suite against the standalone Release build and uploads the Maestro report and failure artifacts.
+
 The release APK is written to `android/app/build/outputs/apk/release/app-release.apk`.
 
 GitHub Actions also performs an unsigned native iOS Simulator build of the app and widget, installs and launches it, then keeps the zipped `.app` and smoke-test screenshot as short-lived workflow artifacts.

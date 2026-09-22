@@ -1,0 +1,76 @@
+appId: com.patrickchin.puptime
+name: iOS navigation and empty states
+tags:
+  - ios
+  - smoke
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- assertVisible:
+    id: nav.log
+    selected: true
+- assertVisible:
+    id: quick.pee
+- assertVisible:
+    id: quick.poop
+- assertVisible:
+    id: quick.meal
+- assertVisible:
+    id: quick.pottyTrip
+- assertVisible:
+    id: quick.walk
+- assertVisible:
+    id: quick.nap
+- tapOn:
+    id: nav.timeline
+- assertVisible:
+    id: screen.timeline
+- assertVisible:
+    id: nav.timeline
+    selected: true
+- assertVisible:
+    id: timeline.zoom.out
+    enabled: false
+- assertVisible:
+    id: timeline.zoom.in
+    enabled: true
+- tapOn:
+    id: nav.insights
+- assertVisible:
+    id: screen.insights
+- assertVisible:
+    id: nav.insights
+    selected: true
+- scrollUntilVisible:
+    element:
+      id: insights.export
+    direction: DOWN
+    visibilityPercentage: 50
+- assertVisible:
+    id: insights.export
+    enabled: false
+- tapOn:
+    id: nav.schedule
+- assertVisible:
+    id: screen.schedule
+- assertVisible:
+    id: nav.schedule
+    selected: true
+- scrollUntilVisible:
+    element:
+      id: schedule.empty
+    direction: DOWN
+    visibilityPercentage: 50
+- assertVisible:
+    id: schedule.empty
+- tapOn:
+    id: nav.log
+- assertVisible:
+    id: screen.today
+- assertVisible:
+    id: nav.log
+    selected: true

@@ -1,0 +1,167 @@
+appId: com.patrickchin.puptime
+name: iOS settings and preference persistence
+tags:
+  - ios
+  - settings
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: settings.open
+    timeout: 90000
+- tapOn:
+    id: settings.open
+    retryTapIfNoChange: true
+- assertVisible:
+    id: screen.settings
+- scrollUntilVisible:
+    centerElement: true
+    element:
+      id: settings.widget.action.walk
+    direction: DOWN
+    visibilityPercentage: 50
+- assertVisible:
+    id: settings.widget.action.pee
+    text: checkbox, checked
+- assertVisible:
+    id: settings.widget.action.poop
+    text: checkbox, checked
+- assertVisible:
+    id: settings.widget.action.meal
+    text: checkbox, checked
+- assertVisible:
+    id: settings.widget.action.walk
+    text: checkbox, unchecked
+- tapOn:
+    id: settings.widget.action.walk
+- assertVisible:
+    id: settings.widget.action.walk
+    text: checkbox, checked
+- scrollUntilVisible:
+    centerElement: true
+    element:
+      id: settings.notifications.lead.15
+    direction: DOWN
+    visibilityPercentage: 50
+- assertVisible:
+    id: settings.notifications.lead.10
+    text: radio button, checked
+- tapOn:
+    id: settings.notifications.lead.15
+- assertVisible:
+    id: settings.notifications.lead.15
+    text: radio button, checked
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: settings.open
+    timeout: 90000
+- tapOn:
+    id: settings.open
+    retryTapIfNoChange: true
+- scrollUntilVisible:
+    element:
+      id: settings.widget.action.walk
+    direction: DOWN
+    visibilityPercentage: 50
+- assertVisible:
+    id: settings.widget.action.walk
+    text: checkbox, checked
+- scrollUntilVisible:
+    element:
+      id: settings.notifications.lead.15
+    direction: DOWN
+    visibilityPercentage: 50
+- assertVisible:
+    id: settings.notifications.lead.15
+    text: radio button, checked
+- scrollUntilVisible:
+    centerElement: true
+    element:
+      id: settings.theme.open
+    direction: UP
+    visibilityPercentage: 50
+- tapOn:
+    id: settings.theme.open
+- scrollUntilVisible:
+    element:
+      id: appearance.theme.midnight
+    direction: DOWN
+    visibilityPercentage: 50
+- tapOn:
+    id: appearance.theme.midnight
+- tapOn:
+    id: settings.language.open
+- tapOn:
+    id: appearance.language.es
+- assertVisible:
+    id: screen.settings
+- tapOn:
+    id: settings.theme.open
+- scrollUntilVisible:
+    element:
+      id: appearance.theme.midnight
+    direction: DOWN
+    visibilityPercentage: 50
+- assertVisible:
+    id: appearance.theme.midnight
+    text: radio button, checked
+- tapOn:
+    id: appearance.close
+- tapOn:
+    id: settings.language.open
+- assertVisible:
+    id: appearance.language.es
+    text: radio button, checked
+- tapOn:
+    id: appearance.close
+- tapOn:
+    id: settings.back
+- assertVisible: Hoy
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- assertVisible: Hoy
+- tapOn:
+    id: settings.open
+    retryTapIfNoChange: true
+- tapOn:
+    id: settings.theme.open
+- scrollUntilVisible:
+    element:
+      id: appearance.theme.midnight
+    direction: DOWN
+    visibilityPercentage: 50
+- assertVisible:
+    id: appearance.theme.midnight
+    text: radio button, checked
+- tapOn:
+    id: appearance.close
+- tapOn:
+    id: settings.language.open
+- assertVisible:
+    id: appearance.language.es
+    text: radio button, checked
+- tapOn:
+    id: appearance.close
+- scrollUntilVisible:
+    element:
+      id: settings.widget.action.walk
+    direction: DOWN
+    visibilityPercentage: 50
+- assertVisible:
+    id: settings.widget.action.walk
+    text: checkbox, checked
+- scrollUntilVisible:
+    element:
+      id: settings.notifications.lead.15
+    direction: DOWN
+    visibilityPercentage: 50
+- assertVisible:
+    id: settings.notifications.lead.15
+    text: radio button, checked

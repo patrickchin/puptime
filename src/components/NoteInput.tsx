@@ -107,6 +107,7 @@ export function NoteInput({
         ]}
       >
         <TextInput
+          testID="editor.note.input"
           accessibilityLabel={t('note.label')}
           autoFocus={autoFocus}
           autoCapitalize="sentences"
