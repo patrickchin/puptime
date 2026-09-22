@@ -21,7 +21,8 @@
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
     "react-native-android-widget": "^0.22.1",
-    "react-native-safe-area-context": "~5.7.0"
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-web": "^0.21.2"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
@@ -32,6 +33,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "build:web": "expo export --platform web --output-dir dist-web",
     "typecheck": "tsc --noEmit",
     "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/*.test.ts",
     "prebuild": "expo prebuild",
