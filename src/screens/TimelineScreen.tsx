@@ -19,6 +19,7 @@ import {
   buildTimelineDays,
   TIMELINE_BUCKET_MINUTES,
   TIMELINE_BUCKETS,
+  timelinePointClusters,
   type TimelineDay,
   type TimelineMark,
 } from '../analytics';
@@ -188,33 +189,59 @@ function TimelineTrack({
         <View key={hour} style={[styles.gridLine, { backgroundColor: theme.border, left: `${(hour / 24) * 100}%` }]} />
       ))}
       {marks.map((mark) => {
+        if (mark.endBucket === undefined) return null;
         const color = eventColor(mark.type, theme);
-        if (mark.endBucket !== undefined) {
-          return (
-            <View
-              key={mark.id}
-              style={[
-                styles.durationMark,
-                {
-                  backgroundColor: color,
-                  left: `${(mark.startBucket / TIMELINE_BUCKETS) * 100}%`,
-                  width: `${((mark.endBucket - mark.startBucket) / TIMELINE_BUCKETS) * 100}%`,
-                },
-              ]}
-            />
-          );
-        }
         return (
           <View
             key={mark.id}
             style={[
-              styles.pointMark,
+              styles.durationMark,
               {
                 backgroundColor: color,
-                left: `${((mark.startBucket + 0.5) / TIMELINE_BUCKETS) * 100}%`,
+                left: `${(mark.startBucket / TIMELINE_BUCKETS) * 100}%`,
+                width: `${((mark.endBucket - mark.startBucket) / TIMELINE_BUCKETS) * 100}%`,
               },
             ]}
           />
+        );
+      })}
+      {timelinePointClusters(marks).map((cluster) => {
+        const colors = cluster.types.map((type) => eventColor(type, theme));
+        const durationCount = cluster.types.length - cluster.ids.length;
+        const markWidth = colors.length > 1 ? Math.min(14, 6 + colors.length * 2) : 6;
+        return (
+          <View
+            key={`${cluster.startBucket}-${cluster.ids.join('-')}`}
+            style={[
+              styles.pointMark,
+              {
+                backgroundColor: colors[0],
+                left: `${((cluster.startBucket + 0.5) / TIMELINE_BUCKETS) * 100}%`,
+                marginLeft: -markWidth / 2,
+                width: markWidth,
+              },
+            ]}
+          >
+            {colors.length > 1 ? colors.map((color, index) => {
+              const continuesHorizontally = index < durationCount;
+              return (
+                <View
+                  key={`${color}-${index}`}
+                  style={[
+                    styles.markStripe,
+                    {
+                      backgroundColor: color,
+                      borderColor: theme.surfaceRaised,
+                      borderBottomWidth: index === colors.length - 1 && !continuesHorizontally ? 1 : 0,
+                      borderLeftWidth: continuesHorizontally ? 0 : 1,
+                      borderRightWidth: continuesHorizontally ? 0 : 1,
+                      borderTopWidth: index > 0 || !continuesHorizontally ? 1 : 0,
+                    },
+                  ]}
+                />
+              );
+            }) : null}
+          </View>
         );
       })}
       {currentTimePosition !== undefined ? (
@@ -837,7 +864,8 @@ const styles = StyleSheet.create({
   calendarDate: { fontSize: 10, lineHeight: 13, fontWeight: '600', marginTop: 1 },
   timelineTrack: { width: '100%', borderBottomWidth: StyleSheet.hairlineWidth, position: 'relative', overflow: 'hidden' },
   gridLine: { position: 'absolute', top: 0, bottom: 0, width: StyleSheet.hairlineWidth },
-  pointMark: { position: 'absolute', top: 3, bottom: 3, width: 6, marginLeft: -3, borderRadius: 3, zIndex: 2 },
+  pointMark: { position: 'absolute', top: 3, bottom: 3, width: 6, marginLeft: -3, borderRadius: 3, overflow: 'hidden', zIndex: 2 },
+  markStripe: { flex: 1, width: '100%' },
   durationMark: { position: 'absolute', top: 3, bottom: 3, minWidth: 3, borderRadius: 3, zIndex: 1 },
   currentTimeMarker: {
     position: 'absolute',

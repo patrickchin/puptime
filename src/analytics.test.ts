@@ -12,6 +12,7 @@ import {
   suggestScheduleFromEvents,
   TIMELINE_BUCKETS,
   timelineBucket,
+  timelinePointClusters,
 } from './analytics.ts';
 import type { PuppyEvent, ScheduleEntry } from './domain.ts';
 
@@ -106,6 +107,26 @@ test('shows an open nap only up to now and keeps legacy nap taps as points', () 
   assert.deepEqual(result.marks, [
     { id: 'open', type: 'nap', label: 'Nap', startBucket: 40, endBucket: 43 },
     { id: 'legacy', type: 'nap', label: 'Nap', startBucket: 48 },
+  ]);
+});
+
+test('combines simultaneous point activities and an underlying span into one timeline cluster', () => {
+  const marks = [
+    { id: 'nap', type: 'nap' as const, label: 'Nap', startBucket: 20, endBucket: 28 },
+    { id: 'pee', type: 'pee' as const, label: 'Pee', startBucket: 24 },
+    { id: 'pee-again', type: 'pee' as const, label: 'Pee', startBucket: 24 },
+    { id: 'meal', type: 'meal' as const, label: 'Ate', startBucket: 24 },
+    { id: 'walk', type: 'walk' as const, label: 'Walk', startBucket: 30 },
+  ];
+
+  assert.deepEqual(timelinePointClusters(marks), [
+    {
+      startBucket: 24,
+      ids: ['pee', 'pee-again', 'meal'],
+      types: ['nap', 'pee', 'pee', 'meal'],
+      hasDuration: true,
+    },
+    { startBucket: 30, ids: ['walk'], types: ['walk'], hasDuration: false },
   ]);
 });
 

@@ -26,6 +26,13 @@ export type TimelineDay = {
   marks: TimelineMark[];
 };
 
+export type TimelinePointCluster = {
+  startBucket: number;
+  ids: string[];
+  types: EventType[];
+  hasDuration: boolean;
+};
+
 export type ActivityFrequencyStat = {
   type: EventType;
   total: number;
@@ -400,6 +407,27 @@ function minutesIntoDay(value: number): number {
 
 export function timelineBucket(value: number): number {
   return Math.min(TIMELINE_BUCKETS - 1, Math.floor(minutesIntoDay(value) / TIMELINE_BUCKET_MINUTES));
+}
+
+export function timelinePointClusters(marks: TimelineMark[]): TimelinePointCluster[] {
+  const byBucket = new Map<number, TimelineMark[]>();
+  marks.forEach((mark) => {
+    if (mark.endBucket !== undefined) return;
+    byBucket.set(mark.startBucket, [...(byBucket.get(mark.startBucket) ?? []), mark]);
+  });
+
+  return [...byBucket.entries()].map(([startBucket, points]) => {
+    const durations = marks.filter((mark) => mark.endBucket !== undefined
+      && mark.startBucket <= startBucket
+      && mark.endBucket > startBucket);
+
+    return {
+      startBucket,
+      ids: points.map((mark) => mark.id),
+      types: durations.concat(points).map((mark) => mark.type),
+      hasDuration: durations.length > 0,
+    };
+  });
 }
 
 export function buildTimelineDays(

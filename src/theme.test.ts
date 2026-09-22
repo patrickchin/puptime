@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { EVENT_META } from './domain.ts';
 import {
   darkTheme,
   eventIcon,
@@ -11,6 +12,15 @@ import {
   resolveTheme,
   sunriseTheme,
 } from './theme.ts';
+
+function contrastRatio(foreground: string, background: string): number {
+  const luminance = (color: string) => [1, 3, 5]
+    .map((index) => Number.parseInt(color.slice(index, index + 2), 16) / 255)
+    .map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
+    .reduce((total, channel, index) => total + channel * [0.2126, 0.7152, 0.0722][index], 0);
+  const values = [luminance(foreground), luminance(background)];
+  return (Math.max(...values) + 0.05) / (Math.min(...values) + 0.05);
+}
 
 test('resolves system and named themes', () => {
   assert.equal(resolveTheme('system', 'light'), lightTheme);
@@ -65,4 +75,21 @@ test('every theme has a distinct semantic icon profile', () => {
   ].join(':'));
 
   assert.equal(new Set(signatures).size, Object.keys(namedThemes).length);
+});
+
+test('activity colors keep accessible contrast in chips and timeline tracks', () => {
+  const activities = Object.values(EVENT_META);
+  assert.equal(new Set(activities.map((meta) => meta.color)).size, activities.length);
+  assert.equal(new Set(activities.map((meta) => meta.darkColor)).size, activities.length);
+
+  activities.forEach((meta) => {
+    assert.ok(contrastRatio(meta.color, meta.softColor) >= 4.5);
+    assert.ok(contrastRatio(meta.darkColor, meta.darkSoftColor) >= 4.5);
+
+    Object.values(namedThemes).forEach((theme) => {
+      const color = theme.isDark ? meta.darkColor : meta.color;
+      assert.ok(contrastRatio(color, theme.surface) >= 3);
+      assert.ok(contrastRatio(color, theme.primarySoft) >= 3);
+    });
+  });
 });
