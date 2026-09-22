@@ -1,7 +1,8 @@
 import * as Haptics from 'expo-haptics';
+import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Appearance, AppState, StyleSheet, useColorScheme, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Appearance, AppState, Linking, StyleSheet, useColorScheme, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { BottomNav, type Tab } from './src/components/BottomNav';
@@ -20,6 +21,7 @@ import {
   createNapEvent,
   DEFAULT_WIDGET_ACTIONS,
   isOpenNap,
+  isQuickEventType,
   normalizeCustomLabel,
   normalizeEventTypeChange,
   normalizeNote,
@@ -30,20 +32,36 @@ import {
   type ScheduleEntry,
 } from './src/domain';
 import { InsightsScreen } from './src/screens/InsightsScreen';
-import { LogScreen } from './src/screens/LogScreen';
+import { LogScreen, type LogEditRequest } from './src/screens/LogScreen';
 import { ScheduleScreen } from './src/screens/ScheduleScreen';
+import { SettingsScreen } from './src/screens/SettingsScreen';
 import { TimelineScreen } from './src/screens/TimelineScreen';
-import { configureReminderHandling, requestReminderPermission, syncScheduleReminders } from './src/reminders';
+import {
+  ADD_NOTE_ACTION,
+  configureNotificationActions,
+  configureReminderHandling,
+  getNotificationPermissionState,
+  requestReminderPermission,
+  syncScheduleReminders,
+  WIDGET_LOG_NOTIFICATION_KIND,
+  type NotificationPermissionState,
+} from './src/reminders';
+import {
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  type NotificationPreferences,
+} from './src/notification-config';
 import {
   appendEvents,
   loadEvents,
   loadLanguagePreference,
+  loadNotificationPreferences,
   loadSchedule,
   loadThemePreference,
   loadWidgetActions,
   removeEvent,
   saveSchedule,
   saveLanguagePreference,
+  saveNotificationPreferences,
   saveThemePreference,
   saveWidgetActions,
   updateEvent,
@@ -57,25 +75,47 @@ export default function App() {
   const colorScheme = useColorScheme();
   const [themePreference, setThemePreference] = useState<ThemePreference>('system');
   const [languagePreference, setLanguagePreference] = useState<LanguagePreference>('system');
-  const [themePickerVisible, setThemePickerVisible] = useState(false);
+  const [preferencePicker, setPreferencePicker] = useState<'theme' | 'language' | null>(null);
+  const [settingsVisible, setSettingsVisible] = useState(false);
   const theme = resolveTheme(themePreference, colorScheme);
   const language = resolveLanguage(languagePreference);
   const [tab, setTab] = useState<Tab>('log');
   const [events, setEvents] = useState<PuppyEvent[]>([]);
   const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
   const [widgetActions, setWidgetActions] = useState<QuickEventType[]>([...DEFAULT_WIDGET_ACTIONS]);
+  const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>({
+    ...DEFAULT_NOTIFICATION_PREFERENCES,
+  });
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionState>('requestable');
   const [undoState, setUndoState] = useState<{ event: PuppyEvent; message: string; restore?: PuppyEvent } | null>(null);
-  const [editEventId, setEditEventId] = useState<string | null>(null);
+  const [editRequest, setEditRequest] = useState<LogEditRequest | null>(null);
+  const handledNotificationResponses = useRef(new Set<string>());
 
   const refresh = useCallback(async () => {
     const pending = await readPendingWidgetEvents();
     const nextEvents = pending.length ? await appendEvents(pending) : await loadEvents();
     setEvents(nextEvents);
-    const nextSchedule = await loadSchedule();
+    const [nextSchedule, nextWidgetActions, nextTheme, nextLanguagePreference, nextNotificationPreferences, nextPermission] = await Promise.all([
+      loadSchedule(),
+      loadWidgetActions(),
+      loadThemePreference(),
+      loadLanguagePreference(),
+      loadNotificationPreferences(),
+      getNotificationPermissionState(),
+    ]);
     setSchedule(nextSchedule);
-    setWidgetActions(await loadWidgetActions());
-    await syncScheduleReminders(nextSchedule).catch(() => undefined);
+    setWidgetActions(nextWidgetActions);
+    setThemePreference(nextTheme);
+    setLanguagePreference(nextLanguagePreference);
+    setNotificationPreferences(nextNotificationPreferences);
+    setNotificationPermission(nextPermission);
+    await syncScheduleReminders(
+      nextSchedule,
+      nextNotificationPreferences.reminderLeadMinutes,
+      resolveLanguage(nextLanguagePreference),
+    ).catch(() => undefined);
     await updateHomeWidget(nextEvents).catch(() => undefined);
+    return nextEvents;
   }, []);
 
   useEffect(() => {
@@ -87,13 +127,66 @@ export default function App() {
   }, [refresh]);
 
   useEffect(() => {
-    loadThemePreference().then(setThemePreference).catch(() => undefined);
-    loadLanguagePreference().then(setLanguagePreference).catch(() => undefined);
-  }, []);
-
-  useEffect(() => {
     Appearance.setColorScheme(themePreference === 'system' ? 'unspecified' : theme.isDark ? 'dark' : 'light');
   }, [theme.isDark, themePreference]);
+
+  useEffect(() => {
+    configureNotificationActions(language).catch(() => undefined);
+  }, [language]);
+
+  const handleNotificationResponse = useCallback(async (response: Notifications.NotificationResponse) => {
+    const data = response.notification.request.content.data;
+    if (data?.kind !== WIDGET_LOG_NOTIFICATION_KIND) return;
+    const responseKey = [
+      response.notification.request.identifier,
+      response.actionIdentifier,
+      response.notification.date,
+      response.userText ?? '',
+    ].join(':');
+    if (handledNotificationResponses.current.has(responseKey)) return;
+    handledNotificationResponses.current.add(responseKey);
+
+    const nextEvents = await refresh();
+    const eventId = typeof data.eventId === 'string' ? data.eventId : undefined;
+    const type = isQuickEventType(data.type) ? data.type : undefined;
+    const at = typeof data.at === 'number' ? data.at : undefined;
+    const event = nextEvents.find((candidate) => candidate.id === eventId)
+      ?? (type && at !== undefined
+        ? nextEvents.find((candidate) => (
+            candidate.type === type
+            && (
+              (candidate.source === 'widget' && Math.abs(candidate.at - at) < 60_000)
+              || (typeof candidate.endedAt === 'number' && Math.abs(candidate.endedAt - at) < 60_000)
+            )
+          ))
+        : undefined);
+    if (!event) return;
+
+    if (response.actionIdentifier === ADD_NOTE_ACTION && response.userText?.trim()) {
+      const updatedEvents = await updateEvent(event.id, { note: normalizeNote(response.userText) });
+      setEvents(updatedEvents);
+      updateHomeWidget(updatedEvents).catch(() => undefined);
+    }
+    setSettingsVisible(false);
+    setTab('log');
+    setEditRequest({
+      eventId: event.id,
+      focusNote: response.actionIdentifier === ADD_NOTE_ACTION && !response.userText?.trim(),
+    });
+  }, [refresh]);
+
+  useEffect(() => {
+    const initialResponse = Notifications.getLastNotificationResponse();
+    if (initialResponse) {
+      void handleNotificationResponse(initialResponse)
+        .finally(() => Notifications.clearLastNotificationResponse());
+    }
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      void handleNotificationResponse(response)
+        .finally(() => Notifications.clearLastNotificationResponse());
+    });
+    return () => subscription.remove();
+  }, [handleNotificationResponse]);
 
   useEffect(() => {
     if (!undoState) return;
@@ -196,7 +289,11 @@ export default function App() {
     await saveSchedule(nextSchedule);
     setSchedule(nextSchedule);
     try {
-      const synced = await syncScheduleReminders(nextSchedule);
+      const synced = await syncScheduleReminders(
+        nextSchedule,
+        notificationPreferences.reminderLeadMinutes,
+        language,
+      );
       if (!synced && nextSchedule.some((entry) => entry.reminder)) {
         Alert.alert(translate(language, 'app.routineSaved'), translate(language, 'app.notificationsOff'));
       }
@@ -207,7 +304,7 @@ export default function App() {
 
   const chooseTheme = (preference: ThemePreference) => {
     setThemePreference(preference);
-    setThemePickerVisible(false);
+    setPreferencePicker(null);
     Haptics.selectionAsync().catch(() => undefined);
     saveThemePreference(preference)
       .then(() => updateHomeWidget(events))
@@ -216,8 +313,19 @@ export default function App() {
 
   const chooseLanguage = (preference: LanguagePreference) => {
     setLanguagePreference(preference);
+    setPreferencePicker(null);
     Haptics.selectionAsync().catch(() => undefined);
-    saveLanguagePreference(preference).catch(() => undefined);
+    saveLanguagePreference(preference)
+      .then(() => Promise.all([
+        configureNotificationActions(resolveLanguage(preference)),
+        syncScheduleReminders(
+          schedule,
+          notificationPreferences.reminderLeadMinutes,
+          resolveLanguage(preference),
+        ),
+        updateHomeWidget(events),
+      ]))
+      .catch(() => undefined);
   };
 
   const changeWidgetActions = useCallback(async (nextActions: QuickEventType[]) => {
@@ -226,7 +334,57 @@ export default function App() {
     await updateHomeWidget(events).catch(() => undefined);
   }, [events]);
 
+  const changeNotificationPreferences = async (nextPreferences: NotificationPreferences) => {
+    await saveNotificationPreferences(nextPreferences);
+    setNotificationPreferences(nextPreferences);
+    await syncScheduleReminders(
+      schedule,
+      nextPreferences.reminderLeadMinutes,
+      language,
+    );
+    await updateHomeWidget(events).catch(() => undefined);
+  };
+
+  const requestNotifications = async () => {
+    const granted = await requestReminderPermission(language);
+    setNotificationPermission(await getNotificationPermissionState());
+    if (granted) {
+      await syncScheduleReminders(
+        schedule,
+        notificationPreferences.reminderLeadMinutes,
+        language,
+      );
+      await updateHomeWidget(events).catch(() => undefined);
+    }
+    return granted;
+  };
+
   const screen = useMemo(() => {
+    if (settingsVisible) {
+      return (
+        <SettingsScreen
+          theme={theme}
+          themePreference={themePreference}
+          languagePreference={languagePreference}
+          widgetActions={widgetActions}
+          notificationPreferences={notificationPreferences}
+          notificationPermission={notificationPermission}
+          routineReminderCount={schedule.filter((entry) => entry.reminder).length}
+          onBack={() => setSettingsVisible(false)}
+          onOpenPicker={setPreferencePicker}
+          onWidgetActionsChange={changeWidgetActions}
+          onNotificationPreferencesChange={changeNotificationPreferences}
+          onRequestNotificationPermission={requestNotifications}
+          onOpenSystemSettings={() => {
+            Linking.openSettings().catch(() => undefined);
+          }}
+          onOpenSchedule={() => {
+            setSettingsVisible(false);
+            setTab('schedule');
+          }}
+        />
+      );
+    }
     if (tab === 'timeline') return <TimelineScreen events={events} theme={theme} />;
     if (tab === 'insights') return <InsightsScreen events={events} onAddEstimate={addEstimatedEvent} theme={theme} />;
     if (tab === 'schedule') {
@@ -235,7 +393,7 @@ export default function App() {
           events={events}
           schedule={schedule}
           onChange={changeSchedule}
-          onRequestReminderPermission={requestReminderPermission}
+          onRequestReminderPermission={requestNotifications}
           theme={theme}
         />
       );
@@ -244,24 +402,39 @@ export default function App() {
       <LogScreen
         events={events}
         schedule={schedule}
-        editEventId={editEventId}
-        onEditRequestHandled={() => setEditEventId(null)}
+        editRequest={editRequest}
+        onEditRequestHandled={() => setEditRequest(null)}
         onLog={logEvent}
         onSave={saveEventDetails}
         onDelete={confirmDelete}
         onOpenSchedule={() => setTab('schedule')}
-        onOpenThemePicker={() => setThemePickerVisible(true)}
-        widgetActions={widgetActions}
-        onWidgetActionsChange={changeWidgetActions}
+        onOpenSettings={() => setSettingsVisible(true)}
         theme={theme}
       />
     );
-  }, [changeWidgetActions, editEventId, events, language, schedule, tab, theme, widgetActions]);
+  }, [
+    changeWidgetActions,
+    editRequest,
+    events,
+    language,
+    languagePreference,
+    notificationPermission,
+    notificationPreferences,
+    schedule,
+    settingsVisible,
+    tab,
+    theme,
+    themePreference,
+    widgetActions,
+  ]);
 
   return (
     <SafeAreaProvider>
       <LocalizationProvider language={language} voice={theme.presentation.voice}>
-        <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top', 'left', 'right']}>
+        <SafeAreaView
+          style={[styles.container, { backgroundColor: theme.background }]}
+          edges={settingsVisible ? ['top', 'bottom', 'left', 'right'] : ['top', 'left', 'right']}
+        >
           <StatusBar style={theme.isDark ? 'light' : 'dark'} />
           <View style={styles.screen}>
             {screen}
@@ -269,8 +442,9 @@ export default function App() {
               <Toast
                 message={undoState.message}
                 onNote={() => {
+                  setSettingsVisible(false);
                   setTab('log');
-                  setEditEventId(undoState.event.id);
+                  setEditRequest({ eventId: undoState.event.id, focusNote: true });
                   setUndoState(null);
                 }}
                 onUndo={undo}
@@ -278,18 +452,21 @@ export default function App() {
               />
             ) : null}
           </View>
-          <SafeAreaView edges={['bottom']} style={{ backgroundColor: theme.nav }}>
-            <BottomNav tab={tab} onChange={setTab} theme={theme} />
-          </SafeAreaView>
+          {!settingsVisible ? (
+            <SafeAreaView edges={['bottom']} style={{ backgroundColor: theme.nav }}>
+              <BottomNav tab={tab} onChange={setTab} theme={theme} />
+            </SafeAreaView>
+          ) : null}
           <ThemePicker
-            visible={themePickerVisible}
+            visible={preferencePicker !== null}
+            mode={preferencePicker ?? 'theme'}
             selected={themePreference}
             selectedLanguage={languagePreference}
             colorScheme={colorScheme}
             theme={theme}
             onSelect={chooseTheme}
             onSelectLanguage={chooseLanguage}
-            onClose={() => setThemePickerVisible(false)}
+            onClose={() => setPreferencePicker(null)}
           />
         </SafeAreaView>
       </LocalizationProvider>

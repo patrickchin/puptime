@@ -15,7 +15,12 @@ import {
   replaceClockTime,
   widgetActionsForState,
 } from './domain.ts';
-import { reminderCopy, reminderIdentifier } from './reminder-config.ts';
+import {
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  normalizeNotificationPreferences,
+  reminderTriggerMinutes,
+} from './notification-config.ts';
+import { reminderCopy, reminderIdentifier, reminderTrigger } from './reminder-config.ts';
 
 test('creates a widget event at the supplied time', () => {
   const event = createEvent('pee', 'widget', 123_456);
@@ -100,6 +105,21 @@ test('creates stable daily reminder content for a schedule entry', () => {
   const entry = { id: 'morning-pee', type: 'pee' as const, minutes: 7 * 60 + 5, reminder: true };
 
   assert.equal(reminderIdentifier(entry), 'puptime-routine-morning-pee');
-  assert.match(reminderCopy(entry).title, /Pee time/);
+  assert.match(reminderCopy(entry).title, /Time for Pee/);
   assert.match(reminderCopy(entry).body, /7:05/);
+  assert.match(reminderCopy(entry, 'en', 10).title, /Pee in 10 min/);
+  assert.deepEqual(reminderTrigger(entry, 10), { hour: 6, minute: 55 });
+  assert.equal(reminderTriggerMinutes(5, 10), 23 * 60 + 55);
+});
+
+test('normalizes notification preferences without enabling confirmations by accident', () => {
+  assert.deepEqual(normalizeNotificationPreferences(null), DEFAULT_NOTIFICATION_PREFERENCES);
+  assert.deepEqual(normalizeNotificationPreferences({ reminderLeadMinutes: 15, widgetConfirmations: true }), {
+    reminderLeadMinutes: 15,
+    widgetConfirmations: true,
+  });
+  assert.deepEqual(normalizeNotificationPreferences({ reminderLeadMinutes: 99, widgetConfirmations: 'yes' }), {
+    reminderLeadMinutes: 10,
+    widgetConfirmations: false,
+  });
 });

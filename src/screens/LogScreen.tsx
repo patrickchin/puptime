@@ -14,11 +14,9 @@ import {
   formatDuration,
   formatTime,
   normalizeCustomLabel,
-  quickEventTypes,
   replaceCalendarDate,
   replaceClockTime,
   type EventType,
-  type QuickEventType,
   type PuppyEvent,
   type PuppyEventChanges,
   type ScheduleEntry,
@@ -59,6 +57,8 @@ type Draft = {
 };
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+
+export type LogEditRequest = { eventId: string; focusNote?: boolean };
 
 function createDraft(event: PuppyEvent): Draft {
   return {
@@ -124,28 +124,24 @@ function monthTitle(key: string, locale: string): string {
 export function LogScreen({
   events,
   schedule,
-  editEventId,
+  editRequest,
   onEditRequestHandled,
   onLog,
   onSave,
   onDelete,
   onOpenSchedule,
-  onOpenThemePicker,
-  widgetActions,
-  onWidgetActionsChange,
+  onOpenSettings,
   theme,
 }: {
   events: PuppyEvent[];
   schedule: ScheduleEntry[];
-  editEventId?: string | null;
+  editRequest?: LogEditRequest | null;
   onEditRequestHandled?: () => void;
   onLog: (type: EventType, customLabel?: string) => void;
   onSave: (event: PuppyEvent, changes: PuppyEventChanges) => Promise<void>;
   onDelete: (event: PuppyEvent) => void;
   onOpenSchedule: () => void;
-  onOpenThemePicker: () => void;
-  widgetActions: QuickEventType[];
-  onWidgetActionsChange: (actions: QuickEventType[]) => Promise<void>;
+  onOpenSettings: () => void;
   theme: Theme;
 }) {
   const { eventLabel, locale, relativeTime, t, voiceCopy } = useLocalization();
@@ -156,9 +152,7 @@ export function LogScreen({
   const [closing, setClosing] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>('all');
-  const [showWidgetSettings, setShowWidgetSettings] = useState(false);
-  const [widgetDraft, setWidgetDraft] = useState<QuickEventType[]>(widgetActions);
-  const [savingWidgetSettings, setSavingWidgetSettings] = useState(false);
+  const [focusNote, setFocusNote] = useState(false);
   const [historyScope, setHistoryScope] = useState<HistoryScope>('recent');
   const draftRef = useRef<Draft | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -176,7 +170,7 @@ export function LogScreen({
     }
   };
 
-  const startEditing = (event: PuppyEvent) => {
+  const startEditing = (event: PuppyEvent, shouldFocusNote = false) => {
     clearSaveTimer();
     sessionRef.current += 1;
     revisionRef.current = 0;
@@ -186,6 +180,7 @@ export function LogScreen({
     closingRef.current = false;
     setSaveStatus('idle');
     setClosing(false);
+    setFocusNote(shouldFocusNote);
     setCustomTouched(false);
     const next = createDraft(event);
     draftRef.current = next;
@@ -267,11 +262,11 @@ export function LogScreen({
   }, []);
   useEffect(() => () => clearSaveTimer(), []);
   useEffect(() => {
-    if (!editEventId) return;
-    const event = events.find((candidate) => candidate.id === editEventId);
-    if (event) startEditing(event);
+    if (!editRequest) return;
+    const event = events.find((candidate) => candidate.id === editRequest.eventId);
+    if (event) startEditing(event, Boolean(editRequest.focusNote));
     onEditRequestHandled?.();
-  }, [editEventId, events, onEditRequestHandled]);
+  }, [editRequest, events, onEditRequestHandled]);
   const filteredEvents = useMemo(() => {
     const selected = activityFilters.find((item) => item.id === activityFilter);
     if (!selected || selected.types.length === 0) return events;
@@ -350,6 +345,7 @@ export function LogScreen({
     setPickerMode(null);
     setCustomTouched(false);
     setSaveStatus('idle');
+    setFocusNote(false);
     closingRef.current = false;
     setClosing(false);
     setDraft(null);
@@ -379,32 +375,6 @@ export function LogScreen({
       return;
     }
     void requestCloseEditor();
-  };
-
-  const openWidgetSettings = () => {
-    setWidgetDraft(widgetActions);
-    setShowWidgetSettings(true);
-  };
-
-  const toggleWidgetAction = (type: QuickEventType) => {
-    setWidgetDraft((current) => {
-      if (current.includes(type)) {
-        return current.length > 2 ? current.filter((item) => item !== type) : current;
-      }
-      return current.length < 4 ? [...current, type] : current;
-    });
-  };
-
-  const saveWidgetSettings = async () => {
-    setSavingWidgetSettings(true);
-    try {
-      await onWidgetActionsChange(widgetDraft);
-      setShowWidgetSettings(false);
-    } catch {
-      Alert.alert(t('log.widgetErrorTitle'), t('log.tryAgain'));
-    } finally {
-      setSavingWidgetSettings(false);
-    }
   };
 
   const pickDateTime = (event: DateTimePickerEvent, date?: Date) => {
@@ -458,9 +428,9 @@ export function LogScreen({
               </View>
               <View style={styles.headerActions}>
                 <Pressable
-                  accessibilityLabel={t('log.customizeWidgetA11y')}
+                  accessibilityLabel={t('log.openSettingsA11y')}
                   accessibilityRole="button"
-                  onPress={openWidgetSettings}
+                  onPress={onOpenSettings}
                   style={({ pressed }) => [
                     styles.headerButton,
                     {
@@ -474,29 +444,7 @@ export function LogScreen({
                   <MaterialCommunityIcons
                     accessibilityElementsHidden
                     importantForAccessibility="no"
-                    name="widgets-outline"
-                    size={21}
-                    color={theme.primary}
-                  />
-                </Pressable>
-                <Pressable
-                  accessibilityLabel={t('log.changeAppearanceA11y')}
-                  accessibilityRole="button"
-                  onPress={onOpenThemePicker}
-                  style={({ pressed }) => [
-                    styles.headerButton,
-                    {
-                      backgroundColor: pressed ? theme.primarySoft : theme.surfaceRaised,
-                      borderColor: pressed ? theme.primary : theme.border,
-                      borderRadius: theme.presentation.controlRadius,
-                      borderWidth: theme.presentation.borderWidth,
-                    },
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    accessibilityElementsHidden
-                    importantForAccessibility="no"
-                    name="palette-outline"
+                    name="cog-outline"
                     size={21}
                     color={theme.primary}
                   />
@@ -984,6 +932,7 @@ export function LogScreen({
             {draft ? (
               <NoteInput
                 key={draft.event.id}
+                autoFocus={focusNote}
                 value={draft.note}
                 onBlur={() => void flushAutoSave()}
                 onChangeText={(note) => updateDraft((current) => ({ ...current, note }))}
@@ -994,129 +943,6 @@ export function LogScreen({
         </KeyboardAvoidingView>
       </Modal>
 
-      <Modal visible={showWidgetSettings} transparent animationType="none" onRequestClose={() => setShowWidgetSettings(false)}>
-        <View accessibilityViewIsModal style={styles.scrim}>
-          <ScrollView
-            bounces={false}
-            style={[
-              styles.sheet,
-              {
-                backgroundColor: theme.surfaceRaised,
-                borderTopLeftRadius: theme.presentation.cardRadius + 6,
-                borderTopRightRadius: theme.presentation.cardRadius + 6,
-              },
-            ]}
-            contentContainerStyle={styles.sheetContent}
-          >
-            <View style={styles.sheetHeading}>
-              <View
-                style={[
-                  styles.editorIcon,
-                  { backgroundColor: theme.primarySoft, borderRadius: theme.presentation.iconRadius },
-                ]}
-              >
-                <MaterialCommunityIcons name="widgets-outline" color={theme.primary} size={23} />
-              </View>
-              <View style={styles.editorHeadingCopy}>
-                <Text
-                  style={[
-                    styles.sheetTitle,
-                    {
-                      color: theme.text,
-                      fontWeight: theme.presentation.titleWeight,
-                      letterSpacing: theme.presentation.titleTracking,
-                    },
-                  ]}
-                >
-                  {t('widget.title')}
-                </Text>
-                <Text style={[styles.sheetSubtitle, { color: theme.textMuted }]}>{t('widget.subtitle')}</Text>
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('widget.close')}
-                onPress={() => setShowWidgetSettings(false)}
-                style={({ pressed }) => [
-                  styles.closeButton,
-                  { borderRadius: theme.presentation.controlRadius },
-                  pressed && { backgroundColor: theme.primarySoft },
-                ]}
-              >
-                <MaterialCommunityIcons name="close" size={22} color={theme.text} />
-              </Pressable>
-            </View>
-
-            <View style={styles.widgetActionList}>
-              {quickEventTypes.map((type) => {
-                const meta = EVENT_META[type];
-                const selected = widgetDraft.includes(type);
-                const locked = (selected && widgetDraft.length === 2) || (!selected && widgetDraft.length === 4);
-                const actionColor = theme.isDark ? meta.darkColor : meta.color;
-                const actionSoftColor = theme.isDark ? meta.darkSoftColor : meta.softColor;
-                const label = eventLabel(type);
-                return (
-                  <Pressable
-                    key={type}
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: selected, disabled: locked }}
-                    accessibilityLabel={t(selected ? 'widget.removeAction' : 'widget.addAction', { activity: label })}
-                    accessibilityHint={locked ? t(selected ? 'widget.keepTwo' : 'widget.removeFirst') : undefined}
-                    disabled={locked}
-                    onPress={() => toggleWidgetAction(type)}
-                    style={({ pressed }) => [
-                      styles.widgetAction,
-                      {
-                        backgroundColor: selected ? actionSoftColor : theme.surface,
-                        borderColor: selected || pressed ? actionColor : theme.border,
-                        borderRadius: theme.presentation.controlRadius,
-                        borderWidth: theme.presentation.borderWidth,
-                        opacity: locked ? 0.5 : 1,
-                      },
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.widgetActionIcon,
-                        { backgroundColor: actionSoftColor, borderRadius: theme.presentation.iconRadius },
-                      ]}
-                    >
-                      <MaterialCommunityIcons
-                        name={eventIcon(theme, type) as keyof typeof MaterialCommunityIcons.glyphMap}
-                        size={21}
-                        color={actionColor}
-                      />
-                    </View>
-                    <Text style={[styles.widgetActionText, { color: theme.text }]}>{label}</Text>
-                    <MaterialCommunityIcons name={selected ? 'check-circle' : 'circle-outline'} size={22} color={selected ? actionColor : theme.textMuted} />
-                  </Pressable>
-                );
-              })}
-            </View>
-            {!widgetDraft.includes('nap') ? (
-              <Text style={[styles.widgetHint, { color: theme.textMuted }]}>{t('widget.napHint')}</Text>
-            ) : null}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t('widget.save')}
-              accessibilityState={{ busy: savingWidgetSettings, disabled: savingWidgetSettings }}
-              disabled={savingWidgetSettings}
-              onPress={() => void saveWidgetSettings()}
-              style={({ pressed }) => [
-                styles.widgetSaveButton,
-                {
-                  backgroundColor: pressed ? theme.primaryPressed : theme.primary,
-                  borderRadius: theme.presentation.controlRadius,
-                  opacity: savingWidgetSettings ? 0.55 : 1,
-                },
-              ]}
-            >
-              <Text style={[styles.widgetSaveButtonText, { color: theme.onPrimary }]}>
-                {t(savingWidgetSettings ? 'common.saving' : 'common.done')}
-              </Text>
-            </Pressable>
-          </ScrollView>
-        </View>
-      </Modal>
     </>
   );
 }
@@ -1216,11 +1042,4 @@ const styles = StyleSheet.create({
   exactFieldText: { flex: 1, minWidth: 0, fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] },
   pickerDone: { minHeight: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   pickerDoneText: { fontSize: 15, fontWeight: '800' },
-  widgetActionList: { gap: 8, marginBottom: spacing.md },
-  widgetAction: { minHeight: 56, borderWidth: 1, borderRadius: 16, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  widgetActionIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  widgetActionText: { flex: 1, fontSize: 15, fontWeight: '700' },
-  widgetHint: { fontSize: 12, lineHeight: 18, marginBottom: spacing.md },
-  widgetSaveButton: { minHeight: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  widgetSaveButtonText: { fontSize: 15, fontWeight: '800' },
 });

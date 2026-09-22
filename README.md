@@ -37,14 +37,15 @@ Puptime is a private, offline puppy routine tracker for Android and iOS. Log pot
 - A chronological log grouped by day, with automatically saved activity, name, note, date, and time edits
 - Optional notes on every log, with native speech-to-text dictation
 - An editable daily routine with native time pickers and clear logged, due, upcoming, and missed states
-- Optional per-activity daily reminders, scheduled locally on the device
+- Optional per-activity daily reminders, scheduled locally with an adjustable 0-, 5-, 10-, 15-, or 30-minute lead time
 - A 10-, 20-, or 30-day timing timeline with one compressed row per calendar day, 15-minute windows, overlaid activity marks, and visible nap spans
 - A compact month-by-month pace view for scanning older patterns without crowding out recent activity
 - Pee and poop frequency summaries with per-recorded-day averages, observed ranges, and typical gaps between logs
 - A reviewable routine suggestion built from recurring activity times across at least three recorded days
 - Reviewable possible missed logs learned from strong repeated patterns, including estimated nap spans when prior durations are consistent
 - A spreadsheet-ready CSV export of the complete activity history, including notes and exact timestamps
-- Customizable, color-coded Android and iOS home-screen widgets with clear activity icons
+- Customizable, color-coded Android and iOS home-screen widgets with clear activity icons, immediate saved feedback, and optional confirmation notifications with **Add note** and **Edit details** actions
+- One Settings screen for appearance, language, widget actions, notification access, widget confirmations, and reminder timing
 - Ten named themes—Meadow, Sunrise, Midnight, Paper, Bubblegum, Blueprint, Trail, Tide, Plum, and Contrast—with distinct color, shape, spacing, type, surface, icon, and writing treatments
 - An independent language setting for the system language, English, Simplified Chinese, or Spanish
 - On-device storage—no account, subscription, server, ads, or tracking
@@ -55,7 +56,7 @@ The starter routine is only an editable example, not veterinary guidance. Change
 
 Download the APK from the [latest GitHub release](https://github.com/patrickchin/puptime/releases/latest), open it on your phone, and allow installation from that source if Android asks.
 
-Tap the widget button on the Today screen to choose the two to four actions shown on your home screen. Pee, poop, and meals are the default; an active nap temporarily appears so it can always be ended.
+Open Settings from the gear on the Today screen to choose the two to four actions shown on your home screen. Pee, poop, and meals are the default; an active nap temporarily appears so it can always be ended.
 
 The Android widget uses the available height for its action buttons. Long-press it to resize the widget, or tap the pencil beside any point-in-time log in the app to correct its activity, custom name, date, time, or note. Edits save automatically, including when you close the editor. Nap logs expose editable start and end dates and times.
 
@@ -65,7 +66,7 @@ Saved notes and activity data stay on your device. Voice dictation uses your pho
 
 From **Insights**, use **Export activity CSV** to open the system share sheet. Puptime creates the file in temporary app storage; your data goes nowhere until you choose an app or destination.
 
-Routine reminders are optional. Turn one on while editing a planned time and allow notifications when the phone asks. Puptime schedules repeating reminders locally; it does not upload the routine or require a notification server.
+Routine reminders are optional. Turn one on while editing a planned time, then choose how early reminders should arrive in Settings. Puptime schedules repeating reminders locally; it does not upload the routine or require a notification server. Settings can also enable a local confirmation after every widget log so you can immediately add a note or open the full editor.
 
 The routine suggestion also stays entirely on the device. It looks at the last 14 days, keeps activities that recur on most recorded days, and rounds their typical times to 15 minutes. You can preview the complete suggestion before replacing the current routine, and generated reminders start off.
 
