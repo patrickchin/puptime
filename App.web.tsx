@@ -1,7 +1,6 @@
-import { useEffect } from 'react';
+import { type ComponentProps, type ComponentType, useEffect } from 'react';
 import {
   Image,
-  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +12,9 @@ import {
 const releaseUrl = 'https://github.com/patrickchin/puptime/releases/latest';
 const sourceUrl = 'https://github.com/patrickchin/puptime';
 const privacyUrl = 'https://github.com/patrickchin/puptime/blob/main/PRIVACY.md';
+
+type AnchorProps = ComponentProps<typeof Pressable> & { href: string };
+const Anchor = Pressable as ComponentType<AnchorProps>;
 
 const colors = {
   paper: '#F6F4ED',
@@ -55,9 +57,9 @@ function LinkButton({
   quiet?: boolean;
 }) {
   return (
-    <Pressable
+    <Anchor
       accessibilityRole="link"
-      onPress={() => Linking.openURL(href)}
+      href={href}
       style={({ pressed }) => [
         styles.button,
         quiet && styles.buttonQuiet,
@@ -65,7 +67,7 @@ function LinkButton({
       ]}
     >
       <Text style={[styles.buttonText, quiet && styles.buttonQuietText]}>{children}</Text>
-    </Pressable>
+    </Anchor>
   );
 }
 
@@ -87,9 +89,9 @@ export default function MarketingSite() {
         </View>
         <View style={styles.headerLinks}>
           {!compact && (
-            <Pressable accessibilityRole="link" onPress={() => Linking.openURL(privacyUrl)}>
+            <Anchor accessibilityRole="link" href={privacyUrl}>
               <Text style={styles.textLink}>Privacy</Text>
-            </Pressable>
+            </Anchor>
           )}
           <LinkButton href={releaseUrl}>Download</LinkButton>
         </View>
@@ -173,12 +175,12 @@ export default function MarketingSite() {
       <View style={[styles.footer, compact && styles.footerCompact]}>
         <Text style={styles.footerLine}>Puptime</Text>
         <View style={[styles.footerLinks, compact && styles.footerLinksCompact]}>
-          <Pressable accessibilityRole="link" onPress={() => Linking.openURL(sourceUrl)}>
+          <Anchor accessibilityRole="link" href={sourceUrl}>
             <Text style={styles.textLink}>GitHub</Text>
-          </Pressable>
-          <Pressable accessibilityRole="link" onPress={() => Linking.openURL(privacyUrl)}>
+          </Anchor>
+          <Anchor accessibilityRole="link" href={privacyUrl}>
             <Text style={styles.textLink}>Privacy</Text>
-          </Pressable>
+          </Anchor>
         </View>
       </View>
     </ScrollView>
