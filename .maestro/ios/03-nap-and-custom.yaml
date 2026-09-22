@@ -1,0 +1,103 @@
+appId: com.patrickchin.puptime
+name: iOS nap lifecycle and custom activity editing
+tags:
+  - ios
+  - critical
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: quick.nap
+    timeout: 90000
+- tapOn:
+    id: quick.nap
+    retryTapIfNoChange: true
+- assertVisible:
+    id: toast
+- tapOn:
+    id: quick.nap
+    retryTapIfNoChange: true
+- scrollUntilVisible:
+    element:
+      id: event.nap.edit
+    direction: DOWN
+    visibilityPercentage: 50
+- swipe:
+    start: 50%,70%
+    end: 50%,35%
+    duration: 400
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: event.nap.edit
+- assertVisible:
+    id: editor
+- scrollUntilVisible:
+    element:
+      id: editor.note.input
+    direction: DOWN
+    visibilityPercentage: 50
+- tapOn:
+    id: editor.note.input
+- inputText: Slept in the crate
+- scrollUntilVisible:
+    element:
+      id: editor.close
+    direction: UP
+    visibilityPercentage: 50
+- tapOn:
+    id: editor.close
+- assertVisible:
+    id: event.nap.note
+    text: Slept in the crate
+- scrollUntilVisible:
+    element:
+      id: quick.another
+    direction: UP
+    visibilityPercentage: 50
+- tapOn:
+    id: quick.another
+- scrollUntilVisible:
+    element:
+      id: quick.custom.input
+    direction: DOWN
+    visibilityPercentage: 50
+- tapOn:
+    id: quick.custom.input
+- inputText: Grooming
+- tapOn:
+    id: quick.custom.submit
+- scrollUntilVisible:
+    element:
+      id: event.custom.edit
+    direction: DOWN
+    visibilityPercentage: 50
+- swipe:
+    start: 50%,70%
+    end: 50%,35%
+    duration: 400
+- waitForAnimationToEnd:
+    timeout: 5000
+- assertVisible: Grooming
+- tapOn:
+    id: event.custom.edit
+- scrollUntilVisible:
+    element:
+      id: editor.custom.input
+    direction: DOWN
+    visibilityPercentage: 50
+- tapOn:
+    id: editor.custom.input
+    point: 90%,50%
+- eraseText: 8
+- inputText: Medication
+- pressKey: enter
+- scrollUntilVisible:
+    element:
+      id: editor.close
+    direction: UP
+    visibilityPercentage: 50
+- tapOn:
+    id: editor.close
+- assertVisible: Medication

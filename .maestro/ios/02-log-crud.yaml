@@ -1,0 +1,133 @@
+appId: com.patrickchin.puptime
+name: iOS log CRUD, undo, filters, and persistence
+tags:
+  - ios
+  - critical
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- tapOn:
+    id: quick.pee
+- assertVisible:
+    id: toast
+- tapOn:
+    id: toast.undo
+- scrollUntilVisible:
+    element:
+      id: history.empty
+    direction: DOWN
+    visibilityPercentage: 50
+- assertVisible:
+    id: history.empty
+- scrollUntilVisible:
+    element:
+      id: quick.meal
+    direction: UP
+    visibilityPercentage: 50
+- tapOn:
+    id: quick.meal
+- tapOn:
+    id: toast.note
+- assertVisible:
+    id: editor
+- scrollUntilVisible:
+    element:
+      id: editor.note.input
+    direction: DOWN
+    visibilityPercentage: 50
+- tapOn:
+    id: editor.note.input
+- eraseText
+- inputText: Ate after training
+- scrollUntilVisible:
+    element:
+      id: editor.close
+    direction: UP
+    visibilityPercentage: 50
+- tapOn:
+    id: editor.close
+- scrollUntilVisible:
+    element:
+      id: event.meal.edit
+    direction: DOWN
+    visibilityPercentage: 50
+- assertVisible:
+    id: event.meal.note
+    text: Ate after training
+- tapOn:
+    id: event.meal.edit
+- tapOn:
+    id: editor.type.walk
+- tapOn:
+    id: editor.close
+- assertVisible:
+    id: event.walk
+- assertNotVisible:
+    id: event.meal
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- scrollUntilVisible:
+    element:
+      id: history.filter.walks
+    direction: DOWN
+    visibilityPercentage: 50
+- tapOn:
+    id: history.filter.walks
+- scrollUntilVisible:
+    element:
+      id: event.walk
+    direction: DOWN
+    visibilityPercentage: 50
+- assertVisible:
+    id: event.walk.note
+    text: Ate after training
+- scrollUntilVisible:
+    element:
+      id: history.filter.meals
+    direction: UP
+    visibilityPercentage: 50
+- tapOn:
+    id: history.filter.meals
+- scrollUntilVisible:
+    element:
+      id: history.empty
+    direction: DOWN
+    visibilityPercentage: 50
+- assertVisible:
+    id: history.empty
+- scrollUntilVisible:
+    element:
+      id: history.filter.walks
+    direction: UP
+    visibilityPercentage: 50
+- tapOn:
+    id: history.filter.walks
+- scrollUntilVisible:
+    element:
+      id: event.walk.delete
+    direction: DOWN
+    visibilityPercentage: 50
+- tapOn:
+    id: event.walk.delete
+    retryTapIfNoChange: true
+- tapOn:
+    text: ^(Cancel|取消|Cancelar)$
+    retryTapIfNoChange: true
+- assertVisible:
+    id: event.walk
+- tapOn:
+    id: event.walk.delete
+    retryTapIfNoChange: true
+- tapOn:
+    text: ^(Delete|删除|Eliminar)$
+    retryTapIfNoChange: true
+- assertVisible:
+    id: history.empty

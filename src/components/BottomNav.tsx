@@ -28,6 +28,7 @@ export function BottomNav({ tab, onChange, theme }: { tab: Tab; onChange: (tab: 
         return (
           <Pressable
             key={item}
+            testID={`nav.${item}`}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
             accessibilityLabel={label}

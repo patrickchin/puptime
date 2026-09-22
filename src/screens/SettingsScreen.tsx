@@ -140,9 +140,10 @@ export function SettingsScreen({
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
+    <ScrollView testID="screen.settings" contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <Pressable
+          testID="settings.back"
           accessibilityRole="button"
           accessibilityLabel={t('settings.back')}
           onPress={onBack}
@@ -195,6 +196,7 @@ export function SettingsScreen({
       <SectionLabel label={t('settings.personalization')} theme={theme} />
       <View style={[styles.card, surfaceTreatment(theme), { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
         <SettingsRow
+          testID="settings.theme.open"
           icon="palette-outline"
           label={t('settings.theme')}
           detail={themeLabel}
@@ -204,6 +206,7 @@ export function SettingsScreen({
         />
         <View style={[styles.divider, { backgroundColor: theme.border }]} />
         <SettingsRow
+          testID="settings.language.open"
           icon="translate"
           label={t('settings.language')}
           detail={languageLabel}
@@ -233,6 +236,7 @@ export function SettingsScreen({
             return (
               <Pressable
                 key={type}
+                testID={`settings.widget.action.${type}`}
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: selected, disabled: locked || savingWidget }}
                 accessibilityLabel={t(selected ? 'widget.removeAction' : 'widget.addAction', { activity: label })}
@@ -284,6 +288,7 @@ export function SettingsScreen({
       <SectionLabel label={t('settings.notifications')} theme={theme} />
       <View style={[styles.card, surfaceTreatment(theme), { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
         <Pressable
+          testID="settings.notifications.permission"
           accessibilityRole="button"
           accessibilityLabel={`${t('settings.notificationPermission')}. ${permissionDetail}`}
           onPress={() => {
@@ -336,6 +341,7 @@ export function SettingsScreen({
             <Text adjustsFontSizeToFit minimumFontScale={0.82} numberOfLines={1} style={[styles.rowHint, { color: theme.textMuted }]}>{t('settings.widgetConfirmationsDetail')}</Text>
           </View>
           <Switch
+            testID="settings.notifications.widgetConfirmations"
             accessibilityLabel={t('settings.widgetConfirmations')}
             disabled={savingNotifications}
             ios_backgroundColor={theme.border}
@@ -348,6 +354,7 @@ export function SettingsScreen({
 
         <View style={[styles.divider, { backgroundColor: theme.border }]} />
         <Pressable
+          testID="settings.notifications.routines"
           accessibilityRole="button"
           accessibilityLabel={`${t('settings.routineReminders')}. ${t('settings.routineRemindersDetail', { count: routineReminderCount })}`}
           accessibilityHint={t('settings.manageSchedule')}
@@ -388,6 +395,7 @@ export function SettingsScreen({
               return (
                 <Pressable
                   key={lead}
+                  testID={`settings.notifications.lead.${lead}`}
                   accessibilityRole="radio"
                   accessibilityLabel={label}
                   accessibilityState={{ checked: selected, disabled: savingNotifications }}
@@ -423,6 +431,7 @@ function SectionLabel({ label, theme }: { label: string; theme: Theme }) {
 }
 
 function SettingsRow({
+  testID,
   icon,
   label,
   detail,
@@ -430,6 +439,7 @@ function SettingsRow({
   onPress,
   theme,
 }: {
+  testID: string;
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
   label: string;
   detail: string;
@@ -439,6 +449,7 @@ function SettingsRow({
 }) {
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       accessibilityLabel={`${label}. ${detail}`}
       accessibilityHint={hint}

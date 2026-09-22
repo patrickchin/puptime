@@ -60,6 +60,7 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
           return (
             <Pressable
               key={type}
+              testID={`quick.${type}`}
               accessibilityRole="button"
               accessibilityLabel={isEndingNap ? t('quick.endNapA11y') : t('quick.logAction', { activity: label })}
               accessibilityHint={isEndingNap ? t('quick.endNapHint') : t('quick.logHint')}
@@ -103,6 +104,7 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
         })}
 
         <Pressable
+          testID="quick.another"
           accessibilityRole="button"
           accessibilityLabel={t('quick.logAnother')}
           accessibilityHint={t('quick.anotherHint')}
@@ -162,6 +164,7 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
                 </Text>
               </View>
               <Pressable
+                testID="quick.another.close"
                 accessibilityRole="button"
                 accessibilityLabel={t('quick.close')}
                 onPress={() => setShowMore(false)}
@@ -205,6 +208,7 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
             <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{t('quick.customActivity')}</Text>
             <View style={styles.customRow}>
               <TextInput
+                testID="quick.custom.input"
                 accessibilityLabel={t('quick.customName')}
                 autoCapitalize="sentences"
                 maxLength={40}
@@ -226,6 +230,7 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
                 ]}
               />
               <Pressable
+                testID="quick.custom.submit"
                 accessibilityRole="button"
                 accessibilityLabel={t('quick.customLogA11y')}
                 accessibilityState={{ disabled: !customLabel.trim() }}

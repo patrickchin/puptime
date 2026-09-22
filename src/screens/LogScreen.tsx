@@ -385,6 +385,7 @@ export function LogScreen({
   return (
     <>
       <SectionList
+        testID="screen.today"
         sections={sections}
         keyExtractor={(item) => item.id}
         keyboardShouldPersistTaps="handled"
@@ -424,6 +425,7 @@ export function LogScreen({
               </View>
               <View style={styles.headerActions}>
                 <Pressable
+                  testID="settings.open"
                   accessibilityLabel={t('log.openSettingsA11y')}
                   accessibilityRole="button"
                   onPress={onOpenSettings}
@@ -469,6 +471,7 @@ export function LogScreen({
                 return (
                   <Pressable
                     key={item.id}
+                    testID={`history.filter.${item.id}`}
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
                     accessibilityLabel={t('log.showFilter', { filter: label })}
@@ -578,6 +581,7 @@ export function LogScreen({
         )}
         ListEmptyComponent={
           <View
+            testID="history.empty"
             style={[
               styles.empty,
               {
@@ -600,6 +604,7 @@ export function LogScreen({
 
       <Modal visible={draft !== null} transparent animationType="none" onRequestClose={handleSystemClose}>
         <KeyboardAvoidingView
+          testID="editor"
           accessibilityViewIsModal
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.scrim}
@@ -646,6 +651,7 @@ export function LogScreen({
                 </Text>
               </View>
               <Pressable
+                testID="editor.close"
                 accessibilityRole="button"
                 accessibilityLabel={t('editor.close')}
                 accessibilityState={{ busy: closing, disabled: closing }}
@@ -693,6 +699,7 @@ export function LogScreen({
                     return (
                       <Pressable
                         key={type}
+                        testID={`editor.type.${type}`}
                         accessibilityRole="button"
                         accessibilityState={{ selected }}
                         accessibilityLabel={t('editor.changeActivity', { activity: label })}
@@ -726,6 +733,7 @@ export function LogScreen({
                   <View style={styles.customField}>
                     <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{t('editor.customName')}</Text>
                     <TextInput
+                      testID="editor.custom.input"
                       accessibilityLabel={t('editor.customNameA11y')}
                       accessibilityHint={t('editor.customNameHint')}
                       autoCapitalize="sentences"

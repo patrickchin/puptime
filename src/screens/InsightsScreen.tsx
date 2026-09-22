@@ -68,6 +68,7 @@ function FrequencyRow({ stat, theme }: { stat: ActivityFrequencyStat; theme: The
 
   return (
     <View
+      testID={`insights.frequency.${stat.type}`}
       accessible
       accessibilityLabel={`${label}. ${dailyValue}, ${dailyDetail}. ${t('insights.typicalGap')} ${intervalValue}. ${intervalDetail}.`}
       style={[styles.frequencyRow, { borderColor: theme.border }]}
@@ -91,7 +92,9 @@ function FrequencyRow({ stat, theme }: { stat: ActivityFrequencyStat; theme: The
           />
         </View>
         <Text style={[styles.activityName, { color: theme.text }]}>{label}</Text>
-        <Text style={[styles.logCount, { color: theme.textMuted }]}>{t('insights.logCount', { count: stat.total })}</Text>
+        <Text testID={`insights.frequency.${stat.type}.count`} style={[styles.logCount, { color: theme.textMuted }]}>
+          {t('insights.logCount', { count: stat.total })}
+        </Text>
       </View>
       <View style={styles.metrics}>
         <View style={styles.metric}>
@@ -208,7 +211,7 @@ export function InsightsScreen({
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
+    <ScrollView testID="screen.insights" contentContainerStyle={styles.content}>
       <Text
         numberOfLines={1}
         style={[
@@ -440,6 +443,7 @@ export function InsightsScreen({
 
       <View style={[styles.section, { borderColor: theme.border }]}>
         <Pressable
+          testID="insights.export"
           accessibilityRole="button"
           accessibilityLabel={t(events.length ? 'insights.exportA11y' : 'insights.noExport')}
           accessibilityHint={events.length ? t('insights.exportHint') : undefined}

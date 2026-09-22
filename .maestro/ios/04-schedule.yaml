@@ -1,0 +1,136 @@
+appId: com.patrickchin.puptime
+name: iOS routine create, edit, reminder permission, and remove
+tags:
+  - ios
+  - critical
+---
+- launchApp:
+    clearState: true
+- setPermissions:
+    permissions:
+      notifications: deny
+- extendedWaitUntil:
+    visible:
+      id: nav.schedule
+    timeout: 90000
+- tapOn:
+    id: nav.schedule
+    retryTapIfNoChange: true
+- scrollUntilVisible:
+    element:
+      id: schedule.add
+    direction: DOWN
+    visibilityPercentage: 50
+- swipe:
+    start: 50%,70%
+    end: 50%,35%
+    duration: 400
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: schedule.add
+- assertVisible:
+    id: schedule.editor
+- tapOn:
+    id: schedule.editor.type.meal
+- assertVisible:
+    id: schedule.editor.reminder
+    checked: false
+- tapOn:
+    id: schedule.editor.reminder
+- assertVisible: ^(Notifications are off|通知已关闭|Las notificaciones están desactivadas)$
+- tapOn:
+    text: ^(Not now|暂不|Ahora no)$
+    retryTapIfNoChange: true
+- assertVisible:
+    id: schedule.editor.reminder
+    checked: false
+- scrollUntilVisible:
+    element:
+      id: schedule.editor.save
+    direction: DOWN
+    visibilityPercentage: 50
+- swipe:
+    start: 50%,70%
+    end: 50%,35%
+    duration: 400
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: schedule.editor.save
+- scrollUntilVisible:
+    element:
+      id: schedule.entry.meal
+    direction: DOWN
+    visibilityPercentage: 50
+- swipe:
+    start: 50%,70%
+    end: 50%,35%
+    duration: 400
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: schedule.entry.meal
+- assertVisible:
+    id: schedule.editor.reminder
+    checked: false
+- tapOn:
+    id: schedule.editor.type.walk
+- scrollUntilVisible:
+    element:
+      id: schedule.editor.save
+    direction: DOWN
+    visibilityPercentage: 50
+- swipe:
+    start: 50%,70%
+    end: 50%,35%
+    duration: 400
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: schedule.editor.save
+- assertVisible:
+    id: schedule.entry.walk
+- tapOn:
+    id: nav.log
+    retryTapIfNoChange: true
+- scrollUntilVisible:
+    element:
+      id: routine.card
+    direction: DOWN
+    visibilityPercentage: 50
+- assertVisible:
+    id: routine.card
+- tapOn:
+    id: nav.schedule
+    retryTapIfNoChange: true
+- scrollUntilVisible:
+    element:
+      id: schedule.entry.walk.remove
+    direction: DOWN
+    visibilityPercentage: 50
+- swipe:
+    start: 50%,70%
+    end: 50%,35%
+    duration: 400
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: schedule.entry.walk.remove
+- tapOn:
+    text: ^(Cancel|取消|Cancelar)$
+    retryTapIfNoChange: true
+- assertVisible:
+    id: schedule.entry.walk
+- tapOn:
+    id: schedule.entry.walk.remove
+- tapOn:
+    text: ^(Remove|移除|Quitar)$
+    retryTapIfNoChange: true
+- scrollUntilVisible:
+    element:
+      id: schedule.empty
+    direction: UP
+    visibilityPercentage: 50
+- assertVisible:
+    id: schedule.empty

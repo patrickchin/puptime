@@ -1,0 +1,11 @@
+flows:
+  - ios/*.yaml
+executionOrder:
+  continueOnFailure: true
+  flowsOrder:
+    - iOS navigation and empty states
+    - iOS log CRUD, undo, filters, and persistence
+    - iOS nap lifecycle and custom activity editing
+    - iOS routine create, edit, reminder permission, and remove
+    - iOS settings and preference persistence
+    - iOS populated insights and timeline controls

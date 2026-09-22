@@ -1,0 +1,85 @@
+appId: com.patrickchin.puptime
+name: iOS populated insights and timeline controls
+tags:
+  - ios
+  - analytics
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: quick.pee
+    timeout: 90000
+- tapOn:
+    id: quick.pee
+    retryTapIfNoChange: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: quick.poop
+    retryTapIfNoChange: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: quick.pee
+    retryTapIfNoChange: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: nav.insights
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: screen.insights
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: insights.frequency.pee
+      text: .*2\.0.*
+    timeout: 30000
+- assertVisible:
+    id: insights.frequency.pee
+    text: .*2\.0.*
+- assertVisible:
+    id: insights.frequency.poop
+    text: .*1\.0.*
+- scrollUntilVisible:
+    element:
+      id: insights.export
+    direction: DOWN
+    visibilityPercentage: 50
+- assertVisible:
+    id: insights.export
+    enabled: true
+- tapOn:
+    id: nav.timeline
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: screen.timeline
+    timeout: 30000
+- assertVisible:
+    id: timeline.zoom.value
+    text: .*1\.0×.*
+- assertVisible:
+    id: timeline.filter.all
+    text: checkbox, checked
+- tapOn:
+    id: timeline.zoom.in
+- assertVisible:
+    id: timeline.zoom.value
+    text: .*1\.5×.*
+- tapOn:
+    id: timeline.filter.all
+- assertVisible:
+    id: timeline.filter.all
+    text: checkbox, unchecked
+- assertVisible:
+    id: timeline.empty
+- tapOn:
+    id: timeline.filter.pee
+- assertVisible:
+    id: timeline.filter.pee
+    text: checkbox, checked
+- assertNotVisible:
+    id: timeline.empty

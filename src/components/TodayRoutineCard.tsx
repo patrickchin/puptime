@@ -60,6 +60,7 @@ export function TodayRoutineCard({
 
   return (
     <Pressable
+      testID="routine.card"
       accessibilityRole="button"
       accessibilityLabel={`${title}. ${detail}`}
       accessibilityHint={t('routine.openHint')}

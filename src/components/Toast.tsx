@@ -18,6 +18,7 @@ export function Toast({
 
   return (
     <View
+      testID="toast"
       accessibilityLiveRegion="polite"
       style={[
         styles.toast,
@@ -27,6 +28,7 @@ export function Toast({
       <Text style={[styles.message, { color: theme.background }]}>{message}</Text>
       {onNote ? (
         <Pressable
+          testID="toast.note"
           accessibilityRole="button"
           accessibilityLabel={t('common.addNoteA11y')}
           onPress={onNote}
@@ -36,6 +38,7 @@ export function Toast({
         </Pressable>
       ) : null}
       <Pressable
+        testID="toast.undo"
         accessibilityRole="button"
         onPress={onUndo}
         style={({ pressed }) => [styles.action, pressed && { opacity: 0.6 }]}

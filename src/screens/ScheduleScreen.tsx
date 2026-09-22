@@ -161,7 +161,7 @@ export function ScheduleScreen({
 
   return (
     <>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView testID="screen.schedule" contentContainerStyle={styles.content}>
         <Text
           numberOfLines={1}
           style={[
@@ -190,6 +190,7 @@ export function ScheduleScreen({
           ]}
         >
           <View
+            testID="schedule.empty"
             style={[
               styles.learnStatus,
               { backgroundColor: theme.surface, borderRadius: theme.presentation.controlRadius },
@@ -322,6 +323,7 @@ export function ScheduleScreen({
             return (
               <Pressable
                 key={entry.id}
+                testID={`schedule.entry.${entry.type}`}
                 accessibilityRole="button"
                 accessibilityLabel={t('schedule.editA11y', {
                   activity: label,
@@ -374,6 +376,7 @@ export function ScheduleScreen({
                   </View>
                 ) : null}
                 <Pressable
+                  testID={`schedule.entry.${entry.type}.remove`}
                   accessibilityRole="button"
                   accessibilityLabel={t('schedule.removeA11y', { activity: label, time: formatMinutes(entry.minutes) })}
                   hitSlop={8}
@@ -395,6 +398,7 @@ export function ScheduleScreen({
         )}
 
         <Pressable
+          testID="schedule.add"
           accessibilityRole="button"
           accessibilityLabel={t('schedule.addA11y')}
           onPress={openNew}
@@ -417,7 +421,7 @@ export function ScheduleScreen({
         animationType="none"
         onRequestClose={() => setReviewingSuggestion(false)}
       >
-        <View accessibilityViewIsModal style={styles.scrim}>
+        <View testID="schedule.suggestion" accessibilityViewIsModal style={styles.scrim}>
           <ScrollView
             bounces={false}
             style={[styles.sheet, { backgroundColor: theme.surfaceRaised }]}
@@ -518,7 +522,7 @@ export function ScheduleScreen({
       </Modal>
 
       <Modal visible={draft !== null} transparent animationType="none" onRequestClose={() => setDraft(null)}>
-        <View accessibilityViewIsModal style={styles.scrim}>
+        <View testID="schedule.editor" accessibilityViewIsModal style={styles.scrim}>
           <ScrollView
             bounces={false}
             style={[styles.sheet, { backgroundColor: theme.surfaceRaised }]}
@@ -529,6 +533,7 @@ export function ScheduleScreen({
                 {t(draft?.id ? 'schedule.editTime' : 'schedule.addTime')}
               </Text>
               <Pressable
+                testID="schedule.editor.close"
                 accessibilityLabel={t('schedule.close')}
                 onPress={() => setDraft(null)}
                 style={({ pressed }) => [styles.closeButton, pressed && { backgroundColor: theme.primarySoft }]}
@@ -546,6 +551,7 @@ export function ScheduleScreen({
                 return (
                   <Pressable
                     key={type}
+                    testID={`schedule.editor.type.${type}`}
                     accessibilityState={{ selected }}
                     onPress={() => draft && setDraft({ ...draft, type })}
                     style={({ pressed }) => [
@@ -595,6 +601,7 @@ export function ScheduleScreen({
                 <Text style={[styles.reminderTitle, { color: theme.text }]}>{t('schedule.dailyReminder')}</Text>
               </View>
               <Switch
+                testID="schedule.editor.reminder"
                 accessibilityLabel={t('schedule.reminderA11y')}
                 disabled={requestingPermission}
                 ios_backgroundColor={theme.border}
@@ -605,6 +612,7 @@ export function ScheduleScreen({
             </View>
 
             <Pressable
+              testID="schedule.editor.save"
               accessibilityRole="button"
               accessibilityState={{ busy: saving, disabled: saving }}
               disabled={saving}
