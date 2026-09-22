@@ -103,6 +103,7 @@ export function ThemePicker({
           <View style={styles.heading}>
             <View style={styles.headingCopy}>
               <Text
+                numberOfLines={1}
                 style={[
                   styles.title,
                   {
@@ -142,16 +143,6 @@ export function ThemePicker({
             showsVerticalScrollIndicator={false}
             style={styles.choiceScroll}
           >
-            {mode === 'theme' ? (
-              <Text
-                style={[
-                  styles.sectionLabel,
-                  { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking },
-                ]}
-              >
-                {t('appearance.themeHeading')}
-              </Text>
-            ) : null}
             {(mode === 'theme' ? choices : []).map((choice) => {
               const active = selected === choice.id;
               const preview = previewTheme(choice.id, colorScheme);
@@ -193,7 +184,7 @@ export function ThemePicker({
                   </View>
                   <View style={styles.choiceCopy}>
                     <Text style={[styles.choiceLabel, { color: theme.text }]}>{label}</Text>
-                    <Text style={[styles.choiceDescription, { color: theme.textMuted }]}>{description}</Text>
+                    <Text numberOfLines={1} style={[styles.choiceDescription, { color: theme.textMuted }]}>{description}</Text>
                   </View>
                   <View
                     accessibilityElementsHidden
@@ -241,18 +232,6 @@ export function ThemePicker({
               );
             })}
 
-            {mode === 'language' ? (
-              <View style={styles.languageHeading}>
-                <Text
-                  style={[
-                    styles.sectionLabel,
-                    { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking },
-                  ]}
-                >
-                  {t('appearance.languageHeading')}
-                </Text>
-              </View>
-            ) : null}
             {(mode === 'language' ? languageChoices : []).map((preference) => {
               const active = selectedLanguage === preference;
               const label = preference === 'system' ? t('language.system') : languageLabels[preference];
@@ -284,7 +263,7 @@ export function ThemePicker({
                   <View style={styles.choiceCopy}>
                     <Text style={[styles.choiceLabel, { color: theme.text }]}>{label}</Text>
                     {preference === 'system' ? (
-                      <Text style={[styles.choiceDescription, { color: theme.textMuted }]}>{detail}</Text>
+                      <Text numberOfLines={1} style={[styles.choiceDescription, { color: theme.textMuted }]}>{detail}</Text>
                     ) : null}
                   </View>
                   <MaterialCommunityIcons
@@ -321,7 +300,6 @@ const styles = StyleSheet.create({
   closeButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
   choiceScroll: { flexShrink: 1 },
   choices: { gap: spacing.sm, paddingTop: spacing.lg, paddingBottom: spacing.md },
-  sectionLabel: { fontSize: 11, lineHeight: 15, fontWeight: '800', marginBottom: 2 },
   choice: {
     minHeight: 68,
     paddingHorizontal: 12,
@@ -338,7 +316,6 @@ const styles = StyleSheet.create({
   previewCard: { flex: 1, paddingHorizontal: 5, flexDirection: 'row', alignItems: 'center', gap: 4 },
   previewMark: { width: 8, height: 8 },
   previewLine: { width: 17, height: 3, borderRadius: 2, opacity: 0.65 },
-  languageHeading: { marginTop: spacing.md },
   languageChoice: {
     minHeight: 58,
     paddingHorizontal: 14,

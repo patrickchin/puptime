@@ -1,2 +1,1 @@
-• Refined iPhone and iPad Home Screen widgets with themed, full-height one-tap controls.
-• Improved visual polish and reliability throughout the app.
+• Home Screen widget buttons now fill the available height on iPhone and iPad and match the selected theme.

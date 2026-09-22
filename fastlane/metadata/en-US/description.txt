@@ -1,21 +1,7 @@
-Puptime is a private, offline puppy routine tracker built for quick logging. Record what happened in one tap, then understand your puppy's day and patterns without creating an account.
+Tap Pee, Poop, Meal, Walk, Nap, or another activity to record it; edit the time, type or dictate a note, or change the details later. Start and stop naps to track their duration.
 
-QUICK, FLEXIBLE LOGGING
-• Log pee, poop, meals, potty trips, walks, naps, and custom activities
-• Start and stop timed naps without inventing an end time
-• Add notes by typing or optional voice dictation
-• Correct activity details, dates, and times whenever you need to
+Set a schedule if you need one, with or without reminders. History includes timing patterns and suggested logs, and can be exported as a CSV file. Choose 2–4 activities for the Home Screen widget.
 
-A ROUTINE THAT FITS YOUR PUPPY
-• Plan an editable daily routine with optional on-device reminders
-• See the next activity and daily progress at a glance
-• Review filterable history, timing patterns, frequency summaries, and routine suggestions
-• Export your complete activity history as a spreadsheet-ready CSV file
+Puptime does not require an account and has no ads, subscription, analytics, or tracking. Activity data stays on your device. Voice dictation uses Apple's speech-recognition service and may require a network connection.
 
-HOME-SCREEN WIDGETS
-Log common activities from your iPhone or iPad Home Screen with one tap.
-
-PRIVATE BY DESIGN
-Your activity data stays on your device. Puptime has no account, subscription, server, ads, analytics, or tracking. Voice dictation uses Apple's speech-recognition service and may require a network connection.
-
-The starter routine is an editable example, not veterinary guidance. Adjust it to fit your puppy and your veterinarian's advice.
+The starter routine is an editable example, not veterinary advice. Adjust it with your veterinarian's guidance.

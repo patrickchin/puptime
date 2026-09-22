@@ -163,6 +163,7 @@ export function ScheduleScreen({
     <>
       <ScrollView contentContainerStyle={styles.content}>
         <Text
+          numberOfLines={1}
           style={[
             styles.title,
             {
@@ -188,25 +189,6 @@ export function ScheduleScreen({
             },
           ]}
         >
-          <View style={styles.learnHeading}>
-            <View
-              style={[
-                styles.learnIcon,
-                { backgroundColor: theme.primarySoft, borderRadius: theme.presentation.iconRadius },
-              ]}
-            >
-              <MaterialCommunityIcons
-                accessibilityElementsHidden
-                importantForAccessibility="no"
-                name="chart-timeline-variant"
-                color={theme.primary}
-                size={23}
-              />
-            </View>
-            <View style={styles.learnCopy}>
-              <Text style={[styles.learnTitle, { color: theme.text }]}>{t('schedule.learnTitle')}</Text>
-            </View>
-          </View>
           <View
             style={[
               styles.learnStatus,
@@ -220,7 +202,12 @@ export function ScheduleScreen({
               color={canSuggest ? theme.primary : theme.textMuted}
               size={18}
             />
-            <Text style={[styles.learnStatusText, { color: theme.textMuted }]}>
+            <Text
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
+              numberOfLines={1}
+              style={[styles.learnStatusText, { color: theme.textMuted }]}
+            >
               {canSuggest
                 ? t('schedule.suggestedTimes', { count: suggestion.entries.length, days: suggestion.daysAnalyzed })
                 : suggestion.daysAnalyzed < 3
@@ -303,7 +290,6 @@ export function ScheduleScreen({
                 ]}
               />
             </View>
-            <Text style={[styles.windowHint, { color: theme.textMuted }]}>{t('schedule.windowHint')}</Text>
           </View>
         ) : null}
 
@@ -607,7 +593,6 @@ export function ScheduleScreen({
               </View>
               <View style={styles.reminderCopy}>
                 <Text style={[styles.reminderTitle, { color: theme.text }]}>{t('schedule.dailyReminder')}</Text>
-                <Text style={[styles.reminderHint, { color: theme.textMuted }]}>{t('schedule.reminderHint')}</Text>
               </View>
               <Switch
                 accessibilityLabel={t('schedule.reminderA11y')}
@@ -650,11 +635,8 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 30, lineHeight: 36, fontWeight: '800', letterSpacing: -0.6, marginTop: 4 },
   learnCard: { borderWidth: 1, borderRadius: 22, padding: spacing.md, marginTop: spacing.lg },
-  learnHeading: { flexDirection: 'row', alignItems: 'flex-start', gap: 11 },
-  learnIcon: { width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   learnCopy: { flex: 1, minWidth: 0 },
-  learnTitle: { fontSize: 18, lineHeight: 23, fontWeight: '800' },
-  learnStatus: { minHeight: 43, borderRadius: 13, paddingHorizontal: 11, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 13 },
+  learnStatus: { minHeight: 43, borderRadius: 13, paddingHorizontal: 11, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 8 },
   learnStatusText: { flex: 1, fontSize: 12, lineHeight: 17, fontWeight: '600' },
   learnButton: { minHeight: 50, borderRadius: 16, borderWidth: 1, marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 14 },
   learnButtonText: { fontSize: 15, lineHeight: 20, fontWeight: '800', textAlign: 'center' },
@@ -665,7 +647,6 @@ const styles = StyleSheet.create({
   progressDetail: { fontSize: 13, lineHeight: 18, marginTop: 7 },
   progressTrack: { height: 8, borderRadius: 4, overflow: 'hidden', marginTop: 13 },
   progressFill: { height: 8, borderRadius: 4 },
-  windowHint: { fontSize: 11, lineHeight: 16, marginTop: 8 },
   headingRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: spacing.xl, marginBottom: 12 },
   sectionTitle: { flex: 1, fontSize: 21, fontWeight: '800' },
   scheduleRow: { minHeight: 68, borderWidth: 1, borderRadius: 18, marginBottom: 8, flexDirection: 'row', alignItems: 'center', paddingRight: 10 },
@@ -713,11 +694,10 @@ const styles = StyleSheet.create({
   typeChoiceText: { fontSize: 14, fontWeight: '700' },
   timeButton: { minHeight: 58, borderWidth: 1, borderRadius: 16, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, gap: 10 },
   timeButtonText: { flex: 1, fontSize: 18, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  reminderRow: { minHeight: 72, borderWidth: 1, borderRadius: 17, padding: 12, marginTop: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: 11 },
+  reminderRow: { minHeight: 60, borderWidth: 1, borderRadius: 17, padding: 12, marginTop: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: 11 },
   reminderIcon: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   reminderCopy: { flex: 1, minWidth: 0 },
   reminderTitle: { fontSize: 15, lineHeight: 20, fontWeight: '700' },
-  reminderHint: { fontSize: 12, lineHeight: 17, marginTop: 1 },
   saveButton: { minHeight: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginTop: spacing.lg },
   saveText: { fontSize: 16, fontWeight: '800' },
 });

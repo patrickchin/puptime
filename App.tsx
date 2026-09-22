@@ -430,7 +430,7 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <LocalizationProvider language={language} voice={theme.presentation.voice}>
+      <LocalizationProvider language={language}>
         <SafeAreaView
           style={[styles.container, { backgroundColor: theme.background }]}
           edges={settingsVisible ? ['top', 'bottom', 'left', 'right'] : ['top', 'left', 'right']}

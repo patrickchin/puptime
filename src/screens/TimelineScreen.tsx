@@ -508,13 +508,8 @@ export function TimelineScreen({ events, theme }: { events: PuppyEvent[]; theme:
       >
         <View style={styles.headingRow}>
           <View style={styles.headingCopy}>
-            {!isCompactHeight ? (
-              <Text style={[styles.eyebrow, { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking }]}>
-                {t('timeline.eyebrow')}
-              </Text>
-            ) : null}
             <Text
-              numberOfLines={2}
+              numberOfLines={1}
               adjustsFontSizeToFit
               style={[
                 styles.title,
@@ -529,9 +524,6 @@ export function TimelineScreen({ events, theme }: { events: PuppyEvent[]; theme:
             >
               {t('timeline.title')}
             </Text>
-            {!isCompactHeight ? (
-              <Text numberOfLines={2} style={[styles.subtitle, { color: theme.textMuted }]}>{t('timeline.subtitle')}</Text>
-            ) : null}
           </View>
           <View
             style={[
@@ -582,18 +574,6 @@ export function TimelineScreen({ events, theme }: { events: PuppyEvent[]; theme:
           <Text numberOfLines={1} style={[styles.rangeText, { color: theme.text }]}>
             {t('timeline.range', { range: rangeLabel, count: visibleEventCount })}
           </Text>
-          {!isCompactHeight ? (
-            <View style={styles.gestureHint}>
-              <MaterialCommunityIcons
-                accessibilityElementsHidden
-                importantForAccessibility="no"
-                name="arrow-expand-horizontal"
-                size={15}
-                color={theme.textMuted}
-              />
-              <Text style={[styles.gestureHintText, { color: theme.textMuted }]}>{t('timeline.pinchHint')}</Text>
-            </View>
-          ) : null}
         </View>
 
         <ScrollView
@@ -802,9 +782,7 @@ const styles = StyleSheet.create({
   headerCompact: { paddingTop: spacing.xs, paddingBottom: spacing.xs, gap: spacing.xs },
   headingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   headingCopy: { flex: 1, minWidth: 0 },
-  eyebrow: { fontSize: 10, lineHeight: 14, fontWeight: '800' },
   title: { fontSize: 28, lineHeight: 34, fontWeight: '800' },
-  subtitle: { fontSize: 12, lineHeight: 17, marginTop: 1 },
   zoomControl: {
     minWidth: 140,
     height: 48,
@@ -816,8 +794,6 @@ const styles = StyleSheet.create({
   zoomValue: { minWidth: 44, textAlign: 'center', fontSize: 12, fontWeight: '800', fontVariant: ['tabular-nums'] },
   timelineMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   rangeText: { flex: 1, minWidth: 0, fontSize: 11, lineHeight: 15, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  gestureHint: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  gestureHintText: { fontSize: 10, lineHeight: 14 },
   filters: { gap: spacing.sm, paddingRight: spacing.md },
   filterChip: {
     minHeight: 48,

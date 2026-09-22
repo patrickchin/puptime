@@ -174,6 +174,9 @@ export function SettingsScreen({
           />
         </View>
         <Text
+          adjustsFontSizeToFit
+          minimumFontScale={0.85}
+          numberOfLines={1}
           style={[
             styles.title,
             {
@@ -211,7 +214,14 @@ export function SettingsScreen({
 
       <SectionLabel label={t('settings.widget')} theme={theme} />
       <View style={[styles.card, surfaceTreatment(theme), { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
-        <Text style={[styles.cardDetail, { color: theme.textMuted }]}>{t('settings.widgetDetail')}</Text>
+        <Text
+          adjustsFontSizeToFit
+          minimumFontScale={0.85}
+          numberOfLines={1}
+          style={[styles.cardDetail, { color: theme.textMuted }]}
+        >
+          {t('settings.widgetDetail')}
+        </Text>
         <View style={styles.widgetGrid}>
           {quickEventTypes.map((type) => {
             const selected = widgetActions.includes(type);
@@ -260,7 +270,14 @@ export function SettingsScreen({
           })}
         </View>
         {!widgetActions.includes('nap') ? (
-          <Text style={[styles.widgetHint, { color: theme.textMuted }]}>{t('widget.napHint')}</Text>
+          <Text
+            adjustsFontSizeToFit
+            minimumFontScale={0.85}
+            numberOfLines={1}
+            style={[styles.widgetHint, { color: theme.textMuted }]}
+          >
+            {t('widget.napHint')}
+          </Text>
         ) : null}
       </View>
 
@@ -285,8 +302,8 @@ export function SettingsScreen({
             />
           </View>
           <View style={styles.rowCopy}>
-            <Text style={[styles.rowLabel, { color: theme.text }]}>{t('settings.notificationPermission')}</Text>
-            <Text style={[styles.rowHint, { color: theme.textMuted }]}>{permissionDetail}</Text>
+            <Text numberOfLines={1} style={[styles.rowLabel, { color: theme.text }]}>{t('settings.notificationPermission')}</Text>
+            <Text adjustsFontSizeToFit minimumFontScale={0.82} numberOfLines={1} style={[styles.rowHint, { color: theme.textMuted }]}>{permissionDetail}</Text>
           </View>
           {notificationPermission === 'granted' ? (
             <MaterialCommunityIcons
@@ -297,7 +314,7 @@ export function SettingsScreen({
               color={theme.primary}
             />
           ) : (
-            <Text style={[styles.permissionAction, { color: theme.primary }]}>
+            <Text adjustsFontSizeToFit minimumFontScale={0.75} numberOfLines={1} style={[styles.permissionAction, { color: theme.primary }]}>
               {t(notificationPermission === 'blocked' ? 'schedule.openSettings' : 'settings.allowNotifications')}
             </Text>
           )}
@@ -315,8 +332,8 @@ export function SettingsScreen({
             />
           </View>
           <View style={styles.rowCopy}>
-            <Text style={[styles.rowLabel, { color: theme.text }]}>{t('settings.widgetConfirmations')}</Text>
-            <Text style={[styles.rowHint, { color: theme.textMuted }]}>{t('settings.widgetConfirmationsDetail')}</Text>
+            <Text adjustsFontSizeToFit minimumFontScale={0.82} numberOfLines={1} style={[styles.rowLabel, { color: theme.text }]}>{t('settings.widgetConfirmations')}</Text>
+            <Text adjustsFontSizeToFit minimumFontScale={0.82} numberOfLines={1} style={[styles.rowHint, { color: theme.textMuted }]}>{t('settings.widgetConfirmationsDetail')}</Text>
           </View>
           <Switch
             accessibilityLabel={t('settings.widgetConfirmations')}
@@ -347,8 +364,8 @@ export function SettingsScreen({
             />
           </View>
           <View style={styles.rowCopy}>
-            <Text style={[styles.rowLabel, { color: theme.text }]}>{t('settings.routineReminders')}</Text>
-            <Text style={[styles.rowHint, { color: theme.textMuted }]}>
+            <Text adjustsFontSizeToFit minimumFontScale={0.82} numberOfLines={1} style={[styles.rowLabel, { color: theme.text }]}>{t('settings.routineReminders')}</Text>
+            <Text adjustsFontSizeToFit minimumFontScale={0.82} numberOfLines={1} style={[styles.rowHint, { color: theme.textMuted }]}>
               {t('settings.routineRemindersDetail', { count: routineReminderCount })}
             </Text>
           </View>
@@ -362,8 +379,8 @@ export function SettingsScreen({
         </Pressable>
 
         <View style={[styles.timingBlock, { borderColor: theme.border, backgroundColor: theme.surface }]}>
-          <Text style={[styles.rowLabel, { color: theme.text }]}>{t('settings.reminderTiming')}</Text>
-          <Text style={[styles.rowHint, { color: theme.textMuted }]}>{t('settings.reminderTimingDetail')}</Text>
+          <Text numberOfLines={1} style={[styles.rowLabel, { color: theme.text }]}>{t('settings.reminderTiming')}</Text>
+          <Text adjustsFontSizeToFit minimumFontScale={0.82} numberOfLines={1} style={[styles.rowHint, { color: theme.textMuted }]}>{t('settings.reminderTimingDetail')}</Text>
           <View style={styles.timingChoices}>
             {reminderLeadOptions.map((lead) => {
               const selected = notificationPreferences.reminderLeadMinutes === lead;
@@ -386,7 +403,7 @@ export function SettingsScreen({
                     },
                   ]}
                 >
-                  <Text style={[styles.timingChoiceText, { color: selected ? theme.primary : theme.text }]}>{label}</Text>
+                  <Text adjustsFontSizeToFit minimumFontScale={0.82} numberOfLines={1} style={[styles.timingChoiceText, { color: selected ? theme.primary : theme.text }]}>{label}</Text>
                 </Pressable>
               );
             })}
@@ -399,7 +416,7 @@ export function SettingsScreen({
 
 function SectionLabel({ label, theme }: { label: string; theme: Theme }) {
   return (
-    <Text style={[styles.sectionLabel, { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking }]}>
+    <Text numberOfLines={1} style={[styles.sectionLabel, { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking }]}>
       {label}
     </Text>
   );
@@ -438,8 +455,8 @@ function SettingsRow({
         />
       </View>
       <View style={styles.rowCopy}>
-        <Text style={[styles.rowLabel, { color: theme.text }]}>{label}</Text>
-        <Text style={[styles.rowHint, { color: theme.textMuted }]}>{detail}</Text>
+        <Text numberOfLines={1} style={[styles.rowLabel, { color: theme.text }]}>{label}</Text>
+        <Text adjustsFontSizeToFit minimumFontScale={0.85} numberOfLines={1} style={[styles.rowHint, { color: theme.textMuted }]}>{detail}</Text>
       </View>
       <MaterialCommunityIcons
         accessibilityElementsHidden

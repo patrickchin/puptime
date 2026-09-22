@@ -210,6 +210,7 @@ export function InsightsScreen({
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <Text
+        numberOfLines={1}
         style={[
           styles.title,
           {
@@ -237,7 +238,12 @@ export function InsightsScreen({
           </View>
           <View style={styles.panelHeadingCopy}>
             <Text style={[styles.panelTitle, { color: theme.text }]}>{t('insights.frequencyTitle')}</Text>
-            <Text style={[styles.panelCaption, { color: theme.textMuted }]}>
+            <Text
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
+              numberOfLines={1}
+              style={[styles.panelCaption, { color: theme.textMuted }]}
+            >
               {t('insights.frequencyCaption', {
                 period: frequency.periodDays,
                 recorded: frequency.recordedDays,
@@ -263,9 +269,6 @@ export function InsightsScreen({
           </View>
           <View style={styles.panelHeadingCopy}>
             <Text style={[styles.panelTitle, { color: theme.text }]}>{t('insights.gapsTitle')}</Text>
-            <Text style={[styles.panelCaption, { color: theme.textMuted }]}>
-              {t('insights.gapsCaption', { count: missingLogs.daysAnalyzed })}
-            </Text>
           </View>
         </View>
         {missingLogs.estimates.length ? (
@@ -394,7 +397,6 @@ export function InsightsScreen({
             </View>
             <View style={styles.panelHeadingCopy}>
               <Text style={[styles.panelTitle, { color: theme.text }]}>{t('insights.historyTitle')}</Text>
-              <Text style={[styles.panelCaption, { color: theme.textMuted }]}>{t('insights.historyCaption')}</Text>
             </View>
           </View>
           <View style={styles.months}>
@@ -436,10 +438,7 @@ export function InsightsScreen({
         </View>
       ) : null}
 
-      <View style={[styles.section, styles.exportSection, { borderColor: theme.border }]}>
-        <Text style={[styles.exportNote, { color: theme.textMuted }]}>
-          {t('insights.dataBody')}
-        </Text>
+      <View style={[styles.section, { borderColor: theme.border }]}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t(events.length ? 'insights.exportA11y' : 'insights.noExport')}
@@ -570,8 +569,6 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   historyToggleText: { fontSize: 14, lineHeight: 19, fontWeight: '700' },
-  exportSection: { gap: spacing.md },
-  exportNote: { fontSize: 12, lineHeight: 17 },
   exportButton: {
     minHeight: 52,
     paddingHorizontal: spacing.md,

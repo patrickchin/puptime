@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { isLanguagePreference, resolveLanguage, themeVoiceCopy, translate } from './localization.ts';
+import { isLanguagePreference, resolveLanguage, translate } from './localization.ts';
 
 test('resolves supported device languages with an English fallback', () => {
   assert.equal(resolveLanguage('system', 'zh-CN'), 'zh-Hans');
@@ -13,9 +13,7 @@ test('resolves supported device languages with an English fallback', () => {
   assert.equal(isLanguagePreference('fr'), false);
 });
 
-test('interpolates localized copy and theme voices', () => {
+test('interpolates localized copy', () => {
   assert.equal(translate('zh-Hans', 'time.minutesAgo', { count: 5 }), '5 分钟前');
   assert.equal(translate('es', 'routine.inHoursMinutes', { hours: 2, minutes: 15 }), 'en 2 h 15 min');
-  assert.equal(themeVoiceCopy('en', 'technical', 'SEP 20').title, 'Record an event');
-  assert.equal(themeVoiceCopy('es', 'playful', '20 SEP').eyebrow, 'REVISIÓN DEL CACHORRO · 20 SEP');
 });

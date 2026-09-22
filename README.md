@@ -1,6 +1,6 @@
 # Puptime
 
-Puptime is a private, offline puppy routine tracker for Android and iOS. Log potty results, outside trips, walks, meals, and timed naps from the app or a home-screen widget, then compare when each activity happens from day to day.
+Puptime is a puppy activity log for Android and iOS. Data stays on the device.
 
 ## Screenshots
 
@@ -18,37 +18,28 @@ Puptime is a private, offline puppy routine tracker for Android and iOS. Log pot
   <tr>
     <th>Timing patterns</th>
     <th>Daily routine</th>
-    <th>Appearance</th>
+    <th>Settings</th>
   </tr>
   <tr>
     <td><img src="assets/screenshots/insights-timeline.png" width="260" alt="Puptime timing timeline comparing activity across ten days"></td>
     <td><img src="assets/screenshots/schedule.png" width="260" alt="Puptime editable daily routine with suggested times and progress"></td>
-    <td><img src="assets/screenshots/appearance.png" width="260" alt="Puptime appearance picker showing its visual themes"></td>
+    <td><img src="assets/screenshots/appearance.png" width="260" alt="Puptime Settings screen with theme, language, widget, and notification controls"></td>
   </tr>
 </table>
 
-## What it includes
+## Features
 
-- One-tap logging for pee, poop, meals, potty trips, walks, and naps, with haptic confirmation and undo
-- A Today overview that shows the next routine activity and live daily completion progress
-- A recent-first, filterable activity history with an expandable month-and-year archive
-- Common extra activities plus reusable custom names such as grooming or medication
-- Start/end nap tracking with a visible running state and editable start and end times
-- A chronological log grouped by day, with automatically saved activity, name, note, date, and time edits
-- Optional notes on every log, with native speech-to-text dictation
-- An editable daily routine with native time pickers and clear logged, due, upcoming, and missed states
-- Optional per-activity daily reminders, scheduled locally with an adjustable 0-, 5-, 10-, 15-, or 30-minute lead time
-- A 10-, 20-, or 30-day timing timeline with one compressed row per calendar day, 15-minute windows, overlaid activity marks, and visible nap spans
-- A compact month-by-month pace view for scanning older patterns without crowding out recent activity
-- Pee and poop frequency summaries with per-recorded-day averages, observed ranges, and typical gaps between logs
-- A reviewable routine suggestion built from recurring activity times across at least three recorded days
-- Reviewable possible missed logs learned from strong repeated patterns, including estimated nap spans when prior durations are consistent
-- A spreadsheet-ready CSV export of the complete activity history, including notes and exact timestamps
-- Customizable, color-coded Android and iOS home-screen widgets with clear activity icons, immediate saved feedback, and optional confirmation notifications with **Add note** and **Edit details** actions
-- One Settings screen for appearance, language, widget actions, notification access, widget confirmations, and reminder timing
-- Ten named themes—Meadow, Sunrise, Midnight, Paper, Bubblegum, Blueprint, Trail, Tide, Plum, and Contrast—with distinct color, shape, spacing, type, surface, icon, and writing treatments
-- An independent language setting for the system language, English, Simplified Chinese, or Spanish
-- On-device storage—no account, subscription, server, ads, or tracking
+- Log pee, poop, meals, potty trips, walks, naps, and custom activities, with haptic confirmation and undo.
+- Start and stop naps, then edit their start and end times.
+- Add typed or dictated notes and edit an activity, name, date, time, or note.
+- Filter recent history or open the month-by-month archive.
+- Set a daily routine, choose when reminders arrive, and review suggested times before using them.
+- Compare activity timing across 10, 20, or 30 days and view pee and poop frequency summaries.
+- Review possible missing logs, including estimated nap spans, before adding anything.
+- Export the complete activity history, notes, and timestamps as CSV.
+- Choose two to four Home Screen widget actions and optional confirmation notifications.
+- Manage themes, language, widget actions, and notifications in Settings.
+- Keep data on the device without an account, subscription, server, ads, analytics, or tracking.
 
 The starter routine is only an editable example, not veterinary guidance. Change it to fit your puppy and your veterinarian’s advice.
 
@@ -58,17 +49,17 @@ Download the APK from the [latest GitHub release](https://github.com/patrickchin
 
 Open Settings from the gear on the Today screen to choose the two to four actions shown on your home screen. Pee, poop, and meals are the default; an active nap temporarily appears so it can always be ended.
 
-The Android widget uses the available height for its action buttons. Long-press it to resize the widget, or tap the pencil beside any point-in-time log in the app to correct its activity, custom name, date, time, or note. Edits save automatically, including when you close the editor. Nap logs expose editable start and end dates and times.
+The Android widget uses the available height for its action buttons. Long-press it to resize it. In the app, tap the pencil beside a log to change its activity, custom name, date, time, or note. Edits save automatically, even if you close the editor. Nap logs have separate start and end times.
 
-Puptime never closes an open nap or silently adds estimated sleep. If you forgot to stop a nap, tap **End nap** when you remember, then use the pencil on that nap to correct the end. A possible-gap suggestion may offer a reviewable nap span learned from prior durations; it becomes an editable log only after you tap **Add log**. Old nap taps from Puptime 1.1 remain unchanged as historical point events.
+Puptime does not end an open nap or add estimated sleep. If you forgot to stop a nap, tap **End nap**, then edit its end time. A possible-gap suggestion may include a nap span based on past durations. Nothing is added until you tap **Add log**. Nap taps saved by Puptime 1.1 remain point events.
 
 Saved notes and activity data stay on your device. Voice dictation uses your phone's Apple or Android speech-recognition service, which may require a network connection depending on the device and downloaded language models.
 
-From **Insights**, use **Export activity CSV** to open the system share sheet. Puptime creates the file in temporary app storage; your data goes nowhere until you choose an app or destination.
+From **Insights**, use **Export activity CSV** to open the system share sheet. Puptime creates the file in temporary app storage. The data is not sent until you choose a destination.
 
 Routine reminders are optional. Turn one on while editing a planned time, then choose how early reminders should arrive in Settings. Puptime schedules repeating reminders locally; it does not upload the routine or require a notification server. Settings can also enable a local confirmation after every widget log so you can immediately add a note or open the full editor.
 
-The routine suggestion also stays entirely on the device. It looks at the last 14 days, keeps activities that recur on most recorded days, and rounds their typical times to 15 minutes. You can preview the complete suggestion before replacing the current routine, and generated reminders start off.
+Routine suggestions also stay on the device. Puptime checks the last 14 days, keeps activities logged on most recorded days, and rounds their typical times to 15 minutes. You review the full suggestion before replacing the current routine. Suggested reminders start off.
 
 See [How Puptime learns patterns](LEARNING.md) for the exact routine-learning, event-matching, missing-log, and nap-estimation algorithms and their limits.
 

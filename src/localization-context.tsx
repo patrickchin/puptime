@@ -5,14 +5,12 @@ import {
   localizedEventPastLabel,
   localizedElapsedTime,
   localizedRelativeTime,
-  themeVoiceCopy,
   translate,
   type AppLanguage,
   type MessageKey,
   type TranslationVariables,
 } from './localization';
 import type { PuppyEvent } from './domain';
-import type { ThemeVoice } from './theme';
 
 type Localization = {
   language: AppLanguage;
@@ -22,13 +20,12 @@ type Localization = {
   eventPastLabel: (event: PuppyEvent) => string;
   elapsedTime: (value: number, now?: number) => string;
   relativeTime: (value: number, now?: number) => string;
-  voiceCopy: (date: string) => ReturnType<typeof themeVoiceCopy>;
 };
 
-const fallback = createLocalization('en', 'gentle');
+const fallback = createLocalization('en');
 const LocalizationContext = createContext<Localization>(fallback);
 
-function createLocalization(language: AppLanguage, voice: ThemeVoice): Localization {
+function createLocalization(language: AppLanguage): Localization {
   return {
     language,
     locale: language,
@@ -37,20 +34,17 @@ function createLocalization(language: AppLanguage, voice: ThemeVoice): Localizat
     eventPastLabel: (event) => localizedEventPastLabel(language, event),
     elapsedTime: (value, now) => localizedElapsedTime(language, value, now),
     relativeTime: (value, now) => localizedRelativeTime(language, value, now),
-    voiceCopy: (date) => themeVoiceCopy(language, voice, date),
   };
 }
 
 export function LocalizationProvider({
   children,
   language,
-  voice,
 }: {
   children: ReactNode;
   language: AppLanguage;
-  voice: ThemeVoice;
 }) {
-  const value = useMemo(() => createLocalization(language, voice), [language, voice]);
+  const value = useMemo(() => createLocalization(language), [language]);
   return <LocalizationContext.Provider value={value}>{children}</LocalizationContext.Provider>;
 }
 

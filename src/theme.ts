@@ -1,17 +1,5 @@
 type DisplayWeight = '700' | '800' | '900';
 
-export type ThemeVoice =
-  | 'gentle'
-  | 'brisk'
-  | 'quiet'
-  | 'notebook'
-  | 'playful'
-  | 'technical'
-  | 'outdoors'
-  | 'calm'
-  | 'editorial'
-  | 'direct';
-
 export type ThemeIconProfile = Exclude<ThemePreference, 'system'>;
 export type ThemeEventIcon = 'pee' | 'poop' | 'meal' | 'pottyTrip' | 'walk' | 'nap' | 'custom';
 export type ThemeNavigationIcon = 'log' | 'timeline' | 'insights' | 'schedule';
@@ -50,7 +38,6 @@ export const lightTheme = {
   shadow: '#10251C',
   nav: '#FFFEFA',
   presentation: {
-    voice: 'gentle' as ThemeVoice,
     iconProfile: 'meadow' as ThemeIconProfile,
     markIcon: 'paw' as string,
     cardRadius: 22,
@@ -90,7 +77,6 @@ export const darkTheme: Theme = {
   shadow: '#000000',
   nav: '#151E19',
   presentation: {
-    voice: 'quiet',
     iconProfile: 'midnight',
     markIcon: 'weather-night',
     cardRadius: 28,
@@ -130,7 +116,6 @@ export const sunriseTheme: Theme = {
   shadow: '#3C1E14',
   nav: '#FFF9F4',
   presentation: {
-    voice: 'brisk',
     iconProfile: 'sunrise',
     markIcon: 'weather-sunset-up',
     cardRadius: 10,
@@ -170,7 +155,6 @@ export const paperTheme: Theme = {
   shadow: '#191918',
   nav: '#F8F7F1',
   presentation: {
-    voice: 'notebook',
     iconProfile: 'paper',
     markIcon: 'book-open-page-variant-outline',
     cardRadius: 2,
@@ -210,7 +194,6 @@ export const bubblegumTheme: Theme = {
   shadow: '#7A174A',
   nav: '#FFF7FB',
   presentation: {
-    voice: 'playful',
     iconProfile: 'bubblegum',
     markIcon: 'heart-outline',
     cardRadius: 30,
@@ -250,7 +233,6 @@ export const blueprintTheme: Theme = {
   shadow: '#000000',
   nav: '#081F30',
   presentation: {
-    voice: 'technical',
     iconProfile: 'blueprint',
     markIcon: 'vector-square',
     cardRadius: 4,
@@ -290,7 +272,6 @@ export const trailTheme: Theme = {
   shadow: '#2B2418',
   nav: '#FAF4E8',
   presentation: {
-    voice: 'outdoors',
     iconProfile: 'trail',
     markIcon: 'pine-tree',
     cardRadius: 8,
@@ -330,7 +311,6 @@ export const tideTheme: Theme = {
   shadow: '#0C4A4F',
   nav: '#F6FCFC',
   presentation: {
-    voice: 'calm',
     iconProfile: 'tide',
     markIcon: 'waves',
     cardRadius: 26,
@@ -370,7 +350,6 @@ export const plumTheme: Theme = {
   shadow: '#2A1733',
   nav: '#FAF7FC',
   presentation: {
-    voice: 'editorial',
     iconProfile: 'plum',
     markIcon: 'flower-outline',
     cardRadius: 0,
@@ -410,7 +389,6 @@ export const contrastTheme: Theme = {
   shadow: '#000000',
   nav: '#FFFFFF',
   presentation: {
-    voice: 'direct',
     iconProfile: 'contrast',
     markIcon: 'contrast-circle',
     cardRadius: 0,
