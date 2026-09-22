@@ -19,11 +19,16 @@ tags:
     id: quick.nap
     retryTapIfNoChange: true
 - scrollUntilVisible:
-    centerElement: true
     element:
       id: event.nap.edit
     direction: DOWN
     visibilityPercentage: 50
+- swipe:
+    start: 50%,70%
+    end: 50%,35%
+    duration: 400
+- waitForAnimationToEnd:
+    timeout: 5000
 - tapOn:
     id: event.nap.edit
 - assertVisible:
@@ -64,11 +69,16 @@ tags:
 - tapOn:
     id: quick.custom.submit
 - scrollUntilVisible:
-    centerElement: true
     element:
       id: event.custom.edit
     direction: DOWN
     visibilityPercentage: 50
+- swipe:
+    start: 50%,70%
+    end: 50%,35%
+    duration: 400
+- waitForAnimationToEnd:
+    timeout: 5000
 - assertVisible: Grooming
 - tapOn:
     id: event.custom.edit

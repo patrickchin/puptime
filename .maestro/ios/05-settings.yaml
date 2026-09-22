@@ -16,7 +16,6 @@ tags:
 - assertVisible:
     id: screen.settings
 - scrollUntilVisible:
-    centerElement: true
     element:
       id: settings.widget.action.walk
     direction: DOWN
@@ -39,11 +38,16 @@ tags:
     id: settings.widget.action.walk
     text: checkbox, checked
 - scrollUntilVisible:
-    centerElement: true
     element:
       id: settings.notifications.lead.15
     direction: DOWN
     visibilityPercentage: 50
+- swipe:
+    start: 50%,70%
+    end: 50%,35%
+    duration: 400
+- waitForAnimationToEnd:
+    timeout: 5000
 - assertVisible:
     id: settings.notifications.lead.10
     text: radio button, checked
@@ -74,11 +78,16 @@ tags:
       id: settings.notifications.lead.15
     direction: DOWN
     visibilityPercentage: 50
+- swipe:
+    start: 50%,70%
+    end: 50%,35%
+    duration: 400
+- waitForAnimationToEnd:
+    timeout: 5000
 - assertVisible:
     id: settings.notifications.lead.15
     text: radio button, checked
 - scrollUntilVisible:
-    centerElement: true
     element:
       id: settings.theme.open
     direction: UP
@@ -162,6 +171,12 @@ tags:
       id: settings.notifications.lead.15
     direction: DOWN
     visibilityPercentage: 50
+- swipe:
+    start: 50%,70%
+    end: 50%,35%
+    duration: 400
+- waitForAnimationToEnd:
+    timeout: 5000
 - assertVisible:
     id: settings.notifications.lead.15
     text: radio button, checked

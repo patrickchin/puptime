@@ -51,7 +51,6 @@ tags:
 - tapOn:
     id: editor.close
 - scrollUntilVisible:
-    centerElement: true
     element:
       id: event.meal.edit
     direction: DOWN
@@ -112,18 +111,23 @@ tags:
 - tapOn:
     id: history.filter.walks
 - scrollUntilVisible:
-    centerElement: true
     element:
       id: event.walk.delete
     direction: DOWN
     visibilityPercentage: 50
 - tapOn:
     id: event.walk.delete
-- tapOn: ^(Cancel|取消|Cancelar)$
+    retryTapIfNoChange: true
+- tapOn:
+    text: ^(Cancel|取消|Cancelar)$
+    retryTapIfNoChange: true
 - assertVisible:
     id: event.walk
 - tapOn:
     id: event.walk.delete
-- tapOn: ^(Delete|删除|Eliminar)$
+    retryTapIfNoChange: true
+- tapOn:
+    text: ^(Delete|删除|Eliminar)$
+    retryTapIfNoChange: true
 - assertVisible:
     id: history.empty

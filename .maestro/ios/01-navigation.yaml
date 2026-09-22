@@ -27,6 +27,7 @@ tags:
     id: quick.nap
 - tapOn:
     id: nav.timeline
+    retryTapIfNoChange: true
 - assertVisible:
     id: screen.timeline
 - assertVisible:
@@ -40,6 +41,7 @@ tags:
     enabled: true
 - tapOn:
     id: nav.insights
+    retryTapIfNoChange: true
 - assertVisible:
     id: screen.insights
 - assertVisible:
@@ -55,6 +57,7 @@ tags:
     enabled: false
 - tapOn:
     id: nav.schedule
+    retryTapIfNoChange: true
 - assertVisible:
     id: screen.schedule
 - assertVisible:
@@ -69,6 +72,7 @@ tags:
     id: schedule.empty
 - tapOn:
     id: nav.log
+    retryTapIfNoChange: true
 - assertVisible:
     id: screen.today
 - assertVisible:
