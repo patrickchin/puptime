@@ -10,6 +10,9 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.patrickchin.puptime",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Allow Puptime to access your photo library only when you choose to save or share content there."
+      },
       "config": {
         "usesNonExemptEncryption": false
       }
