@@ -25,6 +25,8 @@ export type PuptimeWidgetProps = {
   openNap?: WidgetPendingEvent | null;
   actions?: QuickEventType[];
   themePreference?: ThemePreference;
+  notificationConfirmations?: boolean;
+  language?: 'en' | 'zh-Hans' | 'es';
 };
 
 const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnvironment) => {
@@ -34,6 +36,7 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
   const visibleActions = widgetActionsForState(configuredActions, Boolean(props.openNap));
   const theme = resolveTheme(props.themePreference ?? 'system', environment.colorScheme);
   const background = { type: 'linearGradient' as const, colors: [theme.background, theme.surface], startPoint: { x: 0, y: 0 }, endPoint: { x: 1, y: 1 } };
+  const savedLabel = props.language === 'zh-Hans' ? '已记录' : props.language === 'es' ? 'Guardado' : 'Saved';
   const add = (type: QuickEventType): PuptimeWidgetProps => {
     const at = Date.now();
     if (type === 'nap' && props.openNap) {
@@ -42,6 +45,8 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
         openNap: null,
         actions: configuredActions,
         themePreference: props.themePreference,
+        notificationConfirmations: props.notificationConfirmations,
+        language: props.language,
         pending: [...pending.filter((event) => event.id !== completed.id), completed].slice(-100),
       };
     }
@@ -55,6 +60,8 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
       openNap: type === 'nap' ? event : props.openNap,
       actions: configuredActions,
       themePreference: props.themePreference,
+      notificationConfirmations: props.notificationConfirmations,
+      language: props.language,
       // ponytail: bound widget props; move to a shared native DB if 100 unopened taps becomes realistic.
       pending: [...pending, event].slice(-100),
     };
@@ -72,8 +79,11 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
       {visibleActions.map((type) => {
         const meta = EVENT_META[type];
         const isEndingNap = type === 'nap' && Boolean(props.openNap);
+        const confirmed = pending[pending.length - 1]?.type === type;
         const color = theme.isDark ? meta.darkColor : meta.color;
-        const systemImage = type === 'pee'
+        const systemImage = confirmed
+          ? 'checkmark.circle.fill'
+          : type === 'pee'
           ? 'drop.fill'
           : type === 'poop'
             ? 'circle.hexagongrid.fill'
@@ -89,9 +99,9 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
         return (
           <Button
             key={type}
-            label={isEndingNap ? 'End' : meta.label}
+            label={confirmed ? savedLabel : isEndingNap ? 'End' : meta.label}
             systemImage={systemImage}
-            target={type}
+            target={`log|${type}|${props.notificationConfirmations ? '1' : '0'}|${props.language ?? 'en'}`}
             onPress={() => add(type)}
             modifiers={actionModifiers(color)}
           />

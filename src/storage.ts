@@ -10,6 +10,11 @@ import {
   type ScheduleEntry,
 } from './domain';
 import { isLanguagePreference, type LanguagePreference } from './localization';
+import {
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  normalizeNotificationPreferences,
+  type NotificationPreferences,
+} from './notification-config';
 import { isThemePreference, type ThemePreference } from './theme';
 
 const EVENTS_KEY = 'puptime.events.v1';
@@ -17,6 +22,7 @@ const SCHEDULE_KEY = 'puptime.schedule.v1';
 const THEME_KEY = 'puptime.theme.v1';
 const LANGUAGE_KEY = 'puptime.language.v1';
 const WIDGET_ACTIONS_KEY = 'puptime.widgetActions.v1';
+const NOTIFICATION_PREFERENCES_KEY = 'puptime.notificationPreferences.v1';
 
 let writeQueue = Promise.resolve();
 
@@ -120,4 +126,21 @@ export async function loadWidgetActions(): Promise<QuickEventType[]> {
 
 export async function saveWidgetActions(actions: QuickEventType[]): Promise<void> {
   await AsyncStorage.setItem(WIDGET_ACTIONS_KEY, JSON.stringify(normalizeWidgetActions(actions)));
+}
+
+export async function loadNotificationPreferences(): Promise<NotificationPreferences> {
+  const stored = await AsyncStorage.getItem(NOTIFICATION_PREFERENCES_KEY);
+  if (stored === null) return { ...DEFAULT_NOTIFICATION_PREFERENCES };
+  try {
+    return normalizeNotificationPreferences(JSON.parse(stored));
+  } catch {
+    return { ...DEFAULT_NOTIFICATION_PREFERENCES };
+  }
+}
+
+export async function saveNotificationPreferences(preferences: NotificationPreferences): Promise<void> {
+  await AsyncStorage.setItem(
+    NOTIFICATION_PREFERENCES_KEY,
+    JSON.stringify(normalizeNotificationPreferences(preferences)),
+  );
 }

@@ -51,6 +51,7 @@ function previewTheme(
 
 export function ThemePicker({
   visible,
+  mode,
   selected,
   selectedLanguage,
   colorScheme,
@@ -60,6 +61,7 @@ export function ThemePicker({
   onClose,
 }: {
   visible: boolean;
+  mode: 'theme' | 'language';
   selected: ThemePreference;
   selectedLanguage: LanguagePreference;
   colorScheme: 'light' | 'dark' | 'unspecified' | null;
@@ -80,7 +82,7 @@ export function ThemePicker({
     >
       <View style={styles.modal}>
         <Pressable
-          accessibilityLabel={t('appearance.close')}
+          accessibilityLabel={t('settings.closePicker')}
           onPress={onClose}
           style={[StyleSheet.absoluteFill, styles.backdrop]}
         />
@@ -110,11 +112,11 @@ export function ThemePicker({
                   },
                 ]}
               >
-                {t('appearance.title')}
+                {t(mode === 'theme' ? 'settings.themePickerTitle' : 'settings.languagePickerTitle')}
               </Text>
             </View>
             <Pressable
-              accessibilityLabel={t('appearance.close')}
+              accessibilityLabel={t('settings.closePicker')}
               accessibilityRole="button"
               onPress={onClose}
               style={({ pressed }) => [
@@ -140,15 +142,17 @@ export function ThemePicker({
             showsVerticalScrollIndicator={false}
             style={styles.choiceScroll}
           >
-            <Text
-              style={[
-                styles.sectionLabel,
-                { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking },
-              ]}
-            >
-              {t('appearance.themeHeading')}
-            </Text>
-            {choices.map((choice) => {
+            {mode === 'theme' ? (
+              <Text
+                style={[
+                  styles.sectionLabel,
+                  { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking },
+                ]}
+              >
+                {t('appearance.themeHeading')}
+              </Text>
+            ) : null}
+            {(mode === 'theme' ? choices : []).map((choice) => {
               const active = selected === choice.id;
               const preview = previewTheme(choice.id, colorScheme);
               const label = choice.id === 'system' ? t('language.system') : choice.label;
@@ -237,17 +241,19 @@ export function ThemePicker({
               );
             })}
 
-            <View style={styles.languageHeading}>
-              <Text
-                style={[
-                  styles.sectionLabel,
-                  { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking },
-                ]}
-              >
-                {t('appearance.languageHeading')}
-              </Text>
-            </View>
-            {languageChoices.map((preference) => {
+            {mode === 'language' ? (
+              <View style={styles.languageHeading}>
+                <Text
+                  style={[
+                    styles.sectionLabel,
+                    { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking },
+                  ]}
+                >
+                  {t('appearance.languageHeading')}
+                </Text>
+              </View>
+            ) : null}
+            {(mode === 'language' ? languageChoices : []).map((preference) => {
               const active = selectedLanguage === preference;
               const label = preference === 'system' ? t('language.system') : languageLabels[preference];
               const detail = preference === 'system' ? t('language.systemDetail') : t(`language.${preference}`);

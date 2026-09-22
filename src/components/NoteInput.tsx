@@ -18,11 +18,13 @@ import { useLocalization } from '../localization-context';
 import { type Theme } from '../theme';
 
 export function NoteInput({
+  autoFocus = false,
   value,
   onChangeText,
   onBlur,
   theme,
 }: {
+  autoFocus?: boolean;
   value: string;
   onChangeText: (value: string) => void;
   onBlur?: () => void;
@@ -106,6 +108,7 @@ export function NoteInput({
       >
         <TextInput
           accessibilityLabel={t('note.label')}
+          autoFocus={autoFocus}
           autoCapitalize="sentences"
           maxLength={300}
           multiline
