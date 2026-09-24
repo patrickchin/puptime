@@ -1,10 +1,14 @@
-import { Button, HStack } from '@expo/ui/swift-ui';
+import { Button, HStack, Image, Text, VStack } from '@expo/ui/swift-ui';
 import {
+  accessibilityHidden,
   buttonBorderShape,
   buttonStyle,
   containerBackground,
-  controlSize,
+  font,
   frame,
+  foregroundStyle,
+  lineLimit,
+  minimumScaleFactor,
   padding,
   tint,
 } from '@expo/ui/swift-ui/modifiers';
@@ -14,6 +18,7 @@ import {
   EVENT_META,
   normalizeWidgetActions,
   widgetActionsForState,
+  type QuickEventTimes,
   type QuickEventType,
 } from '../domain';
 import { resolveTheme, type ThemePreference } from '../theme';
@@ -23,6 +28,7 @@ export type WidgetPendingEvent = { id: string; type: QuickEventType; at: number;
 export type PuptimeWidgetProps = {
   pending: WidgetPendingEvent[];
   openNap?: WidgetPendingEvent | null;
+  lastEventAt?: QuickEventTimes;
   actions?: QuickEventType[];
   themePreference?: ThemePreference;
   notificationConfirmations?: boolean;
@@ -43,6 +49,7 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
       const completed = { ...props.openNap, endedAt: Math.max(props.openNap.at, at) };
       return {
         openNap: null,
+        lastEventAt: { ...props.lastEventAt, nap: at },
         actions: configuredActions,
         themePreference: props.themePreference,
         notificationConfirmations: props.notificationConfirmations,
@@ -58,6 +65,7 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
     };
     return {
       openNap: type === 'nap' ? event : props.openNap,
+      lastEventAt: { ...props.lastEventAt, [type]: at },
       actions: configuredActions,
       themePreference: props.themePreference,
       notificationConfirmations: props.notificationConfirmations,
@@ -69,18 +77,21 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
   const actionModifiers = (color: string) => [
     buttonStyle('bordered' as const),
     buttonBorderShape('roundedRectangle' as const, theme.presentation.controlRadius),
-    controlSize('small' as const),
     tint(color),
-    frame({ width: 46, minHeight: 60, maxHeight: 999 }),
+    frame({ minWidth: 44, maxWidth: 999, minHeight: 96, maxHeight: 999 }),
   ];
 
   return (
-    <HStack spacing={5} modifiers={[padding({ all: 8 }), frame({ maxHeight: 999 }), containerBackground(background, 'widget')]}>
+    <HStack
+      spacing={7}
+      modifiers={[padding({ all: 9 }), frame({ maxHeight: 999 }), containerBackground(background, 'widget')]}
+    >
       {visibleActions.map((type) => {
         const meta = EVENT_META[type];
         const isEndingNap = type === 'nap' && Boolean(props.openNap);
         const confirmed = pending[pending.length - 1]?.type === type;
         const color = theme.isDark ? meta.darkColor : meta.color;
+        const lastAt = props.lastEventAt?.[type];
         const systemImage = confirmed
           ? 'checkmark.circle.fill'
           : type === 'pee'
@@ -99,12 +110,47 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
         return (
           <Button
             key={type}
-            label={confirmed ? savedLabel : isEndingNap ? 'End' : meta.label}
-            systemImage={systemImage}
             target={`log|${type}|${props.notificationConfirmations ? '1' : '0'}|${props.language ?? 'en'}`}
             onPress={() => add(type)}
             modifiers={actionModifiers(color)}
-          />
+          >
+            <VStack spacing={4} modifiers={[padding({ vertical: 8, horizontal: 3 }), frame({ maxWidth: 999, maxHeight: 999 })]}>
+              <Image
+                systemName={systemImage}
+                modifiers={[
+                  font({ textStyle: 'title2', weight: 'semibold' }),
+                  foregroundStyle(color),
+                  accessibilityHidden(true),
+                ]}
+              />
+              <Text modifiers={[
+                font({ textStyle: 'subheadline', weight: 'bold', design: 'rounded' }),
+                foregroundStyle(color),
+                lineLimit(1),
+                minimumScaleFactor(0.72),
+              ]}>
+                {confirmed ? savedLabel : isEndingNap ? 'End' : meta.label}
+              </Text>
+              {lastAt === undefined ? (
+                <Text modifiers={[
+                  font({ textStyle: 'caption', weight: 'medium' }),
+                  foregroundStyle(color),
+                  lineLimit(1),
+                ]}>Never</Text>
+              ) : (
+                <Text
+                  date={new Date(lastAt)}
+                  dateStyle="relative"
+                  modifiers={[
+                    font({ textStyle: 'caption', weight: 'medium' }),
+                    foregroundStyle(color),
+                    lineLimit(1),
+                    minimumScaleFactor(0.72),
+                  ]}
+                />
+              )}
+            </VStack>
+          </Button>
         );
       })}
     </HStack>

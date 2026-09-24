@@ -1,4 +1,4 @@
-import { isOpenNap, type PuppyEvent } from '../domain';
+import { isOpenNap, latestQuickEventTimes, type PuppyEvent } from '../domain';
 import { resolveLanguage } from '../localization';
 import {
   loadLanguagePreference,
@@ -29,6 +29,7 @@ export async function updateHomeWidget(events: PuppyEvent[]): Promise<void> {
   await PuptimeWidget.updateSnapshot({
     pending: [],
     openNap: openNap ? { id: openNap.id, type: 'nap', at: openNap.at, endedAt: null } : null,
+    lastEventAt: latestQuickEventTimes(events),
     actions,
     themePreference,
     notificationConfirmations: notificationPreferences.widgetConfirmations,

@@ -7,6 +7,7 @@ import {
   eventPastLabel,
   formatDuration,
   isOpenNap,
+  latestQuickEventTimes,
   normalizeCustomLabel,
   normalizeEventTypeChange,
   normalizeNote,
@@ -39,6 +40,17 @@ test('keeps an active nap reachable without overflowing the widget', () => {
   assert.deepEqual(widgetActionsForState(['pee', 'poop', 'meal'], true), ['pee', 'poop', 'meal', 'nap']);
   assert.deepEqual(widgetActionsForState(['pee', 'poop', 'meal', 'walk'], true), ['pee', 'poop', 'meal', 'nap']);
   assert.deepEqual(widgetActionsForState(['pee', 'nap'], true), ['pee', 'nap']);
+});
+
+test('finds the latest time for each widget action', () => {
+  const completedNap = { ...createNapEvent('app', 200), endedAt: 500 };
+
+  assert.deepEqual(latestQuickEventTimes([
+    createEvent('pee', 'app', 100),
+    createEvent('pee', 'widget', 300),
+    completedNap,
+    createEvent('custom', 'app', 900, 'Training'),
+  ]), { pee: 300, nap: 500 });
 });
 
 test('normalizes optional log notes', () => {
