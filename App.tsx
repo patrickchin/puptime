@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Appearance, AppState, Linking, StyleSheet, useColorScheme, View } from 'react-native';
+import { Alert, Appearance, AppState, BackHandler, Linking, StyleSheet, useColorScheme, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { BottomNav, type Tab } from './src/components/BottomNav';
@@ -138,6 +138,15 @@ export default function App() {
   useEffect(() => {
     Appearance.setColorScheme(themePreference === 'system' ? 'unspecified' : theme.isDark ? 'dark' : 'light');
   }, [theme.isDark, themePreference]);
+
+  useEffect(() => {
+    if (!settingsVisible) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      setSettingsVisible(false);
+      return true;
+    });
+    return () => subscription.remove();
+  }, [settingsVisible]);
 
   useEffect(() => {
     configureNotificationActions(language).catch(() => undefined);
