@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
+  activityKey,
   customActivityKey,
   isOpenNap,
   quickEventTypes,
@@ -47,21 +48,25 @@ export function QuickActions({ events, customActivities, onLog, now, theme }: Pr
   return (
     <>
       <View style={[styles.grid, { gap: theme.presentation.gridGap }]}>
-        {quickEventTypes.map((type) => {
+        {[
+          ...quickEventTypes.map((type) => ({ type, customLabel: undefined as string | undefined })),
+          ...customActivities.map((customLabel) => ({ type: 'custom' as EventType, customLabel })),
+        ].map(({ type, customLabel }) => {
+          const key = activityKey({ type, customLabel });
           const colors = eventColors(theme, type);
           const latest = type === 'nap' && openNap
             ? openNap
-            : events.find((event) => event.type === type);
+            : events.find((event) => activityKey(event) === key);
           const isEndingNap = type === 'nap' && Boolean(openNap);
-          const label = isEndingNap ? t('quick.endNap') : eventLabel(type);
+          const label = isEndingNap ? t('quick.endNap') : customLabel ?? eventLabel(type);
           return (
             <Pressable
-              key={type}
-              testID={`quick.${type}`}
+              key={key}
+              testID={`quick.${key}`}
               accessibilityRole="button"
               accessibilityLabel={isEndingNap ? t('quick.endNapA11y') : t('quick.logAction', { activity: label })}
               accessibilityHint={isEndingNap ? t('quick.endNapHint') : t('quick.logHint')}
-              onPress={() => onLog(type)}
+              onPress={() => onLog(type, customLabel)}
               style={({ pressed }) => [
                 styles.action,
                 surfaceTreatment(theme),
@@ -96,38 +101,6 @@ export function QuickActions({ events, customActivities, onLog, now, theme }: Pr
                     : relativeTime(latest.endedAt ?? latest.at, now)}
                 </Text>
               ) : null}
-            </Pressable>
-          );
-        })}
-
-        {customActivities.map((label) => {
-          const colors = eventColors(theme, 'custom');
-          const latest = events.find((event) => event.type === 'custom' && customActivityKey(event.customLabel ?? '') === customActivityKey(label));
-          return (
-            <Pressable
-              key={customActivityKey(label)}
-              testID={`quick.custom.${customActivityKey(label)}`}
-              accessibilityRole="button"
-              accessibilityLabel={t('quick.logAction', { activity: label })}
-              accessibilityHint={t('quick.logHint')}
-              onPress={() => onLog('custom', label)}
-              style={({ pressed }) => [
-                styles.action,
-                surfaceTreatment(theme),
-                {
-                  backgroundColor: theme.surfaceRaised,
-                  borderColor: pressed ? colors.color : theme.border,
-                  minHeight: theme.presentation.actionHeight,
-                  padding: theme.presentation.cardPadding - 4,
-                  opacity: pressed ? 0.76 : 1,
-                },
-              ]}
-            >
-              <View style={[styles.iconCircle, { backgroundColor: colors.softColor, borderRadius: theme.presentation.iconRadius }]}>
-                <MaterialCommunityIcons name={eventIcon(theme, 'custom') as keyof typeof MaterialCommunityIcons.glyphMap} color={colors.color} size={25} />
-              </View>
-              <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.actionLabel, { color: theme.text }]}>{label}</Text>
-              {latest ? <Text numberOfLines={1} style={[styles.actionTime, { color: theme.textMuted }]}>{relativeTime(latest.at, now)}</Text> : null}
             </Pressable>
           );
         })}
