@@ -2,11 +2,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import {
   DEFAULT_WIDGET_ACTIONS,
+  normalizeCustomActivities,
   normalizeWidgetActions,
   STARTER_SCHEDULE,
   type PuppyEvent,
   type PuppyEventChanges,
-  type QuickEventType,
+  type ActivityKey,
   type ScheduleEntry,
 } from './domain';
 import { isLanguagePreference, type LanguagePreference } from './localization';
@@ -22,6 +23,7 @@ const SCHEDULE_KEY = 'puptime.schedule.v1';
 const THEME_KEY = 'puptime.theme.v1';
 const LANGUAGE_KEY = 'puptime.language.v1';
 const WIDGET_ACTIONS_KEY = 'puptime.widgetActions.v1';
+const CUSTOM_ACTIVITIES_KEY = 'puptime.customActivities.v1';
 const NOTIFICATION_PREFERENCES_KEY = 'puptime.notificationPreferences.v1';
 const ONBOARDING_KEY = 'puptime.onboarding.v1';
 
@@ -132,18 +134,36 @@ export function saveLanguagePreference(preference: LanguagePreference): Promise<
   return AsyncStorage.setItem(LANGUAGE_KEY, preference);
 }
 
-export async function loadWidgetActions(): Promise<QuickEventType[]> {
+export async function loadCustomActivities(events?: PuppyEvent[]): Promise<string[]> {
+  const stored = parseArray<string>(await AsyncStorage.getItem(CUSTOM_ACTIVITIES_KEY));
+  const historical = (events ?? await loadEvents())
+    .filter((event) => event.type === 'custom')
+    .map((event) => event.customLabel);
+  const activities = normalizeCustomActivities([...stored, ...historical]);
+  if (JSON.stringify(activities) !== JSON.stringify(stored)) {
+    await AsyncStorage.setItem(CUSTOM_ACTIVITIES_KEY, JSON.stringify(activities));
+  }
+  return activities;
+}
+
+export async function saveCustomActivity(label: string): Promise<string[]> {
+  const next = normalizeCustomActivities([...await loadCustomActivities(), label]);
+  await AsyncStorage.setItem(CUSTOM_ACTIVITIES_KEY, JSON.stringify(next));
+  return next;
+}
+
+export async function loadWidgetActions(customActivities?: string[]): Promise<ActivityKey[]> {
   const stored = await AsyncStorage.getItem(WIDGET_ACTIONS_KEY);
   if (stored === null) return [...DEFAULT_WIDGET_ACTIONS];
   try {
-    return normalizeWidgetActions(JSON.parse(stored));
+    return normalizeWidgetActions(JSON.parse(stored), customActivities ?? await loadCustomActivities());
   } catch {
     return [...DEFAULT_WIDGET_ACTIONS];
   }
 }
 
-export async function saveWidgetActions(actions: QuickEventType[]): Promise<void> {
-  await AsyncStorage.setItem(WIDGET_ACTIONS_KEY, JSON.stringify(normalizeWidgetActions(actions)));
+export async function saveWidgetActions(actions: ActivityKey[]): Promise<void> {
+  await AsyncStorage.setItem(WIDGET_ACTIONS_KEY, JSON.stringify(normalizeWidgetActions(actions, await loadCustomActivities())));
 }
 
 export async function loadNotificationPreferences(): Promise<NotificationPreferences> {

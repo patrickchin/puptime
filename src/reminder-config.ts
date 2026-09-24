@@ -1,4 +1,4 @@
-import { formatMinutes, type PuppyEvent, type QuickEventType, type ScheduleEntry } from './domain.ts';
+import { formatMinutes, type ActivityKey, type PuppyEvent, type QuickEventType, type ScheduleEntry } from './domain.ts';
 import { localizedEventLabel, translate, type AppLanguage } from './localization.ts';
 import {
   reminderTriggerMinutes,
@@ -29,7 +29,7 @@ export function reminderCopy(
   language: AppLanguage = 'en',
   leadMinutes: ReminderLeadMinutes = 0,
 ): { title: string; body: string } {
-  const activity = localizedEventLabel(language, entry.type);
+  const activity = entry.customLabel ?? localizedEventLabel(language, entry.type);
   return {
     title: leadMinutes
       ? translate(language, 'notifications.reminderSoon', { activity, minutes: leadMinutes })
@@ -44,13 +44,14 @@ export function reminderTrigger(entry: ScheduleEntry, leadMinutes: ReminderLeadM
 }
 
 export function widgetConfirmationCopy(
-  type: QuickEventType,
+  type: ActivityKey,
   language: AppLanguage = 'en',
+  customLabel?: string,
 ): { title: string; body: string } {
   return {
     title: translate(language, 'notifications.widgetLoggedTitle'),
     body: translate(language, 'notifications.widgetLoggedBody', {
-      activity: localizedEventLabel(language, type),
+      activity: type.startsWith('custom:') ? customLabel ?? type.slice(7) : localizedEventLabel(language, type as QuickEventType),
     }),
   };
 }

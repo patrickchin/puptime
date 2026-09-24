@@ -4,6 +4,8 @@ import test from 'node:test';
 import {
   createEvent,
   createNapEvent,
+  activityKey,
+  normalizeCustomActivities,
   eventPastLabel,
   formatDuration,
   isOpenNap,
@@ -41,6 +43,14 @@ test('normalizes widget actions to a useful two-to-four action set', () => {
   assert.deepEqual(normalizeWidgetActions(['walk', 'walk', 'nap', 'meal', 'poop']), ['walk', 'nap', 'meal', 'poop']);
   assert.deepEqual(normalizeWidgetActions(['pee']), ['pee', 'poop', 'meal']);
   assert.deepEqual(normalizeWidgetActions(['not-an-action']), ['pee', 'poop', 'meal']);
+  assert.deepEqual(normalizeWidgetActions(['pee', 'custom:training'], ['Training']), ['pee', 'custom:training']);
+  assert.deepEqual(normalizeWidgetActions(['pee', 'custom:training'], []), ['pee', 'poop', 'meal']);
+});
+
+test('keeps named activities distinct while ignoring case differences', () => {
+  assert.deepEqual(normalizeCustomActivities([' Training ', 'training', 'Grooming', '']), ['Training', 'Grooming']);
+  assert.equal(activityKey(createEvent('custom', 'app', 100, 'TRAINING')), 'custom:training');
+  assert.equal(activityKey(createEvent('custom', 'app', 100, 'Grooming')), 'custom:grooming');
 });
 
 test('keeps an active nap reachable without overflowing the widget', () => {
@@ -57,7 +67,7 @@ test('finds the latest time for each widget action', () => {
     createEvent('pee', 'widget', 300),
     completedNap,
     createEvent('custom', 'app', 900, 'Training'),
-  ]), { pee: 300, nap: 500 });
+  ]), { pee: 300, nap: 500, 'custom:training': 900 });
 });
 
 test('normalizes optional log notes', () => {

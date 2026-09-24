@@ -3,6 +3,8 @@ import { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
+  activityKey,
+  customActivityKey,
   isOpenNap,
   quickEventTypes,
   type EventType,
@@ -13,12 +15,13 @@ import { eventColors, eventIcon, spacing, supportingIcon, surfaceTreatment, type
 
 type Props = {
   events: PuppyEvent[];
+  customActivities: string[];
   onLog: (type: EventType, customLabel?: string) => void;
   now: number;
   theme: Theme;
 };
 
-export function QuickActions({ events, onLog, now, theme }: Props) {
+export function QuickActions({ events, customActivities, onLog, now, theme }: Props) {
   const { elapsedTime, eventLabel, relativeTime, t } = useLocalization();
   const [showMore, setShowMore] = useState(false);
   const [customLabel, setCustomLabel] = useState('');
@@ -31,12 +34,8 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
     t('quick.crate'),
     t('quick.medicine'),
   ], [t]);
-  const otherActivities = useMemo(() => {
-    const previous = events
-      .filter((event) => event.type === 'custom')
-      .map((event) => event.customLabel?.trim() || eventLabel('custom'));
-    return [...new Set([...suggestions, ...previous])];
-  }, [eventLabel, events, suggestions]);
+  const otherActivities = useMemo(() => suggestions.filter((label) =>
+    !customActivities.some((saved) => customActivityKey(saved) === customActivityKey(label))), [customActivities, suggestions]);
 
   const logOther = (label: string) => {
     const clean = label.trim();
@@ -49,21 +48,25 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
   return (
     <>
       <View style={[styles.grid, { gap: theme.presentation.gridGap }]}>
-        {quickEventTypes.map((type) => {
+        {[
+          ...quickEventTypes.map((type) => ({ type, customLabel: undefined as string | undefined })),
+          ...customActivities.map((customLabel) => ({ type: 'custom' as EventType, customLabel })),
+        ].map(({ type, customLabel }) => {
+          const key = activityKey({ type, customLabel });
           const colors = eventColors(theme, type);
           const latest = type === 'nap' && openNap
             ? openNap
-            : events.find((event) => event.type === type);
+            : events.find((event) => activityKey(event) === key);
           const isEndingNap = type === 'nap' && Boolean(openNap);
-          const label = isEndingNap ? t('quick.endNap') : eventLabel(type);
+          const label = isEndingNap ? t('quick.endNap') : customLabel ?? eventLabel(type);
           return (
             <Pressable
-              key={type}
-              testID={`quick.${type}`}
+              key={key}
+              testID={`quick.${key}`}
               accessibilityRole="button"
               accessibilityLabel={isEndingNap ? t('quick.endNapA11y') : t('quick.logAction', { activity: label })}
               accessibilityHint={isEndingNap ? t('quick.endNapHint') : t('quick.logHint')}
-              onPress={() => onLog(type)}
+              onPress={() => onLog(type, customLabel)}
               style={({ pressed }) => [
                 styles.action,
                 surfaceTreatment(theme),

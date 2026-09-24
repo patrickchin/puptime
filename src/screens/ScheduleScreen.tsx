@@ -15,22 +15,24 @@ import {
 } from 'react-native';
 
 import { scheduleStatusesForDay, suggestScheduleFromEvents, type ScheduleStatus } from '../analytics';
-import { formatMinutes, quickEventTypes, type EventType, type ScheduleEntry } from '../domain';
+import { customActivityKey, formatMinutes, quickEventTypes, type EventType, type ScheduleEntry } from '../domain';
 import type { PuppyEvent } from '../domain';
 import { useLocalization } from '../localization-context';
 import { eventColors, eventIcon, spacing, surfaceTreatment, type Theme } from '../theme';
 
-type Draft = { id?: string; type: EventType; minutes: number; reminder: boolean };
+type Draft = { id?: string; type: EventType; customLabel?: string; minutes: number; reminder: boolean };
 
 export function ScheduleScreen({
   events,
   schedule,
+  customActivities,
   onChange,
   onRequestReminderPermission,
   theme,
 }: {
   events: PuppyEvent[];
   schedule: ScheduleEntry[];
+  customActivities: string[];
   onChange: (schedule: ScheduleEntry[]) => Promise<void>;
   onRequestReminderPermission: () => Promise<boolean>;
   theme: Theme;
@@ -80,6 +82,7 @@ export function ScheduleScreen({
     const entry: ScheduleEntry = {
       id: draft.id ?? `${Date.now()}-${draft.type}`,
       type: draft.type,
+      ...(draft.type === 'custom' ? { customLabel: draft.customLabel } : {}),
       minutes: draft.minutes,
       reminder: draft.reminder,
     };
@@ -124,7 +127,7 @@ export function ScheduleScreen({
 
   const remove = (entry: ScheduleEntry) => {
     Alert.alert(t('schedule.removeTitle'), t('schedule.entryAt', {
-      activity: eventLabel(entry.type),
+      activity: entry.customLabel ?? eventLabel(entry.type),
       time: formatMinutes(entry.minutes),
     }), [
       { text: t('app.cancel'), style: 'cancel' },
@@ -320,7 +323,7 @@ export function ScheduleScreen({
         ) : (
           schedule.map((entry, index) => {
             const colors = eventColors(theme, entry.type);
-            const label = eventLabel(entry.type);
+            const label = entry.customLabel ?? eventLabel(entry.type);
             const status = statuses.find((item) => item.entry.id === entry.id)?.status ?? 'upcoming';
             const presentation = statusPresentation(status, entry.type);
             return (
@@ -452,8 +455,8 @@ export function ScheduleScreen({
 
             <View style={[styles.previewList, { borderColor: theme.border }]}>
               {suggestion.entries.map((entry, index) => {
-                const label = eventLabel(entry.type);
                 const { color, softColor: background } = eventColors(theme, entry.type);
+                const label = entry.customLabel ?? eventLabel(entry.type);
                 return (
                   <View
                     key={entry.id}
@@ -545,16 +548,17 @@ export function ScheduleScreen({
 
             <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{t('schedule.activity')}</Text>
             <View style={styles.typePicker}>
-              {quickEventTypes.map((type) => {
-                const selected = draft?.type === type;
+              {[...quickEventTypes.map((type) => ({ type, customLabel: undefined as string | undefined })),
+                ...customActivities.map((customLabel) => ({ type: 'custom' as EventType, customLabel }))].map(({ type, customLabel }) => {
+                const selected = draft?.type === type && (type !== 'custom' || customActivityKey(draft.customLabel ?? '') === customActivityKey(customLabel ?? ''));
                 const colors = eventColors(theme, type);
-                const label = eventLabel(type);
+                const label = customLabel ?? eventLabel(type);
                 return (
                   <Pressable
-                    key={type}
+                    key={customLabel ? customActivityKey(customLabel) : type}
                     testID={`schedule.editor.type.${type}`}
                     accessibilityState={{ selected }}
-                    onPress={() => draft && setDraft({ ...draft, type })}
+                    onPress={() => draft && setDraft({ ...draft, type, customLabel })}
                     style={({ pressed }) => [
                       styles.typeChoice,
                       {

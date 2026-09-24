@@ -29,7 +29,7 @@ export function TodayRoutineCard({
     ? `${Math.round((completed / statuses.length) * 100)}%`
     : '0%';
   const nextColors = next ? eventColors(theme, next.entry.type) : null;
-  const nextLabel = next ? eventLabel(next.entry.type) : '';
+  const nextLabel = next ? next.entry.customLabel ?? eventLabel(next.entry.type) : '';
   const until = next ? (() => {
     const minutes = Math.max(0, Math.ceil((next.target - now) / 60_000));
     if (minutes < 1) return t('routine.now');

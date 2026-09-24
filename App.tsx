@@ -19,13 +19,14 @@ import {
 import {
   createEvent,
   createNapEvent,
+  activityKey,
   DEFAULT_WIDGET_ACTIONS,
   isOpenNap,
   isQuickEventType,
   normalizeCustomLabel,
   normalizeEventTypeChange,
   normalizeNote,
-  type QuickEventType,
+  type ActivityKey,
   type EventType,
   type PuppyEvent,
   type PuppyEventChanges,
@@ -57,6 +58,7 @@ import {
   appendEvents,
   completeOnboarding,
   loadEvents,
+  loadCustomActivities,
   loadLanguagePreference,
   loadNotificationPreferences,
   loadSchedule,
@@ -64,6 +66,7 @@ import {
   loadWidgetActions,
   removeEvent,
   saveSchedule,
+  saveCustomActivity,
   saveLanguagePreference,
   saveNotificationPreferences,
   saveThemePreference,
@@ -88,8 +91,9 @@ export default function App() {
   const language = resolveLanguage(languagePreference);
   const [tab, setTab] = useState<Tab>('log');
   const [events, setEvents] = useState<PuppyEvent[]>([]);
+  const [customActivities, setCustomActivities] = useState<string[]>([]);
   const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
-  const [widgetActions, setWidgetActions] = useState<QuickEventType[]>([...DEFAULT_WIDGET_ACTIONS]);
+  const [widgetActions, setWidgetActions] = useState<ActivityKey[]>([...DEFAULT_WIDGET_ACTIONS]);
   const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>({
     ...DEFAULT_NOTIFICATION_PREFERENCES,
   });
@@ -103,9 +107,11 @@ export default function App() {
     const pending = await readPendingWidgetEvents();
     const nextEvents = pending.length ? await appendEvents(pending) : await loadEvents();
     setEvents(nextEvents);
+    const nextCustomActivities = await loadCustomActivities(nextEvents);
+    setCustomActivities(nextCustomActivities);
     const [nextSchedule, nextWidgetActions, nextTheme, nextLanguagePreference, nextNotificationPreferences, nextPermission] = await Promise.all([
       loadSchedule(),
-      loadWidgetActions(),
+      loadWidgetActions(nextCustomActivities),
       loadThemePreference(),
       loadLanguagePreference(),
       loadNotificationPreferences(),
@@ -187,12 +193,12 @@ export default function App() {
     await initialOnboardingCheck.catch(() => false);
     const nextEvents = await refresh();
     const eventId = typeof data.eventId === 'string' ? data.eventId : undefined;
-    const type = isQuickEventType(data.type) ? data.type : undefined;
+    const type = isQuickEventType(data.type) || (typeof data.type === 'string' && data.type.startsWith('custom:')) ? data.type : undefined;
     const at = typeof data.at === 'number' ? data.at : undefined;
     const event = nextEvents.find((candidate) => candidate.id === eventId)
       ?? (type && at !== undefined
         ? nextEvents.find((candidate) => (
-            candidate.type === type
+            activityKey(candidate) === type
             && (
               (candidate.source === 'widget' && Math.abs(candidate.at - at) < 60_000)
               || (typeof candidate.endedAt === 'number' && Math.abs(candidate.endedAt - at) < 60_000)
@@ -234,6 +240,7 @@ export default function App() {
   }, [undoState]);
 
   const logEvent = async (type: EventType, customLabel?: string) => {
+    if (type === 'custom' && customLabel) setCustomActivities(await saveCustomActivity(customLabel));
     const now = Date.now();
     if (type === 'nap') {
       const openNap = (await loadEvents()).find(isOpenNap);
@@ -264,7 +271,7 @@ export default function App() {
 
   const addEstimatedEvent = async (estimate: MissingLogEstimate) => {
     const event: PuppyEvent = {
-      ...createEvent(estimate.type, 'app', estimate.at),
+      ...createEvent(estimate.type, 'app', estimate.at, estimate.customLabel),
       ...(estimate.endedAt === undefined ? {} : { endedAt: estimate.endedAt }),
     };
     const nextEvents = await appendEvents([event]);
@@ -304,6 +311,7 @@ export default function App() {
     changes: PuppyEventChanges,
   ) => {
     const type = normalizeEventTypeChange(event, changes.type ?? event.type);
+    if (type === 'custom' && changes.customLabel) setCustomActivities(await saveCustomActivity(changes.customLabel));
     const nextEvents = await updateEvent(event.id, {
       ...changes,
       type,
@@ -377,7 +385,7 @@ export default function App() {
       .catch(() => undefined);
   };
 
-  const changeWidgetActions = useCallback(async (nextActions: QuickEventType[]) => {
+  const changeWidgetActions = useCallback(async (nextActions: ActivityKey[]) => {
     await saveWidgetActions(nextActions);
     setWidgetActions(nextActions);
     await updateHomeWidget(events).catch(() => undefined);
@@ -432,6 +440,7 @@ export default function App() {
           themePreference={themePreference}
           languagePreference={languagePreference}
           widgetActions={widgetActions}
+          customActivities={customActivities}
           notificationPreferences={notificationPreferences}
           notificationPermission={notificationPermission}
           routineReminderCount={schedule.filter((entry) => entry.reminder).length}
@@ -454,13 +463,14 @@ export default function App() {
         />
       );
     }
-    if (tab === 'timeline') return <TimelineScreen events={events} theme={theme} />;
-    if (tab === 'insights') return <InsightsScreen events={events} onAddEstimate={addEstimatedEvent} theme={theme} />;
+    if (tab === 'timeline') return <TimelineScreen events={events} customActivities={customActivities} theme={theme} />;
+    if (tab === 'insights') return <InsightsScreen events={events} customActivities={customActivities} onAddEstimate={addEstimatedEvent} theme={theme} />;
     if (tab === 'schedule') {
       return (
         <ScheduleScreen
           events={events}
           schedule={schedule}
+          customActivities={customActivities}
           onChange={changeSchedule}
           onRequestReminderPermission={requestNotifications}
           theme={theme}
@@ -471,6 +481,7 @@ export default function App() {
       <LogScreen
         events={events}
         schedule={schedule}
+        customActivities={customActivities}
         editRequest={editRequest}
         onEditRequestHandled={() => setEditRequest(null)}
         onLog={logEvent}
@@ -483,6 +494,7 @@ export default function App() {
     );
   }, [
     changeWidgetActions,
+    customActivities,
     editRequest,
     events,
     language,

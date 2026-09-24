@@ -45,7 +45,7 @@ function durationFromMinutes(minutes?: number): string {
 function FrequencyRow({ stat, theme }: { stat: ActivityFrequencyStat; theme: Theme }) {
   const { eventLabel, t } = useLocalization();
   const meta = EVENT_META[stat.type];
-  const label = eventLabel(stat.type);
+  const label = stat.customLabel ?? eventLabel(stat.type);
   const color = eventColor(stat.type, theme);
   const dailyValue = stat.total ? t('insights.perDay', { value: stat.averagePerRecordedDay.toFixed(1) }) : '—';
   const dailyDetail = stat.total
@@ -68,7 +68,7 @@ function FrequencyRow({ stat, theme }: { stat: ActivityFrequencyStat; theme: The
 
   return (
     <View
-      testID={`insights.frequency.${stat.type}`}
+      testID={`insights.frequency.${stat.customLabel ?? stat.type}`}
       accessible
       accessibilityLabel={`${label}. ${dailyValue}, ${dailyDetail}. ${t('insights.typicalGap')} ${intervalValue}. ${intervalDetail}.`}
       style={[styles.frequencyRow, { borderColor: theme.border }]}
@@ -92,7 +92,7 @@ function FrequencyRow({ stat, theme }: { stat: ActivityFrequencyStat; theme: The
           />
         </View>
         <Text style={[styles.activityName, { color: theme.text }]}>{label}</Text>
-        <Text testID={`insights.frequency.${stat.type}.count`} style={[styles.logCount, { color: theme.textMuted }]}>
+        <Text testID={`insights.frequency.${stat.customLabel ?? stat.type}.count`} style={[styles.logCount, { color: theme.textMuted }]}>
           {t('insights.logCount', { count: stat.total })}
         </Text>
       </View>
@@ -166,10 +166,12 @@ function MonthlyRow({
 
 export function InsightsScreen({
   events,
+  customActivities,
   onAddEstimate,
   theme,
 }: {
   events: PuppyEvent[];
+  customActivities: string[];
   onAddEstimate: (estimate: MissingLogEstimate) => Promise<void>;
   theme: Theme;
 }) {
@@ -178,7 +180,7 @@ export function InsightsScreen({
   const [showAllMonths, setShowAllMonths] = useState(false);
   const [addingEstimateId, setAddingEstimateId] = useState<string | null>(null);
   const now = new Date();
-  const frequency = activityFrequencyStats(events, ['pee', 'poop'], FREQUENCY_DAYS, now);
+  const frequency = activityFrequencyStats(events, ['pee', 'poop', ...customActivities.map((customLabel) => ({ type: 'custom' as const, customLabel }))], FREQUENCY_DAYS, now);
   const missingLogs = estimateMissingLogs(events, MISSING_LOG_DAYS, now);
   const monthly = useMemo(() => monthlyActivityStats(events), [events]);
   const visibleMonths = showAllMonths ? monthly : monthly.slice(0, MONTH_PREVIEW_COUNT);
@@ -255,7 +257,7 @@ export function InsightsScreen({
           </View>
         </View>
         <View>
-          {frequency.stats.map((stat) => <FrequencyRow key={stat.type} stat={stat} theme={theme} />)}
+          {frequency.stats.map((stat) => <FrequencyRow key={stat.customLabel ?? stat.type} stat={stat} theme={theme} />)}
         </View>
       </View>
 
@@ -278,7 +280,7 @@ export function InsightsScreen({
           <View style={styles.estimateList}>
             {missingLogs.estimates.map((estimate) => {
               const meta = EVENT_META[estimate.type];
-              const activityName = estimate.type === 'meal' ? t('insights.mealName') : eventLabel(estimate.type);
+              const activityName = estimate.customLabel ?? (estimate.type === 'meal' ? t('insights.mealName') : eventLabel(estimate.type));
               const color = eventColor(estimate.type, theme);
               const softColor = theme.isDark ? meta.darkSoftColor : meta.softColor;
               const adding = addingEstimateId === estimate.id;

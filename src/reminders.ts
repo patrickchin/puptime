@@ -1,7 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
-import type { PuppyEvent, QuickEventType, ScheduleEntry } from './domain';
+import type { ActivityKey, PuppyEvent, ScheduleEntry } from './domain';
 import { translate, type AppLanguage } from './localization';
 import type { NotificationPreferences, ReminderLeadMinutes } from './notification-config';
 import {
@@ -30,7 +30,8 @@ export type NotificationPermissionState = 'granted' | 'requestable' | 'blocked';
 
 export type WidgetLogReference = {
   eventId?: string;
-  type: QuickEventType;
+  type: ActivityKey;
+  customLabel?: string;
   at: number;
 };
 
@@ -215,7 +216,7 @@ export async function showWidgetLogConfirmation(
   await configureNotificationActions(language);
   const settings = await Notifications.getPermissionsAsync();
   if (!permissionAllowsNotifications(settings)) return false;
-  const content = widgetConfirmationCopy(reference.type, language);
+  const content = widgetConfirmationCopy(reference.type, language, reference.customLabel);
   await Notifications.scheduleNotificationAsync({
     identifier: `puptime-widget-${reference.eventId ?? `${reference.at}-${reference.type}`}`,
     content: {

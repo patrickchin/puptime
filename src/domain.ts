@@ -4,17 +4,22 @@ export const quickEventTypes = ['pee', 'poop', 'meal', 'pottyTrip', 'walk', 'nap
 
 export type EventType = (typeof eventTypes)[number];
 export type QuickEventType = (typeof quickEventTypes)[number];
+export type ActivityKey = QuickEventType | `custom:${string}`;
+export type Activity = { type: EventType; customLabel?: string };
 
 export const DEFAULT_WIDGET_ACTIONS = ['pee', 'poop', 'meal'] as const satisfies readonly QuickEventType[];
 
-export function normalizeWidgetActions(value: unknown): QuickEventType[] {
-  const requested = Array.isArray(value) ? value.filter(isQuickEventType) : [];
-  const unique = [...new Set(requested)] as QuickEventType[];
+export function normalizeWidgetActions(value: unknown, customActivities: readonly string[] = []): ActivityKey[] {
+  const allowed = new Set(customActivities.map(customActivityKey));
+  const requested = Array.isArray(value)
+    ? value.filter((item): item is ActivityKey => isQuickEventType(item) || (typeof item === 'string' && allowed.has(item as `custom:${string}`)))
+    : [];
+  const unique = [...new Set(requested)];
   return unique.length >= 2 ? unique.slice(0, 4) : [...DEFAULT_WIDGET_ACTIONS];
 }
 
-export function widgetActionsForState(value: unknown, activeNap: boolean): QuickEventType[] {
-  const actions = normalizeWidgetActions(value);
+export function widgetActionsForState(value: unknown, activeNap: boolean, customActivities: readonly string[] = []): ActivityKey[] {
+  const actions = normalizeWidgetActions(value, customActivities);
   return activeNap && !actions.includes('nap') ? [...actions.slice(0, 3), 'nap'] : actions;
 }
 
@@ -28,7 +33,7 @@ export type PuppyEvent = {
   source: 'app' | 'widget';
 };
 
-export type QuickEventTimes = Partial<Record<QuickEventType, number>>;
+export type QuickEventTimes = Partial<Record<ActivityKey, number>>;
 
 export type PuppyEventChanges = Partial<
   Pick<PuppyEvent, 'type' | 'at' | 'endedAt' | 'customLabel' | 'note'>
@@ -37,6 +42,7 @@ export type PuppyEventChanges = Partial<
 export type ScheduleEntry = {
   id: string;
   type: EventType;
+  customLabel?: string;
   minutes: number;
   reminder?: boolean;
 };
@@ -142,6 +148,35 @@ export function isQuickEventType(value: unknown): value is QuickEventType {
   return typeof value === 'string' && quickEventTypes.includes(value as QuickEventType);
 }
 
+export function customActivityKey(label: string): `custom:${string}` {
+  return `custom:${normalizeCustomLabel(label)?.toLowerCase() ?? ''}`;
+}
+
+export function activityKey(activity: Activity): ActivityKey {
+  return activity.type === 'custom'
+    ? customActivityKey(activity.customLabel ?? '')
+    : activity.type;
+}
+
+export function sameActivity(left: Activity, right: Activity): boolean {
+  return activityKey(left) === activityKey(right);
+}
+
+export function normalizeCustomActivities(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const byKey = new Map<string, string>();
+  value.forEach((item) => {
+    const label = normalizeCustomLabel(item);
+    if (label && !byKey.has(customActivityKey(label))) byKey.set(customActivityKey(label), label);
+  });
+  return [...byKey.values()];
+}
+
+export function activityFromKey(key: ActivityKey, customActivities: readonly string[]): Activity {
+  if (isQuickEventType(key)) return { type: key };
+  return { type: 'custom', customLabel: customActivities.find((label) => customActivityKey(label) === key) ?? key.slice(7) };
+}
+
 export function createEvent(
   type: EventType,
   source: PuppyEvent['source'] = 'app',
@@ -170,9 +205,10 @@ export function isOpenNap(event: PuppyEvent): boolean {
 export function latestQuickEventTimes(events: readonly PuppyEvent[]): QuickEventTimes {
   const latest: QuickEventTimes = {};
   for (const event of events) {
-    if (!isQuickEventType(event.type)) continue;
+    if (event.type === 'custom' && !normalizeCustomLabel(event.customLabel)) continue;
     const time = Math.max(event.at, typeof event.endedAt === 'number' ? event.endedAt : event.at);
-    latest[event.type] = Math.max(latest[event.type] ?? 0, time);
+    const key = activityKey(event);
+    latest[key] = Math.max(latest[key] ?? 0, time);
   }
   return latest;
 }
