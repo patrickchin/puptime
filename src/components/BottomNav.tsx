@@ -40,7 +40,6 @@ export function BottomNav({ tab, onChange, theme }: { tab: Tab; onChange: (tab: 
                 styles.iconWrap,
                 {
                   minWidth: theme.presentation.navIndicatorWidth,
-                  borderRadius: theme.presentation.controlRadius,
                 },
                 selected && { backgroundColor: theme.primarySoft },
               ]}
@@ -74,6 +73,8 @@ const styles = StyleSheet.create({
   },
   iconWrap: {
     height: 30,
+    borderRadius: 999,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },
