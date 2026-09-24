@@ -7,6 +7,7 @@ import {
   createNapEvent,
   isOpenNap,
   isQuickEventType,
+  latestQuickEventTimes,
   type PuppyEvent,
   type QuickEventType,
 } from './domain';
@@ -28,9 +29,10 @@ async function render(props: WidgetTaskHandlerProps, events: PuppyEvent[], confi
   const activeNap = events.some(isOpenNap);
   const actions = await loadWidgetActions();
   const themePreference = await loadThemePreference();
+  const lastEventAt = latestQuickEventTimes(events);
   props.renderWidget({
-    light: <QuickLogWidget compact={compact} activeNap={activeNap} actions={actions} confirmedAction={confirmedAction} themePreference={themePreference} />,
-    dark: <QuickLogWidget compact={compact} activeNap={activeNap} actions={actions} confirmedAction={confirmedAction} themePreference={themePreference} dark />,
+    light: <QuickLogWidget compact={compact} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} confirmedAction={confirmedAction} themePreference={themePreference} />,
+    dark: <QuickLogWidget compact={compact} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} confirmedAction={confirmedAction} themePreference={themePreference} dark />,
   });
 }
 

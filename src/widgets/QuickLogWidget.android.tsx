@@ -2,7 +2,14 @@
 
 import { FlexWidget, SvgWidget, TextWidget } from 'react-native-android-widget';
 
-import { DEFAULT_WIDGET_ACTIONS, EVENT_META, widgetActionsForState, type QuickEventType } from '../domain';
+import {
+  DEFAULT_WIDGET_ACTIONS,
+  EVENT_META,
+  relativeTime,
+  widgetActionsForState,
+  type QuickEventTimes,
+  type QuickEventType,
+} from '../domain';
 import { resolveTheme, type ThemePreference } from '../theme';
 
 type ActionButton = {
@@ -37,6 +44,7 @@ type Props = {
   dark?: boolean;
   compact?: boolean;
   activeNap?: boolean;
+  lastEventAt?: QuickEventTimes;
   actions?: readonly QuickEventType[];
   confirmedAction?: QuickEventType;
   themePreference?: ThemePreference;
@@ -46,6 +54,7 @@ export function QuickLogWidget({
   dark = false,
   compact = false,
   activeNap = false,
+  lastEventAt,
   actions: configuredActions = DEFAULT_WIDGET_ACTIONS,
   confirmedAction,
   themePreference = 'system',
@@ -55,11 +64,12 @@ export function QuickLogWidget({
   const surface = theme.surface as `#${string}`;
   const border = theme.border as `#${string}`;
   const visibleTypes = widgetActionsForState(configuredActions, activeNap);
+  const now = Date.now();
   const visibleButtons = visibleTypes
     .map((type) => buttons.find((button) => button.type === type))
     .filter((button): button is (typeof buttons)[number] => Boolean(button));
   const actionButtons = (
-    <FlexWidget style={{ width: 'match_parent', flex: 1, flexDirection: 'row', flexGap: compact ? 4 : 5 }}>
+    <FlexWidget style={{ width: 'match_parent', flex: 1, flexDirection: 'row', flexGap: compact ? 4 : 7 }}>
       {visibleButtons.map((button) => {
         const isActiveNap = button.type === 'nap' && activeNap;
         const confirmed = confirmedAction === button.type;
@@ -68,12 +78,14 @@ export function QuickLogWidget({
         const actionInk = (theme.isDark ? meta.darkColor : meta.color) as `#${string}`;
         const actionBackground = (theme.isDark ? meta.darkSoftColor : meta.softColor) as `#${string}`;
         const actionBorder = actionInk;
+        const lastAt = lastEventAt?.[button.type];
+        const timeLabel = lastAt === undefined ? 'Never' : relativeTime(lastAt, now);
         return (
           <FlexWidget
             key={button.type}
             clickAction="LOG_EVENT"
             clickActionData={{ type: button.type }}
-            accessibilityLabel={confirmed ? `${button.label} saved` : isActiveNap ? 'End nap' : `Log ${button.label.toLowerCase()}`}
+            accessibilityLabel={`${confirmed ? `${button.label} saved` : isActiveNap ? 'End nap' : `Log ${button.label.toLowerCase()}`}, ${timeLabel}`}
             style={{
               flex: 1,
               height: 'match_parent',
@@ -84,18 +96,26 @@ export function QuickLogWidget({
               borderColor: actionBorder,
               borderWidth: theme.presentation.borderWidth,
               borderRadius: theme.presentation.controlRadius,
-              paddingHorizontal: compact ? 4 : 2,
+              paddingHorizontal: compact ? 4 : 3,
+              paddingVertical: compact ? 2 : 7,
             }}
           >
             <SvgWidget
               svg={makeIcon(confirmed ? 'check' : isActiveNap ? 'stop' : button.type, actionInk)}
-              style={{ width: compact ? 16 : 19, height: compact ? 16 : 19, marginRight: compact ? 4 : 0, marginBottom: compact ? 0 : 2 }}
+              style={{ width: compact ? 20 : 28, height: compact ? 20 : 28, marginRight: compact ? 4 : 0, marginBottom: compact ? 0 : 4 }}
             />
-            <TextWidget
-              text={label}
-              maxLines={1}
-              style={{ color: actionInk, fontSize: compact ? 11 : 9, fontWeight: '700', adjustsFontSizeToFit: true }}
-            />
+            <FlexWidget style={{ flex: compact ? 1 : undefined, flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <TextWidget
+                text={label}
+                maxLines={1}
+                style={{ color: actionInk, fontSize: compact ? 12 : 14, fontWeight: '700', textAlign: 'center', adjustsFontSizeToFit: true }}
+              />
+              <TextWidget
+                text={timeLabel}
+                maxLines={1}
+                style={{ color: actionInk, fontSize: compact ? 9 : 11, fontWeight: '600', textAlign: 'center', adjustsFontSizeToFit: true, marginTop: 1 }}
+              />
+            </FlexWidget>
           </FlexWidget>
         );
       })}

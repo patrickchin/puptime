@@ -28,6 +28,8 @@ export type PuppyEvent = {
   source: 'app' | 'widget';
 };
 
+export type QuickEventTimes = Partial<Record<QuickEventType, number>>;
+
 export type PuppyEventChanges = Partial<
   Pick<PuppyEvent, 'type' | 'at' | 'endedAt' | 'customLabel' | 'note'>
 >;
@@ -163,6 +165,16 @@ export function createNapEvent(source: PuppyEvent['source'] = 'app', at = Date.n
 export function isOpenNap(event: PuppyEvent): boolean {
   // Old Puptime versions stored nap taps without endedAt. They stay historical point events.
   return event.type === 'nap' && event.endedAt === null;
+}
+
+export function latestQuickEventTimes(events: readonly PuppyEvent[]): QuickEventTimes {
+  const latest: QuickEventTimes = {};
+  for (const event of events) {
+    if (!isQuickEventType(event.type)) continue;
+    const time = Math.max(event.at, typeof event.endedAt === 'number' ? event.endedAt : event.at);
+    latest[event.type] = Math.max(latest[event.type] ?? 0, time);
+  }
+  return latest;
 }
 
 export function eventLabel(event: PuppyEvent): string {
