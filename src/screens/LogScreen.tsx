@@ -960,7 +960,12 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: spacing.xl,
   },
-  titleBlock: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  titleBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: spacing.lg,
+  },
   mark: { width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   titleCopy: { flex: 1 },
   headerActions: { flexDirection: 'row', gap: 8 },
