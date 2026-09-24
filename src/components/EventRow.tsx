@@ -2,14 +2,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
-  EVENT_META,
   formatDuration,
   formatTime,
   isOpenNap,
   type PuppyEvent,
 } from '../domain';
 import { useLocalization } from '../localization-context';
-import { eventIcon, spacing, surfaceTreatment, type Theme } from '../theme';
+import { eventColors, eventIcon, spacing, surfaceTreatment, type Theme } from '../theme';
 
 export function EventRow({
   event,
@@ -25,7 +24,7 @@ export function EventRow({
   theme: Theme;
 }) {
   const { eventPastLabel, t } = useLocalization();
-  const meta = EVENT_META[event.type];
+  const colors = eventColors(theme, event.type);
   const note = event.note?.trim();
   const timedNap = event.type === 'nap' && event.endedAt !== undefined;
   const running = isOpenNap(event);
@@ -46,12 +45,12 @@ export function EventRow({
       <View
         style={[
           styles.iconCircle,
-          { backgroundColor: meta.softColor, borderRadius: theme.presentation.iconRadius },
+          { backgroundColor: colors.softColor, borderRadius: theme.presentation.iconRadius },
         ]}
       >
         <MaterialCommunityIcons
           name={eventIcon(theme, event.type) as keyof typeof MaterialCommunityIcons.glyphMap}
-          color={meta.color}
+          color={colors.color}
           size={22}
         />
       </View>

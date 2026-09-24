@@ -2,9 +2,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { scheduleStatusesForDay } from '../analytics';
-import { EVENT_META, formatMinutes, type PuppyEvent, type ScheduleEntry } from '../domain';
+import { formatMinutes, type PuppyEvent, type ScheduleEntry } from '../domain';
 import { useLocalization } from '../localization-context';
-import { eventIcon, spacing, supportingIcon, surfaceTreatment, type Theme } from '../theme';
+import { eventColors, eventIcon, spacing, supportingIcon, surfaceTreatment, type Theme } from '../theme';
 
 export function TodayRoutineCard({
   events,
@@ -28,7 +28,7 @@ export function TodayRoutineCard({
   const progress: `${number}%` = statuses.length
     ? `${Math.round((completed / statuses.length) * 100)}%`
     : '0%';
-  const nextMeta = next ? EVENT_META[next.entry.type] : null;
+  const nextColors = next ? eventColors(theme, next.entry.type) : null;
   const nextLabel = next ? eventLabel(next.entry.type) : '';
   const until = next ? (() => {
     const minutes = Math.max(0, Math.ceil((next.target - now) / 60_000));
@@ -80,14 +80,14 @@ export function TodayRoutineCard({
           style={[
             styles.icon,
             {
-              backgroundColor: nextMeta?.softColor ?? theme.primarySoft,
+              backgroundColor: nextColors?.softColor ?? theme.primarySoft,
               borderRadius: theme.presentation.iconRadius,
             },
           ]}
         >
           <MaterialCommunityIcons
             name={(next ? eventIcon(theme, next.entry.type) : supportingIcon(theme, 'routine')) as keyof typeof MaterialCommunityIcons.glyphMap}
-            color={nextMeta?.color ?? theme.primary}
+            color={nextColors?.color ?? theme.primary}
             size={23}
           />
         </View>

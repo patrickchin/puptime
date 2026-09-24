@@ -4,6 +4,7 @@ import test from 'node:test';
 import { EVENT_META } from './domain.ts';
 import {
   darkTheme,
+  eventColors,
   eventIcon,
   isThemePreference,
   lightTheme,
@@ -77,18 +78,44 @@ test('every theme has a distinct semantic icon profile', () => {
 });
 
 test('activity colors keep accessible contrast in chips and timeline tracks', () => {
-  const activities = Object.values(EVENT_META);
-  assert.equal(new Set(activities.map((meta) => meta.color)).size, activities.length);
-  assert.equal(new Set(activities.map((meta) => meta.darkColor)).size, activities.length);
+  const activities = Object.entries(EVENT_META);
+  assert.equal(new Set(activities.map(([, meta]) => meta.color)).size, activities.length);
+  assert.equal(new Set(activities.map(([, meta]) => meta.darkColor)).size, activities.length);
 
-  activities.forEach((meta) => {
+  activities.forEach(([type, meta]) => {
     assert.ok(contrastRatio(meta.color, meta.softColor) >= 4.5);
     assert.ok(contrastRatio(meta.darkColor, meta.darkSoftColor) >= 4.5);
 
     Object.values(namedThemes).forEach((theme) => {
-      const color = theme.isDark ? meta.darkColor : meta.color;
+      const { color, softColor } = eventColors(theme, type as keyof typeof EVENT_META);
+      assert.equal(softColor, theme.isDark ? meta.darkSoftColor : meta.softColor);
       assert.ok(contrastRatio(color, theme.surface) >= 3);
       assert.ok(contrastRatio(color, theme.primarySoft) >= 3);
+    });
+  });
+});
+
+test('pee, poop, and meals use distinct blue, orange, and green families', () => {
+  const hue = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((index) => Number.parseInt(hex.slice(index, index + 2), 16) / 255);
+    const high = Math.max(r, g, b);
+    const low = Math.min(r, g, b);
+    const range = high - low;
+    if (high === r) return ((g - b) / range + 6) % 6 * 60;
+    if (high === g) return ((b - r) / range + 2) * 60;
+    return ((r - g) / range + 4) * 60;
+  };
+
+  [lightTheme, darkTheme].forEach((theme) => {
+    const hues = (['pee', 'poop', 'meal'] as const).map((type) => hue(eventColors(theme, type).color));
+    assert.ok(hues[0] >= 180 && hues[0] <= 230);
+    assert.ok(hues[1] >= 15 && hues[1] <= 60);
+    assert.ok(hues[2] >= 75 && hues[2] <= 170);
+    hues.forEach((value, index) => {
+      hues.slice(index + 1).forEach((other) => {
+        const gap = Math.abs(value - other);
+        assert.ok(Math.min(gap, 360 - gap) >= 60);
+      });
     });
   });
 });
