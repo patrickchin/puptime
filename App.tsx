@@ -34,6 +34,7 @@ import {
 } from './src/domain';
 import { InsightsScreen } from './src/screens/InsightsScreen';
 import { LogScreen, type LogEditRequest } from './src/screens/LogScreen';
+import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { ScheduleScreen } from './src/screens/ScheduleScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { TimelineScreen } from './src/screens/TimelineScreen';
@@ -55,6 +56,7 @@ import {
 } from './src/notification-config';
 import {
   appendEvents,
+  completeOnboarding,
   loadEvents,
   loadCustomActivities,
   loadLanguagePreference,
@@ -69,6 +71,7 @@ import {
   saveNotificationPreferences,
   saveThemePreference,
   saveWidgetActions,
+  shouldShowOnboarding,
   updateEvent,
 } from './src/storage';
 import { resolveTheme, type ThemePreference } from './src/theme';
@@ -82,6 +85,8 @@ export default function App() {
   const [languagePreference, setLanguagePreference] = useState<LanguagePreference>('system');
   const [preferencePicker, setPreferencePicker] = useState<'theme' | 'language' | null>(null);
   const [settingsVisible, setSettingsVisible] = useState(false);
+  const [onboardingVisible, setOnboardingVisible] = useState<boolean | null>(null);
+  const [initialOnboardingCheck] = useState(shouldShowOnboarding);
   const theme = resolveTheme(themePreference, colorScheme);
   const language = resolveLanguage(languagePreference);
   const [tab, setTab] = useState<Tab>('log');
@@ -96,6 +101,7 @@ export default function App() {
   const [undoState, setUndoState] = useState<{ event: PuppyEvent; message: string; restore?: PuppyEvent } | null>(null);
   const [editRequest, setEditRequest] = useState<LogEditRequest | null>(null);
   const handledNotificationResponses = useRef(new Set<string>());
+  const onboardingChecked = useRef(false);
 
   const refresh = useCallback(async () => {
     const pending = await readPendingWidgetEvents();
@@ -134,12 +140,21 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    refresh();
+    let mounted = true;
+    void (async () => {
+      const showOnboarding = await initialOnboardingCheck.catch(() => false);
+      onboardingChecked.current = true;
+      await refresh().catch(() => undefined);
+      if (mounted) setOnboardingVisible(showOnboarding);
+    })();
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') refresh();
+      if (state === 'active' && onboardingChecked.current) refresh();
     });
-    return () => subscription.remove();
-  }, [refresh]);
+    return () => {
+      mounted = false;
+      subscription.remove();
+    };
+  }, [initialOnboardingCheck, refresh]);
 
   useEffect(() => {
     Appearance.setColorScheme(themePreference === 'system' ? 'unspecified' : theme.isDark ? 'dark' : 'light');
@@ -175,6 +190,7 @@ export default function App() {
     if (handledNotificationResponses.current.has(responseKey)) return;
     handledNotificationResponses.current.add(responseKey);
 
+    await initialOnboardingCheck.catch(() => false);
     const nextEvents = await refresh();
     const eventId = typeof data.eventId === 'string' ? data.eventId : undefined;
     const type = isQuickEventType(data.type) || (typeof data.type === 'string' && data.type.startsWith('custom:')) ? data.type : undefined;
@@ -202,7 +218,7 @@ export default function App() {
       eventId: event.id,
       focusNote: response.actionIdentifier === ADD_NOTE_ACTION && !response.userText?.trim(),
     });
-  }, [refresh]);
+  }, [initialOnboardingCheck, refresh]);
 
   useEffect(() => {
     const initialResponse = Notifications.getLastNotificationResponse();
@@ -406,6 +422,16 @@ export default function App() {
     return granted;
   };
 
+  const finishOnboarding = async () => {
+    try {
+      await completeOnboarding();
+      setOnboardingVisible(false);
+      setTab('log');
+    } catch {
+      Alert.alert(translate(language, 'settings.saveErrorTitle'), translate(language, 'settings.saveErrorBody'));
+    }
+  };
+
   const screen = useMemo(() => {
     if (settingsVisible) {
       return (
@@ -429,6 +455,10 @@ export default function App() {
           onOpenSchedule={() => {
             setSettingsVisible(false);
             setTab('schedule');
+          }}
+          onOpenGuide={() => {
+            setSettingsVisible(false);
+            setOnboardingVisible(true);
           }}
         />
       );
@@ -484,12 +514,20 @@ export default function App() {
       <LocalizationProvider language={language}>
         <SafeAreaView
           style={[styles.container, { backgroundColor: theme.background }]}
-          edges={settingsVisible ? ['top', 'bottom', 'left', 'right'] : ['top', 'left', 'right']}
+          edges={settingsVisible || onboardingVisible ? ['top', 'bottom', 'left', 'right'] : ['top', 'left', 'right']}
         >
           <StatusBar style={theme.isDark ? 'light' : 'dark'} />
           <View style={styles.screen}>
-            {screen}
-            {undoState ? (
+            {onboardingVisible === null ? null : onboardingVisible ? (
+              <OnboardingScreen
+                theme={theme}
+                notificationPermission={notificationPermission}
+                onAllowNotifications={requestNotifications}
+                onOpenSystemSettings={() => Linking.openSettings().catch(() => undefined)}
+                onFinish={finishOnboarding}
+              />
+            ) : screen}
+            {!onboardingVisible && undoState ? (
               <Toast
                 message={undoState.message}
                 onNote={() => {
@@ -503,7 +541,7 @@ export default function App() {
               />
             ) : null}
           </View>
-          {!settingsVisible ? (
+          {onboardingVisible === false && !settingsVisible ? (
             <SafeAreaView edges={['bottom']} style={{ backgroundColor: theme.nav }}>
               <BottomNav tab={tab} onChange={setTab} theme={theme} />
             </SafeAreaView>

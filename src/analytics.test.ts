@@ -12,6 +12,7 @@ import {
   suggestScheduleFromEvents,
   TIMELINE_BUCKETS,
   timelineBucket,
+  timelineDurationRuns,
   timelinePointClusters,
 } from './analytics.ts';
 import type { PuppyEvent, ScheduleEntry } from './domain.ts';
@@ -156,6 +157,22 @@ test('combines simultaneous point activities and an underlying span into one tim
       hasDuration: true,
     },
     { startBucket: 30, ids: ['walk'], types: ['walk'], hasDuration: false },
+  ]);
+});
+
+test('joins touching and overlapping spans of the same activity', () => {
+  const marks = [
+    { id: 'a', type: 'nap' as const, label: 'Nap', startBucket: 20, endBucket: 24 },
+    { id: 'd', type: 'nap' as const, label: 'Nap', startBucket: 27, endBucket: 30 },
+    { id: 'c', type: 'walk' as const, label: 'Walk', startBucket: 25, endBucket: 27 },
+    { id: 'b', type: 'nap' as const, label: 'Nap', startBucket: 24, endBucket: 28 },
+    { id: 'e', type: 'nap' as const, label: 'Nap', startBucket: 32, endBucket: 34 },
+  ];
+
+  assert.deepEqual(timelineDurationRuns(marks), [
+    { type: 'nap', startBucket: 20, endBucket: 30 },
+    { type: 'walk', startBucket: 25, endBucket: 27 },
+    { type: 'nap', startBucket: 32, endBucket: 34 },
   ]);
 });
 

@@ -25,8 +25,26 @@ const LANGUAGE_KEY = 'puptime.language.v1';
 const WIDGET_ACTIONS_KEY = 'puptime.widgetActions.v1';
 const CUSTOM_ACTIVITIES_KEY = 'puptime.customActivities.v1';
 const NOTIFICATION_PREFERENCES_KEY = 'puptime.notificationPreferences.v1';
+const ONBOARDING_KEY = 'puptime.onboarding.v1';
 
 let writeQueue = Promise.resolve();
+
+export async function shouldShowOnboarding(): Promise<boolean> {
+  const entries = await AsyncStorage.multiGet([
+    ONBOARDING_KEY,
+    EVENTS_KEY,
+    SCHEDULE_KEY,
+    THEME_KEY,
+    LANGUAGE_KEY,
+    WIDGET_ACTIONS_KEY,
+    NOTIFICATION_PREFERENCES_KEY,
+  ]);
+  return entries.every(([, value]) => value === null);
+}
+
+export function completeOnboarding(): Promise<void> {
+  return AsyncStorage.setItem(ONBOARDING_KEY, 'done');
+}
 
 function parseArray<T>(value: string | null): T[] {
   if (!value) return [];

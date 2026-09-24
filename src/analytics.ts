@@ -34,6 +34,8 @@ export type TimelinePointCluster = {
   hasDuration: boolean;
 };
 
+export type TimelineDurationRun = Pick<TimelineMark, 'type' | 'startBucket'> & { endBucket: number };
+
 export type ActivityFrequencyStat = {
   type: EventType;
   customLabel?: string;
@@ -416,6 +418,17 @@ function minutesIntoDay(value: number): number {
 
 export function timelineBucket(value: number): number {
   return Math.min(TIMELINE_BUCKETS - 1, Math.floor(minutesIntoDay(value) / TIMELINE_BUCKET_MINUTES));
+}
+
+export function timelineDurationRuns(marks: TimelineMark[]): TimelineDurationRun[] {
+  const runs: TimelineDurationRun[] = [];
+  for (const mark of [...marks].sort((a, b) => a.startBucket - b.startBucket)) {
+    if (mark.endBucket === undefined) continue;
+    const run = runs.find((item) => item.type === mark.type && item.endBucket >= mark.startBucket);
+    if (run) run.endBucket = Math.max(run.endBucket, mark.endBucket);
+    else runs.push({ type: mark.type, startBucket: mark.startBucket, endBucket: mark.endBucket });
+  }
+  return runs;
 }
 
 export function timelinePointClusters(marks: TimelineMark[]): TimelinePointCluster[] {

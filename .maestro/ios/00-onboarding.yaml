@@ -1,0 +1,49 @@
+appId: com.patrickchin.puptime
+name: iOS first launch onboarding and replay
+tags:
+  - ios
+  - smoke
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: onboarding.step.0
+    timeout: 90000
+- tapOn:
+    id: onboarding.primary
+- assertVisible:
+    id: onboarding.step.1
+- tapOn:
+    id: onboarding.primary
+- assertVisible:
+    id: onboarding.step.2
+- tapOn:
+    id: onboarding.primary
+- assertVisible:
+    id: onboarding.step.3
+- tapOn:
+    id: onboarding.later
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- stopApp
+- launchApp
+- assertVisible:
+    id: screen.today
+- tapOn:
+    id: settings.open
+- scrollUntilVisible:
+    element:
+      id: settings.guide.open
+    direction: DOWN
+    visibilityPercentage: 50
+- tapOn:
+    id: settings.guide.open
+- assertVisible:
+    id: onboarding.step.0
+- tapOn:
+    id: onboarding.skip
+- assertVisible:
+    id: screen.today

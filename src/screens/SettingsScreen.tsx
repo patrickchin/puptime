@@ -57,6 +57,7 @@ export function SettingsScreen({
   onRequestNotificationPermission,
   onOpenSystemSettings,
   onOpenSchedule,
+  onOpenGuide,
 }: {
   theme: Theme;
   themePreference: ThemePreference;
@@ -73,6 +74,7 @@ export function SettingsScreen({
   onRequestNotificationPermission: () => Promise<boolean>;
   onOpenSystemSettings: () => void;
   onOpenSchedule: () => void;
+  onOpenGuide: () => void;
 }) {
   const { eventLabel, t } = useLocalization();
   const [savingWidget, setSavingWidget] = useState(false);
@@ -237,6 +239,15 @@ export function SettingsScreen({
           label={t('settings.language')}
           detail={languageLabel}
           onPress={() => onOpenPicker('language')}
+          theme={theme}
+        />
+        <View style={[styles.divider, { backgroundColor: theme.border }]} />
+        <SettingsRow
+          testID="settings.guide.open"
+          icon="compass-outline"
+          label={t('settings.guide')}
+          detail={t('settings.guideDetail')}
+          onPress={onOpenGuide}
           theme={theme}
         />
       </View>
