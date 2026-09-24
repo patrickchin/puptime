@@ -21,7 +21,14 @@ import {
   normalizeNotificationPreferences,
   reminderTriggerMinutes,
 } from './notification-config.ts';
-import { reminderCopy, reminderIdentifier, reminderTrigger } from './reminder-config.ts';
+import {
+  pottyReminderCopy,
+  pottyReminderIdentifier,
+  pottyReminderPlans,
+  reminderCopy,
+  reminderIdentifier,
+  reminderTrigger,
+} from './reminder-config.ts';
 
 test('creates a widget event at the supplied time', () => {
   const event = createEvent('pee', 'widget', 123_456);
@@ -129,9 +136,53 @@ test('normalizes notification preferences without enabling confirmations by acci
   assert.deepEqual(normalizeNotificationPreferences({ reminderLeadMinutes: 15, widgetConfirmations: true }), {
     reminderLeadMinutes: 15,
     widgetConfirmations: true,
+    pottyAfterPee: { enabled: true, delayMinutes: 120 },
+    pottyAfterMeal: { enabled: true, delayMinutes: 30 },
   });
-  assert.deepEqual(normalizeNotificationPreferences({ reminderLeadMinutes: 99, widgetConfirmations: 'yes' }), {
+  assert.deepEqual(normalizeNotificationPreferences({
+    reminderLeadMinutes: 99,
+    widgetConfirmations: 'yes',
+    pottyAfterPee: { enabled: false, delayMinutes: 60 },
+    pottyAfterMeal: { enabled: 'yes', delayMinutes: 31 },
+  }), {
     reminderLeadMinutes: 10,
     widgetConfirmations: false,
+    pottyAfterPee: { enabled: false, delayMinutes: 60 },
+    pottyAfterMeal: { enabled: true, delayMinutes: 30 },
   });
+});
+
+test('plans potty reminders from the latest relevant logs', () => {
+  const now = 10_000_000;
+  const pee = createEvent('pee', 'app', now - 30 * 60_000);
+  const meal = createEvent('meal', 'app', now - 10 * 60_000);
+
+  assert.deepEqual(pottyReminderPlans([pee, meal], DEFAULT_NOTIFICATION_PREFERENCES, now), [
+    {
+      kind: 'afterPee',
+      sourceEventId: pee.id,
+      sourceType: 'pee',
+      delayMinutes: 120,
+      at: now + 90 * 60_000,
+    },
+    {
+      kind: 'afterMeal',
+      sourceEventId: meal.id,
+      sourceType: 'meal',
+      delayMinutes: 30,
+      at: now + 20 * 60_000,
+    },
+  ]);
+
+  const newerPee = createEvent('pee', 'app', now - 5 * 60_000);
+  assert.deepEqual(
+    pottyReminderPlans([meal, newerPee], DEFAULT_NOTIFICATION_PREFERENCES, now).map((plan) => plan.kind),
+    ['afterPee'],
+  );
+});
+
+test('creates stable localized potty reminder content', () => {
+  assert.equal(pottyReminderIdentifier('afterPee'), 'puptime-activity-afterPee');
+  assert.match(pottyReminderCopy('afterPee', 120).body, /2 hours since the last pee/);
+  assert.match(pottyReminderCopy('afterMeal', 30, 'es').body, /30 minutos/);
 });

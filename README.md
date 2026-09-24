@@ -34,6 +34,7 @@ Puptime is a puppy activity log for Android and iOS. Data stays on the device.
 - Add typed or dictated notes and edit an activity, name, date, time, or note.
 - Filter recent history or open the month-by-month archive.
 - Set a daily routine, choose when reminders arrive, and review suggested times before using them.
+- Get customizable potty nudges after the latest pee or meal log.
 - Compare activity timing across 10, 20, or 30 days and view pee and poop frequency summaries.
 - Review possible missing logs, including estimated nap spans, before adding anything.
 - Export the complete activity history, notes, and timestamps as CSV.
@@ -57,7 +58,7 @@ Saved notes and activity data stay on your device. Voice dictation uses your pho
 
 From **Insights**, use **Export activity CSV** to open the system share sheet. Puptime creates the file in temporary app storage. The data is not sent until you choose a destination.
 
-Routine reminders are optional. Turn one on while editing a planned time, then choose how early reminders should arrive in Settings. Puptime schedules repeating reminders locally; it does not upload the routine or require a notification server. Settings can also enable a local confirmation after every widget log so you can immediately add a note or open the full editor.
+Routine reminders are optional. Turn one on while editing a planned time, then choose how early reminders should arrive in Settings. Puptime can also remind you after the latest pee or meal; the default potty nudges are two hours after a pee and 30 minutes after a meal, and each can be turned off or changed from 15 minutes to four hours. Puptime schedules reminders locally; it does not upload the routine or require a notification server. Settings can also enable a local confirmation after every widget log so you can immediately add a note or open the full editor.
 
 Routine suggestions also stay on the device. Puptime checks the last 14 days, keeps activities logged on most recorded days, and rounds their typical times to 15 minutes. You review the full suggestion before replacing the current routine. Suggested reminders start off.
 

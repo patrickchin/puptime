@@ -33,6 +33,12 @@ export async function updateHomeWidget(events: PuppyEvent[]): Promise<void> {
     actions,
     themePreference,
     notificationConfirmations: notificationPreferences.widgetConfirmations,
+    pottyAfterPeeMinutes: notificationPreferences.pottyAfterPee.enabled
+      ? notificationPreferences.pottyAfterPee.delayMinutes
+      : 0,
+    pottyAfterMealMinutes: notificationPreferences.pottyAfterMeal.enabled
+      ? notificationPreferences.pottyAfterMeal.delayMinutes
+      : 0,
     language: resolveLanguage(languagePreference),
   });
 }
