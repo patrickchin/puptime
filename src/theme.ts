@@ -1,3 +1,5 @@
+import { EVENT_META, type EventType } from './domain.ts';
+
 type DisplayWeight = '700' | '800' | '900';
 
 export type ThemeIconProfile = Exclude<ThemePreference, 'system'>;
@@ -497,6 +499,13 @@ const iconProfiles: Record<
 
 export function eventIcon(theme: Theme, type: ThemeEventIcon): string {
   return iconProfiles[theme.presentation.iconProfile].events[type];
+}
+
+export function eventColors(theme: Theme, type: EventType) {
+  const meta = EVENT_META[type];
+  return theme.isDark
+    ? { color: meta.darkColor, softColor: meta.darkSoftColor }
+    : { color: meta.color, softColor: meta.softColor };
 }
 
 export function navigationIcon(theme: Theme, tab: ThemeNavigationIcon): string {
