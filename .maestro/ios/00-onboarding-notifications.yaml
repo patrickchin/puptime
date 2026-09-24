@@ -1,0 +1,38 @@
+appId: com.patrickchin.puptime
+name: iOS onboarding notification opt in
+tags:
+  - ios
+  - smoke
+---
+- launchApp:
+    clearState: true
+- setPermissions:
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      id: onboarding.step.0
+    timeout: 90000
+- tapOn:
+    id: onboarding.primary
+- tapOn:
+    id: onboarding.primary
+- tapOn:
+    id: onboarding.primary
+- assertVisible:
+    id: onboarding.step.3
+- tapOn:
+    id: onboarding.primary
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- tapOn:
+    id: settings.open
+- scrollUntilVisible:
+    element:
+      id: settings.notifications.permission
+    direction: DOWN
+    visibilityPercentage: 50
+- assertVisible:
+    id: settings.notifications.permission

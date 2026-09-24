@@ -6,6 +6,7 @@ tags:
 ---
 - launchApp:
     clearState: true
+- runFlow: ../helpers/skip-onboarding.yaml
 - setPermissions:
     permissions:
       notifications: deny
@@ -91,9 +92,16 @@ tags:
     id: schedule.editor.save
 - assertVisible:
     id: schedule.entry.walk
+- waitForAnimationToEnd:
+    timeout: 5000
 - tapOn:
     id: nav.log
     retryTapIfNoChange: true
+- tapOn:
+    id: nav.log
+    retryTapIfNoChange: true
+- assertVisible:
+    id: screen.today
 - scrollUntilVisible:
     element:
       id: routine.card

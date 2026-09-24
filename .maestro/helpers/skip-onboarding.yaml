@@ -1,0 +1,8 @@
+appId: com.patrickchin.puptime
+---
+- extendedWaitUntil:
+    visible:
+      id: screen.onboarding
+    timeout: 90000
+- tapOn:
+    id: onboarding.skip
