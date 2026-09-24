@@ -15,10 +15,10 @@ import {
 } from 'react-native';
 
 import { scheduleStatusesForDay, suggestScheduleFromEvents, type ScheduleStatus } from '../analytics';
-import { customActivityKey, EVENT_META, formatMinutes, quickEventTypes, type EventType, type ScheduleEntry } from '../domain';
+import { customActivityKey, formatMinutes, quickEventTypes, type EventType, type ScheduleEntry } from '../domain';
 import type { PuppyEvent } from '../domain';
 import { useLocalization } from '../localization-context';
-import { eventIcon, spacing, surfaceTreatment, type Theme } from '../theme';
+import { eventColors, eventIcon, spacing, surfaceTreatment, type Theme } from '../theme';
 
 type Draft = { id?: string; type: EventType; customLabel?: string; minutes: number; reminder: boolean };
 
@@ -63,7 +63,10 @@ export function ScheduleScreen({
 
   const statusPresentation = (status: ScheduleStatus, type: EventType) => {
     if (status === 'done') return { label: t('schedule.status.logged'), color: theme.primary, background: theme.primarySoft };
-    if (status === 'due') return { label: t('schedule.status.due'), color: EVENT_META[type].color, background: EVENT_META[type].softColor };
+    if (status === 'due') {
+      const colors = eventColors(theme, type);
+      return { label: t('schedule.status.due'), color: colors.color, background: colors.softColor };
+    }
     if (status === 'missed') return { label: t('schedule.status.missed'), color: theme.danger, background: theme.dangerSoft };
     return { label: t('schedule.status.upcoming'), color: theme.textMuted, background: theme.surface };
   };
@@ -319,7 +322,7 @@ export function ScheduleScreen({
           </View>
         ) : (
           schedule.map((entry, index) => {
-            const meta = EVENT_META[entry.type];
+            const colors = eventColors(theme, entry.type);
             const label = entry.customLabel ?? eventLabel(entry.type);
             const status = statuses.find((item) => item.entry.id === entry.id)?.status ?? 'upcoming';
             const presentation = statusPresentation(status, entry.type);
@@ -345,7 +348,7 @@ export function ScheduleScreen({
                 ]}
               >
                 <View style={styles.timelineRail}>
-                  <View style={[styles.timelineDot, { backgroundColor: meta.color }]} />
+                  <View style={[styles.timelineDot, { backgroundColor: colors.color }]} />
                   {index < schedule.length - 1 ? <View style={[styles.timelineLine, { backgroundColor: theme.border }]} /> : null}
                 </View>
                 <Text style={[styles.time, { color: theme.text }]}>{formatMinutes(entry.minutes)}</Text>
@@ -452,10 +455,8 @@ export function ScheduleScreen({
 
             <View style={[styles.previewList, { borderColor: theme.border }]}>
               {suggestion.entries.map((entry, index) => {
-                const meta = EVENT_META[entry.type];
+                const { color, softColor: background } = eventColors(theme, entry.type);
                 const label = entry.customLabel ?? eventLabel(entry.type);
-                const color = theme.isDark ? meta.darkColor : meta.color;
-                const background = theme.isDark ? meta.darkSoftColor : meta.softColor;
                 return (
                   <View
                     key={entry.id}
@@ -550,7 +551,7 @@ export function ScheduleScreen({
               {[...quickEventTypes.map((type) => ({ type, customLabel: undefined as string | undefined })),
                 ...customActivities.map((customLabel) => ({ type: 'custom' as EventType, customLabel }))].map(({ type, customLabel }) => {
                 const selected = draft?.type === type && (type !== 'custom' || customActivityKey(draft.customLabel ?? '') === customActivityKey(customLabel ?? ''));
-                const meta = EVENT_META[type];
+                const colors = eventColors(theme, type);
                 const label = customLabel ?? eventLabel(type);
                 return (
                   <Pressable
@@ -561,18 +562,18 @@ export function ScheduleScreen({
                     style={({ pressed }) => [
                       styles.typeChoice,
                       {
-                        backgroundColor: selected ? meta.softColor : theme.surface,
-                        borderColor: selected ? meta.color : theme.border,
+                        backgroundColor: selected ? colors.softColor : theme.surface,
+                        borderColor: selected ? colors.color : theme.border,
                         opacity: pressed ? 0.7 : 1,
                       },
                     ]}
                   >
                     <MaterialCommunityIcons
                       name={eventIcon(theme, type) as keyof typeof MaterialCommunityIcons.glyphMap}
-                      color={selected ? meta.color : theme.textMuted}
+                      color={selected ? colors.color : theme.textMuted}
                       size={21}
                     />
-                    <Text style={[styles.typeChoiceText, { color: selected ? meta.color : theme.text }]}>{label}</Text>
+                    <Text style={[styles.typeChoiceText, { color: selected ? colors.color : theme.text }]}>{label}</Text>
                   </Pressable>
                 );
               })}

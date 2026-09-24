@@ -3,7 +3,6 @@ import { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
-  EVENT_META,
   customActivityKey,
   isOpenNap,
   quickEventTypes,
@@ -11,7 +10,7 @@ import {
   type PuppyEvent,
 } from '../domain';
 import { useLocalization } from '../localization-context';
-import { eventIcon, spacing, supportingIcon, surfaceTreatment, type Theme } from '../theme';
+import { eventColors, eventIcon, spacing, supportingIcon, surfaceTreatment, type Theme } from '../theme';
 
 type Props = {
   events: PuppyEvent[];
@@ -49,7 +48,7 @@ export function QuickActions({ events, customActivities, onLog, now, theme }: Pr
     <>
       <View style={[styles.grid, { gap: theme.presentation.gridGap }]}>
         {quickEventTypes.map((type) => {
-          const meta = EVENT_META[type];
+          const colors = eventColors(theme, type);
           const latest = type === 'nap' && openNap
             ? openNap
             : events.find((event) => event.type === type);
@@ -67,8 +66,8 @@ export function QuickActions({ events, customActivities, onLog, now, theme }: Pr
                 styles.action,
                 surfaceTreatment(theme),
                 {
-                  backgroundColor: isEndingNap ? meta.softColor : theme.surfaceRaised,
-                  borderColor: pressed || isEndingNap ? meta.color : theme.border,
+                  backgroundColor: isEndingNap ? colors.softColor : theme.surfaceRaised,
+                  borderColor: pressed || isEndingNap ? colors.color : theme.border,
                   minHeight: theme.presentation.actionHeight,
                   padding: theme.presentation.cardPadding - 4,
                   opacity: pressed ? 0.76 : 1,
@@ -78,12 +77,12 @@ export function QuickActions({ events, customActivities, onLog, now, theme }: Pr
               <View
                 style={[
                   styles.iconCircle,
-                  { backgroundColor: meta.softColor, borderRadius: theme.presentation.iconRadius },
+                  { backgroundColor: colors.softColor, borderRadius: theme.presentation.iconRadius },
                 ]}
               >
                 <MaterialCommunityIcons
                   name={(isEndingNap ? 'stop' : eventIcon(theme, type)) as keyof typeof MaterialCommunityIcons.glyphMap}
-                  color={meta.color}
+                  color={colors.color}
                   size={25}
                 />
               </View>
@@ -102,7 +101,7 @@ export function QuickActions({ events, customActivities, onLog, now, theme }: Pr
         })}
 
         {customActivities.map((label) => {
-          const meta = EVENT_META.custom;
+          const colors = eventColors(theme, 'custom');
           const latest = events.find((event) => event.type === 'custom' && customActivityKey(event.customLabel ?? '') === customActivityKey(label));
           return (
             <Pressable
@@ -117,15 +116,15 @@ export function QuickActions({ events, customActivities, onLog, now, theme }: Pr
                 surfaceTreatment(theme),
                 {
                   backgroundColor: theme.surfaceRaised,
-                  borderColor: pressed ? meta.color : theme.border,
+                  borderColor: pressed ? colors.color : theme.border,
                   minHeight: theme.presentation.actionHeight,
                   padding: theme.presentation.cardPadding - 4,
                   opacity: pressed ? 0.76 : 1,
                 },
               ]}
             >
-              <View style={[styles.iconCircle, { backgroundColor: meta.softColor, borderRadius: theme.presentation.iconRadius }]}>
-                <MaterialCommunityIcons name={eventIcon(theme, 'custom') as keyof typeof MaterialCommunityIcons.glyphMap} color={meta.color} size={25} />
+              <View style={[styles.iconCircle, { backgroundColor: colors.softColor, borderRadius: theme.presentation.iconRadius }]}>
+                <MaterialCommunityIcons name={eventIcon(theme, 'custom') as keyof typeof MaterialCommunityIcons.glyphMap} color={colors.color} size={25} />
               </View>
               <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.actionLabel, { color: theme.text }]}>{label}</Text>
               {latest ? <Text numberOfLines={1} style={[styles.actionTime, { color: theme.textMuted }]}>{relativeTime(latest.at, now)}</Text> : null}

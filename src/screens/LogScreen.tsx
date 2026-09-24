@@ -10,7 +10,6 @@ import { TodayRoutineCard } from '../components/TodayRoutineCard';
 import {
   dateKey,
   customActivityKey,
-  EVENT_META,
   eventTypes,
   formatDuration,
   formatTime,
@@ -24,7 +23,7 @@ import {
 } from '../domain';
 import { useLocalization } from '../localization-context';
 import type { MessageKey } from '../localization';
-import { eventIcon, spacing, surfaceTreatment, type Theme } from '../theme';
+import { eventColors, eventIcon, spacing, surfaceTreatment, type Theme } from '../theme';
 
 const quickBackdates = [0, 5, 15, 30, 60] as const;
 const editableEventTypes = eventTypes.filter((type) => type !== 'nap');
@@ -327,7 +326,7 @@ export function LogScreen({
   const timedNap = draft?.event.type === 'nap' && draft.event.endedAt !== undefined;
   const activeValue = draft?.field === 'end' ? draft.endedAt ?? Date.now() : draft?.at ?? Date.now();
   const pickerDate = new Date(activeValue);
-  const draftMeta = draft ? EVENT_META[draft.type] : EVENT_META.pee;
+  const draftColors = eventColors(theme, draft?.type ?? 'pee');
   const customInvalid = draft?.type === 'custom' && !normalizeCustomLabel(draft.customLabel);
   const selectedFilter = filters.find((item) => item.id === activityFilter) ?? activityFilters[0];
   const setDraftTime = (value: number) => {
@@ -635,12 +634,12 @@ export function LogScreen({
               <View
                 style={[
                   styles.editorIcon,
-                  { backgroundColor: draftMeta.softColor, borderRadius: theme.presentation.iconRadius },
+                  { backgroundColor: draftColors.softColor, borderRadius: theme.presentation.iconRadius },
                 ]}
               >
                 <MaterialCommunityIcons
                   name={eventIcon(theme, draft?.type ?? 'pee') as keyof typeof MaterialCommunityIcons.glyphMap}
-                  color={draftMeta.color}
+                  color={draftColors.color}
                   size={23}
                 />
               </View>
@@ -702,10 +701,10 @@ export function LogScreen({
                 <View style={styles.typePicker}>
                   {[...editableEventTypes.map((type) => ({ type, customLabel: undefined as string | undefined })),
                     ...customActivities.map((customLabel) => ({ type: 'custom' as EventType, customLabel }))].map(({ type, customLabel }) => {
-                    const meta = EVENT_META[type];
-                    const selected = draft.type === type && (type !== 'custom' || customLabel === undefined
-                      ? type !== 'custom' || !customActivities.some((item) => customActivityKey(item) === customActivityKey(draft.customLabel))
-                      : customActivityKey(draft.customLabel) === customActivityKey(customLabel));
+                    const colors = eventColors(theme, type);
+                    const matchingCustom = customActivities.some((item) => customActivityKey(item) === customActivityKey(draft.customLabel));
+                    const selected = draft.type === type && (type !== 'custom'
+                      || (customLabel ? customActivityKey(draft.customLabel) === customActivityKey(customLabel) : !matchingCustom));
                     const label = customLabel ?? eventLabel(type);
                     return (
                       <Pressable
@@ -721,8 +720,8 @@ export function LogScreen({
                         style={({ pressed }) => [
                           styles.typeChoice,
                           {
-                            backgroundColor: selected ? meta.softColor : theme.surface,
-                            borderColor: selected || pressed ? meta.color : theme.border,
+                            backgroundColor: selected ? colors.softColor : theme.surface,
+                            borderColor: selected || pressed ? colors.color : theme.border,
                             borderRadius: theme.presentation.controlRadius,
                             borderWidth: theme.presentation.borderWidth,
                           },
@@ -730,10 +729,10 @@ export function LogScreen({
                       >
                         <MaterialCommunityIcons
                           name={eventIcon(theme, type) as keyof typeof MaterialCommunityIcons.glyphMap}
-                          color={selected ? meta.color : theme.textMuted}
+                          color={selected ? colors.color : theme.textMuted}
                           size={20}
                         />
-                        <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.typeChoiceText, { color: selected ? meta.color : theme.text }]}>
+                        <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.typeChoiceText, { color: selected ? colors.color : theme.text }]}>
                           {label}
                         </Text>
                       </Pressable>
@@ -821,8 +820,8 @@ export function LogScreen({
                       style={({ pressed }) => [
                         styles.timeField,
                         {
-                          backgroundColor: selected ? draftMeta.softColor : theme.surface,
-                          borderColor: selected || pressed ? draftMeta.color : theme.border,
+                          backgroundColor: selected ? draftColors.softColor : theme.surface,
+                          borderColor: selected || pressed ? draftColors.color : theme.border,
                           borderRadius: theme.presentation.controlRadius,
                           borderWidth: theme.presentation.borderWidth,
                         },
