@@ -9,6 +9,7 @@ import { NoteInput } from '../components/NoteInput';
 import { TodayRoutineCard } from '../components/TodayRoutineCard';
 import {
   dateKey,
+  customActivityKey,
   EVENT_META,
   eventTypes,
   formatDuration,
@@ -124,6 +125,7 @@ function monthTitle(key: string, locale: string): string {
 export function LogScreen({
   events,
   schedule,
+  customActivities,
   editRequest,
   onEditRequestHandled,
   onLog,
@@ -135,6 +137,7 @@ export function LogScreen({
 }: {
   events: PuppyEvent[];
   schedule: ScheduleEntry[];
+  customActivities: string[];
   editRequest?: LogEditRequest | null;
   onEditRequestHandled?: () => void;
   onLog: (type: EventType, customLabel?: string) => void;
@@ -267,11 +270,16 @@ export function LogScreen({
     if (event) startEditing(event, Boolean(editRequest.focusNote));
     onEditRequestHandled?.();
   }, [editRequest, events, onEditRequestHandled]);
+  const filters = useMemo(() => [
+    ...activityFilters,
+    ...customActivities.map((label) => ({ id: customActivityKey(label), label, icon: 'tag-outline' as const, types: ['custom'] as readonly EventType[] })),
+  ], [customActivities]);
   const filteredEvents = useMemo(() => {
-    const selected = activityFilters.find((item) => item.id === activityFilter);
+    const selected = filters.find((item) => item.id === activityFilter);
     if (!selected || selected.types.length === 0) return events;
-    return events.filter((event) => (selected.types as readonly EventType[]).includes(event.type));
-  }, [activityFilter, events]);
+    return events.filter((event) => selected.types.includes(event.type)
+      && (!activityFilter.startsWith('custom:') || customActivityKey(event.customLabel ?? '') === activityFilter));
+  }, [activityFilter, events, filters]);
   const todayKey = dateKey(now);
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);
@@ -321,7 +329,7 @@ export function LogScreen({
   const pickerDate = new Date(activeValue);
   const draftMeta = draft ? EVENT_META[draft.type] : EVENT_META.pee;
   const customInvalid = draft?.type === 'custom' && !normalizeCustomLabel(draft.customLabel);
-  const selectedFilter = activityFilters.find((item) => item.id === activityFilter) ?? activityFilters[0];
+  const selectedFilter = filters.find((item) => item.id === activityFilter) ?? activityFilters[0];
   const setDraftTime = (value: number) => {
     updateDraft((current) => {
       if (current.field === 'end') {
@@ -449,7 +457,7 @@ export function LogScreen({
                 </Pressable>
               </View>
             </View>
-            <QuickActions events={events} onLog={onLog} now={now} theme={theme} />
+            <QuickActions events={events} customActivities={customActivities} onLog={onLog} now={now} theme={theme} />
             <TodayRoutineCard
               events={events}
               schedule={schedule}
@@ -465,9 +473,9 @@ export function LogScreen({
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.filters}
             >
-              {activityFilters.map((item) => {
+              {filters.map((item) => {
                 const selected = activityFilter === item.id;
-                const label = t(item.labelKey);
+                const label = 'label' in item ? item.label : t(item.labelKey);
                 return (
                   <Pressable
                     key={item.id}
@@ -596,7 +604,7 @@ export function LogScreen({
             <Text style={[styles.emptyTitle, { color: theme.text }]}>
               {activityFilter === 'all'
                 ? t('log.emptyTitle')
-                : t('log.emptyFilteredTitle', { filter: t(selectedFilter.labelKey).toLocaleLowerCase(locale) })}
+                : t('log.emptyFilteredTitle', { filter: ('label' in selectedFilter ? selectedFilter.label : t(selectedFilter.labelKey)).toLocaleLowerCase(locale) })}
             </Text>
           </View>
         }
@@ -692,20 +700,23 @@ export function LogScreen({
               <>
                 <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{t('editor.activity')}</Text>
                 <View style={styles.typePicker}>
-                  {editableEventTypes.map((type) => {
+                  {[...editableEventTypes.map((type) => ({ type, customLabel: undefined as string | undefined })),
+                    ...customActivities.map((customLabel) => ({ type: 'custom' as EventType, customLabel }))].map(({ type, customLabel }) => {
                     const meta = EVENT_META[type];
-                    const selected = draft.type === type;
-                    const label = eventLabel(type);
+                    const selected = draft.type === type && (type !== 'custom' || customLabel === undefined
+                      ? type !== 'custom' || !customActivities.some((item) => customActivityKey(item) === customActivityKey(draft.customLabel))
+                      : customActivityKey(draft.customLabel) === customActivityKey(customLabel));
+                    const label = customLabel ?? eventLabel(type);
                     return (
                       <Pressable
-                        key={type}
+                        key={customLabel ? customActivityKey(customLabel) : type}
                         testID={`editor.type.${type}`}
                         accessibilityRole="button"
                         accessibilityState={{ selected }}
                         accessibilityLabel={t('editor.changeActivity', { activity: label })}
                         onPress={() => {
                           setCustomTouched(false);
-                          updateDraft((current) => ({ ...current, type }));
+                          updateDraft((current) => ({ ...current, type, customLabel: customLabel ?? (type === 'custom' ? current.customLabel : '') }));
                         }}
                         style={({ pressed }) => [
                           styles.typeChoice,

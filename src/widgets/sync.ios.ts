@@ -2,6 +2,7 @@ import { isOpenNap, latestQuickEventTimes, type PuppyEvent } from '../domain';
 import { resolveLanguage } from '../localization';
 import {
   loadLanguagePreference,
+  loadCustomActivities,
   loadNotificationPreferences,
   loadThemePreference,
   loadWidgetActions,
@@ -20,8 +21,9 @@ export async function readPendingWidgetEvents(): Promise<PuppyEvent[]> {
 
 export async function updateHomeWidget(events: PuppyEvent[]): Promise<void> {
   const openNap = events.find(isOpenNap);
+  const customActivities = await loadCustomActivities(events);
   const [actions, themePreference, notificationPreferences, languagePreference] = await Promise.all([
-    loadWidgetActions(),
+    loadWidgetActions(customActivities),
     loadThemePreference(),
     loadNotificationPreferences(),
     loadLanguagePreference(),
@@ -31,6 +33,7 @@ export async function updateHomeWidget(events: PuppyEvent[]): Promise<void> {
     openNap: openNap ? { id: openNap.id, type: 'nap', at: openNap.at, endedAt: null } : null,
     lastEventAt: latestQuickEventTimes(events),
     actions,
+    customActivities,
     themePreference,
     notificationConfirmations: notificationPreferences.widgetConfirmations,
     pottyAfterPeeMinutes: notificationPreferences.pottyAfterPee.enabled

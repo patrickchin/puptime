@@ -23,7 +23,7 @@ import {
   type TimelineDay,
   type TimelineMark,
 } from '../analytics';
-import { dateKey, EVENT_META, eventTypes, type EventType, type PuppyEvent } from '../domain';
+import { activityKey, customActivityKey, dateKey, EVENT_META, quickEventTypes, type ActivityKey, type EventType, type PuppyEvent } from '../domain';
 import { useLocalization } from '../localization-context';
 import { localizedEventLabel, translate, type AppLanguage } from '../localization';
 import { eventIcon, spacing, type Theme } from '../theme';
@@ -35,7 +35,6 @@ const LOAD_ROW_HEIGHT = 48;
 const MIN_TIME_SCALE = 1;
 const MAX_TIME_SCALE = 4;
 const ZOOM_STEP = 0.5;
-const activityFilters = ['all', ...eventTypes] as const;
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
@@ -47,7 +46,7 @@ function formatBucket(bucket: number, language: AppLanguage): string {
 }
 
 function describeMark(mark: TimelineMark, language: AppLanguage): string {
-  const activity = localizedEventLabel(language, mark.type);
+  const activity = mark.type === 'custom' ? mark.label : localizedEventLabel(language, mark.type);
   return mark.endBucket === undefined
     ? translate(language, 'insights.pointWindow', {
       activity,
@@ -61,9 +60,9 @@ function describeMark(mark: TimelineMark, language: AppLanguage): string {
     });
 }
 
-function filterName(types: readonly EventType[], language: AppLanguage): string {
-  if (types.length === eventTypes.length) return translate(language, 'insights.activity');
-  if (types.length === 1) return localizedEventLabel(language, types[0]).toLocaleLowerCase(language);
+function filterName(types: readonly ActivityKey[], language: AppLanguage, allCount: number): string {
+  if (types.length === allCount) return translate(language, 'insights.activity');
+  if (types.length === 1) return (types[0].startsWith('custom:') ? types[0].slice(7) : localizedEventLabel(language, types[0] as EventType)).toLocaleLowerCase(language);
   return translate(language, 'insights.selectedActivity');
 }
 
@@ -96,6 +95,7 @@ function horizontalTouchDistance(touches: readonly { pageX: number }[]): number 
 function TimelineDateLabel({
   day,
   selectedTypes,
+  activityCount,
   isToday,
   currentTime,
   rowHeight,
@@ -103,7 +103,8 @@ function TimelineDateLabel({
   theme,
 }: {
   day: TimelineDay;
-  selectedTypes: readonly EventType[];
+  selectedTypes: readonly ActivityKey[];
+  activityCount: number;
   isToday: boolean;
   currentTime?: Date;
   rowHeight: number;
@@ -111,11 +112,11 @@ function TimelineDateLabel({
   theme: Theme;
 }) {
   const { language, t } = useLocalization();
-  const marks = day.marks.filter((mark) => selectedTypes.includes(mark.type));
+  const marks = day.marks.filter((mark) => selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label })));
   const description = marks.length
     ? marks.map((mark) => describeMark(mark, language)).join('. ')
     : selectedTypes.length
-      ? t('insights.noLogged', { activity: filterName(selectedTypes, language) })
+      ? t('insights.noLogged', { activity: filterName(selectedTypes, language, activityCount) })
       : t('insights.noActivitySelected');
   const fullDate = new Intl.DateTimeFormat(language, { weekday: 'long', month: 'long', day: 'numeric' });
   const shortDay = new Intl.DateTimeFormat(language, { weekday: 'short' });
@@ -160,14 +161,14 @@ function TimelineTrack({
   theme,
 }: {
   day: TimelineDay;
-  selectedTypes: readonly EventType[];
+  selectedTypes: readonly ActivityKey[];
   isToday: boolean;
   currentTime?: Date;
   rowHeight: number;
   gridHours: readonly number[];
   theme: Theme;
 }) {
-  const marks = day.marks.filter((mark) => selectedTypes.includes(mark.type));
+  const marks = day.marks.filter((mark) => selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label })));
   const currentTimePosition = currentTime
     ? ((currentTime.getHours() * 60 + currentTime.getMinutes()) / (24 * 60)) * 100
     : undefined;
@@ -320,10 +321,14 @@ function TimelineAxis({
   );
 }
 
-export function TimelineScreen({ events, theme }: { events: PuppyEvent[]; theme: Theme }) {
+export function TimelineScreen({ events, customActivities, theme }: { events: PuppyEvent[]; customActivities: string[]; theme: Theme }) {
   const { eventLabel, language, t } = useLocalization();
   const { fontScale, height, width } = useWindowDimensions();
-  const [selectedTypes, setSelectedTypes] = useState<EventType[]>([...eventTypes]);
+  const activityFilters: ActivityKey[] = [...quickEventTypes, ...customActivities.map(customActivityKey)];
+  const [selectedTypes, setSelectedTypes] = useState<ActivityKey[]>([...quickEventTypes]);
+  useEffect(() => {
+    setSelectedTypes((current) => [...current, ...customActivities.map(customActivityKey).filter((key) => !current.includes(key))]);
+  }, [customActivities]);
   const [loadedDayCount, setLoadedDayCount] = useState(INITIAL_DAYS);
   const [timeScale, setTimeScale] = useState(MIN_TIME_SCALE);
   const [nowTime, setNowTime] = useState(Date.now());
@@ -348,10 +353,10 @@ export function TimelineScreen({ events, theme }: { events: PuppyEvent[]; theme:
   );
   const todayKey = dateKey(now);
   const visibleEventCount = new Set(
-    days.flatMap((day) => day.marks.filter((mark) => selectedTypes.includes(mark.type)).map((mark) => mark.id)),
+    days.flatMap((day) => day.marks.filter((mark) => selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label }))).map((mark) => mark.id)),
   ).size;
   const rangeLabel = days.length ? formatDateRange(days[0].date, days[days.length - 1].date, language) : '';
-  const allSelected = selectedTypes.length === eventTypes.length;
+  const allSelected = activityFilters.every((key) => selectedTypes.includes(key));
   const hasEarlierDays = loadedDayCount < maxHistoryDays;
   const isCompactHeight = height < 500;
 
@@ -439,10 +444,10 @@ export function TimelineScreen({ events, theme }: { events: PuppyEvent[]; theme:
     onPanResponderTerminationRequest: () => false,
   }), []);
 
-  function toggleActivity(type: EventType) {
+  function toggleActivity(type: ActivityKey) {
     setSelectedTypes((current) => current.includes(type)
       ? current.filter((candidate) => candidate !== type)
-      : eventTypes.filter((candidate) => current.includes(candidate) || candidate === type));
+      : activityFilters.filter((candidate) => current.includes(candidate) || candidate === type));
   }
 
   function loadEarlierDays() {
@@ -584,7 +589,7 @@ export function TimelineScreen({ events, theme }: { events: PuppyEvent[]; theme:
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filters}
         >
-          {activityFilters.map((type) => {
+          {(['all', ...activityFilters] as const).map((type) => {
             const isAll = type === 'all';
             const checked: boolean | 'mixed' = isAll
               ? allSelected
@@ -595,14 +600,14 @@ export function TimelineScreen({ events, theme }: { events: PuppyEvent[]; theme:
               : selectedTypes.includes(type);
             const active = checked !== false;
             const selected = checked === true;
-            const label = isAll ? t('insights.all') : eventLabel(type);
-            const icon = isAll ? 'layers-outline' : eventIcon(theme, type);
-            const color = isAll ? theme.primary : eventColor(type, theme);
+            const label = isAll ? t('insights.all') : type.startsWith('custom:') ? customActivities.find((item) => customActivityKey(item) === type) ?? type.slice(7) : eventLabel(type as EventType);
+            const icon = isAll ? 'layers-outline' : eventIcon(theme, type.startsWith('custom:') ? 'custom' : type as EventType);
+            const color = isAll ? theme.primary : eventColor(type.startsWith('custom:') ? 'custom' : type as EventType, theme);
             const activeBackground = isAll
               ? theme.primarySoft
               : theme.isDark
-                ? EVENT_META[type].darkSoftColor
-                : EVENT_META[type].softColor;
+                ? EVENT_META[type.startsWith('custom:') ? 'custom' : type as EventType].darkSoftColor
+                : EVENT_META[type.startsWith('custom:') ? 'custom' : type as EventType].softColor;
             return (
               <Pressable
                 key={type}
@@ -613,7 +618,7 @@ export function TimelineScreen({ events, theme }: { events: PuppyEvent[]; theme:
                   : t(selected ? 'insights.hideTiming' : 'insights.showTiming', { activity: label })}
                 accessibilityState={{ checked }}
                 onPress={() => isAll
-                  ? setSelectedTypes(allSelected ? [] : [...eventTypes])
+                  ? setSelectedTypes(allSelected ? [] : [...activityFilters])
                   : toggleActivity(type)}
                 style={({ pressed }) => [
                   styles.filterChip,
@@ -653,7 +658,7 @@ export function TimelineScreen({ events, theme }: { events: PuppyEvent[]; theme:
             <Text style={[styles.emptyText, { color: theme.textMuted }]}>
               {selectedTypes.length === 0
                 ? t('insights.chooseActivity')
-                : t('insights.noRangeLogs', { activity: filterName(selectedTypes, language) })}
+                : t('insights.noRangeLogs', { activity: filterName(selectedTypes, language, activityFilters.length) })}
             </Text>
           </View>
         ) : null}
@@ -687,6 +692,7 @@ export function TimelineScreen({ events, theme }: { events: PuppyEvent[]; theme:
                   <TimelineDateLabel
                     day={day}
                     selectedTypes={selectedTypes}
+                    activityCount={activityFilters.length}
                     isToday={day.key === todayKey}
                     currentTime={day.key === todayKey ? now : undefined}
                     rowHeight={rowHeight}

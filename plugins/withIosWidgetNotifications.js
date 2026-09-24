@@ -29,9 +29,9 @@ private final class PuptimeWidgetNotificationBridge {
 
     let parts = target.split(separator: "|", maxSplits: 5, omittingEmptySubsequences: false).map(String.init)
     guard parts.count >= 4, parts[0] == "log" else { return }
-    let type = parts[1]
+    let type = parts[1].removingPercentEncoding ?? parts[1]
     let language = parts[3]
-    guard ["pee", "poop", "meal", "pottyTrip", "walk", "nap"].contains(type) else { return }
+    guard ["pee", "poop", "meal", "pottyTrip", "walk", "nap"].contains(type) || type.hasPrefix("custom:") else { return }
 
     if parts[2] == "1" {
       showConfirmation(type, language, timestamp)
@@ -151,6 +151,14 @@ private final class PuptimeWidgetNotificationBridge {
   }
 
   private func body(_ type: String, _ language: String) -> String {
+    if type.hasPrefix("custom:") {
+      let activity = String(type.dropFirst("custom:".count))
+      switch language {
+      case "zh-Hans": return "已通过小组件记录：\\(activity)。"
+      case "es": return "Se guardó \\(activity) desde el widget."
+      default: return "\\(activity) saved from the widget."
+      }
+    }
     let activity: String
     switch language {
     case "zh-Hans":

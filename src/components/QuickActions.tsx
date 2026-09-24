@@ -4,6 +4,7 @@ import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleShee
 
 import {
   EVENT_META,
+  customActivityKey,
   isOpenNap,
   quickEventTypes,
   type EventType,
@@ -14,12 +15,13 @@ import { eventIcon, spacing, supportingIcon, surfaceTreatment, type Theme } from
 
 type Props = {
   events: PuppyEvent[];
+  customActivities: string[];
   onLog: (type: EventType, customLabel?: string) => void;
   now: number;
   theme: Theme;
 };
 
-export function QuickActions({ events, onLog, now, theme }: Props) {
+export function QuickActions({ events, customActivities, onLog, now, theme }: Props) {
   const { elapsedTime, eventLabel, relativeTime, t } = useLocalization();
   const [showMore, setShowMore] = useState(false);
   const [customLabel, setCustomLabel] = useState('');
@@ -32,12 +34,8 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
     t('quick.crate'),
     t('quick.medicine'),
   ], [t]);
-  const otherActivities = useMemo(() => {
-    const previous = events
-      .filter((event) => event.type === 'custom')
-      .map((event) => event.customLabel?.trim() || eventLabel('custom'));
-    return [...new Set([...suggestions, ...previous])];
-  }, [eventLabel, events, suggestions]);
+  const otherActivities = useMemo(() => suggestions.filter((label) =>
+    !customActivities.some((saved) => customActivityKey(saved) === customActivityKey(label))), [customActivities, suggestions]);
 
   const logOther = (label: string) => {
     const clean = label.trim();
@@ -99,6 +97,38 @@ export function QuickActions({ events, onLog, now, theme }: Props) {
                     : relativeTime(latest.endedAt ?? latest.at, now)}
                 </Text>
               ) : null}
+            </Pressable>
+          );
+        })}
+
+        {customActivities.map((label) => {
+          const meta = EVENT_META.custom;
+          const latest = events.find((event) => event.type === 'custom' && customActivityKey(event.customLabel ?? '') === customActivityKey(label));
+          return (
+            <Pressable
+              key={customActivityKey(label)}
+              testID={`quick.custom.${customActivityKey(label)}`}
+              accessibilityRole="button"
+              accessibilityLabel={t('quick.logAction', { activity: label })}
+              accessibilityHint={t('quick.logHint')}
+              onPress={() => onLog('custom', label)}
+              style={({ pressed }) => [
+                styles.action,
+                surfaceTreatment(theme),
+                {
+                  backgroundColor: theme.surfaceRaised,
+                  borderColor: pressed ? meta.color : theme.border,
+                  minHeight: theme.presentation.actionHeight,
+                  padding: theme.presentation.cardPadding - 4,
+                  opacity: pressed ? 0.76 : 1,
+                },
+              ]}
+            >
+              <View style={[styles.iconCircle, { backgroundColor: meta.softColor, borderRadius: theme.presentation.iconRadius }]}>
+                <MaterialCommunityIcons name={eventIcon(theme, 'custom') as keyof typeof MaterialCommunityIcons.glyphMap} color={meta.color} size={25} />
+              </View>
+              <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.actionLabel, { color: theme.text }]}>{label}</Text>
+              {latest ? <Text numberOfLines={1} style={[styles.actionTime, { color: theme.textMuted }]}>{relativeTime(latest.at, now)}</Text> : null}
             </Pressable>
           );
         })}

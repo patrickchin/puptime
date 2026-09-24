@@ -29,7 +29,7 @@ Puptime is a puppy activity log for Android and iOS. Data stays on the device.
 
 ## Features
 
-- Log pee, poop, meals, potty trips, walks, naps, and custom activities, with haptic confirmation and undo.
+- Log pee, poop, meals, potty trips, walks, naps, and custom activities, with haptic confirmation and undo. Named activities stay available as quick actions, routine choices, timeline filters, frequency summaries, and widget actions.
 - Start and stop naps, then edit their start and end times.
 - Add typed or dictated notes and edit an activity, name, date, time, or note.
 - Filter recent history or open the month-by-month archive.

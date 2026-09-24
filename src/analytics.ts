@@ -1,11 +1,12 @@
 import {
   dateKey,
+  activityKey,
   eventLabel,
-  isQuickEventType,
   quickEventTypes,
+  sameActivity,
   type EventType,
+  type Activity,
   type PuppyEvent,
-  type QuickEventType,
   type ScheduleEntry,
 } from './domain.ts';
 
@@ -35,6 +36,7 @@ export type TimelinePointCluster = {
 
 export type ActivityFrequencyStat = {
   type: EventType;
+  customLabel?: string;
   total: number;
   recordedDays: number;
   averagePerRecordedDay: number;
@@ -69,7 +71,8 @@ export type ScheduleSuggestion = {
 
 export type MissingLogEstimate = {
   id: string;
-  type: QuickEventType;
+  type: EventType;
+  customLabel?: string;
   at: number;
   endedAt?: number;
   observedDays: number;
@@ -112,7 +115,7 @@ function percentile(values: number[], amount: number): number | undefined {
 
 export function activityFrequencyStats(
   events: PuppyEvent[],
-  types: readonly EventType[] = ['pee', 'poop'],
+  types: readonly (EventType | Activity)[] = ['pee', 'poop'],
   days = 14,
   now = new Date(),
 ): ActivityFrequencySnapshot {
@@ -123,8 +126,10 @@ export function activityFrequencyStats(
   return {
     periodDays,
     recordedDays: recordedDayKeys.length,
-    stats: types.map((type) => {
-      const matching = recent.filter((event) => event.type === type).sort((a, b) => a.at - b.at);
+    stats: types.map((item) => {
+      const activity = typeof item === 'string' ? { type: item } : item;
+      const { type, customLabel } = activity;
+      const matching = recent.filter((event) => sameActivity(event, activity)).sort((a, b) => a.at - b.at);
       const countByDay = new Map<string, number>();
       matching.forEach((event) => {
         const key = dateKey(event.at);
@@ -138,6 +143,7 @@ export function activityFrequencyStats(
 
       return {
         type,
+        ...(customLabel ? { customLabel } : {}),
         total: matching.length,
         recordedDays: recordedDayKeys.length,
         averagePerRecordedDay: recordedDayKeys.length ? matching.length / recordedDayKeys.length : 0,
@@ -203,26 +209,27 @@ export function suggestScheduleFromEvents(
     return { entries: [], daysAnalyzed: recordedDayKeys.length, periodDays, sourceEvents: recent.length };
   }
 
-  const byTypeAndDay = new Map<EventType, Map<string, number[]>>();
-  quickEventTypes.forEach((type) => byTypeAndDay.set(type, new Map()));
+  const byTypeAndDay = new Map<string, { type: EventType; customLabel?: string; days: Map<string, number[]> }>();
+  quickEventTypes.forEach((type) => byTypeAndDay.set(type, { type, days: new Map() }));
   recent.forEach((event) => {
-    if (!isQuickEventType(event.type)) return;
+    if (event.type === 'custom' && !event.customLabel?.trim()) return;
     const day = dateKey(event.at);
     const date = new Date(event.at);
     const minutes = date.getHours() * 60 + date.getMinutes();
-    const byDay = byTypeAndDay.get(event.type);
-    const times = byDay?.get(day) ?? [];
+    const key = activityKey(event);
+    const activity = byTypeAndDay.get(key) ?? { type: event.type, customLabel: event.customLabel, days: new Map<string, number[]>() };
+    byTypeAndDay.set(key, activity);
+    const times = activity.days.get(day) ?? [];
     times.push(minutes);
     times.sort((a, b) => a - b);
-    byDay?.set(day, times);
+    activity.days.set(day, times);
   });
 
   const requiredDays = Math.max(3, Math.ceil(recordedDayKeys.length / 2));
   const entries: ScheduleEntry[] = [];
   const seen = new Set<string>();
 
-  quickEventTypes.forEach((type) => {
-    const byDay = byTypeAndDay.get(type) ?? new Map<string, number[]>();
+  byTypeAndDay.forEach(({ type, customLabel, days: byDay }, key) => {
     const dailyCounts = recordedDayKeys.map((key) => byDay.get(key)?.length ?? 0);
     const typicalCount = Math.min(8, Math.max(0, Math.round(percentile(dailyCounts, 0.5) ?? 0)));
 
@@ -235,12 +242,13 @@ export function suggestScheduleFromEvents(
       const medianMinutes = percentile(samples, 0.5);
       if (medianMinutes === undefined) continue;
       const minutes = Math.round(medianMinutes / TIMELINE_BUCKET_MINUTES) * TIMELINE_BUCKET_MINUTES % (24 * 60);
-      const identity = `${type}-${minutes}`;
+      const identity = `${key}-${minutes}`;
       if (seen.has(identity)) continue;
       seen.add(identity);
       entries.push({
-        id: `learned-${type}-${minutes}-${index}`,
+        id: `learned-${key}-${minutes}-${index}`,
         type,
+        ...(customLabel ? { customLabel } : {}),
         minutes,
         reminder: false,
       });
@@ -280,7 +288,7 @@ export function scheduleStatusesForDay(
     const options = candidates
       .filter(
         (event) =>
-          event.type === item.type && Math.abs(event.at - item.target) <= tolerance,
+          sameActivity(event, item) && Math.abs(event.at - item.target) <= tolerance,
       )
       .sort((a, b) => Math.abs(a.at - item.target) - Math.abs(b.at - item.target));
 
@@ -355,7 +363,7 @@ export function estimateMissingLogs(
     const statuses = statusesByDay.get(key) ?? [];
 
     return statuses.flatMap<MissingLogEstimate>((status) => {
-      if (status.status !== 'missed' || !isQuickEventType(status.entry.type)) return [];
+      if (status.status !== 'missed' || (status.entry.type === 'custom' && !status.entry.customLabel)) return [];
       if (!dayEvents.some((event) => event.at > status.target)) return [];
 
       const comparison = activeDays
@@ -385,6 +393,7 @@ export function estimateMissingLogs(
       return [{
         id: `estimate-${key}-${status.entry.id}`,
         type: status.entry.type,
+        ...(status.entry.customLabel ? { customLabel: status.entry.customLabel } : {}),
         at: status.target,
         ...(endedAt === undefined ? {} : { endedAt }),
         observedDays: observed.length,

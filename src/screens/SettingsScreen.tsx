@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
-import { EVENT_META, quickEventTypes, type QuickEventType } from '../domain';
+import { customActivityKey, EVENT_META, quickEventTypes, type ActivityKey, type EventType } from '../domain';
 import { useLocalization } from '../localization-context';
 import type { LanguagePreference } from '../localization';
 import {
@@ -46,6 +46,7 @@ export function SettingsScreen({
   themePreference,
   languagePreference,
   widgetActions,
+  customActivities,
   notificationPreferences,
   notificationPermission,
   routineReminderCount,
@@ -60,13 +61,14 @@ export function SettingsScreen({
   theme: Theme;
   themePreference: ThemePreference;
   languagePreference: LanguagePreference;
-  widgetActions: QuickEventType[];
+  widgetActions: ActivityKey[];
+  customActivities: string[];
   notificationPreferences: NotificationPreferences;
   notificationPermission: NotificationPermissionState;
   routineReminderCount: number;
   onBack: () => void;
   onOpenPicker: (mode: 'theme' | 'language') => void;
-  onWidgetActionsChange: (actions: QuickEventType[]) => Promise<void>;
+  onWidgetActionsChange: (actions: ActivityKey[]) => Promise<void>;
   onNotificationPreferencesChange: (preferences: NotificationPreferences) => Promise<void>;
   onRequestNotificationPermission: () => Promise<boolean>;
   onOpenSystemSettings: () => void;
@@ -88,7 +90,7 @@ export function SettingsScreen({
 
   const showSaveError = () => Alert.alert(t('settings.saveErrorTitle'), t('settings.saveErrorBody'));
 
-  const changeWidgetAction = async (type: QuickEventType) => {
+  const changeWidgetAction = async (type: ActivityKey) => {
     if (savingWidget) return;
     const selected = widgetActions.includes(type);
     if ((selected && widgetActions.length === 2) || (!selected && widgetActions.length === 4)) return;
@@ -250,13 +252,13 @@ export function SettingsScreen({
           {t('settings.widgetDetail')}
         </Text>
         <View style={styles.widgetGrid}>
-          {quickEventTypes.map((type) => {
+          {([...quickEventTypes, ...customActivities.map(customActivityKey)] as ActivityKey[]).map((type) => {
             const selected = widgetActions.includes(type);
             const locked = (selected && widgetActions.length === 2) || (!selected && widgetActions.length === 4);
-            const meta = EVENT_META[type];
+            const meta = EVENT_META[type.startsWith('custom:') ? 'custom' : type as EventType];
             const color = theme.isDark ? meta.darkColor : meta.color;
             const softColor = theme.isDark ? meta.darkSoftColor : meta.softColor;
-            const label = eventLabel(type);
+            const label = type.startsWith('custom:') ? customActivities.find((item) => customActivityKey(item) === type) ?? type.slice(7) : eventLabel(type as EventType);
             return (
               <Pressable
                 key={type}
@@ -281,7 +283,7 @@ export function SettingsScreen({
                 <MaterialCommunityIcons
                   accessibilityElementsHidden
                   importantForAccessibility="no"
-                  name={eventIcon(theme, type) as keyof typeof MaterialCommunityIcons.glyphMap}
+                  name={eventIcon(theme, type.startsWith('custom:') ? 'custom' : type as EventType) as keyof typeof MaterialCommunityIcons.glyphMap}
                   size={20}
                   color={color}
                 />

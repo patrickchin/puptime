@@ -52,6 +52,35 @@ test('reassigns a nearby event when that matches more of the planned routine', (
   );
 });
 
+test('matches named activities to their own routine entries and frequency rows', () => {
+  const schedule: ScheduleEntry[] = [
+    { id: 'training', type: 'custom', customLabel: 'Training', minutes: 7 * 60 },
+    { id: 'grooming', type: 'custom', customLabel: 'Grooming', minutes: 7 * 60 },
+  ];
+  const events: PuppyEvent[] = [
+    { id: '1', type: 'custom', customLabel: 'training', at: at(7, 5), source: 'app' },
+    { id: '2', type: 'custom', customLabel: 'Grooming', at: at(7, 10), source: 'app' },
+  ];
+
+  assert.deepEqual(scheduleStatusesForDay(events, schedule, day).map((item) => item.event?.id), ['1', '2']);
+  assert.deepEqual(
+    activityFrequencyStats(events, schedule, 1, new Date(2026, 8, 10, 20)).stats.map((stat) => [stat.customLabel, stat.total]),
+    [['Training', 1], ['Grooming', 1]],
+  );
+});
+
+test('learns each named activity as a separate routine choice', () => {
+  const events: PuppyEvent[] = [7, 8, 9, 10].flatMap((date) => [
+    { id: `training-${date}`, type: 'custom', customLabel: 'Training', at: new Date(2026, 8, date, 9).getTime(), source: 'app' },
+    { id: `grooming-${date}`, type: 'custom', customLabel: 'Grooming', at: new Date(2026, 8, date, 17).getTime(), source: 'app' },
+  ] as PuppyEvent[]);
+  const suggestion = suggestScheduleFromEvents(events, 14, new Date(2026, 8, 10, 20));
+  assert.deepEqual(suggestion.entries.map(({ customLabel, minutes }) => [customLabel, minutes]), [
+    ['Training', 9 * 60],
+    ['Grooming', 17 * 60],
+  ]);
+});
+
 test('describes completed, due, upcoming, and missed routine items', () => {
   const schedule: ScheduleEntry[] = [
     { id: 'done', type: 'pee', minutes: 7 * 60 },
