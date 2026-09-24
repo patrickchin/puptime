@@ -27,14 +27,14 @@ private final class PuptimeWidgetNotificationBridge {
       let timestamp = event["timestamp"] as? Int
     else { return }
 
-    let parts = target.split(separator: "|", maxSplits: 5, omittingEmptySubsequences: false).map(String.init)
+    let parts = target.split(separator: "|", maxSplits: 6, omittingEmptySubsequences: false).map(String.init)
     guard parts.count >= 4, parts[0] == "log" else { return }
     let type = parts[1].removingPercentEncoding ?? parts[1]
     let language = parts[3]
     guard ["pee", "poop", "meal", "pottyTrip", "walk", "nap"].contains(type) || type.hasPrefix("custom:") else { return }
 
     if parts[2] == "1" {
-      showConfirmation(type, language, timestamp)
+      showConfirmation(type, language, timestamp, parts.count > 6 ? parts[6].removingPercentEncoding : nil)
     }
     syncPottyReminder(
       type,
@@ -44,10 +44,10 @@ private final class PuptimeWidgetNotificationBridge {
     )
   }
 
-  private func showConfirmation(_ type: String, _ language: String, _ timestamp: Int) {
+  private func showConfirmation(_ type: String, _ language: String, _ timestamp: Int, _ customLabel: String?) {
     let content = UNMutableNotificationContent()
     content.title = title(language)
-    content.body = body(type, language)
+    content.body = body(type, language, customLabel)
     content.sound = .default
     content.categoryIdentifier = "puptimeWidgetLog"
     content.userInfo = ["kind": "widgetLog", "type": type, "at": timestamp]
@@ -150,9 +150,9 @@ private final class PuptimeWidgetNotificationBridge {
     }
   }
 
-  private func body(_ type: String, _ language: String) -> String {
+  private func body(_ type: String, _ language: String, _ customLabel: String?) -> String {
     if type.hasPrefix("custom:") {
-      let activity = String(type.dropFirst("custom:".count))
+      let activity = customLabel ?? String(type.dropFirst("custom:".count))
       switch language {
       case "zh-Hans": return "已通过小组件记录：\\(activity)。"
       case "es": return "Se guardó \\(activity) desde el widget."

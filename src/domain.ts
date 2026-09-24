@@ -149,7 +149,7 @@ export function isQuickEventType(value: unknown): value is QuickEventType {
 }
 
 export function customActivityKey(label: string): `custom:${string}` {
-  return `custom:${normalizeCustomLabel(label)?.toLocaleLowerCase() ?? ''}`;
+  return `custom:${normalizeCustomLabel(label)?.toLowerCase() ?? ''}`;
 }
 
 export function activityKey(activity: Activity): ActivityKey {

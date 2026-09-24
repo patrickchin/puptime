@@ -125,7 +125,7 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
         return (
           <Button
             key={type}
-            target={`log|${encodeURIComponent(type)}|${props.notificationConfirmations ? '1' : '0'}|${props.language ?? 'en'}|${props.pottyAfterPeeMinutes ?? 0}|${props.pottyAfterMealMinutes ?? 0}`}
+            target={`log|${encodeURIComponent(type)}|${props.notificationConfirmations ? '1' : '0'}|${props.language ?? 'en'}|${props.pottyAfterPeeMinutes ?? 0}|${props.pottyAfterMealMinutes ?? 0}|${encodeURIComponent(type.startsWith('custom:') ? customActivities.find((label) => customActivityKey(label) === type) ?? type.slice(7) : '')}`}
             onPress={() => add(type)}
             modifiers={actionModifiers(color)}
           >
