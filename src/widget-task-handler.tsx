@@ -12,7 +12,7 @@ import {
   type QuickEventType,
 } from './domain';
 import { resolveLanguage } from './localization';
-import { showWidgetLogConfirmation } from './reminders';
+import { showWidgetLogConfirmation, syncPottyReminders } from './reminders';
 import {
   appendEvents,
   loadEvents,
@@ -55,12 +55,14 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
         loadNotificationPreferences(),
         loadLanguagePreference(),
       ]);
+      const language = resolveLanguage(languagePreference);
       await Promise.all([
         render(props, nextEvents, type),
+        syncPottyReminders(nextEvents, preferences, language).catch(() => false),
         preferences.widgetConfirmations
           ? showWidgetLogConfirmation(
               { eventId: event.id, type, at },
-              resolveLanguage(languagePreference),
+              language,
             ).catch(() => false)
           : Promise.resolve(false),
       ]);

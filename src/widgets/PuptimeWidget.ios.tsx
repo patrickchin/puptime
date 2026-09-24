@@ -32,6 +32,8 @@ export type PuptimeWidgetProps = {
   actions?: QuickEventType[];
   themePreference?: ThemePreference;
   notificationConfirmations?: boolean;
+  pottyAfterPeeMinutes?: number;
+  pottyAfterMealMinutes?: number;
   language?: 'en' | 'zh-Hans' | 'es';
 };
 
@@ -53,6 +55,8 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
         actions: configuredActions,
         themePreference: props.themePreference,
         notificationConfirmations: props.notificationConfirmations,
+        pottyAfterPeeMinutes: props.pottyAfterPeeMinutes,
+        pottyAfterMealMinutes: props.pottyAfterMealMinutes,
         language: props.language,
         pending: [...pending.filter((event) => event.id !== completed.id), completed].slice(-100),
       };
@@ -69,6 +73,8 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
       actions: configuredActions,
       themePreference: props.themePreference,
       notificationConfirmations: props.notificationConfirmations,
+      pottyAfterPeeMinutes: props.pottyAfterPeeMinutes,
+      pottyAfterMealMinutes: props.pottyAfterMealMinutes,
       language: props.language,
       // ponytail: bound widget props; move to a shared native DB if 100 unopened taps becomes realistic.
       pending: [...pending, event].slice(-100),
@@ -110,7 +116,7 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
         return (
           <Button
             key={type}
-            target={`log|${type}|${props.notificationConfirmations ? '1' : '0'}|${props.language ?? 'en'}`}
+            target={`log|${type}|${props.notificationConfirmations ? '1' : '0'}|${props.language ?? 'en'}|${props.pottyAfterPeeMinutes ?? 0}|${props.pottyAfterMealMinutes ?? 0}`}
             onPress={() => add(type)}
             modifiers={actionModifiers(color)}
           >

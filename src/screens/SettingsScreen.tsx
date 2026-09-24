@@ -6,8 +6,11 @@ import { EVENT_META, quickEventTypes, type QuickEventType } from '../domain';
 import { useLocalization } from '../localization-context';
 import type { LanguagePreference } from '../localization';
 import {
+  pottyReminderDelayOptions,
   reminderLeadOptions,
   type NotificationPreferences,
+  type PottyReminderDelayMinutes,
+  type PottyReminderPreference,
   type ReminderLeadMinutes,
 } from '../notification-config';
 import type { NotificationPermissionState } from '../reminders';
@@ -133,6 +136,27 @@ export function SettingsScreen({
   const toggleWidgetConfirmations = async (enabled: boolean) => {
     if (enabled && notificationPermission !== 'granted' && !(await requestNotifications())) return;
     await saveNotifications({ ...notificationPreferences, widgetConfirmations: enabled });
+  };
+
+  const togglePottyReminder = async (
+    key: 'pottyAfterPee' | 'pottyAfterMeal',
+    enabled: boolean,
+  ) => {
+    if (enabled && notificationPermission !== 'granted' && !(await requestNotifications())) return;
+    await saveNotifications({
+      ...notificationPreferences,
+      [key]: { ...notificationPreferences[key], enabled },
+    });
+  };
+
+  const choosePottyDelay = (
+    key: 'pottyAfterPee' | 'pottyAfterMeal',
+    delayMinutes: PottyReminderDelayMinutes,
+  ) => {
+    void saveNotifications({
+      ...notificationPreferences,
+      [key]: { ...notificationPreferences[key], delayMinutes },
+    });
   };
 
   const chooseLeadTime = (lead: ReminderLeadMinutes) => {
@@ -307,8 +331,13 @@ export function SettingsScreen({
             />
           </View>
           <View style={styles.rowCopy}>
-            <Text numberOfLines={1} style={[styles.rowLabel, { color: theme.text }]}>{t('settings.notificationPermission')}</Text>
-            <Text adjustsFontSizeToFit minimumFontScale={0.82} numberOfLines={1} style={[styles.rowHint, { color: theme.textMuted }]}>{permissionDetail}</Text>
+            <Text style={[styles.rowLabel, { color: theme.text }]}>{t('settings.notificationPermission')}</Text>
+            <Text style={[styles.rowHint, { color: theme.textMuted }]}>{permissionDetail}</Text>
+            {notificationPermission !== 'granted' ? (
+              <Text style={[styles.permissionAction, { color: theme.primary }]}>
+                {t(notificationPermission === 'blocked' ? 'schedule.openSettings' : 'settings.allowNotifications')}
+              </Text>
+            ) : null}
           </View>
           {notificationPermission === 'granted' ? (
             <MaterialCommunityIcons
@@ -318,12 +347,47 @@ export function SettingsScreen({
               size={22}
               color={theme.primary}
             />
-          ) : (
-            <Text adjustsFontSizeToFit minimumFontScale={0.75} numberOfLines={1} style={[styles.permissionAction, { color: theme.primary }]}>
-              {t(notificationPermission === 'blocked' ? 'schedule.openSettings' : 'settings.allowNotifications')}
-            </Text>
-          )}
+          ) : null}
         </Pressable>
+
+        <View style={[styles.divider, { backgroundColor: theme.border }]} />
+        <View style={styles.pottyBlock}>
+          <View style={styles.pottyHeader}>
+            <View style={[styles.rowIcon, { backgroundColor: theme.primarySoft, borderRadius: theme.presentation.iconRadius }]}>
+              <MaterialCommunityIcons
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+                name="timer-outline"
+                size={21}
+                color={theme.primary}
+              />
+            </View>
+            <View style={styles.rowCopy}>
+              <Text style={[styles.rowLabel, { color: theme.text }]}>{t('settings.pottyNudges')}</Text>
+              <Text style={[styles.rowHint, { color: theme.textMuted }]}>{t('settings.pottyNudgesDetail')}</Text>
+            </View>
+          </View>
+          <PottyReminderRule
+            testID="settings.notifications.pottyAfterPee"
+            label={t('settings.afterPeeReminder')}
+            detail={t('settings.afterPeeReminderDetail')}
+            rule={notificationPreferences.pottyAfterPee}
+            disabled={savingNotifications}
+            onToggle={(enabled) => void togglePottyReminder('pottyAfterPee', enabled)}
+            onDelayChange={(delay) => choosePottyDelay('pottyAfterPee', delay)}
+            theme={theme}
+          />
+          <PottyReminderRule
+            testID="settings.notifications.pottyAfterMeal"
+            label={t('settings.afterMealReminder')}
+            detail={t('settings.afterMealReminderDetail')}
+            rule={notificationPreferences.pottyAfterMeal}
+            disabled={savingNotifications}
+            onToggle={(enabled) => void togglePottyReminder('pottyAfterMeal', enabled)}
+            onDelayChange={(delay) => choosePottyDelay('pottyAfterMeal', delay)}
+            theme={theme}
+          />
+        </View>
 
         <View style={[styles.divider, { backgroundColor: theme.border }]} />
         <View style={styles.toggleRow}>
@@ -337,8 +401,8 @@ export function SettingsScreen({
             />
           </View>
           <View style={styles.rowCopy}>
-            <Text adjustsFontSizeToFit minimumFontScale={0.82} numberOfLines={1} style={[styles.rowLabel, { color: theme.text }]}>{t('settings.widgetConfirmations')}</Text>
-            <Text adjustsFontSizeToFit minimumFontScale={0.82} numberOfLines={1} style={[styles.rowHint, { color: theme.textMuted }]}>{t('settings.widgetConfirmationsDetail')}</Text>
+            <Text style={[styles.rowLabel, { color: theme.text }]}>{t('settings.widgetConfirmations')}</Text>
+            <Text style={[styles.rowHint, { color: theme.textMuted }]}>{t('settings.widgetConfirmationsDetail')}</Text>
           </View>
           <Switch
             testID="settings.notifications.widgetConfirmations"
@@ -371,8 +435,8 @@ export function SettingsScreen({
             />
           </View>
           <View style={styles.rowCopy}>
-            <Text adjustsFontSizeToFit minimumFontScale={0.82} numberOfLines={1} style={[styles.rowLabel, { color: theme.text }]}>{t('settings.routineReminders')}</Text>
-            <Text adjustsFontSizeToFit minimumFontScale={0.82} numberOfLines={1} style={[styles.rowHint, { color: theme.textMuted }]}>
+            <Text style={[styles.rowLabel, { color: theme.text }]}>{t('settings.routineReminders')}</Text>
+            <Text style={[styles.rowHint, { color: theme.textMuted }]}>
               {t('settings.routineRemindersDetail', { count: routineReminderCount })}
             </Text>
           </View>
@@ -386,8 +450,8 @@ export function SettingsScreen({
         </Pressable>
 
         <View style={[styles.timingBlock, { borderColor: theme.border, backgroundColor: theme.surface }]}>
-          <Text numberOfLines={1} style={[styles.rowLabel, { color: theme.text }]}>{t('settings.reminderTiming')}</Text>
-          <Text adjustsFontSizeToFit minimumFontScale={0.82} numberOfLines={1} style={[styles.rowHint, { color: theme.textMuted }]}>{t('settings.reminderTimingDetail')}</Text>
+          <Text style={[styles.rowLabel, { color: theme.text }]}>{t('settings.reminderTiming')}</Text>
+          <Text style={[styles.rowHint, { color: theme.textMuted }]}>{t('settings.reminderTimingDetail')}</Text>
           <View style={styles.timingChoices}>
             {reminderLeadOptions.map((lead) => {
               const selected = notificationPreferences.reminderLeadMinutes === lead;
@@ -411,7 +475,7 @@ export function SettingsScreen({
                     },
                   ]}
                 >
-                  <Text adjustsFontSizeToFit minimumFontScale={0.82} numberOfLines={1} style={[styles.timingChoiceText, { color: selected ? theme.primary : theme.text }]}>{label}</Text>
+                  <Text maxFontSizeMultiplier={1.5} numberOfLines={1} style={[styles.timingChoiceText, { color: selected ? theme.primary : theme.text }]}>{label}</Text>
                 </Pressable>
               );
             })}
@@ -480,6 +544,94 @@ function SettingsRow({
   );
 }
 
+function PottyReminderRule({
+  testID,
+  label,
+  detail,
+  rule,
+  disabled,
+  onToggle,
+  onDelayChange,
+  theme,
+}: {
+  testID: string;
+  label: string;
+  detail: string;
+  rule: PottyReminderPreference;
+  disabled: boolean;
+  onToggle: (enabled: boolean) => void;
+  onDelayChange: (delay: PottyReminderDelayMinutes) => void;
+  theme: Theme;
+}) {
+  const { t } = useLocalization();
+  return (
+    <View style={[styles.pottyRule, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+      <View style={styles.pottyRuleRow}>
+        <View style={styles.rowCopy}>
+          <Text style={[styles.pottyRuleLabel, { color: theme.text }]}>{label}</Text>
+          <Text style={[styles.rowHint, { color: theme.textMuted }]}>{detail}</Text>
+        </View>
+        <Switch
+          testID={`${testID}.enabled`}
+          accessibilityLabel={label}
+          accessibilityHint={detail}
+          disabled={disabled}
+          hitSlop={8}
+          ios_backgroundColor={theme.border}
+          onValueChange={onToggle}
+          thumbColor={theme.surfaceRaised}
+          trackColor={{ false: theme.border, true: theme.primary }}
+          value={rule.enabled}
+        />
+      </View>
+      {rule.enabled ? (
+        <View style={styles.pottyTimingChoices} accessibilityRole="radiogroup">
+          {pottyReminderDelayOptions.map((delay) => {
+            const selected = delay === rule.delayMinutes;
+            const labelText = delay < 60
+              ? t('time.minutes', { count: delay })
+              : t('time.hours', { count: delay / 60 });
+            return (
+              <Pressable
+                key={delay}
+                testID={`${testID}.delay.${delay}`}
+                accessibilityRole="radio"
+                accessibilityLabel={`${label}, ${labelText}`}
+                accessibilityState={{ checked: selected, disabled }}
+                disabled={disabled}
+                onPress={() => onDelayChange(delay)}
+                style={({ pressed }) => [
+                  styles.pottyTimingChoice,
+                  {
+                    backgroundColor: selected || pressed ? theme.primarySoft : theme.surfaceRaised,
+                    borderColor: selected ? theme.primary : theme.border,
+                    borderRadius: theme.presentation.controlRadius,
+                    borderWidth: theme.presentation.borderWidth,
+                    opacity: disabled ? 0.55 : 1,
+                  },
+                ]}
+              >
+                {selected ? (
+                  <MaterialCommunityIcons
+                    accessibilityElementsHidden
+                    importantForAccessibility="no"
+                    name="check"
+                    size={14}
+                    color={theme.primary}
+                  />
+                ) : null}
+                <Text maxFontSizeMultiplier={1.5} style={[styles.timingChoiceText, { color: selected ? theme.primary : theme.text }]}>
+                  {labelText}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   content: {
     width: '100%',
@@ -503,12 +655,19 @@ const styles = StyleSheet.create({
   rowCopy: { flex: 1, minWidth: 0 },
   rowLabel: { fontSize: 16, lineHeight: 21, fontWeight: '800' },
   rowHint: { fontSize: 12, lineHeight: 17, marginTop: 2 },
-  permissionAction: { maxWidth: 104, fontSize: 12, lineHeight: 17, fontWeight: '800', textAlign: 'right' },
+  permissionAction: { fontSize: 12, lineHeight: 17, fontWeight: '800', marginTop: 5 },
   cardDetail: { fontSize: 13, lineHeight: 19, paddingHorizontal: 8, paddingTop: 6, paddingBottom: 10 },
   widgetGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   widgetAction: { flexBasis: '47%', flexGrow: 1, minWidth: 130, minHeight: 56, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 8 },
   widgetActionText: { flex: 1, minWidth: 0, fontSize: 14, lineHeight: 19, fontWeight: '700' },
   widgetHint: { fontSize: 12, lineHeight: 18, paddingHorizontal: 8, paddingTop: 10, paddingBottom: 4 },
+  pottyBlock: { paddingHorizontal: 8, paddingVertical: 12, gap: 9 },
+  pottyHeader: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 2 },
+  pottyRule: { borderWidth: 1, borderRadius: 17, padding: 12 },
+  pottyRuleRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  pottyRuleLabel: { fontSize: 15, lineHeight: 20, fontWeight: '800' },
+  pottyTimingChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 10 },
+  pottyTimingChoice: { minWidth: 56, minHeight: 48, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
   timingBlock: { borderWidth: 1, borderRadius: 17, padding: 13, marginTop: 8 },
   timingChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 12 },
   timingChoice: { minHeight: 44, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },

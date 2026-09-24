@@ -41,7 +41,9 @@ import {
   configureNotificationActions,
   configureReminderHandling,
   getNotificationPermissionState,
+  POTTY_REMINDER_NOTIFICATION_KIND,
   requestReminderPermission,
+  syncPottyReminders,
   syncScheduleReminders,
   WIDGET_LOG_NOTIFICATION_KIND,
   type NotificationPermissionState,
@@ -109,12 +111,19 @@ export default function App() {
     setLanguagePreference(nextLanguagePreference);
     setNotificationPreferences(nextNotificationPreferences);
     setNotificationPermission(nextPermission);
-    await syncScheduleReminders(
-      nextSchedule,
-      nextNotificationPreferences.reminderLeadMinutes,
-      resolveLanguage(nextLanguagePreference),
-    ).catch(() => undefined);
-    await updateHomeWidget(nextEvents).catch(() => undefined);
+    await Promise.all([
+      syncScheduleReminders(
+        nextSchedule,
+        nextNotificationPreferences.reminderLeadMinutes,
+        resolveLanguage(nextLanguagePreference),
+      ).catch(() => undefined),
+      syncPottyReminders(
+        nextEvents,
+        nextNotificationPreferences,
+        resolveLanguage(nextLanguagePreference),
+      ).catch(() => undefined),
+      updateHomeWidget(nextEvents).catch(() => undefined),
+    ]);
     return nextEvents;
   }, []);
 
@@ -136,6 +145,11 @@ export default function App() {
 
   const handleNotificationResponse = useCallback(async (response: Notifications.NotificationResponse) => {
     const data = response.notification.request.content.data;
+    if (data?.kind === POTTY_REMINDER_NOTIFICATION_KIND) {
+      setSettingsVisible(false);
+      setTab('log');
+      return;
+    }
     if (data?.kind !== WIDGET_LOG_NOTIFICATION_KIND) return;
     const responseKey = [
       response.notification.request.identifier,
@@ -219,6 +233,7 @@ export default function App() {
         : translate(language, 'app.logged', { activity: localizedEventPastLabel(language, event) }),
     });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+    syncPottyReminders(nextEvents, notificationPreferences, language).catch(() => undefined);
     updateHomeWidget(nextEvents).catch(() => undefined);
   };
 
@@ -236,6 +251,7 @@ export default function App() {
       }),
     });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+    syncPottyReminders(nextEvents, notificationPreferences, language).catch(() => undefined);
     updateHomeWidget(nextEvents).catch(() => undefined);
   };
 
@@ -251,6 +267,7 @@ export default function App() {
         onPress: async () => {
           const nextEvents = await removeEvent(event.id);
           setEvents(nextEvents);
+          syncPottyReminders(nextEvents, notificationPreferences, language).catch(() => undefined);
           updateHomeWidget(nextEvents).catch(() => undefined);
         },
       },
@@ -271,6 +288,7 @@ export default function App() {
     });
     setEvents(nextEvents);
     Haptics.selectionAsync().catch(() => undefined);
+    syncPottyReminders(nextEvents, notificationPreferences, language).catch(() => undefined);
     updateHomeWidget(nextEvents).catch(() => undefined);
   };
 
@@ -282,6 +300,7 @@ export default function App() {
     setEvents(nextEvents);
     setUndoState(null);
     Haptics.selectionAsync().catch(() => undefined);
+    syncPottyReminders(nextEvents, notificationPreferences, language).catch(() => undefined);
     updateHomeWidget(nextEvents).catch(() => undefined);
   };
 
@@ -323,6 +342,11 @@ export default function App() {
           notificationPreferences.reminderLeadMinutes,
           resolveLanguage(preference),
         ),
+        syncPottyReminders(
+          events,
+          notificationPreferences,
+          resolveLanguage(preference),
+        ),
         updateHomeWidget(events),
       ]))
       .catch(() => undefined);
@@ -337,24 +361,30 @@ export default function App() {
   const changeNotificationPreferences = async (nextPreferences: NotificationPreferences) => {
     await saveNotificationPreferences(nextPreferences);
     setNotificationPreferences(nextPreferences);
-    await syncScheduleReminders(
-      schedule,
-      nextPreferences.reminderLeadMinutes,
-      language,
-    );
-    await updateHomeWidget(events).catch(() => undefined);
+    await Promise.all([
+      syncScheduleReminders(
+        schedule,
+        nextPreferences.reminderLeadMinutes,
+        language,
+      ),
+      syncPottyReminders(events, nextPreferences, language),
+      updateHomeWidget(events).catch(() => undefined),
+    ]);
   };
 
   const requestNotifications = async () => {
     const granted = await requestReminderPermission(language);
     setNotificationPermission(await getNotificationPermissionState());
     if (granted) {
-      await syncScheduleReminders(
-        schedule,
-        notificationPreferences.reminderLeadMinutes,
-        language,
-      );
-      await updateHomeWidget(events).catch(() => undefined);
+      await Promise.all([
+        syncScheduleReminders(
+          schedule,
+          notificationPreferences.reminderLeadMinutes,
+          language,
+        ),
+        syncPottyReminders(events, notificationPreferences, language),
+        updateHomeWidget(events).catch(() => undefined),
+      ]);
     }
     return granted;
   };
