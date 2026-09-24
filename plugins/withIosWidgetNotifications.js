@@ -27,12 +27,24 @@ private final class PuptimeWidgetNotificationBridge {
       let timestamp = event["timestamp"] as? Int
     else { return }
 
-    let parts = target.split(separator: "|", maxSplits: 3).map(String.init)
-    guard parts.count == 4, parts[0] == "log", parts[2] == "1" else { return }
+    let parts = target.split(separator: "|", maxSplits: 5, omittingEmptySubsequences: false).map(String.init)
+    guard parts.count >= 4, parts[0] == "log" else { return }
     let type = parts[1]
     let language = parts[3]
     guard ["pee", "poop", "meal", "pottyTrip", "walk", "nap"].contains(type) else { return }
 
+    if parts[2] == "1" {
+      showConfirmation(type, language, timestamp)
+    }
+    syncPottyReminder(
+      type,
+      parts.count > 4 ? Int(parts[4]) ?? 0 : 0,
+      parts.count > 5 ? Int(parts[5]) ?? 0 : 0,
+      language
+    )
+  }
+
+  private func showConfirmation(_ type: String, _ language: String, _ timestamp: Int) {
     let content = UNMutableNotificationContent()
     content.title = title(language)
     content.body = body(type, language)
@@ -49,6 +61,84 @@ private final class PuptimeWidgetNotificationBridge {
       if let error {
         print("[Puptime] Widget confirmation could not be scheduled: \\(error.localizedDescription)")
       }
+    }
+  }
+
+  private func syncPottyReminder(
+    _ type: String,
+    _ afterPeeMinutes: Int,
+    _ afterMealMinutes: Int,
+    _ language: String
+  ) {
+    let center = UNUserNotificationCenter.current()
+    if type == "pee" {
+      center.removePendingNotificationRequests(withIdentifiers: [
+        "puptime-activity-afterPee", "puptime-activity-afterMeal"
+      ])
+      if afterPeeMinutes > 0 {
+        schedulePottyReminder("afterPee", afterPeeMinutes, language)
+      }
+    } else if type == "meal" {
+      center.removePendingNotificationRequests(withIdentifiers: ["puptime-activity-afterMeal"])
+      if afterMealMinutes > 0 {
+        schedulePottyReminder("afterMeal", afterMealMinutes, language)
+      }
+    }
+  }
+
+  private func schedulePottyReminder(_ kind: String, _ minutes: Int, _ language: String) {
+    let content = UNMutableNotificationContent()
+    content.title = pottyTitle(kind, language)
+    content.body = pottyBody(kind, minutes, language)
+    content.sound = .default
+    content.userInfo = ["kind": "pottyReminder", "sourceType": kind == "afterPee" ? "pee" : "meal"]
+
+    let request = UNNotificationRequest(
+      identifier: "puptime-activity-\\(kind)",
+      content: content,
+      trigger: UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(minutes * 60), repeats: false)
+    )
+    UNUserNotificationCenter.current().add(request) { error in
+      if let error {
+        print("[Puptime] Potty reminder could not be scheduled: \\(error.localizedDescription)")
+      }
+    }
+  }
+
+  private func pottyTitle(_ kind: String, _ language: String) -> String {
+    switch language {
+    case "zh-Hans": return kind == "afterPee" ? "该出去尿尿了吗？" : "饭后该出去尿尿了吗？"
+    case "es": return kind == "afterPee" ? "¿Hora de salir al baño?" : "¿Hora de salir después de comer?"
+    default: return kind == "afterPee" ? "Potty break?" : "Potty break after eating?"
+    }
+  }
+
+  private func pottyBody(_ kind: String, _ minutes: Int, _ language: String) -> String {
+    let delay: String
+    if minutes < 60 {
+      delay = language == "zh-Hans" ? "\\(minutes) 分钟" : language == "es" ? "\\(minutes) minutos" : "\\(minutes) minutes"
+    } else {
+      let hours = minutes / 60
+      delay = language == "zh-Hans"
+        ? "\\(hours) 小时"
+        : language == "es"
+          ? (hours == 1 ? "1 hora" : "\\(hours) horas")
+          : (hours == 1 ? "1 hour" : "\\(hours) hours")
+    }
+
+    switch language {
+    case "zh-Hans":
+      return kind == "afterPee"
+        ? "距离上次尿尿已经 \\(delay)，小狗可能又需要出去了。"
+        : "距离上次吃饭已经 \\(delay)，小狗可能需要出去尿尿。"
+    case "es":
+      return kind == "afterPee"
+        ? "Han pasado \\(delay) desde el último pipí. Puede que necesite volver a salir."
+        : "Han pasado \\(delay) desde la última comida. Puede que necesite salir al baño."
+    default:
+      return kind == "afterPee"
+        ? "It’s been \\(delay) since the last pee. Your puppy may need to go again."
+        : "It’s been \\(delay) since the last meal. Your puppy may need to go."
     }
   }
 

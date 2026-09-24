@@ -1,1 +1,2 @@
-• Home Screen widget buttons now fill the available height on iPhone and iPad and match the selected theme.
+• Add customizable potty reminders after pee and meal logs.
+• See the latest activity time directly on larger, clearer Home Screen widget buttons.
