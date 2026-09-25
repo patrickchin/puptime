@@ -4,7 +4,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { scheduleStatusesForDay } from '../analytics';
 import { formatMinutes, type PuppyEvent, type ScheduleEntry } from '../domain';
 import { useLocalization } from '../localization-context';
-import { eventColors, eventIcon, spacing, supportingIcon, surfaceTreatment, type Theme } from '../theme';
+import { ActivityIcon } from './ActivityIcon';
+import { spacing, supportingIcon, surfaceTreatment, type Theme } from '../theme';
 
 export function TodayRoutineCard({
   events,
@@ -19,7 +20,7 @@ export function TodayRoutineCard({
   onOpenSchedule: () => void;
   theme: Theme;
 }) {
-  const { eventLabel, t } = useLocalization();
+  const { activityColors, activityLabel, t } = useLocalization();
   const statuses = scheduleStatusesForDay(events, schedule, new Date(now), 30, now);
   const completed = statuses.filter((item) => item.status === 'done').length;
   const missed = statuses.filter((item) => item.status === 'missed').length;
@@ -28,8 +29,8 @@ export function TodayRoutineCard({
   const progress: `${number}%` = statuses.length
     ? `${Math.round((completed / statuses.length) * 100)}%`
     : '0%';
-  const nextColors = next ? eventColors(theme, next.entry.type) : null;
-  const nextLabel = next ? next.entry.customLabel ?? eventLabel(next.entry.type) : '';
+  const nextColors = next ? activityColors(theme, next.entry) : null;
+  const nextLabel = next ? activityLabel(next.entry) : '';
   const until = next ? (() => {
     const minutes = Math.max(0, Math.ceil((next.target - now) / 60_000));
     if (minutes < 1) return t('routine.now');
@@ -85,11 +86,9 @@ export function TodayRoutineCard({
             },
           ]}
         >
-          <MaterialCommunityIcons
-            name={(next ? eventIcon(theme, next.entry.type) : supportingIcon(theme, 'routine')) as keyof typeof MaterialCommunityIcons.glyphMap}
-            color={nextColors?.color ?? theme.primary}
-            size={23}
-          />
+          {next
+            ? <ActivityIcon activity={next.entry} theme={theme} color={nextColors?.color ?? theme.primary} size={23} />
+            : <MaterialCommunityIcons name={supportingIcon(theme, 'routine') as keyof typeof MaterialCommunityIcons.glyphMap} color={theme.primary} size={23} />}
         </View>
         <View style={styles.copy}>
           <Text numberOfLines={2} style={[styles.title, { color: theme.text }]}>{title}</Text>

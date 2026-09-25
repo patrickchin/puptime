@@ -1,30 +1,40 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { activityColors, activityEmojis, type ActivityCustomization } from '../activity-customization';
 import {
   activityKey,
   customActivityKey,
   isOpenNap,
   quickEventTypes,
   type EventType,
+  type Activity,
   type PuppyEvent,
 } from '../domain';
+import { ActivityIcon } from './ActivityIcon';
 import { useLocalization } from '../localization-context';
+import { localizedEventLabel } from '../localization';
 import { eventColors, eventIcon, spacing, supportingIcon, surfaceTreatment, type Theme } from '../theme';
 
 type Props = {
   events: PuppyEvent[];
   customActivities: string[];
-  onLog: (type: EventType, customLabel?: string) => void;
+  onLog: (type: EventType, customLabel?: string) => Promise<void>;
+  onChangeAppearance: (activity: Activity, customization: ActivityCustomization) => Promise<void>;
+  onDeleteCustomActivity: (label: string) => Promise<void>;
   now: number;
   theme: Theme;
 };
 
-export function QuickActions({ events, customActivities, onLog, now, theme }: Props) {
-  const { elapsedTime, eventLabel, relativeTime, t } = useLocalization();
+type Editor = { activity: Activity; isNew: boolean; name: string; emoji?: string; color?: number };
+
+export function QuickActions({ events, customActivities, onLog, onChangeAppearance, onDeleteCustomActivity, now, theme }: Props) {
+  const { activityAppearance, activityColors: colorsFor, activityLabel, elapsedTime, language, relativeTime, t } = useLocalization();
   const [showMore, setShowMore] = useState(false);
   const [customLabel, setCustomLabel] = useState('');
+  const [editor, setEditor] = useState<Editor | null>(null);
+  const [saving, setSaving] = useState(false);
   const openNap = events.find(isOpenNap);
   const suggestions = useMemo(() => [
     t('quick.water'),
@@ -37,12 +47,55 @@ export function QuickActions({ events, customActivities, onLog, now, theme }: Pr
   const otherActivities = useMemo(() => suggestions.filter((label) =>
     !customActivities.some((saved) => customActivityKey(saved) === customActivityKey(label))), [customActivities, suggestions]);
 
-  const logOther = (label: string) => {
+  const openEditor = (activity: Activity, isNew = false) => {
+    const appearance = activityAppearance(activity);
+    setEditor({ activity, isNew, name: isNew ? activity.customLabel ?? '' : activityLabel(activity), emoji: appearance?.emoji ?? (isNew ? '🐾' : undefined), color: appearance?.color });
+    setShowMore(false);
+  };
+
+  const openNew = (label: string) => {
     const clean = label.trim();
     if (!clean) return;
-    onLog('custom', clean);
-    setCustomLabel('');
-    setShowMore(false);
+    Keyboard.dismiss();
+    openEditor({ type: 'custom', customLabel: clean }, true);
+  };
+
+  const saveEditor = async () => {
+    if (!editor || !editor.name.trim() || saving) return;
+    setSaving(true);
+    try {
+      const name = editor.name.trim();
+      const activity = editor.isNew ? { type: 'custom' as const, customLabel: name } : editor.activity;
+      const defaultName = activity.type === 'custom' ? activity.customLabel : localizedEventLabel(language, activity.type);
+      await onChangeAppearance(activity, {
+        ...(name !== defaultName ? { name } : {}),
+        ...(editor.emoji ? { emoji: editor.emoji } : {}),
+        ...(editor.color !== undefined ? { color: editor.color } : {}),
+      });
+      if (editor.isNew) await onLog('custom', name);
+      setEditor(null);
+      setCustomLabel('');
+    } catch {
+      Alert.alert(t('settings.saveErrorTitle'), t('settings.saveErrorBody'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const confirmDelete = () => {
+    if (!editor?.activity.customLabel || saving) return;
+    const label = editor.activity.customLabel;
+    Alert.alert(t('quick.deleteTitle'), t('quick.deleteMessage', { activity: activityLabel(editor.activity) }), [
+      { text: t('app.cancel'), style: 'cancel' },
+      { text: t('app.delete'), style: 'destructive', onPress: async () => {
+        try {
+          await onDeleteCustomActivity(label);
+          setEditor(null);
+        } catch {
+          Alert.alert(t('settings.saveErrorTitle'), t('settings.saveErrorBody'));
+        }
+      } },
+    ]);
   };
 
   return (
@@ -53,20 +106,25 @@ export function QuickActions({ events, customActivities, onLog, now, theme }: Pr
           ...customActivities.map((customLabel) => ({ type: 'custom' as EventType, customLabel })),
         ].map(({ type, customLabel }) => {
           const key = activityKey({ type, customLabel });
-          const colors = eventColors(theme, type);
+          const activity = { type, customLabel };
+          const colors = colorsFor(theme, activity);
           const latest = type === 'nap' && openNap
             ? openNap
             : events.find((event) => activityKey(event) === key);
           const isEndingNap = type === 'nap' && Boolean(openNap);
-          const label = isEndingNap ? t('quick.endNap') : customLabel ?? eventLabel(type);
+          const label = isEndingNap ? t('quick.endNap') : activityLabel(activity);
           return (
             <Pressable
               key={key}
               testID={`quick.${key}`}
               accessibilityRole="button"
               accessibilityLabel={isEndingNap ? t('quick.endNapA11y') : t('quick.logAction', { activity: label })}
-              accessibilityHint={isEndingNap ? t('quick.endNapHint') : t('quick.logHint')}
+              accessibilityHint={isEndingNap ? t('quick.endNapHint') : t('quick.logAndCustomizeHint')}
+              accessibilityActions={[{ name: 'customize', label: t('quick.customizeActivity') }]}
+              onAccessibilityAction={(event) => { if (event.nativeEvent.actionName === 'customize') openEditor(activity); }}
               onPress={() => onLog(type, customLabel)}
+              onLongPress={() => openEditor(activity)}
+              delayLongPress={450}
               style={({ pressed }) => [
                 styles.action,
                 surfaceTreatment(theme),
@@ -85,11 +143,9 @@ export function QuickActions({ events, customActivities, onLog, now, theme }: Pr
                   { backgroundColor: colors.softColor, borderRadius: theme.presentation.iconRadius },
                 ]}
               >
-                <MaterialCommunityIcons
-                  name={(isEndingNap ? 'stop' : eventIcon(theme, type)) as keyof typeof MaterialCommunityIcons.glyphMap}
-                  color={colors.color}
-                  size={25}
-                />
+                {isEndingNap
+                  ? <MaterialCommunityIcons name="stop" color={colors.color} size={25} />
+                  : <ActivityIcon activity={activity} theme={theme} color={colors.color} size={25} />}
               </View>
               <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.actionLabel, { color: theme.text }]}>
                 {label}
@@ -130,13 +186,16 @@ export function QuickActions({ events, customActivities, onLog, now, theme }: Pr
         </Pressable>
       </View>
 
-      <Modal visible={showMore} transparent animationType="none" onRequestClose={() => setShowMore(false)}>
+      <Text style={[styles.customizeHint, { color: theme.textMuted }]}>{t('quick.holdToCustomize')}</Text>
+
+      <Modal visible={showMore || editor !== null} transparent animationType="none" onRequestClose={() => { setShowMore(false); setEditor(null); }}>
         <KeyboardAvoidingView
           accessibilityViewIsModal
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.scrim}
         >
           <ScrollView
+            key={editor ? 'editor' : 'more'}
             bounces={false}
             keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
             keyboardShouldPersistTaps="handled"
@@ -162,14 +221,14 @@ export function QuickActions({ events, customActivities, onLog, now, theme }: Pr
                     },
                   ]}
                 >
-                  {t('quick.logAnother')}
+                  {t(editor ? 'quick.customizeActivity' : 'quick.logAnother')}
                 </Text>
               </View>
               <Pressable
                 testID="quick.another.close"
                 accessibilityRole="button"
                 accessibilityLabel={t('quick.close')}
-                onPress={() => setShowMore(false)}
+                onPress={() => { setShowMore(false); setEditor(null); }}
                 style={({ pressed }) => [
                   styles.closeButton,
                   { borderRadius: theme.presentation.controlRadius },
@@ -180,13 +239,56 @@ export function QuickActions({ events, customActivities, onLog, now, theme }: Pr
               </Pressable>
             </View>
 
+            {editor ? <>
+              <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{t('quick.name')}</Text>
+              <TextInput
+                testID="quick.editor.name"
+                accessibilityLabel={t('quick.name')}
+                autoCapitalize="sentences"
+                maxLength={40}
+                onChangeText={(name) => setEditor((current) => current && { ...current, name })}
+                value={editor.name}
+                style={[styles.input, styles.editorInput, { backgroundColor: theme.surface, borderColor: theme.border, borderRadius: theme.presentation.controlRadius, borderWidth: theme.presentation.borderWidth, color: theme.text }]}
+              />
+              <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{t('quick.emoji')}</Text>
+              <View style={styles.emojiGrid}>
+                <Pressable accessibilityRole="radio" accessibilityState={{ selected: !editor.emoji }} accessibilityLabel={t('quick.defaultIcon')} onPress={() => setEditor({ ...editor, emoji: undefined })} style={[styles.emojiChoice, { borderColor: !editor.emoji ? theme.primary : theme.border, backgroundColor: !editor.emoji ? theme.primarySoft : theme.surface }]}>
+                  <MaterialCommunityIcons name={eventIcon(theme, editor.activity.type) as keyof typeof MaterialCommunityIcons.glyphMap} color={theme.primary} size={24} />
+                </Pressable>
+                {activityEmojis.map((emoji) => (
+                  <Pressable key={emoji} accessibilityRole="radio" accessibilityState={{ selected: editor.emoji === emoji }} accessibilityLabel={t('quick.chooseEmoji', { emoji })} onPress={() => setEditor({ ...editor, emoji })} style={[styles.emojiChoice, { borderColor: editor.emoji === emoji ? theme.primary : theme.border, backgroundColor: editor.emoji === emoji ? theme.primarySoft : theme.surface }]}>
+                    <Text style={styles.emojiText}>{emoji}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{t('quick.color')}</Text>
+              <View style={styles.colorGrid}>
+                <Pressable accessibilityRole="radio" accessibilityState={{ selected: editor.color === undefined }} accessibilityLabel={t('quick.defaultColor')} onPress={() => setEditor({ ...editor, color: undefined })} style={[styles.colorChoice, { backgroundColor: eventColors(theme, editor.activity.type).softColor, borderColor: editor.color === undefined ? theme.primary : theme.border }]}>
+                  {editor.color === undefined ? <MaterialCommunityIcons name="check" color={theme.primary} size={24} /> : null}
+                </Pressable>
+                {activityColors.map((option, index) => (
+                  <Pressable key={option.name} accessibilityRole="radio" accessibilityState={{ selected: editor.color === index }} accessibilityLabel={t('quick.chooseColor', { color: option.name })} onPress={() => setEditor({ ...editor, color: index })} style={[styles.colorChoice, { backgroundColor: theme.isDark ? option.dark : option.light, borderColor: editor.color === index ? theme.text : 'transparent' }]}>
+                    {editor.color === index ? <MaterialCommunityIcons name="check" color={theme.isDark ? theme.background : '#FFFFFF'} size={24} /> : null}
+                  </Pressable>
+                ))}
+              </View>
+              <Pressable testID="quick.editor.save" accessibilityRole="button" accessibilityState={{ disabled: saving || !editor.name.trim() }} disabled={saving || !editor.name.trim()} onPress={() => void saveEditor()} style={({ pressed }) => [styles.editorSave, { backgroundColor: pressed ? theme.primaryPressed : theme.primary, borderRadius: theme.presentation.controlRadius, opacity: saving || !editor.name.trim() ? 0.5 : 1 }]}>
+                <Text style={[styles.logButtonText, { color: theme.onPrimary }]}>{t(editor.isNew ? 'quick.logNow' : 'quick.saveActivity')}</Text>
+              </Pressable>
+              {!editor.isNew && editor.activity.type === 'custom' ? (
+                <Pressable testID="quick.editor.delete" accessibilityRole="button" accessibilityLabel={t('quick.deleteActivity', { activity: activityLabel(editor.activity) })} accessibilityState={{ disabled: saving }} disabled={saving} onPress={confirmDelete} style={({ pressed }) => [styles.editorDelete, { backgroundColor: pressed ? theme.dangerSoft : 'transparent', opacity: saving ? 0.5 : 1 }]}>
+                  <MaterialCommunityIcons name="trash-can-outline" color={theme.danger} size={20} />
+                  <Text style={{ color: theme.danger, fontWeight: '700' }}>{t('quick.deleteActivity', { activity: activityLabel(editor.activity) })}</Text>
+                </Pressable>
+              ) : null}
+            </> : <>
             <View style={styles.otherGrid}>
               {otherActivities.map((label) => (
                 <Pressable
                   key={label.toLocaleLowerCase()}
                   accessibilityRole="button"
-                  accessibilityLabel={t('quick.logAction', { activity: label })}
-                  onPress={() => logOther(label)}
+                  accessibilityLabel={t('quick.setUpAction', { activity: label })}
+                  onPress={() => openNew(label)}
                   style={({ pressed }) => [
                     styles.otherChoice,
                     {
@@ -215,7 +317,7 @@ export function QuickActions({ events, customActivities, onLog, now, theme }: Pr
                 autoCapitalize="sentences"
                 maxLength={40}
                 onChangeText={setCustomLabel}
-                onSubmitEditing={() => logOther(customLabel)}
+                onSubmitEditing={() => openNew(customLabel)}
                 placeholder={t('quick.customPlaceholder')}
                 placeholderTextColor={theme.textMuted}
                 returnKeyType="done"
@@ -234,10 +336,10 @@ export function QuickActions({ events, customActivities, onLog, now, theme }: Pr
               <Pressable
                 testID="quick.custom.submit"
                 accessibilityRole="button"
-                accessibilityLabel={t('quick.customLogA11y')}
+                accessibilityLabel={t('quick.chooseDetails')}
                 accessibilityState={{ disabled: !customLabel.trim() }}
                 disabled={!customLabel.trim()}
-                onPress={() => logOther(customLabel)}
+                onPress={() => openNew(customLabel)}
                 style={({ pressed }) => [
                   styles.logButton,
                   {
@@ -247,9 +349,10 @@ export function QuickActions({ events, customActivities, onLog, now, theme }: Pr
                   },
                 ]}
               >
-                <Text style={[styles.logButtonText, { color: theme.onPrimary }]}>{t('quick.logNow')}</Text>
+                <Text style={[styles.logButtonText, { color: theme.onPrimary }]}>{t('quick.chooseDetails')}</Text>
               </Pressable>
             </View>
+            </>}
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
@@ -278,6 +381,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   moreLabel: { flex: 1, fontSize: 15, fontWeight: '700' },
+  customizeHint: { fontSize: 12, lineHeight: 18, marginTop: 8, textAlign: 'center' },
   scrim: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.56)', justifyContent: 'flex-end' },
   sheet: {
     width: '100%',
@@ -305,6 +409,14 @@ const styles = StyleSheet.create({
   fieldLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2, marginBottom: 8 },
   customRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   input: { flex: 1, minHeight: 54, paddingHorizontal: 14, fontSize: 16 },
+  editorInput: { marginBottom: spacing.lg, flex: 0 },
+  emojiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.lg },
+  emojiChoice: { width: 48, height: 48, borderWidth: 2, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  emojiText: { fontSize: 24, lineHeight: 30 },
+  colorGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: spacing.lg },
+  colorChoice: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  editorSave: { minHeight: 54, alignItems: 'center', justifyContent: 'center' },
+  editorDelete: { minHeight: 48, marginTop: 10, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
   logButton: { minHeight: 54, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
   logButtonText: { fontSize: 14, fontWeight: '800' },
 });

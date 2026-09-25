@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { activityColors } from './activity-customization.ts';
 import { EVENT_META } from './domain.ts';
 import {
   darkTheme,
@@ -91,6 +92,17 @@ test('activity colors keep accessible contrast in chips and timeline tracks', ()
       assert.equal(softColor, theme.isDark ? meta.darkSoftColor : meta.softColor);
       assert.ok(contrastRatio(color, theme.surface) >= 3);
       assert.ok(contrastRatio(color, theme.primarySoft) >= 3);
+    });
+  });
+});
+
+test('custom activity colors remain legible in light and dark themes', () => {
+  activityColors.forEach((option) => {
+    assert.ok(contrastRatio(option.light, option.softLight) >= 4.5, option.name);
+    assert.ok(contrastRatio(option.dark, option.softDark) >= 4.5, option.name);
+    Object.values(namedThemes).forEach((theme) => {
+      const color = theme.isDark ? option.dark : option.light;
+      assert.ok(contrastRatio(color, theme.surface) >= 3, `${option.name} on ${theme.presentation.iconProfile}`);
     });
   });
 });

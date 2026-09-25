@@ -69,6 +69,15 @@ tags:
 - inputText: Grooming
 - tapOn:
     id: quick.custom.submit
+- assertVisible:
+    id: quick.editor.name
+- scrollUntilVisible:
+    element:
+      id: quick.editor.save
+    direction: DOWN
+    visibilityPercentage: 50
+- tapOn:
+    id: quick.editor.save
 - scrollUntilVisible:
     element:
       id: event.custom.edit

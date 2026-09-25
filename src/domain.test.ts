@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { normalizeActivityCustomizations } from './activity-customization.ts';
 import {
   createEvent,
   createNapEvent,
@@ -51,6 +52,16 @@ test('keeps named activities distinct while ignoring case differences', () => {
   assert.deepEqual(normalizeCustomActivities([' Training ', 'training', 'Grooming', '']), ['Training', 'Grooming']);
   assert.equal(activityKey(createEvent('custom', 'app', 100, 'TRAINING')), 'custom:training');
   assert.equal(activityKey(createEvent('custom', 'app', 100, 'Grooming')), 'custom:grooming');
+});
+
+test('a deleted custom activity stays hidden even when old logs still contain its name', () => {
+  assert.deepEqual(normalizeCustomActivities(['Training', 'Grooming', 'training'], ['custom:training']), ['Grooming']);
+});
+
+test('activity appearance keeps supported emoji and colors', () => {
+  assert.deepEqual(normalizeActivityCustomizations({ pee: { name: ' Water ', emoji: '💧', color: 4 }, poop: { emoji: 'invalid', color: 99 } }), {
+    pee: { name: 'Water', emoji: '💧', color: 4 },
+  });
 });
 
 test('keeps an active nap reachable without overflowing the widget', () => {

@@ -7,8 +7,9 @@ import {
   isOpenNap,
   type PuppyEvent,
 } from '../domain';
+import { ActivityIcon } from './ActivityIcon';
 import { useLocalization } from '../localization-context';
-import { eventColors, eventIcon, spacing, surfaceTreatment, type Theme } from '../theme';
+import { spacing, surfaceTreatment, type Theme } from '../theme';
 
 export function EventRow({
   event,
@@ -23,8 +24,8 @@ export function EventRow({
   now: number;
   theme: Theme;
 }) {
-  const { eventPastLabel, t } = useLocalization();
-  const colors = eventColors(theme, event.type);
+  const { activityColors, eventPastLabel, t } = useLocalization();
+  const colors = activityColors(theme, event);
   const note = event.note?.trim();
   const timedNap = event.type === 'nap' && event.endedAt !== undefined;
   const running = isOpenNap(event);
@@ -48,11 +49,7 @@ export function EventRow({
           { backgroundColor: colors.softColor, borderRadius: theme.presentation.iconRadius },
         ]}
       >
-        <MaterialCommunityIcons
-          name={eventIcon(theme, event.type) as keyof typeof MaterialCommunityIcons.glyphMap}
-          color={colors.color}
-          size={22}
-        />
+        <ActivityIcon activity={event} theme={theme} color={colors.color} size={22} />
       </View>
       <View style={styles.copy}>
         <Text testID={`event.${event.type}.label`} numberOfLines={1} style={[styles.label, { color: theme.text }]}>{pastLabel}</Text>

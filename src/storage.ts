@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { normalizeActivityCustomizations, type ActivityCustomization, type ActivityCustomizations } from './activity-customization';
 import {
+  customActivityKey,
   DEFAULT_WIDGET_ACTIONS,
   normalizeCustomActivities,
   normalizeWidgetActions,
@@ -24,6 +26,8 @@ const THEME_KEY = 'puptime.theme.v1';
 const LANGUAGE_KEY = 'puptime.language.v1';
 const WIDGET_ACTIONS_KEY = 'puptime.widgetActions.v1';
 const CUSTOM_ACTIVITIES_KEY = 'puptime.customActivities.v1';
+const DELETED_CUSTOM_ACTIVITIES_KEY = 'puptime.deletedCustomActivities.v1';
+const ACTIVITY_CUSTOMIZATIONS_KEY = 'puptime.activityCustomizations.v1';
 const NOTIFICATION_PREFERENCES_KEY = 'puptime.notificationPreferences.v1';
 const ONBOARDING_KEY = 'puptime.onboarding.v1';
 
@@ -136,10 +140,11 @@ export function saveLanguagePreference(preference: LanguagePreference): Promise<
 
 export async function loadCustomActivities(events?: PuppyEvent[]): Promise<string[]> {
   const stored = parseArray<string>(await AsyncStorage.getItem(CUSTOM_ACTIVITIES_KEY));
+  const deleted = parseArray<string>(await AsyncStorage.getItem(DELETED_CUSTOM_ACTIVITIES_KEY));
   const historical = (events ?? await loadEvents())
     .filter((event) => event.type === 'custom')
     .map((event) => event.customLabel);
-  const activities = normalizeCustomActivities([...stored, ...historical]);
+  const activities = normalizeCustomActivities([...stored, ...historical], deleted);
   if (JSON.stringify(activities) !== JSON.stringify(stored)) {
     await AsyncStorage.setItem(CUSTOM_ACTIVITIES_KEY, JSON.stringify(activities));
   }
@@ -147,8 +152,36 @@ export async function loadCustomActivities(events?: PuppyEvent[]): Promise<strin
 }
 
 export async function saveCustomActivity(label: string): Promise<string[]> {
+  const key = customActivityKey(label);
+  const deleted = parseArray<string>(await AsyncStorage.getItem(DELETED_CUSTOM_ACTIVITIES_KEY));
+  if (deleted.includes(key)) await AsyncStorage.setItem(DELETED_CUSTOM_ACTIVITIES_KEY, JSON.stringify(deleted.filter((item) => item !== key)));
   const next = normalizeCustomActivities([...await loadCustomActivities(), label]);
   await AsyncStorage.setItem(CUSTOM_ACTIVITIES_KEY, JSON.stringify(next));
+  return next;
+}
+
+export async function deleteCustomActivity(label: string): Promise<string[]> {
+  const key = customActivityKey(label);
+  const deleted = parseArray<string>(await AsyncStorage.getItem(DELETED_CUSTOM_ACTIVITIES_KEY));
+  await AsyncStorage.setItem(DELETED_CUSTOM_ACTIVITIES_KEY, JSON.stringify([...new Set([...deleted, key])]));
+  const next = normalizeCustomActivities((await loadCustomActivities()).filter((item) => customActivityKey(item) !== key));
+  await AsyncStorage.setItem(CUSTOM_ACTIVITIES_KEY, JSON.stringify(next));
+  const customizations = await loadActivityCustomizations();
+  delete customizations[key];
+  await AsyncStorage.setItem(ACTIVITY_CUSTOMIZATIONS_KEY, JSON.stringify(customizations));
+  return next;
+}
+
+export async function loadActivityCustomizations(): Promise<ActivityCustomizations> {
+  const stored = await AsyncStorage.getItem(ACTIVITY_CUSTOMIZATIONS_KEY);
+  if (!stored) return {};
+  try { return normalizeActivityCustomizations(JSON.parse(stored)); }
+  catch { return {}; }
+}
+
+export async function saveActivityCustomization(key: ActivityKey, customization: ActivityCustomization): Promise<ActivityCustomizations> {
+  const next = { ...await loadActivityCustomizations(), [key]: customization };
+  await AsyncStorage.setItem(ACTIVITY_CUSTOMIZATIONS_KEY, JSON.stringify(next));
   return next;
 }
 
