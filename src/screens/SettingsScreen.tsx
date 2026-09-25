@@ -2,7 +2,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
-import { customActivityKey, EVENT_META, quickEventTypes, type ActivityKey, type EventType } from '../domain';
+import { customActivityKey, quickEventTypes, type ActivityKey, type EventType } from '../domain';
+import { ActivityIcon } from '../components/ActivityIcon';
 import { useLocalization } from '../localization-context';
 import type { LanguagePreference } from '../localization';
 import {
@@ -15,7 +16,6 @@ import {
 } from '../notification-config';
 import type { NotificationPermissionState } from '../reminders';
 import {
-  eventIcon,
   spacing,
   surfaceTreatment,
   type Theme,
@@ -76,7 +76,7 @@ export function SettingsScreen({
   onOpenSchedule: () => void;
   onOpenGuide: () => void;
 }) {
-  const { eventLabel, t } = useLocalization();
+  const { activityColors, activityLabel, t } = useLocalization();
   const [savingWidget, setSavingWidget] = useState(false);
   const [savingNotifications, setSavingNotifications] = useState(false);
 
@@ -266,10 +266,11 @@ export function SettingsScreen({
           {([...quickEventTypes, ...customActivities.map(customActivityKey)] as ActivityKey[]).map((type) => {
             const selected = widgetActions.includes(type);
             const locked = (selected && widgetActions.length === 2) || (!selected && widgetActions.length === 4);
-            const meta = EVENT_META[type.startsWith('custom:') ? 'custom' : type as EventType];
-            const color = theme.isDark ? meta.darkColor : meta.color;
-            const softColor = theme.isDark ? meta.darkSoftColor : meta.softColor;
-            const label = type.startsWith('custom:') ? customActivities.find((item) => customActivityKey(item) === type) ?? type.slice(7) : eventLabel(type as EventType);
+            const activity = type.startsWith('custom:')
+              ? { type: 'custom' as const, customLabel: customActivities.find((item) => customActivityKey(item) === type) ?? type.slice(7) }
+              : { type: type as EventType };
+            const { color, softColor } = activityColors(theme, activity);
+            const label = activityLabel(activity);
             return (
               <Pressable
                 key={type}
@@ -291,13 +292,7 @@ export function SettingsScreen({
                   },
                 ]}
               >
-                <MaterialCommunityIcons
-                  accessibilityElementsHidden
-                  importantForAccessibility="no"
-                  name={eventIcon(theme, type.startsWith('custom:') ? 'custom' : type as EventType) as keyof typeof MaterialCommunityIcons.glyphMap}
-                  size={20}
-                  color={color}
-                />
+                <ActivityIcon activity={activity} theme={theme} color={color} size={20} />
                 <Text numberOfLines={1} style={[styles.widgetActionText, { color: theme.text }]}>{label}</Text>
                 <MaterialCommunityIcons
                   accessibilityElementsHidden

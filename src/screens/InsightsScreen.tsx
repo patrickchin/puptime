@@ -20,33 +20,28 @@ import {
 } from '../analytics';
 import {
   dateKey,
-  EVENT_META,
   formatDuration,
   formatTime,
-  type EventType,
   type PuppyEvent,
 } from '../domain';
+import { ActivityIcon } from '../components/ActivityIcon';
 import { useLocalization } from '../localization-context';
 import { shareEventsCsv } from '../share-export';
-import { eventIcon, spacing, type Theme } from '../theme';
+import { spacing, type Theme } from '../theme';
 
 const FREQUENCY_DAYS = 10;
 const MISSING_LOG_DAYS = 14;
 const MONTH_PREVIEW_COUNT = 6;
-
-function eventColor(type: EventType, theme: Theme): string {
-  return theme.isDark ? EVENT_META[type].darkColor : EVENT_META[type].color;
-}
 
 function durationFromMinutes(minutes?: number): string {
   return minutes === undefined ? '—' : formatDuration(minutes * 60_000);
 }
 
 function FrequencyRow({ stat, theme }: { stat: ActivityFrequencyStat; theme: Theme }) {
-  const { eventLabel, t } = useLocalization();
-  const meta = EVENT_META[stat.type];
-  const label = stat.customLabel ?? eventLabel(stat.type);
-  const color = eventColor(stat.type, theme);
+  const { activityColors, activityLabel, t } = useLocalization();
+  const activity = { type: stat.type, customLabel: stat.customLabel };
+  const label = activityLabel(activity);
+  const { color, softColor } = activityColors(theme, activity);
   const dailyValue = stat.total ? t('insights.perDay', { value: stat.averagePerRecordedDay.toFixed(1) }) : '—';
   const dailyDetail = stat.total
     ? stat.minimumPerRecordedDay === stat.maximumPerRecordedDay
@@ -78,18 +73,12 @@ function FrequencyRow({ stat, theme }: { stat: ActivityFrequencyStat; theme: The
           style={[
             styles.activityIcon,
             {
-              backgroundColor: theme.isDark ? meta.darkSoftColor : meta.softColor,
+              backgroundColor: softColor,
               borderRadius: theme.presentation.iconRadius,
             },
           ]}
         >
-          <MaterialCommunityIcons
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-            name={eventIcon(theme, stat.type) as keyof typeof MaterialCommunityIcons.glyphMap}
-            size={20}
-            color={color}
-          />
+          <ActivityIcon activity={activity} theme={theme} color={color} size={20} />
         </View>
         <Text style={[styles.activityName, { color: theme.text }]}>{label}</Text>
         <Text testID={`insights.frequency.${stat.customLabel ?? stat.type}.count`} style={[styles.logCount, { color: theme.textMuted }]}>
@@ -175,7 +164,7 @@ export function InsightsScreen({
   onAddEstimate: (estimate: MissingLogEstimate) => Promise<void>;
   theme: Theme;
 }) {
-  const { eventLabel, language, t } = useLocalization();
+  const { activityColors, activityLabel, language, t } = useLocalization();
   const [exporting, setExporting] = useState(false);
   const [showAllMonths, setShowAllMonths] = useState(false);
   const [addingEstimateId, setAddingEstimateId] = useState<string | null>(null);
@@ -279,10 +268,8 @@ export function InsightsScreen({
         {missingLogs.estimates.length ? (
           <View style={styles.estimateList}>
             {missingLogs.estimates.map((estimate) => {
-              const meta = EVENT_META[estimate.type];
-              const activityName = estimate.customLabel ?? (estimate.type === 'meal' ? t('insights.mealName') : eventLabel(estimate.type));
-              const color = eventColor(estimate.type, theme);
-              const softColor = theme.isDark ? meta.darkSoftColor : meta.softColor;
+              const activityName = activityLabel(estimate);
+              const { color, softColor } = activityColors(theme, estimate);
               const adding = addingEstimateId === estimate.id;
               const time = estimate.endedAt === undefined
                 ? t('insights.around', { time: formatTime(estimate.at) })
@@ -313,11 +300,7 @@ export function InsightsScreen({
                       { backgroundColor: softColor, borderRadius: theme.presentation.iconRadius },
                     ]}
                   >
-                    <MaterialCommunityIcons
-                      name={eventIcon(theme, estimate.type) as keyof typeof MaterialCommunityIcons.glyphMap}
-                      size={20}
-                      color={color}
-                    />
+                    <ActivityIcon activity={estimate} theme={theme} color={color} size={20} />
                     <View
                       style={[
                         styles.questionBadge,

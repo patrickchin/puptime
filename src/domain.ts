@@ -162,12 +162,12 @@ export function sameActivity(left: Activity, right: Activity): boolean {
   return activityKey(left) === activityKey(right);
 }
 
-export function normalizeCustomActivities(value: unknown): string[] {
+export function normalizeCustomActivities(value: unknown, excluded: readonly string[] = []): string[] {
   if (!Array.isArray(value)) return [];
   const byKey = new Map<string, string>();
   value.forEach((item) => {
     const label = normalizeCustomLabel(item);
-    if (label && !byKey.has(customActivityKey(label))) byKey.set(customActivityKey(label), label);
+    if (label && !excluded.includes(customActivityKey(label)) && !byKey.has(customActivityKey(label))) byKey.set(customActivityKey(label), label);
   });
   return [...byKey.values()];
 }

@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { QuickActions } from '../components/QuickActions';
+import { ActivityIcon } from '../components/ActivityIcon';
+import type { ActivityCustomization } from '../activity-customization';
 import { EventRow } from '../components/EventRow';
 import { NoteInput } from '../components/NoteInput';
 import { TodayRoutineCard } from '../components/TodayRoutineCard';
@@ -17,13 +19,14 @@ import {
   replaceCalendarDate,
   replaceClockTime,
   type EventType,
+  type Activity,
   type PuppyEvent,
   type PuppyEventChanges,
   type ScheduleEntry,
 } from '../domain';
 import { useLocalization } from '../localization-context';
 import type { MessageKey } from '../localization';
-import { eventColors, eventIcon, spacing, surfaceTreatment, type Theme } from '../theme';
+import { spacing, surfaceTreatment, type Theme } from '../theme';
 
 const quickBackdates = [0, 5, 15, 30, 60] as const;
 const editableEventTypes = eventTypes.filter((type) => type !== 'nap');
@@ -125,6 +128,8 @@ export function LogScreen({
   events,
   schedule,
   customActivities,
+  onChangeActivityAppearance,
+  onDeleteCustomActivity,
   editRequest,
   onEditRequestHandled,
   onLog,
@@ -137,16 +142,18 @@ export function LogScreen({
   events: PuppyEvent[];
   schedule: ScheduleEntry[];
   customActivities: string[];
+  onChangeActivityAppearance: (activity: Activity, customization: ActivityCustomization) => Promise<void>;
+  onDeleteCustomActivity: (label: string) => Promise<void>;
   editRequest?: LogEditRequest | null;
   onEditRequestHandled?: () => void;
-  onLog: (type: EventType, customLabel?: string) => void;
+  onLog: (type: EventType, customLabel?: string) => Promise<void>;
   onSave: (event: PuppyEvent, changes: PuppyEventChanges) => Promise<void>;
   onDelete: (event: PuppyEvent) => void;
   onOpenSchedule: () => void;
   onOpenSettings: () => void;
   theme: Theme;
 }) {
-  const { eventLabel, locale, relativeTime, t } = useLocalization();
+  const { activityColors, activityLabel, locale, relativeTime, t } = useLocalization();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [pickerMode, setPickerMode] = useState<'date' | 'time' | null>(null);
   const [customTouched, setCustomTouched] = useState(false);
@@ -271,8 +278,13 @@ export function LogScreen({
   }, [editRequest, events, onEditRequestHandled]);
   const filters = useMemo(() => [
     ...activityFilters,
-    ...customActivities.map((label) => ({ id: customActivityKey(label), label, icon: 'tag-outline' as const, types: ['custom'] as readonly EventType[] })),
-  ], [customActivities]);
+    ...customActivities.map((label) => ({ id: customActivityKey(label), label: activityLabel({ type: 'custom', customLabel: label }), icon: 'tag-outline' as const, types: ['custom'] as readonly EventType[] })),
+  ], [activityLabel, customActivities]);
+  useEffect(() => {
+    if (activityFilter.startsWith('custom:') && !customActivities.some((label) => customActivityKey(label) === activityFilter)) {
+      setActivityFilter('all');
+    }
+  }, [activityFilter, customActivities]);
   const filteredEvents = useMemo(() => {
     const selected = filters.find((item) => item.id === activityFilter);
     if (!selected || selected.types.length === 0) return events;
@@ -326,7 +338,7 @@ export function LogScreen({
   const timedNap = draft?.event.type === 'nap' && draft.event.endedAt !== undefined;
   const activeValue = draft?.field === 'end' ? draft.endedAt ?? Date.now() : draft?.at ?? Date.now();
   const pickerDate = new Date(activeValue);
-  const draftColors = eventColors(theme, draft?.type ?? 'pee');
+  const draftColors = activityColors(theme, draft ?? { type: 'pee' });
   const customInvalid = draft?.type === 'custom' && !normalizeCustomLabel(draft.customLabel);
   const selectedFilter = filters.find((item) => item.id === activityFilter) ?? activityFilters[0];
   const setDraftTime = (value: number) => {
@@ -456,7 +468,7 @@ export function LogScreen({
                 </Pressable>
               </View>
             </View>
-            <QuickActions events={events} customActivities={customActivities} onLog={onLog} now={now} theme={theme} />
+            <QuickActions events={events} customActivities={customActivities} onLog={onLog} onChangeAppearance={onChangeActivityAppearance} onDeleteCustomActivity={onDeleteCustomActivity} now={now} theme={theme} />
             <TodayRoutineCard
               events={events}
               schedule={schedule}
@@ -493,11 +505,9 @@ export function LogScreen({
                       },
                     ]}
                   >
-                    <MaterialCommunityIcons
-                      name={item.icon as keyof typeof MaterialCommunityIcons.glyphMap}
-                      size={17}
-                      color={selected ? theme.primary : theme.textMuted}
-                    />
+                    {item.id.startsWith('custom:')
+                      ? <ActivityIcon activity={{ type: 'custom', customLabel: customActivities.find((label) => customActivityKey(label) === item.id) }} theme={theme} size={17} color={selected ? theme.primary : theme.textMuted} />
+                      : <MaterialCommunityIcons name={item.icon as keyof typeof MaterialCommunityIcons.glyphMap} size={17} color={selected ? theme.primary : theme.textMuted} />}
                     <Text style={[styles.filterText, { color: selected ? theme.primary : theme.textMuted }]}>
                       {label}
                     </Text>
@@ -637,11 +647,7 @@ export function LogScreen({
                   { backgroundColor: draftColors.softColor, borderRadius: theme.presentation.iconRadius },
                 ]}
               >
-                <MaterialCommunityIcons
-                  name={eventIcon(theme, draft?.type ?? 'pee') as keyof typeof MaterialCommunityIcons.glyphMap}
-                  color={draftColors.color}
-                  size={23}
-                />
+                <ActivityIcon activity={draft ?? { type: 'pee' }} theme={theme} color={draftColors.color} size={23} />
               </View>
               <View style={styles.editorHeadingCopy}>
                 <Text
@@ -701,11 +707,12 @@ export function LogScreen({
                 <View style={styles.typePicker}>
                   {[...editableEventTypes.map((type) => ({ type, customLabel: undefined as string | undefined })),
                     ...customActivities.map((customLabel) => ({ type: 'custom' as EventType, customLabel }))].map(({ type, customLabel }) => {
-                    const colors = eventColors(theme, type);
+                    const activity = { type, customLabel };
+                    const colors = activityColors(theme, activity);
                     const matchingCustom = customActivities.some((item) => customActivityKey(item) === customActivityKey(draft.customLabel));
                     const selected = draft.type === type && (type !== 'custom'
                       || (customLabel ? customActivityKey(draft.customLabel) === customActivityKey(customLabel) : !matchingCustom));
-                    const label = customLabel ?? eventLabel(type);
+                    const label = activityLabel(activity);
                     return (
                       <Pressable
                         key={customLabel ? customActivityKey(customLabel) : type}
@@ -727,11 +734,7 @@ export function LogScreen({
                           },
                         ]}
                       >
-                        <MaterialCommunityIcons
-                          name={eventIcon(theme, type) as keyof typeof MaterialCommunityIcons.glyphMap}
-                          color={selected ? colors.color : theme.textMuted}
-                          size={20}
-                        />
+                        <ActivityIcon activity={activity} theme={theme} color={selected ? colors.color : theme.textMuted} size={20} />
                         <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.typeChoiceText, { color: selected ? colors.color : theme.text }]}>
                           {label}
                         </Text>

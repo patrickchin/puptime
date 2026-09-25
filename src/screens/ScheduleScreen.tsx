@@ -15,10 +15,11 @@ import {
 } from 'react-native';
 
 import { scheduleStatusesForDay, suggestScheduleFromEvents, type ScheduleStatus } from '../analytics';
+import { ActivityIcon } from '../components/ActivityIcon';
 import { customActivityKey, formatMinutes, quickEventTypes, type EventType, type ScheduleEntry } from '../domain';
 import type { PuppyEvent } from '../domain';
 import { useLocalization } from '../localization-context';
-import { eventColors, eventIcon, spacing, surfaceTreatment, type Theme } from '../theme';
+import { spacing, surfaceTreatment, type Theme } from '../theme';
 
 type Draft = { id?: string; type: EventType; customLabel?: string; minutes: number; reminder: boolean };
 
@@ -37,7 +38,7 @@ export function ScheduleScreen({
   onRequestReminderPermission: () => Promise<boolean>;
   theme: Theme;
 }) {
-  const { eventLabel, t } = useLocalization();
+  const { activityColors, activityLabel, t } = useLocalization();
   const [draft, setDraft] = useState<Draft | null>(null);
   const [showAndroidPicker, setShowAndroidPicker] = useState(false);
   const [requestingPermission, setRequestingPermission] = useState(false);
@@ -61,10 +62,10 @@ export function ScheduleScreen({
     ? `${Math.round((completed / schedule.length) * 100)}%`
     : '0%';
 
-  const statusPresentation = (status: ScheduleStatus, type: EventType) => {
+  const statusPresentation = (status: ScheduleStatus, activity: ScheduleEntry) => {
     if (status === 'done') return { label: t('schedule.status.logged'), color: theme.primary, background: theme.primarySoft };
     if (status === 'due') {
-      const colors = eventColors(theme, type);
+      const colors = activityColors(theme, activity);
       return { label: t('schedule.status.due'), color: colors.color, background: colors.softColor };
     }
     if (status === 'missed') return { label: t('schedule.status.missed'), color: theme.danger, background: theme.dangerSoft };
@@ -127,7 +128,7 @@ export function ScheduleScreen({
 
   const remove = (entry: ScheduleEntry) => {
     Alert.alert(t('schedule.removeTitle'), t('schedule.entryAt', {
-      activity: entry.customLabel ?? eventLabel(entry.type),
+      activity: activityLabel(entry),
       time: formatMinutes(entry.minutes),
     }), [
       { text: t('app.cancel'), style: 'cancel' },
@@ -322,10 +323,10 @@ export function ScheduleScreen({
           </View>
         ) : (
           schedule.map((entry, index) => {
-            const colors = eventColors(theme, entry.type);
-            const label = entry.customLabel ?? eventLabel(entry.type);
+            const colors = activityColors(theme, entry);
+            const label = activityLabel(entry);
             const status = statuses.find((item) => item.entry.id === entry.id)?.status ?? 'upcoming';
-            const presentation = statusPresentation(status, entry.type);
+            const presentation = statusPresentation(status, entry);
             return (
               <Pressable
                 key={entry.id}
@@ -455,8 +456,8 @@ export function ScheduleScreen({
 
             <View style={[styles.previewList, { borderColor: theme.border }]}>
               {suggestion.entries.map((entry, index) => {
-                const { color, softColor: background } = eventColors(theme, entry.type);
-                const label = entry.customLabel ?? eventLabel(entry.type);
+                const { color, softColor: background } = activityColors(theme, entry);
+                const label = activityLabel(entry);
                 return (
                   <View
                     key={entry.id}
@@ -468,13 +469,7 @@ export function ScheduleScreen({
                     ]}
                   >
                     <View style={[styles.previewIcon, { backgroundColor: background }]}>
-                      <MaterialCommunityIcons
-                        accessibilityElementsHidden
-                        importantForAccessibility="no"
-                        name={eventIcon(theme, entry.type) as keyof typeof MaterialCommunityIcons.glyphMap}
-                        size={19}
-                        color={color}
-                      />
+                      <ActivityIcon activity={entry} theme={theme} color={color} size={19} />
                     </View>
                     <Text style={[styles.previewActivity, { color: theme.text }]}>{label}</Text>
                     <Text style={[styles.previewTime, { color: theme.text }]}>{formatMinutes(entry.minutes)}</Text>
@@ -551,8 +546,9 @@ export function ScheduleScreen({
               {[...quickEventTypes.map((type) => ({ type, customLabel: undefined as string | undefined })),
                 ...customActivities.map((customLabel) => ({ type: 'custom' as EventType, customLabel }))].map(({ type, customLabel }) => {
                 const selected = draft?.type === type && (type !== 'custom' || customActivityKey(draft.customLabel ?? '') === customActivityKey(customLabel ?? ''));
-                const colors = eventColors(theme, type);
-                const label = customLabel ?? eventLabel(type);
+                const activity = { type, customLabel };
+                const colors = activityColors(theme, activity);
+                const label = activityLabel(activity);
                 return (
                   <Pressable
                     key={customLabel ? customActivityKey(customLabel) : type}
@@ -568,11 +564,7 @@ export function ScheduleScreen({
                       },
                     ]}
                   >
-                    <MaterialCommunityIcons
-                      name={eventIcon(theme, type) as keyof typeof MaterialCommunityIcons.glyphMap}
-                      color={selected ? colors.color : theme.textMuted}
-                      size={21}
-                    />
+                    <ActivityIcon activity={activity} theme={theme} color={selected ? colors.color : theme.textMuted} size={21} />
                     <Text style={[styles.typeChoiceText, { color: selected ? colors.color : theme.text }]}>{label}</Text>
                   </Pressable>
                 );

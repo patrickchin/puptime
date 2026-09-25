@@ -8,6 +8,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { BottomNav, type Tab } from './src/components/BottomNav';
 import { ThemePicker } from './src/components/ThemePicker';
 import { Toast } from './src/components/Toast';
+import type { ActivityCustomization, ActivityCustomizations } from './src/activity-customization';
 import type { MissingLogEstimate } from './src/analytics';
 import { LocalizationProvider } from './src/localization-context';
 import {
@@ -27,6 +28,7 @@ import {
   normalizeEventTypeChange,
   normalizeNote,
   type ActivityKey,
+  type Activity,
   type EventType,
   type PuppyEvent,
   type PuppyEventChanges,
@@ -57,6 +59,8 @@ import {
 import {
   appendEvents,
   completeOnboarding,
+  deleteCustomActivity,
+  loadActivityCustomizations,
   loadEvents,
   loadCustomActivities,
   loadLanguagePreference,
@@ -66,6 +70,7 @@ import {
   loadWidgetActions,
   removeEvent,
   saveSchedule,
+  saveActivityCustomization,
   saveCustomActivity,
   saveLanguagePreference,
   saveNotificationPreferences,
@@ -92,6 +97,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('log');
   const [events, setEvents] = useState<PuppyEvent[]>([]);
   const [customActivities, setCustomActivities] = useState<string[]>([]);
+  const [activityCustomizations, setActivityCustomizations] = useState<ActivityCustomizations>({});
   const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
   const [widgetActions, setWidgetActions] = useState<ActivityKey[]>([...DEFAULT_WIDGET_ACTIONS]);
   const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>({
@@ -109,13 +115,14 @@ export default function App() {
     setEvents(nextEvents);
     const nextCustomActivities = await loadCustomActivities(nextEvents);
     setCustomActivities(nextCustomActivities);
-    const [nextSchedule, nextWidgetActions, nextTheme, nextLanguagePreference, nextNotificationPreferences, nextPermission] = await Promise.all([
+    const [nextSchedule, nextWidgetActions, nextTheme, nextLanguagePreference, nextNotificationPreferences, nextPermission, nextActivityCustomizations] = await Promise.all([
       loadSchedule(),
       loadWidgetActions(nextCustomActivities),
       loadThemePreference(),
       loadLanguagePreference(),
       loadNotificationPreferences(),
       getNotificationPermissionState(),
+      loadActivityCustomizations(),
     ]);
     setSchedule(nextSchedule);
     setWidgetActions(nextWidgetActions);
@@ -123,6 +130,7 @@ export default function App() {
     setLanguagePreference(nextLanguagePreference);
     setNotificationPreferences(nextNotificationPreferences);
     setNotificationPermission(nextPermission);
+    setActivityCustomizations(nextActivityCustomizations);
     await Promise.all([
       syncScheduleReminders(
         nextSchedule,
@@ -239,6 +247,8 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [undoState]);
 
+  const displayPastLabel = (event: PuppyEvent) => activityCustomizations[activityKey(event)]?.name ?? localizedEventPastLabel(language, event);
+
   const logEvent = async (type: EventType, customLabel?: string) => {
     if (type === 'custom' && customLabel) setCustomActivities(await saveCustomActivity(customLabel));
     const now = Date.now();
@@ -262,11 +272,25 @@ export default function App() {
       event,
       message: type === 'nap'
         ? translate(language, 'app.napStarted')
-        : translate(language, 'app.logged', { activity: localizedEventPastLabel(language, event) }),
+        : translate(language, 'app.logged', { activity: displayPastLabel(event) }),
     });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
     syncPottyReminders(nextEvents, notificationPreferences, language).catch(() => undefined);
     updateHomeWidget(nextEvents).catch(() => undefined);
+  };
+
+  const changeActivityAppearance = async (activity: Activity, customization: ActivityCustomization) => {
+    setActivityCustomizations(await saveActivityCustomization(activityKey(activity), customization));
+  };
+
+  const removeCustomActivity = async (label: string) => {
+    const next = await deleteCustomActivity(label);
+    setCustomActivities(next);
+    setActivityCustomizations(await loadActivityCustomizations());
+    const actions = await loadWidgetActions(next);
+    await saveWidgetActions(actions);
+    setWidgetActions(actions);
+    await updateHomeWidget(events).catch(() => undefined);
   };
 
   const addEstimatedEvent = async (estimate: MissingLogEstimate) => {
@@ -279,7 +303,7 @@ export default function App() {
     setUndoState({
       event,
       message: translate(language, 'app.estimateAdded', {
-        activity: localizedEventPastLabel(language, event),
+        activity: displayPastLabel(event),
       }),
     });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
@@ -289,7 +313,7 @@ export default function App() {
 
   const confirmDelete = (event: PuppyEvent) => {
     Alert.alert(translate(language, 'app.deleteTitle'), translate(language, 'app.deleteMessage', {
-      activity: localizedEventPastLabel(language, event),
+      activity: displayPastLabel(event),
       time: new Date(event.at).toLocaleTimeString(language, { hour: 'numeric', minute: '2-digit' }),
     }), [
       { text: translate(language, 'app.cancel'), style: 'cancel' },
@@ -311,7 +335,9 @@ export default function App() {
     changes: PuppyEventChanges,
   ) => {
     const type = normalizeEventTypeChange(event, changes.type ?? event.type);
-    if (type === 'custom' && changes.customLabel) setCustomActivities(await saveCustomActivity(changes.customLabel));
+    if (type === 'custom' && changes.customLabel && activityKey({ type, customLabel: changes.customLabel }) !== activityKey(event)) {
+      setCustomActivities(await saveCustomActivity(changes.customLabel));
+    }
     const nextEvents = await updateEvent(event.id, {
       ...changes,
       type,
@@ -482,6 +508,8 @@ export default function App() {
         events={events}
         schedule={schedule}
         customActivities={customActivities}
+        onChangeActivityAppearance={changeActivityAppearance}
+        onDeleteCustomActivity={removeCustomActivity}
         editRequest={editRequest}
         onEditRequestHandled={() => setEditRequest(null)}
         onLog={logEvent}
@@ -495,6 +523,7 @@ export default function App() {
   }, [
     changeWidgetActions,
     customActivities,
+    activityCustomizations,
     editRequest,
     events,
     language,
@@ -511,7 +540,7 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <LocalizationProvider language={language}>
+      <LocalizationProvider language={language} customizations={activityCustomizations}>
         <SafeAreaView
           style={[styles.container, { backgroundColor: theme.background }]}
           edges={settingsVisible || onboardingVisible ? ['top', 'bottom', 'left', 'right'] : ['top', 'left', 'right']}

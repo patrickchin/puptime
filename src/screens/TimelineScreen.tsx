@@ -24,10 +24,11 @@ import {
   type TimelineDay,
   type TimelineMark,
 } from '../analytics';
-import { activityKey, customActivityKey, dateKey, EVENT_META, quickEventTypes, type ActivityKey, type EventType, type PuppyEvent } from '../domain';
+import { activityFromKey, activityKey, customActivityKey, dateKey, quickEventTypes, type Activity, type ActivityKey, type PuppyEvent } from '../domain';
+import { ActivityIcon } from '../components/ActivityIcon';
 import { useLocalization } from '../localization-context';
-import { localizedEventLabel, translate, type AppLanguage } from '../localization';
-import { eventIcon, spacing, type Theme } from '../theme';
+import { translate, type AppLanguage } from '../localization';
+import { spacing, type Theme } from '../theme';
 
 const INITIAL_DAYS = 14;
 const LOAD_DAYS = 14;
@@ -46,8 +47,8 @@ function formatBucket(bucket: number, language: AppLanguage): string {
     .format(new Date(2000, 0, 1, 0, bucket * TIMELINE_BUCKET_MINUTES));
 }
 
-function describeMark(mark: TimelineMark, language: AppLanguage): string {
-  const activity = mark.type === 'custom' ? mark.label : localizedEventLabel(language, mark.type);
+function describeMark(mark: TimelineMark, language: AppLanguage, activityLabel: (activity: Activity) => string): string {
+  const activity = activityLabel({ type: mark.type, customLabel: mark.label });
   return mark.endBucket === undefined
     ? translate(language, 'insights.pointWindow', {
       activity,
@@ -61,9 +62,9 @@ function describeMark(mark: TimelineMark, language: AppLanguage): string {
     });
 }
 
-function filterName(types: readonly ActivityKey[], language: AppLanguage, allCount: number): string {
+function filterName(types: readonly ActivityKey[], language: AppLanguage, allCount: number, activityLabel: (activity: Activity) => string): string {
   if (types.length === allCount) return translate(language, 'insights.activity');
-  if (types.length === 1) return (types[0].startsWith('custom:') ? types[0].slice(7) : localizedEventLabel(language, types[0] as EventType)).toLocaleLowerCase(language);
+  if (types.length === 1) return activityLabel(activityFromKey(types[0], [])).toLocaleLowerCase(language);
   return translate(language, 'insights.selectedActivity');
 }
 
@@ -83,10 +84,6 @@ function formatDateRange(start: Date, end: Date, language: AppLanguage): string 
   return start.getFullYear() === end.getFullYear()
     ? `${shortDate.format(start)} – ${rangeDate.format(end)}`
     : `${rangeDate.format(start)} – ${rangeDate.format(end)}`;
-}
-
-function eventColor(type: EventType, theme: Theme): string {
-  return theme.isDark ? EVENT_META[type].darkColor : EVENT_META[type].color;
 }
 
 function horizontalTouchDistance(touches: readonly { pageX: number }[]): number {
@@ -112,12 +109,12 @@ function TimelineDateLabel({
   horizontalOffset: Animated.Value;
   theme: Theme;
 }) {
-  const { language, t } = useLocalization();
+  const { activityLabel, language, t } = useLocalization();
   const marks = day.marks.filter((mark) => selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label })));
   const description = marks.length
-    ? marks.map((mark) => describeMark(mark, language)).join('. ')
+    ? marks.map((mark) => describeMark(mark, language, activityLabel)).join('. ')
     : selectedTypes.length
-      ? t('insights.noLogged', { activity: filterName(selectedTypes, language, activityCount) })
+      ? t('insights.noLogged', { activity: filterName(selectedTypes, language, activityCount, activityLabel) })
       : t('insights.noActivitySelected');
   const fullDate = new Intl.DateTimeFormat(language, { weekday: 'long', month: 'long', day: 'numeric' });
   const shortDay = new Intl.DateTimeFormat(language, { weekday: 'short' });
@@ -169,6 +166,7 @@ function TimelineTrack({
   gridHours: readonly number[];
   theme: Theme;
 }) {
+  const { activityColors } = useLocalization();
   const marks = day.marks.filter((mark) => selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label })));
   const currentTimePosition = currentTime
     ? ((currentTime.getHours() * 60 + currentTime.getMinutes()) / (24 * 60)) * 100
@@ -191,7 +189,7 @@ function TimelineTrack({
         <View key={hour} style={[styles.gridLine, { backgroundColor: theme.border, left: `${(hour / 24) * 100}%` }]} />
       ))}
       {timelineDurationRuns(marks).map((mark) => {
-        const color = eventColor(mark.type, theme);
+        const color = activityColors(theme, { type: mark.type }).color;
         return (
           <View
             key={`${mark.type}-${mark.startBucket}`}
@@ -207,10 +205,11 @@ function TimelineTrack({
         );
       })}
       {timelinePointClusters(marks).map((cluster) => {
-        const durationTypes = cluster.types.slice(0, cluster.types.length - cluster.ids.length);
-        const types = [...new Set(cluster.types)];
-        const colors = types.map((type) => eventColor(type, theme));
-        const durationCount = new Set(durationTypes).size;
+        const durationMarks = marks.filter((mark) => mark.endBucket !== undefined
+          && mark.startBucket <= cluster.startBucket && mark.endBucket > cluster.startBucket);
+        const pointMarks = marks.filter((mark) => cluster.ids.includes(mark.id));
+        const colors = [...new Set([...durationMarks, ...pointMarks].map((mark) => activityColors(theme, { type: mark.type, customLabel: mark.label }).color))];
+        const durationCount = new Set(durationMarks.map((mark) => activityColors(theme, { type: mark.type, customLabel: mark.label }).color)).size;
         const markWidth = colors.length > 1 ? Math.min(14, 6 + colors.length * 2) : 6;
         return (
           <View
@@ -324,7 +323,7 @@ function TimelineAxis({
 }
 
 export function TimelineScreen({ events, customActivities, theme }: { events: PuppyEvent[]; customActivities: string[]; theme: Theme }) {
-  const { eventLabel, language, t } = useLocalization();
+  const { activityColors, activityLabel, language, t } = useLocalization();
   const { fontScale, height, width } = useWindowDimensions();
   const activityFilters: ActivityKey[] = [...quickEventTypes, ...customActivities.map(customActivityKey)];
   const [selectedTypes, setSelectedTypes] = useState<ActivityKey[]>([...quickEventTypes]);
@@ -602,14 +601,11 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
               : selectedTypes.includes(type);
             const active = checked !== false;
             const selected = checked === true;
-            const label = isAll ? t('insights.all') : type.startsWith('custom:') ? customActivities.find((item) => customActivityKey(item) === type) ?? type.slice(7) : eventLabel(type as EventType);
-            const icon = isAll ? 'layers-outline' : eventIcon(theme, type.startsWith('custom:') ? 'custom' : type as EventType);
-            const color = isAll ? theme.primary : eventColor(type.startsWith('custom:') ? 'custom' : type as EventType, theme);
-            const activeBackground = isAll
-              ? theme.primarySoft
-              : theme.isDark
-                ? EVENT_META[type.startsWith('custom:') ? 'custom' : type as EventType].darkSoftColor
-                : EVENT_META[type.startsWith('custom:') ? 'custom' : type as EventType].softColor;
+            const activity = isAll ? null : activityFromKey(type, customActivities);
+            const label = activity ? activityLabel(activity) : t('insights.all');
+            const colors = activity ? activityColors(theme, activity) : { color: theme.primary, softColor: theme.primarySoft };
+            const color = colors.color;
+            const activeBackground = colors.softColor;
             return (
               <Pressable
                 key={type}
@@ -632,13 +628,9 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
                   },
                 ]}
               >
-                <MaterialCommunityIcons
-                  accessibilityElementsHidden
-                  importantForAccessibility="no"
-                  name={icon as keyof typeof MaterialCommunityIcons.glyphMap}
-                  size={17}
-                  color={active ? color : theme.textMuted}
-                />
+                {activity
+                  ? <ActivityIcon activity={activity} theme={theme} size={17} color={active ? color : theme.textMuted} />
+                  : <MaterialCommunityIcons accessibilityElementsHidden importantForAccessibility="no" name="layers-outline" size={17} color={active ? color : theme.textMuted} />}
                 <Text style={[styles.filterLabel, { color: active ? color : theme.textMuted }]}>{label}</Text>
                 {active ? (
                   <MaterialCommunityIcons
@@ -660,7 +652,7 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
             <Text style={[styles.emptyText, { color: theme.textMuted }]}>
               {selectedTypes.length === 0
                 ? t('insights.chooseActivity')
-                : t('insights.noRangeLogs', { activity: filterName(selectedTypes, language, activityFilters.length) })}
+                : t('insights.noRangeLogs', { activity: filterName(selectedTypes, language, activityFilters.length, activityLabel) })}
             </Text>
           </View>
         ) : null}
