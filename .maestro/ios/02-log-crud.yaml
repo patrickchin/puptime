@@ -90,6 +90,14 @@ tags:
 - assertVisible:
     id: event.walk.note
     text: Ate after training
+- tapOn:
+    id: history.day.today
+- assertNotVisible:
+    id: event.walk
+- tapOn:
+    id: history.day.today
+- assertVisible:
+    id: event.walk
 - scrollUntilVisible:
     element:
       id: history.filter.meals
