@@ -28,7 +28,7 @@ import { eventColors, eventIcon, spacing, surfaceTreatment, type Theme } from '.
 const quickBackdates = [0, 5, 15, 30, 60] as const;
 const editableEventTypes = eventTypes.filter((type) => type !== 'nap');
 const autoSaveDelayMs = 450;
-const recentHistoryDays = 10;
+const recentHistoryDays = 2;
 const activityFilters: readonly {
   id: string;
   labelKey: MessageKey;
@@ -156,6 +156,7 @@ export function LogScreen({
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>('all');
   const [focusNote, setFocusNote] = useState(false);
   const [historyScope, setHistoryScope] = useState<HistoryScope>('recent');
+  const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
   const draftRef = useRef<Draft | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const revisionRef = useRef(0);
@@ -307,6 +308,7 @@ export function LogScreen({
       const monthKey = key.slice(0, 7);
       const startsMonth = historyScope === 'all' && monthKey !== previousMonth;
       previousMonth = monthKey;
+      const expanded = expandedDays[key] ?? (key === todayKey);
       return {
         key,
         title: sectionTitle(
@@ -318,11 +320,13 @@ export function LogScreen({
           t('log.today'),
           t('log.yesterday'),
         ),
-        data,
+        count: data.length,
+        expanded,
+        data: expanded ? data : [],
         monthTitle: startsMonth ? monthTitle(monthKey, locale) : undefined,
       };
     });
-  }, [currentYear, historyScope, locale, t, todayKey, visibleEvents, yesterdayKey]);
+  }, [currentYear, expandedDays, historyScope, locale, t, todayKey, visibleEvents, yesterdayKey]);
   const timedNap = draft?.event.type === 'nap' && draft.event.endedAt !== undefined;
   const activeValue = draft?.field === 'end' ? draft.endedAt ?? Date.now() : draft?.at ?? Date.now();
   const pickerDate = new Date(activeValue);
@@ -567,14 +571,35 @@ export function LogScreen({
                 <View style={[styles.archiveMonthLine, { backgroundColor: theme.border }]} />
               </View>
             ) : null}
-            <Text
-              style={[
+            <Pressable
+              testID={`history.day.${section.key === todayKey ? 'today' : section.key}`}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: section.expanded }}
+              accessibilityLabel={t('log.toggleDayA11y', { day: section.title, count: section.count })}
+              onPress={() => setExpandedDays((current) => ({
+                ...current,
+                [section.key]: !(current[section.key] ?? (section.key === todayKey)),
+              }))}
+              style={({ pressed }) => [
                 styles.dayHeading,
-                { color: theme.textMuted, letterSpacing: theme.presentation.eyebrowTracking },
+                {
+                  backgroundColor: pressed ? theme.primarySoft : theme.surfaceRaised,
+                  borderColor: theme.border,
+                  borderRadius: theme.presentation.controlRadius,
+                  borderWidth: theme.presentation.borderWidth,
+                },
               ]}
             >
-              {section.title.toUpperCase()}
-            </Text>
+              <Text style={[styles.dayHeadingText, { color: theme.text }]}>{section.title}</Text>
+              <Text style={[styles.dayCount, { color: theme.textMuted }]}>{section.count}</Text>
+              <MaterialCommunityIcons
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+                name={section.expanded ? 'chevron-up' : 'chevron-down'}
+                size={22}
+                color={theme.textMuted}
+              />
+            </Pressable>
           </View>
         )}
         renderItem={({ item }) => (
@@ -601,7 +626,9 @@ export function LogScreen({
           >
             <MaterialCommunityIcons name={selectedFilter.icon as keyof typeof MaterialCommunityIcons.glyphMap} size={28} color={theme.textMuted} />
             <Text style={[styles.emptyTitle, { color: theme.text }]}>
-              {activityFilter === 'all'
+              {historyScope === 'recent' && olderEventCount > 0
+                ? t('log.emptyRecentTitle', { count: recentHistoryDays })
+                : activityFilter === 'all'
                 ? t('log.emptyTitle')
                 : t('log.emptyFilteredTitle', { filter: ('label' in selectedFilter ? selectedFilter.label : t(selectedFilter.labelKey)).toLocaleLowerCase(locale) })}
             </Text>
@@ -1017,7 +1044,9 @@ const styles = StyleSheet.create({
   archiveMonthHeading: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18, marginBottom: 2 },
   archiveMonthText: { fontSize: 12, lineHeight: 17, fontWeight: '800', letterSpacing: 1.2 },
   archiveMonthLine: { flex: 1, height: StyleSheet.hairlineWidth },
-  dayHeading: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2, marginTop: 8, marginBottom: 8 },
+  dayHeading: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, marginTop: 8, marginBottom: 8 },
+  dayHeadingText: { flex: 1, fontSize: 15, lineHeight: 20, fontWeight: '700' },
+  dayCount: { fontSize: 13, lineHeight: 18, fontWeight: '700', fontVariant: ['tabular-nums'] },
   empty: { borderWidth: 1, borderStyle: 'dashed', borderRadius: 20, padding: spacing.lg, alignItems: 'center' },
   emptyTitle: { fontSize: 17, fontWeight: '700', marginTop: 8 },
   scrim: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.56)', justifyContent: 'flex-end' },
