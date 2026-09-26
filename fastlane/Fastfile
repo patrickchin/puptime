@@ -21,7 +21,7 @@ platform :ios do
       submit_for_review: false,
       automatic_release: true,
       price_tier: 0,
-      overwrite_screenshots: true,
+      overwrite_screenshots: false,
       force: true
     )
   end
@@ -53,4 +53,3 @@ platform :ios do
     )
   end
 end
-
