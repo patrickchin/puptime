@@ -148,6 +148,25 @@ export default function MarketingSite() {
           ))}
         </View>
 
+        <View style={[styles.widgetFeature, narrow && styles.widgetFeatureNarrow]}>
+          <View style={styles.widgetCopy}>
+            <Text style={styles.detailLabel}>IPHONE HOME SCREEN</Text>
+            <Text accessibilityRole="header" style={styles.widgetTitle}>The little things, one tap away.</Text>
+            <Text style={styles.widgetDescription}>
+              Log a pee, poop, or meal straight from the Puptime widget. Your most recent time stays
+              in view between visits.
+            </Text>
+          </View>
+          <View style={styles.widgetScreenshotFrame}>
+            <Image
+              accessibilityLabel="Puptime quick log widget on an iPhone Home Screen"
+              resizeMode="cover"
+              source={require('./assets/screenshots/widget.jpg')}
+              style={styles.previewImage}
+            />
+          </View>
+        </View>
+
         <View style={[styles.previewGrid, compact && styles.previewGridCompact]}>
           {previews.map(([label, source], index) => (
             <View
@@ -488,6 +507,54 @@ const styles = StyleSheet.create({
     fontFamily: 'Avenir Next, Avenir, system-ui, sans-serif',
     fontSize: 17,
     lineHeight: 26,
+  },
+  widgetFeature: {
+    width: '100%',
+    maxWidth: 1160,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 64,
+    marginTop: 100,
+    padding: 48,
+    backgroundColor: colors.greenSoft,
+    borderRadius: 36,
+  },
+  widgetFeatureNarrow: {
+    flexDirection: 'column',
+    gap: 36,
+    padding: 28,
+  },
+  widgetCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  widgetTitle: {
+    color: colors.ink,
+    fontFamily: 'Arial Rounded MT Bold, ui-rounded, system-ui, sans-serif',
+    fontSize: 42,
+    fontWeight: '800',
+    letterSpacing: -1.6,
+    lineHeight: 47,
+  },
+  widgetDescription: {
+    maxWidth: 480,
+    color: colors.muted,
+    fontFamily: 'Avenir Next, Avenir, system-ui, sans-serif',
+    fontSize: 18,
+    lineHeight: 28,
+    marginTop: 20,
+  },
+  widgetScreenshotFrame: {
+    width: 284,
+    maxWidth: '100%',
+    aspectRatio: 1320 / 2868,
+    overflow: 'hidden',
+    borderColor: colors.ink,
+    borderWidth: 6,
+    borderRadius: 34,
+    backgroundColor: colors.white,
   },
   previewGrid: {
     width: '100%',

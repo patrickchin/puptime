@@ -3,7 +3,7 @@ name: iOS Simulator
 on:
   push:
     branches:
-      - master
+      - main
   pull_request:
   workflow_dispatch:
 
@@ -62,6 +62,15 @@ jobs:
           xcrun simctl launch "$iphone_id" com.patrickchin.puptime >/dev/null
           sleep 5
           xcrun simctl terminate "$iphone_id" com.patrickchin.puptime
+          group_container=$(xcrun simctl get_app_container "$iphone_id" com.patrickchin.puptime group.com.patrickchin.puptime 2>/dev/null || true)
+          widget_defaults="$group_container/Library/Preferences/group.com.patrickchin.puptime.plist"
+          if [ ! -f "$widget_defaults" ]; then
+            app_data=$(xcrun simctl get_app_container "$iphone_id" com.patrickchin.puptime data)
+            widget_defaults="$app_data/Library/Preferences/group.com.patrickchin.puptime.plist"
+          fi
+          swift scripts/verify-ios-widget.swift \
+            "$widget_defaults" \
+            build/ios-simulator/Build/Products/Release-iphonesimulator/Puptime.app/PlugIns/ExpoWidgetsTarget.appex/ExpoWidgets.bundle/ExpoWidgets.bundle
           maestro test \
             --platform ios \
             --device "$iphone_id" \
