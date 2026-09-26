@@ -14,27 +14,22 @@ import {
 } from '@expo/ui/swift-ui/modifiers';
 import { createWidget, type WidgetEnvironment } from 'expo-widgets';
 
-import {
-  EVENT_META,
-  activityKey,
-  customActivityKey,
-  normalizeWidgetActions,
-  widgetActionsForState,
-  type QuickEventTimes,
-  type ActivityKey,
-  type QuickEventType,
-} from '../domain';
-import { resolveTheme, type ThemePreference } from '../theme';
+import type { QuickEventTimes, ActivityKey, QuickEventType } from '../domain';
 
-export type WidgetPendingEvent = { id: string; type: QuickEventType | 'custom'; customLabel?: string; at: number; endedAt?: number | null };
+export type WidgetPendingEvent = { id: string; type: QuickEventType | 'custom'; customLabel?: string; at: number; endedAt?: number };
 
 export type PuptimeWidgetProps = {
   pending: WidgetPendingEvent[];
-  openNap?: WidgetPendingEvent | null;
+  // iOS UserDefaults rejects null inside widget snapshots.
+  openNap?: WidgetPendingEvent | false;
   lastEventAt?: QuickEventTimes;
   actions?: ActivityKey[];
-  customActivities?: string[];
-  themePreference?: ThemePreference;
+  actionDetails?: Record<string, { label: string; lightColor: string; darkColor: string }>;
+  appearance?: {
+    light: { background: string; surface: string; controlRadius: number };
+    dark: { background: string; surface: string; controlRadius: number };
+  };
+  lastAction?: ActivityKey;
   notificationConfirmations?: boolean;
   pottyAfterPeeMinutes?: number;
   pottyAfterMealMinutes?: number;
@@ -44,23 +39,26 @@ export type PuptimeWidgetProps = {
 const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnvironment) => {
   'widget';
   const pending = props.pending ?? [];
-  const customActivities = props.customActivities ?? [];
-  const configuredActions = normalizeWidgetActions(props.actions, customActivities);
-  const visibleActions = widgetActionsForState(configuredActions, Boolean(props.openNap), customActivities);
-  const theme = resolveTheme(props.themePreference ?? 'system', environment.colorScheme);
-  const background = { type: 'linearGradient' as const, colors: [theme.background, theme.surface], startPoint: { x: 0, y: 0 }, endPoint: { x: 1, y: 1 } };
+  const configuredActions = props.actions ?? ['pee', 'poop', 'meal'];
+  const visibleActions = props.openNap && !configuredActions.includes('nap')
+    ? [...configuredActions.slice(0, 3), 'nap' as const]
+    : configuredActions;
+  const appearance = props.appearance?.[environment.colorScheme === 'dark' ? 'dark' : 'light']
+    ?? { background: '#F5F3EC', surface: '#FFFEFA', controlRadius: 16 };
+  const background = { type: 'linearGradient' as const, colors: [appearance.background, appearance.surface], startPoint: { x: 0, y: 0 }, endPoint: { x: 1, y: 1 } };
   const savedLabel = props.language === 'zh-Hans' ? '已记录' : props.language === 'es' ? 'Guardado' : 'Saved';
   const add = (type: ActivityKey): PuptimeWidgetProps => {
     const at = Date.now();
-    const customLabel = type.startsWith('custom:') ? customActivities.find((label) => customActivityKey(label) === type) ?? type.slice(7) : undefined;
+    const customLabel = type.startsWith('custom:') ? props.actionDetails?.[type]?.label ?? type.slice(7) : undefined;
     if (type === 'nap' && props.openNap) {
       const completed = { ...props.openNap, endedAt: Math.max(props.openNap.at, at) };
       return {
-        openNap: null,
+        openNap: false,
         lastEventAt: { ...props.lastEventAt, nap: at },
         actions: configuredActions,
-        customActivities,
-        themePreference: props.themePreference,
+        actionDetails: props.actionDetails,
+        appearance: props.appearance,
+        lastAction: type,
         notificationConfirmations: props.notificationConfirmations,
         pottyAfterPeeMinutes: props.pottyAfterPeeMinutes,
         pottyAfterMealMinutes: props.pottyAfterMealMinutes,
@@ -73,14 +71,14 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
       type: type.startsWith('custom:') ? 'custom' as const : type as QuickEventType,
       ...(customLabel ? { customLabel } : {}),
       at,
-      ...(type === 'nap' ? { endedAt: null } : {}),
     };
     return {
-      openNap: type === 'nap' ? event : props.openNap,
+      openNap: type === 'nap' ? event : props.openNap ?? false,
       lastEventAt: { ...props.lastEventAt, [type]: at },
       actions: configuredActions,
-      customActivities,
-      themePreference: props.themePreference,
+      actionDetails: props.actionDetails,
+      appearance: props.appearance,
+      lastAction: type,
       notificationConfirmations: props.notificationConfirmations,
       pottyAfterPeeMinutes: props.pottyAfterPeeMinutes,
       pottyAfterMealMinutes: props.pottyAfterMealMinutes,
@@ -91,7 +89,7 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
   };
   const actionModifiers = (color: string) => [
     buttonStyle('bordered' as const),
-    buttonBorderShape('roundedRectangle' as const, theme.presentation.controlRadius),
+    buttonBorderShape('roundedRectangle' as const, appearance.controlRadius),
     tint(color),
     frame({ minWidth: 44, maxWidth: 999, minHeight: 96, maxHeight: 999 }),
   ];
@@ -102,10 +100,10 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
       modifiers={[padding({ all: 9 }), frame({ maxHeight: 999 }), containerBackground(background, 'widget')]}
     >
       {visibleActions.map((type) => {
-        const meta = EVENT_META[type.startsWith('custom:') ? 'custom' : type as QuickEventType];
+        const detail = props.actionDetails?.[type] ?? { label: type, lightColor: '#176B52', darkColor: '#73D3AD' };
         const isEndingNap = type === 'nap' && Boolean(props.openNap);
-        const confirmed = pending.length > 0 && activityKey(pending[pending.length - 1]) === type;
-        const color = theme.isDark ? meta.darkColor : meta.color;
+        const confirmed = pending.length > 0 && props.lastAction === type;
+        const color = environment.colorScheme === 'dark' ? detail.darkColor : detail.lightColor;
         const lastAt = props.lastEventAt?.[type];
         const systemImage = confirmed
           ? 'checkmark.circle.fill'
@@ -125,7 +123,7 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
         return (
           <Button
             key={type}
-            target={`log|${encodeURIComponent(type)}|${props.notificationConfirmations ? '1' : '0'}|${props.language ?? 'en'}|${props.pottyAfterPeeMinutes ?? 0}|${props.pottyAfterMealMinutes ?? 0}|${encodeURIComponent(type.startsWith('custom:') ? customActivities.find((label) => customActivityKey(label) === type) ?? type.slice(7) : '')}`}
+            target={`log|${encodeURIComponent(type)}|${props.notificationConfirmations ? '1' : '0'}|${props.language ?? 'en'}|${props.pottyAfterPeeMinutes ?? 0}|${props.pottyAfterMealMinutes ?? 0}|${encodeURIComponent(type.startsWith('custom:') ? detail.label : '')}`}
             onPress={() => add(type)}
             modifiers={actionModifiers(color)}
           >
@@ -144,7 +142,7 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
                 lineLimit(1),
                 minimumScaleFactor(0.72),
               ]}>
-                {confirmed ? savedLabel : isEndingNap ? 'End' : type.startsWith('custom:') ? customActivities.find((label) => customActivityKey(label) === type) ?? type.slice(7) : meta.label}
+                {confirmed ? savedLabel : isEndingNap ? 'End' : detail.label}
               </Text>
               {lastAt === undefined ? (
                 <Text modifiers={[
