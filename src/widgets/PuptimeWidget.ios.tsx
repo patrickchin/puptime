@@ -108,7 +108,9 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
         const systemImage = confirmed
           ? 'checkmark.circle.fill'
           : type === 'pee'
-            ? 'drop.fill'
+          ? 'drop.fill'
+          : type === 'poop'
+            ? 'circle.hexagongrid.fill'
             : type === 'meal'
               ? 'fork.knife'
               : type === 'pottyTrip'
@@ -126,18 +128,14 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
             modifiers={actionModifiers(color)}
           >
             <VStack spacing={4} modifiers={[padding({ vertical: 8, horizontal: 3 }), frame({ maxWidth: 999, maxHeight: 999 })]}>
-              {type === 'poop' && !confirmed ? (
-                <Text modifiers={[font({ textStyle: 'title' }), accessibilityHidden(true)]}>💩</Text>
-              ) : (
-                <Image
-                  systemName={systemImage}
-                  modifiers={[
-                    font({ textStyle: 'title2', weight: 'semibold' }),
-                    foregroundStyle(color),
-                    accessibilityHidden(true),
-                  ]}
-                />
-              )}
+              <Image
+                systemName={systemImage}
+                modifiers={[
+                  font({ textStyle: 'title2', weight: 'semibold' }),
+                  foregroundStyle(color),
+                  accessibilityHidden(true),
+                ]}
+              />
               <Text modifiers={[
                 font({ textStyle: 'subheadline', weight: 'bold', design: 'rounded' }),
                 foregroundStyle(color),
