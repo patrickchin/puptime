@@ -289,3 +289,8 @@ export function relativeTime(value: number, now = Date.now()): string {
   if (hours < 24) return `${hours}h ago`;
   return `${Math.floor(hours / 24)}d ago`;
 }
+
+export function roundedWidgetTime(value: number, now = Date.now()): string {
+  const rounded = Math.max(0, Math.round((now - value) / 300_000)) * 300_000;
+  return rounded === 0 ? 'just now' : `${formatDuration(rounded)} ago`;
+}
