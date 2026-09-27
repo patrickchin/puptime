@@ -26,8 +26,9 @@ import {
   updateEvent,
 } from './storage';
 import { QuickLogWidget } from './widgets/QuickLogWidget.android';
+import { updateHomeWidget } from './widgets/sync';
 
-async function render(props: WidgetTaskHandlerProps, events: PuppyEvent[], confirmedAction?: ActivityKey) {
+async function render(props: WidgetTaskHandlerProps, events: PuppyEvent[]) {
   const compact = props.widgetInfo.height < 90;
   const activeNap = events.some(isOpenNap);
   const customActivities = await loadCustomActivities(events);
@@ -35,8 +36,8 @@ async function render(props: WidgetTaskHandlerProps, events: PuppyEvent[], confi
   const themePreference = await loadThemePreference();
   const lastEventAt = latestQuickEventTimes(events);
   props.renderWidget({
-    light: <QuickLogWidget compact={compact} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} confirmedAction={confirmedAction} themePreference={themePreference} />,
-    dark: <QuickLogWidget compact={compact} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} confirmedAction={confirmedAction} themePreference={themePreference} dark />,
+    light: <QuickLogWidget compact={compact} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} />,
+    dark: <QuickLogWidget compact={compact} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} dark />,
   });
 }
 
@@ -65,7 +66,8 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
       ]);
       const language = resolveLanguage(languagePreference);
       await Promise.all([
-        render(props, nextEvents, key),
+        render(props, nextEvents),
+        updateHomeWidget(nextEvents).catch(() => undefined),
         syncPottyReminders(nextEvents, preferences, language).catch(() => false),
         preferences.widgetConfirmations
           ? showWidgetLogConfirmation(

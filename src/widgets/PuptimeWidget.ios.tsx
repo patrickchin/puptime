@@ -29,7 +29,6 @@ export type PuptimeWidgetProps = {
     light: { background: string; surface: string; controlRadius: number };
     dark: { background: string; surface: string; controlRadius: number };
   };
-  lastAction?: ActivityKey;
   notificationConfirmations?: boolean;
   pottyAfterPeeMinutes?: number;
   pottyAfterMealMinutes?: number;
@@ -46,7 +45,6 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
   const appearance = props.appearance?.[environment.colorScheme === 'dark' ? 'dark' : 'light']
     ?? { background: '#F5F3EC', surface: '#FFFEFA', controlRadius: 16 };
   const background = { type: 'linearGradient' as const, colors: [appearance.background, appearance.surface], startPoint: { x: 0, y: 0 }, endPoint: { x: 1, y: 1 } };
-  const savedLabel = props.language === 'zh-Hans' ? '已记录' : props.language === 'es' ? 'Guardado' : 'Saved';
   const add = (type: ActivityKey): PuptimeWidgetProps => {
     const at = Date.now();
     const customLabel = type.startsWith('custom:') ? props.actionDetails?.[type]?.label ?? type.slice(7) : undefined;
@@ -58,7 +56,6 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
         actions: configuredActions,
         actionDetails: props.actionDetails,
         appearance: props.appearance,
-        lastAction: type,
         notificationConfirmations: props.notificationConfirmations,
         pottyAfterPeeMinutes: props.pottyAfterPeeMinutes,
         pottyAfterMealMinutes: props.pottyAfterMealMinutes,
@@ -78,7 +75,6 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
       actions: configuredActions,
       actionDetails: props.actionDetails,
       appearance: props.appearance,
-      lastAction: type,
       notificationConfirmations: props.notificationConfirmations,
       pottyAfterPeeMinutes: props.pottyAfterPeeMinutes,
       pottyAfterMealMinutes: props.pottyAfterMealMinutes,
@@ -102,12 +98,9 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
       {visibleActions.map((type) => {
         const detail = props.actionDetails?.[type] ?? { label: type, lightColor: '#176B52', darkColor: '#73D3AD' };
         const isEndingNap = type === 'nap' && Boolean(props.openNap);
-        const confirmed = pending.length > 0 && props.lastAction === type;
         const color = environment.colorScheme === 'dark' ? detail.darkColor : detail.lightColor;
         const lastAt = props.lastEventAt?.[type];
-        const systemImage = confirmed
-          ? 'checkmark.circle.fill'
-          : type === 'pee'
+        const systemImage = type === 'pee'
           ? 'drop.fill'
           : type === 'poop'
             ? 'circle.hexagongrid.fill'
@@ -142,7 +135,7 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
                 lineLimit(1),
                 minimumScaleFactor(0.72),
               ]}>
-                {confirmed ? savedLabel : isEndingNap ? 'End' : detail.label}
+                {isEndingNap ? 'End' : detail.label}
               </Text>
               {lastAt === undefined ? (
                 <Text modifiers={[

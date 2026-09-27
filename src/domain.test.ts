@@ -17,6 +17,7 @@ import {
   normalizeWidgetActions,
   replaceCalendarDate,
   replaceClockTime,
+  roundedWidgetTime,
   widgetActionsForState,
 } from './domain.ts';
 import {
@@ -139,6 +140,14 @@ test('only new timed naps count as running', () => {
 test('formats a duration for compact log and chart labels', () => {
   assert.equal(formatDuration(42 * 60_000), '42m');
   assert.equal(formatDuration(90 * 60_000), '1h 30m');
+});
+
+test('rounds widget elapsed time to five-minute steps', () => {
+  const now = 1_000_000;
+  assert.equal(roundedWidgetTime(now - 2 * 60_000, now), 'just now');
+  assert.equal(roundedWidgetTime(now - 3 * 60_000, now), '5m ago');
+  assert.equal(roundedWidgetTime(now - 62 * 60_000, now), '1h ago');
+  assert.equal(roundedWidgetTime(now - 63 * 60_000, now), '1h 5m ago');
 });
 
 test('creates stable daily reminder content for a schedule entry', () => {

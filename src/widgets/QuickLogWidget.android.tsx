@@ -6,7 +6,7 @@ import {
   DEFAULT_WIDGET_ACTIONS,
   customActivityKey,
   EVENT_META,
-  relativeTime,
+  roundedWidgetTime,
   widgetActionsForState,
   type QuickEventTimes,
   type ActivityKey,
@@ -28,7 +28,7 @@ const buttons = [
   { type: 'nap', label: 'Nap' },
 ] as const satisfies readonly ActionButton[];
 
-const iconPaths: Record<QuickEventType | 'custom' | 'stop' | 'check', string> = {
+const iconPaths: Record<QuickEventType | 'custom' | 'stop', string> = {
   pee: '<path d="M12 3.2S6.9 9.1 6.9 13.4a5.1 5.1 0 0 0 10.2 0C17.1 9.1 12 3.2 12 3.2Z"/><path d="M9.4 14.1a2.8 2.8 0 0 0 2.7 2.2"/>',
   poop: '<path d="M8.7 10.2c-.2-2.2 1.7-2.6 2.5-3.5.7-.8.2-1.8-.3-2.5 2.3.2 3.7 1.7 3.3 3.7 1.9.1 3 1.3 2.8 3.1 1.7.3 2.7 1.6 2.4 3.4H4.7c-.3-1.9 1.1-3.5 4-4.2Z"/><path d="M4.5 14.4h15a2.8 2.8 0 0 1-2.8 3.4H7.3a2.8 2.8 0 0 1-2.8-3.4Z"/>',
   meal: '<path d="M4.5 10.5h15a7.5 7.5 0 0 1-15 0Z"/><path d="M3.5 10.5h17M7.2 18.2h9.6M8.5 6.5c.4-1.1 1.4-1.7 2.5-1.7M14 6.5c.4-1.1 1.4-1.7 2.5-1.7"/>',
@@ -37,10 +37,9 @@ const iconPaths: Record<QuickEventType | 'custom' | 'stop' | 'check', string> = 
   nap: '<path d="M18.3 15.9A7.8 7.8 0 0 1 8.1 5.7a7.9 7.9 0 1 0 10.2 10.2Z"/><path d="M15.4 5.3h3.2l-3.2 3h3.2"/>',
   custom: '<path d="M3 5v6l10 10 8-8L11 3H5a2 2 0 0 0-2 2Z"/><circle cx="7.5" cy="7.5" r="1"/>',
   stop: '<rect x="6.5" y="6.5" width="11" height="11" rx="2"/>',
-  check: '<path d="m5 12.5 4.2 4.2L19 7"/>',
 };
 
-const makeIcon = (name: QuickEventType | 'custom' | 'stop' | 'check', color: string) =>
+const makeIcon = (name: QuickEventType | 'custom' | 'stop', color: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${iconPaths[name]}</svg>`;
 
 type Props = {
@@ -50,7 +49,6 @@ type Props = {
   lastEventAt?: QuickEventTimes;
   actions?: readonly ActivityKey[];
   customActivities?: readonly string[];
-  confirmedAction?: ActivityKey;
   themePreference?: ThemePreference;
 };
 
@@ -61,15 +59,14 @@ export function QuickLogWidget({
   lastEventAt,
   actions: configuredActions = DEFAULT_WIDGET_ACTIONS,
   customActivities = [],
-  confirmedAction,
   themePreference = 'system',
 }: Props) {
   const theme = resolveTheme(themePreference, dark ? 'dark' : 'light');
   const background = theme.background as `#${string}`;
   const surface = theme.surface as `#${string}`;
   const border = theme.border as `#${string}`;
-  const visibleTypes = widgetActionsForState(configuredActions, activeNap, customActivities);
   const now = Date.now();
+  const visibleTypes = widgetActionsForState(configuredActions, activeNap, customActivities);
   const visibleButtons = visibleTypes.map((type) => ({
     type,
     label: type.startsWith('custom:')
@@ -80,20 +77,19 @@ export function QuickLogWidget({
     <FlexWidget style={{ width: 'match_parent', flex: 1, flexDirection: 'row', flexGap: compact ? 4 : 7 }}>
       {visibleButtons.map((button) => {
         const isActiveNap = button.type === 'nap' && activeNap;
-        const confirmed = confirmedAction === button.type;
-        const label = confirmed ? 'Saved' : isActiveNap ? (compact ? 'Wake' : 'End nap') : button.label;
+        const label = isActiveNap ? (compact ? 'Wake' : 'End nap') : button.label;
         const meta = EVENT_META[button.type.startsWith('custom:') ? 'custom' : button.type as QuickEventType];
         const actionInk = (theme.isDark ? meta.darkColor : meta.color) as `#${string}`;
         const actionBackground = (theme.isDark ? meta.darkSoftColor : meta.softColor) as `#${string}`;
         const actionBorder = actionInk;
         const lastAt = lastEventAt?.[button.type];
-        const timeLabel = lastAt === undefined ? 'Never' : relativeTime(lastAt, now);
+        const timeLabel = lastAt === undefined ? 'Never' : roundedWidgetTime(lastAt, now);
         return (
           <FlexWidget
             key={button.type}
             clickAction="LOG_EVENT"
             clickActionData={{ type: button.type }}
-            accessibilityLabel={`${confirmed ? `${button.label} saved` : isActiveNap ? 'End nap' : `Log ${button.label.toLowerCase()}`}, ${timeLabel}`}
+            accessibilityLabel={`${isActiveNap ? 'End nap' : `Log ${button.label.toLowerCase()}`}, ${timeLabel}`}
             style={{
               flex: 1,
               height: 'match_parent',
@@ -109,7 +105,7 @@ export function QuickLogWidget({
             }}
           >
             <SvgWidget
-              svg={makeIcon(confirmed ? 'check' : isActiveNap ? 'stop' : button.type.startsWith('custom:') ? 'custom' : button.type as QuickEventType, actionInk)}
+              svg={makeIcon(isActiveNap ? 'stop' : button.type.startsWith('custom:') ? 'custom' : button.type as QuickEventType, actionInk)}
               style={{ width: compact ? 20 : 28, height: compact ? 20 : 28, marginRight: compact ? 4 : 0, marginBottom: compact ? 0 : 4 }}
             />
             <FlexWidget style={{ flex: compact ? 1 : undefined, flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
