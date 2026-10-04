@@ -1,15 +1,16 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { useLocalization } from '../localization-context';
 import { spacing, type Theme } from '../theme';
+import { TimeWheelColumn, wheelHeight, wheelRowHeight } from './TimeWheelColumn';
 
-const dialSize = 256;
-const center = dialSize / 2;
-const outerRadius = 100;
-const innerRadius = 58;
 const twoDigits = (value: number) => String(value).padStart(2, '0');
+const twelveHours = Array.from({ length: 12 }, (_, index) => index + 1);
+const twentyFourHours = Array.from({ length: 24 }, (_, index) => index);
+const minutes = Array.from({ length: 60 }, (_, index) => index);
+const periods = [0, 1];
 
 export function DateTimeSelector({ mode, value, locale, theme, onChange, onCancel }: {
   mode: 'date' | 'time';
@@ -20,32 +21,37 @@ export function DateTimeSelector({ mode, value, locale, theme, onChange, onCance
   onCancel: () => void;
 }) {
   const { t } = useLocalization();
-  const [selected, setSelected] = useState(value);
-  const [month, setMonth] = useState(() => new Date(value.getFullYear(), value.getMonth(), 1, 12));
-  const [clockField, setClockField] = useState<'hour' | 'minute'>('hour');
-  const [inputMode, setInputMode] = useState(false);
-  const [hourInput, setHourInput] = useState(twoDigits(value.getHours()));
-  const [minuteInput, setMinuteInput] = useState(twoDigits(value.getMinutes()));
   const uses24Hour = new Intl.DateTimeFormat(locale, { hour: 'numeric' }).resolvedOptions().hour12 === false;
+  const [selected, setSelected] = useState(value);
+  const selectedRef = useRef(value);
+  const [month, setMonth] = useState(() => new Date(value.getFullYear(), value.getMonth(), 1, 12));
+  const [inputMode, setInputMode] = useState(false);
+  const [hourInput, setHourInput] = useState(twoDigits(uses24Hour ? value.getHours() : value.getHours() % 12 || 12));
+  const [minuteInput, setMinuteInput] = useState(twoDigits(value.getMinutes()));
+  const [periodInput, setPeriodInput] = useState<'AM' | 'PM'>(value.getHours() < 12 ? 'AM' : 'PM');
   const hour = selected.getHours();
   const minute = selected.getMinutes();
   const displayHour = uses24Hour ? hour : hour % 12 || 12;
   const validInput = /^\d{1,2}$/.test(hourInput) && /^\d{1,2}$/.test(minuteInput)
-    && Number(hourInput) <= 23 && Number(minuteInput) <= 59;
+    && (uses24Hour ? Number(hourInput) <= 23 : Number(hourInput) >= 1 && Number(hourInput) <= 12)
+    && Number(minuteInput) <= 59;
+  const inputHour = uses24Hour ? Number(hourInput) : (Number(hourInput) % 12) + (periodInput === 'PM' ? 12 : 0);
 
-  const selectTime = (nextHour: number, nextMinute: number) => {
-    const next = new Date(selected);
-    next.setHours(nextHour, nextMinute, 0, 0);
+  const selectTime = (nextHour?: number, nextMinute?: number) => {
+    const next = new Date(selectedRef.current);
+    next.setHours(nextHour ?? next.getHours(), nextMinute ?? next.getMinutes(), 0, 0);
+    selectedRef.current = next;
     setSelected(next);
-    setHourInput(twoDigits(next.getHours()));
+    setHourInput(twoDigits(uses24Hour ? next.getHours() : next.getHours() % 12 || 12));
     setMinuteInput(twoDigits(next.getMinutes()));
+    setPeriodInput(next.getHours() < 12 ? 'AM' : 'PM');
   };
 
   const confirm = () => {
     if (inputMode && !validInput) return;
     if (inputMode) {
       const next = new Date(selected);
-      next.setHours(Number(hourInput), Number(minuteInput), 0, 0);
+      next.setHours(inputHour, Number(minuteInput), 0, 0);
       onChange(next);
     } else {
       onChange(selected);
@@ -60,20 +66,6 @@ export function DateTimeSelector({ mode, value, locale, theme, onChange, onCance
   const offset = (new Date(month.getFullYear(), month.getMonth(), 1).getDay() - firstWeekday + 7) % 7;
   const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
   const days = Array.from({ length: Math.ceil((offset + daysInMonth) / 7) * 7 }, (_, index) => index - offset + 1);
-
-  const dialValues = clockField === 'minute'
-    ? Array.from({ length: 12 }, (_, index) => ({ value: index * 5, label: twoDigits(index * 5), radius: outerRadius }))
-    : uses24Hour
-      ? [
-        ...Array.from({ length: 12 }, (_, index) => ({ value: index || 12, label: twoDigits(index || 12), radius: outerRadius })),
-        ...Array.from({ length: 12 }, (_, index) => ({ value: index ? index + 12 : 0, label: twoDigits(index ? index + 12 : 0), radius: innerRadius })),
-      ]
-      : Array.from({ length: 12 }, (_, index) => ({ value: index || 12, label: String(index || 12), radius: outerRadius }));
-  const selectedValue = clockField === 'minute' ? minute : uses24Hour ? hour : displayHour;
-  const selectedRadius = clockField === 'hour' && uses24Hour && (hour === 0 || hour >= 13) ? innerRadius : outerRadius;
-  const selectedAngle = ((clockField === 'minute' ? minute / 5 : displayHour % 12) / 12) * Math.PI * 2 - Math.PI / 2;
-  const handX = Math.cos(selectedAngle) * selectedRadius;
-  const handY = Math.sin(selectedAngle) * selectedRadius;
 
   return (
     <View testID={mode === 'date' ? 'date.selector' : 'time.selector'} accessibilityViewIsModal style={styles.overlay}>
@@ -128,23 +120,9 @@ export function DateTimeSelector({ mode, value, locale, theme, onChange, onCance
           </>
         ) : (
           <>
-            {!inputMode ? <View style={styles.clockHeader}>
-              <Pressable testID="time.field.hour" accessibilityRole="button" accessibilityState={{ selected: clockField === 'hour' }} onPress={() => setClockField('hour')} style={[styles.timeField, { backgroundColor: clockField === 'hour' ? theme.primarySoft : theme.surface }]}>
-                <Text style={[styles.timeDigits, { color: clockField === 'hour' ? theme.primary : theme.text }]}>{twoDigits(displayHour)}</Text>
-              </Pressable>
-              <Text style={[styles.colon, { color: theme.text }]}>{':'}</Text>
-              <Pressable testID="time.field.minute" accessibilityRole="button" accessibilityState={{ selected: clockField === 'minute' }} onPress={() => setClockField('minute')} style={[styles.timeField, { backgroundColor: clockField === 'minute' ? theme.primarySoft : theme.surface }]}>
-                <Text style={[styles.timeDigits, { color: clockField === 'minute' ? theme.primary : theme.text }]}>{twoDigits(minute)}</Text>
-              </Pressable>
-              {!uses24Hour ? (
-                <View style={[styles.period, { borderColor: theme.border }]}>
-                  {(['AM', 'PM'] as const).map((period) => {
-                    const active = (hour < 12 ? 'AM' : 'PM') === period;
-                    return <Pressable key={period} testID={`time.period.${period}`} accessibilityRole="button" accessibilityState={{ selected: active }} onPress={() => selectTime((hour % 12) + (period === 'PM' ? 12 : 0), minute)} style={[styles.periodButton, { backgroundColor: active ? theme.primarySoft : 'transparent' }]}><Text style={[styles.periodText, { color: active ? theme.primary : theme.textMuted }]}>{period}</Text></Pressable>;
-                  })}
-                </View>
-              ) : null}
-            </View> : null}
+            <Text style={[styles.timeHeadline, { color: theme.text }]}>
+              {inputMode ? t('editor.enterTime') : new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(selected)}
+            </Text>
             {inputMode ? (
               <View style={styles.inputRow}>
                 <View style={styles.inputColumn}>
@@ -156,40 +134,35 @@ export function DateTimeSelector({ mode, value, locale, theme, onChange, onCance
                   <Text style={[styles.inputLabel, { color: theme.textMuted }]}>{t('editor.minute')}</Text>
                   <TextInput testID="time.input.minute" accessibilityLabel={t('editor.minute')} keyboardType="number-pad" maxLength={2} selectTextOnFocus value={minuteInput} onChangeText={setMinuteInput} style={[styles.timeInput, { backgroundColor: theme.surface, borderColor: validInput ? theme.border : theme.danger, color: theme.text }]} />
                 </View>
+                {!uses24Hour ? <View style={[styles.inputPeriod, { borderColor: theme.border }]}>
+                  {(['AM', 'PM'] as const).map((period) => <Pressable key={period} testID={`time.input.period.${period}`} accessibilityRole="button" accessibilityState={{ selected: periodInput === period }} onPress={() => setPeriodInput(period)} style={[styles.inputPeriodButton, { backgroundColor: periodInput === period ? theme.primarySoft : 'transparent' }]}><Text style={[styles.inputPeriodText, { color: periodInput === period ? theme.primary : theme.textMuted }]}>{period}</Text></Pressable>)}
+                </View> : null}
               </View>
             ) : (
-              <View style={[styles.dial, { backgroundColor: theme.surface }]}>
-                <View style={[styles.hand, { width: selectedRadius, left: center + handX / 2 - selectedRadius / 2, top: center + handY / 2 - 1, backgroundColor: theme.primary, transform: [{ rotate: `${selectedAngle}rad` }] }]} />
-                <View style={[styles.centerDot, { backgroundColor: theme.primary }]} />
-                {dialValues.map(({ value: dialValue, label, radius }) => {
-                  const angle = (dialValue % (clockField === 'minute' ? 60 : 12)) / (clockField === 'minute' ? 60 : 12) * Math.PI * 2 - Math.PI / 2;
-                  const active = selectedValue === dialValue;
-                  return (
-                    <Pressable
-                      key={`${radius}.${dialValue}`}
-                      testID={`time.${clockField}.${dialValue}`}
-                      accessibilityRole="button"
-                      accessibilityLabel={label}
-                      accessibilityState={{ selected: active }}
-                      onPress={() => {
-                        if (clockField === 'hour') {
-                          selectTime(uses24Hour ? dialValue : (dialValue % 12) + (hour >= 12 ? 12 : 0), minute);
-                          setClockField('minute');
-                        } else selectTime(hour, dialValue);
-                      }}
-                      style={({ pressed }) => [styles.dialNumber, { left: center + Math.cos(angle) * radius - 22, top: center + Math.sin(angle) * radius - 22, backgroundColor: active ? theme.primary : pressed ? theme.primarySoft : 'transparent' }]}
-                    >
-                      <Text style={[styles.dialText, { color: active ? theme.onPrimary : theme.text, fontSize: radius === innerRadius ? 13 : 16 }]}>{label}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+              <>
+                <View style={styles.wheels}>
+                  <View pointerEvents="none" style={[styles.wheelHighlight, { backgroundColor: theme.primarySoft }]} />
+                  <TimeWheelColumn testID="time.wheel.hour" label={t('editor.hour')} values={uses24Hour ? twentyFourHours : twelveHours} selected={uses24Hour ? hour : displayHour} format={twoDigits} onSelect={(nextHour) => selectTime(uses24Hour ? nextHour : (nextHour % 12) + (hour >= 12 ? 12 : 0))} theme={theme} width={80} />
+                  <Text style={[styles.wheelColon, { color: theme.text }]}>{':'}</Text>
+                  <TimeWheelColumn testID="time.wheel.minute" label={t('editor.minute')} values={minutes} selected={minute} format={twoDigits} onSelect={(nextMinute) => selectTime(undefined, nextMinute)} theme={theme} width={80} />
+                  {!uses24Hour ? <TimeWheelColumn testID="time.wheel.period" label={t('editor.period')} values={periods} selected={hour >= 12 ? 1 : 0} format={(period) => period ? 'PM' : 'AM'} onSelect={(period) => selectTime((hour % 12) + period * 12)} theme={theme} width={64} /> : null}
+                </View>
+                <Text style={[styles.wheelHint, { color: theme.textMuted }]}>{t('editor.swipeTime')}</Text>
+              </>
             )}
           </>
         )}
 
         <View style={styles.footer}>
-          {mode === 'time' ? <Pressable testID="time.mode" accessibilityRole="button" accessibilityLabel={inputMode ? t('editor.useDial') : t('editor.useKeyboard')} onPress={() => setInputMode((current) => !current)} style={({ pressed }) => [styles.iconButton, pressed && { backgroundColor: theme.primarySoft }]}><MaterialCommunityIcons name={inputMode ? 'clock-outline' : 'keyboard-outline'} size={23} color={theme.primary} /></Pressable> : null}
+          {mode === 'time' ? <Pressable testID="time.mode" accessibilityRole="button" accessibilityLabel={inputMode ? t('editor.useWheels') : t('editor.useKeyboard')} onPress={() => {
+            if (inputMode && validInput) selectTime(inputHour, Number(minuteInput));
+            else if (inputMode) {
+              setHourInput(twoDigits(uses24Hour ? selectedRef.current.getHours() : selectedRef.current.getHours() % 12 || 12));
+              setMinuteInput(twoDigits(selectedRef.current.getMinutes()));
+              setPeriodInput(selectedRef.current.getHours() < 12 ? 'AM' : 'PM');
+            }
+            setInputMode(!inputMode);
+          }} style={({ pressed }) => [styles.iconButton, pressed && { backgroundColor: theme.primarySoft }]}><MaterialCommunityIcons name={inputMode ? 'swap-vertical' : 'keyboard-outline'} size={23} color={theme.primary} /></Pressable> : null}
           <View style={styles.footerSpacer} />
           <Pressable testID="picker.cancel" accessibilityRole="button" onPress={onCancel} style={({ pressed }) => [styles.action, pressed && { backgroundColor: theme.primarySoft }]}><Text style={[styles.actionText, { color: theme.primary }]}>{t('app.cancel')}</Text></Pressable>
           <Pressable testID="picker.done" accessibilityRole="button" disabled={inputMode && !validInput} accessibilityState={{ disabled: inputMode && !validInput }} onPress={confirm} style={({ pressed }) => [styles.action, pressed && { backgroundColor: theme.primarySoft }, inputMode && !validInput && { opacity: 0.4 }]}><Text style={[styles.actionText, { color: theme.primary }]}>{t('common.done')}</Text></Pressable>
@@ -214,23 +187,19 @@ const styles = StyleSheet.create({
   dayCell: { width: '14.2857%', height: 42, alignItems: 'center', justifyContent: 'center' },
   dayButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   dayText: { fontSize: 15, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  clockHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 18, marginBottom: 20 },
-  timeField: { width: 82, height: 76, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  timeDigits: { fontSize: 43, fontWeight: '500', fontVariant: ['tabular-nums'] },
-  colon: { fontSize: 40, marginHorizontal: 4, paddingBottom: 7 },
-  period: { height: 76, width: 50, borderWidth: 1, borderRadius: 14, marginLeft: 8, overflow: 'hidden' },
-  periodButton: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  periodText: { fontSize: 12, fontWeight: '700' },
-  dial: { width: dialSize, height: dialSize, borderRadius: dialSize / 2, alignSelf: 'center' },
-  hand: { position: 'absolute', height: 2 },
-  centerDot: { position: 'absolute', left: center - 4, top: center - 4, width: 8, height: 8, borderRadius: 4 },
-  dialNumber: { position: 'absolute', width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  dialText: { fontWeight: '600', fontVariant: ['tabular-nums'] },
+  timeHeadline: { fontSize: 27, lineHeight: 34, fontWeight: '700', marginTop: 6 },
+  wheels: { height: wheelHeight, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 12 },
+  wheelHighlight: { position: 'absolute', left: 0, right: 0, top: (wheelHeight - wheelRowHeight) / 2, height: wheelRowHeight, borderRadius: 14 },
+  wheelColon: { width: 18, height: wheelRowHeight, lineHeight: wheelRowHeight, textAlign: 'center', fontSize: 28, fontWeight: '700' },
+  wheelHint: { fontSize: 12, textAlign: 'center', marginTop: 4 },
   inputRow: { minHeight: 158, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12 },
   inputColumn: { alignItems: 'center', gap: 8 },
   inputLabel: { fontSize: 12, fontWeight: '700' },
   timeInput: { width: 84, height: 70, borderWidth: 1, borderRadius: 14, textAlign: 'center', fontSize: 36, fontVariant: ['tabular-nums'] },
   inputColon: { fontSize: 36, marginTop: 18 },
+  inputPeriod: { width: 50, height: 70, borderWidth: 1, borderRadius: 14, marginTop: 20, overflow: 'hidden' },
+  inputPeriodButton: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  inputPeriodText: { fontSize: 12, fontWeight: '700' },
   footer: { minHeight: 60, flexDirection: 'row', alignItems: 'center', marginTop: 12 },
   footerSpacer: { flex: 1 },
   action: { minWidth: 72, minHeight: 48, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', borderRadius: 24 },
