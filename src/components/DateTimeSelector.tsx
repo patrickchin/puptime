@@ -139,16 +139,13 @@ export function DateTimeSelector({ mode, value, locale, theme, onChange, onCance
                 </View> : null}
               </View>
             ) : (
-              <>
-                <View style={styles.wheels}>
-                  <View pointerEvents="none" style={[styles.wheelHighlight, { backgroundColor: theme.primarySoft }]} />
-                  <TimeWheelColumn testID="time.wheel.hour" label={t('editor.hour')} values={uses24Hour ? twentyFourHours : twelveHours} selected={uses24Hour ? hour : displayHour} format={twoDigits} onSelect={(nextHour) => selectTime(uses24Hour ? nextHour : (nextHour % 12) + (hour >= 12 ? 12 : 0))} theme={theme} width={80} />
-                  <Text style={[styles.wheelColon, { color: theme.text }]}>{':'}</Text>
-                  <TimeWheelColumn testID="time.wheel.minute" label={t('editor.minute')} values={minutes} selected={minute} format={twoDigits} onSelect={(nextMinute) => selectTime(undefined, nextMinute)} theme={theme} width={80} />
-                  {!uses24Hour ? <TimeWheelColumn testID="time.wheel.period" label={t('editor.period')} values={periods} selected={hour >= 12 ? 1 : 0} format={(period) => period ? 'PM' : 'AM'} onSelect={(period) => selectTime((hour % 12) + period * 12)} theme={theme} width={64} /> : null}
-                </View>
-                <Text style={[styles.wheelHint, { color: theme.textMuted }]}>{t('editor.swipeTime')}</Text>
-              </>
+              <View style={styles.wheels}>
+                <View pointerEvents="none" style={[styles.wheelHighlight, { backgroundColor: theme.primarySoft }]} />
+                <TimeWheelColumn testID="time.wheel.hour" label={t('editor.hour')} values={uses24Hour ? twentyFourHours : twelveHours} selected={uses24Hour ? hour : displayHour} format={twoDigits} onSelect={(nextHour) => selectTime(uses24Hour ? nextHour : (nextHour % 12) + (hour >= 12 ? 12 : 0))} theme={theme} width={80} />
+                <Text style={[styles.wheelColon, { color: theme.text }]}>{':'}</Text>
+                <TimeWheelColumn testID="time.wheel.minute" label={t('editor.minute')} values={minutes} selected={minute} format={twoDigits} onSelect={(nextMinute) => selectTime(undefined, nextMinute)} theme={theme} width={80} />
+                {!uses24Hour ? <TimeWheelColumn testID="time.wheel.period" label={t('editor.period')} values={periods} selected={hour >= 12 ? 1 : 0} format={(period) => period ? 'PM' : 'AM'} onSelect={(period) => selectTime((hour % 12) + period * 12)} theme={theme} width={64} /> : null}
+              </View>
             )}
           </>
         )}
@@ -191,7 +188,6 @@ const styles = StyleSheet.create({
   wheels: { height: wheelHeight, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 12 },
   wheelHighlight: { position: 'absolute', left: 0, right: 0, top: (wheelHeight - wheelRowHeight) / 2, height: wheelRowHeight, borderRadius: 14 },
   wheelColon: { width: 18, height: wheelRowHeight, lineHeight: wheelRowHeight, textAlign: 'center', fontSize: 28, fontWeight: '700' },
-  wheelHint: { fontSize: 12, textAlign: 'center', marginTop: 4 },
   inputRow: { minHeight: 158, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12 },
   inputColumn: { alignItems: 'center', gap: 8 },
   inputLabel: { fontSize: 12, fontWeight: '700' },
