@@ -9,7 +9,6 @@ import { BottomNav, type Tab } from './src/components/BottomNav';
 import { ThemePicker } from './src/components/ThemePicker';
 import { Toast } from './src/components/Toast';
 import type { ActivityCustomization, ActivityCustomizations } from './src/activity-customization';
-import type { MissingLogEstimate } from './src/analytics';
 import { LocalizationProvider } from './src/localization-context';
 import {
   localizedEventPastLabel,
@@ -317,24 +316,6 @@ export default function App() {
     await updateHomeWidget(events).catch(() => undefined);
   };
 
-  const addEstimatedEvent = async (estimate: MissingLogEstimate) => {
-    const event: PuppyEvent = {
-      ...createEvent(estimate.type, 'app', estimate.at, estimate.customLabel),
-      ...(estimate.endedAt === undefined ? {} : { endedAt: estimate.endedAt }),
-    };
-    const nextEvents = await appendEvents([event]);
-    setEvents(nextEvents);
-    setUndoState({
-      event,
-      message: translate(language, 'app.estimateAdded', {
-        activity: displayPastLabel(event),
-      }),
-    });
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-    syncPottyReminders(nextEvents, notificationPreferences, language).catch(() => undefined);
-    updateHomeWidget(nextEvents).catch(() => undefined);
-  };
-
   const confirmDelete = (event: PuppyEvent) => {
     Alert.alert(translate(language, 'app.deleteTitle'), translate(language, 'app.deleteMessage', {
       activity: displayPastLabel(event),
@@ -517,7 +498,7 @@ export default function App() {
       );
     }
     if (tab === 'timeline') return <TimelineScreen events={events} customActivities={customActivities} theme={theme} />;
-    if (tab === 'insights') return <InsightsScreen events={events} customActivities={customActivities} onAddEstimate={addEstimatedEvent} theme={theme} />;
+    if (tab === 'insights') return <InsightsScreen events={events} customActivities={customActivities} theme={theme} />;
     if (tab === 'schedule') {
       return (
         <ScheduleScreen

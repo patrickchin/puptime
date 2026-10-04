@@ -336,6 +336,12 @@ test('flags a repeated meal slot when logging continued after the gap', () => {
     })),
     [{ type: 'meal', day: 9, hour: 12, observedDays: 6, comparedDays: 6 }],
   );
+
+  const days = buildTimelineDays(events, 7, new Date(2026, 8, 10, 22), new Date(2026, 8, 10, 22), result.estimates);
+  assert.deepEqual(days.find((day) => day.key === '2026-09-09')?.marks.filter((mark) => mark.estimated), [
+    { id: result.estimates[0].id, type: 'meal', label: 'Ate', startBucket: 48, estimated: true },
+  ]);
+  assert.equal(events.some((event) => event.id === result.estimates[0].id), false);
 });
 
 test('estimates a missing nap span from completed naps at the same daily slot', () => {
@@ -366,6 +372,12 @@ test('estimates a missing nap span from completed naps at the same daily slot', 
   assert.equal(new Date(nap.at).getDate(), 9);
   assert.equal(new Date(nap.at).getHours(), 13);
   assert.equal(nap.endedAt, nap.at + 90 * 60_000);
+  assert.deepEqual(
+    buildTimelineDays(events, 2, new Date(2026, 8, 10, 22), new Date(2026, 8, 10, 22), result.estimates)
+      .find((day) => day.key === '2026-09-09')?.marks.filter((mark) => mark.estimated && mark.type === 'nap')
+      .map(({ startBucket, endBucket, estimated }) => ({ startBucket, endBucket, estimated })),
+    [{ startBucket: 52, endBucket: 58, estimated: true }],
+  );
 });
 
 test('does not guess on a blank day or before a possible slot has passed', () => {
