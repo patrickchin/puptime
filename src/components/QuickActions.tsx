@@ -13,6 +13,7 @@ import {
   type PuppyEvent,
 } from '../domain';
 import { ActivityIcon } from './ActivityIcon';
+import { ConfirmDialog } from './ConfirmDialog';
 import { useLocalization } from '../localization-context';
 import { localizedEventLabel } from '../localization';
 import { eventColors, eventIcon, spacing, supportingIcon, surfaceTreatment, type Theme } from '../theme';
@@ -34,6 +35,8 @@ export function QuickActions({ events, customActivities, onLog, onChangeAppearan
   const [showMore, setShowMore] = useState(false);
   const [customLabel, setCustomLabel] = useState('');
   const [editor, setEditor] = useState<Editor | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteFailed, setDeleteFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const openNap = events.find(isOpenNap);
   const suggestions = useMemo(() => [
@@ -51,6 +54,8 @@ export function QuickActions({ events, customActivities, onLog, onChangeAppearan
     const appearance = activityAppearance(activity);
     setEditor({ activity, isNew, name: isNew ? activity.customLabel ?? '' : activityLabel(activity), emoji: appearance?.emoji ?? (isNew ? '🐾' : undefined), color: appearance?.color });
     setShowMore(false);
+    setConfirmingDelete(false);
+    setDeleteFailed(false);
   };
 
   const openNew = (label: string) => {
@@ -84,18 +89,24 @@ export function QuickActions({ events, customActivities, onLog, onChangeAppearan
 
   const confirmDelete = () => {
     if (!editor?.activity.customLabel || saving) return;
+    setDeleteFailed(false);
+    setConfirmingDelete(true);
+  };
+
+  const deleteActivity = async () => {
+    if (!editor?.activity.customLabel || saving) return;
     const label = editor.activity.customLabel;
-    Alert.alert(t('quick.deleteTitle'), t('quick.deleteMessage', { activity: activityLabel(editor.activity) }), [
-      { text: t('app.cancel'), style: 'cancel' },
-      { text: t('app.delete'), style: 'destructive', onPress: async () => {
-        try {
-          await onDeleteCustomActivity(label);
-          setEditor(null);
-        } catch {
-          Alert.alert(t('settings.saveErrorTitle'), t('settings.saveErrorBody'));
-        }
-      } },
-    ]);
+    setSaving(true);
+    setDeleteFailed(false);
+    try {
+      await onDeleteCustomActivity(label);
+      setConfirmingDelete(false);
+      setEditor(null);
+    } catch {
+      setDeleteFailed(true);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -188,7 +199,7 @@ export function QuickActions({ events, customActivities, onLog, onChangeAppearan
 
       <Text style={[styles.customizeHint, { color: theme.textMuted }]}>{t('quick.holdToCustomize')}</Text>
 
-      <Modal visible={showMore || editor !== null} transparent animationType="none" onRequestClose={() => { setShowMore(false); setEditor(null); }}>
+      <Modal visible={showMore || editor !== null} transparent animationType="none" onRequestClose={() => { if (confirmingDelete) { if (!saving) setConfirmingDelete(false); } else { setShowMore(false); setEditor(null); } }}>
         <KeyboardAvoidingView
           accessibilityViewIsModal
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -354,6 +365,18 @@ export function QuickActions({ events, customActivities, onLog, onChangeAppearan
             </View>
             </>}
           </ScrollView>
+          <ConfirmDialog
+            inline
+            visible={confirmingDelete}
+            title={t('quick.deleteTitle')}
+            message={editor ? t('quick.deleteMessage', { activity: activityLabel(editor.activity) }) : ''}
+            confirmLabel={t('app.delete')}
+            error={deleteFailed ? t('quick.deleteError') : undefined}
+            busy={saving}
+            theme={theme}
+            onCancel={() => { setConfirmingDelete(false); setDeleteFailed(false); }}
+            onConfirm={() => void deleteActivity()}
+          />
         </KeyboardAvoidingView>
       </Modal>
     </>

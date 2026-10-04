@@ -316,23 +316,11 @@ export default function App() {
     await updateHomeWidget(events).catch(() => undefined);
   };
 
-  const confirmDelete = (event: PuppyEvent) => {
-    Alert.alert(translate(language, 'app.deleteTitle'), translate(language, 'app.deleteMessage', {
-      activity: displayPastLabel(event),
-      time: new Date(event.at).toLocaleTimeString(language, { hour: 'numeric', minute: '2-digit' }),
-    }), [
-      { text: translate(language, 'app.cancel'), style: 'cancel' },
-      {
-        text: translate(language, 'app.delete'),
-        style: 'destructive',
-        onPress: async () => {
-          const nextEvents = await removeEvent(event.id);
-          setEvents(nextEvents);
-          syncPottyReminders(nextEvents, notificationPreferences, language).catch(() => undefined);
-          updateHomeWidget(nextEvents).catch(() => undefined);
-        },
-      },
-    ]);
+  const deleteEvent = async (event: PuppyEvent) => {
+    const nextEvents = await removeEvent(event.id);
+    setEvents(nextEvents);
+    syncPottyReminders(nextEvents, notificationPreferences, language).catch(() => undefined);
+    updateHomeWidget(nextEvents).catch(() => undefined);
   };
 
   const saveEventDetails = async (
@@ -522,7 +510,7 @@ export default function App() {
         onEditRequestHandled={() => setEditRequest(null)}
         onLog={logEvent}
         onSave={saveEventDetails}
-        onDelete={confirmDelete}
+        onDelete={deleteEvent}
         onOpenSchedule={() => navigateToTab('schedule')}
         onOpenSettings={() => setSettingsVisible(true)}
         theme={theme}

@@ -91,7 +91,6 @@
           "defaultChannel": "puptime-routine"
         }
       ],
-      "@react-native-community/datetimepicker",
       "expo-font",
       "./plugins/withAndroidWorkManager",
       "expo-sharing"
