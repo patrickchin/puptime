@@ -12,6 +12,7 @@ import {
   type QuickEventType,
 } from '../domain';
 import { resolveTheme, type ThemePreference } from '../theme';
+import { widgetAgo } from './ago';
 
 type ActionButton = {
   type: QuickEventType;
@@ -49,6 +50,7 @@ type Props = {
   actions?: readonly ActivityKey[];
   customActivities?: readonly string[];
   themePreference?: ThemePreference;
+  now?: number;
 };
 
 export function QuickLogWidget({
@@ -59,6 +61,7 @@ export function QuickLogWidget({
   actions: configuredActions = DEFAULT_WIDGET_ACTIONS,
   customActivities = [],
   themePreference = 'system',
+  now = Date.now(),
 }: Props) {
   const theme = resolveTheme(themePreference, dark ? 'dark' : 'light');
   const background = theme.background as `#${string}`;
@@ -81,9 +84,7 @@ export function QuickLogWidget({
         const actionBackground = (theme.isDark ? meta.darkSoftColor : meta.softColor) as `#${string}`;
         const actionBorder = actionInk;
         const lastAt = lastEventAt?.[button.type];
-        const timeLabel = lastAt === undefined ? 'Never' : new Intl.DateTimeFormat(undefined, {
-          hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-        }).format(lastAt);
+        const timeLabel = lastAt === undefined ? 'Never' : widgetAgo(lastAt, now);
         return (
           <FlexWidget
             key={button.type}

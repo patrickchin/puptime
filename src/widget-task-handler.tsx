@@ -26,6 +26,7 @@ import {
   updateEvent,
 } from './storage';
 import { QuickLogWidget } from './widgets/QuickLogWidget.android';
+import { scheduleWidgetAgoRefresh } from './widgets/scheduleAgo.android';
 import { updateHomeWidget } from './widgets/sync';
 
 async function render(props: WidgetTaskHandlerProps, events: PuppyEvent[]) {
@@ -35,10 +36,12 @@ async function render(props: WidgetTaskHandlerProps, events: PuppyEvent[]) {
   const actions = await loadWidgetActions(customActivities);
   const themePreference = await loadThemePreference();
   const lastEventAt = latestQuickEventTimes(events);
+  const now = Date.now();
   props.renderWidget({
-    light: <QuickLogWidget compact={compact} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} />,
-    dark: <QuickLogWidget compact={compact} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} dark />,
+    light: <QuickLogWidget compact={compact} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} now={now} />,
+    dark: <QuickLogWidget compact={compact} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} now={now} dark />,
   });
+  scheduleWidgetAgoRefresh(lastEventAt, actions, activeNap, customActivities, now);
 }
 
 export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
