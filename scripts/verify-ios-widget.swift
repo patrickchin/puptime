@@ -37,20 +37,19 @@ func buttonCount(_ value: Any) -> Int {
   return 0
 }
 
-func textValues(_ value: Any) -> [String] {
-  if let array = value as? [Any] { return array.flatMap(textValues) }
+func relativeDateCount(_ value: Any) -> Int {
+  if let array = value as? [Any] { return array.reduce(0) { $0 + relativeDateCount($1) } }
   if let object = value as? [String: Any] {
-    let text = object["type"] as? String == "TextView"
-      ? (object["props"] as? [String: Any])?["text"] as? String
-      : nil
-    return (text.map { [$0] } ?? []) + object.values.flatMap(textValues)
+    let props = object["props"] as? [String: Any]
+    return (object["type"] as? String == "TextView" && props?["dateStyle"] as? String == "relative" ? 1 : 0)
+      + object.values.reduce(0) { $0 + relativeDateCount($1) }
   }
-  return []
+  return 0
 }
 
 let rendered = invoke("__expoWidgetRender", props)
 precondition(buttonCount(rendered) == (props["actions"] as! [String]).count, "Widget did not render its quick log buttons")
-precondition(textValues(rendered).contains { $0.range(of: #"^\d{2}:\d{2}$"#, options: .regularExpression) != nil }, "Widget did not render a clock time")
+precondition(relativeDateCount(rendered) > 0, "Widget did not render a relative date")
 precondition(buttonCount(invoke("__expoWidgetRender", props, colorScheme: "dark")) == 3, "Dark widget did not render")
 
 let pee = invoke("__expoWidgetHandlePress", props, target: "log|pee|0|en|120|30|")
@@ -66,4 +65,4 @@ let ended = invoke("__expoWidgetHandlePress", started, target: "log|nap|0|en|120
 precondition(PropertyListSerialization.propertyList(ended, isValidFor: .binary), "Nap end returned invalid UserDefaults props")
 precondition(ended["openNap"] as? Bool == false, "Nap action did not end the nap")
 precondition((ended["pending"] as? [[String: Any]])?.first?["endedAt"] != nil, "Ended nap has no end time")
-print("Widget snapshot, clock time, three rendered buttons, pee action, and nap start/end passed")
+print("Widget snapshot, relative time, three rendered buttons, pee action, and nap start/end passed")
