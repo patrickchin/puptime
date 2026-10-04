@@ -148,6 +148,7 @@ export function ScheduleScreen({
   const onPick = (date: Date) => {
     if (!draft) return;
     setDraft({ ...draft, minutes: date.getHours() * 60 + date.getMinutes() });
+    setShowTimeSelector(false);
   };
 
   const applySuggestion = async () => {
@@ -574,21 +575,13 @@ export function ScheduleScreen({
               testID="schedule.editor.time"
               accessibilityRole="button"
               accessibilityState={{ expanded: showTimeSelector }}
-              onPress={() => setShowTimeSelector((open) => !open)}
+              onPress={() => setShowTimeSelector(true)}
               style={({ pressed }) => [styles.timeButton, { backgroundColor: showTimeSelector || pressed ? theme.primarySoft : theme.surface, borderColor: showTimeSelector ? theme.primary : theme.border, borderRadius: theme.presentation.controlRadius, borderWidth: theme.presentation.borderWidth }]}
             >
               <MaterialCommunityIcons name="clock-outline" size={22} color={theme.primary} />
               <Text style={[styles.timeButtonText, { color: theme.text }]}>{formatMinutes(draft?.minutes ?? 0)}</Text>
-              <MaterialCommunityIcons name={showTimeSelector ? 'chevron-up' : 'chevron-down'} size={22} color={theme.textMuted} />
+              <MaterialCommunityIcons name="chevron-right" size={22} color={theme.textMuted} />
             </Pressable>
-            {showTimeSelector ? (
-              <>
-                <DateTimeSelector value={pickerDate} mode="time" locale={locale} theme={theme} onChange={onPick} />
-                <Pressable testID="schedule.editor.time.done" accessibilityRole="button" accessibilityLabel={t('editor.finishPicker', { picker: t('editor.time') })} onPress={() => setShowTimeSelector(false)} style={({ pressed }) => [styles.timeDone, pressed && { backgroundColor: theme.primarySoft }]}>
-                  <Text style={[styles.timeDoneText, { color: theme.primary }]}>{t('common.done')}</Text>
-                </Pressable>
-              </>
-            ) : null}
 
             <View style={[styles.reminderRow, { backgroundColor: theme.surface, borderColor: theme.border }]}>
               <View style={[styles.reminderIcon, { backgroundColor: theme.primarySoft }]}>
@@ -624,6 +617,16 @@ export function ScheduleScreen({
               </Text>
             </Pressable>
           </ScrollView>
+          {showTimeSelector ? (
+            <DateTimeSelector
+              value={pickerDate}
+              mode="time"
+              locale={locale}
+              theme={theme}
+              onChange={onPick}
+              onCancel={() => setShowTimeSelector(false)}
+            />
+          ) : null}
         </View>
       </Modal>
       <ConfirmDialog
@@ -713,8 +716,6 @@ const styles = StyleSheet.create({
   typeChoiceText: { fontSize: 14, fontWeight: '700' },
   timeButton: { minHeight: 58, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, gap: 10 },
   timeButtonText: { flex: 1, fontSize: 18, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  timeDone: { minHeight: 48, marginTop: spacing.sm, alignItems: 'center', justifyContent: 'center', borderRadius: 14 },
-  timeDoneText: { fontSize: 15, fontWeight: '800' },
   reminderRow: { minHeight: 60, borderWidth: 1, borderRadius: 17, padding: 12, marginTop: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: 11 },
   reminderIcon: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   reminderCopy: { flex: 1, minWidth: 0 },

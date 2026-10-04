@@ -391,6 +391,10 @@ export function LogScreen({
   };
 
   const handleSystemClose = () => {
+    if (pickerMode) {
+      setPickerMode(null);
+      return;
+    }
     if (Keyboard.isVisible()) {
       Keyboard.dismiss();
       return;
@@ -405,6 +409,8 @@ export function LogScreen({
         ? replaceCalendarDate(activeValue, date)
         : date.getTime(),
     );
+    setPickerMode(null);
+    void flushAutoSave();
   };
 
   const confirmDelete = async () => {
@@ -963,32 +969,6 @@ export function LogScreen({
                 <Text numberOfLines={1} style={[styles.exactFieldText, { color: theme.text }]}>{formatTime(activeValue)}</Text>
               </Pressable>
             </View>
-            {pickerMode ? (
-              <>
-                <DateTimeSelector
-                  key={`${pickerMode}.${pickerDate.getFullYear()}.${pickerDate.getMonth()}`}
-                  value={pickerDate}
-                  mode={pickerMode}
-                  locale={locale}
-                  theme={theme}
-                  onChange={pickDateTime}
-                />
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={t('editor.finishPicker', {
-                    picker: t(pickerMode === 'date' ? 'editor.date' : 'editor.time'),
-                  })}
-                  onPress={() => {
-                    setPickerMode(null);
-                    void flushAutoSave();
-                  }}
-                  style={({ pressed }) => [styles.pickerDone, pressed && { backgroundColor: theme.primarySoft }]}
-                >
-                  <Text style={[styles.pickerDoneText, { color: theme.primary }]}>{t('common.done')}</Text>
-                </Pressable>
-              </>
-            ) : null}
-
             <Text style={[styles.fieldLabel, styles.noteLabel, { color: theme.textMuted }]}>{t('editor.note')}</Text>
             {draft ? (
               <NoteInput
@@ -1001,6 +981,17 @@ export function LogScreen({
               />
             ) : null}
           </ScrollView>
+          {pickerMode ? (
+            <DateTimeSelector
+              key={pickerMode}
+              value={pickerDate}
+              mode={pickerMode}
+              locale={locale}
+              theme={theme}
+              onChange={pickDateTime}
+              onCancel={() => setPickerMode(null)}
+            />
+          ) : null}
         </KeyboardAvoidingView>
       </Modal>
 
@@ -1122,6 +1113,4 @@ const styles = StyleSheet.create({
   exactFields: { flexDirection: 'row', gap: 8 },
   exactField: { flex: 1, minWidth: 0, minHeight: 58, borderWidth: 1, borderRadius: 16, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 8 },
   exactFieldText: { flex: 1, minWidth: 0, fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  pickerDone: { minHeight: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  pickerDoneText: { fontSize: 15, fontWeight: '800' },
 });
