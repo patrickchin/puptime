@@ -410,6 +410,9 @@ const english = {
   'timeline.loadEarlier': 'Load earlier days',
   'timeline.loadingEarlier': 'Loading earlier days',
   'timeline.historyStart': 'No earlier logged days',
+  'timeline.viewDetails': 'View log details',
+  'timeline.details': 'Log details',
+  'timeline.closeDetails': 'Close log details',
 } as const;
 
 export type MessageKey = keyof typeof english;
@@ -820,6 +823,9 @@ const simplifiedChinese: Dictionary = {
   'timeline.loadEarlier': '加载更早日期',
   'timeline.loadingEarlier': '正在加载更早日期',
   'timeline.historyStart': '没有更早的记录日期',
+  'timeline.viewDetails': '查看记录详情',
+  'timeline.details': '记录详情',
+  'timeline.closeDetails': '关闭记录详情',
 };
 
 const spanish: Dictionary = {
@@ -1227,6 +1233,9 @@ const spanish: Dictionary = {
   'timeline.loadEarlier': 'Cargar días anteriores',
   'timeline.loadingEarlier': 'Cargando días anteriores',
   'timeline.historyStart': 'No hay días registrados anteriores',
+  'timeline.viewDetails': 'Ver detalles del registro',
+  'timeline.details': 'Detalles del registro',
+  'timeline.closeDetails': 'Cerrar detalles del registro',
 };
 
 const dictionaries: Record<AppLanguage, Dictionary> = {

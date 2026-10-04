@@ -13,6 +13,7 @@ import {
   TIMELINE_BUCKETS,
   timelineBucket,
   timelineDurationRuns,
+  timelineMarksForPointHit,
   timelinePointClusters,
 } from './analytics.ts';
 import type { PuppyEvent, ScheduleEntry } from './domain.ts';
@@ -158,6 +159,19 @@ test('combines simultaneous point activities and an underlying span into one tim
     },
     { startBucket: 30, ids: ['walk'], types: ['walk'], hasDuration: false },
   ]);
+});
+
+test('a timeline tap includes overlapping logs and separates them when zoomed in', () => {
+  const marks = [
+    { id: 'nap', type: 'nap' as const, label: 'Nap', startBucket: 20, endBucket: 26 },
+    { id: 'pee', type: 'pee' as const, label: 'Pee', startBucket: 24 },
+    { id: 'meal', type: 'meal' as const, label: 'Ate', startBucket: 30 },
+    { id: 'later-nap', type: 'nap' as const, label: 'Nap', startBucket: 29, endBucket: 33 },
+    { id: 'walk', type: 'walk' as const, label: 'Walk', startBucket: 40 },
+  ];
+
+  assert.deepEqual(timelineMarksForPointHit(marks, 24, 384).map((mark) => mark.id), ['nap', 'pee', 'meal', 'later-nap']);
+  assert.deepEqual(timelineMarksForPointHit(marks, 24, 1536).map((mark) => mark.id), ['nap', 'pee']);
 });
 
 test('joins touching and overlapping spans of the same activity', () => {
