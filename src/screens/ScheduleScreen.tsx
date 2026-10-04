@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import {
   Alert,
+  Keyboard,
   Linking,
   Modal,
   Pressable,
@@ -9,6 +10,7 @@ import {
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 
@@ -519,7 +521,14 @@ export function ScheduleScreen({
         </View>
       </Modal>
 
-      <Modal visible={draft !== null} transparent animationType="none" onRequestClose={() => showTimeSelector ? setShowTimeSelector(false) : setDraft(null)}>
+      <Modal visible={draft !== null} transparent animationType="none" onRequestClose={() => {
+        const focusedInput = TextInput.State.currentlyFocusedInput();
+        if (focusedInput) {
+          focusedInput.blur();
+          Keyboard.dismiss();
+        } else if (showTimeSelector) setShowTimeSelector(false);
+        else setDraft(null);
+      }}>
         <View testID="schedule.editor" accessibilityViewIsModal style={styles.scrim}>
           <ScrollView
             bounces={false}

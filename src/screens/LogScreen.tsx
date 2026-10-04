@@ -320,6 +320,12 @@ export function LogScreen({
   };
 
   const handleSystemClose = () => {
+    const focusedInput = TextInput.State.currentlyFocusedInput();
+    if (focusedInput) {
+      focusedInput.blur();
+      Keyboard.dismiss();
+      return;
+    }
     if (pickerMode) {
       setPickerMode(null);
       return;
