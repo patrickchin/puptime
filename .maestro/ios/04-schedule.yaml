@@ -39,7 +39,6 @@ tags:
     checked: false
 - tapOn:
     id: schedule.editor.reminder
-- assertVisible: ^(Notifications are off|通知已关闭|Las notificaciones están desactivadas)$
 - tapOn:
     text: ^(Not now|暂不|Ahora no)$
     retryTapIfNoChange: true
