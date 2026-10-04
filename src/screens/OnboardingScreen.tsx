@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { EVENT_META } from '../domain';
 import { useLocalization } from '../localization-context';
@@ -15,16 +15,27 @@ export function OnboardingScreen({
   onAllowNotifications,
   onOpenSystemSettings,
   onFinish,
+  onBack,
 }: {
   theme: Theme;
   notificationPermission: NotificationPermissionState;
   onAllowNotifications: () => Promise<boolean>;
   onOpenSystemSettings: () => void;
   onFinish: () => Promise<void>;
+  onBack: () => boolean;
 }) {
   const { t } = useLocalization();
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (step === 0) return onBack();
+      setStep((current) => Math.max(0, current - 1));
+      return true;
+    });
+    return () => subscription.remove();
+  }, [onBack, step]);
 
   const finish = async () => {
     if (busy) return;

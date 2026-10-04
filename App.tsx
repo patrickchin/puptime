@@ -91,6 +91,8 @@ export default function App() {
   const [preferencePicker, setPreferencePicker] = useState<'theme' | 'language' | null>(null);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [onboardingVisible, setOnboardingVisible] = useState<boolean | null>(null);
+  const [guideOpenedFromSettings, setGuideOpenedFromSettings] = useState(false);
+  const [scheduleOpenedFromSettings, setScheduleOpenedFromSettings] = useState(false);
   const [initialOnboardingCheck] = useState(shouldShowOnboarding);
   const theme = resolveTheme(themePreference, colorScheme);
   const language = resolveLanguage(languagePreference);
@@ -168,14 +170,36 @@ export default function App() {
     Appearance.setColorScheme(themePreference === 'system' ? 'unspecified' : theme.isDark ? 'dark' : 'light');
   }, [theme.isDark, themePreference]);
 
+  const navigateToTab = (nextTab: Tab) => {
+    setScheduleOpenedFromSettings(false);
+    setTab(nextTab);
+  };
+
   useEffect(() => {
-    if (!settingsVisible) return;
+    if (onboardingVisible !== false) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      setSettingsVisible(false);
-      return true;
+      if (preferencePicker !== null) {
+        setPreferencePicker(null);
+        return true;
+      }
+      if (settingsVisible) {
+        setSettingsVisible(false);
+        return true;
+      }
+      if (tab === 'schedule' && scheduleOpenedFromSettings) {
+        setScheduleOpenedFromSettings(false);
+        setTab('log');
+        setSettingsVisible(true);
+        return true;
+      }
+      if (tab !== 'log') {
+        setTab('log');
+        return true;
+      }
+      return false;
     });
     return () => subscription.remove();
-  }, [settingsVisible]);
+  }, [onboardingVisible, preferencePicker, scheduleOpenedFromSettings, settingsVisible, tab]);
 
   useEffect(() => {
     configureNotificationActions(language).catch(() => undefined);
@@ -452,7 +476,8 @@ export default function App() {
     try {
       await completeOnboarding();
       setOnboardingVisible(false);
-      setTab('log');
+      setGuideOpenedFromSettings(false);
+      navigateToTab('log');
     } catch {
       Alert.alert(translate(language, 'settings.saveErrorTitle'), translate(language, 'settings.saveErrorBody'));
     }
@@ -480,10 +505,12 @@ export default function App() {
           }}
           onOpenSchedule={() => {
             setSettingsVisible(false);
+            setScheduleOpenedFromSettings(true);
             setTab('schedule');
           }}
           onOpenGuide={() => {
             setSettingsVisible(false);
+            setGuideOpenedFromSettings(true);
             setOnboardingVisible(true);
           }}
         />
@@ -515,7 +542,7 @@ export default function App() {
         onLog={logEvent}
         onSave={saveEventDetails}
         onDelete={confirmDelete}
-        onOpenSchedule={() => setTab('schedule')}
+        onOpenSchedule={() => navigateToTab('schedule')}
         onOpenSettings={() => setSettingsVisible(true)}
         theme={theme}
       />
@@ -554,6 +581,13 @@ export default function App() {
                 onAllowNotifications={requestNotifications}
                 onOpenSystemSettings={() => Linking.openSettings().catch(() => undefined)}
                 onFinish={finishOnboarding}
+                onBack={() => {
+                  if (!guideOpenedFromSettings) return false;
+                  setOnboardingVisible(false);
+                  setGuideOpenedFromSettings(false);
+                  setSettingsVisible(true);
+                  return true;
+                }}
               />
             ) : screen}
             {!onboardingVisible && undoState ? (
@@ -572,7 +606,7 @@ export default function App() {
           </View>
           {onboardingVisible === false && !settingsVisible ? (
             <SafeAreaView edges={['bottom']} style={{ backgroundColor: theme.nav }}>
-              <BottomNav tab={tab} onChange={setTab} theme={theme} />
+              <BottomNav tab={tab} onChange={navigateToTab} theme={theme} />
             </SafeAreaView>
           ) : null}
           <ThemePicker
