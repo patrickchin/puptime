@@ -385,10 +385,11 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
   const { activityColors, activityLabel, language, t } = useLocalization();
   const { fontScale, height, width } = useWindowDimensions();
   const activityFilters: ActivityKey[] = [...quickEventTypes, ...customActivities.map(customActivityKey)];
-  const [selectedTypes, setSelectedTypes] = useState<ActivityKey[]>([...quickEventTypes]);
+  const [selectedType, setSelectedType] = useState<ActivityKey | 'all'>('all');
+  const selectedTypes = selectedType === 'all' ? activityFilters : [selectedType];
   useEffect(() => {
-    setSelectedTypes((current) => [...current, ...customActivities.map(customActivityKey).filter((key) => !current.includes(key))]);
-  }, [customActivities]);
+    if (selectedType !== 'all' && !activityFilters.includes(selectedType)) setSelectedType('all');
+  }, [customActivities, selectedType]);
   const [loadedDayCount, setLoadedDayCount] = useState(INITIAL_DAYS);
   const [timeScale, setTimeScale] = useState(MIN_TIME_SCALE);
   const [nowTime, setNowTime] = useState(Date.now());
@@ -421,7 +422,6 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
   const visibleMarkCount = days.flatMap((day) => day.marks.filter((mark) => selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label })))).length;
   const hasVisibleEstimates = days.some((day) => day.marks.some((mark) => mark.estimated && selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label }))));
   const rangeLabel = days.length ? formatDateRange(days[0].date, days[days.length - 1].date, language) : '';
-  const allSelected = activityFilters.every((key) => selectedTypes.includes(key));
   const hasEarlierDays = loadedDayCount < maxHistoryDays;
   const isCompactHeight = height < 500;
   const selectedEvents = events.filter((event) => selection?.ids.includes(event.id)).sort((a, b) => a.at - b.at);
@@ -523,12 +523,6 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
     },
     onPanResponderTerminationRequest: () => false,
   }), []);
-
-  function toggleActivity(type: ActivityKey) {
-    setSelectedTypes((current) => current.includes(type)
-      ? current.filter((candidate) => candidate !== type)
-      : activityFilters.filter((candidate) => current.includes(candidate) || candidate === type));
-  }
 
   function loadEarlierDays() {
     if (!hasEarlierDays || isLoadingEarlier) return;
@@ -695,15 +689,7 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
         >
           {(['all', ...activityFilters] as const).map((type) => {
             const isAll = type === 'all';
-            const checked: boolean | 'mixed' = isAll
-              ? allSelected
-                ? true
-                : selectedTypes.length
-                  ? 'mixed'
-                  : false
-              : selectedTypes.includes(type);
-            const active = checked !== false;
-            const selected = checked === true;
+            const active = selectedType === type;
             const activity = isAll ? null : activityFromKey(type, customActivities);
             const label = activity ? activityLabel(activity) : t('insights.all');
             const colors = activity ? activityColors(theme, activity) : { color: theme.primary, softColor: theme.primarySoft };
@@ -713,15 +699,12 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
               <Pressable
                 key={type}
                 testID={`timeline.filter.${type}`}
-                accessibilityRole="checkbox"
-                accessibilityLabel={isAll
-                  ? t(allSelected ? 'insights.clearFilters' : 'insights.selectFilters')
-                  : t(selected ? 'insights.hideTiming' : 'insights.showTiming', { activity: label })}
-                accessibilityState={{ checked }}
+                accessibilityRole="radio"
+                accessibilityLabel={label}
+                accessibilityState={{ checked: active }}
                 onPress={() => {
                   setSelection(null);
-                  if (isAll) setSelectedTypes(allSelected ? [] : [...activityFilters]);
-                  else toggleActivity(type);
+                  setSelectedType(type);
                 }}
                 style={({ pressed }) => [
                   styles.filterChip,
@@ -741,7 +724,7 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
                   <MaterialCommunityIcons
                     accessibilityElementsHidden
                     importantForAccessibility="no"
-                    name={checked === 'mixed' ? 'minus' : 'check'}
+                    name="check"
                     size={14}
                     color={color}
                   />
@@ -751,13 +734,11 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
           })}
         </ScrollView>
 
-        {!isCompactHeight && (selectedTypes.length === 0 || visibleMarkCount === 0) ? (
+        {!isCompactHeight && visibleMarkCount === 0 ? (
           <View testID="timeline.empty" style={[styles.emptyNote, { backgroundColor: theme.surface, borderRadius: theme.presentation.controlRadius }]}>
             <MaterialCommunityIcons name="clock-outline" size={18} color={theme.textMuted} />
             <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-              {selectedTypes.length === 0
-                ? t('insights.chooseActivity')
-                : t('insights.noRangeLogs', { activity: filterName(selectedTypes, language, activityFilters.length, activityLabel) })}
+              {t('insights.noRangeLogs', { activity: filterName(selectedTypes, language, activityFilters.length, activityLabel) })}
             </Text>
           </View>
         ) : null}

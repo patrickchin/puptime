@@ -64,19 +64,19 @@ tags:
     text: .*1\.0×.*
 - assertVisible:
     id: timeline.filter.all
-    text: checkbox, checked
+- assertVisible:
+    id: timeline.range
+    text: .*3 logs.*
 - tapOn:
-    id: timeline.filter.all
+    id: timeline.filter.poop
 - assertVisible:
-    id: timeline.filter.all
-    text: checkbox, unchecked
-- assertVisible:
-    id: timeline.empty
+    id: timeline.range
+    text: .*1 logs.*
 - tapOn:
     id: timeline.filter.pee
 - assertVisible:
-    id: timeline.filter.pee
-    text: checkbox, checked
+    id: timeline.range
+    text: .*2 logs.*
 - assertNotVisible:
     id: timeline.empty
 - tapOn:
@@ -104,3 +104,8 @@ tags:
 - assertVisible:
     id: timeline.zoom.value
     text: .*1\.5×.*
+- tapOn:
+    id: timeline.filter.all
+- assertVisible:
+    id: timeline.range
+    text: .*3 logs.*
