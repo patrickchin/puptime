@@ -6,14 +6,14 @@ Puptime is a puppy activity log for Android and iOS. Data stays on the device.
 
 <table>
   <tr>
-    <th>Today</th>
-    <th>Activity history</th>
+    <th>Log</th>
     <th>Home Screen widget</th>
+    <th>Insights</th>
   </tr>
   <tr>
-    <td><img src="assets/screenshots/today.png" width="260" alt="Puptime Today screen with quick logging and routine progress"></td>
-    <td><img src="assets/screenshots/activity.png" width="260" alt="Puptime activity history with notes and timed naps"></td>
+    <td><img src="assets/screenshots/today.png" width="260" alt="Puptime Log screen with pee, poop, eat, and one card per day"></td>
     <td><img src="assets/screenshots/widget.jpg" width="260" alt="Puptime quick logging widget on the iPhone Home Screen"></td>
+    <td><img src="assets/screenshots/insights-summary.png" width="260" alt="Puptime insights with frequency summaries and possible missing logs"></td>
   </tr>
   <tr>
     <th>Timing patterns</th>
@@ -29,10 +29,10 @@ Puptime is a puppy activity log for Android and iOS. Data stays on the device.
 
 ## Features
 
-- Log pee, poop, meals, potty trips, walks, naps, and custom activities, with haptic confirmation and undo. Named activities stay available as quick actions, routine choices, timeline filters, frequency summaries, and widget actions.
-- Start and stop naps, then edit their start and end times.
+- Log pee, poop, and meals with one tap, haptic confirmation, and undo. Earlier logs of other activities remain in history.
+- Use a configured widget action to start and stop naps, then edit their start and end times.
 - Add typed or dictated notes and edit an activity, name, date, time, or note.
-- Filter recent history or open the month-by-month archive.
+- See today and yesterday together, expand earlier dates, and load more history as needed.
 - Set a daily routine, choose when reminders arrive, and review suggested times before using them.
 - Get customizable potty nudges after the latest pee or meal log.
 - Compare activity timing across 10, 20, or 30 days and view pee and poop frequency summaries.
@@ -48,11 +48,11 @@ The starter routine is only an editable example, not veterinary guidance. Change
 
 Download the APK from the [latest GitHub release](https://github.com/patrickchin/puptime/releases/latest), open it on your phone, and allow installation from that source if Android asks.
 
-Open Settings from the gear on the Today screen to choose the two to four actions shown on your home screen. Pee, poop, and meals are the default; an active nap temporarily appears so it can always be ended.
+Open Settings from the gear on the Log screen to choose the two to four actions shown on your home screen. Pee, poop, and meals are the default; an active nap temporarily appears so it can always be ended from the widget.
 
 The Android widget uses the available height for its action buttons. Long-press it to resize it. In the app, tap the pencil beside a log to change its activity, custom name, date, time, or note. Edits save automatically, even if you close the editor. Nap logs have separate start and end times.
 
-Puptime does not end an open nap or add estimated sleep to your logs. If you forgot to stop a nap, tap **End nap**, then edit its end time. Possible gaps appear automatically as faded marks on the timeline; they remain uncertain and are excluded from log counts, exports, and reminders. Nap taps saved by Puptime 1.1 remain point events.
+Puptime does not end an open nap or add estimated sleep to your logs. If you forgot to stop a nap, tap **End nap** on the widget, then edit its end time. Possible gaps appear automatically as faded marks on the timeline; they remain uncertain and are excluded from log counts, exports, and reminders. Nap taps saved by Puptime 1.1 remain point events.
 
 Saved notes and activity data stay on your device. Voice dictation uses your phone's Apple or Android speech-recognition service, which may require a network connection depending on the device and downloaded language models.
 
@@ -88,7 +88,7 @@ npm run build:android
 
 ## iOS end-to-end tests
 
-The Maestro suite covers navigation, activity CRUD and persistence, naps, custom activities, routine editing and reminder permission handling, widget and appearance settings, localization, Insights, and Timeline controls.
+The Maestro suite covers navigation, core logging and persistence, routine editing and reminder permission handling, widget and appearance settings, localization, Insights, and Timeline controls.
 
 Install [Maestro](https://docs.maestro.dev/maestro-cli/how-to-install-maestro-cli), boot an iOS 26 Simulator, and install a local Puptime build with `npm run ios`. Keep Expo running, then run this in another terminal:
 

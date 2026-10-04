@@ -1,0 +1,37 @@
+appId: com.patrickchin.puptime
+name: iOS simple log and date sections
+tags:
+  - ios
+  - critical
+---
+- launchApp:
+    clearState: true
+- runFlow: ../helpers/skip-onboarding.yaml
+- extendedWaitUntil:
+    visible:
+      id: quick.pee
+    timeout: 90000
+- assertVisible:
+    id: quick.poop
+- assertVisible:
+    id: quick.meal
+- assertNotVisible:
+    id: quick.nap
+- assertNotVisible:
+    id: quick.another
+- tapOn:
+    id: quick.pee
+- scrollUntilVisible:
+    element:
+      id: history.day.today
+    direction: DOWN
+    visibilityPercentage: 50
+- assertVisible:
+    id: event.pee
+- scrollUntilVisible:
+    element:
+      id: history.day.yesterday
+    direction: DOWN
+    visibilityPercentage: 50
+- assertVisible:
+    id: history.day.yesterday

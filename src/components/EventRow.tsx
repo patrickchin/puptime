@@ -9,19 +9,21 @@ import {
 } from '../domain';
 import { ActivityIcon } from './ActivityIcon';
 import { useLocalization } from '../localization-context';
-import { spacing, surfaceTreatment, type Theme } from '../theme';
+import { type Theme } from '../theme';
 
 export function EventRow({
   event,
   onEdit,
   onDelete,
   now,
+  showDivider,
   theme,
 }: {
   event: PuppyEvent;
   onEdit: () => void;
   onDelete: () => void;
   now: number;
+  showDivider: boolean;
   theme: Theme;
 }) {
   const { activityColors, eventPastLabel, t } = useLocalization();
@@ -39,8 +41,7 @@ export function EventRow({
       testID={`event.${event.type}`}
       style={[
         styles.row,
-        surfaceTreatment(theme),
-        { backgroundColor: theme.surfaceRaised, borderColor: theme.border },
+        { borderBottomColor: theme.border, borderBottomWidth: showDivider ? StyleSheet.hairlineWidth : 0 },
       ]}
     >
       <View
@@ -98,12 +99,10 @@ export function EventRow({
 const styles = StyleSheet.create({
   row: {
     minHeight: 72,
-    paddingHorizontal: 12,
     paddingVertical: 10,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginBottom: spacing.sm,
   },
   iconCircle: {
     width: 42,

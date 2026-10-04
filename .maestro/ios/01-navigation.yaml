@@ -20,11 +20,11 @@ tags:
     id: quick.poop
 - assertVisible:
     id: quick.meal
-- assertVisible:
+- assertNotVisible:
     id: quick.pottyTrip
-- assertVisible:
+- assertNotVisible:
     id: quick.walk
-- assertVisible:
+- assertNotVisible:
     id: quick.nap
 - tapOn:
     id: nav.timeline

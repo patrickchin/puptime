@@ -1,15 +1,13 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { QuickActions } from '../components/QuickActions';
 import { ActivityIcon } from '../components/ActivityIcon';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { DateTimeSelector } from '../components/DateTimeSelector';
-import type { ActivityCustomization } from '../activity-customization';
 import { EventRow } from '../components/EventRow';
 import { NoteInput } from '../components/NoteInput';
-import { TodayRoutineCard } from '../components/TodayRoutineCard';
 import {
   dateKey,
   customActivityKey,
@@ -19,35 +17,17 @@ import {
   normalizeCustomLabel,
   replaceCalendarDate,
   type EventType,
-  type Activity,
   type PuppyEvent,
   type PuppyEventChanges,
-  type ScheduleEntry,
 } from '../domain';
 import { useLocalization } from '../localization-context';
-import type { MessageKey } from '../localization';
+import { groupLogHistory } from '../log-history';
 import { spacing, surfaceTreatment, type Theme } from '../theme';
 
 const quickBackdates = [0, 5, 15, 30, 60] as const;
 const editableEventTypes = eventTypes.filter((type) => type !== 'nap');
 const autoSaveDelayMs = 450;
-const recentHistoryDays = 2;
-const activityFilters: readonly {
-  id: string;
-  labelKey: MessageKey;
-  icon: keyof typeof MaterialCommunityIcons.glyphMap;
-  types: readonly EventType[];
-}[] = [
-  { id: 'all', labelKey: 'log.filter.all', icon: 'format-list-bulleted', types: [] },
-  { id: 'potty', labelKey: 'log.filter.potty', icon: 'water-outline', types: ['pee', 'poop', 'pottyTrip'] },
-  { id: 'meals', labelKey: 'log.filter.meals', icon: 'food-apple-outline', types: ['meal'] },
-  { id: 'walks', labelKey: 'log.filter.walks', icon: 'walk', types: ['walk'] },
-  { id: 'naps', labelKey: 'log.filter.naps', icon: 'sleep', types: ['nap'] },
-  { id: 'other', labelKey: 'log.filter.other', icon: 'tag-outline', types: ['custom'] },
-] as const;
-
-type ActivityFilter = (typeof activityFilters)[number]['id'];
-type HistoryScope = 'recent' | 'all';
+const olderDaysPerPage = 7;
 
 type Draft = {
   event: PuppyEvent;
@@ -119,37 +99,24 @@ function sectionTitle(
   return new Intl.DateTimeFormat(locale, options).format(date);
 }
 
-function monthTitle(key: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' })
-    .format(new Date(`${key}-01T12:00:00`));
-}
-
 export function LogScreen({
   events,
-  schedule,
   customActivities,
-  onChangeActivityAppearance,
-  onDeleteCustomActivity,
   editRequest,
   onEditRequestHandled,
   onLog,
   onSave,
   onDelete,
-  onOpenSchedule,
   onOpenSettings,
   theme,
 }: {
   events: PuppyEvent[];
-  schedule: ScheduleEntry[];
   customActivities: string[];
-  onChangeActivityAppearance: (activity: Activity, customization: ActivityCustomization) => Promise<void>;
-  onDeleteCustomActivity: (label: string) => Promise<void>;
   editRequest?: LogEditRequest | null;
   onEditRequestHandled?: () => void;
   onLog: (type: EventType, customLabel?: string) => Promise<void>;
   onSave: (event: PuppyEvent, changes: PuppyEventChanges) => Promise<void>;
   onDelete: (event: PuppyEvent) => Promise<void>;
-  onOpenSchedule: () => void;
   onOpenSettings: () => void;
   theme: Theme;
 }) {
@@ -163,9 +130,8 @@ export function LogScreen({
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [closing, setClosing] = useState(false);
   const [now, setNow] = useState(Date.now());
-  const [activityFilter, setActivityFilter] = useState<ActivityFilter>('all');
   const [focusNote, setFocusNote] = useState(false);
-  const [historyScope, setHistoryScope] = useState<HistoryScope>('recent');
+  const [loadedOlderDays, setLoadedOlderDays] = useState(olderDaysPerPage);
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
   const draftRef = useRef<Draft | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -280,50 +246,15 @@ export function LogScreen({
     if (event) startEditing(event, Boolean(editRequest.focusNote));
     onEditRequestHandled?.();
   }, [editRequest, events, onEditRequestHandled]);
-  const filters = useMemo(() => [
-    ...activityFilters,
-    ...customActivities.map((label) => ({ id: customActivityKey(label), label: activityLabel({ type: 'custom', customLabel: label }), icon: 'tag-outline' as const, types: ['custom'] as readonly EventType[] })),
-  ], [activityLabel, customActivities]);
-  useEffect(() => {
-    if (activityFilter.startsWith('custom:') && !customActivities.some((label) => customActivityKey(label) === activityFilter)) {
-      setActivityFilter('all');
-    }
-  }, [activityFilter, customActivities]);
-  const filteredEvents = useMemo(() => {
-    const selected = filters.find((item) => item.id === activityFilter);
-    if (!selected || selected.types.length === 0) return events;
-    return events.filter((event) => selected.types.includes(event.type)
-      && (!activityFilter.startsWith('custom:') || customActivityKey(event.customLabel ?? '') === activityFilter));
-  }, [activityFilter, events, filters]);
   const todayKey = dateKey(now);
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);
   const yesterdayKey = dateKey(yesterday);
   const currentYear = new Date(now).getFullYear();
-  const recentStartDate = new Date(now);
-  recentStartDate.setHours(0, 0, 0, 0);
-  recentStartDate.setDate(recentStartDate.getDate() - (recentHistoryDays - 1));
-  const recentStart = recentStartDate.getTime();
-  const recentEvents = useMemo(
-    () => filteredEvents.filter((event) => event.at >= recentStart),
-    [filteredEvents, recentStart],
-  );
-  const visibleEvents = historyScope === 'all' ? filteredEvents : recentEvents;
-  const olderEventCount = filteredEvents.length - recentEvents.length;
-  const sections = useMemo(() => {
-    const byDay = new Map<string, PuppyEvent[]>();
-    visibleEvents.forEach((event) => {
-      const key = dateKey(event.at);
-      const day = byDay.get(key);
-      if (day) day.push(event);
-      else byDay.set(key, [event]);
-    });
-    let previousMonth = '';
-    return [...byDay.entries()].map(([key, data]) => {
-      const monthKey = key.slice(0, 7);
-      const startsMonth = historyScope === 'all' && monthKey !== previousMonth;
-      previousMonth = monthKey;
-      const expanded = expandedDays[key] ?? (key === todayKey);
+  const { sections, hasMoreDays } = useMemo(() => {
+    const { days, hasMoreDays } = groupLogHistory(events, now, loadedOlderDays);
+    return { hasMoreDays, sections: days.map(({ key, data }) => {
+      const expanded = expandedDays[key] ?? (key === todayKey || key === yesterdayKey);
       return {
         key,
         title: sectionTitle(
@@ -338,16 +269,14 @@ export function LogScreen({
         count: data.length,
         expanded,
         data: expanded ? data : [],
-        monthTitle: startsMonth ? monthTitle(monthKey, locale) : undefined,
       };
-    });
-  }, [currentYear, expandedDays, historyScope, locale, t, todayKey, visibleEvents, yesterdayKey]);
+    }) };
+  }, [currentYear, expandedDays, events, loadedOlderDays, locale, now, t, todayKey, yesterdayKey]);
   const timedNap = draft?.event.type === 'nap' && draft.event.endedAt !== undefined;
   const activeValue = draft?.field === 'end' ? draft.endedAt ?? Date.now() : draft?.at ?? Date.now();
   const pickerDate = new Date(activeValue);
   const draftColors = activityColors(theme, draft ?? { type: 'pee' });
   const customInvalid = draft?.type === 'custom' && !normalizeCustomLabel(draft.customLabel);
-  const selectedFilter = filters.find((item) => item.id === activityFilter) ?? activityFilters[0];
   const setDraftTime = (value: number) => {
     updateDraft((current) => {
       if (current.field === 'end') {
@@ -429,13 +358,12 @@ export function LogScreen({
 
   return (
     <>
-      <SectionList
+      <FlatList
         testID="screen.today"
-        sections={sections}
-        keyExtractor={(item) => item.id}
+        data={sections}
+        keyExtractor={(section) => section.key}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.content}
-        stickySectionHeadersEnabled={false}
         ListHeaderComponent={
           <>
             <View style={styles.titleBlock}>
@@ -494,135 +422,36 @@ export function LogScreen({
                 </Pressable>
               </View>
             </View>
-            <QuickActions events={events} customActivities={customActivities} onLog={onLog} onChangeAppearance={onChangeActivityAppearance} onDeleteCustomActivity={onDeleteCustomActivity} now={now} theme={theme} />
-            <TodayRoutineCard
-              events={events}
-              schedule={schedule}
-              now={now}
-              onOpenSchedule={onOpenSchedule}
-              theme={theme}
-            />
+            <QuickActions events={events} onLog={onLog} now={now} theme={theme} />
             <View style={styles.activityHeading}>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('log.activity')}</Text>
             </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.filters}
-            >
-              {filters.map((item) => {
-                const selected = activityFilter === item.id;
-                const label = 'label' in item ? item.label : t(item.labelKey);
-                return (
-                  <Pressable
-                    key={item.id}
-                    testID={`history.filter.${item.id}`}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    accessibilityLabel={t('log.showFilter', { filter: label })}
-                    onPress={() => setActivityFilter(item.id)}
-                    style={({ pressed }) => [
-                      styles.filter,
-                      {
-                        backgroundColor: selected || pressed ? theme.primarySoft : theme.surfaceRaised,
-                        borderColor: selected ? theme.primary : theme.border,
-                        borderRadius: theme.presentation.controlRadius,
-                        borderWidth: theme.presentation.borderWidth,
-                      },
-                    ]}
-                  >
-                    {item.id.startsWith('custom:')
-                      ? <ActivityIcon activity={{ type: 'custom', customLabel: customActivities.find((label) => customActivityKey(label) === item.id) }} theme={theme} size={17} color={selected ? theme.primary : theme.textMuted} />
-                      : <MaterialCommunityIcons name={item.icon as keyof typeof MaterialCommunityIcons.glyphMap} size={17} color={selected ? theme.primary : theme.textMuted} />}
-                    <Text style={[styles.filterText, { color: selected ? theme.primary : theme.textMuted }]}>
-                      {label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-            {olderEventCount > 0 || historyScope === 'all' ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={historyScope === 'all'
-                  ? t('log.showRecentA11y', { count: recentHistoryDays })
-                  : t('log.viewAllA11y', { count: olderEventCount })}
-                onPress={() => setHistoryScope((scope) => scope === 'recent' ? 'all' : 'recent')}
-                style={({ pressed }) => [
-                  styles.historyScope,
-                  {
-                    backgroundColor: pressed ? theme.primarySoft : theme.surfaceRaised,
-                    borderColor: theme.border,
-                    borderRadius: theme.presentation.cardRadius,
-                    borderWidth: theme.presentation.borderWidth,
-                  },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.historyScopeIcon,
-                    { backgroundColor: theme.primarySoft, borderRadius: theme.presentation.iconRadius },
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    accessibilityElementsHidden
-                    importantForAccessibility="no"
-                    name={historyScope === 'all' ? 'calendar-today-outline' : 'history'}
-                    size={20}
-                    color={theme.primary}
-                  />
-                </View>
-                <Text style={[styles.historyScopeTitle, { color: theme.text }]}>
-                  {historyScope === 'all'
-                    ? t('log.showRecent', { count: recentHistoryDays })
-                    : t('log.viewAll', { count: olderEventCount })}
-                </Text>
-                <MaterialCommunityIcons
-                  accessibilityElementsHidden
-                  importantForAccessibility="no"
-                  name="chevron-right"
-                  size={22}
-                  color={theme.textMuted}
-                />
-              </Pressable>
-            ) : null}
           </>
         }
-        renderSectionHeader={({ section }) => (
-          <View>
-            {section.monthTitle ? (
-              <View style={styles.archiveMonthHeading}>
-                <Text
-                  style={[
-                    styles.archiveMonthText,
-                    { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking },
-                  ]}
-                >
-                  {section.monthTitle.toUpperCase()}
-                </Text>
-                <View style={[styles.archiveMonthLine, { backgroundColor: theme.border }]} />
-              </View>
-            ) : null}
+        renderItem={({ item: section }) => (
+          <View style={[styles.dayCard, surfaceTreatment(theme), { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
             <Pressable
-              testID={`history.day.${section.key === todayKey ? 'today' : section.key}`}
+              testID={`history.day.${section.key === todayKey ? 'today' : section.key === yesterdayKey ? 'yesterday' : section.key}`}
               accessibilityRole="button"
               accessibilityState={{ expanded: section.expanded }}
               accessibilityLabel={t('log.toggleDayA11y', { day: section.title, count: section.count })}
               onPress={() => setExpandedDays((current) => ({
                 ...current,
-                [section.key]: !(current[section.key] ?? (section.key === todayKey)),
+                [section.key]: !(current[section.key] ?? (section.key === todayKey || section.key === yesterdayKey)),
               }))}
               style={({ pressed }) => [
                 styles.dayHeading,
                 {
-                  backgroundColor: pressed ? theme.primarySoft : theme.surfaceRaised,
-                  borderColor: theme.border,
-                  borderRadius: theme.presentation.controlRadius,
-                  borderWidth: theme.presentation.borderWidth,
+                  backgroundColor: pressed ? theme.primarySoft : 'transparent',
+                  borderBottomColor: theme.border,
+                  borderBottomWidth: section.expanded ? StyleSheet.hairlineWidth : 0,
+                  borderRadius: section.expanded ? 0 : theme.presentation.cardRadius,
+                  borderTopLeftRadius: theme.presentation.cardRadius,
+                  borderTopRightRadius: theme.presentation.cardRadius,
                 },
               ]}
             >
-              <Text style={[styles.dayHeadingText, { color: theme.text }]}>{section.title}</Text>
+              <Text style={[styles.dayHeadingText, { color: section.key === todayKey || section.key === yesterdayKey ? theme.primary : theme.text }]}>{section.title}</Text>
               <Text style={[styles.dayCount, { color: theme.textMuted }]}>{section.count}</Text>
               <MaterialCommunityIcons
                 accessibilityElementsHidden
@@ -632,40 +461,35 @@ export function LogScreen({
                 color={theme.textMuted}
               />
             </Pressable>
+            {section.data.map((event, index) => (
+              <View key={event.id} style={styles.dayRow}>
+                <EventRow
+                  event={event}
+                  now={now}
+                  onEdit={() => startEditing(event)}
+                  onDelete={() => { setDeleteFailed(false); setPendingDelete(event); }}
+                  showDivider={index < section.data.length - 1}
+                  theme={theme}
+                />
+              </View>
+            ))}
+            {section.expanded && section.count === 0 && (section.key === todayKey || section.key === yesterdayKey) ? (
+              <Text testID={section.key === todayKey ? 'history.empty' : undefined} style={[styles.emptyDay, { color: theme.textMuted }]}>
+                {t(section.key === todayKey ? 'log.emptyTitle' : 'log.emptyDay')}
+              </Text>
+            ) : null}
           </View>
         )}
-        renderItem={({ item }) => (
-          <EventRow
-            event={item}
-            now={now}
-            onEdit={() => startEditing(item)}
-            onDelete={() => { setDeleteFailed(false); setPendingDelete(item); }}
-            theme={theme}
-          />
-        )}
-        ListEmptyComponent={
-          <View
-            testID="history.empty"
-            style={[
-              styles.empty,
-              {
-                borderColor: theme.border,
-                backgroundColor: theme.surface,
-                borderRadius: theme.presentation.cardRadius,
-                borderWidth: theme.presentation.borderWidth,
-              },
-            ]}
+        ListFooterComponent={hasMoreDays ? (
+          <Pressable
+            testID="history.loadMore"
+            accessibilityRole="button"
+            onPress={() => setLoadedOlderDays((count) => count + olderDaysPerPage)}
+            style={({ pressed }) => [styles.loadMore, { backgroundColor: pressed ? theme.primarySoft : 'transparent' }]}
           >
-            <MaterialCommunityIcons name={selectedFilter.icon as keyof typeof MaterialCommunityIcons.glyphMap} size={28} color={theme.textMuted} />
-            <Text style={[styles.emptyTitle, { color: theme.text }]}>
-              {historyScope === 'recent' && olderEventCount > 0
-                ? t('log.emptyRecentTitle', { count: recentHistoryDays })
-                : activityFilter === 'all'
-                ? t('log.emptyTitle')
-                : t('log.emptyFilteredTitle', { filter: ('label' in selectedFilter ? selectedFilter.label : t(selectedFilter.labelKey)).toLocaleLowerCase(locale) })}
-            </Text>
-          </View>
-        }
+            <Text style={[styles.loadMoreText, { color: theme.primary }]}>{t('log.loadMore')}</Text>
+          </Pressable>
+        ) : null}
       />
 
       <Modal visible={draft !== null} transparent animationType="none" onRequestClose={handleSystemClose}>
@@ -1042,38 +866,14 @@ const styles = StyleSheet.create({
   title: { fontSize: 27, lineHeight: 33, fontWeight: '800', letterSpacing: -0.5 },
   activityHeading: { marginTop: spacing.xl, marginBottom: 12, flexDirection: 'row', alignItems: 'baseline' },
   sectionTitle: { flex: 1, fontSize: 21, fontWeight: '800' },
-  filters: { gap: 8, paddingBottom: 8 },
-  filter: {
-    minHeight: 48,
-    borderWidth: 1,
-    borderRadius: 16,
-    paddingHorizontal: 13,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  filterText: { fontSize: 13, lineHeight: 18, fontWeight: '700' },
-  historyScope: {
-    minHeight: 64,
-    borderWidth: 1,
-    borderRadius: 18,
-    paddingHorizontal: 12,
-    marginTop: 4,
-    marginBottom: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  historyScopeIcon: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  historyScopeTitle: { flex: 1, fontSize: 14, lineHeight: 19, fontWeight: '700' },
-  archiveMonthHeading: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18, marginBottom: 2 },
-  archiveMonthText: { fontSize: 12, lineHeight: 17, fontWeight: '800', letterSpacing: 1.2 },
-  archiveMonthLine: { flex: 1, height: StyleSheet.hairlineWidth },
-  dayHeading: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, marginTop: 8, marginBottom: 8 },
+  dayCard: { marginBottom: spacing.sm },
+  dayHeading: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14 },
   dayHeadingText: { flex: 1, fontSize: 15, lineHeight: 20, fontWeight: '700' },
   dayCount: { fontSize: 13, lineHeight: 18, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  empty: { borderWidth: 1, borderStyle: 'dashed', borderRadius: 20, padding: spacing.lg, alignItems: 'center' },
-  emptyTitle: { fontSize: 17, fontWeight: '700', marginTop: 8 },
+  dayRow: { paddingHorizontal: 14 },
+  emptyDay: { fontSize: 14, lineHeight: 20, paddingHorizontal: 14, paddingVertical: spacing.md },
+  loadMore: { minHeight: 48, alignItems: 'center', justifyContent: 'center', marginTop: spacing.md },
+  loadMoreText: { fontSize: 14, fontWeight: '700' },
   scrim: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.56)', justifyContent: 'flex-end' },
   sheet: {
     width: '100%',

@@ -1,5 +1,5 @@
 appId: com.patrickchin.puptime
-name: iOS log CRUD, undo, filters, and persistence
+name: iOS log CRUD, undo, and persistence
 tags:
   - ios
   - critical
@@ -42,7 +42,6 @@ tags:
     visibilityPercentage: 50
 - tapOn:
     id: editor.note.input
-- eraseText
 - inputText: Ate after training
 - scrollUntilVisible:
     element:
@@ -63,13 +62,11 @@ tags:
 - tapOn:
     id: event.meal.edit
 - tapOn:
-    id: editor.type.walk
+    id: editor.type.poop
 - tapOn:
     id: editor.close
 - assertVisible:
-    id: event.walk
-- assertNotVisible:
-    id: event.meal
+    id: event.poop
 - stopApp
 - launchApp
 - extendedWaitUntil:
@@ -78,18 +75,11 @@ tags:
     timeout: 90000
 - scrollUntilVisible:
     element:
-      id: history.filter.walks
-    direction: DOWN
-    visibilityPercentage: 50
-- tapOn:
-    id: history.filter.walks
-- scrollUntilVisible:
-    element:
-      id: event.walk
+      id: event.poop
     direction: DOWN
     visibilityPercentage: 50
 - assertVisible:
-    id: event.walk.note
+    id: event.poop.note
     text: Ate after training
 - scrollUntilVisible:
     element:
@@ -99,48 +89,21 @@ tags:
 - tapOn:
     id: history.day.today
 - assertNotVisible:
-    id: event.walk
+    id: event.poop
 - tapOn:
     id: history.day.today
 - assertVisible:
-    id: event.walk
-- scrollUntilVisible:
-    element:
-      id: history.filter.meals
-    direction: UP
-    visibilityPercentage: 50
+    id: event.poop
 - tapOn:
-    id: history.filter.meals
-- scrollUntilVisible:
-    element:
-      id: history.empty
-    direction: DOWN
-    visibilityPercentage: 50
-- assertVisible:
-    id: history.empty
-- scrollUntilVisible:
-    element:
-      id: history.filter.walks
-    direction: UP
-    visibilityPercentage: 50
-- tapOn:
-    id: history.filter.walks
-- scrollUntilVisible:
-    element:
-      id: event.walk.delete
-    direction: DOWN
-    visibilityPercentage: 50
-    centerElement: true
-- tapOn:
-    id: event.walk.delete
+    id: event.poop.delete
     retryTapIfNoChange: true
 - tapOn:
     text: ^(Cancel|取消|Cancelar)$
     retryTapIfNoChange: true
 - assertVisible:
-    id: event.walk
+    id: event.poop
 - tapOn:
-    id: event.walk.delete
+    id: event.poop.delete
     retryTapIfNoChange: true
 - tapOn:
     text: ^(Delete|删除|Eliminar)$
