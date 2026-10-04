@@ -8,7 +8,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { BottomNav, type Tab } from './src/components/BottomNav';
 import { ThemePicker } from './src/components/ThemePicker';
 import { Toast } from './src/components/Toast';
-import type { ActivityCustomization, ActivityCustomizations } from './src/activity-customization';
+import type { ActivityCustomizations } from './src/activity-customization';
 import { LocalizationProvider } from './src/localization-context';
 import {
   localizedEventPastLabel,
@@ -27,7 +27,6 @@ import {
   normalizeEventTypeChange,
   normalizeNote,
   type ActivityKey,
-  type Activity,
   type EventType,
   type PuppyEvent,
   type PuppyEventChanges,
@@ -58,7 +57,6 @@ import {
 import {
   appendEvents,
   completeOnboarding,
-  deleteCustomActivity,
   loadActivityCustomizations,
   loadEvents,
   loadCustomActivities,
@@ -69,7 +67,6 @@ import {
   loadWidgetActions,
   removeEvent,
   saveSchedule,
-  saveActivityCustomization,
   saveCustomActivity,
   saveLanguagePreference,
   saveNotificationPreferences,
@@ -302,20 +299,6 @@ export default function App() {
     updateHomeWidget(nextEvents).catch(() => undefined);
   };
 
-  const changeActivityAppearance = async (activity: Activity, customization: ActivityCustomization) => {
-    setActivityCustomizations(await saveActivityCustomization(activityKey(activity), customization));
-  };
-
-  const removeCustomActivity = async (label: string) => {
-    const next = await deleteCustomActivity(label);
-    setCustomActivities(next);
-    setActivityCustomizations(await loadActivityCustomizations());
-    const actions = await loadWidgetActions(next);
-    await saveWidgetActions(actions);
-    setWidgetActions(actions);
-    await updateHomeWidget(events).catch(() => undefined);
-  };
-
   const deleteEvent = async (event: PuppyEvent) => {
     const nextEvents = await removeEvent(event.id);
     setEvents(nextEvents);
@@ -502,16 +485,12 @@ export default function App() {
     return (
       <LogScreen
         events={events}
-        schedule={schedule}
         customActivities={customActivities}
-        onChangeActivityAppearance={changeActivityAppearance}
-        onDeleteCustomActivity={removeCustomActivity}
         editRequest={editRequest}
         onEditRequestHandled={() => setEditRequest(null)}
         onLog={logEvent}
         onSave={saveEventDetails}
         onDelete={deleteEvent}
-        onOpenSchedule={() => navigateToTab('schedule')}
         onOpenSettings={() => setSettingsVisible(true)}
         theme={theme}
       />

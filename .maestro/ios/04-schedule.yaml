@@ -102,12 +102,7 @@ tags:
     retryTapIfNoChange: true
 - assertVisible:
     id: screen.today
-- scrollUntilVisible:
-    element:
-      id: routine.card
-    direction: DOWN
-    visibilityPercentage: 50
-- assertVisible:
+- assertNotVisible:
     id: routine.card
 - tapOn:
     id: nav.schedule

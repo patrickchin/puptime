@@ -1,4 +1,4 @@
-Tap Pee, Poop, Meal, Walk, Nap, or another activity to record it; edit the time, type or dictate a note, or change the details later. Start and stop naps to track their duration.
+Tap Pee, Poop, or Eat to record it; edit the time, type or dictate a note, or change the details later. Today and yesterday stay visible in the log, with earlier dates available on demand.
 
 Set a schedule if you need one, with or without reminders. History includes timing patterns and suggested logs, and can be exported as a CSV file. Choose 2–4 activities for the Home Screen widget.
 
