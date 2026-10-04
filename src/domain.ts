@@ -284,13 +284,8 @@ export function formatMinutes(minutes: number): string {
 export function relativeTime(value: number, now = Date.now()): string {
   const minutes = Math.max(0, Math.floor((now - value) / 60_000));
   if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
-}
-
-export function roundedWidgetTime(value: number, now = Date.now()): string {
-  const rounded = Math.max(0, Math.round((now - value) / 300_000)) * 300_000;
-  return rounded === 0 ? 'just now' : `${formatDuration(rounded)} ago`;
+  const days = Math.floor(minutes / 1_440);
+  const hours = Math.floor((minutes % 1_440) / 60);
+  const remainder = minutes % 60;
+  return `${[days && `${days}d`, hours && `${hours}h`, remainder && `${remainder}m`].filter(Boolean).join(' ')} ago`;
 }

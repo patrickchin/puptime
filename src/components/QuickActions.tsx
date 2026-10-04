@@ -48,7 +48,7 @@ export function QuickActions({ events, onLog, now, theme }: {
               {activityLabel(activity)}
             </Text>
             {latest ? (
-              <Text numberOfLines={1} style={[styles.actionTime, { color: theme.textMuted }]}>
+              <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.actionTime, { color: theme.textMuted }]}>
                 {relativeTime(latest.at, now)}
               </Text>
             ) : null}

@@ -125,9 +125,7 @@ const english = {
   'time.minutes': '{count}m',
   'time.hours': '{count}h',
   'time.days': '{count}d',
-  'time.minutesAgo': '{count}m ago',
-  'time.hoursAgo': '{count}h ago',
-  'time.daysAgo': '{count}d ago',
+  'time.ago': '{time} ago',
   'quick.endNap': 'End nap',
   'quick.endNapA11y': 'End the current nap',
   'quick.endNapHint': 'Saves the nap end time',
@@ -529,9 +527,7 @@ const simplifiedChinese: Dictionary = {
   'time.minutes': '{count} 分钟',
   'time.hours': '{count} 小时',
   'time.days': '{count} 天',
-  'time.minutesAgo': '{count} 分钟前',
-  'time.hoursAgo': '{count} 小时前',
-  'time.daysAgo': '{count} 天前',
+  'time.ago': '{time}前',
   'quick.endNap': '结束小睡',
   'quick.endNapA11y': '结束当前小睡',
   'quick.endNapHint': '保存小睡结束时间',
@@ -930,9 +926,7 @@ const spanish: Dictionary = {
   'time.minutes': '{count} min',
   'time.hours': '{count} h',
   'time.days': '{count} d',
-  'time.minutesAgo': 'hace {count} min',
-  'time.hoursAgo': 'hace {count} h',
-  'time.daysAgo': 'hace {count} d',
+  'time.ago': 'hace {time}',
   'quick.endNap': 'Terminar siesta',
   'quick.endNapA11y': 'Terminar la siesta actual',
   'quick.endNapHint': 'Guarda la hora de fin de la siesta',
@@ -1278,16 +1272,25 @@ export function localizedEventPastLabel(language: AppLanguage, event: PuppyEvent
 export function localizedRelativeTime(language: AppLanguage, value: number, now = Date.now()): string {
   const minutes = Math.max(0, Math.floor((now - value) / 60_000));
   if (minutes < 1) return translate(language, 'time.justNow');
-  if (minutes < 60) return translate(language, 'time.minutesAgo', { count: minutes });
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return translate(language, 'time.hoursAgo', { count: hours });
-  return translate(language, 'time.daysAgo', { count: Math.floor(hours / 24) });
+  const days = Math.floor(minutes / 1_440);
+  const hours = Math.floor((minutes % 1_440) / 60);
+  const remainder = minutes % 60;
+  const parts = [
+    days && translate(language, 'time.days', { count: days }),
+    hours && translate(language, 'time.hours', { count: hours }),
+    remainder && translate(language, 'time.minutes', { count: remainder }),
+  ].filter(Boolean);
+  return translate(language, 'time.ago', { time: parts.join(' ') });
 }
 
 export function localizedElapsedTime(language: AppLanguage, value: number, now = Date.now()): string {
   const minutes = Math.max(0, Math.floor((now - value) / 60_000));
-  if (minutes < 60) return translate(language, 'time.minutes', { count: minutes });
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return translate(language, 'time.hours', { count: hours });
-  return translate(language, 'time.days', { count: Math.floor(hours / 24) });
+  const days = Math.floor(minutes / 1_440);
+  const hours = Math.floor((minutes % 1_440) / 60);
+  const remainder = minutes % 60;
+  return [
+    days && translate(language, 'time.days', { count: days }),
+    hours && translate(language, 'time.hours', { count: hours }),
+    ((!days && !hours) || remainder > 0) && translate(language, 'time.minutes', { count: remainder }),
+  ].filter(Boolean).join(' ');
 }

@@ -36,7 +36,6 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "./plugins/withAndroidWidgetRefresh",
       [
         "react-native-android-widget",
         {
