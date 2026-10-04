@@ -129,6 +129,7 @@ tags:
     id: appearance.close
 - tapOn:
     id: settings.back
+    retryTapIfNoChange: true
 - assertVisible: Hoy
 - stopApp
 - launchApp

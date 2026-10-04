@@ -132,7 +132,7 @@ export default function App() {
     setNotificationPreferences(nextNotificationPreferences);
     setNotificationPermission(nextPermission);
     setActivityCustomizations(nextActivityCustomizations);
-    await Promise.all([
+    void Promise.all([
       syncScheduleReminders(
         nextSchedule,
         nextNotificationPreferences.reminderLeadMinutes,

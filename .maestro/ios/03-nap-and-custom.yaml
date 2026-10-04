@@ -41,7 +41,11 @@ tags:
     visibilityPercentage: 50
 - tapOn:
     id: editor.note.input
-- inputText: Slept in the crate
+- setClipboard: Slept in the crate
+- pasteText
+- assertVisible:
+    id: editor.note.input
+    text: Slept in the crate
 - scrollUntilVisible:
     element:
       id: editor.close
