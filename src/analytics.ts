@@ -12,6 +12,7 @@ import {
 
 export const TIMELINE_BUCKET_MINUTES = 15;
 export const TIMELINE_BUCKETS = (24 * 60) / TIMELINE_BUCKET_MINUTES;
+const TIMELINE_MARK_TOUCH_OVERLAP = 48;
 
 export type TimelineMark = {
   id: string;
@@ -450,6 +451,16 @@ export function timelinePointClusters(marks: TimelineMark[]): TimelinePointClust
       types: durations.concat(points).map((mark) => mark.type),
       hasDuration: durations.length > 0,
     };
+  });
+}
+
+export function timelineMarksForPointHit(marks: TimelineMark[], bucket: number, trackWidth: number): TimelineMark[] {
+  const nearbyPoints = marks.filter((mark) => mark.endBucket === undefined
+    && Math.abs(mark.startBucket - bucket) * trackWidth / TIMELINE_BUCKETS <= TIMELINE_MARK_TOUCH_OVERLAP);
+  return marks.filter((mark) => {
+    if (nearbyPoints.includes(mark)) return true;
+    const endBucket = mark.endBucket;
+    return endBucket !== undefined && nearbyPoints.some((point) => mark.startBucket <= point.startBucket && endBucket > point.startBucket);
   });
 }
 

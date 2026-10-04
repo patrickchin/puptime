@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Animated,
   FlatList,
+  type GestureResponderEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   PanResponder,
@@ -21,11 +22,12 @@ import {
   TIMELINE_BUCKET_MINUTES,
   TIMELINE_BUCKETS,
   timelineDurationRuns,
+  timelineMarksForPointHit,
   timelinePointClusters,
   type TimelineDay,
   type TimelineMark,
 } from '../analytics';
-import { activityFromKey, activityKey, customActivityKey, dateKey, quickEventTypes, type Activity, type ActivityKey, type PuppyEvent } from '../domain';
+import { activityFromKey, activityKey, customActivityKey, dateKey, formatDuration, isOpenNap, quickEventTypes, type Activity, type ActivityKey, type PuppyEvent } from '../domain';
 import { ActivityIcon } from '../components/ActivityIcon';
 import { useLocalization } from '../localization-context';
 import { translate, type AppLanguage } from '../localization';
@@ -39,6 +41,11 @@ const MIN_TIME_SCALE = 1;
 const MAX_TIME_SCALE = 4;
 const ZOOM_STEP = 0.5;
 const ESTIMATE_OPACITY = 0.35;
+const POPOVER_MAX_WIDTH = 320;
+const POPOVER_MAX_HEIGHT = 320;
+const POPOVER_GAP = 16;
+
+type TimelineSelection = { ids: string[]; x: number; y: number; width: number; height: number };
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
@@ -164,7 +171,9 @@ function TimelineTrack({
   isToday,
   currentTime,
   rowHeight,
+  trackWidth,
   gridHours,
+  onSelectMarks,
   theme,
 }: {
   day: TimelineDay;
@@ -172,10 +181,12 @@ function TimelineTrack({
   isToday: boolean;
   currentTime?: Date;
   rowHeight: number;
+  trackWidth: number;
   gridHours: readonly number[];
+  onSelectMarks: (ids: string[], event: GestureResponderEvent) => void;
   theme: Theme;
 }) {
-  const { activityColors } = useLocalization();
+  const { activityColors, activityLabel, language, t } = useLocalization();
   const marks = day.marks.filter((mark) => selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label })));
   const recordedMarks = marks.filter((mark) => !mark.estimated);
   const currentTimePosition = currentTime
@@ -184,8 +195,6 @@ function TimelineTrack({
 
   return (
     <View
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
       style={[
         styles.timelineTrack,
         {
@@ -200,15 +209,29 @@ function TimelineTrack({
       ))}
       {timelineDurationRuns(recordedMarks).map((mark) => {
         const color = activityColors(theme, { type: mark.type }).color;
+        const ids = recordedMarks.filter((candidate) => candidate.endBucket !== undefined
+          && candidate.type === mark.type
+          && candidate.startBucket < mark.endBucket
+          && candidate.endBucket > mark.startBucket).map((candidate) => candidate.id);
         return (
-          <View
+          <Pressable
             key={`${mark.type}-${mark.startBucket}`}
-            style={[
+            testID={`timeline.mark.duration.${day.key}.${mark.startBucket}`}
+            accessibilityRole="button"
+            accessibilityLabel={`${t('insights.durationWindow', {
+              activity: activityLabel({ type: mark.type }),
+              start: formatBucket(mark.startBucket, language),
+              end: formatBucket(mark.endBucket, language),
+            })}. ${t('timeline.viewDetails')}`}
+            hitSlop={20}
+            onPress={(event) => onSelectMarks(ids, event)}
+            style={({ pressed }) => [
               styles.durationMark,
               {
                 backgroundColor: color,
                 left: `${(mark.startBucket / TIMELINE_BUCKETS) * 100}%`,
                 width: `${((mark.endBucket - mark.startBucket) / TIMELINE_BUCKETS) * 100}%`,
+                opacity: pressed ? 0.6 : 1,
               },
             ]}
           />
@@ -218,42 +241,48 @@ function TimelineTrack({
         const durationMarks = recordedMarks.filter((mark) => mark.endBucket !== undefined
           && mark.startBucket <= cluster.startBucket && mark.endBucket > cluster.startBucket);
         const pointMarks = recordedMarks.filter((mark) => cluster.ids.includes(mark.id));
+        const selectedMarks = timelineMarksForPointHit(recordedMarks, cluster.startBucket, trackWidth);
         const colors = [...new Set([...durationMarks, ...pointMarks].map((mark) => activityColors(theme, { type: mark.type, customLabel: mark.label }).color))];
         const durationCount = new Set(durationMarks.map((mark) => activityColors(theme, { type: mark.type, customLabel: mark.label }).color)).size;
         const markWidth = colors.length > 1 ? Math.min(14, 6 + colors.length * 2) : 6;
         return (
-          <View
+          <Pressable
             key={`${cluster.startBucket}-${cluster.ids.join('-')}`}
-            style={[
-              styles.pointMark,
+            testID={`timeline.mark.point.${day.key}.${cluster.startBucket}`}
+            accessibilityRole="button"
+            accessibilityLabel={`${selectedMarks.map((mark) => describeMark(mark, language, activityLabel)).join('. ')}. ${t('timeline.viewDetails')}`}
+            onPress={(event) => onSelectMarks([...new Set(selectedMarks.map((mark) => mark.id))], event)}
+            style={({ pressed }) => [
+              styles.pointHitTarget,
               {
-                backgroundColor: colors[0],
                 left: `${((cluster.startBucket + 0.5) / TIMELINE_BUCKETS) * 100}%`,
-                marginLeft: -markWidth / 2,
-                width: markWidth,
+                marginLeft: -24,
+                opacity: pressed ? 0.6 : 1,
               },
             ]}
           >
-            {colors.length > 1 ? colors.map((color, index) => {
-              const continuesHorizontally = index < durationCount;
-              return (
-                <View
-                  key={`${color}-${index}`}
-                  style={[
-                    styles.markStripe,
-                    {
-                      backgroundColor: color,
-                      borderColor: theme.surfaceRaised,
-                      borderBottomWidth: index === colors.length - 1 && !continuesHorizontally ? 1 : 0,
-                      borderLeftWidth: continuesHorizontally ? 0 : 1,
-                      borderRightWidth: continuesHorizontally ? 0 : 1,
-                      borderTopWidth: index > 0 || !continuesHorizontally ? 1 : 0,
-                    },
-                  ]}
-                />
-              );
-            }) : null}
-          </View>
+            <View style={[styles.pointMark, { backgroundColor: colors[0], height: rowHeight - 6, width: markWidth }]}>
+              {colors.length > 1 ? colors.map((color, index) => {
+                const continuesHorizontally = index < durationCount;
+                return (
+                  <View
+                    key={`${color}-${index}`}
+                    style={[
+                      styles.markStripe,
+                      {
+                        backgroundColor: color,
+                        borderColor: theme.surfaceRaised,
+                        borderBottomWidth: index === colors.length - 1 && !continuesHorizontally ? 1 : 0,
+                        borderLeftWidth: continuesHorizontally ? 0 : 1,
+                        borderRightWidth: continuesHorizontally ? 0 : 1,
+                        borderTopWidth: index > 0 || !continuesHorizontally ? 1 : 0,
+                      },
+                    ]}
+                  />
+                );
+              }) : null}
+            </View>
+          </Pressable>
         );
       })}
       {marks.filter((mark) => mark.estimated).map((mark) => {
@@ -262,8 +291,9 @@ function TimelineTrack({
         return (
           <View
             key={mark.id}
+            pointerEvents="none"
             style={[
-              duration ? styles.durationMark : styles.pointMark,
+              duration ? styles.durationMark : styles.estimatedPointMark,
               {
                 backgroundColor: color,
                 left: `${((mark.startBucket + (duration ? 0 : 0.5)) / TIMELINE_BUCKETS) * 100}%`,
@@ -276,6 +306,7 @@ function TimelineTrack({
       })}
       {currentTimePosition !== undefined ? (
         <View
+          pointerEvents="none"
           style={[
             styles.currentTimeMarker,
             {
@@ -361,6 +392,8 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
   const [loadedDayCount, setLoadedDayCount] = useState(INITIAL_DAYS);
   const [timeScale, setTimeScale] = useState(MIN_TIME_SCALE);
   const [nowTime, setNowTime] = useState(Date.now());
+  const [selection, setSelection] = useState<TimelineSelection | null>(null);
+  const [popoverHeight, setPopoverHeight] = useState(0);
   const [isLoadingEarlier, startLoadingEarlier] = useTransition();
   const rowHeight = Math.round(52 * Math.min(fontScale, 1.5));
   const viewportWidth = width;
@@ -391,7 +424,19 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
   const allSelected = activityFilters.every((key) => selectedTypes.includes(key));
   const hasEarlierDays = loadedDayCount < maxHistoryDays;
   const isCompactHeight = height < 500;
+  const selectedEvents = events.filter((event) => selection?.ids.includes(event.id)).sort((a, b) => a.at - b.at);
+  const popoverWidth = selection ? Math.min(POPOVER_MAX_WIDTH, selection.width - 32) : 0;
+  const popoverAbove = !!selection && selection.y > selection.height / 2;
+  const availableSpace = selection ? (popoverAbove ? selection.y : selection.height - selection.y) : 0;
+  const popoverMaxHeight = Math.max(96, Math.min(POPOVER_MAX_HEIGHT, availableSpace - POPOVER_GAP - 8));
+  const displayedPopoverHeight = Math.min(popoverHeight || popoverMaxHeight, popoverMaxHeight);
+  const popoverLeft = selection ? clamp(selection.x - popoverWidth / 2, 16, selection.width - popoverWidth - 16) : 0;
+  const popoverTop = selection ? (popoverAbove
+    ? selection.y - POPOVER_GAP - displayedPopoverHeight
+    : selection.y + POPOVER_GAP) : 0;
+  const arrowLeft = selection ? clamp(selection.x - popoverLeft - 10, 18, popoverWidth - 38) : 0;
 
+  const screenRef = useRef<View>(null);
   const listRef = useRef<FlatList<TimelineDay>>(null);
   const horizontalRef = useRef<ScrollView>(null);
   const horizontalOffset = useRef(new Animated.Value(0)).current;
@@ -410,6 +455,8 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
     const timer = setInterval(() => setNowTime(Date.now()), 60_000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => setSelection(null), [width, height]);
 
   useEffect(() => {
     setLoadedDayCount((current) => Math.min(current, maxHistoryDays));
@@ -440,6 +487,7 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
     onStartShouldSetPanResponderCapture: (event) => event.nativeEvent.touches.length >= 2,
     onMoveShouldSetPanResponderCapture: (event) => event.nativeEvent.touches.length >= 2,
     onPanResponderGrant: (event) => {
+      setSelection(null);
       const touches = event.nativeEvent.touches;
       if (touches.length < 2) return;
       pinch.current = {
@@ -484,12 +532,14 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
 
   function loadEarlierDays() {
     if (!hasEarlierDays || isLoadingEarlier) return;
+    setSelection(null);
     startLoadingEarlier(() => {
       setLoadedDayCount((current) => Math.min(maxHistoryDays, current + LOAD_DAYS));
     });
   }
 
   function changeTimeScale(change: number) {
+    setSelection(null);
     const nextScale = clamp(
       Math.round((timeScaleValue.current + change) / ZOOM_STEP) * ZOOM_STEP,
       MIN_TIME_SCALE,
@@ -530,12 +580,28 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
   }
 
   function handleVerticalDragStart() {
+    setSelection(null);
     didUserScroll.current = true;
     if (didInitialScroll.current && verticalOffsetValue.current <= 28) loadEarlierDays();
   }
 
+  function selectMarks(ids: string[], event: GestureResponderEvent) {
+    if (!ids.length) return;
+    const { pageX, pageY } = event.nativeEvent;
+    screenRef.current?.measureInWindow((left, top, measuredWidth, measuredHeight) => {
+      setPopoverHeight(0);
+      setSelection({
+        ids,
+        x: clamp(pageX - left, 0, measuredWidth),
+        y: clamp(pageY - top, 0, measuredHeight),
+        width: measuredWidth,
+        height: measuredHeight,
+      });
+    });
+  }
+
   return (
-    <View testID="screen.timeline" style={[styles.screen, { backgroundColor: theme.background }]}>
+    <View ref={screenRef} testID="screen.timeline" style={[styles.screen, { backgroundColor: theme.background }]}>
       <View
         style={[
           styles.header,
@@ -652,9 +718,11 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
                   ? t(allSelected ? 'insights.clearFilters' : 'insights.selectFilters')
                   : t(selected ? 'insights.hideTiming' : 'insights.showTiming', { activity: label })}
                 accessibilityState={{ checked }}
-                onPress={() => isAll
-                  ? setSelectedTypes(allSelected ? [] : [...activityFilters])
-                  : toggleActivity(type)}
+                onPress={() => {
+                  setSelection(null);
+                  if (isAll) setSelectedTypes(allSelected ? [] : [...activityFilters]);
+                  else toggleActivity(type);
+                }}
                 style={({ pressed }) => [
                   styles.filterChip,
                   {
@@ -704,6 +772,7 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
           scrollEventThrottle={16}
           showsHorizontalScrollIndicator
           onScroll={horizontalScrollHandler}
+          onScrollBeginDrag={() => setSelection(null)}
           style={styles.horizontalScroller}
           contentContainerStyle={styles.horizontalContent}
         >
@@ -737,7 +806,9 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
                       isToday={day.key === todayKey}
                       currentTime={day.key === todayKey ? now : undefined}
                       rowHeight={rowHeight}
+                      trackWidth={trackWidth}
                       gridHours={gridHours}
+                      onSelectMarks={selectMarks}
                       theme={theme}
                     />
                   </View>
@@ -806,6 +877,96 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
           </View>
         </Animated.ScrollView>
       </View>
+      {selection && selectedEvents.length ? (
+        <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+          <View
+            pointerEvents="box-none"
+            style={[styles.popoverPosition, {
+              left: popoverLeft,
+              top: popoverTop,
+              width: popoverWidth,
+              opacity: popoverHeight ? 1 : 0,
+            }]}
+          >
+            <View
+              testID="timeline.details"
+              onLayout={(event) => setPopoverHeight(event.nativeEvent.layout.height)}
+              style={[styles.detailsPopover, {
+                backgroundColor: theme.surfaceRaised,
+                borderColor: theme.border,
+                borderRadius: theme.presentation.cardRadius,
+                maxHeight: popoverMaxHeight,
+                shadowColor: theme.shadow,
+              }]}
+            >
+              <View style={styles.detailsHeading}>
+                <View style={styles.detailsHeadingCopy}>
+                  <Text numberOfLines={1} style={[styles.detailsTitle, { color: theme.text }]}>
+                    {selectedEvents.length > 1 && selectedEvents.every((item) => activityKey(item) === activityKey(selectedEvents[0]))
+                      ? t('timeline.range', { range: activityLabel(selectedEvents[0]), count: selectedEvents.length })
+                      : selectedEvents.length === 1 ? activityLabel(selectedEvents[0]) : t('timeline.details')}
+                  </Text>
+                  <Text style={[styles.detailsDate, { color: theme.textMuted }]}>
+                    {new Intl.DateTimeFormat(language, { weekday: 'long', month: 'short', day: 'numeric' }).format(selectedEvents[0].at)}
+                  </Text>
+                </View>
+                <Pressable
+                  testID="timeline.details.close"
+                  accessibilityRole="button"
+                  accessibilityLabel={t('timeline.closeDetails')}
+                  onPress={() => setSelection(null)}
+                  style={({ pressed }) => [styles.detailsClose, { opacity: pressed ? 0.5 : 1 }]}
+                >
+                  <MaterialCommunityIcons name="close" size={22} color={theme.textMuted} />
+                </Pressable>
+              </View>
+              <ScrollView style={styles.detailsScroll} contentContainerStyle={styles.detailsList}>
+                {selectedEvents.map((event) => {
+                  const colors = activityColors(theme, event);
+                  const running = isOpenNap(event);
+                  const start = new Intl.DateTimeFormat(language, { hour: 'numeric', minute: '2-digit' }).format(event.at);
+                  const end = typeof event.endedAt === 'number'
+                    ? new Intl.DateTimeFormat(language, {
+                      ...(dateKey(new Date(event.at)) === dateKey(new Date(event.endedAt)) ? {} : { month: 'short' as const, day: 'numeric' as const }),
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    }).format(event.endedAt)
+                    : null;
+                  return (
+                    <View key={event.id} style={[styles.detailsEvent, { borderColor: theme.border }]}>
+                      <View style={[styles.detailsDot, { backgroundColor: colors.color }]} />
+                      <View style={styles.detailsCopy}>
+                        <View style={styles.detailsEventHeading}>
+                          <Text style={[styles.detailsEventTitle, { color: theme.text }]}>{activityLabel(event)}</Text>
+                          <Text style={[styles.detailsTime, { color: theme.textMuted }]}>{start}</Text>
+                        </View>
+                        {end || running ? (
+                          <Text style={[styles.detailsTime, { color: theme.textMuted }]}>
+                            {end ?? t('eventRow.now')} · {formatDuration((event.endedAt ?? nowTime) - event.at)}{running ? ` ${t('eventRow.running')}` : ''}
+                          </Text>
+                        ) : null}
+                        {event.note?.trim() ? <Text style={[styles.detailsNote, { color: theme.text }]}>{event.note.trim()}</Text> : null}
+                        <Text style={[styles.detailsSource, { color: theme.textMuted }]}>{t(event.source === 'widget' ? 'eventRow.widget' : 'eventRow.app')}</Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            </View>
+            <View
+              pointerEvents="none"
+              style={[styles.popoverArrow, {
+                left: arrowLeft,
+                top: popoverAbove ? displayedPopoverHeight - 1 : -9,
+                borderTopWidth: popoverAbove ? 10 : 0,
+                borderBottomWidth: popoverAbove ? 0 : 10,
+                borderTopColor: popoverAbove ? theme.surfaceRaised : 'transparent',
+                borderBottomColor: popoverAbove ? 'transparent' : theme.surfaceRaised,
+              }]}
+            />
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -881,7 +1042,9 @@ const styles = StyleSheet.create({
   calendarDate: { fontSize: 10, lineHeight: 13, fontWeight: '600', marginTop: 1 },
   timelineTrack: { width: '100%', borderBottomWidth: StyleSheet.hairlineWidth, position: 'relative', overflow: 'hidden' },
   gridLine: { position: 'absolute', top: 0, bottom: 0, width: StyleSheet.hairlineWidth },
-  pointMark: { position: 'absolute', top: 3, bottom: 3, width: 6, marginLeft: -3, borderRadius: 999, overflow: 'hidden', zIndex: 2 },
+  pointHitTarget: { position: 'absolute', top: 0, bottom: 0, width: 48, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
+  pointMark: { borderRadius: 999, overflow: 'hidden' },
+  estimatedPointMark: { position: 'absolute', top: 3, bottom: 3, width: 6, marginLeft: -3, borderRadius: 999, zIndex: 2 },
   estimateLegend: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   estimateLegendMark: { width: 6, height: 16, borderRadius: 3 },
   estimateLegendText: { fontSize: 11, lineHeight: 16, fontWeight: '600' },
@@ -908,4 +1071,22 @@ const styles = StyleSheet.create({
     paddingLeft: 12,
   },
   loadEarlierText: { fontSize: 11, lineHeight: 16, fontWeight: '700' },
+  popoverPosition: { position: 'absolute' },
+  popoverArrow: { position: 'absolute', width: 0, height: 0, borderLeftWidth: 10, borderRightWidth: 10, borderLeftColor: 'transparent', borderRightColor: 'transparent' },
+  detailsPopover: { borderWidth: 1, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.16, shadowRadius: 18, elevation: 8 },
+  detailsHeading: { minHeight: 64, paddingLeft: spacing.md, paddingRight: spacing.xs, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  detailsHeadingCopy: { flex: 1, minWidth: 0, gap: 2 },
+  detailsTitle: { fontSize: 17, fontWeight: '700' },
+  detailsDate: { fontSize: 13 },
+  detailsClose: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  detailsScroll: { flexShrink: 1 },
+  detailsList: { paddingHorizontal: spacing.md, paddingBottom: spacing.xs },
+  detailsEvent: { minHeight: 52, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth },
+  detailsDot: { width: 8, height: 8, borderRadius: 4, marginTop: 7 },
+  detailsCopy: { flex: 1, gap: 2 },
+  detailsEventHeading: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
+  detailsEventTitle: { flex: 1, fontSize: 15, fontWeight: '700' },
+  detailsTime: { fontSize: 13 },
+  detailsNote: { fontSize: 13, marginTop: spacing.xs },
+  detailsSource: { fontSize: 12 },
 });
