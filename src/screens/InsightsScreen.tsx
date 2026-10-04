@@ -12,16 +12,13 @@ import {
 
 import {
   activityFrequencyStats,
-  estimateMissingLogs,
   monthlyActivityStats,
   type ActivityFrequencyStat,
-  type MissingLogEstimate,
   type MonthlyActivityStat,
 } from '../analytics';
 import {
   dateKey,
   formatDuration,
-  formatTime,
   type PuppyEvent,
 } from '../domain';
 import { ActivityIcon } from '../components/ActivityIcon';
@@ -30,7 +27,6 @@ import { shareEventsCsv } from '../share-export';
 import { spacing, type Theme } from '../theme';
 
 const FREQUENCY_DAYS = 10;
-const MISSING_LOG_DAYS = 14;
 const MONTH_PREVIEW_COUNT = 6;
 
 function durationFromMinutes(minutes?: number): string {
@@ -156,21 +152,17 @@ function MonthlyRow({
 export function InsightsScreen({
   events,
   customActivities,
-  onAddEstimate,
   theme,
 }: {
   events: PuppyEvent[];
   customActivities: string[];
-  onAddEstimate: (estimate: MissingLogEstimate) => Promise<void>;
   theme: Theme;
 }) {
   const { activityColors, activityLabel, language, t } = useLocalization();
   const [exporting, setExporting] = useState(false);
   const [showAllMonths, setShowAllMonths] = useState(false);
-  const [addingEstimateId, setAddingEstimateId] = useState<string | null>(null);
   const now = new Date();
   const frequency = activityFrequencyStats(events, ['pee', 'poop', ...customActivities.map((customLabel) => ({ type: 'custom' as const, customLabel }))], FREQUENCY_DAYS, now);
-  const missingLogs = estimateMissingLogs(events, MISSING_LOG_DAYS, now);
   const monthly = useMemo(() => monthlyActivityStats(events), [events]);
   const visibleMonths = showAllMonths ? monthly : monthly.slice(0, MONTH_PREVIEW_COUNT);
   const maxMonthlyAverage = Math.max(1, ...monthly.map((stat) => stat.averagePerRecordedDay));
@@ -186,18 +178,6 @@ export function InsightsScreen({
       Alert.alert(t('insights.exportErrorTitle'), t('insights.exportErrorBody'));
     } finally {
       setExporting(false);
-    }
-  }
-
-  async function addEstimate(estimate: MissingLogEstimate) {
-    if (addingEstimateId) return;
-    setAddingEstimateId(estimate.id);
-    try {
-      await onAddEstimate(estimate);
-    } catch {
-      Alert.alert(t('insights.estimateErrorTitle'), t('insights.estimateErrorBody'));
-    } finally {
-      setAddingEstimateId(null);
     }
   }
 
@@ -248,127 +228,6 @@ export function InsightsScreen({
         <View>
           {frequency.stats.map((stat) => <FrequencyRow key={stat.customLabel ?? stat.type} stat={stat} theme={theme} />)}
         </View>
-      </View>
-
-      <View style={[styles.section, { borderColor: theme.border }]}>
-        <View style={styles.sectionHeading}>
-          <View style={styles.smallIcon}>
-            <MaterialCommunityIcons
-              accessibilityElementsHidden
-              importantForAccessibility="no"
-              name="magnify"
-              size={21}
-              color={theme.primary}
-            />
-          </View>
-          <View style={styles.panelHeadingCopy}>
-            <Text style={[styles.panelTitle, { color: theme.text }]}>{t('insights.gapsTitle')}</Text>
-          </View>
-        </View>
-        {missingLogs.estimates.length ? (
-          <View style={styles.estimateList}>
-            {missingLogs.estimates.map((estimate) => {
-              const activityName = activityLabel(estimate);
-              const { color, softColor } = activityColors(theme, estimate);
-              const adding = addingEstimateId === estimate.id;
-              const time = estimate.endedAt === undefined
-                ? t('insights.around', { time: formatTime(estimate.at) })
-                : t('insights.aboutRange', {
-                  start: formatTime(estimate.at),
-                  end: formatTime(estimate.endedAt),
-                });
-              const title = estimate.type === 'nap'
-                ? t('insights.possibleNap')
-                : t('insights.mayBeUnlogged', { activity: activityName });
-              const estimateDate = new Intl.DateTimeFormat(language, {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-              });
-              const evidence = t('insights.seenEvidence', {
-                observed: estimate.observedDays,
-                compared: estimate.comparedDays,
-              });
-
-              return (
-                <View key={estimate.id} style={[styles.estimateRow, { borderColor: theme.border }]}>
-                  <View
-                    accessibilityElementsHidden
-                    importantForAccessibility="no-hide-descendants"
-                    style={[
-                      styles.estimateIcon,
-                      { backgroundColor: softColor, borderRadius: theme.presentation.iconRadius },
-                    ]}
-                  >
-                    <ActivityIcon activity={estimate} theme={theme} color={color} size={20} />
-                    <View
-                      style={[
-                        styles.questionBadge,
-                        {
-                          backgroundColor: theme.surfaceRaised,
-                          borderColor: color,
-                          borderRadius: theme.presentation.iconRadius,
-                        },
-                      ]}
-                    >
-                      <Text style={[styles.questionMark, { color }]}>?</Text>
-                    </View>
-                  </View>
-                  <View
-                    accessible
-                    accessibilityLabel={`${title}. ${estimateDate.format(estimate.at)}, ${time}. ${evidence}`}
-                    style={styles.estimateCopy}
-                  >
-                    <Text style={[styles.estimateTitle, { color: theme.text }]}>{title}</Text>
-                    <Text style={[styles.estimateTime, { color }]}>{estimateDate.format(estimate.at)} · {time}</Text>
-                    <Text style={[styles.estimateEvidence, { color: theme.textMuted }]}>{evidence}</Text>
-                  </View>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={t('insights.addEstimateA11y', { activity: activityName })}
-                    accessibilityState={{ busy: adding, disabled: addingEstimateId !== null }}
-                    disabled={addingEstimateId !== null}
-                    onPress={() => void addEstimate(estimate)}
-                    style={({ pressed }) => [
-                      styles.addEstimateButton,
-                      {
-                        backgroundColor: pressed ? theme.primaryPressed : theme.primary,
-                        borderRadius: theme.presentation.controlRadius,
-                        opacity: addingEstimateId && !adding ? 0.45 : 1,
-                      },
-                    ]}
-                  >
-                    <View style={styles.addEstimateIcon}>
-                      {adding ? (
-                        <ActivityIndicator color={theme.onPrimary} size="small" />
-                      ) : (
-                        <MaterialCommunityIcons name="plus" size={19} color={theme.onPrimary} />
-                      )}
-                    </View>
-                    <Text style={[styles.addEstimateText, { color: theme.onPrimary }]}>
-                      {t('insights.addLog')}
-                    </Text>
-                  </Pressable>
-                </View>
-              );
-            })}
-          </View>
-        ) : (
-          <View style={[styles.noEstimate, { borderColor: theme.border }]}>
-            <MaterialCommunityIcons
-              accessibilityElementsHidden
-              importantForAccessibility="no"
-              name={missingLogs.daysAnalyzed < 4 ? 'chart-timeline-variant' : 'check-circle-outline'}
-              size={19}
-              color={theme.textMuted}
-            />
-            <Text style={[styles.noEstimateText, { color: theme.textMuted }]}>
-              {missingLogs.daysAnalyzed < 4
-                ? t('insights.needGapDays', { count: 4 - missingLogs.daysAnalyzed })
-                : t('insights.noGaps', { count: missingLogs.periodDays })}
-            </Text>
-          </View>
-        )}
       </View>
 
       {monthly.length > 1 ? (
@@ -491,54 +350,6 @@ const styles = StyleSheet.create({
   metricValue: { fontSize: 21, lineHeight: 27, fontWeight: '800', fontVariant: ['tabular-nums'] },
   metricLabel: { fontSize: 9, lineHeight: 13, fontWeight: '800', letterSpacing: 0.8, marginTop: 2 },
   metricDetail: { fontSize: 11, lineHeight: 16, marginTop: 4 },
-  estimateList: { marginTop: 12 },
-  estimateRow: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 4,
-    paddingTop: 13,
-    paddingBottom: 11,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  estimateIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
-  questionBadge: {
-    position: 'absolute',
-    right: -3,
-    bottom: -3,
-    width: 17,
-    height: 17,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  questionMark: { fontSize: 10, lineHeight: 12, fontWeight: '900' },
-  estimateCopy: { flex: 1, minWidth: 0 },
-  estimateTitle: { fontSize: 14, lineHeight: 19, fontWeight: '800' },
-  estimateTime: { fontSize: 12, lineHeight: 17, fontWeight: '700', marginTop: 1 },
-  estimateEvidence: { fontSize: 11, lineHeight: 16, marginTop: 2 },
-  addEstimateButton: {
-    minWidth: 86,
-    minHeight: 48,
-    paddingHorizontal: 11,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-  },
-  addEstimateIcon: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
-  addEstimateText: { fontSize: 12, lineHeight: 16, fontWeight: '800' },
-  noEstimate: {
-    minHeight: 48,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    marginTop: 12,
-    paddingHorizontal: 4,
-    paddingTop: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  noEstimateText: { flex: 1, fontSize: 12, lineHeight: 17 },
   months: { marginTop: 4 },
   monthRow: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 8, paddingVertical: 11 },
   monthHeading: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm },

@@ -2,7 +2,7 @@
 
 Puptime does not use machine learning, a language model, or a server. Its suggestions come from deterministic statistics over the activity stored on the device. The same history always produces the same result for a given time and time zone.
 
-Suggestions are evidence about the log, not claims about the puppy. A missing meal log can mean that the meal was not recorded; Puptime does not assert that the puppy ate. Nothing inferred is added to history until the user reviews it and taps **Add log**.
+Suggestions are evidence about the log, not claims about the puppy. A missing meal log can mean that the meal was not recorded; Puptime does not assert that the puppy ate. Possible gaps appear as faded timeline marks and are never added to stored history automatically.
 
 ## Shared definitions
 
@@ -73,7 +73,7 @@ The routine UI uses a ±30-minute tolerance. Missing-log estimation deliberately
 
 The 75% figure is an evidence threshold, not a calibrated probability that an activity happened. Puptime intentionally says that a log **may** be missing rather than displaying a false probability score.
 
-No suggestions are made for completely blank days, future windows, weak patterns, or custom activities. Adding a suggestion creates a normal, editable app log at the estimated time; undo remains available.
+No suggestions are made for completely blank days, future windows, weak patterns, or custom activities. Estimates appear automatically on the timeline for the current 14-day analysis window. They remain separate from real logs and are excluded from counts, exports, and reminders.
 
 ### Example: missing meal
 
@@ -121,6 +121,5 @@ These values do not create routine times or missing-log suggestions.
 | Windowing, percentiles, routine learning | `src/analytics.ts` — `windowedEvents`, `percentile`, `suggestScheduleFromEvents` |
 | One-to-one event matching and statuses | `src/analytics.ts` — `scheduleStatusesForDay` |
 | Missing-log and nap estimates | `src/analytics.ts` — `estimateMissingLogs` |
-| User review and evidence display | `src/screens/InsightsScreen.tsx` |
-| Confirmation, persistence, and undo | `App.tsx` — `addEstimatedEvent` |
+| Uncertain timeline display | `src/screens/TimelineScreen.tsx` — faded marks and accessibility labels |
 | Executable examples and edge cases | `src/analytics.test.ts` |

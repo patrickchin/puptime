@@ -8,12 +8,12 @@ Puptime is a puppy activity log for Android and iOS. Data stays on the device.
   <tr>
     <th>Today</th>
     <th>Activity history</th>
-    <th>Insights</th>
+    <th>Home Screen widget</th>
   </tr>
   <tr>
     <td><img src="assets/screenshots/today.png" width="260" alt="Puptime Today screen with quick logging and routine progress"></td>
     <td><img src="assets/screenshots/activity.png" width="260" alt="Puptime activity history with notes and timed naps"></td>
-    <td><img src="assets/screenshots/insights-summary.png" width="260" alt="Puptime insights with frequency summaries and possible missing logs"></td>
+    <td><img src="assets/screenshots/widget.jpg" width="260" alt="Puptime quick logging widget on the iPhone Home Screen"></td>
   </tr>
   <tr>
     <th>Timing patterns</th>
@@ -36,7 +36,7 @@ Puptime is a puppy activity log for Android and iOS. Data stays on the device.
 - Set a daily routine, choose when reminders arrive, and review suggested times before using them.
 - Get customizable potty nudges after the latest pee or meal log.
 - Compare activity timing across 10, 20, or 30 days and view pee and poop frequency summaries.
-- Review possible missing logs, including estimated nap spans, before adding anything.
+- See possible missing logs, including estimated nap spans, automatically faded on the timeline without adding them to history.
 - Export the complete activity history, notes, and timestamps as CSV.
 - Choose two to four Home Screen widget actions and optional confirmation notifications.
 - Manage themes, language, widget actions, and notifications in Settings.
@@ -52,7 +52,7 @@ Open Settings from the gear on the Today screen to choose the two to four action
 
 The Android widget uses the available height for its action buttons. Long-press it to resize it. In the app, tap the pencil beside a log to change its activity, custom name, date, time, or note. Edits save automatically, even if you close the editor. Nap logs have separate start and end times.
 
-Puptime does not end an open nap or add estimated sleep. If you forgot to stop a nap, tap **End nap**, then edit its end time. A possible-gap suggestion may include a nap span based on past durations. Nothing is added until you tap **Add log**. Nap taps saved by Puptime 1.1 remain point events.
+Puptime does not end an open nap or add estimated sleep to your logs. If you forgot to stop a nap, tap **End nap**, then edit its end time. Possible gaps appear automatically as faded marks on the timeline; they remain uncertain and are excluded from log counts, exports, and reminders. Nap taps saved by Puptime 1.1 remain point events.
 
 Saved notes and activity data stay on your device. Voice dictation uses your phone's Apple or Android speech-recognition service, which may require a network connection depending on the device and downloaded language models.
 

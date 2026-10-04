@@ -19,6 +19,7 @@ export type TimelineMark = {
   label: string;
   startBucket: number;
   endBucket?: number;
+  estimated?: boolean;
 };
 
 export type TimelineDay = {
@@ -457,6 +458,7 @@ export function buildTimelineDays(
   days = 14,
   endDate = new Date(),
   now = endDate,
+  estimates: MissingLogEstimate[] = [],
 ): TimelineDay[] {
   const dayCount = Math.max(0, Math.floor(days));
   const nowTime = now.getTime();
@@ -471,7 +473,9 @@ export function buildTimelineDays(
     dayEndDate.setDate(dayEndDate.getDate() + 1);
     const dayEnd = dayEndDate.getTime();
 
-    const marks = events.flatMap<TimelineMark>((event) => {
+    const marks = [...events, ...estimates].flatMap<TimelineMark>((event) => {
+      const estimated = 'observedDays' in event;
+      const label = eventLabel(estimated ? { ...event, source: 'app' } : event);
       if (event.type === 'nap' && event.endedAt !== undefined) {
         const napEnd = Math.max(event.at, Math.min(event.endedAt ?? nowTime, nowTime));
         const start = Math.max(event.at, dayStart);
@@ -488,9 +492,10 @@ export function buildTimelineDays(
         return [{
           id: event.id,
           type: event.type,
-          label: eventLabel(event),
+          label,
           startBucket,
           endBucket,
+          ...(estimated ? { estimated: true } : {}),
         }];
       }
 
@@ -498,8 +503,9 @@ export function buildTimelineDays(
       return [{
         id: event.id,
         type: event.type,
-        label: eventLabel(event),
+        label,
         startBucket: timelineBucket(event.at),
+        ...(estimated ? { estimated: true } : {}),
       }];
     }).sort((a, b) =>
       a.startBucket - b.startBucket
