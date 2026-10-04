@@ -122,6 +122,7 @@ tags:
     id: appearance.close
 - tapOn:
     id: settings.language.open
+    retryTapIfNoChange: true
 - assertVisible:
     id: appearance.language.es
     text: radio button, checked
@@ -130,14 +131,14 @@ tags:
 - tapOn:
     id: settings.back
     retryTapIfNoChange: true
-- assertVisible: Hoy
+- assertVisible: Registro
 - stopApp
 - launchApp
 - extendedWaitUntil:
     visible:
       id: screen.today
     timeout: 90000
-- assertVisible: Hoy
+- assertVisible: Registro
 - tapOn:
     id: settings.open
     retryTapIfNoChange: true

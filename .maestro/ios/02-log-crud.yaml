@@ -42,7 +42,12 @@ tags:
     visibilityPercentage: 50
 - tapOn:
     id: editor.note.input
-- inputText: Ate after training
+- eraseText
+- setClipboard: Ate after training
+- pasteText
+- assertVisible:
+    id: editor.note.input
+    text: Ate after training
 - scrollUntilVisible:
     element:
       id: editor.close
