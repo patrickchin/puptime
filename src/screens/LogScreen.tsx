@@ -5,7 +5,6 @@ import { Alert, FlatList, Keyboard, KeyboardAvoidingView, Modal, Platform, Press
 import { QuickActions } from '../components/QuickActions';
 import { ActivityIcon } from '../components/ActivityIcon';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { DateTimeSelector } from '../components/DateTimeSelector';
 import { EventRow } from '../components/EventRow';
 import { NoteInput } from '../components/NoteInput';
 import {
@@ -15,7 +14,6 @@ import {
   formatDuration,
   formatTime,
   normalizeCustomLabel,
-  replaceCalendarDate,
   type EventType,
   type PuppyEvent,
   type PuppyEventChanges,
@@ -24,7 +22,7 @@ import { useLocalization } from '../localization-context';
 import { groupLogHistory } from '../log-history';
 import { spacing, surfaceTreatment, type Theme } from '../theme';
 
-const quickBackdates = [0, 5, 15, 30, 60] as const;
+const timeAdjustments = [-60, -15, 15, 60] as const;
 const editableEventTypes = eventTypes.filter((type) => type !== 'nap');
 const autoSaveDelayMs = 450;
 const olderDaysPerPage = 7;
@@ -125,7 +123,6 @@ export function LogScreen({
   const [pendingDelete, setPendingDelete] = useState<PuppyEvent | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteFailed, setDeleteFailed] = useState(false);
-  const [pickerMode, setPickerMode] = useState<'date' | 'time' | null>(null);
   const [customTouched, setCustomTouched] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [closing, setClosing] = useState(false);
@@ -274,7 +271,7 @@ export function LogScreen({
   }, [currentYear, expandedDays, events, loadedOlderDays, locale, now, t, todayKey, yesterdayKey]);
   const timedNap = draft?.event.type === 'nap' && draft.event.endedAt !== undefined;
   const activeValue = draft?.field === 'end' ? draft.endedAt ?? Date.now() : draft?.at ?? Date.now();
-  const pickerDate = new Date(activeValue);
+  const adjustmentField = t(timedNap ? (draft?.field === 'end' ? 'editor.end' : 'editor.start') : 'editor.time');
   const draftColors = activityColors(theme, draft ?? { type: 'pee' });
   const customInvalid = draft?.type === 'custom' && !normalizeCustomLabel(draft.customLabel);
   const setDraftTime = (value: number) => {
@@ -286,13 +283,28 @@ export function LogScreen({
       return { ...current, at: Math.min(value, latestStart) };
     });
   };
+  const adjustDraftTime = (minutes: number) => {
+    const current = draftRef.current;
+    if (!current) return;
+    Keyboard.dismiss();
+    const value = current.field === 'end' ? current.endedAt ?? Date.now() : current.at;
+    setDraftTime(value + minutes * 60_000);
+  };
+  const adjustDraftDay = (days: number) => {
+    const current = draftRef.current;
+    if (!current) return;
+    Keyboard.dismiss();
+    const value = current.field === 'end' ? current.endedAt ?? Date.now() : current.at;
+    const next = new Date(value);
+    next.setDate(next.getDate() + days);
+    setDraftTime(next.getTime());
+  };
 
   const closeEditor = () => {
     clearSaveTimer();
     sessionRef.current += 1;
     draftRef.current = null;
     Keyboard.dismiss();
-    setPickerMode(null);
     setCustomTouched(false);
     setSaveStatus('idle');
     setFocusNote(false);
@@ -326,26 +338,11 @@ export function LogScreen({
       Keyboard.dismiss();
       return;
     }
-    if (pickerMode) {
-      setPickerMode(null);
-      return;
-    }
     if (Keyboard.isVisible()) {
       Keyboard.dismiss();
       return;
     }
     void requestCloseEditor();
-  };
-
-  const pickDateTime = (date: Date) => {
-    if (!draft) return;
-    setDraftTime(
-      pickerMode === 'date'
-        ? replaceCalendarDate(activeValue, date)
-        : date.getTime(),
-    );
-    setPickerMode(null);
-    void flushAutoSave();
   };
 
   const confirmDelete = async () => {
@@ -721,84 +718,97 @@ export function LogScreen({
 
             <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>
               {timedNap
-                ? t('editor.setField', { field: t(draft?.field === 'end' ? 'editor.end' : 'editor.start') })
-                : t('editor.quickBackdate')}
+                ? t('editor.adjustField', { field: t(draft?.field === 'end' ? 'editor.end' : 'editor.start') })
+                : t('editor.adjustTime')}
             </Text>
             <View style={styles.quickTimes}>
-              {quickBackdates.map((minutes) => (
-                <Pressable
-                  key={minutes}
-                  accessibilityRole="button"
-                  accessibilityLabel={minutes
-                    ? t('editor.backdate', { count: minutes })
-                    : t('editor.setNow')}
-                  onPress={() => setDraftTime(Date.now() - minutes * 60_000)}
-                  style={({ pressed }) => [
-                    styles.quickTime,
-                    {
-                      backgroundColor: pressed ? theme.primarySoft : theme.surface,
-                      borderColor: theme.border,
-                      borderRadius: theme.presentation.controlRadius,
-                      borderWidth: theme.presentation.borderWidth,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.quickTimeText, { color: theme.text }]}>
-                    {minutes ? t('editor.minutesAgo', { count: minutes }) : t('editor.now')}
-                  </Text>
-                </Pressable>
-              ))}
+              <View style={styles.adjustmentHeaders}>
+                <Text style={[styles.adjustmentHeaderText, styles.adjustmentHeaderEarlier, { color: theme.primary }]}>{t('editor.earlier')}</Text>
+                <Text style={[styles.adjustmentHeaderText, styles.adjustmentHeaderLater, { color: theme.textMuted }]}>{t('editor.later')}</Text>
+              </View>
+              <View style={styles.adjustmentQuartet}>
+                {timeAdjustments.map((minutes) => {
+                  const direction = minutes < 0 ? -1 : 1;
+                  const duration = Math.abs(minutes);
+                  const latestValue = draft?.field === 'end' ? Date.now() : typeof draft?.endedAt === 'number' ? draft.endedAt : Date.now();
+                  const nextValue = activeValue + minutes * 60_000;
+                  const disabled = direction < 0
+                    ? draft?.field === 'end' && nextValue < (draft?.at ?? 0)
+                    : (draft?.field === 'end' && draft.endedAt == null) || nextValue > latestValue;
+                  return (
+                    <Pressable
+                      key={minutes}
+                      testID={`editor.adjust.${direction < 0 ? 'back' : 'forward'}.${duration}`}
+                      accessibilityRole="button"
+                      accessibilityState={{ disabled }}
+                      accessibilityLabel={t(direction < 0 ? 'editor.moveEarlier' : 'editor.moveLater', {
+                        field: adjustmentField,
+                        count: duration,
+                      })}
+                      disabled={disabled}
+                      onPress={() => adjustDraftTime(minutes)}
+                      style={({ pressed }) => [
+                        styles.quickTime,
+                        direction < 0 ? styles.quickTimeTallBack : styles.quickTimeTallForward,
+                        {
+                          backgroundColor: direction < 0 ? theme.primary : theme.surface,
+                          borderColor: direction < 0 ? theme.primary : theme.border,
+                          borderRadius: theme.presentation.controlRadius,
+                          borderWidth: theme.presentation.borderWidth,
+                          opacity: disabled ? 0.45 : pressed ? 0.7 : 1,
+                        },
+                      ]}
+                    >
+                      <Text
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.75}
+                        style={[styles.quickTimeText, { color: direction < 0 ? theme.onPrimary : theme.text }]}
+                      >
+                        {`${direction < 0 ? '−' : '+'}${t(duration === 60 ? 'time.hours' : 'time.minutes', { count: duration === 60 ? 1 : duration })}`}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <View style={styles.dayAdjustment}>
+                {([-1, 1] as const).map((direction) => {
+                  const candidate = new Date(activeValue);
+                  candidate.setDate(candidate.getDate() + direction);
+                  const latestValue = draft?.field === 'end' ? Date.now() : typeof draft?.endedAt === 'number' ? draft.endedAt : Date.now();
+                  const disabled = direction < 0
+                    ? draft?.field === 'end' && candidate.getTime() < (draft?.at ?? 0)
+                    : candidate.getTime() > latestValue;
+                  return (
+                    <Pressable
+                      key={direction}
+                      testID={`editor.adjust.${direction < 0 ? 'back' : 'forward'}.day`}
+                      accessibilityRole="button"
+                      accessibilityState={{ disabled }}
+                      accessibilityLabel={t(direction < 0 ? 'editor.moveDayEarlier' : 'editor.moveDayLater', { field: adjustmentField })}
+                      disabled={disabled}
+                      onPress={() => adjustDraftDay(direction)}
+                      style={({ pressed }) => [
+                        styles.quickTime,
+                        direction < 0 ? styles.quickDayPrimary : styles.quickDaySecondary,
+                        {
+                          backgroundColor: direction < 0 ? theme.primarySoft : theme.surface,
+                          borderColor: direction < 0 ? theme.primary : theme.border,
+                          borderRadius: theme.presentation.controlRadius,
+                          borderWidth: theme.presentation.borderWidth,
+                          opacity: disabled ? 0.45 : pressed ? 0.7 : 1,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.quickTimeText, { color: direction < 0 ? theme.primary : theme.text }]}>
+                        {`${direction < 0 ? '−' : '+'}${t('time.days', { count: 1 })}`}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
             </View>
 
-            <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{t('editor.dateTime')}</Text>
-            <View style={styles.exactFields}>
-              <Pressable
-                testID="editor.date"
-                accessibilityRole="button"
-                accessibilityState={{ selected: pickerMode === 'date' }}
-                accessibilityLabel={t('editor.chooseDate', {
-                  field: t(draft?.field === 'end' ? 'editor.end' : 'editor.start'),
-                  date: dateLabel(activeValue, locale),
-                })}
-                onPress={() => { Keyboard.dismiss(); setPickerMode('date'); }}
-                style={({ pressed }) => [
-                  styles.exactField,
-                  {
-                    backgroundColor: pickerMode === 'date' ? theme.primarySoft : theme.surface,
-                    borderColor: pickerMode === 'date' || pressed ? theme.primary : theme.border,
-                    borderRadius: theme.presentation.controlRadius,
-                    borderWidth: theme.presentation.borderWidth,
-                  },
-                ]}
-              >
-                <MaterialCommunityIcons name="calendar-outline" size={21} color={theme.primary} />
-                <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.exactFieldText, { color: theme.text }]}>
-                  {dateLabel(activeValue, locale)}
-                </Text>
-              </Pressable>
-              <Pressable
-                testID="editor.time"
-                accessibilityRole="button"
-                accessibilityState={{ selected: pickerMode === 'time' }}
-                accessibilityLabel={t('editor.chooseTime', {
-                  field: t(draft?.field === 'end' ? 'editor.end' : 'editor.start'),
-                  time: formatTime(activeValue),
-                })}
-                onPress={() => { Keyboard.dismiss(); setPickerMode('time'); }}
-                style={({ pressed }) => [
-                  styles.exactField,
-                  {
-                    backgroundColor: pickerMode === 'time' ? theme.primarySoft : theme.surface,
-                    borderColor: pickerMode === 'time' || pressed ? theme.primary : theme.border,
-                    borderRadius: theme.presentation.controlRadius,
-                    borderWidth: theme.presentation.borderWidth,
-                  },
-                ]}
-              >
-                <MaterialCommunityIcons name="clock-outline" size={21} color={theme.primary} />
-                <Text numberOfLines={1} style={[styles.exactFieldText, { color: theme.text }]}>{formatTime(activeValue)}</Text>
-              </Pressable>
-            </View>
             <Text style={[styles.fieldLabel, styles.noteLabel, { color: theme.textMuted }]}>{t('editor.note')}</Text>
             {draft ? (
               <NoteInput
@@ -811,17 +821,6 @@ export function LogScreen({
               />
             ) : null}
           </ScrollView>
-          {pickerMode ? (
-            <DateTimeSelector
-              key={pickerMode}
-              value={pickerDate}
-              mode={pickerMode}
-              locale={locale}
-              theme={theme}
-              onChange={pickDateTime}
-              onCancel={() => setPickerMode(null)}
-            />
-          ) : null}
         </KeyboardAvoidingView>
       </Modal>
 
@@ -913,10 +912,17 @@ const styles = StyleSheet.create({
   timeFieldValue: { fontSize: 17, lineHeight: 23, fontWeight: '700', fontVariant: ['tabular-nums'] },
   fieldLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2, marginBottom: 8 },
   noteLabel: { marginTop: spacing.lg },
-  quickTimes: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.lg },
-  quickTime: { flexGrow: 1, minWidth: 88, minHeight: 48, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  quickTimeText: { fontSize: 14, fontWeight: '700' },
-  exactFields: { flexDirection: 'row', gap: 8 },
-  exactField: { flex: 1, minWidth: 0, minHeight: 58, borderWidth: 1, borderRadius: 16, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 8 },
-  exactFieldText: { flex: 1, minWidth: 0, fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  adjustmentHeaders: { flexDirection: 'row', gap: 8 },
+  adjustmentHeaderText: { textAlign: 'center', fontSize: 11, lineHeight: 16, fontWeight: '800', letterSpacing: 1.1 },
+  adjustmentHeaderEarlier: { flex: 3 },
+  adjustmentHeaderLater: { flex: 2 },
+  quickTimes: { gap: 8, marginBottom: spacing.lg },
+  adjustmentQuartet: { flexDirection: 'row', gap: 8 },
+  dayAdjustment: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  quickTime: { flex: 1, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  quickTimeTallBack: { flex: 3, minHeight: 112 },
+  quickTimeTallForward: { flex: 2, minHeight: 112 },
+  quickDayPrimary: { minHeight: 58 },
+  quickDaySecondary: { minHeight: 58 },
+  quickTimeText: { fontSize: 18, fontWeight: '800', fontVariant: ['tabular-nums'] },
 });
