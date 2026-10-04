@@ -101,7 +101,7 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
         const color = environment.colorScheme === 'dark' ? detail.darkColor : detail.lightColor;
         const lastAt = props.lastEventAt?.[type];
         const lastDate = lastAt === undefined ? undefined : new Date(lastAt);
-        const lastLabel = lastDate === undefined ? 'Never' : `${lastDate.getMonth() + 1}/${lastDate.getDate()} ${String(lastDate.getHours()).padStart(2, '0')}:${String(lastDate.getMinutes()).padStart(2, '0')}`;
+        const lastLabel = lastDate === undefined ? 'Never' : `${String(lastDate.getHours()).padStart(2, '0')}:${String(lastDate.getMinutes()).padStart(2, '0')}`;
         const systemImage = type === 'pee'
           ? 'drop.fill'
           : type === 'poop'

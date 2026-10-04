@@ -50,7 +50,7 @@ func textValues(_ value: Any) -> [String] {
 
 let rendered = invoke("__expoWidgetRender", props)
 precondition(buttonCount(rendered) == (props["actions"] as! [String]).count, "Widget did not render its quick log buttons")
-precondition(textValues(rendered).contains { $0.range(of: #"^\d{1,2}/\d{1,2} \d{2}:\d{2}$"#, options: .regularExpression) != nil }, "Widget did not render an exact date and time")
+precondition(textValues(rendered).contains { $0.range(of: #"^\d{2}:\d{2}$"#, options: .regularExpression) != nil }, "Widget did not render a clock time")
 precondition(buttonCount(invoke("__expoWidgetRender", props, colorScheme: "dark")) == 3, "Dark widget did not render")
 
 let pee = invoke("__expoWidgetHandlePress", props, target: "log|pee|0|en|120|30|")
@@ -66,4 +66,4 @@ let ended = invoke("__expoWidgetHandlePress", started, target: "log|nap|0|en|120
 precondition(PropertyListSerialization.propertyList(ended, isValidFor: .binary), "Nap end returned invalid UserDefaults props")
 precondition(ended["openNap"] as? Bool == false, "Nap action did not end the nap")
 precondition((ended["pending"] as? [[String: Any]])?.first?["endedAt"] != nil, "Ended nap has no end time")
-print("Widget snapshot, exact timestamp, three rendered buttons, pee action, and nap start/end passed")
+print("Widget snapshot, clock time, three rendered buttons, pee action, and nap start/end passed")
