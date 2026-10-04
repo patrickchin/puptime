@@ -15,6 +15,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   buildTimelineDays,
@@ -383,6 +384,7 @@ function TimelineAxis({
 
 export function TimelineScreen({ events, customActivities, theme }: { events: PuppyEvent[]; customActivities: string[]; theme: Theme }) {
   const { activityColors, activityLabel, language, t } = useLocalization();
+  const insets = useSafeAreaInsets();
   const { fontScale, height, width } = useWindowDimensions();
   const activityFilters: ActivityKey[] = [...quickEventTypes, ...customActivities.map(customActivityKey)];
   const [selectedType, setSelectedType] = useState<ActivityKey | 'all'>('all');
@@ -394,7 +396,6 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
   const [timeScale, setTimeScale] = useState(MIN_TIME_SCALE);
   const [nowTime, setNowTime] = useState(Date.now());
   const [selection, setSelection] = useState<TimelineSelection | null>(null);
-  const [popoverHeight, setPopoverHeight] = useState(0);
   const [isLoadingEarlier, startLoadingEarlier] = useTransition();
   const rowHeight = Math.round(52 * Math.min(fontScale, 1.5));
   const viewportWidth = width;
@@ -429,14 +430,11 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
   const popoverAbove = !!selection && selection.y > selection.height / 2;
   const availableSpace = selection ? (popoverAbove ? selection.y : selection.height - selection.y) : 0;
   const popoverMaxHeight = Math.max(96, Math.min(POPOVER_MAX_HEIGHT, availableSpace - POPOVER_GAP - 8));
-  const displayedPopoverHeight = Math.min(popoverHeight || popoverMaxHeight, popoverMaxHeight);
   const popoverLeft = selection ? clamp(selection.x - popoverWidth / 2, 16, selection.width - popoverWidth - 16) : 0;
-  const popoverTop = selection ? (popoverAbove
-    ? selection.y - POPOVER_GAP - displayedPopoverHeight
-    : selection.y + POPOVER_GAP) : 0;
   const arrowLeft = selection ? clamp(selection.x - popoverLeft - 10, 18, popoverWidth - 38) : 0;
 
   const screenRef = useRef<View>(null);
+  const screenBounds = useRef<{ left: number; top: number; width: number; height: number } | null>(null);
   const listRef = useRef<FlatList<TimelineDay>>(null);
   const horizontalRef = useRef<ScrollView>(null);
   const horizontalOffset = useRef(new Animated.Value(0)).current;
@@ -582,8 +580,7 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
   function selectMarks(ids: string[], event: GestureResponderEvent) {
     if (!ids.length) return;
     const { pageX, pageY } = event.nativeEvent;
-    screenRef.current?.measureInWindow((left, top, measuredWidth, measuredHeight) => {
-      setPopoverHeight(0);
+    const showDetails = ({ left, top, width: measuredWidth, height: measuredHeight }: NonNullable<typeof screenBounds.current>) => {
       setSelection({
         ids,
         x: clamp(pageX - left, 0, measuredWidth),
@@ -591,11 +588,23 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
         width: measuredWidth,
         height: measuredHeight,
       });
-    });
+    };
+    if (screenBounds.current) showDetails(screenBounds.current);
   }
 
   return (
-    <View ref={screenRef} testID="screen.timeline" style={[styles.screen, { backgroundColor: theme.background }]}>
+    <View
+      ref={screenRef}
+      testID="screen.timeline"
+      onLayout={(event) => {
+        const { width: measuredWidth, height: measuredHeight } = event.nativeEvent.layout;
+        screenBounds.current = { left: insets.left, top: insets.top, width: measuredWidth, height: measuredHeight };
+        screenRef.current?.measureInWindow((left, top, actualWidth, actualHeight) => {
+          screenBounds.current = { left, top, width: actualWidth, height: actualHeight };
+        });
+      }}
+      style={[styles.screen, { backgroundColor: theme.background }]}
+    >
       <View
         style={[
           styles.header,
@@ -864,14 +873,14 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
             pointerEvents="box-none"
             style={[styles.popoverPosition, {
               left: popoverLeft,
-              top: popoverTop,
               width: popoverWidth,
-              opacity: popoverHeight ? 1 : 0,
+              ...(popoverAbove
+                ? { bottom: selection.height - selection.y + POPOVER_GAP }
+                : { top: selection.y + POPOVER_GAP }),
             }]}
           >
             <View
               testID="timeline.details"
-              onLayout={(event) => setPopoverHeight(event.nativeEvent.layout.height)}
               style={[styles.detailsPopover, {
                 backgroundColor: theme.surfaceRaised,
                 borderColor: theme.border,
@@ -938,7 +947,7 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
               pointerEvents="none"
               style={[styles.popoverArrow, {
                 left: arrowLeft,
-                top: popoverAbove ? displayedPopoverHeight - 1 : -9,
+                ...(popoverAbove ? { bottom: -9 } : { top: -9 }),
                 borderTopWidth: popoverAbove ? 10 : 0,
                 borderBottomWidth: popoverAbove ? 0 : 10,
                 borderTopColor: popoverAbove ? theme.surfaceRaised : 'transparent',
