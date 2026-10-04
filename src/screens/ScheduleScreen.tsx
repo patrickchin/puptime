@@ -1,11 +1,9 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useEffect, useState } from 'react';
 import {
   Alert,
   Linking,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +14,8 @@ import {
 
 import { scheduleStatusesForDay, suggestScheduleFromEvents, type ScheduleStatus } from '../analytics';
 import { ActivityIcon } from '../components/ActivityIcon';
+import { ConfirmDialog } from '../components/ConfirmDialog';
+import { DateTimeSelector } from '../components/DateTimeSelector';
 import { customActivityKey, formatMinutes, quickEventTypes, type EventType, type ScheduleEntry } from '../domain';
 import type { PuppyEvent } from '../domain';
 import { useLocalization } from '../localization-context';
@@ -38,9 +38,12 @@ export function ScheduleScreen({
   onRequestReminderPermission: () => Promise<boolean>;
   theme: Theme;
 }) {
-  const { activityColors, activityLabel, t } = useLocalization();
+  const { activityColors, activityLabel, locale, t } = useLocalization();
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [showAndroidPicker, setShowAndroidPicker] = useState(false);
+  const [showTimeSelector, setShowTimeSelector] = useState(false);
+  const [pendingRemove, setPendingRemove] = useState<ScheduleEntry | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const [removeFailed, setRemoveFailed] = useState(false);
   const [requestingPermission, setRequestingPermission] = useState(false);
   const [saving, setSaving] = useState(false);
   const [reviewingSuggestion, setReviewingSuggestion] = useState(false);
@@ -76,6 +79,7 @@ export function ScheduleScreen({
     const now = new Date();
     const rounded = Math.round((now.getHours() * 60 + now.getMinutes()) / 15) * 15;
     setDraft({ type: 'pee', minutes: rounded % (24 * 60), reminder: false });
+    setShowTimeSelector(false);
   };
 
   const save = async () => {
@@ -126,30 +130,23 @@ export function ScheduleScreen({
     }
   };
 
-  const remove = (entry: ScheduleEntry) => {
-    Alert.alert(t('schedule.removeTitle'), t('schedule.entryAt', {
-      activity: activityLabel(entry),
-      time: formatMinutes(entry.minutes),
-    }), [
-      { text: t('app.cancel'), style: 'cancel' },
-      {
-        text: t('schedule.remove'),
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await onChange(schedule.filter((item) => item.id !== entry.id));
-          } catch {
-            Alert.alert(t('schedule.removeErrorTitle'), t('schedule.removeErrorBody'));
-          }
-        },
-      },
-    ]);
+  const confirmRemove = async () => {
+    if (!pendingRemove || removing) return;
+    setRemoving(true);
+    setRemoveFailed(false);
+    try {
+      await onChange(schedule.filter((item) => item.id !== pendingRemove.id));
+      setPendingRemove(null);
+    } catch {
+      setRemoveFailed(true);
+    } finally {
+      setRemoving(false);
+    }
   };
 
   const pickerDate = new Date(2000, 0, 1, Math.floor((draft?.minutes ?? 0) / 60), (draft?.minutes ?? 0) % 60);
-  const onPick = (event: DateTimePickerEvent, date?: Date) => {
-    if (Platform.OS === 'android') setShowAndroidPicker(false);
-    if (event.type === 'dismissed' || !date || !draft) return;
+  const onPick = (date: Date) => {
+    if (!draft) return;
     setDraft({ ...draft, minutes: date.getHours() * 60 + date.getMinutes() });
   };
 
@@ -338,7 +335,7 @@ export function ScheduleScreen({
                   status: presentation.label,
                   reminder: entry.reminder ? t('schedule.reminderOn') : '',
                 })}
-                onPress={() => setDraft({ ...entry, reminder: Boolean(entry.reminder) })}
+                onPress={() => { setDraft({ ...entry, reminder: Boolean(entry.reminder) }); setShowTimeSelector(false); }}
                 style={({ pressed }) => [
                   styles.scheduleRow,
                   surfaceTreatment(theme),
@@ -389,7 +386,8 @@ export function ScheduleScreen({
                   hitSlop={8}
                   onPress={(event) => {
                     event.stopPropagation();
-                    remove(entry);
+                    setRemoveFailed(false);
+                    setPendingRemove(entry);
                   }}
                   style={({ pressed }) => [
                     styles.removeButton,
@@ -520,7 +518,7 @@ export function ScheduleScreen({
         </View>
       </Modal>
 
-      <Modal visible={draft !== null} transparent animationType="none" onRequestClose={() => setDraft(null)}>
+      <Modal visible={draft !== null} transparent animationType="none" onRequestClose={() => showTimeSelector ? setShowTimeSelector(false) : setDraft(null)}>
         <View testID="schedule.editor" accessibilityViewIsModal style={styles.scrim}>
           <ScrollView
             bounces={false}
@@ -572,23 +570,25 @@ export function ScheduleScreen({
             </View>
 
             <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{t('schedule.time')}</Text>
-            {Platform.OS === 'ios' ? (
-              <DateTimePicker value={pickerDate} mode="time" display="spinner" onChange={onPick} />
-            ) : (
+            <Pressable
+              testID="schedule.editor.time"
+              accessibilityRole="button"
+              accessibilityState={{ expanded: showTimeSelector }}
+              onPress={() => setShowTimeSelector((open) => !open)}
+              style={({ pressed }) => [styles.timeButton, { backgroundColor: showTimeSelector || pressed ? theme.primarySoft : theme.surface, borderColor: showTimeSelector ? theme.primary : theme.border, borderRadius: theme.presentation.controlRadius, borderWidth: theme.presentation.borderWidth }]}
+            >
+              <MaterialCommunityIcons name="clock-outline" size={22} color={theme.primary} />
+              <Text style={[styles.timeButtonText, { color: theme.text }]}>{formatMinutes(draft?.minutes ?? 0)}</Text>
+              <MaterialCommunityIcons name={showTimeSelector ? 'chevron-up' : 'chevron-down'} size={22} color={theme.textMuted} />
+            </Pressable>
+            {showTimeSelector ? (
               <>
-                <Pressable
-                  onPress={() => setShowAndroidPicker(true)}
-                  style={({ pressed }) => [
-                    styles.timeButton,
-                    { backgroundColor: theme.surface, borderColor: pressed ? theme.primary : theme.border },
-                  ]}
-                >
-                  <MaterialCommunityIcons name="clock-outline" size={22} color={theme.primary} />
-                  <Text style={[styles.timeButtonText, { color: theme.text }]}>{formatMinutes(draft?.minutes ?? 0)}</Text>
+                <DateTimeSelector value={pickerDate} mode="time" locale={locale} theme={theme} onChange={onPick} />
+                <Pressable testID="schedule.editor.time.done" accessibilityRole="button" accessibilityLabel={t('editor.finishPicker', { picker: t('editor.time') })} onPress={() => setShowTimeSelector(false)} style={({ pressed }) => [styles.timeDone, pressed && { backgroundColor: theme.primarySoft }]}>
+                  <Text style={[styles.timeDoneText, { color: theme.primary }]}>{t('common.done')}</Text>
                 </Pressable>
-                {showAndroidPicker ? <DateTimePicker value={pickerDate} mode="time" onChange={onPick} /> : null}
               </>
-            )}
+            ) : null}
 
             <View style={[styles.reminderRow, { backgroundColor: theme.surface, borderColor: theme.border }]}>
               <View style={[styles.reminderIcon, { backgroundColor: theme.primarySoft }]}>
@@ -626,6 +626,20 @@ export function ScheduleScreen({
           </ScrollView>
         </View>
       </Modal>
+      <ConfirmDialog
+        visible={pendingRemove !== null}
+        title={t('schedule.removeTitle')}
+        message={pendingRemove ? t('schedule.entryAt', {
+          activity: activityLabel(pendingRemove),
+          time: formatMinutes(pendingRemove.minutes),
+        }) : ''}
+        confirmLabel={t('schedule.remove')}
+        error={removeFailed ? t('schedule.removeErrorBody') : undefined}
+        busy={removing}
+        theme={theme}
+        onCancel={() => { setPendingRemove(null); setRemoveFailed(false); }}
+        onConfirm={() => void confirmRemove()}
+      />
     </>
   );
 }
@@ -697,8 +711,10 @@ const styles = StyleSheet.create({
   typePicker: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.lg },
   typeChoice: { flexBasis: '47%', flexGrow: 1, minHeight: 50, borderRadius: 15, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   typeChoiceText: { fontSize: 14, fontWeight: '700' },
-  timeButton: { minHeight: 58, borderWidth: 1, borderRadius: 16, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, gap: 10 },
+  timeButton: { minHeight: 58, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, gap: 10 },
   timeButtonText: { flex: 1, fontSize: 18, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  timeDone: { minHeight: 48, marginTop: spacing.sm, alignItems: 'center', justifyContent: 'center', borderRadius: 14 },
+  timeDoneText: { fontSize: 15, fontWeight: '800' },
   reminderRow: { minHeight: 60, borderWidth: 1, borderRadius: 17, padding: 12, marginTop: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: 11 },
   reminderIcon: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   reminderCopy: { flex: 1, minWidth: 0 },

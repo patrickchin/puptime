@@ -1,10 +1,11 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { QuickActions } from '../components/QuickActions';
 import { ActivityIcon } from '../components/ActivityIcon';
+import { ConfirmDialog } from '../components/ConfirmDialog';
+import { DateTimeSelector } from '../components/DateTimeSelector';
 import type { ActivityCustomization } from '../activity-customization';
 import { EventRow } from '../components/EventRow';
 import { NoteInput } from '../components/NoteInput';
@@ -17,7 +18,6 @@ import {
   formatTime,
   normalizeCustomLabel,
   replaceCalendarDate,
-  replaceClockTime,
   type EventType,
   type Activity,
   type PuppyEvent,
@@ -148,13 +148,16 @@ export function LogScreen({
   onEditRequestHandled?: () => void;
   onLog: (type: EventType, customLabel?: string) => Promise<void>;
   onSave: (event: PuppyEvent, changes: PuppyEventChanges) => Promise<void>;
-  onDelete: (event: PuppyEvent) => void;
+  onDelete: (event: PuppyEvent) => Promise<void>;
   onOpenSchedule: () => void;
   onOpenSettings: () => void;
   theme: Theme;
 }) {
-  const { activityColors, activityLabel, locale, relativeTime, t } = useLocalization();
+  const { activityColors, activityLabel, eventPastLabel, locale, relativeTime, t } = useLocalization();
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<PuppyEvent | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteFailed, setDeleteFailed] = useState(false);
   const [pickerMode, setPickerMode] = useState<'date' | 'time' | null>(null);
   const [customTouched, setCustomTouched] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
@@ -395,14 +398,27 @@ export function LogScreen({
     void requestCloseEditor();
   };
 
-  const pickDateTime = (event: DateTimePickerEvent, date?: Date) => {
-    if (Platform.OS === 'android') setPickerMode(null);
-    if (event.type === 'dismissed' || !date || !draft) return;
+  const pickDateTime = (date: Date) => {
+    if (!draft) return;
     setDraftTime(
       pickerMode === 'date'
         ? replaceCalendarDate(activeValue, date)
-        : replaceClockTime(activeValue, date.getHours(), date.getMinutes()),
+        : date.getTime(),
     );
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete || deleting) return;
+    setDeleting(true);
+    setDeleteFailed(false);
+    try {
+      await onDelete(pendingDelete);
+      setPendingDelete(null);
+    } catch {
+      setDeleteFailed(true);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -617,7 +633,7 @@ export function LogScreen({
             event={item}
             now={now}
             onEdit={() => startEditing(item)}
-            onDelete={() => onDelete(item)}
+            onDelete={() => { setDeleteFailed(false); setPendingDelete(item); }}
             theme={theme}
           />
         )}
@@ -901,13 +917,14 @@ export function LogScreen({
             <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{t('editor.dateTime')}</Text>
             <View style={styles.exactFields}>
               <Pressable
+                testID="editor.date"
                 accessibilityRole="button"
                 accessibilityState={{ selected: pickerMode === 'date' }}
                 accessibilityLabel={t('editor.chooseDate', {
                   field: t(draft?.field === 'end' ? 'editor.end' : 'editor.start'),
                   date: dateLabel(activeValue, locale),
                 })}
-                onPress={() => setPickerMode('date')}
+                onPress={() => { Keyboard.dismiss(); setPickerMode('date'); }}
                 style={({ pressed }) => [
                   styles.exactField,
                   {
@@ -924,13 +941,14 @@ export function LogScreen({
                 </Text>
               </Pressable>
               <Pressable
+                testID="editor.time"
                 accessibilityRole="button"
                 accessibilityState={{ selected: pickerMode === 'time' }}
                 accessibilityLabel={t('editor.chooseTime', {
                   field: t(draft?.field === 'end' ? 'editor.end' : 'editor.start'),
                   time: formatTime(activeValue),
                 })}
-                onPress={() => setPickerMode('time')}
+                onPress={() => { Keyboard.dismiss(); setPickerMode('time'); }}
                 style={({ pressed }) => [
                   styles.exactField,
                   {
@@ -947,28 +965,27 @@ export function LogScreen({
             </View>
             {pickerMode ? (
               <>
-                <DateTimePicker
+                <DateTimeSelector
+                  key={`${pickerMode}.${pickerDate.getFullYear()}.${pickerDate.getMonth()}`}
                   value={pickerDate}
                   mode={pickerMode}
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  maximumDate={pickerMode === 'date' ? new Date() : undefined}
+                  locale={locale}
+                  theme={theme}
                   onChange={pickDateTime}
                 />
-                {Platform.OS === 'ios' ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={t('editor.finishPicker', {
-                      picker: t(pickerMode === 'date' ? 'editor.date' : 'editor.time'),
-                    })}
-                    onPress={() => {
-                      setPickerMode(null);
-                      void flushAutoSave();
-                    }}
-                    style={({ pressed }) => [styles.pickerDone, pressed && { backgroundColor: theme.primarySoft }]}
-                  >
-                    <Text style={[styles.pickerDoneText, { color: theme.primary }]}>{t('common.done')}</Text>
-                  </Pressable>
-                ) : null}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('editor.finishPicker', {
+                    picker: t(pickerMode === 'date' ? 'editor.date' : 'editor.time'),
+                  })}
+                  onPress={() => {
+                    setPickerMode(null);
+                    void flushAutoSave();
+                  }}
+                  style={({ pressed }) => [styles.pickerDone, pressed && { backgroundColor: theme.primarySoft }]}
+                >
+                  <Text style={[styles.pickerDoneText, { color: theme.primary }]}>{t('common.done')}</Text>
+                </Pressable>
               </>
             ) : null}
 
@@ -987,6 +1004,20 @@ export function LogScreen({
         </KeyboardAvoidingView>
       </Modal>
 
+      <ConfirmDialog
+        visible={pendingDelete !== null}
+        title={t('app.deleteTitle')}
+        message={pendingDelete ? t('app.deleteMessage', {
+          activity: eventPastLabel(pendingDelete),
+          time: new Date(pendingDelete.at).toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' }),
+        }) : ''}
+        confirmLabel={t('app.delete')}
+        error={deleteFailed ? t('app.deleteErrorBody') : undefined}
+        busy={deleting}
+        theme={theme}
+        onCancel={() => { setPendingDelete(null); setDeleteFailed(false); }}
+        onConfirm={() => void confirmDelete()}
+      />
     </>
   );
 }
