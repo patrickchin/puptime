@@ -6,7 +6,6 @@ import {
   DEFAULT_WIDGET_ACTIONS,
   customActivityKey,
   EVENT_META,
-  roundedWidgetTime,
   widgetActionsForState,
   type QuickEventTimes,
   type ActivityKey,
@@ -65,7 +64,6 @@ export function QuickLogWidget({
   const background = theme.background as `#${string}`;
   const surface = theme.surface as `#${string}`;
   const border = theme.border as `#${string}`;
-  const now = Date.now();
   const visibleTypes = widgetActionsForState(configuredActions, activeNap, customActivities);
   const visibleButtons = visibleTypes.map((type) => ({
     type,
@@ -83,13 +81,15 @@ export function QuickLogWidget({
         const actionBackground = (theme.isDark ? meta.darkSoftColor : meta.softColor) as `#${string}`;
         const actionBorder = actionInk;
         const lastAt = lastEventAt?.[button.type];
-        const timeLabel = lastAt === undefined ? 'Never' : roundedWidgetTime(lastAt, now);
+        const timeLabel = lastAt === undefined ? 'Never' : new Intl.DateTimeFormat(undefined, {
+          month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+        }).format(lastAt);
         return (
           <FlexWidget
             key={button.type}
             clickAction="LOG_EVENT"
             clickActionData={{ type: button.type }}
-            accessibilityLabel={`${isActiveNap ? 'End nap' : `Log ${button.label.toLowerCase()}`}, ${timeLabel}`}
+            accessibilityLabel={`${isActiveNap ? 'End nap' : `Log ${button.label.toLowerCase()}`}, ${lastAt === undefined ? 'never logged' : `last logged ${timeLabel}`}`}
             style={{
               flex: 1,
               height: 'match_parent',

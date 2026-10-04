@@ -17,7 +17,7 @@ import {
   normalizeWidgetActions,
   replaceCalendarDate,
   replaceClockTime,
-  roundedWidgetTime,
+  relativeTime,
   widgetActionsForState,
 } from './domain.ts';
 import {
@@ -33,6 +33,14 @@ import {
   reminderIdentifier,
   reminderTrigger,
 } from './reminder-config.ts';
+
+test('shows relative time to the minute', () => {
+  const now = 48 * 60 * 60_000;
+  assert.equal(relativeTime(now - 59 * 60_000, now), '59m ago');
+  assert.equal(relativeTime(now - 110 * 60_000, now), '1h 50m ago');
+  assert.equal(relativeTime(now - (24 * 60 + 30) * 60_000, now), '1d 30m ago');
+  assert.equal(relativeTime(now - (26 * 60 + 30) * 60_000, now), '1d 2h 30m ago');
+});
 
 test('creates a widget event at the supplied time', () => {
   const event = createEvent('pee', 'widget', 123_456);
@@ -140,14 +148,6 @@ test('only new timed naps count as running', () => {
 test('formats a duration for compact log and chart labels', () => {
   assert.equal(formatDuration(42 * 60_000), '42m');
   assert.equal(formatDuration(90 * 60_000), '1h 30m');
-});
-
-test('rounds widget elapsed time to five-minute steps', () => {
-  const now = 1_000_000;
-  assert.equal(roundedWidgetTime(now - 2 * 60_000, now), 'just now');
-  assert.equal(roundedWidgetTime(now - 3 * 60_000, now), '5m ago');
-  assert.equal(roundedWidgetTime(now - 62 * 60_000, now), '1h ago');
-  assert.equal(roundedWidgetTime(now - 63 * 60_000, now), '1h 5m ago');
 });
 
 test('creates stable daily reminder content for a schedule entry', () => {

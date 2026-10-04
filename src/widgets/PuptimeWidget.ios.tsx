@@ -100,6 +100,8 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
         const isEndingNap = type === 'nap' && Boolean(props.openNap);
         const color = environment.colorScheme === 'dark' ? detail.darkColor : detail.lightColor;
         const lastAt = props.lastEventAt?.[type];
+        const lastDate = lastAt === undefined ? undefined : new Date(lastAt);
+        const lastLabel = lastDate === undefined ? 'Never' : `${lastDate.getMonth() + 1}/${lastDate.getDate()} ${String(lastDate.getHours()).padStart(2, '0')}:${String(lastDate.getMinutes()).padStart(2, '0')}`;
         const systemImage = type === 'pee'
           ? 'drop.fill'
           : type === 'poop'
@@ -137,24 +139,12 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
               ]}>
                 {isEndingNap ? 'End' : detail.label}
               </Text>
-              {lastAt === undefined ? (
-                <Text modifiers={[
-                  font({ textStyle: 'caption', weight: 'medium' }),
-                  foregroundStyle(color),
-                  lineLimit(1),
-                ]}>Never</Text>
-              ) : (
-                <Text
-                  date={new Date(lastAt)}
-                  dateStyle="relative"
-                  modifiers={[
-                    font({ textStyle: 'caption', weight: 'medium' }),
-                    foregroundStyle(color),
-                    lineLimit(1),
-                    minimumScaleFactor(0.72),
-                  ]}
-                />
-              )}
+              <Text modifiers={[
+                font({ textStyle: 'caption', weight: 'medium' }),
+                foregroundStyle(color),
+                lineLimit(1),
+                minimumScaleFactor(0.65),
+              ]}>{lastLabel}</Text>
             </VStack>
           </Button>
         );
