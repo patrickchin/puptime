@@ -30,8 +30,10 @@ tags:
     timeout: 90000
 - stopApp
 - launchApp
-- assertVisible:
-    id: screen.today
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
 - tapOn:
     id: settings.open
 - scrollUntilVisible:
