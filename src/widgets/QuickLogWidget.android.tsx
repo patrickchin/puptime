@@ -82,7 +82,7 @@ export function QuickLogWidget({
         const actionBorder = actionInk;
         const lastAt = lastEventAt?.[button.type];
         const timeLabel = lastAt === undefined ? 'Never' : new Intl.DateTimeFormat(undefined, {
-          month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+          hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
         }).format(lastAt);
         return (
           <FlexWidget
