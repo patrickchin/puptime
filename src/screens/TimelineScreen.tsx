@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -382,13 +382,17 @@ function TimelineAxis({
   );
 }
 
+const MemoTimelineDateLabel = memo(TimelineDateLabel);
+const MemoTimelineTrack = memo(TimelineTrack);
+const MemoTimelineAxis = memo(TimelineAxis);
+
 export function TimelineScreen({ events, customActivities, theme }: { events: PuppyEvent[]; customActivities: string[]; theme: Theme }) {
   const { activityColors, activityLabel, language, t } = useLocalization();
   const insets = useSafeAreaInsets();
   const { fontScale, height, width } = useWindowDimensions();
-  const activityFilters: ActivityKey[] = [...quickEventTypes, ...customActivities.map(customActivityKey)];
+  const activityFilters: ActivityKey[] = useMemo(() => [...quickEventTypes, ...customActivities.map(customActivityKey)], [customActivities]);
   const [selectedType, setSelectedType] = useState<ActivityKey | 'all'>('all');
-  const selectedTypes = selectedType === 'all' ? activityFilters : [selectedType];
+  const selectedTypes = useMemo(() => selectedType === 'all' ? activityFilters : [selectedType], [activityFilters, selectedType]);
   useEffect(() => {
     if (selectedType !== 'all' && !activityFilters.includes(selectedType)) setSelectedType('all');
   }, [customActivities, selectedType]);
@@ -404,8 +408,8 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
   const totalWidth = DATE_COLUMN_WIDTH + trackWidth;
   const pixelsPerHour = trackWidth / 24;
   const tickStep = pixelsPerHour >= 60 ? 1 : pixelsPerHour >= 32 ? 2 : pixelsPerHour >= 20 ? 3 : 6;
-  const tickHours = Array.from({ length: 24 / tickStep + 1 }, (_, index) => index * tickStep);
-  const gridHours = tickHours.slice(1, -1);
+  const tickHours = useMemo(() => Array.from({ length: 24 / tickStep + 1 }, (_, index) => index * tickStep), [tickStep]);
+  const gridHours = useMemo(() => tickHours.slice(1, -1), [tickHours]);
   const now = useMemo(() => new Date(nowTime), [nowTime]);
   const estimates = useMemo(() => estimateMissingLogs(events, INITIAL_DAYS, now).estimates, [events, now]);
   const earliestEventAt = events.reduce((earliest, event) => Math.min(earliest, event.at), nowTime);
@@ -577,7 +581,7 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
     if (didInitialScroll.current && verticalOffsetValue.current <= 28) loadEarlierDays();
   }
 
-  function selectMarks(ids: string[], event: GestureResponderEvent) {
+  const selectMarks = useCallback((ids: string[], event: GestureResponderEvent) => {
     if (!ids.length) return;
     const { pageX, pageY } = event.nativeEvent;
     const showDetails = ({ left, top, width: measuredWidth, height: measuredHeight }: NonNullable<typeof screenBounds.current>) => {
@@ -590,7 +594,7 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
       });
     };
     if (screenBounds.current) showDetails(screenBounds.current);
-  }
+  }, []);
 
   return (
     <View
@@ -767,7 +771,7 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
           contentContainerStyle={styles.horizontalContent}
         >
           <View style={[styles.timelineCanvas, { width: totalWidth }]}>
-            <TimelineAxis
+            <MemoTimelineAxis
               hours={tickHours}
               trackWidth={trackWidth}
               horizontalOffset={horizontalOffset}
@@ -779,7 +783,7 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
               keyExtractor={(day) => day.key}
               renderItem={({ item: day }) => (
                 <View style={[styles.dayRow, { height: rowHeight, width: totalWidth }]}>
-                  <TimelineDateLabel
+                  <MemoTimelineDateLabel
                     day={day}
                     selectedTypes={selectedTypes}
                     activityCount={activityFilters.length}
@@ -790,7 +794,7 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
                     theme={theme}
                   />
                   <View style={{ width: trackWidth }}>
-                    <TimelineTrack
+                    <MemoTimelineTrack
                       day={day}
                       selectedTypes={selectedTypes}
                       isToday={day.key === todayKey}
