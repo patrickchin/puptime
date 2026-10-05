@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -11,7 +12,7 @@ import { ActivityIcon } from './ActivityIcon';
 import { useLocalization } from '../localization-context';
 import { type Theme } from '../theme';
 
-export function EventRow({
+export const EventRow = memo(function EventRow({
   event,
   onEdit,
   onDelete,
@@ -20,8 +21,8 @@ export function EventRow({
   theme,
 }: {
   event: PuppyEvent;
-  onEdit: () => void;
-  onDelete: () => void;
+  onEdit: (event: PuppyEvent) => void;
+  onDelete: (event: PuppyEvent) => void;
   now: number;
   showDivider: boolean;
   theme: Theme;
@@ -69,7 +70,7 @@ export function EventRow({
         accessibilityHint={event.type === 'nap'
           ? t('eventRow.editNapHint')
           : t('eventRow.editHint')}
-        onPress={onEdit}
+        onPress={() => onEdit(event)}
         style={({ pressed }) => [
           styles.editButton,
           { borderRadius: theme.presentation.controlRadius },
@@ -83,7 +84,7 @@ export function EventRow({
         accessibilityRole="button"
         accessibilityLabel={t('eventRow.delete', { activity: pastLabel, time: formatTime(event.at) })}
         hitSlop={8}
-        onPress={onDelete}
+        onPress={() => onDelete(event)}
         style={({ pressed }) => [
           styles.deleteButton,
           { borderRadius: theme.presentation.controlRadius },
@@ -94,7 +95,7 @@ export function EventRow({
       </Pressable>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   row: {

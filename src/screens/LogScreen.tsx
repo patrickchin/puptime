@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, FlatList, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { QuickActions } from '../components/QuickActions';
@@ -13,6 +13,7 @@ import {
   eventTypes,
   formatDuration,
   formatTime,
+  isOpenNap,
   normalizeCustomLabel,
   type EventType,
   type PuppyEvent,
@@ -139,14 +140,14 @@ export function LogScreen({
   const latestSaveRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const closingRef = useRef(false);
 
-  const clearSaveTimer = () => {
+  const clearSaveTimer = useCallback(() => {
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
     }
-  };
+  }, []);
 
-  const startEditing = (event: PuppyEvent, shouldFocusNote = false) => {
+  const startEditing = useCallback((event: PuppyEvent, shouldFocusNote = false) => {
     clearSaveTimer();
     sessionRef.current += 1;
     revisionRef.current = 0;
@@ -161,7 +162,11 @@ export function LogScreen({
     const next = createDraft(event);
     draftRef.current = next;
     setDraft(next);
-  };
+  }, [clearSaveTimer]);
+  const queueDelete = useCallback((event: PuppyEvent) => {
+    setDeleteFailed(false);
+    setPendingDelete(event);
+  }, []);
 
   const persistDraft = (next: Draft, revision: number, session: number): Promise<boolean> => {
     setSaveStatus('saving');
@@ -242,7 +247,7 @@ export function LogScreen({
     const event = events.find((candidate) => candidate.id === editRequest.eventId);
     if (event) startEditing(event, Boolean(editRequest.focusNote));
     onEditRequestHandled?.();
-  }, [editRequest, events, onEditRequestHandled]);
+  }, [editRequest, events, onEditRequestHandled, startEditing]);
   const todayKey = dateKey(now);
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);
@@ -468,9 +473,9 @@ export function LogScreen({
               <View key={event.id} style={styles.dayRow}>
                 <EventRow
                   event={event}
-                  now={now}
-                  onEdit={() => startEditing(event)}
-                  onDelete={() => { setDeleteFailed(false); setPendingDelete(event); }}
+                  now={isOpenNap(event) ? now : 0}
+                  onEdit={startEditing}
+                  onDelete={queueDelete}
                   showDivider={index < section.data.length - 1}
                   theme={theme}
                 />
