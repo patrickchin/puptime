@@ -31,6 +31,7 @@ import { ActivityIcon } from '../components/ActivityIcon';
 import { useLocalization } from '../localization-context';
 import { translate, type AppLanguage } from '../localization';
 import { spacing, type Theme } from '../theme';
+import { timelineFormatters } from '../timeline-format';
 
 const INITIAL_DAYS = 14;
 const LOAD_DAYS = 14;
@@ -46,7 +47,7 @@ function clamp(value: number, minimum: number, maximum: number): number {
 }
 
 function formatBucket(bucket: number, language: AppLanguage): string {
-  return new Intl.DateTimeFormat(language, { hour: 'numeric', minute: '2-digit' })
+  return timelineFormatters(language).time
     .format(new Date(2000, 0, 1, 0, bucket * TIMELINE_BUCKET_MINUTES));
 }
 
@@ -84,13 +85,12 @@ function calendarDayDistance(older: Date, newer: Date): number {
 }
 
 function formatHour(hour: number, language: AppLanguage): string {
-  return new Intl.DateTimeFormat(language, { hour: 'numeric' })
+  return timelineFormatters(language).hour
     .format(new Date(2000, 0, 1, hour % 24));
 }
 
 function formatDateRange(start: Date, end: Date, language: AppLanguage): string {
-  const shortDate = new Intl.DateTimeFormat(language, { month: 'short', day: 'numeric' });
-  const rangeDate = new Intl.DateTimeFormat(language, { month: 'short', day: 'numeric', year: 'numeric' });
+  const { shortDate, rangeDate } = timelineFormatters(language);
   return start.getFullYear() === end.getFullYear()
     ? `${shortDate.format(start)} – ${rangeDate.format(end)}`
     : `${rangeDate.format(start)} – ${rangeDate.format(end)}`;
@@ -120,18 +120,18 @@ function TimelineDateLabel({
   theme: Theme;
 }) {
   const { activityLabel, language, t } = useLocalization();
-  const marks = day.marks.filter((mark) => selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label })));
-  const description = marks.length
-    ? marks.map((mark) => describeMark(mark, language, activityLabel)).join('. ')
-    : selectedTypes.length
-      ? t('insights.noLogged', { activity: filterName(selectedTypes, language, activityCount, activityLabel) })
-      : t('insights.noActivitySelected');
-  const fullDate = new Intl.DateTimeFormat(language, { weekday: 'long', month: 'long', day: 'numeric' });
-  const shortDay = new Intl.DateTimeFormat(language, { weekday: 'short' });
-  const shortDate = new Intl.DateTimeFormat(language, { month: 'short', day: 'numeric' });
+  const description = useMemo(() => {
+    const marks = day.marks.filter((mark) => selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label })));
+    return marks.length
+      ? marks.map((mark) => describeMark(mark, language, activityLabel)).join('. ')
+      : selectedTypes.length
+        ? t('insights.noLogged', { activity: filterName(selectedTypes, language, activityCount, activityLabel) })
+        : t('insights.noActivitySelected');
+  }, [day, selectedTypes, language, activityCount, activityLabel, t]);
+  const { fullDate, weekday: shortDay, shortDate, time } = timelineFormatters(language);
   const currentTimeDescription = currentTime
     ? t('insights.currentTime', {
-      time: new Intl.DateTimeFormat(language, { hour: 'numeric', minute: '2-digit' }).format(currentTime),
+      time: time.format(currentTime),
     })
     : undefined;
 
@@ -744,9 +744,9 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
             {selectedEvents.map((event) => {
               const colors = activityColors(theme, event);
               const running = isOpenNap(event);
-              const start = new Intl.DateTimeFormat(language, { hour: 'numeric', minute: '2-digit' }).format(event.at);
+              const start = timelineFormatters(language).time.format(event.at);
               const end = typeof event.endedAt === 'number'
-                ? new Intl.DateTimeFormat(language, { hour: 'numeric', minute: '2-digit' }).format(event.endedAt)
+                ? timelineFormatters(language).time.format(event.endedAt)
                 : null;
               return (
                 <View key={event.id} style={[styles.detailsEvent, { borderColor: theme.border }]}>
