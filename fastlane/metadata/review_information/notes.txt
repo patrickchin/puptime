@@ -1,6 +1,11 @@
-Puptime requires no account or sign-in. All activity data is stored locally on the device.
+Puptime tracks one pet and requires no account or sign-in. All activity data is stored locally on the device. Core logging, editing, history, and reminders work offline.
 
 To test voice dictation, allow Microphone and Speech Recognition when prompted. To test reminders, enable a routine reminder and allow notifications.
 
-The Puptime Quick Log widget can be added from the Home Screen widget gallery. Its interactive logging buttons require iOS 17 or later.
+In Insights, Activity backup offers Export CSV through the system share sheet and Import CSV through the system file picker. Export a few logs, then import the same file: existing entries are skipped and current edits are kept. To test recovery, delete one exported entry and import the file again. Activity backups include notes, custom activity names, nap state, and Estimated labels; they do not include routines or settings.
 
+The Log screen offers Pee, Poop, and Eat quick actions, with today and yesterday visible and earlier dates available on demand. Other actions, including walks, custom activities, and nap start/stop, are available through the configurable Home Screen widget.
+
+Possible missing activity appears automatically as faded Timeline marks; these marks are not stored or exported. Saved or imported estimated entries retain an Estimated label in Log, Timeline, Insights, and CSV backups and count separately from recorded activity.
+
+The Puptime Quick Log widget can be added from the Home Screen widget gallery. Its interactive logging buttons require iOS 17 or later.

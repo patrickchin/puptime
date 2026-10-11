@@ -55,6 +55,11 @@ export const EventRow = memo(function EventRow({
       </View>
       <View style={styles.copy}>
         <Text testID={`event.${event.type}.label`} numberOfLines={1} style={[styles.label, { color: theme.text }]}>{pastLabel}</Text>
+        {event.estimated ? (
+          <Text testID={`event.${event.type}.estimated`} style={[styles.estimated, { color: theme.text }]}>
+            {t('eventRow.estimated')}
+          </Text>
+        ) : null}
         <Text numberOfLines={1} style={[styles.source, { color: theme.textMuted }]}>{timeSummary}</Text>
         {note ? (
           <View style={styles.noteRow}>
@@ -113,6 +118,7 @@ const styles = StyleSheet.create({
   },
   copy: { flex: 1, minWidth: 0 },
   label: { fontSize: 16, fontWeight: '600' },
+  estimated: { fontSize: 12, lineHeight: 17, fontWeight: '600', marginTop: 2 },
   source: { fontSize: 12, lineHeight: 17, marginTop: 2 },
   noteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 5, marginTop: 6 },
   note: { flex: 1, fontSize: 13, lineHeight: 18 },

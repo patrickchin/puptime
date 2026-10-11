@@ -1,7 +1,9 @@
 Tap Pee, Poop, or Eat to record it; edit the time, type or dictate a note, or change the details later. Today and yesterday stay visible in the log, with earlier dates available on demand.
 
-Set a schedule if you need one, with or without reminders. History includes timing patterns and suggested logs, and can be exported as a CSV file. Choose 2–4 activities for the Home Screen widget.
+Set a schedule if you need one, with or without reminders. Compare timing patterns in Timeline, where possible gaps appear as faded marks without being added to history. Saved or imported estimated entries keep their Estimated label and are counted separately from recorded activity. Choose 2–4 Home Screen widget actions, including walks, naps, or custom activities. Start and stop naps from the widget to track their duration.
 
-Puptime does not require an account and has no ads, subscription, analytics, or tracking. Activity data stays on your device. Voice dictation uses Apple's speech-recognition service and may require a network connection.
+Export an activity CSV to keep a backup, then import it to recover missing entries while keeping your current edits. Backups include activity times, notes, custom activity names, nap state, and estimate labels. Routines and settings are not included.
+
+Puptime tracks one pet without an account, ads, a subscription, analytics, or tracking. Activity data stays on your device unless you choose to export it. Voice dictation uses your device's speech-recognition service and may require a network connection.
 
 The starter routine is an editable example, not veterinary advice. Adjust it with your veterinarian's guidance.

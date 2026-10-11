@@ -36,8 +36,8 @@ Puptime is a puppy activity log for Android and iOS. Data stays on the device.
 - Set a daily routine, choose when reminders arrive, and review suggested times before using them.
 - Get customizable potty nudges after the latest pee or meal log.
 - Compare activity timing across 10, 20, or 30 days and view pee and poop frequency summaries.
-- See possible missing logs, including estimated nap spans, automatically faded on the timeline without adding them to history.
-- Export the complete activity history, notes, and timestamps as CSV.
+- See possible missing logs, including estimated nap spans, automatically faded on the timeline without adding them to history. Saved estimates stay labeled and do not influence learned routines or recorded statistics.
+- Export and import activity CSV backups with stable IDs, notes, exact timestamps, nap states, and estimate labels. Reimporting preserves existing edits.
 - Choose two to four Home Screen widget actions and optional confirmation notifications.
 - Manage themes, language, widget actions, and notifications in Settings.
 - Keep data on the device without an account, subscription, server, ads, analytics, or tracking.
@@ -56,17 +56,19 @@ Puptime does not end an open nap or add estimated sleep to your logs. If you for
 
 Saved notes and activity data stay on your device. Voice dictation uses your phone's Apple or Android speech-recognition service, which may require a network connection depending on the device and downloaded language models.
 
-From **Insights**, use **Export activity CSV** to open the system share sheet. Puptime creates the file in temporary app storage. The data is not sent until you choose a destination.
+From **Insights → Activity backup**, use **Export CSV** to open the system share sheet. Puptime creates the file in temporary app storage. The data is not sent until you choose a destination. **Import CSV** opens your device’s file picker and accepts a Puptime activity export. It adds missing event IDs, skips existing IDs without overwriting current edits, and reports both counts. The entire file is checked before any activity is saved; invalid files and imports that would leave multiple naps running are rejected. Backups include activity only, so routines and settings must be set up separately. Development exports from before the import schema are not supported.
+
+Saved estimated entries retain an **Estimated** label in history, Timeline, and backups, even after editing or importing. Recorded averages, routine learning, routine completion, last-log timestamps, and potty reminders exclude these estimates. Suggestions you have not added are never exported.
 
 Routine reminders are optional. Turn one on while editing a planned time, then choose how early reminders should arrive in Settings. Puptime can also remind you after the latest pee or meal; the default potty nudges are two hours after a pee and 30 minutes after a meal, and each can be turned off or changed from 15 minutes to four hours. Puptime schedules reminders locally; it does not upload the routine or require a notification server. Settings can also enable a local confirmation after every widget log so you can immediately add a note or open the full editor.
 
-Routine suggestions also stay on the device. Puptime checks the last 14 days, keeps activities logged on most recorded days, and rounds their typical times to 15 minutes. You review the full suggestion before replacing the current routine. Suggested reminders start off.
+Routine suggestions also stay on the device. Puptime checks the last 14 completed days and finds recurring time windows across distinct recorded days. The review shows typical variation and how many days support each pattern; extra taps and skipped early activities do not shift every later slot. These windows are guides, not deadlines. You review the full suggestion before replacing the current routine. Suggested reminders start off and use the window's central time if enabled.
 
 See [How Puptime learns patterns](LEARNING.md) for the exact routine-learning, event-matching, missing-log, and nap-estimation algorithms and their limits.
 
 ## Run locally
 
-Requires Node.js 22.13 or newer, the Android SDK for Android, and Xcode for iOS.
+Requires Node.js 22.18 or newer, the Android SDK for Android, and Xcode for iOS.
 
 ```sh
 npm ci

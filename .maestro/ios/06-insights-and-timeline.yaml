@@ -66,17 +66,17 @@ tags:
     id: timeline.filter.all
 - assertVisible:
     id: timeline.range
-    text: .*3 logs.*
+    text: .*3 entries.*
 - tapOn:
     id: timeline.filter.poop
 - assertVisible:
     id: timeline.range
-    text: .*1 logs.*
+    text: .*1 entries.*
 - tapOn:
     id: timeline.filter.pee
 - assertVisible:
     id: timeline.range
-    text: .*2 logs.*
+    text: .*2 entries.*
 - assertNotVisible:
     id: timeline.empty
 - tapOn:
@@ -121,4 +121,4 @@ tags:
     id: timeline.filter.all
 - assertVisible:
     id: timeline.range
-    text: .*3 logs.*
+    text: .*3 entries.*

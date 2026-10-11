@@ -31,6 +31,7 @@ export type PuppyEvent = {
   customLabel?: string;
   note?: string;
   source: 'app' | 'widget';
+  estimated?: boolean;
 };
 
 export type QuickEventTimes = Partial<Record<ActivityKey, number>>;
@@ -45,6 +46,7 @@ export type ScheduleEntry = {
   customLabel?: string;
   minutes: number;
   reminder?: boolean;
+  toleranceMinutes?: number;
 };
 
 export const EVENT_META: Record<
@@ -205,7 +207,7 @@ export function isOpenNap(event: PuppyEvent): boolean {
 export function latestQuickEventTimes(events: readonly PuppyEvent[]): QuickEventTimes {
   const latest: QuickEventTimes = {};
   for (const event of events) {
-    if (event.type === 'custom' && !normalizeCustomLabel(event.customLabel)) continue;
+    if (event.estimated || (event.type === 'custom' && !normalizeCustomLabel(event.customLabel))) continue;
     const time = Math.max(event.at, typeof event.endedAt === 'number' ? event.endedAt : event.at);
     const key = activityKey(event);
     latest[key] = Math.max(latest[key] ?? 0, time);
@@ -269,16 +271,22 @@ export function dateKey(value: number | Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export function formatTime(value: number): string {
-  return new Intl.DateTimeFormat(undefined, {
+export function formatTime(value: number, locale?: string): string {
+  return new Intl.DateTimeFormat(locale, {
     hour: 'numeric',
     minute: '2-digit',
   }).format(value);
 }
 
-export function formatMinutes(minutes: number): string {
+export function formatMinutes(minutes: number, locale?: string): string {
   const date = new Date(2000, 0, 1, Math.floor(minutes / 60), minutes % 60);
-  return formatTime(date.getTime());
+  return formatTime(date.getTime(), locale);
+}
+
+export function formatScheduleWindow(entry: Pick<ScheduleEntry, 'minutes' | 'toleranceMinutes'>, locale?: string): string {
+  const tolerance = entry.toleranceMinutes ?? 30;
+  const clock = (minutes: number) => formatMinutes((minutes + 1440) % 1440, locale);
+  return `${clock(entry.minutes - tolerance)}–${clock(entry.minutes + tolerance)}`;
 }
 
 export function relativeTime(value: number, now = Date.now()): string {

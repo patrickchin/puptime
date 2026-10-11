@@ -128,6 +128,11 @@ tags:
     text: radio button, checked
 - tapOn:
     id: appearance.close
+- scrollUntilVisible:
+    element:
+      id: settings.back
+    direction: UP
+    visibilityPercentage: 50
 - tapOn:
     id: settings.back
     retryTapIfNoChange: true
