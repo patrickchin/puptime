@@ -84,10 +84,14 @@ tags:
 - assertVisible:
     id: timeline.details
 - assertVisible:
-    text: .*Pee.*2 logs.*
+    id: timeline.details.event.*
+    index: 0
+    text: .*Pee.*
 - assertVisible:
-    text: Pee
-- assertVisible:
+    id: timeline.details.event.*
+    index: 1
+    text: .*Pee.*
+- assertNotVisible:
     text: App
 - tapOn:
     id: timeline.details.close

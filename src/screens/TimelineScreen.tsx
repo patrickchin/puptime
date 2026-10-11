@@ -744,32 +744,20 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
             {selectedEvents.map((event) => {
               const colors = activityColors(theme, event);
               const running = isOpenNap(event);
-              const start = new Intl.DateTimeFormat(language, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(event.at);
+              const start = new Intl.DateTimeFormat(language, { hour: 'numeric', minute: '2-digit' }).format(event.at);
               const end = typeof event.endedAt === 'number'
-                ? new Intl.DateTimeFormat(language, {
-                  ...(dateKey(new Date(event.at)) === dateKey(new Date(event.endedAt)) ? {} : { month: 'short' as const, day: 'numeric' as const }),
-                  hour: 'numeric',
-                  minute: '2-digit',
-                }).format(event.endedAt)
+                ? new Intl.DateTimeFormat(language, { hour: 'numeric', minute: '2-digit' }).format(event.endedAt)
                 : null;
               return (
                 <View key={event.id} style={[styles.detailsEvent, { borderColor: theme.border }]}>
                   <View style={[styles.detailsDot, { backgroundColor: colors.color }]} />
-                  <View style={styles.detailsCopy}>
-                    <View style={styles.detailsEventHeading}>
-                      <Text style={[styles.detailsEventTitle, { color: theme.text }]}>
-                        {activityLabel(event)}
-                        <Text style={[styles.detailsSource, { color: theme.textMuted }]}> · {t(event.source === 'widget' ? 'eventRow.widget' : 'eventRow.app')}</Text>
-                      </Text>
-                      <Text style={[styles.detailsTime, { color: theme.textMuted }]}>{start}</Text>
-                    </View>
-                    {end || running ? (
-                      <Text style={[styles.detailsTime, { color: theme.textMuted }]}>
-                        {end ?? t('eventRow.now')} · {formatDuration((event.endedAt ?? nowTime) - event.at)}{running ? ` ${t('eventRow.running')}` : ''}
-                      </Text>
-                    ) : null}
-                    {event.note?.trim() ? <Text style={[styles.detailsNote, { color: theme.text }]}>{event.note.trim()}</Text> : null}
-                  </View>
+                  <Text testID={`timeline.details.event.${event.id}`} style={[styles.detailsCopy, { color: theme.text }]}>
+                    <Text style={styles.detailsEventTitle}>{activityLabel(event)}</Text>
+                    <Text style={{ color: theme.textMuted }}>
+                      {'  '}{start}{end || running ? `–${end ?? t('eventRow.now')} · ${formatDuration((event.endedAt ?? nowTime) - event.at)}${running ? ` ${t('eventRow.running')}` : ''}` : ''}
+                    </Text>
+                    {event.note?.trim() ? ` · ${event.note.trim()}` : ''}
+                  </Text>
                 </View>
               );
             })}
@@ -779,9 +767,10 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
             accessibilityRole="button"
             accessibilityLabel={t('timeline.closeDetails')}
             onPress={() => setSelection([])}
-            style={({ pressed }) => [styles.detailsClose, { opacity: pressed ? 0.5 : 1 }]}
+            style={({ pressed }) => [styles.detailsClose, { borderColor: theme.border, opacity: pressed ? 0.5 : 1 }]}
           >
-            <MaterialCommunityIcons name="close" size={22} color={theme.textMuted} />
+            <MaterialCommunityIcons name="close" size={16} color={theme.textMuted} />
+            <Text style={[styles.detailsCloseText, { color: theme.textMuted }]}>{t('timeline.closeDetails')}</Text>
           </Pressable>
         </View>
       ) : null}
@@ -1003,16 +992,13 @@ const styles = StyleSheet.create({
     paddingLeft: 12,
   },
   loadEarlierText: { fontSize: 11, lineHeight: 16, fontWeight: '700' },
-  detailsPanel: { borderBottomWidth: StyleSheet.hairlineWidth, flexShrink: 0, flexDirection: 'row' },
-  detailsClose: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', marginRight: spacing.xs },
-  detailsScroll: { flex: 1 },
-  detailsList: { paddingLeft: spacing.md, paddingRight: spacing.xs },
-  detailsEvent: { minHeight: 40, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.xs, borderTopWidth: StyleSheet.hairlineWidth },
+  detailsPanel: { borderBottomWidth: StyleSheet.hairlineWidth, flexShrink: 0 },
+  detailsClose: { minHeight: 48, flexShrink: 0, flexDirection: 'row', gap: spacing.xs, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md, borderTopWidth: StyleSheet.hairlineWidth },
+  detailsCloseText: { fontSize: 14, fontWeight: '600', flexShrink: 1 },
+  detailsScroll: { flexShrink: 1 },
+  detailsList: { paddingHorizontal: spacing.md },
+  detailsEvent: { minHeight: 28, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.xs, borderTopWidth: StyleSheet.hairlineWidth },
   detailsDot: { width: 8, height: 8, borderRadius: 4, marginTop: 7 },
-  detailsCopy: { flex: 1, gap: 2 },
-  detailsEventHeading: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
-  detailsEventTitle: { flex: 1, fontSize: 15, fontWeight: '700' },
-  detailsTime: { fontSize: 13, flexShrink: 1 },
-  detailsNote: { fontSize: 13 },
-  detailsSource: { fontSize: 12, fontWeight: '400' },
+  detailsCopy: { flex: 1, fontSize: 14 },
+  detailsEventTitle: { fontSize: 15, fontWeight: '700' },
 });
