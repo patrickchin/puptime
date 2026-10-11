@@ -35,6 +35,7 @@ import {
   type ScheduleEntry,
 } from './src/domain';
 import { InsightsScreen } from './src/screens/InsightsScreen';
+import { LearnScreen } from './src/screens/LearnScreen';
 import { LogScreen, type LogEditRequest } from './src/screens/LogScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { ScheduleScreen } from './src/screens/ScheduleScreen';
@@ -528,6 +529,7 @@ export default function App() {
         />
       );
     }
+    if (tab === 'learn') return <LearnScreen theme={theme} />;
     if (tab === 'timeline') return <TimelineScreen events={events} customActivities={customActivities} theme={theme} />;
     if (tab === 'insights') return <InsightsScreen events={events} customActivities={customActivities} onImport={importActivity} theme={theme} />;
     if (tab === 'schedule') {

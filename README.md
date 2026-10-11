@@ -40,6 +40,7 @@ Puptime is a puppy activity log for Android and iOS. Data stays on the device.
 - Export and import activity CSV backups with stable IDs, notes, exact timestamps, nap states, and estimate labels. Reimporting preserves existing edits.
 - Choose two to four Home Screen widget actions and optional confirmation notifications.
 - Manage themes, language, widget actions, and notifications in Settings.
+- Read a short getting-started guide and 12 detailed puppy-care articles in **Learn**, with section citations, further reading, and selected YouTube demonstrations. The same guides are on the website under **Puppy care**. Articles are currently in English; in-app navigation supports all app languages. Text works offline; external resources need a browser and internet connection.
 - Keep data on the device without an account, subscription, server, ads, analytics, or tracking.
 
 The starter routine is only an editable example, not veterinary guidance. Change it to fit your puppy and your veterinarian’s advice.
@@ -103,6 +104,8 @@ Every flow clears app state before it starts. GitHub Actions also runs the compl
 The release APK is written to `android/app/build/outputs/apk/release/app-release.apk`.
 
 GitHub Actions also performs an unsigned native iOS Simulator build of the app and widget, installs and launches it, then keeps the zipped `.app` and smoke-test screenshot as short-lived workflow artifacts.
+
+See [Puppy care research](PUPPY_CARE_RESEARCH.md) for the source selection, evidence differences, and content maintenance notes.
 
 ## Stack
 
