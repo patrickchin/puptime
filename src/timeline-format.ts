@@ -5,6 +5,7 @@ function createTimelineFormatters(language: AppLanguage) {
     time: new Intl.DateTimeFormat(language, { hour: 'numeric', minute: '2-digit' }),
     hour: new Intl.DateTimeFormat(language, { hour: 'numeric' }),
     fullDate: new Intl.DateTimeFormat(language, { weekday: 'long', month: 'long', day: 'numeric' }),
+    fullDateTime: new Intl.DateTimeFormat(language, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }),
     weekday: new Intl.DateTimeFormat(language, { weekday: 'short' }),
     shortDate: new Intl.DateTimeFormat(language, { month: 'short', day: 'numeric' }),
     rangeDate: new Intl.DateTimeFormat(language, { month: 'short', day: 'numeric', year: 'numeric' }),
