@@ -432,7 +432,7 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
   const hasEarlierDays = loadedDayCount < maxHistoryDays;
   const isCompactHeight = height < 500;
   const selectedEvents = events.filter((event) => selection.includes(event.id)).sort((a, b) => a.at - b.at);
-  const detailsMaxHeight = isCompactHeight ? 80 : Math.min(260, height * 0.28);
+  const detailsMaxHeight = isCompactHeight ? 80 : Math.min(180, height * 0.22);
   const listRef = useRef<FlatList<TimelineDay>>(null);
   const horizontalRef = useRef<ScrollView>(null);
   const horizontalOffset = useRef(new Animated.Value(0)).current;
@@ -734,29 +734,17 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
       {selectedEvents.length > 0 ? (
         <View
           testID="timeline.details"
-          style={[styles.detailsPanel, isCompactHeight && styles.detailsPanelCompact, {
+          style={[styles.detailsPanel, {
             backgroundColor: theme.surfaceRaised,
             borderColor: theme.border,
             maxHeight: detailsMaxHeight,
           }]}
         >
-          <View style={[styles.detailsHeading, isCompactHeight && styles.detailsHeadingCompact]}>
-            <View style={styles.detailsHeadingCopy}>
-              <Text style={[styles.detailsTitle, { color: theme.text }]}>
-                {selectedEvents.length > 1 && selectedEvents.every((item) => activityKey(item) === activityKey(selectedEvents[0]))
-                  ? t('timeline.range', { range: activityLabel(selectedEvents[0]), count: selectedEvents.length })
-                  : selectedEvents.length === 1 ? activityLabel(selectedEvents[0]) : t('timeline.details')}
-              </Text>
-              <Text style={[styles.detailsDate, { color: theme.textMuted }]}>
-                {new Intl.DateTimeFormat(language, { weekday: 'long', month: 'short', day: 'numeric' }).format(selectedEvents[0].at)}
-              </Text>
-            </View>
-          </View>
-          <ScrollView nestedScrollEnabled style={[styles.detailsScroll, isCompactHeight && styles.detailsScrollCompact]} contentContainerStyle={styles.detailsList}>
+          <ScrollView nestedScrollEnabled style={styles.detailsScroll} contentContainerStyle={styles.detailsList}>
             {selectedEvents.map((event) => {
               const colors = activityColors(theme, event);
               const running = isOpenNap(event);
-              const start = new Intl.DateTimeFormat(language, { hour: 'numeric', minute: '2-digit' }).format(event.at);
+              const start = new Intl.DateTimeFormat(language, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(event.at);
               const end = typeof event.endedAt === 'number'
                 ? new Intl.DateTimeFormat(language, {
                   ...(dateKey(new Date(event.at)) === dateKey(new Date(event.endedAt)) ? {} : { month: 'short' as const, day: 'numeric' as const }),
@@ -769,7 +757,10 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
                   <View style={[styles.detailsDot, { backgroundColor: colors.color }]} />
                   <View style={styles.detailsCopy}>
                     <View style={styles.detailsEventHeading}>
-                      <Text style={[styles.detailsEventTitle, { color: theme.text }]}>{activityLabel(event)}</Text>
+                      <Text style={[styles.detailsEventTitle, { color: theme.text }]}>
+                        {activityLabel(event)}
+                        <Text style={[styles.detailsSource, { color: theme.textMuted }]}> · {t(event.source === 'widget' ? 'eventRow.widget' : 'eventRow.app')}</Text>
+                      </Text>
                       <Text style={[styles.detailsTime, { color: theme.textMuted }]}>{start}</Text>
                     </View>
                     {end || running ? (
@@ -778,7 +769,6 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
                       </Text>
                     ) : null}
                     {event.note?.trim() ? <Text style={[styles.detailsNote, { color: theme.text }]}>{event.note.trim()}</Text> : null}
-                    <Text style={[styles.detailsSource, { color: theme.textMuted }]}>{t(event.source === 'widget' ? 'eventRow.widget' : 'eventRow.app')}</Text>
                   </View>
                 </View>
               );
@@ -789,7 +779,7 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
             accessibilityRole="button"
             accessibilityLabel={t('timeline.closeDetails')}
             onPress={() => setSelection([])}
-            style={({ pressed }) => [styles.detailsClose, isCompactHeight && styles.detailsCloseCompact, { opacity: pressed ? 0.5 : 1 }]}
+            style={({ pressed }) => [styles.detailsClose, { opacity: pressed ? 0.5 : 1 }]}
           >
             <MaterialCommunityIcons name="close" size={22} color={theme.textMuted} />
           </Pressable>
@@ -1013,24 +1003,16 @@ const styles = StyleSheet.create({
     paddingLeft: 12,
   },
   loadEarlierText: { fontSize: 11, lineHeight: 16, fontWeight: '700' },
-  detailsPanel: { borderBottomWidth: StyleSheet.hairlineWidth, flexShrink: 0 },
-  detailsPanelCompact: { flexDirection: 'row' },
-  detailsHeading: { minHeight: 64, paddingLeft: spacing.md, paddingRight: 56, flexDirection: 'row', alignItems: 'center' },
-  detailsHeadingCompact: { width: 220, paddingRight: spacing.sm },
-  detailsHeadingCopy: { flex: 1, minWidth: 0, gap: 2 },
-  detailsTitle: { fontSize: 17, fontWeight: '700' },
-  detailsDate: { fontSize: 13 },
-  detailsClose: { position: 'absolute', top: spacing.sm, right: spacing.xs, width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
-  detailsCloseCompact: { position: 'relative', top: 0, right: 0, alignSelf: 'center', marginRight: spacing.xs },
-  detailsScroll: { flexShrink: 1 },
-  detailsScrollCompact: { flex: 1 },
-  detailsList: { paddingHorizontal: spacing.md, paddingBottom: spacing.xs },
-  detailsEvent: { minHeight: 52, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth },
+  detailsPanel: { borderBottomWidth: StyleSheet.hairlineWidth, flexShrink: 0, flexDirection: 'row' },
+  detailsClose: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', marginRight: spacing.xs },
+  detailsScroll: { flex: 1 },
+  detailsList: { paddingLeft: spacing.md, paddingRight: spacing.xs },
+  detailsEvent: { minHeight: 40, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.xs, borderTopWidth: StyleSheet.hairlineWidth },
   detailsDot: { width: 8, height: 8, borderRadius: 4, marginTop: 7 },
   detailsCopy: { flex: 1, gap: 2 },
   detailsEventHeading: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
   detailsEventTitle: { flex: 1, fontSize: 15, fontWeight: '700' },
-  detailsTime: { fontSize: 13 },
-  detailsNote: { fontSize: 13, marginTop: spacing.xs },
-  detailsSource: { fontSize: 12 },
+  detailsTime: { fontSize: 13, flexShrink: 1 },
+  detailsNote: { fontSize: 13 },
+  detailsSource: { fontSize: 12, fontWeight: '400' },
 });
