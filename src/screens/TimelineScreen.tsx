@@ -37,10 +37,11 @@ const INITIAL_DAYS = 14;
 const LOAD_DAYS = 14;
 const DATE_COLUMN_WIDTH = 72;
 const LOAD_ROW_HEIGHT = 48;
-const MIN_TIME_SCALE = 1;
+const MIN_TIME_SCALE = 0.25;
 const MAX_TIME_SCALE = 4;
-const ZOOM_STEP = 0.5;
+const ZOOM_STEP = 0.25;
 const ESTIMATE_OPACITY = 0.35;
+const GRID_HOURS = Array.from({ length: 23 }, (_, index) => index + 1);
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
@@ -200,7 +201,11 @@ function TimelineTrack({
       ]}
     >
       {gridHours.map((hour) => (
-        <View key={hour} style={[styles.gridLine, { backgroundColor: theme.border, left: `${(hour / 24) * 100}%` }]} />
+        <View key={hour} pointerEvents="none" style={[styles.gridLine, {
+          backgroundColor: hour % 3 === 0 ? theme.textMuted : theme.border,
+          opacity: hour % 3 === 0 ? 0.4 : 1,
+          left: `${(hour / 24) * 100}%`,
+        }]} />
       ))}
       {timelineDurationRuns(recordedMarks).map((mark) => {
         const color = activityColors(theme, { type: mark.type }).color;
@@ -344,6 +349,7 @@ function TimelineAxis({
   theme: Theme;
 }) {
   const { language, t } = useLocalization();
+  const labelWidth = trackWidth * (hours[1] - hours[0]) / 24;
   return (
     <View style={[styles.axisRow, { backgroundColor: theme.background, borderColor: theme.border }]}>
       <Animated.View
@@ -373,8 +379,8 @@ function TimelineAxis({
                 ? styles.axisStart
                 : hour === 24
                   ? styles.axisEnd
-                  : { left: `${(hour / 24) * 100}%`, marginLeft: -20, textAlign: 'center' },
-              { color: theme.textMuted },
+                  : { left: `${(hour / 24) * 100}%`, marginLeft: -labelWidth / 2, textAlign: 'center' },
+              { color: theme.textMuted, width: labelWidth },
             ]}
           >
             {formatHour(hour, language)}
@@ -399,19 +405,20 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
     if (selectedType !== 'all' && !activityFilters.includes(selectedType)) setSelectedType('all');
   }, [customActivities, selectedType]);
   const [loadedDayCount, setLoadedDayCount] = useState(INITIAL_DAYS);
-  const [timeScale, setTimeScale] = useState(MIN_TIME_SCALE);
+  const [timeScale, setTimeScale] = useState(1);
+  const timeScaleLabel = timeScale.toFixed(2).replace(/0$/, '');
   const [nowTime, setNowTime] = useState(Date.now());
   const [selection, setSelection] = useState<string[]>([]);
   const [isLoadingEarlier, startLoadingEarlier] = useTransition();
   const rowHeight = Math.round(52 * Math.min(fontScale, 1.5));
   const viewportWidth = width;
-  const baseTrackWidth = Math.max(288, viewportWidth - DATE_COLUMN_WIDTH);
+  const hourLabelWidth = Math.ceil(60 * Math.min(fontScale, 1.4));
+  const baseTrackWidth = Math.max(24 * hourLabelWidth, viewportWidth - DATE_COLUMN_WIDTH);
   const trackWidth = Math.round(baseTrackWidth * timeScale);
   const totalWidth = DATE_COLUMN_WIDTH + trackWidth;
   const pixelsPerHour = trackWidth / 24;
-  const tickStep = pixelsPerHour >= 60 ? 1 : pixelsPerHour >= 32 ? 2 : pixelsPerHour >= 20 ? 3 : 6;
+  const tickStep = pixelsPerHour >= hourLabelWidth ? 1 : pixelsPerHour >= hourLabelWidth / 2 ? 2 : pixelsPerHour >= hourLabelWidth / 3 ? 3 : 6;
   const tickHours = useMemo(() => Array.from({ length: 24 / tickStep + 1 }, (_, index) => index * tickStep), [tickStep]);
-  const gridHours = useMemo(() => tickHours.slice(1, -1), [tickHours]);
   const now = useMemo(() => new Date(nowTime), [nowTime]);
   const estimates = useMemo(() => estimateMissingLogs(events, INITIAL_DAYS, now).estimates, [events, now]);
   const earliestEventAt = events.reduce((earliest, event) => Math.min(earliest, event.at), nowTime);
@@ -633,10 +640,10 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
             </Pressable>
             <Text
               testID="timeline.zoom.value"
-              accessibilityLabel={`${t('insights.timeWidth')}: ${timeScale.toFixed(1)}×`}
+              accessibilityLabel={`${t('insights.timeWidth')}: ${timeScaleLabel}×`}
               style={[styles.zoomValue, { color: theme.text }]}
             >
-              {timeScale.toFixed(1)}×
+              {timeScaleLabel}×
             </Text>
             <Pressable
               testID="timeline.zoom.in"
@@ -818,7 +825,7 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
                       currentTime={day.key === todayKey ? now : undefined}
                       rowHeight={rowHeight}
                       trackWidth={trackWidth}
-                      gridHours={gridHours}
+                      gridHours={GRID_HOURS}
                       onSelectMarks={selectMarks}
                       theme={theme}
                     />
@@ -944,7 +951,7 @@ const styles = StyleSheet.create({
   },
   axisDateText: { fontSize: 9, lineHeight: 12, fontWeight: '800', letterSpacing: 0.7 },
   axisTrack: { height: 30, position: 'relative' },
-  axisLabel: { position: 'absolute', width: 40, top: 7, fontSize: 10, lineHeight: 14, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  axisLabel: { position: 'absolute', top: 6, fontSize: 12, lineHeight: 17, fontWeight: '600', fontVariant: ['tabular-nums'] },
   axisStart: { left: 4, textAlign: 'left' },
   axisEnd: { right: 4, textAlign: 'right' },
   dayList: { flex: 1 },
@@ -962,7 +969,7 @@ const styles = StyleSheet.create({
   weekday: { fontSize: 10, lineHeight: 13, fontWeight: '800', letterSpacing: 0.35 },
   calendarDate: { fontSize: 10, lineHeight: 13, fontWeight: '600', marginTop: 1 },
   timelineTrack: { width: '100%', borderBottomWidth: StyleSheet.hairlineWidth, position: 'relative', overflow: 'hidden' },
-  gridLine: { position: 'absolute', top: 0, bottom: 0, width: StyleSheet.hairlineWidth },
+  gridLine: { position: 'absolute', top: 0, bottom: 0, width: 1 },
   pointHitTarget: { position: 'absolute', top: 0, bottom: 0, justifyContent: 'center', zIndex: 2 },
   pointMark: { position: 'absolute', top: 3, borderRadius: 999, overflow: 'hidden' },
   estimatedPointMark: { position: 'absolute', top: 3, bottom: 3, width: 6, marginLeft: -3, borderRadius: 999, zIndex: 2 },
