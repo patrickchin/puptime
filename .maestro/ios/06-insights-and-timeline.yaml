@@ -99,6 +99,15 @@ tags:
     id: timeline.details
 - tapOn:
     id: timeline.zoom.in
+- assertVisible:
+    id: timeline.details
+- swipe:
+    start: 50%, 65%
+    end: 50%, 85%
+- assertVisible:
+    id: timeline.details
+- tapOn:
+    id: timeline.details.close
 - assertNotVisible:
     id: timeline.details
 - assertVisible:

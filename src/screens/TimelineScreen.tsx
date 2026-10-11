@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   Animated,
   FlatList,
-  type GestureResponderEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   PanResponder,
@@ -15,7 +14,6 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   buildTimelineDays,
@@ -42,11 +40,6 @@ const MIN_TIME_SCALE = 1;
 const MAX_TIME_SCALE = 4;
 const ZOOM_STEP = 0.5;
 const ESTIMATE_OPACITY = 0.35;
-const POPOVER_MAX_WIDTH = 320;
-const POPOVER_MAX_HEIGHT = 320;
-const POPOVER_GAP = 16;
-
-type TimelineSelection = { ids: string[]; x: number; y: number; width: number; height: number };
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
@@ -184,12 +177,13 @@ function TimelineTrack({
   rowHeight: number;
   trackWidth: number;
   gridHours: readonly number[];
-  onSelectMarks: (ids: string[], event: GestureResponderEvent) => void;
+  onSelectMarks: (ids: string[]) => void;
   theme: Theme;
 }) {
   const { activityColors, activityLabel, language, t } = useLocalization();
   const marks = day.marks.filter((mark) => selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label })));
   const recordedMarks = marks.filter((mark) => !mark.estimated);
+  const clusters = timelinePointClusters(recordedMarks);
   const currentTimePosition = currentTime
     ? ((currentTime.getHours() * 60 + currentTime.getMinutes()) / (24 * 60)) * 100
     : undefined;
@@ -210,59 +204,68 @@ function TimelineTrack({
       ))}
       {timelineDurationRuns(recordedMarks).map((mark) => {
         const color = activityColors(theme, { type: mark.type }).color;
-        const ids = recordedMarks.filter((candidate) => candidate.endBucket !== undefined
-          && candidate.type === mark.type
-          && candidate.startBucket < mark.endBucket
-          && candidate.endBucket > mark.startBucket).map((candidate) => candidate.id);
         return (
-          <Pressable
+          <View
             key={`${mark.type}-${mark.startBucket}`}
-            testID={`timeline.mark.duration.${day.key}.${mark.startBucket}`}
-            accessibilityRole="button"
-            accessibilityLabel={`${t('insights.durationWindow', {
-              activity: activityLabel({ type: mark.type }),
-              start: formatBucket(mark.startBucket, language),
-              end: formatBucket(mark.endBucket, language),
-            })}. ${t('timeline.viewDetails')}`}
-            hitSlop={20}
-            onPress={(event) => onSelectMarks(ids, event)}
-            style={({ pressed }) => [
+            pointerEvents="none"
+            style={[
               styles.durationMark,
               {
                 backgroundColor: color,
                 left: `${(mark.startBucket / TIMELINE_BUCKETS) * 100}%`,
                 width: `${((mark.endBucket - mark.startBucket) / TIMELINE_BUCKETS) * 100}%`,
-                opacity: pressed ? 0.6 : 1,
               },
             ]}
           />
         );
       })}
-      {timelinePointClusters(recordedMarks).map((cluster) => {
+      {recordedMarks.filter((mark) => mark.endBucket !== undefined).map((mark) => (
+        <Pressable
+          key={mark.id}
+          testID={`timeline.mark.duration.${day.key}.${mark.startBucket}`}
+          accessibilityRole="button"
+          accessibilityLabel={`${describeMark(mark, language, activityLabel)}. ${t('timeline.viewDetails')}`}
+          hitSlop={{ top: 3, bottom: 3 }}
+          onPress={() => onSelectMarks([mark.id])}
+          style={({ pressed }) => [styles.durationMark, {
+            left: `${(mark.startBucket / TIMELINE_BUCKETS) * 100}%`,
+            width: `${((mark.endBucket! - mark.startBucket) / TIMELINE_BUCKETS) * 100}%`,
+            backgroundColor: pressed ? theme.surface : 'transparent',
+            opacity: pressed ? 0.4 : 1,
+          }]}
+        />
+      ))}
+      {clusters.map((cluster, index) => {
         const durationMarks = recordedMarks.filter((mark) => mark.endBucket !== undefined
           && mark.startBucket <= cluster.startBucket && mark.endBucket > cluster.startBucket);
         const pointMarks = recordedMarks.filter((mark) => cluster.ids.includes(mark.id));
-        const selectedMarks = timelineMarksForPointHit(recordedMarks, cluster.startBucket, trackWidth);
+        const selectedMarks = timelineMarksForPointHit(recordedMarks, cluster.startBucket);
         const colors = [...new Set([...durationMarks, ...pointMarks].map((mark) => activityColors(theme, { type: mark.type, customLabel: mark.label }).color))];
         const durationCount = new Set(durationMarks.map((mark) => activityColors(theme, { type: mark.type, customLabel: mark.label }).color)).size;
         const markWidth = colors.length > 1 ? Math.min(14, 6 + colors.length * 2) : 6;
+        const center = (cluster.startBucket + 0.5) * trackWidth / TIMELINE_BUCKETS;
+        const previous = clusters[index - 1];
+        const next = clusters[index + 1];
+        // Share dense tap space at the midpoint so a neighbor cannot steal the visible mark's tap.
+        const left = Math.max(0, center - 24, previous ? (previous.startBucket + cluster.startBucket + 1) * trackWidth / (2 * TIMELINE_BUCKETS) : 0);
+        const right = Math.min(trackWidth, center + 24, next ? (next.startBucket + cluster.startBucket + 1) * trackWidth / (2 * TIMELINE_BUCKETS) : trackWidth);
         return (
           <Pressable
             key={`${cluster.startBucket}-${cluster.ids.join('-')}`}
             testID={`timeline.mark.point.${day.key}.${cluster.startBucket}`}
             accessibilityRole="button"
             accessibilityLabel={`${selectedMarks.map((mark) => describeMark(mark, language, activityLabel)).join('. ')}. ${t('timeline.viewDetails')}`}
-            onPress={(event) => onSelectMarks([...new Set(selectedMarks.map((mark) => mark.id))], event)}
+            onPress={() => onSelectMarks([...new Set(selectedMarks.map((mark) => mark.id))])}
             style={({ pressed }) => [
               styles.pointHitTarget,
               {
-                left: `${((cluster.startBucket + 0.5) / TIMELINE_BUCKETS) * 100}%`,
-                marginLeft: -24,
+                left,
+                width: right - left,
                 opacity: pressed ? 0.6 : 1,
               },
             ]}
           >
-            <View style={[styles.pointMark, { backgroundColor: colors[0], height: rowHeight - 6, width: markWidth }]}>
+            <View pointerEvents="none" style={[styles.pointMark, { left: center - left - markWidth / 2, backgroundColor: colors[0], height: rowHeight - 6, width: markWidth }]}>
               {colors.length > 1 ? colors.map((color, index) => {
                 const continuesHorizontally = index < durationCount;
                 return (
@@ -388,7 +391,6 @@ const MemoTimelineAxis = memo(TimelineAxis);
 
 export function TimelineScreen({ events, customActivities, theme }: { events: PuppyEvent[]; customActivities: string[]; theme: Theme }) {
   const { activityColors, activityLabel, language, t } = useLocalization();
-  const insets = useSafeAreaInsets();
   const { fontScale, height, width } = useWindowDimensions();
   const activityFilters: ActivityKey[] = useMemo(() => [...quickEventTypes, ...customActivities.map(customActivityKey)], [customActivities]);
   const [selectedType, setSelectedType] = useState<ActivityKey | 'all'>('all');
@@ -399,7 +401,7 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
   const [loadedDayCount, setLoadedDayCount] = useState(INITIAL_DAYS);
   const [timeScale, setTimeScale] = useState(MIN_TIME_SCALE);
   const [nowTime, setNowTime] = useState(Date.now());
-  const [selection, setSelection] = useState<TimelineSelection | null>(null);
+  const [selection, setSelection] = useState<string[]>([]);
   const [isLoadingEarlier, startLoadingEarlier] = useTransition();
   const rowHeight = Math.round(52 * Math.min(fontScale, 1.5));
   const viewportWidth = width;
@@ -429,16 +431,8 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
   const rangeLabel = days.length ? formatDateRange(days[0].date, days[days.length - 1].date, language) : '';
   const hasEarlierDays = loadedDayCount < maxHistoryDays;
   const isCompactHeight = height < 500;
-  const selectedEvents = events.filter((event) => selection?.ids.includes(event.id)).sort((a, b) => a.at - b.at);
-  const popoverWidth = selection ? Math.min(POPOVER_MAX_WIDTH, selection.width - 32) : 0;
-  const popoverAbove = !!selection && selection.y > selection.height / 2;
-  const availableSpace = selection ? (popoverAbove ? selection.y : selection.height - selection.y) : 0;
-  const popoverMaxHeight = Math.max(96, Math.min(POPOVER_MAX_HEIGHT, availableSpace - POPOVER_GAP - 8));
-  const popoverLeft = selection ? clamp(selection.x - popoverWidth / 2, 16, selection.width - popoverWidth - 16) : 0;
-  const arrowLeft = selection ? clamp(selection.x - popoverLeft - 10, 18, popoverWidth - 38) : 0;
-
-  const screenRef = useRef<View>(null);
-  const screenBounds = useRef<{ left: number; top: number; width: number; height: number } | null>(null);
+  const selectedEvents = events.filter((event) => selection.includes(event.id)).sort((a, b) => a.at - b.at);
+  const detailsMaxHeight = isCompactHeight ? 80 : Math.min(260, height * 0.28);
   const listRef = useRef<FlatList<TimelineDay>>(null);
   const horizontalRef = useRef<ScrollView>(null);
   const horizontalOffset = useRef(new Animated.Value(0)).current;
@@ -457,8 +451,6 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
     const timer = setInterval(() => setNowTime(Date.now()), 60_000);
     return () => clearInterval(timer);
   }, []);
-
-  useEffect(() => setSelection(null), [width, height]);
 
   useEffect(() => {
     setLoadedDayCount((current) => Math.min(current, maxHistoryDays));
@@ -489,7 +481,6 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
     onStartShouldSetPanResponderCapture: (event) => event.nativeEvent.touches.length >= 2,
     onMoveShouldSetPanResponderCapture: (event) => event.nativeEvent.touches.length >= 2,
     onPanResponderGrant: (event) => {
-      setSelection(null);
       const touches = event.nativeEvent.touches;
       if (touches.length < 2) return;
       pinch.current = {
@@ -528,14 +519,12 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
 
   function loadEarlierDays() {
     if (!hasEarlierDays || isLoadingEarlier) return;
-    setSelection(null);
     startLoadingEarlier(() => {
       setLoadedDayCount((current) => Math.min(maxHistoryDays, current + LOAD_DAYS));
     });
   }
 
   function changeTimeScale(change: number) {
-    setSelection(null);
     const nextScale = clamp(
       Math.round((timeScaleValue.current + change) / ZOOM_STEP) * ZOOM_STEP,
       MIN_TIME_SCALE,
@@ -576,37 +565,15 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
   }
 
   function handleVerticalDragStart() {
-    setSelection(null);
     didUserScroll.current = true;
     if (didInitialScroll.current && verticalOffsetValue.current <= 28) loadEarlierDays();
   }
 
-  const selectMarks = useCallback((ids: string[], event: GestureResponderEvent) => {
-    if (!ids.length) return;
-    const { pageX, pageY } = event.nativeEvent;
-    const showDetails = ({ left, top, width: measuredWidth, height: measuredHeight }: NonNullable<typeof screenBounds.current>) => {
-      setSelection({
-        ids,
-        x: clamp(pageX - left, 0, measuredWidth),
-        y: clamp(pageY - top, 0, measuredHeight),
-        width: measuredWidth,
-        height: measuredHeight,
-      });
-    };
-    if (screenBounds.current) showDetails(screenBounds.current);
-  }, []);
+  const selectMarks = useCallback((ids: string[]) => setSelection(ids), []);
 
   return (
     <View
-      ref={screenRef}
       testID="screen.timeline"
-      onLayout={(event) => {
-        const { width: measuredWidth, height: measuredHeight } = event.nativeEvent.layout;
-        screenBounds.current = { left: insets.left, top: insets.top, width: measuredWidth, height: measuredHeight };
-        screenRef.current?.measureInWindow((left, top, actualWidth, actualHeight) => {
-          screenBounds.current = { left, top, width: actualWidth, height: actualHeight };
-        });
-      }}
       style={[styles.screen, { backgroundColor: theme.background }]}
     >
       <View
@@ -634,6 +601,11 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
             >
               {t('timeline.title')}
             </Text>
+            {isCompactHeight ? (
+              <Text testID="timeline.range" numberOfLines={1} style={[styles.rangeText, { flex: 0, color: theme.text }]}>
+                {t('timeline.range', { range: rangeLabel, count: visibleEventCount })}
+              </Text>
+            ) : null}
           </View>
           <View
             style={[
@@ -683,11 +655,13 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
           </View>
         </View>
 
-        <View style={styles.timelineMeta}>
-          <Text testID="timeline.range" numberOfLines={1} style={[styles.rangeText, { color: theme.text }]}>
-            {t('timeline.range', { range: rangeLabel, count: visibleEventCount })}
-          </Text>
-        </View>
+        {!isCompactHeight ? (
+          <View style={styles.timelineMeta}>
+            <Text testID="timeline.range" numberOfLines={1} style={[styles.rangeText, { color: theme.text }]}>
+              {t('timeline.range', { range: rangeLabel, count: visibleEventCount })}
+            </Text>
+          </View>
+        ) : null}
         {hasVisibleEstimates ? (
           <View style={styles.estimateLegend}>
             <View style={[styles.estimateLegendMark, { backgroundColor: theme.textMuted, opacity: ESTIMATE_OPACITY }]} />
@@ -716,7 +690,7 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
                 accessibilityLabel={label}
                 accessibilityState={{ checked: active }}
                 onPress={() => {
-                  setSelection(null);
+                  setSelection([]);
                   setSelectedType(type);
                 }}
                 style={({ pressed }) => [
@@ -757,6 +731,71 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
         ) : null}
       </View>
 
+      {selectedEvents.length > 0 ? (
+        <View
+          testID="timeline.details"
+          style={[styles.detailsPanel, isCompactHeight && styles.detailsPanelCompact, {
+            backgroundColor: theme.surfaceRaised,
+            borderColor: theme.border,
+            maxHeight: detailsMaxHeight,
+          }]}
+        >
+          <View style={[styles.detailsHeading, isCompactHeight && styles.detailsHeadingCompact]}>
+            <View style={styles.detailsHeadingCopy}>
+              <Text style={[styles.detailsTitle, { color: theme.text }]}>
+                {selectedEvents.length > 1 && selectedEvents.every((item) => activityKey(item) === activityKey(selectedEvents[0]))
+                  ? t('timeline.range', { range: activityLabel(selectedEvents[0]), count: selectedEvents.length })
+                  : selectedEvents.length === 1 ? activityLabel(selectedEvents[0]) : t('timeline.details')}
+              </Text>
+              <Text style={[styles.detailsDate, { color: theme.textMuted }]}>
+                {new Intl.DateTimeFormat(language, { weekday: 'long', month: 'short', day: 'numeric' }).format(selectedEvents[0].at)}
+              </Text>
+            </View>
+          </View>
+          <ScrollView nestedScrollEnabled style={[styles.detailsScroll, isCompactHeight && styles.detailsScrollCompact]} contentContainerStyle={styles.detailsList}>
+            {selectedEvents.map((event) => {
+              const colors = activityColors(theme, event);
+              const running = isOpenNap(event);
+              const start = new Intl.DateTimeFormat(language, { hour: 'numeric', minute: '2-digit' }).format(event.at);
+              const end = typeof event.endedAt === 'number'
+                ? new Intl.DateTimeFormat(language, {
+                  ...(dateKey(new Date(event.at)) === dateKey(new Date(event.endedAt)) ? {} : { month: 'short' as const, day: 'numeric' as const }),
+                  hour: 'numeric',
+                  minute: '2-digit',
+                }).format(event.endedAt)
+                : null;
+              return (
+                <View key={event.id} style={[styles.detailsEvent, { borderColor: theme.border }]}>
+                  <View style={[styles.detailsDot, { backgroundColor: colors.color }]} />
+                  <View style={styles.detailsCopy}>
+                    <View style={styles.detailsEventHeading}>
+                      <Text style={[styles.detailsEventTitle, { color: theme.text }]}>{activityLabel(event)}</Text>
+                      <Text style={[styles.detailsTime, { color: theme.textMuted }]}>{start}</Text>
+                    </View>
+                    {end || running ? (
+                      <Text style={[styles.detailsTime, { color: theme.textMuted }]}>
+                        {end ?? t('eventRow.now')} · {formatDuration((event.endedAt ?? nowTime) - event.at)}{running ? ` ${t('eventRow.running')}` : ''}
+                      </Text>
+                    ) : null}
+                    {event.note?.trim() ? <Text style={[styles.detailsNote, { color: theme.text }]}>{event.note.trim()}</Text> : null}
+                    <Text style={[styles.detailsSource, { color: theme.textMuted }]}>{t(event.source === 'widget' ? 'eventRow.widget' : 'eventRow.app')}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </ScrollView>
+          <Pressable
+            testID="timeline.details.close"
+            accessibilityRole="button"
+            accessibilityLabel={t('timeline.closeDetails')}
+            onPress={() => setSelection([])}
+            style={({ pressed }) => [styles.detailsClose, isCompactHeight && styles.detailsCloseCompact, { opacity: pressed ? 0.5 : 1 }]}
+          >
+            <MaterialCommunityIcons name="close" size={22} color={theme.textMuted} />
+          </Pressable>
+        </View>
+      ) : null}
+
       <View style={styles.timelineViewport} {...pinchResponder.panHandlers}>
         <Animated.ScrollView
           ref={horizontalRef}
@@ -766,7 +805,6 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
           scrollEventThrottle={16}
           showsHorizontalScrollIndicator
           onScroll={horizontalScrollHandler}
-          onScrollBeginDrag={() => setSelection(null)}
           style={styles.horizontalScroller}
           contentContainerStyle={styles.horizontalContent}
         >
@@ -871,96 +909,6 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
           </View>
         </Animated.ScrollView>
       </View>
-      {selection && selectedEvents.length ? (
-        <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-          <View
-            pointerEvents="box-none"
-            style={[styles.popoverPosition, {
-              left: popoverLeft,
-              width: popoverWidth,
-              ...(popoverAbove
-                ? { bottom: selection.height - selection.y + POPOVER_GAP }
-                : { top: selection.y + POPOVER_GAP }),
-            }]}
-          >
-            <View
-              testID="timeline.details"
-              style={[styles.detailsPopover, {
-                backgroundColor: theme.surfaceRaised,
-                borderColor: theme.border,
-                borderRadius: theme.presentation.cardRadius,
-                maxHeight: popoverMaxHeight,
-                shadowColor: theme.shadow,
-              }]}
-            >
-              <View style={styles.detailsHeading}>
-                <View style={styles.detailsHeadingCopy}>
-                  <Text numberOfLines={1} style={[styles.detailsTitle, { color: theme.text }]}>
-                    {selectedEvents.length > 1 && selectedEvents.every((item) => activityKey(item) === activityKey(selectedEvents[0]))
-                      ? t('timeline.range', { range: activityLabel(selectedEvents[0]), count: selectedEvents.length })
-                      : selectedEvents.length === 1 ? activityLabel(selectedEvents[0]) : t('timeline.details')}
-                  </Text>
-                  <Text style={[styles.detailsDate, { color: theme.textMuted }]}>
-                    {new Intl.DateTimeFormat(language, { weekday: 'long', month: 'short', day: 'numeric' }).format(selectedEvents[0].at)}
-                  </Text>
-                </View>
-                <Pressable
-                  testID="timeline.details.close"
-                  accessibilityRole="button"
-                  accessibilityLabel={t('timeline.closeDetails')}
-                  onPress={() => setSelection(null)}
-                  style={({ pressed }) => [styles.detailsClose, { opacity: pressed ? 0.5 : 1 }]}
-                >
-                  <MaterialCommunityIcons name="close" size={22} color={theme.textMuted} />
-                </Pressable>
-              </View>
-              <ScrollView style={styles.detailsScroll} contentContainerStyle={styles.detailsList}>
-                {selectedEvents.map((event) => {
-                  const colors = activityColors(theme, event);
-                  const running = isOpenNap(event);
-                  const start = new Intl.DateTimeFormat(language, { hour: 'numeric', minute: '2-digit' }).format(event.at);
-                  const end = typeof event.endedAt === 'number'
-                    ? new Intl.DateTimeFormat(language, {
-                      ...(dateKey(new Date(event.at)) === dateKey(new Date(event.endedAt)) ? {} : { month: 'short' as const, day: 'numeric' as const }),
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    }).format(event.endedAt)
-                    : null;
-                  return (
-                    <View key={event.id} style={[styles.detailsEvent, { borderColor: theme.border }]}>
-                      <View style={[styles.detailsDot, { backgroundColor: colors.color }]} />
-                      <View style={styles.detailsCopy}>
-                        <View style={styles.detailsEventHeading}>
-                          <Text style={[styles.detailsEventTitle, { color: theme.text }]}>{activityLabel(event)}</Text>
-                          <Text style={[styles.detailsTime, { color: theme.textMuted }]}>{start}</Text>
-                        </View>
-                        {end || running ? (
-                          <Text style={[styles.detailsTime, { color: theme.textMuted }]}>
-                            {end ?? t('eventRow.now')} · {formatDuration((event.endedAt ?? nowTime) - event.at)}{running ? ` ${t('eventRow.running')}` : ''}
-                          </Text>
-                        ) : null}
-                        {event.note?.trim() ? <Text style={[styles.detailsNote, { color: theme.text }]}>{event.note.trim()}</Text> : null}
-                        <Text style={[styles.detailsSource, { color: theme.textMuted }]}>{t(event.source === 'widget' ? 'eventRow.widget' : 'eventRow.app')}</Text>
-                      </View>
-                    </View>
-                  );
-                })}
-              </ScrollView>
-            </View>
-            <View
-              pointerEvents="none"
-              style={[styles.popoverArrow, {
-                left: arrowLeft,
-                ...(popoverAbove ? { bottom: -9 } : { top: -9 }),
-                borderTopWidth: popoverAbove ? 10 : 0,
-                borderBottomWidth: popoverAbove ? 0 : 10,
-                borderTopColor: popoverAbove ? theme.surfaceRaised : 'transparent',
-                borderBottomColor: popoverAbove ? 'transparent' : theme.surfaceRaised,
-              }]}
-            />
-          </View>
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -1036,8 +984,8 @@ const styles = StyleSheet.create({
   calendarDate: { fontSize: 10, lineHeight: 13, fontWeight: '600', marginTop: 1 },
   timelineTrack: { width: '100%', borderBottomWidth: StyleSheet.hairlineWidth, position: 'relative', overflow: 'hidden' },
   gridLine: { position: 'absolute', top: 0, bottom: 0, width: StyleSheet.hairlineWidth },
-  pointHitTarget: { position: 'absolute', top: 0, bottom: 0, width: 48, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
-  pointMark: { borderRadius: 999, overflow: 'hidden' },
+  pointHitTarget: { position: 'absolute', top: 0, bottom: 0, justifyContent: 'center', zIndex: 2 },
+  pointMark: { position: 'absolute', top: 3, borderRadius: 999, overflow: 'hidden' },
   estimatedPointMark: { position: 'absolute', top: 3, bottom: 3, width: 6, marginLeft: -3, borderRadius: 999, zIndex: 2 },
   estimateLegend: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   estimateLegendMark: { width: 6, height: 16, borderRadius: 3 },
@@ -1065,15 +1013,17 @@ const styles = StyleSheet.create({
     paddingLeft: 12,
   },
   loadEarlierText: { fontSize: 11, lineHeight: 16, fontWeight: '700' },
-  popoverPosition: { position: 'absolute' },
-  popoverArrow: { position: 'absolute', width: 0, height: 0, borderLeftWidth: 10, borderRightWidth: 10, borderLeftColor: 'transparent', borderRightColor: 'transparent' },
-  detailsPopover: { borderWidth: 1, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.16, shadowRadius: 18, elevation: 8 },
-  detailsHeading: { minHeight: 64, paddingLeft: spacing.md, paddingRight: spacing.xs, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  detailsPanel: { borderBottomWidth: StyleSheet.hairlineWidth, flexShrink: 0 },
+  detailsPanelCompact: { flexDirection: 'row' },
+  detailsHeading: { minHeight: 64, paddingLeft: spacing.md, paddingRight: 56, flexDirection: 'row', alignItems: 'center' },
+  detailsHeadingCompact: { width: 220, paddingRight: spacing.sm },
   detailsHeadingCopy: { flex: 1, minWidth: 0, gap: 2 },
   detailsTitle: { fontSize: 17, fontWeight: '700' },
   detailsDate: { fontSize: 13 },
-  detailsClose: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  detailsClose: { position: 'absolute', top: spacing.sm, right: spacing.xs, width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
+  detailsCloseCompact: { position: 'relative', top: 0, right: 0, alignSelf: 'center', marginRight: spacing.xs },
   detailsScroll: { flexShrink: 1 },
+  detailsScrollCompact: { flex: 1 },
   detailsList: { paddingHorizontal: spacing.md, paddingBottom: spacing.xs },
   detailsEvent: { minHeight: 52, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth },
   detailsDot: { width: 8, height: 8, borderRadius: 4, marginTop: 7 },
