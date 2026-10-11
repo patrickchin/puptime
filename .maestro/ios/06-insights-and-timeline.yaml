@@ -79,6 +79,11 @@ tags:
     text: .*2 entries.*
 - assertNotVisible:
     id: timeline.empty
+- scrollUntilVisible:
+    element:
+      id: timeline.mark.point.*
+    direction: RIGHT
+    visibilityPercentage: 50
 - tapOn:
     id: timeline.mark.point.*
 - assertVisible:
@@ -116,7 +121,7 @@ tags:
     id: timeline.details
 - assertVisible:
     id: timeline.zoom.value
-    text: .*1\.5×.*
+    text: .*1\.25×.*
 - tapOn:
     id: timeline.filter.all
 - assertVisible:
