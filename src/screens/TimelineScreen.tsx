@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Animated,
   FlatList,
+  Modal,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   PanResponder,
@@ -14,6 +15,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   buildTimelineDays,
@@ -410,6 +412,7 @@ const MemoTimelineAxis = memo(TimelineAxis);
 export function TimelineScreen({ events, customActivities, theme }: { events: PuppyEvent[]; customActivities: string[]; theme: Theme }) {
   const { activityColors, activityLabel, language, t } = useLocalization();
   const { fontScale, height, width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const activityFilters: ActivityKey[] = useMemo(() => [...quickEventTypes, ...customActivities.map(customActivityKey)], [customActivities]);
   const [selectedType, setSelectedType] = useState<ActivityKey | 'all'>('all');
   const selectedTypes = useMemo(() => selectedType === 'all' ? activityFilters : [selectedType], [activityFilters, selectedType]);
@@ -458,7 +461,7 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
   const hasEarlierDays = loadedDayCount < maxHistoryDays;
   const isCompactHeight = height < 500;
   const selectedEvents = events.filter((event) => selection.includes(event.id)).sort((a, b) => a.at - b.at);
-  const detailsMaxHeight = isCompactHeight ? 80 : Math.min(180, height * 0.22);
+  const detailsHeight = Math.min(height * 0.8, Math.max(300, 88 + selectedEvents.length * 90 + insets.bottom));
   const listRef = useRef<FlatList<TimelineDay>>(null);
   const horizontalRef = useRef<ScrollView>(null);
   const horizontalOffset = useRef(new Animated.Value(0)).current;
@@ -761,50 +764,6 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
         ) : null}
       </View>
 
-      {selectedEvents.length > 0 ? (
-        <View
-          testID="timeline.details"
-          style={[styles.detailsPanel, {
-            backgroundColor: theme.surfaceRaised,
-            borderColor: theme.border,
-            maxHeight: detailsMaxHeight,
-          }]}
-        >
-          <ScrollView nestedScrollEnabled style={styles.detailsScroll} contentContainerStyle={styles.detailsList}>
-            {selectedEvents.map((event) => {
-              const colors = activityColors(theme, event);
-              const running = isOpenNap(event);
-              const start = timelineFormatters(language).time.format(event.at);
-              const end = typeof event.endedAt === 'number'
-                ? timelineFormatters(language).time.format(event.endedAt)
-                : null;
-              return (
-                <View key={event.id} style={[styles.detailsEvent, { borderColor: theme.border }]}>
-                  <View style={[styles.detailsDot, { backgroundColor: colors.color }]} />
-                  <Text testID={`timeline.details.event.${event.id}`} style={[styles.detailsCopy, { color: theme.text }]}>
-                    <Text style={styles.detailsEventTitle}>{activityLabel(event)}{event.estimated ? ` · ${t('eventRow.estimated')}` : ''}</Text>
-                    <Text style={{ color: theme.textMuted }}>
-                      {'  '}{start}{end || running ? `–${end ?? t('eventRow.now')} · ${formatDuration((event.endedAt ?? nowTime) - event.at)}${running ? ` ${t('eventRow.running')}` : ''}` : ''}
-                    </Text>
-                    {event.note?.trim() ? ` · ${event.note.trim()}` : ''}
-                  </Text>
-                </View>
-              );
-            })}
-          </ScrollView>
-          <Pressable
-            testID="timeline.details.close"
-            accessibilityRole="button"
-            accessibilityLabel={t('timeline.closeDetails')}
-            onPress={() => setSelection([])}
-            style={({ pressed }) => [styles.detailsClose, { borderColor: theme.border, opacity: pressed ? 0.5 : 1 }]}
-          >
-            <MaterialCommunityIcons name="close" size={16} color={theme.textMuted} />
-            <Text style={[styles.detailsCloseText, { color: theme.textMuted }]}>{t('timeline.closeDetails')}</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
       <View style={styles.timelineViewport} {...pinchResponder.panHandlers}>
         <Animated.ScrollView
           ref={horizontalRef}
@@ -920,6 +879,75 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
           </View>
         </Animated.ScrollView>
       </View>
+      <Modal
+        visible={selectedEvents.length > 0}
+        transparent
+        animationType="none"
+        presentationStyle="overFullScreen"
+        statusBarTranslucent
+        navigationBarTranslucent
+        onRequestClose={() => setSelection([])}
+      >
+        <View style={styles.detailsModal} accessibilityViewIsModal>
+          <Pressable
+            testID="timeline.details.backdrop"
+            accessibilityRole="button"
+            accessibilityLabel={t('timeline.closeDetails')}
+            onPress={() => setSelection([])}
+            style={styles.detailsBackdrop}
+          />
+          <View
+            testID="timeline.details"
+            style={[styles.detailsSheet, {
+              backgroundColor: theme.surfaceRaised,
+              height: detailsHeight,
+              paddingBottom: insets.bottom,
+            }]}
+          >
+            <View style={[styles.detailsHeading, { borderColor: theme.border }]}>
+              <Text style={[styles.detailsTitle, { color: theme.text }]}>{t('timeline.details')}</Text>
+              <Pressable
+                testID="timeline.details.close"
+                accessibilityRole="button"
+                accessibilityLabel={t('timeline.closeDetails')}
+                onPress={() => setSelection([])}
+                style={({ pressed }) => [styles.detailsClose, { opacity: pressed ? 0.5 : 1 }]}
+              >
+                <MaterialCommunityIcons name="close" size={24} color={theme.text} />
+              </Pressable>
+            </View>
+            <ScrollView nestedScrollEnabled style={styles.detailsScroll} contentContainerStyle={styles.detailsList}>
+              {selectedEvents.map((event, index) => {
+                const colors = activityColors(theme, event);
+                const running = isOpenNap(event);
+                const end = typeof event.endedAt === 'number'
+                  ? timelineFormatters(language).fullDateTime.format(event.endedAt)
+                  : null;
+                return (
+                  <View key={event.id} style={[styles.detailsEvent, { borderColor: theme.border, borderBottomWidth: index === selectedEvents.length - 1 ? 0 : StyleSheet.hairlineWidth }]}>
+                    <View style={[styles.detailsIcon, { backgroundColor: colors.softColor }]}>
+                      <ActivityIcon activity={event} theme={theme} color={colors.color} size={26} />
+                    </View>
+                    <View style={styles.detailsCopy}>
+                      <Text testID={`timeline.details.event.${event.id}`} style={[styles.detailsEventTitle, { color: theme.text }]}>
+                        {activityLabel(event)}{event.estimated ? ` · ${t('eventRow.estimated')}` : ''}
+                      </Text>
+                      <Text style={[styles.detailsTime, { color: theme.textMuted }]}>{timelineFormatters(language).fullDateTime.format(event.at)}</Text>
+                      {end || running ? (
+                        <Text style={[styles.detailsTime, { color: theme.textMuted }]}>
+                          {end ?? t('eventRow.now')} · {formatDuration((event.endedAt ?? nowTime) - event.at)}{running ? ` ${t('eventRow.running')}` : ''}
+                        </Text>
+                      ) : null}
+                      {event.note?.trim() ? <Text style={[styles.detailsNote, { color: theme.text }]}>{event.note.trim()}</Text> : null}
+                      <Text style={[styles.detailsSource, { color: theme.textMuted }]}>{t(event.source === 'widget' ? 'eventRow.widget' : 'eventRow.app')}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1027,13 +1055,19 @@ const styles = StyleSheet.create({
     paddingLeft: 12,
   },
   loadEarlierText: { fontSize: 11, lineHeight: 16, fontWeight: '700' },
-  detailsPanel: { borderBottomWidth: StyleSheet.hairlineWidth, flexShrink: 0 },
-  detailsClose: { minHeight: 48, flexShrink: 0, flexDirection: 'row', gap: spacing.xs, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md, borderTopWidth: StyleSheet.hairlineWidth },
-  detailsCloseText: { fontSize: 14, fontWeight: '600', flexShrink: 1 },
-  detailsScroll: { flexShrink: 1 },
+  detailsModal: { flex: 1, justifyContent: 'flex-end' },
+  detailsBackdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0, 0, 0, 0.42)' },
+  detailsSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden' },
+  detailsHeading: { minHeight: 64, marginHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth },
+  detailsTitle: { fontSize: 20, fontWeight: '800' },
+  detailsClose: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  detailsScroll: { flex: 1 },
   detailsList: { paddingHorizontal: spacing.md },
-  detailsEvent: { minHeight: 36, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth },
-  detailsDot: { width: 8, height: 8, borderRadius: 4, marginTop: 7 },
-  detailsCopy: { flex: 1, fontSize: 14 },
-  detailsEventTitle: { fontSize: 15, fontWeight: '700' },
+  detailsEvent: { minHeight: 90, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: 16 },
+  detailsIcon: { width: 44, height: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  detailsCopy: { flex: 1, gap: 2 },
+  detailsEventTitle: { fontSize: 16, fontWeight: '700' },
+  detailsTime: { fontSize: 14 },
+  detailsNote: { fontSize: 14, marginTop: spacing.xs },
+  detailsSource: { fontSize: 13, marginTop: spacing.xs },
 });
