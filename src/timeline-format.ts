@@ -3,7 +3,6 @@ import type { AppLanguage } from './localization.ts';
 function createTimelineFormatters(language: AppLanguage) {
   return {
     time: new Intl.DateTimeFormat(language, { hour: 'numeric', minute: '2-digit' }),
-    hour: new Intl.DateTimeFormat(language, { hour: 'numeric' }),
     fullDate: new Intl.DateTimeFormat(language, { weekday: 'long', month: 'long', day: 'numeric' }),
     fullDateTime: new Intl.DateTimeFormat(language, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }),
     weekday: new Intl.DateTimeFormat(language, { weekday: 'short' }),
