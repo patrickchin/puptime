@@ -84,10 +84,14 @@ tags:
 - assertVisible:
     id: timeline.details
 - assertVisible:
-    text: .*Pee.*2 logs.*
+    id: timeline.details.event.*
+    index: 0
+    text: .*Pee.*
 - assertVisible:
-    text: Pee
-- assertVisible:
+    id: timeline.details.event.*
+    index: 1
+    text: .*Pee.*
+- assertNotVisible:
     text: App
 - tapOn:
     id: timeline.details.close
@@ -99,6 +103,15 @@ tags:
     id: timeline.details
 - tapOn:
     id: timeline.zoom.in
+- assertVisible:
+    id: timeline.details
+- swipe:
+    start: 50%, 65%
+    end: 50%, 85%
+- assertVisible:
+    id: timeline.details
+- tapOn:
+    id: timeline.details.close
 - assertNotVisible:
     id: timeline.details
 - assertVisible:

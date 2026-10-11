@@ -161,17 +161,22 @@ test('combines simultaneous point activities and an underlying span into one tim
   ]);
 });
 
-test('a timeline tap includes overlapping logs and separates them when zoomed in', () => {
+test('a timeline tap includes only its bucket and overlapping recorded spans', () => {
   const marks = [
     { id: 'nap', type: 'nap' as const, label: 'Nap', startBucket: 20, endBucket: 26 },
     { id: 'pee', type: 'pee' as const, label: 'Pee', startBucket: 24 },
+    { id: 'poop', type: 'poop' as const, label: 'Poop', startBucket: 24 },
+    { id: 'adjacent', type: 'pee' as const, label: 'Pee', startBucket: 25 },
     { id: 'meal', type: 'meal' as const, label: 'Ate', startBucket: 30 },
     { id: 'later-nap', type: 'nap' as const, label: 'Nap', startBucket: 29, endBucket: 33 },
     { id: 'walk', type: 'walk' as const, label: 'Walk', startBucket: 40 },
+    { id: 'ended', type: 'nap' as const, label: 'Nap', startBucket: 20, endBucket: 24 },
+    { id: 'estimated', type: 'pee' as const, label: 'Pee', startBucket: 24, estimated: true },
   ];
 
-  assert.deepEqual(timelineMarksForPointHit(marks, 24, 384).map((mark) => mark.id), ['nap', 'pee', 'meal', 'later-nap']);
-  assert.deepEqual(timelineMarksForPointHit(marks, 24, 1536).map((mark) => mark.id), ['nap', 'pee']);
+  assert.deepEqual(timelineMarksForPointHit(marks, 24).map((mark) => mark.id), ['nap', 'pee', 'poop']);
+  assert.deepEqual(timelineMarksForPointHit(marks, 30).map((mark) => mark.id), ['meal', 'later-nap']);
+  assert.deepEqual(timelineMarksForPointHit(marks, 40).map((mark) => mark.id), ['walk']);
 });
 
 test('joins touching and overlapping spans of the same activity', () => {
