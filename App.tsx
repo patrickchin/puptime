@@ -9,6 +9,8 @@ import { BottomNav, type Tab } from './src/components/BottomNav';
 import { ThemePicker } from './src/components/ThemePicker';
 import { Toast } from './src/components/Toast';
 import type { ActivityCustomizations } from './src/activity-customization';
+import { CsvImportError } from './src/export';
+import { pickEventsCsv } from './src/share-export';
 import { LocalizationProvider } from './src/localization-context';
 import {
   localizedEventPastLabel,
@@ -58,6 +60,9 @@ import {
   appendEvents,
   completeOnboarding,
   loadActivityCustomizations,
+  EventsImportError,
+  EventsStorageError,
+  importEvents,
   loadEvents,
   loadCustomActivities,
   loadLanguagePreference,
@@ -92,6 +97,8 @@ export default function App() {
   const [initialOnboardingCheck] = useState(shouldShowOnboarding);
   const theme = resolveTheme(themePreference, colorScheme);
   const language = resolveLanguage(languagePreference);
+  const languageRef = useRef(language);
+  languageRef.current = language;
   const [tab, setTab] = useState<Tab>('log');
   const [events, setEvents] = useState<PuppyEvent[]>([]);
   const [customActivities, setCustomActivities] = useState<string[]>([]);
@@ -106,6 +113,10 @@ export default function App() {
   const [editRequest, setEditRequest] = useState<LogEditRequest | null>(null);
   const handledNotificationResponses = useRef(new Set<string>());
   const onboardingChecked = useRef(false);
+
+  const showSaveError = useCallback(() => {
+    Alert.alert(translate(language, 'app.saveErrorTitle'), translate(language, 'app.saveErrorBody'));
+  }, [language]);
 
   const refresh = useCallback(async () => {
     const pending = await readPendingWidgetEvents();
@@ -147,14 +158,23 @@ export default function App() {
 
   useEffect(() => {
     let mounted = true;
+    const reload = async () => {
+      try {
+        await refresh();
+      } catch {
+        if (mounted) {
+          Alert.alert(translate(languageRef.current, 'app.loadErrorTitle'), translate(languageRef.current, 'app.loadErrorBody'));
+        }
+      }
+    };
     void (async () => {
       const showOnboarding = await initialOnboardingCheck.catch(() => false);
       onboardingChecked.current = true;
-      await refresh().catch(() => undefined);
+      await reload();
       if (mounted) setOnboardingVisible(showOnboarding);
     })();
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active' && onboardingChecked.current) refresh();
+      if (state === 'active' && onboardingChecked.current) void reload();
     });
     return () => {
       mounted = false;
@@ -252,14 +272,16 @@ export default function App() {
     const initialResponse = Notifications.getLastNotificationResponse();
     if (initialResponse) {
       void handleNotificationResponse(initialResponse)
+        .catch(showSaveError)
         .finally(() => Notifications.clearLastNotificationResponse());
     }
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       void handleNotificationResponse(response)
+        .catch(showSaveError)
         .finally(() => Notifications.clearLastNotificationResponse());
     });
     return () => subscription.remove();
-  }, [handleNotificationResponse]);
+  }, [handleNotificationResponse, showSaveError]);
 
   useEffect(() => {
     if (!undoState) return;
@@ -269,7 +291,7 @@ export default function App() {
 
   const displayPastLabel = (event: PuppyEvent) => activityCustomizations[activityKey(event)]?.name ?? localizedEventPastLabel(language, event);
 
-  const logEvent = async (type: EventType, customLabel?: string) => {
+  const persistLogEvent = async (type: EventType, customLabel?: string) => {
     if (type === 'custom' && customLabel) setCustomActivities(await saveCustomActivity(customLabel));
     const now = Date.now();
     if (type === 'nap') {
@@ -299,11 +321,41 @@ export default function App() {
     updateHomeWidget(nextEvents).catch(() => undefined);
   };
 
+  const logEvent = (type: EventType, customLabel?: string) => {
+    return persistLogEvent(type, customLabel).catch(showSaveError);
+  };
+
   const deleteEvent = async (event: PuppyEvent) => {
     const nextEvents = await removeEvent(event.id);
     setEvents(nextEvents);
     syncPottyReminders(nextEvents, notificationPreferences, language).catch(() => undefined);
     updateHomeWidget(nextEvents).catch(() => undefined);
+  };
+
+  const importActivity = async () => {
+    try {
+      const incoming = await pickEventsCsv();
+      if (incoming === null) return;
+      const result = await importEvents(incoming);
+      setEvents(result.events);
+      setUndoState(null);
+      void loadCustomActivities(result.events).then(setCustomActivities).catch(() => undefined);
+      syncPottyReminders(result.events, notificationPreferences, language).catch(() => undefined);
+      updateHomeWidget(result.events).catch(() => undefined);
+      Alert.alert(translate(language, 'insights.importedTitle'), translate(language, 'insights.importedBody', {
+        imported: result.imported,
+        skipped: result.skipped,
+      }));
+    } catch (error) {
+      const body = error instanceof CsvImportError
+        ? 'insights.invalidCsvBody'
+        : error instanceof EventsImportError
+          ? 'insights.importNapConflictBody'
+          : error instanceof EventsStorageError
+            ? 'app.loadErrorBody'
+            : 'insights.importErrorBody';
+      Alert.alert(translate(language, 'insights.importErrorTitle'), translate(language, body));
+    }
   };
 
   const saveEventDetails = async (
@@ -327,7 +379,7 @@ export default function App() {
     updateHomeWidget(nextEvents).catch(() => undefined);
   };
 
-  const undo = async () => {
+  const persistUndo = async () => {
     if (!undoState) return;
     const nextEvents = undoState.restore
       ? await appendEvents([undoState.restore])
@@ -337,6 +389,10 @@ export default function App() {
     Haptics.selectionAsync().catch(() => undefined);
     syncPottyReminders(nextEvents, notificationPreferences, language).catch(() => undefined);
     updateHomeWidget(nextEvents).catch(() => undefined);
+  };
+
+  const undo = () => {
+    void persistUndo().catch(showSaveError);
   };
 
   const changeSchedule = async (nextSchedule: ScheduleEntry[]) => {
@@ -357,34 +413,38 @@ export default function App() {
   };
 
   const chooseTheme = (preference: ThemePreference) => {
-    setThemePreference(preference);
-    setPreferencePicker(null);
-    Haptics.selectionAsync().catch(() => undefined);
     saveThemePreference(preference)
-      .then(() => updateHomeWidget(events))
-      .catch(() => undefined);
+      .then(() => {
+        setThemePreference(preference);
+        setPreferencePicker(null);
+        Haptics.selectionAsync().catch(() => undefined);
+        updateHomeWidget(events).catch(() => undefined);
+      })
+      .catch(() => Alert.alert(translate(language, 'settings.saveErrorTitle'), translate(language, 'settings.saveErrorBody')));
   };
 
   const chooseLanguage = (preference: LanguagePreference) => {
-    setLanguagePreference(preference);
-    setPreferencePicker(null);
-    Haptics.selectionAsync().catch(() => undefined);
     saveLanguagePreference(preference)
-      .then(() => Promise.all([
-        configureNotificationActions(resolveLanguage(preference)),
-        syncScheduleReminders(
-          schedule,
-          notificationPreferences.reminderLeadMinutes,
-          resolveLanguage(preference),
-        ),
-        syncPottyReminders(
-          events,
-          notificationPreferences,
-          resolveLanguage(preference),
-        ),
-        updateHomeWidget(events),
-      ]))
-      .catch(() => undefined);
+      .then(() => {
+        setLanguagePreference(preference);
+        setPreferencePicker(null);
+        Haptics.selectionAsync().catch(() => undefined);
+        void Promise.all([
+          configureNotificationActions(resolveLanguage(preference)),
+          syncScheduleReminders(
+            schedule,
+            notificationPreferences.reminderLeadMinutes,
+            resolveLanguage(preference),
+          ),
+          syncPottyReminders(
+            events,
+            notificationPreferences,
+            resolveLanguage(preference),
+          ),
+          updateHomeWidget(events),
+        ]).catch(() => undefined);
+      })
+      .catch(() => Alert.alert(translate(language, 'settings.saveErrorTitle'), translate(language, 'settings.saveErrorBody')));
   };
 
   const changeWidgetActions = useCallback(async (nextActions: ActivityKey[]) => {
@@ -469,7 +529,7 @@ export default function App() {
       );
     }
     if (tab === 'timeline') return <TimelineScreen events={events} customActivities={customActivities} theme={theme} />;
-    if (tab === 'insights') return <InsightsScreen events={events} customActivities={customActivities} theme={theme} />;
+    if (tab === 'insights') return <InsightsScreen events={events} customActivities={customActivities} onImport={importActivity} theme={theme} />;
     if (tab === 'schedule') {
       return (
         <ScheduleScreen

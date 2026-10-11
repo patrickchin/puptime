@@ -18,12 +18,12 @@ import { scheduleStatusesForDay, suggestScheduleFromEvents, type ScheduleStatus 
 import { ActivityIcon } from '../components/ActivityIcon';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { DateTimeSelector } from '../components/DateTimeSelector';
-import { customActivityKey, formatMinutes, quickEventTypes, type EventType, type ScheduleEntry } from '../domain';
+import { customActivityKey, formatMinutes, formatScheduleWindow, quickEventTypes, type EventType, type ScheduleEntry } from '../domain';
 import type { PuppyEvent } from '../domain';
 import { useLocalization } from '../localization-context';
 import { spacing, surfaceTreatment, type Theme } from '../theme';
 
-type Draft = { id?: string; type: EventType; customLabel?: string; minutes: number; reminder: boolean };
+type Draft = { id?: string; type: EventType; customLabel?: string; minutes: number; reminder: boolean; toleranceMinutes?: number };
 
 export function ScheduleScreen({
   events,
@@ -71,9 +71,9 @@ export function ScheduleScreen({
     if (status === 'done') return { label: t('schedule.status.logged'), color: theme.primary, background: theme.primarySoft };
     if (status === 'due') {
       const colors = activityColors(theme, activity);
-      return { label: t('schedule.status.due'), color: colors.color, background: colors.softColor };
+      return { label: t(activity.toleranceMinutes !== undefined ? 'schedule.status.flexibleDue' : 'schedule.status.due'), color: colors.color, background: colors.softColor };
     }
-    if (status === 'missed') return { label: t('schedule.status.missed'), color: theme.danger, background: theme.dangerSoft };
+    if (status === 'missed') return { label: t('schedule.status.missed'), color: theme.textMuted, background: theme.surface };
     return { label: t('schedule.status.upcoming'), color: theme.textMuted, background: theme.surface };
   };
 
@@ -92,6 +92,7 @@ export function ScheduleScreen({
       ...(draft.type === 'custom' ? { customLabel: draft.customLabel } : {}),
       minutes: draft.minutes,
       reminder: draft.reminder,
+      ...(draft.toleranceMinutes === undefined ? {} : { toleranceMinutes: draft.toleranceMinutes }),
     };
     setSaving(true);
     try {
@@ -334,7 +335,7 @@ export function ScheduleScreen({
                 accessibilityRole="button"
                 accessibilityLabel={t('schedule.editA11y', {
                   activity: label,
-                  time: formatMinutes(entry.minutes),
+                  time: entry.toleranceMinutes === undefined ? formatMinutes(entry.minutes, locale) : formatScheduleWindow(entry, locale),
                   status: presentation.label,
                   reminder: entry.reminder ? t('schedule.reminderOn') : '',
                 })}
@@ -352,9 +353,14 @@ export function ScheduleScreen({
                   <View style={[styles.timelineDot, { backgroundColor: colors.color }]} />
                   {index < schedule.length - 1 ? <View style={[styles.timelineLine, { backgroundColor: theme.border }]} /> : null}
                 </View>
-                <Text style={[styles.time, { color: theme.text }]}>{formatMinutes(entry.minutes)}</Text>
+                <Text style={[styles.time, { color: theme.text }]}>{formatMinutes(entry.minutes, locale)}</Text>
                 <View style={styles.rowCopy}>
                   <Text style={[styles.rowTitle, { color: theme.text }]}>{label}</Text>
+                  {entry.toleranceMinutes !== undefined ? (
+                    <Text style={[styles.windowDetail, { color: theme.textMuted }]}>
+                      {t('schedule.usualWindow', { range: formatScheduleWindow(entry, locale) })}
+                    </Text>
+                  ) : null}
                   <View
                     style={[
                       styles.statusPill,
@@ -385,7 +391,7 @@ export function ScheduleScreen({
                 <Pressable
                   testID={`schedule.entry.${entry.type}.remove`}
                   accessibilityRole="button"
-                  accessibilityLabel={t('schedule.removeA11y', { activity: label, time: formatMinutes(entry.minutes) })}
+                  accessibilityLabel={t('schedule.removeA11y', { activity: label, time: formatMinutes(entry.minutes, locale) })}
                   hitSlop={8}
                   onPress={(event) => {
                     event.stopPropagation();
@@ -463,7 +469,7 @@ export function ScheduleScreen({
                   <View
                     key={entry.id}
                     accessible
-                    accessibilityLabel={t('schedule.entryAt', { activity: label, time: formatMinutes(entry.minutes) })}
+                    accessibilityLabel={`${label}. ${t('schedule.usualWindow', { range: formatScheduleWindow(entry, locale) })}. ${t('schedule.patternDays', { count: suggestion.observedDaysByEntry[entry.id], days: suggestion.daysAnalyzed })}`}
                     style={[
                       styles.previewRow,
                       index > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
@@ -472,8 +478,15 @@ export function ScheduleScreen({
                     <View style={[styles.previewIcon, { backgroundColor: background }]}>
                       <ActivityIcon activity={entry} theme={theme} color={color} size={19} />
                     </View>
-                    <Text style={[styles.previewActivity, { color: theme.text }]}>{label}</Text>
-                    <Text style={[styles.previewTime, { color: theme.text }]}>{formatMinutes(entry.minutes)}</Text>
+                    <View style={styles.previewCopy}>
+                      <Text style={[styles.previewActivity, { color: theme.text }]}>{label}</Text>
+                      <Text style={[styles.windowDetail, { color: theme.textMuted }]}>
+                        {t('schedule.usualWindow', { range: formatScheduleWindow(entry, locale) })}
+                      </Text>
+                      <Text style={[styles.windowDetail, { color: theme.textMuted }]}>
+                        {t('schedule.patternDays', { count: suggestion.observedDaysByEntry[entry.id], days: suggestion.daysAnalyzed })}
+                      </Text>
+                    </View>
                   </View>
                 );
               })}
@@ -562,7 +575,7 @@ export function ScheduleScreen({
                     key={customLabel ? customActivityKey(customLabel) : type}
                     testID={`schedule.editor.type.${type}`}
                     accessibilityState={{ selected }}
-                    onPress={() => draft && setDraft({ ...draft, type, customLabel })}
+                    onPress={() => draft && setDraft({ ...draft, type, customLabel, toleranceMinutes: selected ? draft.toleranceMinutes : undefined })}
                     style={({ pressed }) => [
                       styles.typeChoice,
                       {
@@ -588,10 +601,15 @@ export function ScheduleScreen({
               style={({ pressed }) => [styles.timeButton, { backgroundColor: showTimeSelector || pressed ? theme.primarySoft : theme.surface, borderColor: showTimeSelector ? theme.primary : theme.border, borderRadius: theme.presentation.controlRadius, borderWidth: theme.presentation.borderWidth }]}
             >
               <MaterialCommunityIcons name="clock-outline" size={22} color={theme.primary} />
-              <Text style={[styles.timeButtonText, { color: theme.text }]}>{formatMinutes(draft?.minutes ?? 0)}</Text>
+              <Text style={[styles.timeButtonText, { color: theme.text }]}>{formatMinutes(draft?.minutes ?? 0, locale)}</Text>
               <MaterialCommunityIcons name="chevron-right" size={22} color={theme.textMuted} />
             </Pressable>
 
+            {draft?.toleranceMinutes !== undefined ? (
+              <Text style={[styles.previewSubtitle, { color: theme.textMuted }]}>
+                {t('schedule.windowReminder', { range: formatScheduleWindow(draft, locale) })}
+              </Text>
+            ) : null}
             <View style={[styles.reminderRow, { backgroundColor: theme.surface, borderColor: theme.border }]}>
               <View style={[styles.reminderIcon, { backgroundColor: theme.primarySoft }]}>
                 <MaterialCommunityIcons name="bell-outline" size={21} color={theme.primary} />
@@ -643,7 +661,7 @@ export function ScheduleScreen({
         title={t('schedule.removeTitle')}
         message={pendingRemove ? t('schedule.entryAt', {
           activity: activityLabel(pendingRemove),
-          time: formatMinutes(pendingRemove.minutes),
+          time: formatMinutes(pendingRemove.minutes, locale),
         }) : ''}
         confirmLabel={t('schedule.remove')}
         error={removeFailed ? t('schedule.removeErrorBody') : undefined}
@@ -685,7 +703,8 @@ const styles = StyleSheet.create({
   timelineDot: { width: 10, height: 10, borderRadius: 5, marginTop: 28 },
   timelineLine: { position: 'absolute', width: 2, top: 38, bottom: -18 },
   time: { width: 78, fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  rowCopy: { flex: 1 },
+  rowCopy: { flex: 1, minWidth: 0, paddingVertical: 10 },
+  windowDetail: { fontSize: 12, lineHeight: 18, marginTop: 2 },
   rowTitle: { fontSize: 15, fontWeight: '700' },
   statusPill: { alignSelf: 'flex-start', minHeight: 22, borderRadius: 11, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
@@ -710,10 +729,10 @@ const styles = StyleSheet.create({
   sheetTitle: { flex: 1, fontSize: 23, fontWeight: '800' },
   previewSubtitle: { fontSize: 13, lineHeight: 19, marginTop: 4 },
   previewList: { borderWidth: 1, borderRadius: 17, paddingHorizontal: 12, overflow: 'hidden' },
-  previewRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  previewRow: { minHeight: 86, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
   previewIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  previewActivity: { flex: 1, fontSize: 15, lineHeight: 20, fontWeight: '700' },
-  previewTime: { fontSize: 15, lineHeight: 20, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  previewCopy: { flex: 1, minWidth: 0 },
+  previewActivity: { fontSize: 15, lineHeight: 20, fontWeight: '700' },
   replaceNote: { borderRadius: 14, padding: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 9, marginTop: spacing.md },
   replaceNoteText: { flex: 1, fontSize: 12, lineHeight: 18 },
   cancelButton: { minHeight: 48, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginTop: spacing.sm },

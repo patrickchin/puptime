@@ -51,16 +51,16 @@ function formatBucket(bucket: number, language: AppLanguage): string {
     .format(new Date(2000, 0, 1, 0, bucket * TIMELINE_BUCKET_MINUTES));
 }
 
-function describeMark(mark: TimelineMark, language: AppLanguage, activityLabel: (activity: Activity) => string): string {
+function describeMark(mark: TimelineMark, language: AppLanguage, activityLabel: (activity: Activity) => string, savedEstimate = false): string {
   const activity = activityLabel({ type: mark.type, customLabel: mark.label });
-  if (mark.estimated) return mark.endBucket === undefined
+  if (mark.estimated && !savedEstimate) return mark.endBucket === undefined
     ? translate(language, 'timeline.estimatedPoint', { activity, time: formatBucket(mark.startBucket, language) })
     : translate(language, 'timeline.estimatedSpan', {
       activity,
       start: formatBucket(mark.startBucket, language),
       end: formatBucket(mark.endBucket, language),
     });
-  return mark.endBucket === undefined
+  const description = mark.endBucket === undefined
     ? translate(language, 'insights.pointWindow', {
       activity,
       start: formatBucket(mark.startBucket, language),
@@ -71,6 +71,7 @@ function describeMark(mark: TimelineMark, language: AppLanguage, activityLabel: 
       start: formatBucket(mark.startBucket, language),
       end: formatBucket(mark.endBucket, language),
     });
+  return savedEstimate ? translate(language, 'timeline.estimatedDescription', { description }) : description;
 }
 
 function filterName(types: readonly ActivityKey[], language: AppLanguage, allCount: number, activityLabel: (activity: Activity) => string): string {
@@ -103,6 +104,7 @@ function horizontalTouchDistance(touches: readonly { pageX: number }[]): number 
 function TimelineDateLabel({
   day,
   selectedTypes,
+  savedEstimateIds,
   activityCount,
   isToday,
   currentTime,
@@ -112,6 +114,7 @@ function TimelineDateLabel({
 }: {
   day: TimelineDay;
   selectedTypes: readonly ActivityKey[];
+  savedEstimateIds: ReadonlySet<string>;
   activityCount: number;
   isToday: boolean;
   currentTime?: Date;
@@ -123,11 +126,11 @@ function TimelineDateLabel({
   const description = useMemo(() => {
     const marks = day.marks.filter((mark) => selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label })));
     return marks.length
-      ? marks.map((mark) => describeMark(mark, language, activityLabel)).join('. ')
+      ? marks.map((mark) => describeMark(mark, language, activityLabel, savedEstimateIds.has(mark.id))).join('. ')
       : selectedTypes.length
         ? t('insights.noLogged', { activity: filterName(selectedTypes, language, activityCount, activityLabel) })
         : t('insights.noActivitySelected');
-  }, [day, selectedTypes, language, activityCount, activityLabel, t]);
+  }, [day, selectedTypes, savedEstimateIds, language, activityCount, activityLabel, t]);
   const { fullDate, weekday: shortDay, shortDate, time } = timelineFormatters(language);
   const currentTimeDescription = currentTime
     ? t('insights.currentTime', {
@@ -162,6 +165,7 @@ function TimelineDateLabel({
 function TimelineTrack({
   day,
   selectedTypes,
+  savedEstimateIds,
   isToday,
   currentTime,
   rowHeight,
@@ -172,6 +176,7 @@ function TimelineTrack({
 }: {
   day: TimelineDay;
   selectedTypes: readonly ActivityKey[];
+  savedEstimateIds: ReadonlySet<string>;
   isToday: boolean;
   currentTime?: Date;
   rowHeight: number;
@@ -183,7 +188,8 @@ function TimelineTrack({
   const { activityColors, activityLabel, language, t } = useLocalization();
   const marks = day.marks.filter((mark) => selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label })));
   const recordedMarks = marks.filter((mark) => !mark.estimated);
-  const clusters = timelinePointClusters(recordedMarks);
+  const interactiveMarks = marks.filter((mark) => !mark.estimated || savedEstimateIds.has(mark.id));
+  const clusters = timelinePointClusters(interactiveMarks);
   const currentTimePosition = currentTime
     ? ((currentTime.getHours() * 60 + currentTime.getMinutes()) / (24 * 60)) * 100
     : undefined;
@@ -219,12 +225,12 @@ function TimelineTrack({
           />
         );
       })}
-      {recordedMarks.filter((mark) => mark.endBucket !== undefined).map((mark) => (
+      {interactiveMarks.filter((mark) => mark.endBucket !== undefined).map((mark) => (
         <Pressable
           key={mark.id}
           testID={`timeline.mark.duration.${day.key}.${mark.startBucket}`}
           accessibilityRole="button"
-          accessibilityLabel={`${describeMark(mark, language, activityLabel)}. ${t('timeline.viewDetails')}`}
+          accessibilityLabel={`${describeMark(mark, language, activityLabel, savedEstimateIds.has(mark.id))}. ${t('timeline.viewDetails')}`}
           hitSlop={{ top: 3, bottom: 3 }}
           onPress={() => onSelectMarks([mark.id])}
           style={({ pressed }) => [styles.durationMark, {
@@ -239,7 +245,7 @@ function TimelineTrack({
         const durationMarks = recordedMarks.filter((mark) => mark.endBucket !== undefined
           && mark.startBucket <= cluster.startBucket && mark.endBucket > cluster.startBucket);
         const pointMarks = recordedMarks.filter((mark) => cluster.ids.includes(mark.id));
-        const selectedMarks = timelineMarksForPointHit(recordedMarks, cluster.startBucket);
+        const selectedMarks = timelineMarksForPointHit(interactiveMarks, cluster.startBucket, savedEstimateIds);
         const colors = [...new Set([...durationMarks, ...pointMarks].map((mark) => activityColors(theme, { type: mark.type, customLabel: mark.label }).color))];
         const durationCount = new Set(durationMarks.map((mark) => activityColors(theme, { type: mark.type, customLabel: mark.label }).color)).size;
         const markWidth = colors.length > 1 ? Math.min(14, 6 + colors.length * 2) : 6;
@@ -254,7 +260,7 @@ function TimelineTrack({
             key={`${cluster.startBucket}-${cluster.ids.join('-')}`}
             testID={`timeline.mark.point.${day.key}.${cluster.startBucket}`}
             accessibilityRole="button"
-            accessibilityLabel={`${selectedMarks.map((mark) => describeMark(mark, language, activityLabel)).join('. ')}. ${t('timeline.viewDetails')}`}
+            accessibilityLabel={`${selectedMarks.map((mark) => describeMark(mark, language, activityLabel, savedEstimateIds.has(mark.id))).join('. ')}. ${t('timeline.viewDetails')}`}
             onPress={() => onSelectMarks([...new Set(selectedMarks.map((mark) => mark.id))])}
             style={({ pressed }) => [
               styles.pointHitTarget,
@@ -265,7 +271,7 @@ function TimelineTrack({
               },
             ]}
           >
-            <View pointerEvents="none" style={[styles.pointMark, { left: center - left - markWidth / 2, backgroundColor: colors[0], height: rowHeight - 6, width: markWidth }]}>
+            {colors.length ? <View pointerEvents="none" style={[styles.pointMark, { left: center - left - markWidth / 2, backgroundColor: colors[0], height: rowHeight - 6, width: markWidth }]}>
               {colors.length > 1 ? colors.map((color, index) => {
                 const continuesHorizontally = index < durationCount;
                 return (
@@ -285,27 +291,33 @@ function TimelineTrack({
                   />
                 );
               }) : null}
-            </View>
+            </View> : null}
           </Pressable>
         );
       })}
       {marks.filter((mark) => mark.estimated).map((mark) => {
         const color = activityColors(theme, { type: mark.type, customLabel: mark.label }).color;
         const duration = mark.endBucket !== undefined;
+        const saved = savedEstimateIds.has(mark.id);
         return (
           <View
             key={mark.id}
             pointerEvents="none"
             style={[
               duration ? styles.durationMark : styles.estimatedPointMark,
+              saved && styles.savedEstimateMark,
+              saved && !duration && styles.savedEstimatePoint,
               {
-                backgroundColor: color,
+                backgroundColor: saved ? theme.surface : color,
+                borderColor: color,
                 left: `${((mark.startBucket + (duration ? 0 : 0.5)) / TIMELINE_BUCKETS) * 100}%`,
                 ...(duration ? { width: `${((mark.endBucket! - mark.startBucket) / TIMELINE_BUCKETS) * 100}%` } : {}),
-                opacity: ESTIMATE_OPACITY,
+                opacity: saved ? 1 : ESTIMATE_OPACITY,
               },
             ]}
-          />
+          >
+            {saved ? <Text allowFontScaling={false} style={[styles.estimateSymbol, { color: theme.text }]}>?</Text> : null}
+          </View>
         );
       })}
       {currentTimePosition !== undefined ? (
@@ -423,12 +435,19 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
     [events, estimates, loadedDayCount, maxHistoryDays, now],
   );
   const todayKey = dateKey(now);
+  const savedEstimateIds = useMemo(() => new Set(events.filter((event) => event.estimated).map((event) => event.id)), [events]);
   const visibleEventCount = new Set(
     days.flatMap((day) => day.marks.filter((mark) => !mark.estimated && selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label }))).map((mark) => mark.id)),
   ).size;
   const visibleMarkCount = days.flatMap((day) => day.marks.filter((mark) => selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label })))).length;
-  const hasVisibleEstimates = days.some((day) => day.marks.some((mark) => mark.estimated && selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label }))));
+  const visibleEstimateCount = new Set(
+    days.flatMap((day) => day.marks.filter((mark) => savedEstimateIds.has(mark.id) && selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label }))).map((mark) => mark.id)),
+  ).size;
+  const hasVisibleGaps = days.some((day) => day.marks.some((mark) => mark.estimated && !savedEstimateIds.has(mark.id) && selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label }))));
   const rangeLabel = days.length ? formatDateRange(days[0].date, days[days.length - 1].date, language) : '';
+  const rangeDescription = visibleEstimateCount
+    ? t('timeline.rangeWithEstimates', { range: rangeLabel, recorded: visibleEventCount, estimated: visibleEstimateCount })
+    : t('timeline.range', { range: rangeLabel, count: visibleEventCount });
   const hasEarlierDays = loadedDayCount < maxHistoryDays;
   const isCompactHeight = height < 500;
   const selectedEvents = events.filter((event) => selection.includes(event.id)).sort((a, b) => a.at - b.at);
@@ -602,8 +621,8 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
               {t('timeline.title')}
             </Text>
             {isCompactHeight ? (
-              <Text testID="timeline.range" numberOfLines={1} style={[styles.rangeText, { flex: 0, color: theme.text }]}>
-                {t('timeline.range', { range: rangeLabel, count: visibleEventCount })}
+              <Text testID="timeline.range" style={[styles.rangeText, { flex: 0, color: theme.text }]}>
+                {rangeDescription}
               </Text>
             ) : null}
           </View>
@@ -657,16 +676,20 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
 
         {!isCompactHeight ? (
           <View style={styles.timelineMeta}>
-            <Text testID="timeline.range" numberOfLines={1} style={[styles.rangeText, { color: theme.text }]}>
-              {t('timeline.range', { range: rangeLabel, count: visibleEventCount })}
+            <Text testID="timeline.range" style={[styles.rangeText, { color: theme.text }]}>
+              {rangeDescription}
             </Text>
           </View>
         ) : null}
-        {hasVisibleEstimates ? (
+        {hasVisibleGaps ? (
           <View style={styles.estimateLegend}>
             <View style={[styles.estimateLegendMark, { backgroundColor: theme.textMuted, opacity: ESTIMATE_OPACITY }]} />
             <Text style={[styles.estimateLegendText, { color: theme.textMuted }]}>{t('timeline.estimateLegend')}</Text>
           </View>
+        ) : null}
+
+        {visibleEstimateCount ? (
+          <Text style={[styles.estimateLegendText, { color: theme.text }]}>{t('timeline.estimatedLegend')}</Text>
         ) : null}
 
         <ScrollView
@@ -752,7 +775,7 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
                 <View key={event.id} style={[styles.detailsEvent, { borderColor: theme.border }]}>
                   <View style={[styles.detailsDot, { backgroundColor: colors.color }]} />
                   <Text testID={`timeline.details.event.${event.id}`} style={[styles.detailsCopy, { color: theme.text }]}>
-                    <Text style={styles.detailsEventTitle}>{activityLabel(event)}</Text>
+                    <Text style={styles.detailsEventTitle}>{activityLabel(event)}{event.estimated ? ` · ${t('eventRow.estimated')}` : ''}</Text>
                     <Text style={{ color: theme.textMuted }}>
                       {'  '}{start}{end || running ? `–${end ?? t('eventRow.now')} · ${formatDuration((event.endedAt ?? nowTime) - event.at)}${running ? ` ${t('eventRow.running')}` : ''}` : ''}
                     </Text>
@@ -803,6 +826,7 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
                   <MemoTimelineDateLabel
                     day={day}
                     selectedTypes={selectedTypes}
+                    savedEstimateIds={savedEstimateIds}
                     activityCount={activityFilters.length}
                     isToday={day.key === todayKey}
                     currentTime={day.key === todayKey ? now : undefined}
@@ -814,6 +838,7 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
                     <MemoTimelineTrack
                       day={day}
                       selectedTypes={selectedTypes}
+                      savedEstimateIds={savedEstimateIds}
                       isToday={day.key === todayKey}
                       currentTime={day.key === todayKey ? now : undefined}
                       rowHeight={rowHeight}
@@ -966,6 +991,9 @@ const styles = StyleSheet.create({
   pointHitTarget: { position: 'absolute', top: 0, bottom: 0, justifyContent: 'center', zIndex: 2 },
   pointMark: { position: 'absolute', top: 3, borderRadius: 999, overflow: 'hidden' },
   estimatedPointMark: { position: 'absolute', top: 3, bottom: 3, width: 6, marginLeft: -3, borderRadius: 999, zIndex: 2 },
+  savedEstimateMark: { minWidth: 14, borderWidth: 1, borderStyle: 'dashed', borderRadius: 3, justifyContent: 'center' },
+  savedEstimatePoint: { width: 14, marginLeft: -7 },
+  estimateSymbol: { fontSize: 12, lineHeight: 17, textAlign: 'center', fontWeight: '700' },
   estimateLegend: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   estimateLegendMark: { width: 6, height: 16, borderRadius: 3 },
   estimateLegendText: { fontSize: 11, lineHeight: 16, fontWeight: '600' },

@@ -61,7 +61,7 @@ function FrequencyRow({ stat, theme }: { stat: ActivityFrequencyStat; theme: The
     <View
       testID={`insights.frequency.${stat.customLabel ?? stat.type}`}
       accessible
-      accessibilityLabel={`${label}. ${dailyValue}, ${dailyDetail}. ${t('insights.typicalGap')} ${intervalValue}. ${intervalDetail}.`}
+      accessibilityLabel={`${label}. ${dailyValue}, ${dailyDetail}. ${t('insights.typicalGap')} ${intervalValue}. ${intervalDetail}.${stat.estimatedTotal ? ` ${t('insights.estimatedCount', { count: stat.estimatedTotal })}.` : ''}`}
       style={[styles.frequencyRow, { borderColor: theme.border }]}
     >
       <View style={styles.activityHeading}>
@@ -78,7 +78,9 @@ function FrequencyRow({ stat, theme }: { stat: ActivityFrequencyStat; theme: The
         </View>
         <Text style={[styles.activityName, { color: theme.text }]}>{label}</Text>
         <Text testID={`insights.frequency.${stat.customLabel ?? stat.type}.count`} style={[styles.logCount, { color: theme.textMuted }]}>
-          {t('insights.logCount', { count: stat.total })}
+          {stat.estimatedTotal
+            ? `${t('insights.recordedCount', { count: stat.total })}\n${t('insights.estimatedCount', { count: stat.estimatedTotal })}`
+            : t('insights.logCount', { count: stat.total })}
         </Text>
       </View>
       <View style={styles.metrics}>
@@ -124,7 +126,7 @@ function MonthlyRow({
         activity: t('insights.activity'),
         logs: stat.total,
         days: stat.recordedDays,
-      })}
+      }) + (stat.estimatedTotal ? ` ${t('insights.estimatedCount', { count: stat.estimatedTotal })}.` : '')}
       style={[styles.monthRow, { borderColor: theme.border }, isCurrent && { backgroundColor: theme.primarySoft }]}
     >
       <View style={styles.monthHeading}>
@@ -144,6 +146,7 @@ function MonthlyRow({
       </View>
       <Text style={[styles.monthDetail, { color: theme.textMuted }]}>
         {isCurrent ? `${month} · ` : ''}{t('insights.monthDetail', { logs: stat.total, days: stat.recordedDays })}
+        {stat.estimatedTotal ? ` · ${t('insights.estimatedCount', { count: stat.estimatedTotal })}` : ''}
       </Text>
     </View>
   );
@@ -152,14 +155,17 @@ function MonthlyRow({
 export function InsightsScreen({
   events,
   customActivities,
+  onImport,
   theme,
 }: {
   events: PuppyEvent[];
   customActivities: string[];
+  onImport: () => Promise<void>;
   theme: Theme;
 }) {
   const { activityColors, activityLabel, language, t } = useLocalization();
   const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [showAllMonths, setShowAllMonths] = useState(false);
   const now = new Date();
   const frequency = activityFrequencyStats(events, ['pee', 'poop', ...customActivities.map((customLabel) => ({ type: 'custom' as const, customLabel }))], FREQUENCY_DAYS, now);
@@ -167,7 +173,19 @@ export function InsightsScreen({
   const visibleMonths = showAllMonths ? monthly : monthly.slice(0, MONTH_PREVIEW_COUNT);
   const maxMonthlyAverage = Math.max(1, ...monthly.map((stat) => stat.averagePerRecordedDay));
   const currentMonthKey = dateKey(now).slice(0, 7);
-  const exportDisabled = exporting || events.length === 0;
+  const exportDisabled = exporting || importing || events.length === 0;
+
+  async function importActivity() {
+    if (importing || exporting) return;
+    setImporting(true);
+    try {
+      await onImport();
+    } catch {
+      Alert.alert(t('insights.importErrorTitle'), t('insights.importErrorBody'));
+    } finally {
+      setImporting(false);
+    }
+  }
 
   async function exportActivity() {
     if (exportDisabled) return;
@@ -286,6 +304,8 @@ export function InsightsScreen({
       ) : null}
 
       <View style={[styles.section, { borderColor: theme.border }]}>
+        <Text style={[styles.panelTitle, { color: theme.text }]}>{t('insights.dataTitle')}</Text>
+        <Text style={[styles.dataCaption, { color: theme.textMuted }]}>{t('insights.dataCaption')}</Text>
         <Pressable
           testID="insights.export"
           accessibilityRole="button"
@@ -306,10 +326,38 @@ export function InsightsScreen({
           {exporting ? (
             <ActivityIndicator color={theme.onPrimary} size="small" />
           ) : (
-            <MaterialCommunityIcons name="share-variant-outline" size={20} color={theme.onPrimary} />
+            <MaterialCommunityIcons accessibilityElementsHidden importantForAccessibility="no" name="share-variant-outline" size={20} color={theme.onPrimary} />
           )}
           <Text style={[styles.exportButtonText, { color: theme.onPrimary }]}>
             {t(events.length ? 'insights.exportButton' : 'insights.noExport')}
+          </Text>
+        </Pressable>
+        <Pressable
+          testID="insights.import"
+          accessibilityRole="button"
+          accessibilityLabel={t('insights.importA11y')}
+          accessibilityHint={t('insights.importHint')}
+          accessibilityState={{ busy: importing, disabled: importing || exporting }}
+          disabled={importing || exporting}
+          onPress={() => void importActivity()}
+          style={({ pressed }) => [
+            styles.exportButton,
+            styles.importButton,
+            {
+              backgroundColor: pressed ? theme.primarySoft : theme.surfaceRaised,
+              borderColor: theme.primary,
+              borderRadius: theme.presentation.controlRadius,
+              opacity: importing || exporting ? 0.45 : 1,
+            },
+          ]}
+        >
+          {importing ? (
+            <ActivityIndicator color={theme.primary} size="small" />
+          ) : (
+            <MaterialCommunityIcons accessibilityElementsHidden importantForAccessibility="no" name="file-import-outline" size={20} color={theme.primary} />
+          )}
+          <Text style={[styles.exportButtonText, { color: theme.primary }]}>
+            {t(importing ? 'insights.importing' : 'insights.importButton')}
           </Text>
         </Pressable>
       </View>
@@ -343,7 +391,7 @@ const styles = StyleSheet.create({
   activityHeading: { flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: 11 },
   activityIcon: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
   activityName: { flex: 1, fontSize: 16, lineHeight: 21, fontWeight: '800' },
-  logCount: { fontSize: 12, lineHeight: 17, fontWeight: '600' },
+  logCount: { fontSize: 12, lineHeight: 17, fontWeight: '600', textAlign: 'right' },
   metrics: { flexDirection: 'row', alignItems: 'stretch' },
   metric: { flex: 1, minWidth: 0, paddingHorizontal: 6 },
   metricDivider: { width: StyleSheet.hairlineWidth, marginHorizontal: 6 },
@@ -377,5 +425,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.sm,
   },
+  dataCaption: { fontSize: 14, lineHeight: 20, marginTop: spacing.xs, marginBottom: spacing.md },
+  importButton: { borderWidth: 1, marginTop: spacing.sm },
   exportButtonText: { fontSize: 15, lineHeight: 20, fontWeight: '700', textAlign: 'center' },
 });

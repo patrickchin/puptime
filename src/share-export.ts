@@ -1,8 +1,21 @@
 import { File, Paths } from 'expo-file-system';
+import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
 
 import { dateKey, type PuppyEvent } from './domain';
-import { eventsToCsv } from './export';
+import { csvToEvents, eventsToCsv } from './export';
+
+export async function pickEventsCsv(): Promise<PuppyEvent[] | null> {
+  const result = await DocumentPicker.getDocumentAsync({
+    type: '*/*',
+    multiple: false,
+    copyToCacheDirectory: true,
+  });
+  if (result.canceled) return null;
+
+  const file = new File(result.assets[0].uri);
+  return csvToEvents(await file.text());
+}
 
 export async function shareEventsCsv(events: PuppyEvent[]): Promise<void> {
   if (!(await Sharing.isAvailableAsync())) {

@@ -93,6 +93,7 @@ export function pottyReminderPlans(
   let latestPee: PuppyEvent | undefined;
   let latestMeal: PuppyEvent | undefined;
   for (const event of events) {
+    if (event.estimated) continue;
     if (event.type === 'pee' && (!latestPee || event.at > latestPee.at)) latestPee = event;
     if (event.type === 'meal' && (!latestMeal || event.at > latestMeal.at)) latestMeal = event;
   }

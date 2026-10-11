@@ -1,24 +1,26 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { normalizeActivityCustomizations, type ActivityCustomization, type ActivityCustomizations } from './activity-customization';
+import { normalizeActivityCustomizations, type ActivityCustomization, type ActivityCustomizations } from './activity-customization.ts';
 import {
   customActivityKey,
   DEFAULT_WIDGET_ACTIONS,
   normalizeCustomActivities,
+  isEventType,
+  isOpenNap,
   normalizeWidgetActions,
   STARTER_SCHEDULE,
   type PuppyEvent,
   type PuppyEventChanges,
   type ActivityKey,
   type ScheduleEntry,
-} from './domain';
-import { isLanguagePreference, type LanguagePreference } from './localization';
+} from './domain.ts';
+import { isLanguagePreference, type LanguagePreference } from './localization.ts';
 import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   normalizeNotificationPreferences,
   type NotificationPreferences,
-} from './notification-config';
-import { isThemePreference, type ThemePreference } from './theme';
+} from './notification-config.ts';
+import { isThemePreference, type ThemePreference } from './theme.ts';
 
 const EVENTS_KEY = 'puptime.events.v1';
 const SCHEDULE_KEY = 'puptime.schedule.v1';
@@ -31,6 +33,7 @@ const ACTIVITY_CUSTOMIZATIONS_KEY = 'puptime.activityCustomizations.v1';
 const NOTIFICATION_PREFERENCES_KEY = 'puptime.notificationPreferences.v1';
 const ONBOARDING_KEY = 'puptime.onboarding.v1';
 
+// ponytail: This queue covers one JS runtime; use transactional storage if widget writers need a shared lock.
 let writeQueue = Promise.resolve();
 
 export async function shouldShowOnboarding(): Promise<boolean> {
@@ -50,6 +53,61 @@ export function completeOnboarding(): Promise<void> {
   return AsyncStorage.setItem(ONBOARDING_KEY, 'done');
 }
 
+export class EventsStorageError extends Error {
+  constructor() {
+    super('Saved activity data could not be read. The original data has been preserved.');
+    this.name = 'EventsStorageError';
+  }
+}
+
+export class EventsImportError extends Error {
+  constructor() {
+    super('Import would leave more than one nap in progress.');
+    this.name = 'EventsImportError';
+  }
+}
+
+function isTimestamp(value: unknown): value is number {
+  return typeof value === 'number'
+    && Number.isInteger(value)
+    && Number.isFinite(new Date(value).getTime());
+}
+
+export function assertValidEvents(value: unknown): asserts value is PuppyEvent[] {
+  if (!Array.isArray(value)) throw new TypeError('Activity data must be an array.');
+  const ids = new Set<string>();
+  for (const event of value) {
+    if (!event || typeof event !== 'object'
+      || typeof event.id !== 'string' || !event.id.trim() || ids.has(event.id)
+      || !isEventType(event.type) || !isTimestamp(event.at)
+      || (event.source !== 'app' && event.source !== 'widget')
+      || (event.note !== undefined && typeof event.note !== 'string')
+      || (event.customLabel !== undefined && typeof event.customLabel !== 'string')
+      || (event.estimated !== undefined && typeof event.estimated !== 'boolean')
+      || (event.endedAt !== undefined && (
+        event.type !== 'nap'
+        || (event.endedAt !== null && (!isTimestamp(event.endedAt) || event.endedAt < event.at))
+      ))) {
+      throw new TypeError('Activity data contains an invalid or duplicate event.');
+    }
+    ids.add(event.id);
+  }
+}
+
+function queueEventWrite<T>(operation: () => Promise<T>): Promise<T> {
+  const result = writeQueue.then(operation);
+  // Keep the caller's rejection while allowing the next operation to retry storage.
+  writeQueue = result.then(() => undefined, () => undefined);
+  return result;
+}
+
+async function writeEvents(events: PuppyEvent[]): Promise<PuppyEvent[]> {
+  assertValidEvents(events);
+  const sorted = [...events].sort((a, b) => b.at - a.at);
+  await AsyncStorage.setItem(EVENTS_KEY, JSON.stringify(sorted));
+  return sorted;
+}
+
 function parseArray<T>(value: string | null): T[] {
   if (!value) return [];
   try {
@@ -61,29 +119,50 @@ function parseArray<T>(value: string | null): T[] {
 }
 
 export async function loadEvents(): Promise<PuppyEvent[]> {
-  const events = parseArray<PuppyEvent>(await AsyncStorage.getItem(EVENTS_KEY));
-  return events.sort((a, b) => b.at - a.at);
+  const stored = await AsyncStorage.getItem(EVENTS_KEY);
+  if (stored === null) return [];
+  try {
+    const events: unknown = JSON.parse(stored);
+    assertValidEvents(events);
+    return events.sort((a, b) => b.at - a.at);
+  } catch {
+    throw new EventsStorageError();
+  }
 }
 
 export function appendEvents(incoming: PuppyEvent[]): Promise<PuppyEvent[]> {
-  let result: PuppyEvent[] = [];
-  writeQueue = writeQueue.then(async () => {
+  return queueEventWrite(async () => {
+    assertValidEvents(incoming);
     const current = await loadEvents();
     const byId = new Map(current.map((event) => [event.id, event]));
-    incoming.forEach((event) => byId.set(event.id, event));
-    result = [...byId.values()].sort((a, b) => b.at - a.at);
-    await AsyncStorage.setItem(EVENTS_KEY, JSON.stringify(result));
+    incoming.forEach((event) => byId.set(event.id, {
+      ...byId.get(event.id),
+      ...event,
+      ...(byId.get(event.id)?.estimated ? { estimated: true } : {}),
+    }));
+    return writeEvents([...byId.values()]);
   });
-  return writeQueue.then(() => result);
+}
+
+export function importEvents(incoming: PuppyEvent[]): Promise<{
+  events: PuppyEvent[];
+  imported: number;
+  skipped: number;
+}> {
+  return queueEventWrite(async () => {
+    assertValidEvents(incoming);
+    const current = await loadEvents();
+    const ids = new Set(current.map((event) => event.id));
+    const additions = incoming.filter((event) => !ids.has(event.id));
+    const merged = [...current, ...additions];
+    if (merged.filter(isOpenNap).length > 1) throw new EventsImportError();
+    const events = additions.length ? await writeEvents(merged) : current;
+    return { events, imported: additions.length, skipped: incoming.length - additions.length };
+  });
 }
 
 export function removeEvent(id: string): Promise<PuppyEvent[]> {
-  let result: PuppyEvent[] = [];
-  writeQueue = writeQueue.then(async () => {
-    result = (await loadEvents()).filter((event) => event.id !== id);
-    await AsyncStorage.setItem(EVENTS_KEY, JSON.stringify(result));
-  });
-  return writeQueue.then(() => result);
+  return queueEventWrite(async () => writeEvents((await loadEvents()).filter((event) => event.id !== id)));
 }
 
 export function updateEventTime(id: string, at: number): Promise<PuppyEvent[]> {
@@ -94,14 +173,8 @@ export function updateEvent(
   id: string,
   changes: PuppyEventChanges,
 ): Promise<PuppyEvent[]> {
-  let result: PuppyEvent[] = [];
-  writeQueue = writeQueue.then(async () => {
-    result = (await loadEvents())
-      .map((event) => (event.id === id ? { ...event, ...changes } : event))
-      .sort((a, b) => b.at - a.at);
-    await AsyncStorage.setItem(EVENTS_KEY, JSON.stringify(result));
-  });
-  return writeQueue.then(() => result);
+  return queueEventWrite(async () => writeEvents((await loadEvents())
+    .map((event) => (event.id === id ? { ...event, ...changes } : event))));
 }
 
 export async function loadSchedule(): Promise<ScheduleEntry[]> {

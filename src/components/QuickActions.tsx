@@ -20,7 +20,7 @@ export function QuickActions({ events, onLog, now, theme }: {
       {actions.map((type) => {
         const activity = { type };
         const colors = activityColors(theme, activity);
-        const latest = events.find((event) => activityKey(event) === type);
+        const latest = events.find((event) => activityKey(event) === type && !event.estimated);
         return (
           <Pressable
             key={type}

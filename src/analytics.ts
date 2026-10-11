@@ -41,6 +41,7 @@ export type ActivityFrequencyStat = {
   type: EventType;
   customLabel?: string;
   total: number;
+  estimatedTotal: number;
   recordedDays: number;
   averagePerRecordedDay: number;
   minimumPerRecordedDay: number;
@@ -61,6 +62,7 @@ export type MonthlyActivityStat = {
   key: string;
   date: Date;
   total: number;
+  estimatedTotal: number;
   recordedDays: number;
   averagePerRecordedDay: number;
 };
@@ -70,6 +72,7 @@ export type ScheduleSuggestion = {
   daysAnalyzed: number;
   periodDays: number;
   sourceEvents: number;
+  observedDaysByEntry: Record<string, number>;
 };
 
 export type MissingLogEstimate = {
@@ -123,7 +126,8 @@ export function activityFrequencyStats(
   now = new Date(),
 ): ActivityFrequencySnapshot {
   const periodDays = Math.max(1, Math.floor(days));
-  const recent = windowedEvents(events, periodDays, now);
+  const inWindow = windowedEvents(events, periodDays, now);
+  const recent = inWindow.filter((event) => !event.estimated);
   const recordedDayKeys = [...new Set(recent.map((event) => dateKey(event.at)))].sort();
 
   return {
@@ -148,6 +152,7 @@ export function activityFrequencyStats(
         type,
         ...(customLabel ? { customLabel } : {}),
         total: matching.length,
+        estimatedTotal: inWindow.filter((event) => event.estimated && sameActivity(event, activity)).length,
         recordedDays: recordedDayKeys.length,
         averagePerRecordedDay: recordedDayKeys.length ? matching.length / recordedDayKeys.length : 0,
         minimumPerRecordedDay: dailyCounts.length ? Math.min(...dailyCounts) : 0,
@@ -173,6 +178,7 @@ export function monthlyActivityStats(
   const months = new Map<string, {
     date: Date;
     total: number;
+    estimatedTotal: number;
     recordedDays: Set<string>;
   }>();
 
@@ -182,10 +188,14 @@ export function monthlyActivityStats(
     const month = months.get(key) ?? {
       date: new Date(date.getFullYear(), date.getMonth(), 1, 12),
       total: 0,
+      estimatedTotal: 0,
       recordedDays: new Set<string>(),
     };
-    month.recordedDays.add(dateKey(event.at));
-    if (!selectedTypes || selectedTypes.has(event.type)) month.total += 1;
+    if (!event.estimated) month.recordedDays.add(dateKey(event.at));
+    if (!selectedTypes || selectedTypes.has(event.type)) {
+      if (event.estimated) month.estimatedTotal += 1;
+      else month.total += 1;
+    }
     months.set(key, month);
   });
 
@@ -195,6 +205,7 @@ export function monthlyActivityStats(
       key,
       date: month.date,
       total: month.total,
+      estimatedTotal: month.estimatedTotal,
       recordedDays: month.recordedDays.size,
       averagePerRecordedDay: month.recordedDays.size ? month.total / month.recordedDays.size : 0,
     }));
@@ -206,10 +217,15 @@ export function suggestScheduleFromEvents(
   now = new Date(),
 ): ScheduleSuggestion {
   const periodDays = Math.max(1, Math.floor(days));
-  const recent = windowedEvents(events, periodDays, now);
+  // An unfinished day is not evidence that later activities were skipped.
+  const completedThrough = new Date(now);
+  completedThrough.setHours(0, 0, 0, 0);
+  const recent = windowedEvents(events, periodDays, new Date(completedThrough.getTime() - 1))
+    .filter((event) => !event.estimated);
   const recordedDayKeys = [...new Set(recent.map((event) => dateKey(event.at)))].sort();
+  const observedDaysByEntry: Record<string, number> = {};
   if (recordedDayKeys.length < 3) {
-    return { entries: [], daysAnalyzed: recordedDayKeys.length, periodDays, sourceEvents: recent.length };
+    return { entries: [], daysAnalyzed: recordedDayKeys.length, periodDays, sourceEvents: recent.length, observedDaysByEntry };
   }
 
   const byTypeAndDay = new Map<string, { type: EventType; customLabel?: string; days: Map<string, number[]> }>();
@@ -228,33 +244,57 @@ export function suggestScheduleFromEvents(
     activity.days.set(day, times);
   });
 
-  const requiredDays = Math.max(3, Math.ceil(recordedDayKeys.length / 2));
+  const requiredDays = Math.max(3, Math.floor(recordedDayKeys.length / 2) + 1);
+
   const entries: ScheduleEntry[] = [];
-  const seen = new Set<string>();
+  const clockOffset = (minutes: number, center: number) => (minutes - center + 2160) % 1440 - 720;
 
   byTypeAndDay.forEach(({ type, customLabel, days: byDay }, key) => {
-    const dailyCounts = recordedDayKeys.map((key) => byDay.get(key)?.length ?? 0);
-    const typicalCount = Math.min(8, Math.max(0, Math.round(percentile(dailyCounts, 0.5) ?? 0)));
+    let remaining = [...byDay.entries()].flatMap(([day, minutes]) => minutes.map((value) => ({ day, minutes: value })))
+      .sort((a, b) => a.minutes - b.minutes || a.day.localeCompare(b.day));
 
-    for (let index = 0; index < typicalCount; index += 1) {
-      const samples = recordedDayKeys.flatMap((key) => {
-        const value = byDay.get(key)?.[index];
-        return value === undefined ? [] : [value];
-      });
-      if (samples.length < requiredDays) continue;
-      const medianMinutes = percentile(samples, 0.5);
-      if (medianMinutes === undefined) continue;
-      const minutes = Math.round(medianMinutes / TIMELINE_BUCKET_MINUTES) * TIMELINE_BUCKET_MINUTES % (24 * 60);
-      const identity = `${key}-${minutes}`;
-      if (seen.has(identity)) continue;
-      seen.add(identity);
+    // ponytail: nearby occurrences share a clock-time window; use sequence alignment if distinct routines within three hours need separating.
+    for (let index = 0; index < 8 && remaining.length; index += 1) {
+      let best: number[] = [];
+      let bestCenter = 0;
+      let bestSpread = Infinity;
+      for (const candidate of remaining) {
+        const byDay = new Map<string, number>();
+        for (const sample of remaining) {
+          const offset = clockOffset(sample.minutes, candidate.minutes);
+          const previous = byDay.get(sample.day);
+          if (Math.abs(offset) <= 90 && (previous === undefined || Math.abs(offset) < Math.abs(previous))) {
+            byDay.set(sample.day, offset);
+          }
+        }
+        const offsets = [...byDay.values()];
+        const spread = offsets.reduce((sum, value) => sum + Math.abs(value), 0) / offsets.length;
+        if (offsets.length > best.length || (offsets.length === best.length && spread < bestSpread)) {
+          best = offsets;
+          bestCenter = candidate.minutes;
+          bestSpread = spread;
+        }
+      }
+      if (best.length < requiredDays) break;
+      const samples = best.map((offset) => bestCenter + offset);
+      const center = Math.round(percentile(samples, 0.5)! / TIMELINE_BUCKET_MINUTES) * TIMELINE_BUCKET_MINUTES;
+      const minutes = (center + 1440) % 1440;
+      const toleranceMinutes = Math.max(30, Math.ceil(Math.max(
+        center - percentile(samples, 0.1)!,
+        percentile(samples, 0.9)! - center,
+      ) / TIMELINE_BUCKET_MINUTES) * TIMELINE_BUCKET_MINUTES);
+      const id = `learned-${key}-${minutes}`;
       entries.push({
-        id: `learned-${key}-${minutes}-${index}`,
+        id,
         type,
         ...(customLabel ? { customLabel } : {}),
         minutes,
         reminder: false,
+        toleranceMinutes,
       });
+      observedDaysByEntry[id] = best.length;
+      // One day gets one vote, and extra taps in this window cannot create extra slots.
+      remaining = remaining.filter((sample) => Math.abs(clockOffset(sample.minutes, bestCenter)) > 90);
     }
   });
 
@@ -263,6 +303,7 @@ export function suggestScheduleFromEvents(
     daysAnalyzed: recordedDayKeys.length,
     periodDays,
     sourceEvents: recent.length,
+    observedDaysByEntry,
   };
 }
 
@@ -273,16 +314,15 @@ export function scheduleStatusesForDay(
   toleranceMinutes = 30,
   now = Date.now(),
 ): ScheduleStatusItem[] {
-  const tolerance = toleranceMinutes * 60_000;
-
   const key = dateKey(day);
-  const candidates = events.filter((event) => dateKey(event.at) === key);
+  const candidates = events.filter((event) => !event.estimated && event.at <= now);
   const planned = [...schedule]
     .sort((a, b) => a.minutes - b.minutes)
     .map((entry) => {
       const target = new Date(day);
       target.setHours(Math.floor(entry.minutes / 60), entry.minutes % 60, 0, 0);
-      return { ...entry, target: target.getTime() };
+      const tolerance = Math.max(toleranceMinutes, entry.toleranceMinutes ?? 0) * 60_000;
+      return { ...entry, target: target.getTime(), tolerance };
     });
   const matches = new Map<string, number>();
 
@@ -291,7 +331,8 @@ export function scheduleStatusesForDay(
     const options = candidates
       .filter(
         (event) =>
-          sameActivity(event, item) && Math.abs(event.at - item.target) <= tolerance,
+          sameActivity(event, item) && Math.abs(event.at - item.target) <= item.tolerance
+          && (item.toleranceMinutes !== undefined || dateKey(event.at) === key),
       )
       .sort((a, b) => Math.abs(a.at - item.target) - Math.abs(b.at - item.target));
 
@@ -322,11 +363,11 @@ export function scheduleStatusesForDay(
     const event = eventsByPlan.get(index);
     let status: ScheduleStatus;
     if (event) status = 'done';
-    else if (now < item.target - tolerance) status = 'upcoming';
-    else if (now <= item.target + tolerance) status = 'due';
+    else if (now < item.target - item.tolerance) status = 'upcoming';
+    else if (now <= item.target + item.tolerance) status = 'due';
     else status = 'missed';
 
-    const { target, ...entry } = item;
+    const { target, tolerance: _tolerance, ...entry } = item;
     return { entry, target, status, ...(event ? { event } : {}) };
   });
 }
@@ -337,7 +378,7 @@ export function estimateMissingLogs(
   now = new Date(),
 ): MissingLogSnapshot {
   const suggestion = suggestScheduleFromEvents(events, days, now);
-  const recent = windowedEvents(events, suggestion.periodDays, now);
+  const recent = windowedEvents(events, suggestion.periodDays, now).filter((event) => !event.estimated);
   const eventsByDay = new Map<string, PuppyEvent[]>();
   recent.forEach((event) => {
     const key = dateKey(event.at);
@@ -367,12 +408,17 @@ export function estimateMissingLogs(
 
     return statuses.flatMap<MissingLogEstimate>((status) => {
       if (status.status !== 'missed' || (status.entry.type === 'custom' && !status.entry.customLabel)) return [];
+      if (events.some((event) => event.estimated && sameActivity(event, status.entry)
+        && Math.abs(event.at - status.target) <= toleranceMinutes * 60_000)) return [];
       if (!dayEvents.some((event) => event.at > status.target)) return [];
+      // An unmatched log of this type may be a shifted occurrence, not a gap.
+      if (dayEvents.some((event) => sameActivity(event, status.entry)
+        && !statuses.some((item) => item.event?.id === event.id))) return [];
 
       const comparison = activeDays
         .filter((otherKey) => otherKey !== key)
         .map((otherKey) => statusesByDay.get(otherKey)?.find((item) => item.entry.id === status.entry.id))
-        .filter((item): item is ScheduleStatusItem => Boolean(item));
+        .filter((item): item is ScheduleStatusItem => Boolean(item && (item.status === 'done' || item.status === 'missed')));
       const observed = comparison.filter((item) => item.status === 'done' && item.event);
       if (comparison.length < 3 || observed.length < 3 || observed.length / comparison.length < 0.75) return [];
 
@@ -386,7 +432,7 @@ export function estimateMissingLogs(
         });
         const duration = percentile(durations, 0.5);
         if (durations.length < 3 || duration === undefined) return [];
-        const estimatedEnd = status.target + duration;
+        const estimatedEnd = Math.round(status.target + duration);
         if (estimatedEnd > now.getTime()) return [];
         if (dayEvents.some((event) => event.at > status.target && event.at < estimatedEnd)) return [];
         if (!dayEvents.some((event) => event.at >= estimatedEnd)) return [];
@@ -453,8 +499,8 @@ export function timelinePointClusters(marks: TimelineMark[]): TimelinePointClust
   });
 }
 
-export function timelineMarksForPointHit(marks: TimelineMark[], bucket: number): TimelineMark[] {
-  return marks.filter((mark) => !mark.estimated && (mark.endBucket === undefined
+export function timelineMarksForPointHit(marks: TimelineMark[], bucket: number, savedEstimateIds?: ReadonlySet<string>): TimelineMark[] {
+  return marks.filter((mark) => (!mark.estimated || savedEstimateIds?.has(mark.id)) && (mark.endBucket === undefined
     ? mark.startBucket === bucket
     : mark.startBucket <= bucket && mark.endBucket > bucket));
 }
@@ -480,8 +526,9 @@ export function buildTimelineDays(
     const dayEnd = dayEndDate.getTime();
 
     const marks = [...events, ...estimates].flatMap<TimelineMark>((event) => {
-      const estimated = 'observedDays' in event;
-      const label = eventLabel(estimated ? { ...event, source: 'app' } : event);
+      const inferred = 'observedDays' in event;
+      const estimated = inferred || event.estimated;
+      const label = eventLabel(inferred ? { ...event, source: 'app' } : event);
       if (event.type === 'nap' && event.endedAt !== undefined) {
         const napEnd = Math.max(event.at, Math.min(event.endedAt ?? nowTime, nowTime));
         const start = Math.max(event.at, dayStart);

@@ -6,8 +6,9 @@ executionOrder:
     - iOS first launch onboarding and replay
     - iOS onboarding notification opt in
     - iOS navigation and empty states
-    - iOS log CRUD, undo, filters, and persistence
-    - iOS nap lifecycle and custom activity editing
+    - iOS log CRUD, undo, and persistence
+    - iOS simple log and date sections
     - iOS routine create, edit, reminder permission, and remove
     - iOS settings and preference persistence
     - iOS populated insights and timeline controls
+    - iOS CSV picker cancellation preserves activity

@@ -16,7 +16,7 @@ import {
   timelineMarksForPointHit,
   timelinePointClusters,
 } from './analytics.ts';
-import type { PuppyEvent, ScheduleEntry } from './domain.ts';
+import { latestQuickEventTimes, type PuppyEvent, type ScheduleEntry } from './domain.ts';
 
 const day = new Date(2026, 8, 10);
 const at = (hour: number, minute: number) => new Date(2026, 8, 10, hour, minute).getTime();
@@ -69,6 +69,18 @@ test('matches named activities to their own routine entries and frequency rows',
     activityFrequencyStats(events, schedule, 1, new Date(2026, 8, 10, 20)).stats.map((stat) => [stat.customLabel, stat.total]),
     [['Training', 1], ['Grooming', 1]],
   );
+  const estimated: PuppyEvent[] = [
+    { id: 'estimated-training', type: 'custom', customLabel: 'Training', at: at(8, 0), source: 'app', estimated: true },
+    { id: 'estimated-grooming', type: 'custom', customLabel: 'Grooming', at: at(9, 0), source: 'app', estimated: true },
+  ];
+  assert.deepEqual(
+    activityFrequencyStats([...events, ...estimated], schedule, 1, new Date(2026, 8, 10, 20)).stats
+      .map((stat) => [stat.customLabel, stat.total, stat.estimatedTotal]),
+    [['Training', 1, 1], ['Grooming', 1, 1]],
+  );
+  assert.deepEqual(latestQuickEventTimes([...events, ...estimated]), {
+    'custom:training': at(7, 5), 'custom:grooming': at(7, 10),
+  });
 });
 
 test('learns each named activity as a separate routine choice', () => {
@@ -159,6 +171,19 @@ test('combines simultaneous point activities and an underlying span into one tim
     },
     { startBucket: 30, ids: ['walk'], types: ['walk'], hasDuration: false },
   ]);
+});
+
+test('timeline taps include saved estimates but exclude automatic gap hints', () => {
+  const marks = [
+    { id: 'recorded', type: 'pee' as const, label: 'Pee', startBucket: 24 },
+    { id: 'saved-point', type: 'poop' as const, label: 'Poop', startBucket: 24, estimated: true },
+    { id: 'saved-span', type: 'nap' as const, label: 'Nap', startBucket: 20, endBucket: 26, estimated: true },
+    { id: 'automatic-gap', type: 'meal' as const, label: 'Meal', startBucket: 24, estimated: true },
+    { id: 'other-bucket', type: 'pee' as const, label: 'Pee', startBucket: 25, estimated: true },
+  ];
+  const savedEstimateIds = new Set(['saved-point', 'saved-span', 'other-bucket']);
+  assert.deepEqual(timelineMarksForPointHit(marks, 24).map((mark) => mark.id), ['recorded']);
+  assert.deepEqual(timelineMarksForPointHit(marks, 24, savedEstimateIds).map((mark) => mark.id), ['recorded', 'saved-point', 'saved-span']);
 });
 
 test('a timeline tap includes only its bucket and overlapping recorded spans', () => {
@@ -284,7 +309,7 @@ test('summarizes every recorded month while applying an activity filter', () => 
   );
 });
 
-test('learns a 15-minute routine from repeated daily log positions', () => {
+test('learns a 15-minute routine from recurring clock-time windows', () => {
   const jitters = [0, 10, -5, 5];
   const events: PuppyEvent[] = [];
   jitters.forEach((jitter, dayIndex) => {
@@ -303,7 +328,7 @@ test('learns a 15-minute routine from repeated daily log positions', () => {
     if (dayIndex === 0) add('walk', 'walk', 17 * 60);
   });
 
-  const result = suggestScheduleFromEvents(events, 14, new Date(2026, 8, 10, 20));
+  const result = suggestScheduleFromEvents(events, 14, new Date(2026, 8, 11, 20));
 
   assert.equal(result.daysAnalyzed, 4);
   assert.equal(result.sourceEvents, 13);
@@ -323,9 +348,96 @@ test('waits for three recorded days before suggesting a routine', () => {
     { id: '2', type: 'pee', at: new Date(2026, 8, 10, 7).getTime(), source: 'app' },
   ];
 
-  const result = suggestScheduleFromEvents(events, 14, new Date(2026, 8, 10, 20));
+  const result = suggestScheduleFromEvents(events, 14, new Date(2026, 8, 11, 20));
   assert.equal(result.daysAnalyzed, 2);
   assert.deepEqual(result.entries, []);
+});
+
+test('keeps breakfast and dinner separate when early meals are skipped and extra taps occur', () => {
+  const events: PuppyEvent[] = [];
+  for (let index = 0; index < 7; index += 1) {
+    const add = (id: string, minutes: number) => events.push({
+      id: `${id}-${index}`, type: 'meal', source: 'app',
+      at: new Date(2026, 8, 4 + index, 0, minutes).getTime(),
+    });
+    if (index < 4) add('breakfast', 490 + index * 20);
+    add('dinner', 19 * 60);
+    if (index < 2) {
+      for (let tap = 0; tap < 10; tap += 1) add(`extra-${tap}`, 19 * 60 + 1);
+      add('unusual', 2 * 60);
+    }
+  }
+  const result = suggestScheduleFromEvents(events, 14, new Date(2026, 8, 11));
+  assert.deepEqual(result.entries.map(({ minutes }) => minutes), [8 * 60 + 45, 19 * 60]);
+  assert.deepEqual(result.entries.map((entry) => result.observedDaysByEntry[entry.id]), [4, 7]);
+  assert.deepEqual(result, suggestScheduleFromEvents([...events].reverse(), 14, new Date(2026, 8, 11)));
+});
+
+test('learns variation without letting one unusual time widen the window', () => {
+  const events: PuppyEvent[] = [480, 490, 500, 520, 530, 550, 1250].map((minutes, index) => ({
+    id: `${index}`, type: 'meal', source: 'app',
+    at: new Date(2026, 8, 4 + index, 0, minutes).getTime(),
+  }));
+  const result = suggestScheduleFromEvents(events, 14, new Date(2026, 8, 11));
+  assert.equal(result.entries.length, 1);
+  assert.equal(result.entries[0].minutes, 8 * 60 + 30);
+  assert.equal(result.observedDaysByEntry[result.entries[0].id], 6);
+  assert.ok(result.entries[0].toleranceMinutes! <= 60);
+});
+
+test('learns midnight as one window and matches logs across the calendar boundary', () => {
+  const events: PuppyEvent[] = [1425, 0, 15, 1430, 10, 1435, 5].map((minutes, index) => ({
+    id: `${index}`, type: 'pee', source: 'app',
+    at: new Date(2026, 8, 4 + index, 0, minutes).getTime(),
+  }));
+  const result = suggestScheduleFromEvents(events, 14, new Date(2026, 8, 11));
+  assert.equal(result.entries.length, 1);
+  assert.equal(result.entries[0].minutes, 0);
+  assert.equal(result.entries[0].toleranceMinutes, 30);
+  assert.equal(scheduleStatusesForDay(events, result.entries, day, 30, at(23, 59))[0].status, 'done');
+  const beforeMidnight: PuppyEvent[] = [{ id: 'prior-night', type: 'pee', source: 'app', at: new Date(2026, 8, 9, 23, 55).getTime() }];
+  assert.equal(scheduleStatusesForDay(beforeMidnight, result.entries, day, 30, at(1, 0))[0].status, 'done');
+  assert.equal(scheduleStatusesForDay(beforeMidnight, [{ id: 'manual', type: 'pee', minutes: 0 }], day, 30, at(1, 0))[0].status, 'missed');
+});
+
+test('uses completed days only and leaves sparse or exactly half-day patterns unlearned', () => {
+  const events: PuppyEvent[] = [];
+  for (let index = 0; index < 6; index += 1) {
+    events.push({ id: `meal-${index}`, type: 'meal', source: 'app', at: new Date(2026, 8, 4 + index, 8).getTime() });
+    if (index < 3) events.push({ id: `walk-${index}`, type: 'walk', source: 'app', at: new Date(2026, 8, 4 + index, 17).getTime() });
+  }
+  const now = new Date(2026, 8, 10, 12);
+  const baseline = suggestScheduleFromEvents(events, 14, now);
+  assert.deepEqual(baseline.entries.map(({ type }) => type), ['meal']);
+  events.push({ id: 'partial', type: 'pee', source: 'app', at: at(7, 0) });
+  events.push({ id: 'future', type: 'pee', source: 'app', at: new Date(2026, 8, 11, 7).getTime() });
+  events.push({ id: 'old', type: 'pee', source: 'app', at: new Date(2026, 7, 1, 7).getTime() });
+  assert.deepEqual(suggestScheduleFromEvents(events, 14, now), baseline);
+});
+
+test('uses learned variation for routine status while keeping one log per slot', () => {
+  const schedule: ScheduleEntry[] = [
+    { id: 'one', type: 'meal', minutes: 9 * 60, toleranceMinutes: 75 },
+    { id: 'two', type: 'meal', minutes: 10 * 60, toleranceMinutes: 75 },
+  ];
+  const events: PuppyEvent[] = [{ id: 'late', type: 'meal', at: at(10, 5), source: 'app' }];
+  const result = scheduleStatusesForDay(events, schedule, day, 30, at(10, 10));
+  assert.equal(result.filter((item) => item.status === 'done').length, 1);
+  assert.equal(result.filter((item) => item.status === 'due').length, 1);
+  assert.equal(scheduleStatusesForDay([], [schedule[0]], day, 30, at(10, 10))[0].status, 'due');
+  assert.equal(scheduleStatusesForDay(events, [schedule[0]], day, 30, at(10, 10))[0].status, 'done');
+  assert.equal(scheduleStatusesForDay(events, [schedule[0]], day, 30, at(8, 0))[0].status, 'due');
+});
+
+test('does not infer a missing meal when an unmatched meal could be a shifted occurrence', () => {
+  const events: PuppyEvent[] = [];
+  for (let dayOfMonth = 4; dayOfMonth <= 10; dayOfMonth += 1) {
+    for (const hour of [8, dayOfMonth === 9 ? 15 : 12, 19]) {
+      events.push({ id: `${dayOfMonth}-${hour}`, type: 'meal', source: 'app', at: new Date(2026, 8, dayOfMonth, hour).getTime() });
+    }
+    events.push({ id: `pee-${dayOfMonth}`, type: 'pee', source: 'app', at: new Date(2026, 8, dayOfMonth, 21).getTime() });
+  }
+  assert.deepEqual(estimateMissingLogs(events, 14, new Date(2026, 8, 11)).estimates, []);
 });
 
 test('flags a repeated meal slot when logging continued after the gap', () => {
@@ -397,6 +509,18 @@ test('estimates a missing nap span from completed naps at the same daily slot', 
       .map(({ startBucket, endBucket, estimated }) => ({ startBucket, endBucket, estimated })),
     [{ startBucket: 52, endBucket: 58, estimated: true }],
   );
+
+  // An even number of observations can produce a half-millisecond median.
+  const variedDurations = events.map((event) => event.type === 'nap' && typeof event.endedAt === 'number'
+    ? { ...event, endedAt: event.endedAt + Number(new Date(event.at).getDate() >= 8) }
+    : event);
+  const roundedNap = estimateMissingLogs(variedDurations, 14, new Date(2026, 8, 10, 22))
+    .estimates.find((estimate) => estimate.type === 'nap');
+  assert.ok(roundedNap);
+  assert.equal(roundedNap.endedAt, roundedNap.at + 90 * 60_000 + 1);
+  assert.equal(Number.isInteger(roundedNap.at), true);
+  assert.equal(Number.isInteger(roundedNap.endedAt), true);
+
 });
 
 test('does not guess on a blank day or before a possible slot has passed', () => {
@@ -410,4 +534,95 @@ test('does not guess on a blank day or before a possible slot has passed', () =>
   const result = estimateMissingLogs(events, 14, new Date(2026, 8, 10, 12));
 
   assert.deepEqual(result.estimates, []);
+});
+
+test('keeps estimates visible in point and spanning nap history while counting them separately', () => {
+  const events: PuppyEvent[] = [
+    { id: 'recorded-pee', type: 'pee', at: at(7, 0), source: 'app' },
+    { id: 'estimated-pee', type: 'pee', at: at(8, 0), source: 'app', estimated: true },
+    { id: 'recorded-pee-later', type: 'pee', at: at(9, 0), source: 'widget' },
+    {
+      id: 'estimated-nap', type: 'nap', source: 'app', estimated: true,
+      at: new Date(2026, 8, 9, 23, 30).getTime(), endedAt: at(1, 0),
+    },
+    { id: 'estimated-only-month', type: 'pee', source: 'app', estimated: true, at: new Date(2026, 7, 2, 8).getTime() },
+  ];
+  const frequency = activityFrequencyStats(events, ['pee'], 14, new Date(2026, 8, 10, 18));
+  assert.equal(frequency.recordedDays, 1);
+  assert.equal(frequency.stats[0].total, 2);
+  assert.equal(frequency.stats[0].estimatedTotal, 1);
+  assert.equal(frequency.stats[0].averagePerRecordedDay, 2);
+  assert.equal(frequency.stats[0].medianIntervalMinutes, 120);
+  assert.deepEqual(latestQuickEventTimes(events), { pee: at(9, 0) });
+  assert.deepEqual(
+    monthlyActivityStats(events).map(({ total, estimatedTotal, recordedDays, averagePerRecordedDay }) => ({
+      total, estimatedTotal, recordedDays, averagePerRecordedDay,
+    })),
+    [
+      { total: 2, estimatedTotal: 2, recordedDays: 1, averagePerRecordedDay: 2 },
+      { total: 0, estimatedTotal: 1, recordedDays: 0, averagePerRecordedDay: 0 },
+    ],
+  );
+  const days = buildTimelineDays(events, 2, new Date(2026, 8, 10, 18));
+  assert.equal(days[0].marks.find((mark) => mark.id === 'estimated-nap')?.estimated, true);
+  assert.equal(days[1].marks.find((mark) => mark.id === 'estimated-nap')?.estimated, true);
+  assert.equal(days[1].marks.find((mark) => mark.id === 'estimated-pee')?.estimated, true);
+  assert.equal(days[1].marks.find((mark) => mark.id === 'recorded-pee')?.estimated, undefined);
+});
+
+test('does not learn routine windows or mark completion from estimated logs', () => {
+  const recorded: PuppyEvent[] = [8, 9].map((date) => ({
+    id: `recorded-${date}`, type: 'meal', source: 'app', at: new Date(2026, 8, date, 8).getTime(),
+  }));
+  const estimated: PuppyEvent[] = [4, 5, 6, 7, 10].map((date) => ({
+    id: `estimated-${date}`, type: 'meal', source: 'app', estimated: true,
+    at: new Date(2026, 8, date, 8).getTime(),
+  }));
+  const now = new Date(2026, 8, 11);
+  assert.deepEqual(suggestScheduleFromEvents([...recorded, ...estimated], 14, now), suggestScheduleFromEvents(recorded, 14, now));
+  assert.equal(scheduleStatusesForDay(estimated, [{ id: 'breakfast', type: 'meal', minutes: 8 * 60 }], day, 30, at(10, 0))[0].status, 'missed');
+});
+
+test('does not infer a gap from estimated activity after an otherwise unfinished day', () => {
+  const events: PuppyEvent[] = [];
+  for (let date = 4; date <= 10; date += 1) {
+    events.push({ id: `breakfast-${date}`, type: 'meal', source: 'app', at: new Date(2026, 8, date, 8).getTime() });
+    if (date !== 9) events.push({ id: `lunch-${date}`, type: 'meal', source: 'app', at: new Date(2026, 8, date, 12).getTime() });
+  }
+  events.push({ id: 'estimated-evening', type: 'pee', source: 'app', estimated: true, at: new Date(2026, 8, 9, 20).getTime() });
+  assert.deepEqual(estimateMissingLogs(events, 14, new Date(2026, 8, 11)).estimates, []);
+});
+
+test('does not offer an accepted estimate again or use it to strengthen the learned routine', () => {
+  const events: PuppyEvent[] = [];
+  for (let date = 4; date <= 10; date += 1) {
+    if (date !== 9) events.push({ id: `meal-${date}`, type: 'meal', source: 'app', at: new Date(2026, 8, date, 12).getTime() });
+    events.push({ id: `pee-${date}`, type: 'pee', source: 'app', at: new Date(2026, 8, date, 20).getTime() });
+  }
+  const now = new Date(2026, 8, 11);
+  const baseline = suggestScheduleFromEvents(events, 14, now);
+  const [estimate] = estimateMissingLogs(events, 14, now).estimates;
+  assert.ok(estimate);
+  const accepted: PuppyEvent = { id: 'accepted', type: estimate.type, at: estimate.at, source: 'app', estimated: true };
+  assert.deepEqual(estimateMissingLogs([...events, accepted], 14, now).estimates, []);
+  assert.deepEqual(suggestScheduleFromEvents([...events, accepted], 14, now), baseline);
+});
+
+test('infers and suppresses accepted gaps for each named activity independently', () => {
+  const events: PuppyEvent[] = [];
+  for (let date = 4; date <= 10; date += 1) {
+    if (date !== 9) events.push({ id: `training-${date}`, type: 'custom', customLabel: 'Training', source: 'app', at: new Date(2026, 8, date, 12).getTime() });
+    events.push({ id: `grooming-${date}`, type: 'custom', customLabel: 'Grooming', source: 'app', at: new Date(2026, 8, date, 15).getTime() });
+    events.push({ id: `pee-${date}`, type: 'pee', source: 'app', at: new Date(2026, 8, date, 20).getTime() });
+  }
+  const now = new Date(2026, 8, 11);
+  const baseline = suggestScheduleFromEvents(events, 14, now);
+  const [estimate] = estimateMissingLogs(events, 14, now).estimates;
+  assert.ok(estimate);
+  assert.equal(estimate.customLabel, 'Training');
+  const accepted: PuppyEvent = { id: 'accepted-training', type: 'custom', customLabel: 'Training', at: estimate.at, source: 'app', estimated: true };
+  const recovered = [...events, accepted];
+  assert.deepEqual(estimateMissingLogs(recovered, 14, now).estimates, []);
+  assert.deepEqual(suggestScheduleFromEvents(recovered, 14, now), baseline);
+  assert.deepEqual(buildTimelineDays(recovered, 3, now, now).flatMap((day) => day.marks).filter((mark) => mark.estimated).map((mark) => mark.id), [accepted.id]);
 });

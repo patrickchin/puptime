@@ -9,8 +9,9 @@ platform :ios do
     )
   end
 
-  desc "Upload App Store metadata, screenshots, pricing, and availability"
+  desc "Upload App Store metadata and screenshots; set pricing in App Store Connect"
   lane :metadata do
+    # Set the US base price to $1.99 with automatic local prices in App Store Connect.
     deliver(
       api_key: connect_api_key,
       app_identifier: "com.patrickchin.puptime",
@@ -20,19 +21,21 @@ platform :ios do
       skip_binary_upload: true,
       submit_for_review: false,
       automatic_release: true,
-      price_tier: 0,
       overwrite_screenshots: false,
       force: true
     )
   end
 
-  desc "Select build 17 and submit version 1.11.0 for App Review"
+  desc "Submit the verified APP_STORE_BUILD_NUMBER for version 1.11.0 to App Review"
   lane :submit do
+    build_number = ENV.fetch("APP_STORE_BUILD_NUMBER").strip
+    UI.user_error!("APP_STORE_BUILD_NUMBER must identify the verified uploaded build") if build_number.empty?
+
     deliver(
       api_key: connect_api_key,
       app_identifier: "com.patrickchin.puptime",
       app_version: "1.11.0",
-      build_number: "17",
+      build_number: build_number,
       metadata_path: "./fastlane/metadata",
       skip_binary_upload: true,
       skip_screenshots: true,

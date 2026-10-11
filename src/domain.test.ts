@@ -216,3 +216,18 @@ test('creates stable localized potty reminder content', () => {
   assert.match(pottyReminderCopy('afterPee', 120).body, /2 hours since the last pee/);
   assert.match(pottyReminderCopy('afterMeal', 30, 'es').body, /30 minutos/);
 });
+
+test('estimated activity cannot reset or suppress recorded potty reminders', () => {
+  const now = 10_000_000;
+  const pee = createEvent('pee', 'app', now - 30 * 60_000);
+  const meal = createEvent('meal', 'app', now - 10 * 60_000);
+  const estimates = [
+    { ...createEvent('pee', 'app', now - 5 * 60_000), estimated: true },
+    { ...createEvent('meal', 'app', now - 2 * 60_000), estimated: true },
+  ];
+  assert.deepEqual(
+    pottyReminderPlans([pee, meal, ...estimates], DEFAULT_NOTIFICATION_PREFERENCES, now),
+    pottyReminderPlans([pee, meal], DEFAULT_NOTIFICATION_PREFERENCES, now),
+  );
+  assert.deepEqual(pottyReminderPlans(estimates, DEFAULT_NOTIFICATION_PREFERENCES, now), []);
+});

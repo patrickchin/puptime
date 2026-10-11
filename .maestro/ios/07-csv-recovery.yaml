@@ -1,0 +1,78 @@
+appId: com.patrickchin.puptime
+name: iOS CSV picker cancellation preserves activity
+tags:
+  - ios
+  - recovery
+---
+- launchApp:
+    clearState: true
+- runFlow: ../helpers/skip-onboarding.yaml
+- extendedWaitUntil:
+    visible:
+      id: quick.pee
+    timeout: 90000
+- tapOn:
+    id: quick.pee
+    retryTapIfNoChange: true
+- tapOn:
+    id: nav.insights
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: insights.frequency.pee
+      text: .*1\.0.*
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: insights.import
+    direction: DOWN
+    visibilityPercentage: 100
+- swipe:
+    start: 50%,70%
+    end: 50%,35%
+    duration: 400
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    id: insights.import
+    retryTapIfNoChange: true
+- runFlow:
+    when:
+      visible:
+        id: insights.import
+    commands:
+      - tapOn:
+          id: insights.import
+          retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      text: ^(Cancel|取消|Cancelar)$
+    timeout: 30000
+- tapOn:
+    text: ^(Cancel|取消|Cancelar)$
+- assertVisible:
+    id: insights.import
+    enabled: true
+- assertVisible:
+    id: insights.export
+    enabled: true
+- scrollUntilVisible:
+    element:
+      id: insights.frequency.pee
+    direction: UP
+    visibilityPercentage: 50
+- assertVisible:
+    id: insights.frequency.pee
+    text: .*1\.0.*
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: nav.insights
+    timeout: 90000
+- tapOn:
+    id: nav.insights
+    retryTapIfNoChange: true
+- assertVisible:
+    id: insights.frequency.pee
+    text: .*1\.0.*
