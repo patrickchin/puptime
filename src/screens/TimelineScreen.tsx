@@ -33,7 +33,7 @@ import { ActivityIcon } from '../components/ActivityIcon';
 import { useLocalization } from '../localization-context';
 import { translate, type AppLanguage } from '../localization';
 import { spacing, type Theme } from '../theme';
-import { timelineFormatters } from '../timeline-format';
+import { timelineDetailTime, timelineFormatters } from '../timeline-format';
 
 const INITIAL_DAYS = 14;
 const LOAD_DAYS = 14;
@@ -458,7 +458,15 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
   const hasEarlierDays = loadedDayCount < maxHistoryDays;
   const isCompactHeight = height < 500;
   const selectedEvents = events.filter((event) => selection.includes(event.id)).sort((a, b) => a.at - b.at);
-  const detailsHeight = Math.min(height * 0.8, Math.max(300, 88 + selectedEvents.length * 90 + insets.bottom));
+  const sharedDetailDay = selectedEvents.length && selectedEvents.every((event) => dateKey(new Date(event.at)) === dateKey(new Date(selectedEvents[0].at)))
+    ? selectedEvents[0].at
+    : undefined;
+  const detailDate = sharedDetailDay === undefined ? undefined
+    : dateKey(new Date(sharedDetailDay)) === todayKey
+      ? `${t('log.today')} · ${timelineFormatters(language).shortDate.format(sharedDetailDay)}`
+      : new Date(sharedDetailDay).getFullYear() === now.getFullYear()
+        ? timelineFormatters(language).fullDate.format(sharedDetailDay)
+        : timelineFormatters(language).rangeDate.format(sharedDetailDay);
   const listRef = useRef<FlatList<TimelineDay>>(null);
   const horizontalRef = useRef<ScrollView>(null);
   const horizontalOffset = useRef(new Animated.Value(0)).current;
@@ -897,12 +905,15 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
             testID="timeline.details"
             style={[styles.detailsSheet, {
               backgroundColor: theme.surfaceRaised,
-              height: detailsHeight,
-              paddingBottom: insets.bottom,
+              maxHeight: height * 0.8,
+              paddingBottom: insets.bottom + spacing.sm,
             }]}
           >
             <View style={[styles.detailsHeading, { borderColor: theme.border }]}>
-              <Text style={[styles.detailsTitle, { color: theme.text }]}>{t('timeline.details')}</Text>
+              <View style={styles.detailsHeadingCopy}>
+                <Text style={[styles.detailsTitle, { color: theme.text }]}>{t('timeline.details')}</Text>
+                {detailDate ? <Text testID="timeline.details.date" style={[styles.detailsTime, { color: theme.textMuted }]}>{detailDate}</Text> : null}
+              </View>
               <Pressable
                 testID="timeline.details.close"
                 accessibilityRole="button"
@@ -918,25 +929,26 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
                 const colors = activityColors(theme, event);
                 const running = isOpenNap(event);
                 const end = typeof event.endedAt === 'number'
-                  ? timelineFormatters(language).fullDateTime.format(event.endedAt)
+                  ? timelineDetailTime(event.endedAt, language, sharedDetailDay)
                   : null;
                 return (
                   <View key={event.id} style={[styles.detailsEvent, { borderColor: theme.border, borderBottomWidth: index === selectedEvents.length - 1 ? 0 : StyleSheet.hairlineWidth }]}>
-                    <View style={[styles.detailsIcon, { backgroundColor: colors.softColor }]}>
-                      <ActivityIcon activity={event} theme={theme} color={colors.color} size={26} />
+                    <View style={[styles.detailsIcon, { backgroundColor: colors.softColor }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                      <ActivityIcon activity={event} theme={theme} color={colors.color} size={24} />
                     </View>
                     <View style={styles.detailsCopy}>
-                      <Text testID={`timeline.details.event.${event.id}`} style={[styles.detailsEventTitle, { color: theme.text }]}>
-                        {activityLabel(event)}{event.estimated ? ` · ${t('eventRow.estimated')}` : ''}
-                      </Text>
-                      <Text style={[styles.detailsTime, { color: theme.textMuted }]}>{timelineFormatters(language).fullDateTime.format(event.at)}</Text>
+                      <View style={styles.detailsSummary}>
+                        <Text testID={`timeline.details.event.${event.id}`} style={[styles.detailsEventTitle, { color: theme.text }]}>
+                          {activityLabel(event)}{event.estimated ? ` · ${t('eventRow.estimated')}` : ''}
+                        </Text>
+                        <Text style={[styles.detailsTime, { color: theme.textMuted }]}>{timelineDetailTime(event.at, language, sharedDetailDay)}</Text>
+                      </View>
                       {end || running ? (
                         <Text style={[styles.detailsTime, { color: theme.textMuted }]}>
-                          {end ?? t('eventRow.now')} · {formatDuration((event.endedAt ?? nowTime) - event.at)}{running ? ` ${t('eventRow.running')}` : ''}
+                          → {end ?? t('eventRow.now')} · {formatDuration((event.endedAt ?? nowTime) - event.at)}{running ? ` ${t('eventRow.running')}` : ''}
                         </Text>
                       ) : null}
                       {event.note?.trim() ? <Text style={[styles.detailsNote, { color: theme.text }]}>{event.note.trim()}</Text> : null}
-                      <Text style={[styles.detailsSource, { color: theme.textMuted }]}>{t(event.source === 'widget' ? 'eventRow.widget' : 'eventRow.app')}</Text>
                     </View>
                   </View>
                 );
@@ -1055,16 +1067,17 @@ const styles = StyleSheet.create({
   detailsModal: { flex: 1, justifyContent: 'flex-end' },
   detailsBackdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0, 0, 0, 0.42)' },
   detailsSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden' },
-  detailsHeading: { minHeight: 64, marginHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth },
+  detailsHeading: { minHeight: 64, paddingVertical: spacing.sm, marginHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth },
+  detailsHeadingCopy: { flex: 1, gap: spacing.xs },
   detailsTitle: { fontSize: 20, fontWeight: '800' },
-  detailsClose: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  detailsScroll: { flex: 1 },
+  detailsClose: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
+  detailsScroll: { flexGrow: 0, flexShrink: 1 },
   detailsList: { paddingHorizontal: spacing.md },
-  detailsEvent: { minHeight: 90, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: 16 },
-  detailsIcon: { width: 44, height: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  detailsEvent: { minHeight: 64, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: 12 },
+  detailsIcon: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   detailsCopy: { flex: 1, gap: 2 },
-  detailsEventTitle: { fontSize: 16, fontWeight: '700' },
-  detailsTime: { fontSize: 14 },
-  detailsNote: { fontSize: 14, marginTop: spacing.xs },
-  detailsSource: { fontSize: 13, marginTop: spacing.xs },
+  detailsSummary: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', justifyContent: 'space-between', columnGap: spacing.sm, rowGap: 2 },
+  detailsEventTitle: { fontSize: 16, fontWeight: '700', flexShrink: 1 },
+  detailsTime: { fontSize: 14, flexShrink: 1 },
+  detailsNote: { fontSize: 14, lineHeight: 20, marginTop: spacing.xs },
 });

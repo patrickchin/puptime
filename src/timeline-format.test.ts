@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { timelineFormatters } from './timeline-format.ts';
+import { timelineDetailTime, timelineFormatters } from './timeline-format.ts';
 
 test('reuses timeline formatters across activities and tab mounts in every app language', () => {
   for (const language of ['en', 'zh-Hans', 'es'] as const) {
@@ -21,4 +21,15 @@ test('reuses timeline formatters across activities and tab mounts in every app l
   }
   assert.notEqual(timelineFormatters('en'), timelineFormatters('zh-Hans'));
   assert.notEqual(timelineFormatters('en'), timelineFormatters('es'));
+});
+
+test('details omit a repeated date but retain dates for mixed days and overnight durations', () => {
+  const start = new Date(2026, 9, 12, 23, 45).getTime();
+  const end = new Date(2026, 9, 13, 0, 30).getTime();
+  for (const language of ['en', 'zh-Hans', 'es'] as const) {
+    const { time, rangeDate } = timelineFormatters(language);
+    assert.equal(timelineDetailTime(start, language, start), time.format(start));
+    assert.equal(timelineDetailTime(end, language, start), `${rangeDate.format(end)} · ${time.format(end)}`);
+    assert.equal(timelineDetailTime(start, language), `${rangeDate.format(start)} · ${time.format(start)}`);
+  }
 });
