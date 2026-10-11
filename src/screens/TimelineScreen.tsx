@@ -997,7 +997,7 @@ const styles = StyleSheet.create({
   detailsCloseText: { fontSize: 14, fontWeight: '600', flexShrink: 1 },
   detailsScroll: { flexShrink: 1 },
   detailsList: { paddingHorizontal: spacing.md },
-  detailsEvent: { minHeight: 28, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.xs, borderTopWidth: StyleSheet.hairlineWidth },
+  detailsEvent: { minHeight: 36, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth },
   detailsDot: { width: 8, height: 8, borderRadius: 4, marginTop: 7 },
   detailsCopy: { flex: 1, fontSize: 14 },
   detailsEventTitle: { fontSize: 15, fontWeight: '700' },
