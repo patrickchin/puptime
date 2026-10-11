@@ -30,7 +30,9 @@ function ArticleRow({ article, theme, onOpen }: { article: CareArticle; theme: T
         <Text style={[styles.rowTitle, { color: theme.text }]}>{article.title}</Text>
         <Text style={[styles.rowSummary, { color: theme.textMuted }]}>{article.summary}</Text>
       </View>
-      <MaterialCommunityIcons name="chevron-right" size={22} color={theme.primary} />
+      {Platform.OS === 'web'
+        ? <Text aria-hidden style={{ fontSize: 28, color: theme.primary }}>›</Text>
+        : <MaterialCommunityIcons name="chevron-right" size={22} color={theme.primary} />}
     </>
   );
   const props = {
@@ -88,7 +90,9 @@ export function LearnScreen({ theme, articleId, onArticleChange }: {
       <View style={[styles.content, article && styles.articleContent]}>
         {selectedId !== null && (
           <Pressable testID="learn.back" accessibilityRole="button" onPress={() => open(null)} style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
-            <MaterialCommunityIcons name="arrow-left" size={22} color={theme.primary} />
+            {Platform.OS === 'web'
+              ? <Text aria-hidden style={{ fontSize: 24, color: theme.primary }}>←</Text>
+              : <MaterialCommunityIcons name="arrow-left" size={22} color={theme.primary} />}
             <Text style={[styles.linkText, { color: theme.primary }]}>{t('learn.back')}</Text>
           </Pressable>
         )}
