@@ -17,6 +17,24 @@ tags:
 - waitForAnimationToEnd:
     timeout: 5000
 - tapOn:
+    id: toast.note
+- scrollUntilVisible:
+    element:
+      id: editor.note.input
+    direction: DOWN
+    visibilityPercentage: 50
+- tapOn:
+    id: editor.note.input
+- setClipboard: Went outside after breakfast
+- pasteText
+- scrollUntilVisible:
+    element:
+      id: editor.close
+    direction: UP
+    visibilityPercentage: 50
+- tapOn:
+    id: editor.close
+- tapOn:
     id: quick.poop
     retryTapIfNoChange: true
 - waitForAnimationToEnd:
@@ -94,7 +112,14 @@ tags:
     index: 1
     text: .*Pee.*
 - assertVisible:
+    id: timeline.details.date
+    text: Today.*
+- assertVisible:
+    text: Went outside after breakfast
+- assertNotVisible:
     text: App
+- assertNotVisible:
+    text: Widget
 - tapOn:
     id: timeline.details.close
 - assertNotVisible:
@@ -109,6 +134,7 @@ tags:
     id: timeline.details
 - tapOn:
     id: timeline.zoom.in
+    retryTapIfNoChange: true
 - assertVisible:
     id: timeline.zoom.value
     text: .*1\.5×.*
