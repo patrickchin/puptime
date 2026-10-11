@@ -49,7 +49,11 @@ func relativeDateCount(_ value: Any) -> Int {
 
 let rendered = invoke("__expoWidgetRender", props)
 precondition(buttonCount(rendered) == (props["actions"] as! [String]).count, "Widget did not render its quick log buttons")
-precondition(relativeDateCount(rendered) > 0, "Widget did not render a relative date")
+// A fresh install has no activity dates and correctly displays "Never".
+// Exercise the relative-date branch with an actual recorded event.
+var datedProps = props
+datedProps["lastEventAt"] = ["pee": (Date().timeIntervalSince1970 - 120) * 1000]
+precondition(relativeDateCount(invoke("__expoWidgetRender", datedProps)) == 1, "Widget did not render a relative date for a recorded event")
 precondition(buttonCount(invoke("__expoWidgetRender", props, colorScheme: "dark")) == 3, "Dark widget did not render")
 
 let pee = invoke("__expoWidgetHandlePress", props, target: "log|pee|0|en|120|30|")
