@@ -37,12 +37,13 @@ import { timelineFormatters } from '../timeline-format';
 
 const INITIAL_DAYS = 14;
 const LOAD_DAYS = 14;
-const DATE_COLUMN_WIDTH = 72;
+const DATE_COLUMN_WIDTH = 56;
 const LOAD_ROW_HEIGHT = 48;
-const MIN_TIME_SCALE = 0.25;
+const MIN_TIME_SCALE = 1;
 const MAX_TIME_SCALE = 4;
-const ZOOM_STEP = 0.25;
+const ZOOM_STEP = 0.5;
 const ESTIMATE_OPACITY = 0.35;
+const AXIS_HOURS = Array.from({ length: 25 }, (_, index) => index);
 const GRID_HOURS = Array.from({ length: 23 }, (_, index) => index + 1);
 
 function clamp(value: number, minimum: number, maximum: number): number {
@@ -86,11 +87,6 @@ function filterName(types: readonly ActivityKey[], language: AppLanguage, allCou
 function calendarDayDistance(older: Date, newer: Date): number {
   const utc = (date: Date) => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
   return Math.max(0, Math.round((utc(newer) - utc(older)) / 86_400_000));
-}
-
-function formatHour(hour: number, language: AppLanguage): string {
-  return timelineFormatters(language).hour
-    .format(new Date(2000, 0, 1, hour % 24));
 }
 
 function formatDateRange(start: Date, end: Date, language: AppLanguage): string {
@@ -155,10 +151,10 @@ function TimelineDateLabel({
         },
       ]}
     >
-      <Text maxFontSizeMultiplier={1.5} style={[styles.weekday, { color: isToday ? theme.primary : theme.text }]}>
+      <Text numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.5} style={[styles.weekday, { color: isToday ? theme.primary : theme.text }]}>
         {isToday ? t('insights.today') : shortDay.format(day.date).toUpperCase()}
       </Text>
-      <Text maxFontSizeMultiplier={1.5} style={[styles.calendarDate, { color: theme.textMuted }]}>
+      <Text numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.5} style={[styles.calendarDate, { color: theme.textMuted }]}>
         {shortDate.format(day.date)}
       </Text>
     </Animated.View>
@@ -352,24 +348,26 @@ function TimelineTrack({
 }
 
 function TimelineAxis({
-  hours,
   trackWidth,
   horizontalOffset,
   theme,
 }: {
-  hours: readonly number[];
   trackWidth: number;
   horizontalOffset: Animated.Value;
   theme: Theme;
 }) {
-  const { language, t } = useLocalization();
-  const labelWidth = trackWidth * (hours[1] - hours[0]) / 24;
+  const { t } = useLocalization();
+  const { fontScale } = useWindowDimensions();
+  const staggerLabels = trackWidth / 24 < 22 * Math.min(fontScale, 1.4);
+  const axisHeight = staggerLabels ? 42 : 30;
+  const labelWidth = trackWidth / 12;
   return (
-    <View style={[styles.axisRow, { backgroundColor: theme.background, borderColor: theme.border }]}>
+    <View style={[styles.axisRow, { height: axisHeight, backgroundColor: theme.background, borderColor: theme.border }]}>
       <Animated.View
         style={[
           styles.axisDateCell,
           {
+            height: axisHeight,
             backgroundColor: theme.background,
             borderColor: theme.border,
             transform: [{ translateX: horizontalOffset }],
@@ -381,9 +379,9 @@ function TimelineAxis({
       <View
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
-        style={[styles.axisTrack, { width: trackWidth }]}
+        style={[styles.axisTrack, { height: axisHeight, width: trackWidth }]}
       >
-        {hours.map((hour) => (
+        {AXIS_HOURS.map((hour) => (
           <Text
             key={hour}
             maxFontSizeMultiplier={1.4}
@@ -394,11 +392,14 @@ function TimelineAxis({
                 : hour === 24
                   ? styles.axisEnd
                   : { left: `${(hour / 24) * 100}%`, marginLeft: -labelWidth / 2, textAlign: 'center' },
-              { color: theme.textMuted, width: labelWidth },
+              { color: theme.textMuted, width: labelWidth, top: staggerLabels && hour % 2 ? 20 : 4 },
             ]}
           >
-            {formatHour(hour, language)}
+            {hour}
           </Text>
+        ))}
+        {GRID_HOURS.map((hour) => (
+          <View key={hour} style={[styles.axisTick, { left: `${(hour / 24) * 100}%`, backgroundColor: theme.textMuted }]} />
         ))}
       </View>
     </View>
@@ -426,14 +427,10 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
   const [selection, setSelection] = useState<string[]>([]);
   const [isLoadingEarlier, startLoadingEarlier] = useTransition();
   const rowHeight = Math.round(52 * Math.min(fontScale, 1.5));
-  const viewportWidth = width;
-  const hourLabelWidth = Math.ceil(60 * Math.min(fontScale, 1.4));
-  const baseTrackWidth = Math.max(24 * hourLabelWidth, viewportWidth - DATE_COLUMN_WIDTH);
-  const trackWidth = Math.round(baseTrackWidth * timeScale);
+  const viewportWidth = width - insets.left - insets.right;
+  const baseTrackWidth = Math.max(1, viewportWidth - DATE_COLUMN_WIDTH);
+  const trackWidth = baseTrackWidth * timeScale;
   const totalWidth = DATE_COLUMN_WIDTH + trackWidth;
-  const pixelsPerHour = trackWidth / 24;
-  const tickStep = pixelsPerHour >= hourLabelWidth ? 1 : pixelsPerHour >= hourLabelWidth / 2 ? 2 : pixelsPerHour >= hourLabelWidth / 3 ? 3 : 6;
-  const tickHours = useMemo(() => Array.from({ length: 24 / tickStep + 1 }, (_, index) => index * tickStep), [tickStep]);
   const now = useMemo(() => new Date(nowTime), [nowTime]);
   const estimates = useMemo(() => estimateMissingLogs(events, INITIAL_DAYS, now).estimates, [events, now]);
   const earliestEventAt = events.reduce((earliest, event) => Math.min(earliest, event.at), nowTime);
@@ -768,6 +765,7 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
         <Animated.ScrollView
           ref={horizontalRef}
           horizontal
+          scrollEnabled={timeScale > MIN_TIME_SCALE}
           directionalLockEnabled
           nestedScrollEnabled
           scrollEventThrottle={16}
@@ -778,7 +776,6 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
         >
           <View style={[styles.timelineCanvas, { width: totalWidth }]}>
             <MemoTimelineAxis
-              hours={tickHours}
               trackWidth={trackWidth}
               horizontalOffset={horizontalOffset}
               theme={theme}
@@ -993,28 +990,28 @@ const styles = StyleSheet.create({
   horizontalScroller: { flex: 1 },
   horizontalContent: { flexGrow: 1 },
   timelineCanvas: { flex: 1 },
-  axisRow: { height: 30, flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, zIndex: 4 },
+  axisRow: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, zIndex: 4 },
   axisDateCell: {
     width: DATE_COLUMN_WIDTH,
-    height: 30,
     borderRightWidth: StyleSheet.hairlineWidth,
     justifyContent: 'center',
-    paddingLeft: 10,
+    paddingLeft: 6,
     zIndex: 5,
   },
   axisDateText: { fontSize: 9, lineHeight: 12, fontWeight: '800', letterSpacing: 0.7 },
-  axisTrack: { height: 30, position: 'relative' },
-  axisLabel: { position: 'absolute', top: 6, fontSize: 12, lineHeight: 17, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  axisStart: { left: 4, textAlign: 'left' },
-  axisEnd: { right: 4, textAlign: 'right' },
+  axisTrack: { position: 'relative' },
+  axisTick: { position: 'absolute', bottom: 0, height: 4, width: StyleSheet.hairlineWidth },
+  axisLabel: { position: 'absolute', fontSize: 10, lineHeight: 14, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  axisStart: { left: 1, textAlign: 'left' },
+  axisEnd: { right: 1, textAlign: 'right' },
   dayList: { flex: 1 },
   dayRow: { flexDirection: 'row' },
   dateCell: {
     width: DATE_COLUMN_WIDTH,
     flexShrink: 0,
     justifyContent: 'center',
-    paddingLeft: 10,
-    paddingRight: 6,
+    paddingLeft: 6,
+    paddingRight: 2,
     borderRightWidth: StyleSheet.hairlineWidth,
     borderBottomWidth: StyleSheet.hairlineWidth,
     zIndex: 3,
