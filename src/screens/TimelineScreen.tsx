@@ -885,6 +885,7 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
         animationType="none"
         presentationStyle="overFullScreen"
         statusBarTranslucent
+        navigationBarTranslucent
         onRequestClose={() => setSelection([])}
       >
         <View style={styles.detailsModal} accessibilityViewIsModal>
@@ -916,14 +917,14 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
               </Pressable>
             </View>
             <ScrollView nestedScrollEnabled style={styles.detailsScroll} contentContainerStyle={styles.detailsList}>
-              {selectedEvents.map((event) => {
+              {selectedEvents.map((event, index) => {
                 const colors = activityColors(theme, event);
                 const running = isOpenNap(event);
                 const end = typeof event.endedAt === 'number'
                   ? timelineFormatters(language).fullDateTime.format(event.endedAt)
                   : null;
                 return (
-                  <View key={event.id} style={[styles.detailsEvent, { borderColor: theme.border }]}>
+                  <View key={event.id} style={[styles.detailsEvent, { borderColor: theme.border, borderBottomWidth: index === selectedEvents.length - 1 ? 0 : StyleSheet.hairlineWidth }]}>
                     <View style={[styles.detailsIcon, { backgroundColor: colors.softColor }]}>
                       <ActivityIcon activity={event} theme={theme} color={colors.color} size={26} />
                     </View>
@@ -1062,7 +1063,7 @@ const styles = StyleSheet.create({
   detailsClose: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   detailsScroll: { flex: 1 },
   detailsList: { paddingHorizontal: spacing.md },
-  detailsEvent: { minHeight: 90, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  detailsEvent: { minHeight: 90, flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: 16 },
   detailsIcon: { width: 44, height: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   detailsCopy: { flex: 1, gap: 2 },
   detailsEventTitle: { fontSize: 16, fontWeight: '700' },
