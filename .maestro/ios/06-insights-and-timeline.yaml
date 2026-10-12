@@ -14,10 +14,18 @@ tags:
 - tapOn:
     id: quick.pee
     retryTapIfNoChange: true
-- waitForAnimationToEnd:
-    timeout: 5000
+- scrollUntilVisible:
+    element:
+      id: event.pee.edit
+    direction: DOWN
+    visibilityPercentage: 50
+    centerElement: true
 - tapOn:
-    id: toast.note
+    id: event.pee.edit
+- extendedWaitUntil:
+    visible:
+      id: editor
+    timeout: 30000
 - scrollUntilVisible:
     element:
       id: editor.note.input
@@ -34,6 +42,11 @@ tags:
     visibilityPercentage: 50
 - tapOn:
     id: editor.close
+- scrollUntilVisible:
+    element:
+      id: quick.poop
+    direction: UP
+    visibilityPercentage: 50
 - tapOn:
     id: quick.poop
     retryTapIfNoChange: true

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Puptime",
     "slug": "puptime",
-    "version": "1.11.26",
+    "version": "1.11.27",
     "description": "Log puppy activities from the app or Home Screen.",
     "scheme": "puptime",
     "icon": "./assets/puptime-icon.png",
@@ -19,7 +19,7 @@
     },
     "android": {
       "package": "com.patrickchin.puptime",
-      "versionCode": 1011026,
+      "versionCode": 1011027,
       "blockedPermissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
