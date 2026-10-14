@@ -1,0 +1,66 @@
+{
+  "tool": "Built-in image_gen",
+  "purpose": "Topic-specific decorative editorial illustrations. Care advice is in selectable text with written citations.",
+  "images": [
+    {
+      "topic": "home",
+      "file": "assets/puppy-care/home.jpg",
+      "prompt": "Use case: illustration-story. Asset type: a small editorial illustration for Puptime, a puppy-care app. Primary request: a friendly golden puppy arriving home, sitting beside an open canvas bag containing a folded green blanket and a coral ball, with a tiny house silhouette behind. Style: charming hand-drawn gouache and colored pencil, slightly irregular dark forest-green outlines, flat shapes with subtle paper grain, contemporary children's field guide rather than cartoon emoji or glossy 3D. One golden floppy-eared puppy with white muzzle and chest, small dark nose and eyes. Palette: forest green #176B52, buttery yellow, soft coral, sky blue, warm ivory. Composition: square canvas, a single uncluttered scene, centered subject large and instantly readable at thumbnail size, generous margin around all edges. Warm ivory background #F5F3EC. No writing, letters, numbers, watermark, branding, decorative sparkles, border or UI. High-quality finished editorial art, not an app mockup."
+    },
+    {
+      "topic": "potty",
+      "file": "assets/puppy-care/potty.jpg",
+      "prompt": "Image 1 is the edit target. Make a topic-specific variant of this puppy illustration for the Puptime puppy-care guide. Preserve the golden floppy-eared puppy character with white muzzle/chest, hand-drawn gouache and colored-pencil style, forest-green outlines, subtle paper grain, warm ivory background #F5F3EC and palette of forest green, buttery yellow, soft coral and sky blue. Replace the entire original scene, pose, bag and house with this scene: The puppy stands on a small patch of garden grass beside an open green back door, looking back at the viewer. A tiny plain coral kitchen timer sits nearby without numbers. Convey a toilet trip outdoors without depicting bodily waste. Square canvas; one uncluttered scene, subject large and instantly readable at thumbnail size, generous margins so nothing is cut off. No text, letters, numbers, watermark, branding, sparkles, border or UI. Consistent finished editorial illustration, not glossy 3D."
+    },
+    {
+      "topic": "feeding",
+      "file": "assets/puppy-care/feeding.jpg",
+      "prompt": "Image 1 is the edit target. Make a topic-specific variant of this puppy illustration for the Puptime puppy-care guide. Preserve the golden floppy-eared puppy character with white muzzle/chest, hand-drawn gouache and colored-pencil style, forest-green outlines, subtle paper grain, warm ivory background #F5F3EC and palette of forest green, buttery yellow, soft coral and sky blue. Replace the entire original scene, pose, bag and house with this scene: The puppy looks down at a green bowl of kibble with a separate blue bowl of clean water next to it. Show the bowls prominently. No bag, house, or timer. Square canvas; one uncluttered scene, subject large and instantly readable at thumbnail size, generous margins so nothing is cut off. No text, letters, numbers, watermark, branding, sparkles, border or UI. Consistent finished editorial illustration, not glossy 3D."
+    },
+    {
+      "topic": "sleep",
+      "file": "assets/puppy-care/sleep.jpg",
+      "prompt": "Image 1 is the edit target. Make a topic-specific variant of this puppy illustration for the Puptime puppy-care guide. Preserve the golden floppy-eared puppy character with white muzzle/chest, hand-drawn gouache and colored-pencil style, forest-green outlines, subtle paper grain, warm ivory background #F5F3EC and palette of forest green, buttery yellow, soft coral and sky blue. Replace the entire original scene, pose, bag and house with this scene: The puppy curls up asleep on a sage-green oval bed with a soft coral blanket. Eyes gently closed, relaxed pose. Only puppy, bed and blanket. Square canvas; one uncluttered scene, subject large and instantly readable at thumbnail size, generous margins so nothing is cut off. No text, letters, numbers, watermark, branding, sparkles, border or UI. Consistent finished editorial illustration, not glossy 3D."
+    },
+    {
+      "topic": "play",
+      "file": "assets/puppy-care/play.jpg",
+      "prompt": "Image 1 is the edit target. Make a topic-specific variant of this puppy illustration for the Puptime puppy-care guide. Preserve the golden floppy-eared puppy character with white muzzle/chest, hand-drawn gouache and colored-pencil style, forest-green outlines, subtle paper grain, warm ivory background #F5F3EC and palette of forest green, buttery yellow, soft coral and sky blue. Replace the entire original scene, pose, bag and house with this scene: The puppy is walking gently with a slack soft green lead beside a small coral ball and a tuft of grass. No running, jumping, obstacle courses or owner hands. Square canvas; one uncluttered scene, subject large and instantly readable at thumbnail size, generous margins so nothing is cut off. No text, letters, numbers, watermark, branding, sparkles, border or UI. Consistent finished editorial illustration, not glossy 3D."
+    },
+    {
+      "topic": "social",
+      "file": "assets/puppy-care/social.jpg",
+      "prompt": "Image 1 is the edit target. Make a topic-specific variant of this puppy illustration for the Puptime puppy-care guide. Preserve the golden floppy-eared puppy character with white muzzle/chest, hand-drawn gouache and colored-pencil style, forest-green outlines, subtle paper grain, warm ivory background #F5F3EC and palette of forest green, buttery yellow, soft coral and sky blue. Replace the entire original scene, pose, bag and house with this scene: The golden puppy calmly meets a small dark brown adult dog nose-to-nose with comfortable loose body language. A little green leaf nearby, plain backdrop. Both dogs fully visible. Square canvas; one uncluttered scene, subject large and instantly readable at thumbnail size, generous margins so nothing is cut off. No text, letters, numbers, watermark, branding, sparkles, border or UI. Consistent finished editorial illustration, not glossy 3D."
+    },
+    {
+      "topic": "training",
+      "file": "assets/puppy-care/training.jpg",
+      "prompt": "Image 1 is the edit target. Make a topic-specific variant of this puppy illustration for the Puptime puppy-care guide. Preserve the golden floppy-eared puppy character with white muzzle/chest, hand-drawn gouache and colored-pencil style, forest-green outlines, subtle paper grain, warm ivory background #F5F3EC and palette of forest green, buttery yellow, soft coral and sky blue. Replace the entire original scene, pose, bag and house with this scene: The puppy sits attentively, looking toward an adult's hand offering a small kibble reward. Only a forearm and hand at the canvas edge, no full human, no collar corrections or tools. Square canvas; one uncluttered scene, subject large and instantly readable at thumbnail size, generous margins so nothing is cut off. No text, letters, numbers, watermark, branding, sparkles, border or UI. Consistent finished editorial illustration, not glossy 3D."
+    },
+    {
+      "topic": "chewing",
+      "file": "assets/puppy-care/chewing.jpg",
+      "prompt": "Image 1 is the edit target. Make a topic-specific variant of this puppy illustration for the Puptime puppy-care guide. Preserve the golden floppy-eared puppy character with white muzzle/chest, hand-drawn gouache and colored-pencil style, forest-green outlines, subtle paper grain, warm ivory background #F5F3EC and palette of forest green, buttery yellow, soft coral and sky blue. Replace the entire original scene, pose, bag and house with this scene: The puppy happily mouths a soft coral-and-green rope toy held between its paws. Only a safe chunky rope toy with no detached fragments, no hands or clothing in its mouth. Square canvas; one uncluttered scene, subject large and instantly readable at thumbnail size, generous margins so nothing is cut off. No text, letters, numbers, watermark, branding, sparkles, border or UI. Consistent finished editorial illustration, not glossy 3D."
+    },
+    {
+      "topic": "alone",
+      "file": "assets/puppy-care/alone.jpg",
+      "prompt": "Image 1 is the edit target. Make a topic-specific variant of this puppy illustration for the Puptime puppy-care guide. Preserve the golden floppy-eared puppy character with white muzzle/chest, hand-drawn gouache and colored-pencil style, forest-green outlines, subtle paper grain, warm ivory background #F5F3EC and palette of forest green, buttery yellow, soft coral and sky blue. Replace the entire original scene, pose, bag and house with this scene: The puppy rests comfortably on a sage cushion beside a green baby gate, with an adult's slippered feet visible nearby on the other side. Convey a very brief comfortable separation, no locked crate, no sadness or tears. Square canvas; one uncluttered scene, subject large and instantly readable at thumbnail size, generous margins so nothing is cut off. No text, letters, numbers, watermark, branding, sparkles, border or UI. Consistent finished editorial illustration, not glossy 3D."
+    },
+    {
+      "topic": "grooming",
+      "file": "assets/puppy-care/grooming.jpg",
+      "prompt": "Image 1 is the edit target. Make a topic-specific variant of this puppy illustration for the Puptime puppy-care guide. Preserve the golden floppy-eared puppy character with white muzzle/chest, hand-drawn gouache and colored-pencil style, forest-green outlines, subtle paper grain, warm ivory background #F5F3EC and palette of forest green, buttery yellow, soft coral and sky blue. Replace the entire original scene, pose, bag and house with this scene: The puppy sits relaxed beside a simple sage-green grooming brush and a coral dog toothbrush. Tools are large and easy to recognize, not inside the puppy's mouth. No medical equipment. Square canvas; one uncluttered scene, subject large and instantly readable at thumbnail size, generous margins so nothing is cut off. No text, letters, numbers, watermark, branding, sparkles, border or UI. Consistent finished editorial illustration, not glossy 3D."
+    },
+    {
+      "topic": "vet",
+      "file": "assets/puppy-care/vet.jpg",
+      "prompt": "Image 1 is the edit target. Make a topic-specific variant of this puppy illustration for the Puptime puppy-care guide. Preserve the golden floppy-eared puppy character with white muzzle/chest, hand-drawn gouache and colored-pencil style, forest-green outlines, subtle paper grain, warm ivory background #F5F3EC and palette of forest green, buttery yellow, soft coral and sky blue. Replace the entire original scene, pose, bag and house with this scene: The puppy sits calmly next to a green stethoscope and a small closed coral vaccination-record notebook with a plain cover and no writing. No needles or medical procedures. Square canvas; one uncluttered scene, subject large and instantly readable at thumbnail size, generous margins so nothing is cut off. No text, letters, numbers, watermark, branding, sparkles, border or UI. Consistent finished editorial illustration, not glossy 3D."
+    },
+    {
+      "topic": "urgent",
+      "file": "assets/puppy-care/urgent.jpg",
+      "prompt": "Image 1 is the edit target. Make a topic-specific variant of this puppy illustration for the Puptime puppy-care guide. Preserve the golden floppy-eared puppy character with white muzzle/chest, hand-drawn gouache and colored-pencil style, forest-green outlines, subtle paper grain, warm ivory background #F5F3EC and palette of forest green, buttery yellow, soft coral and sky blue. Replace the entire original scene, pose, bag and house with this scene: The puppy sits beside a large coral telephone handset and a green veterinary first-aid bag. The phone is the main recognizable object, no writing, no symbols, no depiction of injury, blood, illness or distress. Square canvas; one uncluttered scene, subject large and instantly readable at thumbnail size, generous margins so nothing is cut off. No text, letters, numbers, watermark, branding, sparkles, border or UI. Consistent finished editorial illustration, not glossy 3D."
+    }
+  ]
+}
