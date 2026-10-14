@@ -9,6 +9,14 @@ test('care guides resolve citations, related articles, and videos without orphan
   for (const article of careArticles) {
     assert.match(article.id, /^[a-z]+(?:-[a-z]+)*$/);
     assert.ok(article.sections.length);
+    assert.ok(article.shortTitle);
+    assert.ok(article.glance.length >= 3);
+    const sectionSources = new Set(article.sections.flatMap((section) => section.sources));
+    for (const point of article.glance) {
+      assert.ok(point.label && point.value && point.detail);
+      assert.ok(point.sources.length, `${article.id}: quick advice needs sources`);
+      for (const id of point.sources) assert.ok(sectionSources.has(id), `${article.id}: quick advice must cite the detailed guidance`);
+    }
     for (const section of article.sections) {
       assert.ok(section.paragraphs.length);
       assert.ok(section.sources.length, `${article.id}: ${section.title} needs sources`);

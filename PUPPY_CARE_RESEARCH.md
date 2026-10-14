@@ -25,6 +25,12 @@ Primary websites and indexed source extracts were researched. Several Blue Cross
 
 YouTube's official oEmbed endpoint returned HTTP 200 for all four selected videos and confirmed each title and creator. The selection was checked using public descriptions and metadata; the complete videos were not watched end to end. Video titles are preserved as published. Review the whole video before expanding its techniques into written guidance.
 
+## Visual overviews
+
+The at-a-glance summaries draw from the same written guidance as the full articles. Their source IDs are recorded with each point and tested against the article’s bibliography. Important age ranges, individual variation, and urgent veterinary actions stay visible in the summaries.
+
+The 12 decorative puppy illustrations were created with built-in ImageGen. Optimized JPEGs are bundled in `assets/puppy-care` for offline use; `assets/puppy-care/prompts.json` records the final prompt set and filenames. Images contain no care instructions or text: guidance remains selectable, accessible text.
+
 ## Maintenance
 
 Edit the shared content rather than separate app and web copies. When substantive guidance changes, recheck the affected primary sources and update the checked date. Keep section citations and related article IDs valid (npm test checks these). Prefer current dedicated guidance over older broad checklists. New sources should add a distinct perspective or support a practical claim. Never imply veterinary review or organisational endorsement unless that has actually happened. No automatic update schedule is configured.
