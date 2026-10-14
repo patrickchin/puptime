@@ -1,7 +1,7 @@
 {
   "configVersion": 0,
   "apple": {
-    "version": "1.11.26",
+    "version": "1.11.28",
     "copyright": "2026 Patrick Chin",
     "release": {
       "automaticRelease": true
@@ -29,7 +29,7 @@
         "title": "Puptime: Puppy Tracker",
         "subtitle": "Potty, meals, walks & naps",
         "privacyPolicyUrl": "https://github.com/patrickchin/puptime/blob/main/PRIVACY.md",
-        "releaseNotes": "• Add customizable potty reminders after pee and meal logs.\n• Home Screen widget buttons now fill the available height on iPhone and iPad and match the selected theme.\n• Import an activity CSV backup to recover missing entries without replacing your current edits.\n• Saved and imported estimated entries stay marked as Estimated in Log, Timeline, and CSV backups, with separate counts in Insights.\n• Save failures are reported, and a failed save no longer blocks later saves."
+        "releaseNotes": "• Explore 13 illustrated puppy care guides, with quick facts, detailed advice, sources, and selected training videos.\n• Find practical advice on meals, potty breaks, sleep, training, and preparing your home.\n• Keep navigation readable at large text sizes."
       }
     },
     "categories": [
