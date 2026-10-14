@@ -50,7 +50,7 @@ export function BottomNav({ tab, onChange, theme }: { tab: Tab; onChange: (tab: 
                 color={selected ? theme.primary : theme.textMuted}
               />
             </View>
-            <Text style={[styles.label, { color: selected ? theme.primary : theme.textMuted }]}>{label}</Text>
+            <Text numberOfLines={1} maxFontSizeMultiplier={1.3} adjustsFontSizeToFit minimumFontScale={0.85} style={[styles.label, { color: selected ? theme.primary : theme.textMuted }]}>{label}</Text>
           </Pressable>
         );
       })}
