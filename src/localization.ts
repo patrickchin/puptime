@@ -6,6 +6,19 @@ export type LanguagePreference = 'system' | AppLanguage;
 export const languageChoices: readonly LanguagePreference[] = ['system', 'en', 'zh-Hans', 'es'];
 
 const english = {
+  "learn.audioTitle": "Listen to this guide",
+  "learn.audioCredit": "English · ElevenLabs narration",
+  "learn.audioPlay": "Play",
+  "learn.audioPause": "Pause",
+  "learn.audioRetry": "Try again",
+  "learn.audioLoading": "Loading audio…",
+  "learn.audioBack": "Back 15 seconds",
+  "learn.audioForward": "Forward 15 seconds",
+  "learn.audioProgress": "Guide playback progress",
+  "learn.audioSpeed": "Speed",
+  "learn.audioSpeedValue": "Playback speed: {rate} times",
+  "learn.audioError": "Could not load the recording. Check your connection and try again.",
+
   "nav.learn": "Learn",
   "learn.eyebrow": "LEARN",
   "learn.title": "Puppy care",
@@ -465,6 +478,19 @@ export type MessageKey = keyof typeof english;
 type Dictionary = Record<MessageKey, string>;
 
 const simplifiedChinese: Dictionary = {
+  "learn.audioTitle": "收听本篇指南",
+  "learn.audioCredit": "英语 · ElevenLabs 旁白",
+  "learn.audioPlay": "播放",
+  "learn.audioPause": "暂停",
+  "learn.audioRetry": "重试",
+  "learn.audioLoading": "正在加载音频…",
+  "learn.audioBack": "后退 15 秒",
+  "learn.audioForward": "前进 15 秒",
+  "learn.audioProgress": "指南播放进度",
+  "learn.audioSpeed": "速度",
+  "learn.audioSpeedValue": "播放速度：{rate} 倍",
+  "learn.audioError": "无法加载录音。请检查网络连接后重试。",
+
   "nav.learn": "学习",
   "learn.eyebrow": "学习",
   "learn.title": "幼犬照护",
@@ -921,6 +947,19 @@ const simplifiedChinese: Dictionary = {
 };
 
 const spanish: Dictionary = {
+  "learn.audioTitle": "Escuchar esta guía",
+  "learn.audioCredit": "Inglés · Narración de ElevenLabs",
+  "learn.audioPlay": "Reproducir",
+  "learn.audioPause": "Pausar",
+  "learn.audioRetry": "Reintentar",
+  "learn.audioLoading": "Cargando audio…",
+  "learn.audioBack": "Retroceder 15 segundos",
+  "learn.audioForward": "Avanzar 15 segundos",
+  "learn.audioProgress": "Progreso de reproducción de la guía",
+  "learn.audioSpeed": "Velocidad",
+  "learn.audioSpeedValue": "Velocidad de reproducción: {rate} veces",
+  "learn.audioError": "No se pudo cargar la grabación. Revisa tu conexión y vuelve a intentarlo.",
+
   "nav.learn": "Aprender",
   "learn.eyebrow": "APRENDER",
   "learn.title": "Cuidados del cachorro",

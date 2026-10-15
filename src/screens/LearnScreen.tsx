@@ -3,6 +3,7 @@ import { type ComponentProps, type ComponentType, useEffect, useRef, useState } 
 import { Alert, BackHandler, Image, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 
 import { useLocalization } from '../localization-context';
+import { GuideListener } from '../components/GuideListener';
 import { careArticles, careReviewedOn, careSources, findCareArticles, type CareArticle } from '../puppy-care';
 import { lightTheme, type Theme } from '../theme';
 
@@ -149,6 +150,7 @@ export function LearnScreen({ theme, articleId, onArticleChange }: {
         </View>
         {article && <Text style={[styles.intro, { color: theme.textMuted }]}>{article.summary}</Text>}
         {language !== 'en' && <Text style={[styles.meta, { color: theme.textMuted }]}>{t('learn.english')}</Text>}
+        {article && <GuideListener key={article.id} article={article} theme={theme} />}
 
         {article ? (
           <>
