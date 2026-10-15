@@ -1,4 +1,5 @@
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { Asset } from 'expo-asset';
 import { useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -10,8 +11,9 @@ import type { Theme } from '../theme';
 
 function RecordingPlayer({ article, recording, theme }: { article: CareArticle; recording: GuideRecording; theme: Theme }) {
   const { t } = useLocalization();
-  const player = useAudioPlayer(recording.source, { updateInterval: 500 });
+  const player = useAudioPlayer(Platform.OS === 'web' ? null : recording.source, { updateInterval: 500 });
   const status = useAudioPlayerStatus(player);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [failed, setFailed] = useState(false);
   const [rate, setRate] = useState(1);
   const [volume, setVolume] = useState(1);
@@ -24,6 +26,35 @@ function RecordingPlayer({ article, recording, theme }: { article: CareArticle; 
   const loading = !error && (!status.isLoaded || status.isBuffering);
   const title = `${article.shortTitle}${recording.attribution ? ' · elevenlabs.io' : ''}`;
   const narrator = recording.voice.split(' - ')[0];
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const controller = new AbortController();
+    let objectUrl: string | undefined;
+    // Pages returns full responses to range requests. A complete local blob keeps seeking reliable.
+    void (async () => {
+      try {
+        const response = await fetch(Asset.fromModule(recording.source).uri, { signal: controller.signal });
+        if (!response.ok) throw new Error(`Audio request failed: ${response.status}`);
+        const blob = await response.blob();
+        if (controller.signal.aborted) return;
+        objectUrl = URL.createObjectURL(blob);
+        player.replace({ uri: objectUrl });
+      } catch {
+        if (!controller.signal.aborted) setFailed(true);
+      }
+    })();
+    return () => {
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [player, recording.source, loadAttempt]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !status.isLoaded) return;
+    player.volume = volume;
+    player.muted = muted;
+  }, [player, status.isLoaded, volume, muted]);
 
   useEffect(() => {
     if (error) player.pause();
@@ -43,7 +74,8 @@ function RecordingPlayer({ article, recording, theme }: { article: CareArticle; 
     try {
       if (error) {
         setFailed(false);
-        player.replace(recording.source);
+        player.replace(Platform.OS === 'web' ? null : recording.source);
+        if (Platform.OS === 'web') setLoadAttempt((attempt) => attempt + 1);
         if (volume !== 1) player.volume = volume;
         player.muted = muted;
         player.setPlaybackRate(1);
