@@ -1,6 +1,6 @@
 import manifest from '../assets/puppy-care/audio/manifest.json';
 
-export type GuideRecording = { source: number; script: string; duration: number; voice: string; model: string; attribution: boolean };
+export type GuideRecording = { source: number; script: string; sourceText: string; duration: number; voice: string; model: string; attribution: boolean };
 
 // Static asset references make the recordings available offline in native builds.
 export const guideRecordings: Record<string, GuideRecording> = {

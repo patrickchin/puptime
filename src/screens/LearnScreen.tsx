@@ -129,7 +129,7 @@ export function LearnScreen({ theme, articleId, onArticleChange }: {
   const videos = Object.keys(careSources).filter((id) => careSources[id].kind === 'video');
   const title = article?.shortTitle ?? (invalidArticle ? t('learn.notFound') : t('learn.title'));
 
-  return (
+  const content = (
     <ScrollView ref={scroll} key={selectedId ?? 'library'} testID="screen.learn" style={{ backgroundColor: theme.background }} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
       <View style={[styles.content, article && styles.articleContent]}>
         {selectedId !== null && (
@@ -150,7 +150,7 @@ export function LearnScreen({ theme, articleId, onArticleChange }: {
         </View>
         {article && <Text style={[styles.intro, { color: theme.textMuted }]}>{article.summary}</Text>}
         {language !== 'en' && <Text style={[styles.meta, { color: theme.textMuted }]}>{t('learn.english')}</Text>}
-        {article && <GuideListener key={article.id} article={article} theme={theme} />}
+        {article && Platform.OS !== 'web' && <GuideListener key={article.id} article={article} theme={theme} />}
 
         {article ? (
           <>
@@ -230,6 +230,9 @@ export function LearnScreen({ theme, articleId, onArticleChange }: {
       </View>
     </ScrollView>
   );
+  return Platform.OS === 'web'
+    ? <View style={{ flex: 1, minHeight: 0 }}>{content}{article && <GuideListener key={article.id} article={article} theme={theme} />}</View>
+    : content;
 }
 
 const styles = StyleSheet.create({

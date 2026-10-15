@@ -1,6 +1,6 @@
 import type { CareArticle } from './puppy-care.ts';
 
-export function guideNarration(article: CareArticle): string {
+export function guideSourceText(article: CareArticle): string {
   return [
     article.title, article.summary,
     ...article.sections.flatMap((section) => [section.title, ...section.paragraphs]),

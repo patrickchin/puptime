@@ -33,7 +33,7 @@ The 12 decorative puppy illustrations were created with built-in ImageGen. Optim
 
 ## Narration
 
-All 13 original guide summaries have bundled English ElevenLabs recordings. The spoken scripts include every section and a source note; linked reading and videos remain in the written guides. Audio is generated once and plays without an API request. See [narration provenance and noncommercial attribution requirements](assets/puppy-care/audio/README.md).
+All 13 original guide summaries have bundled English ElevenLabs recordings. Separate spoken scripts use a conversational, podcast-like style while preserving the care guidance and caveats. Linked reading and videos remain in the written guides. Audio is generated once and plays without an API request. See [narration provenance and noncommercial attribution requirements](assets/puppy-care/audio/README.md).
 
 ## Maintenance
 

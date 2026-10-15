@@ -7,7 +7,7 @@ export const languageChoices: readonly LanguagePreference[] = ['system', 'en', '
 
 const english = {
   "learn.audioTitle": "Listen to this guide",
-  "learn.audioCredit": "English · ElevenLabs narration",
+  "learn.audioCredit": "English · {voice} · ElevenLabs",
   "learn.audioPlay": "Play",
   "learn.audioPause": "Pause",
   "learn.audioRetry": "Try again",
@@ -16,6 +16,9 @@ const english = {
   "learn.audioForward": "Forward 15 seconds",
   "learn.audioProgress": "Guide playback progress",
   "learn.audioSpeed": "Speed",
+  "learn.audioMute": "Mute",
+  "learn.audioUnmute": "Unmute",
+  "learn.audioVolume": "Volume",
   "learn.audioSpeedValue": "Playback speed: {rate} times",
   "learn.audioError": "Could not load the recording. Check your connection and try again.",
 
@@ -479,7 +482,7 @@ type Dictionary = Record<MessageKey, string>;
 
 const simplifiedChinese: Dictionary = {
   "learn.audioTitle": "收听本篇指南",
-  "learn.audioCredit": "英语 · ElevenLabs 旁白",
+  "learn.audioCredit": "英语 · {voice} · ElevenLabs",
   "learn.audioPlay": "播放",
   "learn.audioPause": "暂停",
   "learn.audioRetry": "重试",
@@ -488,6 +491,9 @@ const simplifiedChinese: Dictionary = {
   "learn.audioForward": "前进 15 秒",
   "learn.audioProgress": "指南播放进度",
   "learn.audioSpeed": "速度",
+  "learn.audioMute": "静音",
+  "learn.audioUnmute": "取消静音",
+  "learn.audioVolume": "音量",
   "learn.audioSpeedValue": "播放速度：{rate} 倍",
   "learn.audioError": "无法加载录音。请检查网络连接后重试。",
 
@@ -948,7 +954,7 @@ const simplifiedChinese: Dictionary = {
 
 const spanish: Dictionary = {
   "learn.audioTitle": "Escuchar esta guía",
-  "learn.audioCredit": "Inglés · Narración de ElevenLabs",
+  "learn.audioCredit": "Inglés · {voice} · ElevenLabs",
   "learn.audioPlay": "Reproducir",
   "learn.audioPause": "Pausar",
   "learn.audioRetry": "Reintentar",
@@ -957,6 +963,9 @@ const spanish: Dictionary = {
   "learn.audioForward": "Avanzar 15 segundos",
   "learn.audioProgress": "Progreso de reproducción de la guía",
   "learn.audioSpeed": "Velocidad",
+  "learn.audioMute": "Silenciar",
+  "learn.audioUnmute": "Activar sonido",
+  "learn.audioVolume": "Volumen",
   "learn.audioSpeedValue": "Velocidad de reproducción: {rate} veces",
   "learn.audioError": "No se pudo cargar la grabación. Revisa tu conexión y vuelve a intentarlo.",
 
