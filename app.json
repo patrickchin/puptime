@@ -2,7 +2,7 @@
   "expo": {
     "name": "Puptime",
     "slug": "puptime",
-    "version": "1.11.28",
+    "version": "1.11.29",
     "description": "Log puppy activities from the app or Home Screen.",
     "scheme": "puptime",
     "icon": "./assets/puptime-icon.png",
@@ -19,7 +19,7 @@
     },
     "android": {
       "package": "com.patrickchin.puptime",
-      "versionCode": 1011028,
+      "versionCode": 1011029,
       "blockedPermissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
@@ -93,7 +93,16 @@
       ],
       "expo-font",
       "./plugins/withAndroidWorkManager",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow Puptime to use the microphone when you dictate a log note.",
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": true,
+          "enableBackgroundRecording": false
+        }
+      ]
     ],
     "owner": "patchin",
     "extra": {

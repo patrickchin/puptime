@@ -31,6 +31,10 @@ The at-a-glance summaries draw from the same written guidance as the full articl
 
 The 12 decorative puppy illustrations were created with built-in ImageGen. Optimized JPEGs are bundled in `assets/puppy-care` for offline use; `assets/puppy-care/prompts.json` records the final prompt set and filenames. Images contain no care instructions or text: guidance remains selectable, accessible text.
 
+## Narration
+
+All 13 original guide summaries have bundled English ElevenLabs recordings. Separate spoken scripts use a conversational, podcast-like style while preserving the care guidance and caveats. Linked reading and videos remain in the written guides. Audio is generated once and plays without an API request. See [narration provenance and noncommercial attribution requirements](assets/puppy-care/audio/README.md).
+
 ## Maintenance
 
 Edit the shared content rather than separate app and web copies. When substantive guidance changes, recheck the affected primary sources and update the checked date. Keep section citations and related article IDs valid (npm test checks these). Prefer current dedicated guidance over older broad checklists. New sources should add a distinct perspective or support a practical claim. Never imply veterinary review or organisational endorsement unless that has actually happened. No automatic update schedule is configured.
