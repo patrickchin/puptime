@@ -22,19 +22,6 @@ import {
   type ThemePreference,
 } from '../theme';
 
-const themeLabels: Record<Exclude<ThemePreference, 'system'>, string> = {
-  meadow: 'Meadow',
-  sunrise: 'Sunrise',
-  midnight: 'Midnight',
-  paper: 'Paper',
-  bubblegum: 'Bubblegum',
-  blueprint: 'Blueprint',
-  trail: 'Trail',
-  tide: 'Tide',
-  plum: 'Plum',
-  contrast: 'Contrast',
-};
-
 const languageLabels: Record<Exclude<LanguagePreference, 'system'>, string> = {
   en: 'English',
   'zh-Hans': '简体中文',
@@ -80,7 +67,7 @@ export function SettingsScreen({
   const [savingWidget, setSavingWidget] = useState(false);
   const [savingNotifications, setSavingNotifications] = useState(false);
 
-  const themeLabel = themePreference === 'system' ? t('language.system') : themeLabels[themePreference];
+  const themeLabel = t(`theme.${themePreference}.name`);
   const languageLabel = languagePreference === 'system' ? t('language.system') : languageLabels[languagePreference];
   const permissionDetail = t(
     notificationPermission === 'granted'
@@ -213,6 +200,7 @@ export function SettingsScreen({
               fontSize: theme.presentation.titleSize,
               lineHeight: theme.presentation.titleLineHeight,
               fontWeight: theme.presentation.titleWeight,
+              fontFamily: theme.presentation.headingFont,
               letterSpacing: theme.presentation.titleTracking,
             },
           ]}

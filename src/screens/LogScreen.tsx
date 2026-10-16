@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, FlatList, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Image, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { QuickActions } from '../components/QuickActions';
 import { ActivityIcon } from '../components/ActivityIcon';
@@ -21,7 +21,7 @@ import {
 } from '../domain';
 import { useLocalization } from '../localization-context';
 import { groupLogHistory } from '../log-history';
-import { spacing, surfaceTreatment, type Theme } from '../theme';
+import { headingStyle, spacing, surfaceTreatment, type Theme } from '../theme';
 
 const timeAdjustments = [-60, -15, 15, 60] as const;
 const editableEventTypes = eventTypes.filter((type) => type !== 'nap');
@@ -148,6 +148,7 @@ export function LogScreen({
   }, []);
 
   const startEditing = useCallback((event: PuppyEvent, shouldFocusNote = false) => {
+
     clearSaveTimer();
     sessionRef.current += 1;
     revisionRef.current = 0;
@@ -364,6 +365,8 @@ export function LogScreen({
     }
   };
 
+  const playful = theme.presentation.iconProfile !== 'default';
+
   return (
     <>
       <FlatList
@@ -397,11 +400,12 @@ export function LogScreen({
                       fontSize: theme.presentation.titleSize,
                       lineHeight: theme.presentation.titleLineHeight,
                       fontWeight: theme.presentation.titleWeight,
+                      fontFamily: theme.presentation.headingFont,
                       letterSpacing: theme.presentation.titleTracking,
                     },
                   ]}
                 >
-                  {t('nav.log')}
+                  {playful ? 'Puptime' : t('nav.log')}
                 </Text>
               </View>
               <View style={styles.headerActions}>
@@ -430,14 +434,20 @@ export function LogScreen({
                 </Pressable>
               </View>
             </View>
+            {playful ? (
+              <View style={styles.greetingRow}>
+                <Text style={[styles.greeting, headingStyle(theme), { color: theme.text }]}>{t(`theme.${theme.presentation.iconProfile as 'puppy-journal' | 'soft-play' | 'day-trails'}.greeting`)}</Text>
+                <Image source={require('../../assets/puppy-journal.png')} accessible={false} style={styles.puppy} resizeMode="contain" />
+              </View>
+            ) : null}
             <QuickActions events={events} onLog={onLog} now={now} theme={theme} />
             <View style={styles.activityHeading}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('log.activity')}</Text>
+              <Text style={[styles.sectionTitle, playful && headingStyle(theme), { color: theme.text }]}>{t('log.activity')}</Text>
             </View>
           </>
         }
         renderItem={({ item: section }) => (
-          <View style={[styles.dayCard, surfaceTreatment(theme), { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
+          <View style={[styles.dayCard, !playful && surfaceTreatment(theme), { backgroundColor: playful ? 'transparent' : theme.surfaceRaised, borderColor: theme.border }]}>
             <Pressable
               testID={`history.day.${section.key === todayKey ? 'today' : section.key === yesterdayKey ? 'yesterday' : section.key}`}
               accessibilityRole="button"
@@ -452,7 +462,7 @@ export function LogScreen({
                 {
                   backgroundColor: pressed ? theme.primarySoft : 'transparent',
                   borderBottomColor: theme.border,
-                  borderBottomWidth: section.expanded ? StyleSheet.hairlineWidth : 0,
+                  borderBottomWidth: section.expanded && !playful ? StyleSheet.hairlineWidth : 0,
                   borderRadius: section.expanded ? 0 : theme.presentation.cardRadius,
                   borderTopLeftRadius: theme.presentation.cardRadius,
                   borderTopRightRadius: theme.presentation.cardRadius,
@@ -537,6 +547,7 @@ export function LogScreen({
                     {
                       color: theme.text,
                       fontWeight: theme.presentation.titleWeight,
+                      fontFamily: theme.presentation.headingFont,
                       letterSpacing: theme.presentation.titleTracking,
                     },
                   ]}
@@ -856,6 +867,9 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: spacing.xl,
   },
+  greetingRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
+  greeting: { flex: 1, fontSize: 27, lineHeight: 34 },
+  puppy: { width: 84, height: 68 },
   titleBlock: {
     flexDirection: 'row',
     alignItems: 'center',

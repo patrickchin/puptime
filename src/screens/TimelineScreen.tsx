@@ -29,10 +29,11 @@ import {
   type TimelineMark,
 } from '../analytics';
 import { activityFromKey, activityKey, customActivityKey, dateKey, formatDuration, isOpenNap, quickEventTypes, type Activity, type ActivityKey, type PuppyEvent } from '../domain';
+import { DayTimeline } from '../components/DayTimeline';
 import { ActivityIcon } from '../components/ActivityIcon';
 import { useLocalization } from '../localization-context';
 import { translate, type AppLanguage } from '../localization';
-import { spacing, type Theme } from '../theme';
+import { headingStyle, spacing, type Theme } from '../theme';
 import { timelineDetailTime, timelineFormatters } from '../timeline-format';
 
 const INITIAL_DAYS = 14;
@@ -145,7 +146,7 @@ function TimelineDateLabel({
         styles.dateCell,
         {
           backgroundColor: isToday ? theme.primarySoft : theme.background,
-          borderColor: theme.border,
+          borderColor: theme.presentation.iconProfile === 'default' ? theme.border : 'transparent',
           height: rowHeight,
           transform: [{ translateX: horizontalOffset }],
         },
@@ -185,6 +186,7 @@ function TimelineTrack({
   theme: Theme;
 }) {
   const { activityColors, activityLabel, language, t } = useLocalization();
+  const playful = theme.presentation.iconProfile !== 'default';
   const marks = day.marks.filter((mark) => selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label })));
   const recordedMarks = marks.filter((mark) => !mark.estimated);
   const interactiveMarks = marks.filter((mark) => !mark.estimated || savedEstimateIds.has(mark.id));
@@ -198,16 +200,19 @@ function TimelineTrack({
       style={[
         styles.timelineTrack,
         {
-          height: rowHeight,
+          height: rowHeight - (playful ? 8 : 0),
+          marginVertical: playful ? 4 : 0,
+          borderBottomWidth: playful ? 0 : StyleSheet.hairlineWidth,
+          borderRadius: playful ? 18 : 0,
           backgroundColor: isToday ? theme.primarySoft : theme.surface,
           borderBottomColor: theme.border,
         },
       ]}
     >
-      {gridHours.map((hour) => (
+      {gridHours.filter((hour) => !playful || hour % 6 === 0).map((hour) => (
         <View key={hour} pointerEvents="none" style={[styles.gridLine, {
           backgroundColor: hour % 3 === 0 ? theme.textMuted : theme.border,
-          opacity: hour % 3 === 0 ? 0.4 : 1,
+          opacity: playful ? 0.18 : hour % 3 === 0 ? 0.4 : 1,
           left: `${(hour / 24) * 100}%`,
         }]} />
       ))}
@@ -219,6 +224,7 @@ function TimelineTrack({
             pointerEvents="none"
             style={[
               styles.durationMark,
+              playful && { top: (rowHeight - 8) / 2 - 9, bottom: (rowHeight - 8) / 2 - 9 },
               {
                 backgroundColor: color,
                 left: `${(mark.startBucket / TIMELINE_BUCKETS) * 100}%`,
@@ -236,7 +242,8 @@ function TimelineTrack({
           accessibilityLabel={`${describeMark(mark, language, activityLabel, savedEstimateIds.has(mark.id))}. ${t('timeline.viewDetails')}`}
           hitSlop={{ top: 3, bottom: 3 }}
           onPress={() => onSelectMarks([mark.id])}
-          style={({ pressed }) => [styles.durationMark, {
+          style={({ pressed }) => [styles.durationMark,
+            playful && { top: 0, bottom: 0 }, {
             left: `${(mark.startBucket / TIMELINE_BUCKETS) * 100}%`,
             width: `${((mark.endBucket! - mark.startBucket) / TIMELINE_BUCKETS) * 100}%`,
             backgroundColor: pressed ? theme.surface : 'transparent',
@@ -274,7 +281,11 @@ function TimelineTrack({
               },
             ]}
           >
-            {colors.length ? <View pointerEvents="none" style={[styles.pointMark, { left: center - left - markWidth / 2, backgroundColor: colors[0], height: rowHeight - 6, width: markWidth }]}>
+            {playful && pointMarks.length === 1 && colors.length === 1 && center >= 9 && center <= trackWidth - 9 ? (
+              <View pointerEvents="none" style={{ position: 'absolute', left: center - left - 9, top: (rowHeight - 26) * (pointMarks[0].type === 'pee' ? 0.05 : pointMarks[0].type === 'meal' ? 0.95 : 0.5), width: 18, alignItems: 'center' }}>
+                <ActivityIcon activity={{ type: pointMarks[0].type, customLabel: pointMarks[0].label }} theme={theme} size={18} color={colors[0]} />
+              </View>
+            ) : colors.length ? <View pointerEvents="none" style={[styles.pointMark, { left: center - left - markWidth / 2, backgroundColor: colors[0], top: playful ? (rowHeight - 8) / 2 - 10 : 3, height: playful ? 20 : rowHeight - 6, width: markWidth }]}>
               {colors.length > 1 ? colors.map((color, index) => {
                 const continuesHorizontally = index < durationCount;
                 return (
@@ -356,11 +367,12 @@ function TimelineAxis({
   horizontalOffset: Animated.Value;
   theme: Theme;
 }) {
-  const { t } = useLocalization();
+  const { language, t } = useLocalization();
   const { fontScale } = useWindowDimensions();
   const staggerLabels = trackWidth / 24 < 22 * Math.min(fontScale, 1.4);
-  const axisHeight = staggerLabels ? 42 : 30;
-  const labelWidth = trackWidth / 12;
+  const playful = theme.presentation.iconProfile !== 'default';
+  const axisHeight = !playful && staggerLabels ? 42 : 30;
+  const labelWidth = playful ? 48 : trackWidth / 12;
   return (
     <View style={[styles.axisRow, { height: axisHeight, backgroundColor: theme.background, borderColor: theme.border }]}>
       <Animated.View
@@ -381,7 +393,7 @@ function TimelineAxis({
         importantForAccessibility="no-hide-descendants"
         style={[styles.axisTrack, { height: axisHeight, width: trackWidth }]}
       >
-        {AXIS_HOURS.map((hour) => (
+        {AXIS_HOURS.filter((hour) => theme.presentation.iconProfile === 'default' || hour % (trackWidth > 800 ? 3 : 6) === 0).map((hour) => (
           <Text
             key={hour}
             maxFontSizeMultiplier={1.4}
@@ -392,13 +404,13 @@ function TimelineAxis({
                 : hour === 24
                   ? styles.axisEnd
                   : { left: `${(hour / 24) * 100}%`, marginLeft: -labelWidth / 2, textAlign: 'center' },
-              { color: theme.textMuted, width: labelWidth, top: staggerLabels && hour % 2 ? 20 : 4 },
+              { color: theme.textMuted, width: labelWidth, top: theme.presentation.iconProfile === 'default' && staggerLabels && hour % 2 ? 20 : 4 },
             ]}
           >
-            {hour}
+            {playful ? timelineFormatters(language).hour.format(new Date(2000, 0, 1, hour)) : hour}
           </Text>
         ))}
-        {GRID_HOURS.map((hour) => (
+        {GRID_HOURS.filter((hour) => !playful || hour % 6 === 0).map((hour) => (
           <View key={hour} style={[styles.axisTick, { left: `${(hour / 24) * 100}%`, backgroundColor: theme.textMuted }]} />
         ))}
       </View>
@@ -410,7 +422,35 @@ const MemoTimelineDateLabel = memo(TimelineDateLabel);
 const MemoTimelineTrack = memo(TimelineTrack);
 const MemoTimelineAxis = memo(TimelineAxis);
 
-export function TimelineScreen({ events, customActivities, theme }: { events: PuppyEvent[]; customActivities: string[]; theme: Theme }) {
+export function TimelineScreen(props: { events: PuppyEvent[]; customActivities: string[]; theme: Theme }) {
+  if (props.theme.presentation.iconProfile === 'default') return <ComparisonTimelineScreen {...props} />;
+  return <PlayfulTimelineScreen {...props} />;
+}
+
+function PlayfulTimelineScreen(props: { events: PuppyEvent[]; customActivities: string[]; theme: Theme }) {
+  const { t } = useLocalization();
+  const { theme } = props;
+  const [mode, setMode] = useState<'day' | 'compare'>(() => theme.presentation.iconProfile === 'soft-play' ? 'compare' : 'day');
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={styles.modeRow}>
+        {(['day', 'compare'] as const).map((value) => (
+          <Pressable key={value} testID={`timeline.mode.${value}`} accessibilityRole="tab" accessibilityState={{ selected: mode === value }} onPress={() => setMode(value)} style={({ pressed }) => [styles.modeButton, { backgroundColor: mode === value ? theme.primary : theme.surfaceRaised, borderRadius: theme.presentation.controlRadius, opacity: pressed ? 0.7 : 1 }]}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: mode === value ? theme.onPrimary : theme.textMuted }}>{t(`timeline.${value}`)}</Text>
+          </Pressable>
+        ))}
+      </View>
+      {mode === 'day' ? (
+        <View testID="screen.timeline" style={{ flex: 1 }}>
+          <Text style={[styles.dayViewTitle, headingStyle(theme), { color: theme.text }]}>{t('timeline.title')}</Text>
+          <DayTimeline events={props.events} theme={theme} />
+        </View>
+      ) : <ComparisonTimelineScreen {...props} />}
+    </View>
+  );
+}
+
+function ComparisonTimelineScreen({ events, customActivities, theme }: { events: PuppyEvent[]; customActivities: string[]; theme: Theme }) {
   const { activityColors, activityLabel, language, t } = useLocalization();
   const { fontScale, height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -426,7 +466,7 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
   const [nowTime, setNowTime] = useState(Date.now());
   const [selection, setSelection] = useState<string[]>([]);
   const [isLoadingEarlier, startLoadingEarlier] = useTransition();
-  const rowHeight = Math.round(52 * Math.min(fontScale, 1.5));
+  const rowHeight = Math.round((theme.presentation.iconProfile === 'default' ? 52 : 68) * Math.min(fontScale, 1.5));
   const viewportWidth = width - insets.left - insets.right;
   const baseTrackWidth = Math.max(1, viewportWidth - DATE_COLUMN_WIDTH);
   const trackWidth = baseTrackWidth * timeScale;
@@ -629,6 +669,7 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
                   fontSize: theme.presentation.titleSize,
                   lineHeight: theme.presentation.titleLineHeight,
                   fontWeight: theme.presentation.titleWeight,
+                  fontFamily: theme.presentation.headingFont,
                   letterSpacing: theme.presentation.titleTracking,
                 },
               ]}
@@ -962,6 +1003,9 @@ export function TimelineScreen({ events, customActivities, theme }: { events: Pu
 }
 
 const styles = StyleSheet.create({
+  modeRow: { flexDirection: 'row', paddingHorizontal: 16, paddingTop: 8, gap: 8 },
+  modeButton: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
+  dayViewTitle: { fontSize: 34, lineHeight: 44, marginHorizontal: 16, marginTop: 12 },
   screen: { flex: 1 },
   header: {
     paddingHorizontal: spacing.md,

@@ -1,8 +1,20 @@
 import type { AppLanguage } from './localization.ts';
-import { dateKey } from './domain.ts';
+import { dateKey, type PuppyEvent } from './domain.ts';
+
+export function timelineDayEvents(events: readonly PuppyEvent[], day: number, now: number): PuppyEvent[] {
+  const start = new Date(day);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  return events.filter((event) => event.at < end.getTime() && (
+    event.at >= start.getTime()
+    || (event.type === 'nap' && event.endedAt !== undefined && (event.endedAt ?? now) > start.getTime())
+  )).sort((a, b) => a.at - b.at);
+}
 
 function createTimelineFormatters(language: AppLanguage) {
   return {
+    hour: new Intl.DateTimeFormat(language, { hour: 'numeric' }),
     time: new Intl.DateTimeFormat(language, { hour: 'numeric', minute: '2-digit' }),
     fullDate: new Intl.DateTimeFormat(language, { weekday: 'long', month: 'long', day: 'numeric' }),
     weekday: new Intl.DateTimeFormat(language, { weekday: 'short' }),

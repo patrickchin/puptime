@@ -97,11 +97,11 @@ tags:
     id: settings.theme.open
 - scrollUntilVisible:
     element:
-      id: appearance.theme.midnight
+      id: appearance.theme.puppy-journal
     direction: DOWN
     visibilityPercentage: 50
 - tapOn:
-    id: appearance.theme.midnight
+    id: appearance.theme.puppy-journal
 - tapOn:
     id: settings.language.open
 - tapOn:
@@ -112,11 +112,11 @@ tags:
     id: settings.theme.open
 - scrollUntilVisible:
     element:
-      id: appearance.theme.midnight
+      id: appearance.theme.puppy-journal
     direction: DOWN
     visibilityPercentage: 50
 - assertVisible:
-    id: appearance.theme.midnight
+    id: appearance.theme.puppy-journal
     text: radio button, checked
 - tapOn:
     id: appearance.close
@@ -151,11 +151,11 @@ tags:
     id: settings.theme.open
 - scrollUntilVisible:
     element:
-      id: appearance.theme.midnight
+      id: appearance.theme.puppy-journal
     direction: DOWN
     visibilityPercentage: 50
 - assertVisible:
-    id: appearance.theme.midnight
+    id: appearance.theme.puppy-journal
     text: radio button, checked
 - tapOn:
     id: appearance.close

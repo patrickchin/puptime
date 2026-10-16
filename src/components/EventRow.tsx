@@ -29,6 +29,7 @@ export const EventRow = memo(function EventRow({
 }) {
   const { activityColors, eventPastLabel, t } = useLocalization();
   const colors = activityColors(theme, event);
+  const playful = theme.presentation.iconProfile !== 'default';
   const note = event.note?.trim();
   const timedNap = event.type === 'nap' && event.endedAt !== undefined;
   const running = isOpenNap(event);
@@ -42,13 +43,14 @@ export const EventRow = memo(function EventRow({
       testID={`event.${event.type}`}
       style={[
         styles.row,
-        { borderBottomColor: theme.border, borderBottomWidth: showDivider ? StyleSheet.hairlineWidth : 0 },
+        playful && { backgroundColor: colors.softColor, borderRadius: theme.presentation.cardRadius - 6, paddingHorizontal: 10, marginVertical: 5 },
+        { borderBottomColor: theme.border, borderBottomWidth: showDivider && !playful ? StyleSheet.hairlineWidth : 0 },
       ]}
     >
       <View
         style={[
           styles.iconCircle,
-          { backgroundColor: colors.softColor, borderRadius: theme.presentation.iconRadius },
+          { backgroundColor: playful ? theme.surfaceRaised : colors.softColor, borderRadius: theme.presentation.iconRadius },
         ]}
       >
         <ActivityIcon activity={event} theme={theme} color={colors.color} size={22} />
