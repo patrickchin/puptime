@@ -56,13 +56,13 @@ export const EventRow = memo(function EventRow({
         <ActivityIcon activity={event} theme={theme} color={colors.color} size={22} />
       </View>
       <View style={styles.copy}>
-        <Text testID={`event.${event.type}.label`} numberOfLines={1} style={[styles.label, { color: theme.text }]}>{pastLabel}</Text>
+        <Text testID={`event.${event.type}.label`} numberOfLines={playful ? undefined : 1} style={[styles.label, { color: theme.text }]}>{pastLabel}</Text>
         {event.estimated ? (
           <Text testID={`event.${event.type}.estimated`} style={[styles.estimated, { color: theme.text }]}>
             {t('eventRow.estimated')}
           </Text>
         ) : null}
-        <Text numberOfLines={1} style={[styles.source, { color: theme.textMuted }]}>{timeSummary}</Text>
+        <Text numberOfLines={playful ? undefined : 1} style={[styles.source, { color: theme.textMuted }]}>{timeSummary}</Text>
         {note ? (
           <View style={styles.noteRow}>
             <MaterialCommunityIcons name="note-text-outline" size={14} color={theme.primary} />

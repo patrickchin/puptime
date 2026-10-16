@@ -393,6 +393,8 @@ export function LogScreen({
               <View style={styles.titleCopy}>
                 <Text
                   numberOfLines={1}
+                  adjustsFontSizeToFit
+                  maxFontSizeMultiplier={playful ? 1.5 : undefined}
                   style={[
                     styles.title,
                     {
@@ -436,7 +438,7 @@ export function LogScreen({
             </View>
             {playful ? (
               <View style={styles.greetingRow}>
-                <Text style={[styles.greeting, headingStyle(theme), { color: theme.text }]}>{t(`theme.${theme.presentation.iconProfile as 'puppy-journal' | 'soft-play' | 'day-trails'}.greeting`)}</Text>
+                <Text maxFontSizeMultiplier={1.5} style={[styles.greeting, headingStyle(theme), { color: theme.text }]}>{t(`theme.${theme.presentation.iconProfile as 'puppy-journal' | 'soft-play' | 'day-trails'}.greeting`)}</Text>
                 <Image source={require('../../assets/puppy-journal.png')} accessible={false} style={styles.puppy} resizeMode="contain" />
               </View>
             ) : null}
