@@ -1,7 +1,9 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { Asset } from 'expo-asset';
 import { useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View, type GestureResponderEvent } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { audioSeek, audioTime, guideSourceText } from '../guide-audio';
 import { guideRecordings, type GuideRecording } from '../guide-recordings';
@@ -11,6 +13,7 @@ import type { Theme } from '../theme';
 
 function RecordingPlayer({ article, recording, theme }: { article: CareArticle; recording: GuideRecording; theme: Theme }) {
   const { t } = useLocalization();
+  const { width } = useWindowDimensions();
   const player = useAudioPlayer(Platform.OS === 'web' ? null : recording.source, { updateInterval: 500 });
   const status = useAudioPlayerStatus(player);
   const [loadAttempt, setLoadAttempt] = useState(0);
@@ -20,6 +23,8 @@ function RecordingPlayer({ article, recording, theme }: { article: CareArticle; 
   const [muted, setMuted] = useState(false);
   const previousVolume = useRef(1);
   const [scrub, setScrub] = useState<number | null>(null);
+  const [speedPickerOpen, setSpeedPickerOpen] = useState(false);
+  const seekWidth = useRef(1);
   const duration = status.duration || recording.duration;
   const mediaError = (status as typeof status & { error?: string }).error;
   const error = failed || !!mediaError;
@@ -93,6 +98,9 @@ function RecordingPlayer({ article, recording, theme }: { article: CareArticle; 
   };
   const label = error ? t('learn.audioRetry') : loading ? t('learn.audioLoading') : status.playing ? t('learn.audioPause') : t('learn.audioPlay');
   const disabled = loading || error;
+  const changeRate = (speed: number) => {
+    try { player.setPlaybackRate(speed); setRate(speed); } catch { setFailed(true); }
+  };
   if (Platform.OS === 'web') {
     const changeVolume = (value: number) => {
       if (value > 0) previousVolume.current = value;
@@ -121,7 +129,7 @@ function RecordingPlayer({ article, recording, theme }: { article: CareArticle; 
         }} onPointerUp={() => setScrub(null)} onPointerCancel={() => setScrub(null)} onKeyUp={() => setScrub(null)} onBlur={() => setScrub(null)} />
         <output className="puptime-listener-time" data-testid="learn.audio.time">{audioTime(scrub ?? status.currentTime)} / {audioTime(duration)}</output>
         <select className="puptime-listener-speed" data-testid="learn.audio.speed" aria-label={t('learn.audioSpeed')} value={rate} disabled={disabled} onChange={(event) => {
-          try { const speed = Number(event.currentTarget.value); player.setPlaybackRate(speed); setRate(speed); } catch { setFailed(true); }
+          changeRate(Number(event.currentTarget.value));
         }}>{[0.75, 1, 1.25, 1.5].map((speed) => <option key={speed} value={speed}>{speed}×</option>)}</select>
         <div className="puptime-listener-volume">
           <button aria-label={silent ? t('learn.audioUnmute') : t('learn.audioMute')} title={silent ? t('learn.audioUnmute') : t('learn.audioMute')} onClick={() => {
@@ -136,38 +144,71 @@ function RecordingPlayer({ article, recording, theme }: { article: CareArticle; 
       </div>
     </section>;
   }
-  return <View testID="learn.audio" style={[styles.panel, { borderColor: theme.border, backgroundColor: theme.surface, borderRadius: theme.presentation.controlRadius }]}>
-    <View style={styles.row}>
-      <Text accessibilityRole="header" aria-level={2} style={[styles.title, { color: theme.text }]}>{t('learn.audioTitle')}</Text>
-      <Text style={[styles.meta, { color: theme.textMuted }]}>{t('learn.audioCredit', { voice: narrator })}</Text>
-    </View>
-    {recording.attribution && <Text style={[styles.meta, { color: theme.textMuted }]}>{title}</Text>}
-    <View style={styles.row}>
-      <Pressable testID="learn.audio.play" accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: loading }} disabled={loading} onPress={() => void play()}
-        style={({ pressed }) => [styles.button, { backgroundColor: theme.primary, borderColor: theme.primary, borderRadius: theme.presentation.controlRadius, opacity: loading || pressed ? 0.65 : 1 }]}>
-        <Text style={[styles.buttonText, { color: theme.onPrimary }]}>{status.playing ? 'Ⅱ' : '▶'} {label}</Text>
-      </Pressable>
-      <Pressable testID="learn.audio.back" accessibilityRole="button" accessibilityLabel={t('learn.audioBack')} accessibilityState={{ disabled }} disabled={disabled} onPress={() => void seek(-15)} style={({ pressed }) => [styles.button, { borderColor: theme.border, borderRadius: theme.presentation.controlRadius, opacity: disabled ? 0.4 : pressed ? 0.65 : 1 }]}>
-        <Text style={[styles.buttonText, { color: theme.primary }]}>−15 s</Text>
-      </Pressable>
-      <Pressable testID="learn.audio.forward" accessibilityRole="button" accessibilityLabel={t('learn.audioForward')} accessibilityState={{ disabled }} disabled={disabled} onPress={() => void seek(15)} style={({ pressed }) => [styles.button, { borderColor: theme.border, borderRadius: theme.presentation.controlRadius, opacity: disabled ? 0.4 : pressed ? 0.65 : 1 }]}>
-        <Text style={[styles.buttonText, { color: theme.primary }]}>+15 s</Text>
-      </Pressable>
-      <Text testID="learn.audio.time" style={[styles.meta, { color: theme.textMuted }]}>{audioTime(status.currentTime)} / {audioTime(duration)}</Text>
-    </View>
-    <View accessibilityRole="progressbar" accessibilityLabel={t('learn.audioProgress')} aria-valuemin={0} aria-valuemax={duration} aria-valuenow={Math.min(status.currentTime, duration)} aria-valuetext={`${audioTime(status.currentTime)} / ${audioTime(duration)}`} style={[styles.track, { backgroundColor: theme.border }]}>
-      <View style={[styles.progress, { backgroundColor: theme.primary, width: `${duration ? Math.min(100, status.currentTime / duration * 100) : 0}%` }]} />
-    </View>
-    <View style={styles.row}>
-      <Text style={[styles.meta, { color: theme.textMuted }]}>{t('learn.audioSpeed')}</Text>
-      {[0.75, 1, 1.25, 1.5].map((speed) => <Pressable key={speed} testID={`learn.audio.speed.${speed}`} accessibilityRole="button" accessibilityLabel={t('learn.audioSpeedValue', { rate: speed })} accessibilityState={{ selected: rate === speed }} aria-pressed={rate === speed} onPress={() => {
-        try { player.setPlaybackRate(speed); setRate(speed); } catch { setFailed(true); }
-      }} style={({ pressed }) => [styles.speed, { borderColor: rate === speed ? theme.primary : theme.border, backgroundColor: rate === speed ? theme.primarySoft : theme.surface, opacity: pressed ? 0.65 : 1 }]}>
-        <Text style={[styles.buttonText, { color: rate === speed ? theme.primary : theme.text }]}>{speed}×</Text>
-      </Pressable>)}
-    </View>
+  const currentTime = scrub ?? status.currentTime;
+  const progress = `${duration ? Math.min(100, currentTime / duration * 100) : 0}%` as const;
+  const scrubPosition = (event: GestureResponderEvent) => audioSeek((event.nativeEvent.locationX - 8) / Math.max(1, seekWidth.current - 16) * duration, 0, duration);
+  const wide = width >= 700;
+  const copy = (<View style={[styles.copy, wide && styles.copyWide]}>
+        <Text numberOfLines={wide ? 2 : undefined} style={[styles.title, { color: theme.text }]}>{title}</Text>
+        <Text numberOfLines={wide ? 1 : undefined} style={[styles.meta, { color: theme.textMuted }]}>{loading ? t('learn.audioLoading') : t('learn.audioCredit', { voice: narrator })}</Text>
+      </View>);
+  const playControl = (<Pressable testID="learn.audio.play" accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: loading }} disabled={loading} onPress={() => void play()}
+        style={({ pressed }) => [styles.control, styles.play, { backgroundColor: theme.primary, opacity: loading || pressed ? 0.65 : 1 }]}>
+        {loading ? <ActivityIndicator color={theme.onPrimary} /> : <MaterialCommunityIcons name={error ? 'reload' : status.playing ? 'pause' : 'play'} size={26} color={theme.onPrimary} accessible={false} />}
+      </Pressable>);
+  const back = (<Pressable testID="learn.audio.back" accessibilityRole="button" accessibilityLabel={t('learn.audioBack')} accessibilityState={{ disabled }} disabled={disabled} onPress={() => void seek(-15)} style={({ pressed }) => [styles.control, { opacity: disabled ? 0.4 : pressed ? 0.65 : 1 }]}>
+        <Text style={[styles.controlText, { color: theme.text }]}>−15</Text>
+      </Pressable>);
+  const forward = (<Pressable testID="learn.audio.forward" accessibilityRole="button" accessibilityLabel={t('learn.audioForward')} accessibilityState={{ disabled }} disabled={disabled} onPress={() => void seek(15)} style={({ pressed }) => [styles.control, { opacity: disabled ? 0.4 : pressed ? 0.65 : 1 }]}>
+        <Text style={[styles.controlText, { color: theme.text }]}>+15</Text>
+      </Pressable>);
+  const speed = (<Pressable testID="learn.audio.speed" accessibilityRole="button" accessibilityLabel={t('learn.audioSpeedValue', { rate })} accessibilityState={{ disabled, expanded: speedPickerOpen }} disabled={disabled} onPress={() => setSpeedPickerOpen(true)} style={({ pressed }) => [styles.control, styles.speed, { opacity: disabled ? 0.4 : pressed ? 0.65 : 1 }]}>
+        <Text style={[styles.controlText, { color: theme.text }]}>{rate}×</Text>
+        <MaterialCommunityIcons name="chevron-down" size={16} color={theme.textMuted} accessible={false} />
+      </Pressable>);
+  const mute = (<Pressable testID="learn.audio.mute" accessibilityRole="button" accessibilityLabel={t(muted ? 'learn.audioUnmute' : 'learn.audioMute')} accessibilityState={{ selected: muted }} onPress={() => { player.muted = !muted; setMuted(!muted); }} style={({ pressed }) => [styles.control, pressed && styles.pressed]}>
+        <MaterialCommunityIcons name={muted ? 'volume-off' : 'volume-high'} size={21} color={theme.text} accessible={false} />
+      </Pressable>);
+  const time = (<Text testID="learn.audio.time" style={[styles.time, wide && styles.timeWide, { color: theme.textMuted }]}>{audioTime(currentTime)} / {audioTime(duration)}</Text>);
+  const seekTrack = (<View testID="learn.audio.seek" accessible accessibilityRole="adjustable" accessibilityLabel={t('learn.audioProgress')}
+      accessibilityState={{ disabled }} accessibilityValue={{ min: 0, max: duration, now: Math.min(currentTime, duration), text: `${audioTime(currentTime)} / ${audioTime(duration)}` }}
+      accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]} onAccessibilityAction={(event) => { if (!disabled) void seek(event.nativeEvent.actionName === 'increment' ? 15 : -15); }}
+      onLayout={(event) => { seekWidth.current = event.nativeEvent.layout.width; }}
+      onStartShouldSetResponder={() => !disabled}
+      onResponderGrant={(event) => setScrub(scrubPosition(event))}
+      onResponderMove={(event) => setScrub(scrubPosition(event))}
+      onResponderRelease={(event) => { const value = scrubPosition(event); void seekTo(value).finally(() => setScrub(null)); }}
+      onResponderTerminate={() => setScrub(null)} style={[styles.seek, wide && styles.seekWide, { opacity: disabled ? 0.4 : 1 }]}>
+      <View pointerEvents="none" style={[styles.track, { backgroundColor: theme.border }]}>
+        <View style={[styles.progress, { backgroundColor: theme.primary, width: progress }]} />
+        <View style={[styles.thumb, { backgroundColor: theme.primary, left: progress }]} />
+      </View>
+    </View>);
+  return <SafeAreaView edges={['left', 'right']} testID="learn.audio" accessibilityLabel={t('learn.audioTitle')} style={[styles.bar, wide && styles.barWide, { borderColor: theme.border, backgroundColor: theme.surface }]}>
+    {wide ? <View style={styles.wideRow}>{playControl}{copy}{back}{forward}{seekTrack}{time}{speed}{mute}</View> : <>
+      <View style={styles.copyRow}>{copy}{mute}</View>
+      <View style={styles.controls}>{playControl}{back}{forward}{time}{speed}</View>
+      {seekTrack}
+    </>}
     {error && <Text accessibilityRole="alert" style={[styles.meta, { color: theme.danger }]}>{t('learn.audioError')}</Text>}
-  </View>;
+    <Modal visible={speedPickerOpen} transparent animationType="fade" onRequestClose={() => setSpeedPickerOpen(false)}>
+      <View style={styles.modal}>
+        <Pressable accessible={false} style={[StyleSheet.absoluteFill, styles.scrim]} onPress={() => setSpeedPickerOpen(false)} />
+        <SafeAreaView edges={['bottom']} accessibilityViewIsModal style={[styles.sheet, { backgroundColor: theme.surface }]}>
+          <View style={styles.copyRow}>
+            <Text accessibilityRole="header" style={[styles.sheetTitle, { color: theme.text }]}>{t('learn.audioSpeed')}</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('settings.closePicker')} onPress={() => setSpeedPickerOpen(false)} style={({ pressed }) => [styles.control, pressed && styles.pressed]}>
+              <MaterialCommunityIcons name="close" size={22} color={theme.text} accessible={false} />
+            </Pressable>
+          </View>
+          {[0.75, 1, 1.25, 1.5].map((speed) => <Pressable key={speed} testID={`learn.audio.speed.${speed}`} accessibilityRole="radio" accessibilityLabel={t('learn.audioSpeedValue', { rate: speed })} accessibilityState={{ checked: rate === speed }} onPress={() => { changeRate(speed); setSpeedPickerOpen(false); }} style={({ pressed }) => [styles.option, { backgroundColor: pressed || rate === speed ? theme.primarySoft : theme.surface }]}>
+            <Text style={[styles.controlText, { color: theme.text }]}>{speed}×</Text>
+            {rate === speed && <MaterialCommunityIcons name="check" size={22} color={theme.primary} accessible={false} />}
+          </Pressable>)}
+        </SafeAreaView>
+      </View>
+    </Modal>
+  </SafeAreaView>;
 }
 
 export function GuideListener({ article, theme }: { article: CareArticle; theme: Theme }) {
@@ -178,15 +219,32 @@ export function GuideListener({ article, theme }: { article: CareArticle; theme:
 }
 
 const styles = StyleSheet.create({
-  panel: { marginTop: 20, borderWidth: 1, padding: 16, gap: 12 },
-  row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
-  title: { fontSize: 19, lineHeight: 26, fontWeight: '700', marginRight: 'auto' },
-  meta: { fontSize: 13, lineHeight: 20 },
-  button: { minHeight: 48, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  buttonText: { fontSize: 14, lineHeight: 22, fontWeight: '600' },
-  track: { height: 5, borderRadius: 3, overflow: 'hidden' },
+  bar: { flexShrink: 0, borderTopWidth: 1, paddingHorizontal: 16, paddingTop: 8 },
+  barWide: { paddingBottom: 8 },
+  wideRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  copyWide: { minWidth: 120, maxWidth: 220 },
+  seekWide: { flex: 1, minWidth: 120 },
+  timeWide: { flex: 0, width: 76 },
+  copyRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  copy: { flex: 1, minWidth: 0 },
+  title: { fontSize: 14, lineHeight: 21, fontWeight: '700' },
+  meta: { fontSize: 12, lineHeight: 19 },
+  controls: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 4, marginTop: 4 },
+  control: { minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
+  play: { borderRadius: 24, width: 48, height: 48 },
+  controlText: { fontSize: 14, lineHeight: 22, fontWeight: '600' },
+  time: { flex: 1, minWidth: 68, fontSize: 12, lineHeight: 20, textAlign: 'center', fontVariant: ['tabular-nums'] },
+  speed: { flexDirection: 'row', gap: 2, paddingHorizontal: 4 },
+  seek: { height: 48, justifyContent: 'center' },
+  track: { height: 4, borderRadius: 2, marginHorizontal: 8 },
   progress: { height: '100%' },
-  speed: { minWidth: 48, minHeight: 44, borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, justifyContent: 'center', alignItems: 'center' },
+  thumb: { position: 'absolute', width: 14, height: 14, borderRadius: 7, top: -5, marginLeft: -7 },
+  pressed: { opacity: 0.65 },
+  modal: { flex: 1, justifyContent: 'flex-end', alignItems: 'center' },
+  scrim: { backgroundColor: 'rgba(0,0,0,0.5)' },
+  sheet: { width: '100%', maxWidth: 480, padding: 16, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  sheetTitle: { flex: 1, fontSize: 20, lineHeight: 28, fontWeight: '700' },
+  option: { minHeight: 48, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 8 },
 });
 
 const webPlayerStyles = `
