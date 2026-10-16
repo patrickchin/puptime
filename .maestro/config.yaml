@@ -1,5 +1,6 @@
 flows:
   - ios/*.yaml
+  - guide-audio.yaml
 executionOrder:
   continueOnFailure: true
   flowsOrder:
@@ -12,3 +13,4 @@ executionOrder:
     - iOS settings and preference persistence
     - iOS populated insights and timeline controls
     - iOS CSV picker cancellation preserves activity
+    - Puppy guide audio controls

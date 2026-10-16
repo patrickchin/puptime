@@ -1,0 +1,59 @@
+appId: com.patrickchin.puptime
+name: Puppy guide audio controls
+tags:
+  - android
+  - ios
+---
+- launchApp
+- runFlow:
+    when:
+      visible:
+        id: onboarding.skip
+    commands:
+      - tapOn:
+          id: onboarding.skip
+- tapOn:
+    id: nav.learn
+- runFlow:
+    when:
+      visible:
+        id: learn.back
+    commands:
+      - tapOn:
+          id: learn.back
+- tapOn:
+    id: learn.article.getting-started
+- assertVisible: Play
+- assertVisible: Your first days · elevenlabs.io
+- tapOn:
+    id: learn.audio.forward
+- assertVisible: 0:15 / 1:23
+- tapOn:
+    id: learn.audio.back
+- assertVisible: 0:00 / 1:23
+- tapOn:
+    id: learn.audio.seek
+- assertVisible: '0:4[12] / 1:23'
+- tapOn:
+    id: learn.audio.speed
+- tapOn:
+    id: learn.audio.speed.1.25
+- assertVisible: 'Playback speed: 1.25 times'
+- tapOn:
+    id: learn.audio.mute
+- assertVisible: Unmute
+- tapOn:
+    id: learn.audio.mute
+- assertVisible: Mute
+- swipe:
+    start: 50%,45%
+    end: 50%,20%
+    duration: 400
+- assertVisible:
+    id: learn.audio.play
+- assertVisible:
+    id: learn.audio.seek
+- tapOn:
+    id: nav.timeline
+- assertNotVisible:
+    id: learn.audio

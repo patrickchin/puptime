@@ -150,7 +150,6 @@ export function LearnScreen({ theme, articleId, onArticleChange }: {
         </View>
         {article && <Text style={[styles.intro, { color: theme.textMuted }]}>{article.summary}</Text>}
         {language !== 'en' && <Text style={[styles.meta, { color: theme.textMuted }]}>{t('learn.english')}</Text>}
-        {article && Platform.OS !== 'web' && <GuideListener key={article.id} article={article} theme={theme} />}
 
         {article ? (
           <>
@@ -230,9 +229,7 @@ export function LearnScreen({ theme, articleId, onArticleChange }: {
       </View>
     </ScrollView>
   );
-  return Platform.OS === 'web'
-    ? <View style={{ flex: 1, minHeight: 0 }}>{content}{article && <GuideListener key={article.id} article={article} theme={theme} />}</View>
-    : content;
+  return <View style={{ flex: 1, minHeight: 0 }}>{content}{article && <GuideListener key={article.id} article={article} theme={theme} />}</View>;
 }
 
 const styles = StyleSheet.create({

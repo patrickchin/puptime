@@ -1,7 +1,7 @@
 {
   "configVersion": 0,
   "apple": {
-    "version": "1.11.29",
+    "version": "1.11.30",
     "copyright": "2026 Patrick Chin",
     "release": {
       "automaticRelease": true
@@ -29,7 +29,7 @@
         "title": "Puptime: Puppy Tracker",
         "subtitle": "Potty, meals, walks & naps",
         "privacyPolicyUrl": "https://github.com/patrickchin/puptime/blob/main/PRIVACY.md",
-        "releaseNotes": "• Listen to all 13 puppy care guides with conversational English narration from Joanna at ElevenLabs.\n• Pause, skip back or forward 15 seconds, and choose your playback speed.\n• Keep listening with the screen locked. Recordings are available offline in the app."
+        "releaseNotes": "• Listen while reading with a compact audio bar above the navigation tabs.\n• Tap or drag to seek, skip 15 seconds, adjust playback speed, and mute.\n• Landscape and tablet layouts use a single horizontal player."
       }
     },
     "categories": [
