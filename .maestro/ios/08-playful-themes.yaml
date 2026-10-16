@@ -1,0 +1,104 @@
+appId: com.patrickchin.puptime
+name: Playful themes retain logging and both timeline views
+tags:
+  - ios
+  - settings
+---
+- launchApp:
+    clearState: true
+- runFlow: ../helpers/skip-onboarding.yaml
+- extendedWaitUntil:
+    visible:
+      id: quick.pee
+    timeout: 90000
+- tapOn:
+    id: quick.pee
+- tapOn:
+    id: quick.meal
+- tapOn:
+    id: settings.open
+- tapOn:
+    id: settings.theme.open
+- assertVisible:
+    id: appearance.theme.system
+- assertNotVisible:
+    id: appearance.theme.midnight
+- tapOn:
+    id: appearance.theme.puppy-journal
+- tapOn:
+    id: settings.back
+- assertVisible: A little day, together.
+- tapOn:
+    id: nav.timeline
+- assertVisible:
+    id: timeline.day
+- tapOn:
+    id: timeline.day.previous
+- assertVisible: No moments logged this day.
+- tapOn:
+    id: timeline.day.next
+- tapOn:
+    id: timeline.mode.compare
+- assertVisible:
+    id: timeline.zoom.in
+- tapOn:
+    id: timeline.zoom.in
+- assertVisible:
+    id: timeline.zoom.value
+    text: .*1\.5×.*
+- tapOn:
+    id: nav.log
+- tapOn:
+    id: settings.open
+- tapOn:
+    id: settings.theme.open
+- tapOn:
+    id: appearance.theme.soft-play
+- tapOn:
+    id: settings.back
+- assertVisible: How’s your pup?
+- tapOn:
+    id: nav.timeline
+- assertVisible:
+    id: timeline.zoom.in
+- tapOn:
+    id: timeline.mode.day
+- assertVisible:
+    id: timeline.day
+- tapOn:
+    id: nav.log
+- tapOn:
+    id: settings.open
+- tapOn:
+    id: settings.theme.open
+- tapOn:
+    id: appearance.theme.day-trails
+- tapOn:
+    id: settings.back
+- assertVisible: One happy little day
+- tapOn:
+    id: nav.timeline
+- assertVisible:
+    id: timeline.day
+- tapOn:
+    id: timeline.mode.compare
+- assertVisible:
+    id: timeline.zoom.in
+- tapOn:
+    id: nav.log
+- tapOn:
+    id: settings.open
+- tapOn:
+    id: settings.theme.open
+- tapOn:
+    id: appearance.theme.system
+- tapOn:
+    id: settings.back
+- assertVisible:
+    id: event.pee
+- tapOn:
+    id: nav.timeline
+- assertNotVisible:
+    id: timeline.mode.day
+- assertVisible:
+    id: timeline.zoom.in

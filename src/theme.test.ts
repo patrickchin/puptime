@@ -12,7 +12,7 @@ import {
   namedThemes,
   navigationIcon,
   resolveTheme,
-  sunriseTheme,
+  themeChoices,
 } from './theme.ts';
 
 function contrastRatio(foreground: string, background: string): number {
@@ -27,21 +27,17 @@ function contrastRatio(foreground: string, background: string): number {
 test('resolves system and named themes', () => {
   assert.equal(resolveTheme('system', 'light'), lightTheme);
   assert.equal(resolveTheme('system', 'dark'), darkTheme);
-  assert.equal(resolveTheme('meadow', 'dark'), lightTheme);
-  assert.equal(resolveTheme('sunrise', 'dark'), sunriseTheme);
-  assert.equal(resolveTheme('midnight', 'light'), darkTheme);
+  assert.deepEqual(themeChoices, ['system', 'puppy-journal', 'soft-play', 'day-trails']);
   Object.entries(namedThemes).forEach(([preference, theme]) => {
     assert.equal(resolveTheme(preference as keyof typeof namedThemes, 'light'), theme);
   });
 });
 
 test('accepts only supported stored theme preferences', () => {
-  assert.equal(isThemePreference('system'), true);
-  assert.equal(isThemePreference('sunrise'), true);
-  assert.equal(isThemePreference('blueprint'), true);
-  assert.equal(isThemePreference('contrast'), true);
-  assert.equal(isThemePreference('unknown'), false);
-  assert.equal(isThemePreference(null), false);
+  for (const value of themeChoices) assert.equal(isThemePreference(value), true);
+  for (const value of ['meadow', 'sunrise', 'midnight', 'paper', 'bubblegum', 'blueprint', 'trail', 'tide', 'plum', 'contrast', 'unknown', null]) {
+    assert.equal(isThemePreference(value), false);
+  }
 });
 
 test('named themes have distinct presentation systems', () => {
@@ -59,7 +55,7 @@ test('named themes have distinct presentation systems', () => {
     presentation.iconProfile,
   ].join(':'));
 
-  assert.equal(themes.length, 10);
+  assert.equal(themes.length, 3);
   assert.equal(new Set(signatures).size, themes.length);
 });
 

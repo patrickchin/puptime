@@ -1,3 +1,4 @@
+import { useFonts } from 'expo-font';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
@@ -87,6 +88,11 @@ import { readPendingWidgetEvents, updateHomeWidget } from './src/widgets/sync';
 configureReminderHandling();
 
 export default function App() {
+  const [fontsLoaded, fontError] = useFonts({
+    Delius: require('./assets/fonts/Delius-Regular.ttf'),
+    LilitaOne: require('./assets/fonts/LilitaOne-Regular.ttf'),
+    Itim: require('./assets/fonts/Itim-Regular.ttf'),
+  });
   const colorScheme = useColorScheme();
   const [themePreference, setThemePreference] = useState<ThemePreference>('system');
   const [languagePreference, setLanguagePreference] = useState<LanguagePreference>('system');
@@ -584,7 +590,7 @@ export default function App() {
         >
           <StatusBar style={theme.isDark ? 'light' : 'dark'} />
           <View style={styles.screen}>
-            {onboardingVisible === null ? null : onboardingVisible ? (
+            {onboardingVisible === null || (!fontsLoaded && !fontError) ? null : onboardingVisible ? (
               <OnboardingScreen
                 theme={theme}
                 notificationPermission={notificationPermission}

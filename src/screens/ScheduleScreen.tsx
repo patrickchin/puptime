@@ -179,6 +179,7 @@ export function ScheduleScreen({
               fontSize: theme.presentation.titleSize,
               lineHeight: theme.presentation.titleLineHeight,
               fontWeight: theme.presentation.titleWeight,
+              fontFamily: theme.presentation.headingFont,
               letterSpacing: theme.presentation.titleTracking,
             },
           ]}

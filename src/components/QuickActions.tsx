@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { activityKey, type PuppyEvent } from '../domain';
 import { ActivityIcon } from './ActivityIcon';
 import { useLocalization } from '../localization-context';
-import { surfaceTreatment, type Theme } from '../theme';
+import { headingStyle, surfaceTreatment, type Theme } from '../theme';
 
 const actions = ['pee', 'poop', 'meal'] as const;
 
@@ -14,6 +14,7 @@ export function QuickActions({ events, onLog, now, theme }: {
   theme: Theme;
 }) {
   const { activityColors, activityLabel, relativeTime, t } = useLocalization();
+  const playful = theme.presentation.iconProfile !== 'default';
 
   return (
     <View style={[styles.grid, { gap: theme.presentation.gridGap }]}>
@@ -33,7 +34,7 @@ export function QuickActions({ events, onLog, now, theme }: {
               styles.action,
               surfaceTreatment(theme),
               {
-                backgroundColor: theme.surfaceRaised,
+                backgroundColor: playful ? colors.softColor : theme.surfaceRaised,
                 borderColor: pressed ? colors.color : theme.border,
                 minHeight: theme.presentation.actionHeight,
                 padding: theme.presentation.cardPadding - 4,
@@ -41,10 +42,10 @@ export function QuickActions({ events, onLog, now, theme }: {
               },
             ]}
           >
-            <View style={[styles.iconCircle, { backgroundColor: colors.softColor, borderRadius: theme.presentation.iconRadius }]}>
-              <ActivityIcon activity={activity} theme={theme} color={colors.color} size={25} />
+            <View style={[styles.iconCircle, playful && { width: 58, height: 58 }, { backgroundColor: colors.softColor, borderRadius: theme.presentation.iconRadius }]}>
+              <ActivityIcon activity={activity} theme={theme} color={colors.color} size={playful ? 42 : 25} />
             </View>
-            <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.actionLabel, { color: theme.text }]}>
+            <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.actionLabel, playful && { ...headingStyle(theme), fontSize: 21, lineHeight: 28 }, { color: theme.text }]}>
               {activityLabel(activity)}
             </Text>
             {latest ? (

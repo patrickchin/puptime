@@ -9,31 +9,23 @@ import {
   type MessageKey,
 } from '../localization';
 import {
-  namedThemes,
+  themeChoices,
   resolveTheme,
   spacing,
+  headingStyle,
   type Theme,
   type ThemePreference,
 } from '../theme';
 
-const choices: {
-  id: ThemePreference;
-  label: string;
+const choices: Record<ThemePreference, {
   descriptionKey: MessageKey;
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
-}[] = [
-  { id: 'system', label: 'System', descriptionKey: 'language.systemDetail', icon: 'cellphone-cog' },
-  { id: 'meadow', label: 'Meadow', descriptionKey: 'theme.meadow.detail', icon: 'sprout-outline' },
-  { id: 'sunrise', label: 'Sunrise', descriptionKey: 'theme.sunrise.detail', icon: 'weather-sunset-up' },
-  { id: 'midnight', label: 'Midnight', descriptionKey: 'theme.midnight.detail', icon: 'weather-night' },
-  { id: 'paper', label: 'Paper', descriptionKey: 'theme.paper.detail', icon: 'book-open-page-variant-outline' },
-  { id: 'bubblegum', label: 'Bubblegum', descriptionKey: 'theme.bubblegum.detail', icon: 'heart-outline' },
-  { id: 'blueprint', label: 'Blueprint', descriptionKey: 'theme.blueprint.detail', icon: 'vector-square' },
-  { id: 'trail', label: 'Trail', descriptionKey: 'theme.trail.detail', icon: 'pine-tree' },
-  { id: 'tide', label: 'Tide', descriptionKey: 'theme.tide.detail', icon: 'waves' },
-  { id: 'plum', label: 'Plum', descriptionKey: 'theme.plum.detail', icon: 'flower-outline' },
-  { id: 'contrast', label: 'Contrast', descriptionKey: 'theme.contrast.detail', icon: 'contrast-circle' },
-];
+}> = {
+  system: { descriptionKey: 'theme.system.detail', icon: 'paw-outline' },
+  'puppy-journal': { descriptionKey: 'theme.puppy-journal.detail', icon: 'notebook-outline' },
+  'soft-play': { descriptionKey: 'theme.soft-play.detail', icon: 'shape-outline' },
+  'day-trails': { descriptionKey: 'theme.day-trails.detail', icon: 'map-marker-path' },
+};
 
 const languageLabels: Record<Exclude<LanguagePreference, 'system'>, string> = {
   en: 'English',
@@ -45,8 +37,7 @@ function previewTheme(
   preference: ThemePreference,
   colorScheme: 'light' | 'dark' | 'unspecified' | null,
 ): Theme {
-  if (preference === 'system') return resolveTheme('system', colorScheme);
-  return namedThemes[preference];
+  return resolveTheme(preference, colorScheme);
 }
 
 export function ThemePicker({
@@ -109,6 +100,7 @@ export function ThemePicker({
                   {
                     color: theme.text,
                     fontWeight: theme.presentation.titleWeight,
+                    fontFamily: theme.presentation.headingFont,
                     letterSpacing: theme.presentation.titleTracking,
                   },
                 ]}
@@ -144,19 +136,20 @@ export function ThemePicker({
             showsVerticalScrollIndicator={false}
             style={styles.choiceScroll}
           >
-            {(mode === 'theme' ? choices : []).map((choice) => {
-              const active = selected === choice.id;
-              const preview = previewTheme(choice.id, colorScheme);
-              const label = choice.id === 'system' ? t('language.system') : choice.label;
+            {(mode === 'theme' ? themeChoices : []).map((id) => {
+              const choice = choices[id];
+              const active = selected === id;
+              const preview = previewTheme(id, colorScheme);
+              const label = t(`theme.${id}.name`);
               const description = t(choice.descriptionKey);
               return (
                 <Pressable
-                  key={choice.id}
-                  testID={`appearance.theme.${choice.id}`}
+                  key={id}
+                  testID={`appearance.theme.${id}`}
                   accessibilityLabel={`${label}. ${description}`}
                   accessibilityRole="radio"
                   accessibilityState={{ checked: active }}
-                  onPress={() => onSelect(choice.id)}
+                  onPress={() => onSelect(id)}
                   style={({ pressed }) => [
                     styles.choice,
                     {
@@ -185,7 +178,7 @@ export function ThemePicker({
                     />
                   </View>
                   <View style={styles.choiceCopy}>
-                    <Text style={[styles.choiceLabel, { color: theme.text }]}>{label}</Text>
+                    <Text style={[styles.choiceLabel, headingStyle(preview), { color: theme.text }]}>{label}</Text>
                     <Text numberOfLines={1} style={[styles.choiceDescription, { color: theme.textMuted }]}>{description}</Text>
                   </View>
                   <View
