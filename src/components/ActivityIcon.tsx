@@ -11,14 +11,27 @@ const artwork = {
   'day-trails': require('../../assets/appearance/trail-activities.png'),
 };
 
-function ActivityArtwork({ source, index, size }: { source: number; index: number; size: number }) {
-  // Each transparent atlas contains three square cells; crop in the view, preserving the original artwork.
-  const cell = size * 1.25;
+const combinationArtwork = {
+  'puppy-journal': require('../../assets/appearance/journal-combinations.png'),
+  'soft-play': require('../../assets/appearance/soft-combinations.png'),
+  'day-trails': require('../../assets/appearance/trail-combinations.png'),
+};
+
+function ActivityArtwork({ source, index, size, columns = 3, rows = 1, scale = 1.25 }: {
+  source: number; index: number; size: number; columns?: number; rows?: number; scale?: number;
+}) {
+  // Clip square atlas cells at render time, preserving the original transparent artwork.
+  const cell = size * scale;
   return (
     <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ width: size, height: size, overflow: 'hidden' }}>
-      <Image source={source} accessible={false} resizeMode="stretch" style={{ position: 'absolute', width: cell * 3, height: cell, left: -index * cell - (cell - size) / 2, top: (size - cell) / 2 }} />
+      <Image source={source} accessible={false} resizeMode="stretch" style={{ position: 'absolute', width: cell * columns, height: cell * rows, left: -(index % columns) * cell - (cell - size) / 2, top: -Math.floor(index / columns) * cell - (cell - size) / 2 }} />
     </View>
   );
+}
+
+export function ActivityCombinationIcon({ index, theme, size }: { index: number; theme: Theme; size: number }) {
+  const profile = theme.presentation.iconProfile;
+  return profile === 'default' ? null : <ActivityArtwork source={combinationArtwork[profile]} index={index} size={size} columns={2} rows={2} scale={1} />;
 }
 
 export function ActivityIcon({ activity, theme, color, size = 22 }: {

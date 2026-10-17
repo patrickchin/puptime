@@ -2,11 +2,12 @@ import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { TIMELINE_BUCKET_MINUTES, TIMELINE_BUCKETS, timelineMarkerGroups, type TimelineDay } from '../analytics';
+import { activityCombinationIndex } from '../activity-artwork';
 import { activityKey, type ActivityKey } from '../domain';
 import { useLocalization } from '../localization-context';
 import { headingStyle, type Theme } from '../theme';
 import { timelineFormatters } from '../timeline-format';
-import { ActivityIcon } from './ActivityIcon';
+import { ActivityCombinationIcon, ActivityIcon } from './ActivityIcon';
 
 export const TIMELINE_ART_GUTTER = 24;
 
@@ -52,6 +53,7 @@ export const IllustratedTimelineTrack = memo(function IllustratedTimelineTrack({
         const hitLeft = Math.max(center - 24, index === 0 ? 0 : TIMELINE_ART_GUTTER + (groups[index - 1].center + group.center) / 2);
         const hitRight = Math.min(center + 24, index === groups.length - 1 ? trackWidth : TIMELINE_ART_GUTTER + (group.center + groups[index + 1].center) / 2);
         const activities = [...new Set(group.marks.map(mark => mark.type))];
+        const combinationIndex = activityCombinationIndex(activities);
         const merged = group.marks.length > 1;
         const estimated = group.marks.some(mark => mark.estimated);
         const description = group.marks.map(mark => `${activityLabel({ type: mark.type, customLabel: mark.label })}, ${time(mark.startBucket)}${mark.estimated ? `, ${t('eventRow.estimated')}` : ''}`).join('. ');
@@ -63,9 +65,9 @@ export const IllustratedTimelineTrack = memo(function IllustratedTimelineTrack({
             style={({ pressed }) => ({ position: 'absolute', left: hitLeft, width: hitRight - hitLeft, height: rowHeight, opacity: pressed ? 0.6 : 1 })}>
             <View pointerEvents="none" style={{ position: 'absolute', left: center - hitLeft - 21, top: baseline - 21, width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: journal ? 7 : soft ? 21 : 13, backgroundColor: merged ? journal ? '#FFFDF4' : soft ? '#EBF1FF' : '#F4E5C9' : 'transparent', borderWidth: merged ? 1 : 0, borderColor: journal ? '#D7C5A5' : soft ? '#CAD8F3' : '#CDB38D', borderStyle: estimated ? 'dashed' : 'solid', transform: journal ? [{ rotate: index % 2 ? '3deg' : '-3deg' }] : [] }}>
               <View style={{ width: 40, height: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                {activities.slice(0, 3).map((type, artIndex) => <View key={type} style={activities.length > 1 ? { position: 'absolute', left: artIndex * 8, top: 5 } : undefined}>
-                  <ActivityIcon activity={{ type }} theme={theme} size={activities.length > 1 ? 26 : 38} color={theme.text} />
-                </View>)}
+                {combinationIndex === undefined
+                  ? <ActivityIcon activity={{ type: activities[0] }} theme={theme} size={38} color={theme.text} />
+                  : <ActivityCombinationIcon index={combinationIndex} theme={theme} size={40} />}
               </View>
               {merged || estimated ? <View testID={`timeline.cluster.${day.key}.${group.firstBucket}`} style={{ position: 'absolute', right: -3, bottom: -4, minWidth: 20, height: 20, borderRadius: soft ? 10 : 6, paddingHorizontal: 3, backgroundColor: theme.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: theme.background }}>
                 <Text maxFontSizeMultiplier={1} style={[headingStyle(theme), { color: theme.onPrimary, fontSize: 12, lineHeight: 16 }]}>{merged ? `${group.marks.length}${estimated ? '?' : ''}` : '?'}</Text>
