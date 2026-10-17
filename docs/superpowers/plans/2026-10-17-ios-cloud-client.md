@@ -47,11 +47,11 @@
 
 **Interfaces:** `createCloudApi(request: CloudRequest)` provides `config(signal?)`, `account(signal?)`, `startTrial(signal?)`, `enroll(request,signal?)`, `push(mutations,signal?)`, `pull(after,signal?)`. `CloudRequest` accepts only a fixed relative `/api/` path, method/body and AbortSignal and returns SDK `{data,error}`. Export schemas/types for server configuration/account summary/cloud access. `CloudApiError` exposes a status/category/retry delay without response contents. Native SDK adapter alone creates absolute URLs from the validated configured base.
 
-- [ ] RED: malformed config/account/push/pull/enrollment results reject; all provider flags/expiry/user/pet identities validated; missing/unsafe base URLs and forbidden public domain reject. A50-operation body stays below65536 UTF8 bytes; oversized/empty pushes fail before dispatch. Auth/entitlement/throttle/server errors preserve status and do not leak private server content.
-- [ ] Run targeted Node tests, expect missing API/failing assertions. Implement shared Zod contracts and small client methods using existing protocol schemas. Fixed paths only; no arbitrary external URL can receive credentials.
-- [ ] Add official Expo/SecureStore/email OTP plugin adapter with scheme `puptime`, storage prefix `puptime.auth`, base URL from explicit build configuration. Missing URL disables cloud with a clear configuration state; it cannot break local startup. Local HTTP allowed only in an explicit development build against loopback, HTTPS otherwise.
-- [ ] Verify actual installed SDK hooks attach credentials and capture Set-Cookie for protected routes with its `$fetch` client. Tests use actual Better Auth client/Workers runtime where possible; native SecureStore/runtime remains Task6 acceptance. No hand-built session/cookie parser.
-- [ ] Run npm test, Workers tests and both typechecks; expected all pass. Commit API/auth adapter.
+- [x] RED: malformed config/account/push/pull/enrollment results reject; all provider flags/expiry/user/pet identities validated; missing/unsafe base URLs and forbidden public domain reject. A50-operation body stays below65536 UTF8 bytes; oversized/empty pushes fail before dispatch. Auth/entitlement/throttle/server errors preserve status and do not leak private server content.
+- [x] Run targeted Node tests, expect missing API/failing assertions. Implement shared Zod contracts and small client methods using existing protocol schemas. Fixed paths only; no arbitrary external URL can receive credentials.
+- [x] Add official Expo/SecureStore/email OTP plugin adapter with scheme `puptime`, storage prefix `puptime.auth`, base URL from explicit build configuration. Missing URL disables cloud with a clear configuration state; it cannot break local startup. Local HTTP allowed only in an explicit development build against loopback, HTTPS otherwise.
+- [x] Verify actual installed SDK hooks attach credentials and capture Set-Cookie for protected routes with its `$fetch` client. Tests use actual Better Auth client/Workers runtime where possible; native SecureStore/runtime remains Task6 acceptance. No hand-built session/cookie parser.
+- [x] Run npm test, Workers tests and both typechecks; expected all pass. Commit API/auth adapter.
 
 ### Task 2: Restartable bounded sync runner
 
