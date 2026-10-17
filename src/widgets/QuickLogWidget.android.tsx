@@ -12,7 +12,6 @@ import {
   type QuickEventType,
 } from '../domain';
 import { resolveTheme, type ThemePreference } from '../theme';
-import { widgetAgo } from './ago';
 
 type ActionButton = {
   type: QuickEventType;
@@ -50,7 +49,6 @@ type Props = {
   actions?: readonly ActivityKey[];
   customActivities?: readonly string[];
   themePreference?: ThemePreference;
-  now?: number;
 };
 
 export function QuickLogWidget({
@@ -61,7 +59,6 @@ export function QuickLogWidget({
   actions: configuredActions = DEFAULT_WIDGET_ACTIONS,
   customActivities = [],
   themePreference = 'system',
-  now = Date.now(),
 }: Props) {
   const theme = resolveTheme(themePreference, dark ? 'dark' : 'light');
   const background = theme.background as `#${string}`;
@@ -84,13 +81,17 @@ export function QuickLogWidget({
         const actionBackground = (theme.isDark ? meta.darkSoftColor : meta.softColor) as `#${string}`;
         const actionBorder = actionInk;
         const lastAt = lastEventAt?.[button.type];
-        const timeLabel = lastAt === undefined ? 'Never' : widgetAgo(lastAt, now);
+        const lastDate = lastAt === undefined ? undefined : new Date(lastAt);
+        const dateLabel = lastDate === undefined ? undefined : new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(lastDate);
+        const timeLabel = lastDate === undefined ? 'Never' : new Intl.DateTimeFormat(undefined, {
+          hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+        }).format(lastDate);
         return (
           <FlexWidget
             key={button.type}
             clickAction="LOG_EVENT"
             clickActionData={{ type: button.type }}
-            accessibilityLabel={`${isActiveNap ? 'End nap' : `Log ${button.label.toLowerCase()}`}, ${lastAt === undefined ? 'never logged' : `last logged ${timeLabel}`}`}
+            accessibilityLabel={`${isActiveNap ? 'End nap' : `Log ${button.label.toLowerCase()}`}, ${lastDate === undefined ? 'never logged' : `last logged ${lastDate.toDateString()} at ${timeLabel}`}`}
             style={{
               flex: 1,
               height: 'match_parent',
@@ -120,6 +121,13 @@ export function QuickLogWidget({
                 maxLines={1}
                 style={{ color: actionInk, fontSize: compact ? 9 : 11, fontWeight: '600', textAlign: 'center', adjustsFontSizeToFit: true, marginTop: 1 }}
               />
+              {dateLabel && (
+                <TextWidget
+                  text={dateLabel}
+                  maxLines={1}
+                  style={{ color: actionInk, fontSize: compact ? 8 : 9, fontWeight: '500', textAlign: 'center', adjustsFontSizeToFit: true }}
+                />
+              )}
             </FlexWidget>
           </FlexWidget>
         );
