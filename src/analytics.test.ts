@@ -14,6 +14,8 @@ import {
   timelineBucket,
   timelineDurationRuns,
   timelineMarksForPointHit,
+  timelineMarkerGroups,
+  type TimelineMark,
   timelinePointClusters,
 } from './analytics.ts';
 import { latestQuickEventTimes, type PuppyEvent, type ScheduleEntry } from './domain.ts';
@@ -625,4 +627,37 @@ test('infers and suppresses accepted gaps for each named activity independently'
   assert.deepEqual(estimateMissingLogs(recovered, 14, now).estimates, []);
   assert.deepEqual(suggestScheduleFromEvents(recovered, 14, now), baseline);
   assert.deepEqual(buildTimelineDays(recovered, 3, now, now).flatMap((day) => day.marks).filter((mark) => mark.estimated).map((mark) => mark.id), [accepted.id]);
+});
+
+
+test('illustrated timeline merges connected screen-space collisions, preserving every point', () => {
+  const marks: TimelineMark[] = [
+    { id: 'meal', type: 'meal', label: 'Eat', startBucket: 30 },
+    { id: 'pee', type: 'pee', label: 'Pee', startBucket: 10 },
+    { id: 'poop', type: 'poop', label: 'Poop', startBucket: 20, estimated: true },
+    { id: 'nap', type: 'nap', label: 'Nap', startBucket: 10, endBucket: 40 },
+    { id: 'late', type: 'pee', label: 'Pee', startBucket: 95 },
+  ];
+  const original = structuredClone(marks);
+  const groups = timelineMarkerGroups(marks, 300);
+  assert.deepEqual(groups.map(group => group.marks.map(mark => mark.id)), [['pee', 'poop', 'meal'], ['late']]);
+  assert.equal(groups[0].center, 20.5 * 300 / 96);
+  assert.equal(groups[0].marks[1].estimated, true);
+  assert.deepEqual(marks, original);
+  // The same times separate when their artwork no longer collides at higher zoom.
+  assert.deepEqual(timelineMarkerGroups(marks, 1200).map(group => group.marks.map(mark => mark.id)), [['pee'], ['poop'], ['meal'], ['late']]);
+});
+
+test('illustrated timeline keeps same-bucket logs together at every zoom and handles day edges', () => {
+  const marks: TimelineMark[] = [
+    { id: 'first', type: 'pee', label: 'Pee', startBucket: 0 },
+    { id: 'second', type: 'meal', label: 'Eat', startBucket: 0 },
+    { id: 'last', type: 'poop', label: 'Poop', startBucket: 95 },
+  ];
+  assert.deepEqual(timelineMarkerGroups([], 300), []);
+  for (const width of [300, 1200]) {
+    const groups = timelineMarkerGroups(marks, width);
+    assert.deepEqual(groups.map(group => group.marks.map(mark => mark.id)), [['first', 'second'], ['last']]);
+    assert.ok(groups.every(group => group.center >= 0 && group.center <= width));
+  }
 });
