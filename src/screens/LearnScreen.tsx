@@ -85,7 +85,7 @@ function GuideReferences({ article, theme }: { article: CareArticle; theme: Them
   const sources = [...new Set(article.sections.flatMap((section) => section.sources))];
   return <View style={[styles.references, { borderColor: theme.border }]}>
     <Pressable testID="learn.sources.toggle" accessibilityRole="button" accessibilityState={{ expanded }} aria-expanded={expanded} onPress={() => setExpanded(!expanded)} style={({ pressed }) => [styles.referencesToggle, pressed && styles.pressed]}>
-      <Text style={[styles.referenceLabel, { color: theme.textMuted }]}>{t('learn.sources')}</Text>
+      <Text style={[styles.referenceLabel, styles.rowCopy, { color: theme.textMuted }]}>{t('learn.sources')}</Text>
       <Text aria-hidden style={[styles.referenceLabel, { color: theme.textMuted }]}>{expanded ? '−' : '+'}</Text>
     </Pressable>
     {expanded && <View testID="learn.sources" style={styles.referenceContent}>
