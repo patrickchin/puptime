@@ -4,7 +4,7 @@
 
 **Goal:** Build and verify the SQLite migration/repository boundary before switching ordinary app/widget writers or enabling synchronization. This is phase 3a; phase 3b wires every existing native storage API and widget acknowledgment, and phase 3c adds the authenticated outbox/transport. The overall native persistence/sync phase remains incomplete until those follow-ups land.
 
-**Architecture:** Use Expo SQLite's supported async/exclusive-transaction API, with WAL, foreign keys and bounded lock handling. Keep SQL and migration logic platform-independent behind the small subset of that API actually used. Tests execute that SQL with Node's built-in SQLite against real temporary files, including separate connections. The native adapter uses Expo SQLite, not a custom database engine or ORM. Preserve existing public storage behavior and all nap controls/history.
+**Architecture:** Use a dedicated Expo SQLite connection per runtime, with all access serialized around its supported transaction API, WAL, foreign keys and bounded lock handling. Keep SQL and migration logic platform-independent behind the small subset of that API actually used. Tests execute that SQL with Node's built-in SQLite against real temporary files, including separate connections. The native adapter uses Expo SQLite, not a custom database engine or ORM. Preserve existing public storage behavior and all nap controls/history.
 
 **Spec:** `docs/superpowers/specs/2026-10-17-accounts-sync-design.md`. Backend contract/evidence: `docs/cloud-verification.md`.
 
@@ -31,13 +31,13 @@
 
 **Files:** Create `src/local/database.ts`, `src/local/database.test.ts`, test-only real SQLite adapter; install Expo-compatible `expo-sqlite` and create `src/local/open.native.ts`.
 
-**Interfaces:** `LocalDatabase` is the used subset of Expo SQLite's async query/exclusive-transaction API. `migrateLegacy(db, snapshot, newId)` creates schema and inserts the legacy snapshot, initial puppy, event/routine rows and settings in one transaction, then writes the schema/migration marker. Return initial puppy ID and migration status. Native initialization reads the legacy snapshot before the exclusive transaction and checks the completed marker again inside it.
+**Interfaces:** `LocalDatabase` is the used subset of Expo SQLite's async query/transaction API. `migrateLegacy(db, snapshot, newId)` creates schema and inserts the legacy snapshot, initial puppy, event/routine rows and settings in one transaction, then writes the schema/migration marker. Return initial puppy ID and migration status. Native initialization checks the completed marker inside the serialized transaction before lazily reading legacy values. Completed migration never re-reads legacy storage. A lock retry restarts the entire transaction.
 
-- [ ] Write failing real-SQL tests for exact migration fidelity, empty install, retry/reopen idempotency, failure after partial insertion with rollback, unsupported newer schema, pet isolation/FKs and two competing initializers. Expected RED.
-- [ ] Implement minimal relational schema: metadata, puppies, events, routines, settings, retained legacy snapshots. Bind values, never interpolate user data into SQL. All per-puppy IDs are composite with pet ID; account/device settings have their own table.
-- [ ] Configure WAL/foreign keys/busy timeout through native supported APIs. Add bounded retry only for recognized lock contention, preserving other failures. Each retry starts a fresh exclusive transaction.
-- [ ] Run actual SQLite tests and typechecks. Expected GREEN. Verify adapter shape against installed Expo SQLite types; do not use type casts to pretend unsupported APIs exist.
-- [ ] Commit schema/migration/adapter.
+- [x] Write failing real-SQL tests for exact migration fidelity, empty install, retry/reopen idempotency, failure after partial insertion with rollback, unsupported newer schema, pet isolation/FKs and two competing initializers. Expected RED.
+- [x] Implement minimal relational schema: metadata, puppies, events, routines, settings, retained legacy snapshots. Bind values, never interpolate user data into SQL. All per-puppy IDs are composite with pet ID; account/device settings have their own table.
+- [x] Configure WAL/foreign keys/busy timeout through native supported APIs. Add bounded retry only for recognized lock contention, preserving other failures. Each retry starts a fresh transaction. Keep the configured connection private; Expo’s exclusive helper creates another connection and cannot inherit connection-local foreign-key settings.
+- [x] Run actual SQLite tests and typechecks. Expected GREEN. Verify adapter shape against installed Expo SQLite types; do not use type casts to pretend unsupported APIs exist.
+- [x] Commit schema/migration/adapter.
 
 ### Task 3: Transactional event/routine repository
 
