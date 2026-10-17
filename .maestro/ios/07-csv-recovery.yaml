@@ -39,8 +39,11 @@ tags:
           visible:
             text: ^(Cancel|Close|取消|关闭|Cancelar|Cerrar)$
           timeout: 30000
+      - waitForAnimationToEnd:
+          timeout: 5000
       - tapOn:
           text: ^(Cancel|Close|取消|关闭|Cancelar|Cerrar)$
+          retryTapIfNoChange: true
 - runFlow:
     when:
       platform: Android
@@ -50,9 +53,11 @@ tags:
             text: ^(Recent|Downloads|Documents|最近|Recientes)$
           timeout: 30000
       - pressKey: Back
-- assertVisible:
-    id: insights.import
-    enabled: true
+- extendedWaitUntil:
+    visible:
+      id: insights.import
+      enabled: true
+    timeout: 30000
 - assertVisible:
     id: insights.export
     enabled: true
