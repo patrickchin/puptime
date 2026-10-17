@@ -36,6 +36,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "./plugins/withAndroidWidgetChronometer",
       [
         "react-native-android-widget",
         {

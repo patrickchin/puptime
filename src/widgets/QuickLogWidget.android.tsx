@@ -12,6 +12,7 @@ import {
   type QuickEventType,
 } from '../domain';
 import { resolveTheme, type ThemePreference } from '../theme';
+import { ChronometerWidget } from './ChronometerWidget.android';
 
 type ActionButton = {
   type: QuickEventType;
@@ -82,7 +83,6 @@ export function QuickLogWidget({
         const actionBorder = actionInk;
         const lastAt = lastEventAt?.[button.type];
         const lastDate = lastAt === undefined ? undefined : new Date(lastAt);
-        const dateLabel = lastDate === undefined ? undefined : new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(lastDate);
         const timeLabel = lastDate === undefined ? 'Never' : new Intl.DateTimeFormat(undefined, {
           hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
         }).format(lastDate);
@@ -116,16 +116,17 @@ export function QuickLogWidget({
                 maxLines={1}
                 style={{ color: actionInk, fontSize: compact ? 12 : 14, fontWeight: '700', textAlign: 'center', adjustsFontSizeToFit: true }}
               />
-              <TextWidget
-                text={timeLabel}
-                maxLines={1}
-                style={{ color: actionInk, fontSize: compact ? 9 : 11, fontWeight: '600', textAlign: 'center', adjustsFontSizeToFit: true, marginTop: 1 }}
-              />
-              {dateLabel && (
+              {lastAt === undefined ? (
                 <TextWidget
-                  text={dateLabel}
+                  text="Never"
                   maxLines={1}
-                  style={{ color: actionInk, fontSize: compact ? 8 : 9, fontWeight: '500', textAlign: 'center', adjustsFontSizeToFit: true }}
+                  style={{ color: actionInk, fontSize: compact ? 9 : 11, fontWeight: '600', textAlign: 'center', marginTop: 1 }}
+                />
+              ) : (
+                <ChronometerWidget
+                  at={lastAt}
+                  maxLines={1}
+                  style={{ color: actionInk, fontSize: compact ? 9 : 11, fontWeight: '600', textAlign: 'center', adjustsFontSizeToFit: true, marginTop: 1 }}
                 />
               )}
             </FlexWidget>
