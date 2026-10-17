@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { z } from 'zod';
-import { mutationSchema, type CloudRecord, type Mutation, type MutationResult, type PullPage, type Revision } from '../src/cloud/protocol';
+import { enrollmentSchema, mutationSchema, type Enrollment, type CloudRecord, type Mutation, type MutationResult, type PullPage, type Revision } from '../src/cloud/protocol';
 import { reconcileMutation, ReconciliationError } from '../src/cloud/reconcile';
 
 const cursorSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
@@ -13,7 +13,7 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
     ctx.storage.transactionSync(() => {
       ctx.storage.sql.exec('CREATE TABLE IF NOT EXISTS schema_metadata (version INTEGER NOT NULL)');
       const version = ctx.storage.sql.exec<{ version: number }>('SELECT version FROM schema_metadata').toArray()[0]?.version ?? 0;
-      if (version > 1) throw new Error('Account schema requires a newer Worker.');
+      if (version > 2) throw new Error('Account schema requires a newer Worker.');
       if (version === 0) {
         ctx.storage.sql.exec(`
           CREATE TABLE records (id TEXT PRIMARY KEY, body TEXT NOT NULL);
@@ -23,6 +23,15 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
           INSERT INTO schema_metadata(version) VALUES (1);
         `);
       }
+      if (version < 2) {
+        ctx.storage.sql.exec(`
+          CREATE TABLE pets (id TEXT PRIMARY KEY, initial_name TEXT NOT NULL, created_at INTEGER NOT NULL);
+          CREATE TABLE enrollments (id TEXT PRIMARY KEY, payload TEXT NOT NULL, result TEXT NOT NULL);
+          CREATE TABLE enrolled_devices (id TEXT NOT NULL, pet_id TEXT NOT NULL REFERENCES pets(id), PRIMARY KEY(id, pet_id));
+          CREATE INDEX records_by_pet_kind ON records(json_extract(body, '$.petId'), json_extract(body, '$.kind'), json_extract(body, '$.deleted'));
+          UPDATE schema_metadata SET version = 2;
+        `);
+      }
     });
   }
 
@@ -30,6 +39,10 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
     const mutation = mutationSchema.parse(input);
     const payload = JSON.stringify(mutation);
     return this.ctx.storage.transactionSync(() => {
+      const device = this.ctx.storage.sql.exec<{ pet_id: string }>('SELECT pet_id FROM enrolled_devices WHERE id = ? AND (? IS NULL OR pet_id = ?) LIMIT 1', mutation.deviceId, mutation.petId, mutation.petId).toArray()[0];
+      if (!device || (mutation.petId !== null && mutation.petId !== device.pet_id)) {
+        throw new ReconciliationError('Pet is not enrolled for this account.');
+      }
       const prior = this.ctx.storage.sql.exec<{ payload: string; result: string }>('SELECT payload, result FROM operations WHERE id = ?', mutation.operationId).toArray()[0];
       if (prior) {
         if (prior.payload !== payload) throw new ReconciliationError('Operation ID was already used for different content.');
@@ -52,6 +65,74 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
       this.ctx.storage.sql.exec('INSERT INTO operations(id, payload, result) VALUES (?, ?, ?)', mutation.operationId, payload, JSON.stringify(result));
       return result;
     });
+  }
+
+  enroll(input: Enrollment): { petId: string } {
+    const enrollment = enrollmentSchema.parse(input);
+    const payload = JSON.stringify(enrollment);
+    return this.ctx.storage.transactionSync(() => {
+      const previous = this.ctx.storage.sql.exec<{ payload: string; result: string }>('SELECT payload, result FROM enrollments WHERE id = ?', enrollment.operationId).toArray()[0];
+      if (previous) {
+        if (previous.payload !== payload) throw new ReconciliationError('Operation ID was already used for different enrollment.');
+        return JSON.parse(previous.result) as { petId: string };
+      }
+      const existing = this.ctx.storage.sql.exec<{ id: string }>('SELECT id FROM pets ORDER BY created_at, id LIMIT 1').toArray()[0];
+      if (existing && enrollment.confirmedPetId !== existing.id) throw new ReconciliationError('Existing puppy confirmation is required.');
+      if (!existing && enrollment.confirmedPetId) throw new ReconciliationError('Confirmed puppy does not exist.');
+      const petId = existing?.id ?? enrollment.localPetId;
+      if (!existing) this.ctx.storage.sql.exec('INSERT INTO pets(id, initial_name, created_at) VALUES (?, ?, ?)', petId, enrollment.name, Date.now());
+      this.ctx.storage.sql.exec('INSERT INTO enrolled_devices(id, pet_id) VALUES (?, ?) ON CONFLICT(id, pet_id) DO NOTHING', enrollment.deviceId, petId);
+      const result = { petId };
+      this.ctx.storage.sql.exec('INSERT INTO enrollments(id, payload, result) VALUES (?, ?, ?)', enrollment.operationId, payload, JSON.stringify(result));
+      return result;
+    });
+  }
+
+  summary(): { pets: { id: string; name: string; eventCount: number }[] } {
+    const pets = this.ctx.storage.sql.exec<{ id: string; initial_name: string }>('SELECT id, initial_name FROM pets ORDER BY created_at, id').toArray();
+    return { pets: pets.map((pet) => {
+      const profile = this.ctx.storage.sql.exec<JsonRow>('SELECT body FROM records WHERE id = ?', pet.id).toArray()[0];
+      const record = profile ? JSON.parse(profile.body) as CloudRecord : null;
+      const eventCount = this.ctx.storage.sql.exec<{ value: number }>("SELECT COUNT(*) AS value FROM records WHERE json_extract(body, '$.petId') = ? AND json_extract(body, '$.kind') = 'event' AND json_extract(body, '$.deleted') = 0", pet.id).one().value;
+      return { id: pet.id, name: record?.kind === 'puppy' && !record.deleted && 'name' in record.data && typeof record.data.name === 'string' ? record.data.name : pet.initial_name, eventCount };
+    }) };
+  }
+
+  enrollForClient(input: Enrollment): { petId: string } | { error: 'enrollment_conflict' } {
+    try { return this.enroll(input); }
+    catch (error) {
+      if (error instanceof ReconciliationError) return { error: 'enrollment_conflict' };
+      throw error;
+    }
+  }
+
+  push(mutations: Mutation[]): { accepted: MutationResult[]; rejected: { operationId: string; error: string }[] } {
+    const accepted: MutationResult[] = [];
+    const rejected: { operationId: string; error: string }[] = [];
+    for (const mutation of mutations) {
+      try { accepted.push(this.apply(mutation)); }
+      catch (error) { rejected.push({ operationId: mutation.operationId, error: error instanceof ReconciliationError ? 'conflict' : error instanceof z.ZodError ? 'invalid_mutation' : 'retry_later' }); }
+    }
+    return { accepted, rejected };
+  }
+
+  pullForClient(after: number, limit = 100): PullPage & { resyncRequired?: boolean } {
+    try { return this.pull(after, limit); }
+    catch (error) {
+      if (error instanceof ReconciliationError) return { changes: [], cursor: 0, hasMore: false, resyncRequired: true };
+      throw error;
+    }
+  }
+
+  exportSnapshot(): { cursor: number; pets: { id: string; name: string; eventCount: number }[] } {
+    const cursor = this.ctx.storage.sql.exec<{ value: number }>('SELECT COALESCE(MAX(sequence), 0) AS value FROM revisions').one().value;
+    return { cursor, ...this.summary() };
+  }
+
+  exportPage(after: number, through: number): Revision[] {
+    cursorSchema.parse(after); cursorSchema.parse(through);
+    return this.ctx.storage.sql.exec<JsonRow>('SELECT body FROM revisions WHERE sequence > ? AND sequence <= ? ORDER BY sequence LIMIT 100', after, through)
+      .toArray().map((row) => JSON.parse(row.body) as Revision);
   }
 
   pull(after: number, limit = 100): PullPage {

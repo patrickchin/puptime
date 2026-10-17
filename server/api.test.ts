@@ -37,5 +37,7 @@ test('HTTP sign-in reaches the authenticated account route without exposing sess
   const cookie = signIn.headers.getSetCookie().map((value) => value.split(';')[0]).join('; ');
   const account = await worker.fetch(new Request('https://puptime.test/api/account', { headers: { cookie } }), local);
   expect(account.status).toBe(200);
-  expect(await account.json()).toEqual({ user: { id: expect.any(String), email, name: expect.any(String) } });
+  const result = await account.json<{ user: unknown }>();
+  expect(result.user).toEqual({ id: expect.any(String), email, name: expect.any(String) });
+  expect(JSON.stringify(result)).not.toContain('session_token');
 });

@@ -76,3 +76,10 @@ export type Revision = {
 };
 export type MutationResult = { operationId: string; record: CloudRecord; sequence: number; reason: RevisionReason };
 export type PullPage = { changes: CloudRecord[]; cursor: number; hasMore: boolean };
+
+
+export const enrollmentSchema = z.strictObject({
+  operationId: identifier, deviceId: identifier, localPetId: identifier, name: label,
+  confirmedPetId: identifier.optional(),
+});
+export type Enrollment = z.infer<typeof enrollmentSchema>;
