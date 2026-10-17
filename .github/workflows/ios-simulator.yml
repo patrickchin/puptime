@@ -55,6 +55,7 @@ jobs:
         timeout-minutes: 35
         env:
           MAESTRO_CLI_NO_ANALYTICS: "1"
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: "180000"
         run: |
           runtime_id=$(xcrun simctl list runtimes -j | jq -r '[.runtimes[] | select(.isAvailable and (.identifier | contains("iOS-26")))][-1].identifier // empty')
           test -n "$runtime_id"
