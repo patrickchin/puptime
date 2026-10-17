@@ -110,7 +110,7 @@ function RecordingPlayer({ article, recording, theme }: { article: CareArticle; 
       setMuted(false);
     };
     const silent = muted || volume === 0;
-    return <section className="puptime-listener" data-testid="learn.audio" aria-label={t('learn.audioTitle')} style={{ background: theme.surface, borderColor: theme.border, color: theme.text, '--audio-accent': theme.primary } as React.CSSProperties}>
+    return <section className="puptime-listener" data-testid="learn.audio" aria-label={t('learn.audioTitle')} style={{ background: theme.surface, borderColor: theme.border, color: theme.text, '--audio-accent': theme.primary, '--audio-soft': theme.primarySoft, '--audio-border': theme.border } as React.CSSProperties}>
       <style>{webPlayerStyles}</style>
       <div className="puptime-listener-inner">
         <button className="puptime-listener-play" data-testid="learn.audio.play" aria-label={label} title={label} disabled={loading} aria-busy={loading} onClick={() => void play()} style={{ background: theme.primary, color: theme.onPrimary }}>
@@ -120,25 +120,32 @@ function RecordingPlayer({ article, recording, theme }: { article: CareArticle; 
           <div className="puptime-listener-title" title={title}>{title}</div>
           <div className="puptime-listener-credit" style={{ color: theme.textMuted }}>{loading ? t('learn.audioLoading') : t('learn.audioCredit', { voice: narrator })}</div>
         </div>
-        <button className="puptime-listener-skip puptime-listener-back" data-testid="learn.audio.back" aria-label={t('learn.audioBack')} title={t('learn.audioBack')} disabled={disabled} onClick={() => void seek(-15)}>−15</button>
-        <button className="puptime-listener-skip puptime-listener-forward" data-testid="learn.audio.forward" aria-label={t('learn.audioForward')} title={t('learn.audioForward')} disabled={disabled} onClick={() => void seek(15)}>+15</button>
+        <button className="puptime-listener-skip puptime-listener-back" data-testid="learn.audio.back" aria-label={t('learn.audioBack')} title={t('learn.audioBack')} disabled={disabled} onClick={() => void seek(-15)}>
+          <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true" fill="none"><path d="M8 9a11 11 0 1 1-3 9M8 4v5H3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /><text x="16" y="21" textAnchor="middle" fill="currentColor">15</text></svg>
+        </button>
+        <button className="puptime-listener-skip puptime-listener-forward" data-testid="learn.audio.forward" aria-label={t('learn.audioForward')} title={t('learn.audioForward')} disabled={disabled} onClick={() => void seek(15)}>
+          <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true" fill="none"><path d="M24 9a11 11 0 1 0 3 9M24 4v5h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /><text x="16" y="21" textAnchor="middle" fill="currentColor">15</text></svg>
+        </button>
         <input className="puptime-listener-progress" data-testid="learn.audio.seek" type="range" min="0" max={duration} step="0.1" value={scrub ?? status.currentTime} disabled={disabled} aria-label={t('learn.audioProgress')} aria-valuetext={`${audioTime(scrub ?? status.currentTime)} / ${audioTime(duration)}`} onChange={(event) => {
           const value = Number(event.currentTarget.value);
           setScrub(value);
           void seekTo(value);
         }} onPointerUp={() => setScrub(null)} onPointerCancel={() => setScrub(null)} onKeyUp={() => setScrub(null)} onBlur={() => setScrub(null)} />
         <output className="puptime-listener-time" data-testid="learn.audio.time">{audioTime(scrub ?? status.currentTime)} / {audioTime(duration)}</output>
-        <select className="puptime-listener-speed" data-testid="learn.audio.speed" aria-label={t('learn.audioSpeed')} value={rate} disabled={disabled} onChange={(event) => {
-          changeRate(Number(event.currentTarget.value));
-        }}>{[0.75, 1, 1.25, 1.5].map((speed) => <option key={speed} value={speed}>{speed}×</option>)}</select>
+        <div className="puptime-listener-speed-control">
+          <select className="puptime-listener-speed" data-testid="learn.audio.speed" aria-label={t('learn.audioSpeed')} title={t('learn.audioSpeed')} value={rate} disabled={disabled} onChange={(event) => {
+            changeRate(Number(event.currentTarget.value));
+          }}>{[0.75, 1, 1.25, 1.5].map((speed) => <option key={speed} value={speed}>{speed}×</option>)}</select>
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none"><path d="m4 6 4 4 4-4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </div>
         <div className="puptime-listener-volume">
-          <button aria-label={silent ? t('learn.audioUnmute') : t('learn.audioMute')} title={silent ? t('learn.audioUnmute') : t('learn.audioMute')} onClick={() => {
+          <button data-testid="learn.audio.mute" aria-label={silent ? t('learn.audioUnmute') : t('learn.audioMute')} title={silent ? t('learn.audioUnmute') : t('learn.audioMute')} onClick={() => {
             if (silent) { if (volume === 0) changeVolume(previousVolume.current); player.muted = false; setMuted(false); }
             else { player.muted = true; setMuted(true); }
           }}>
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4 5 9H2v6h3l6 5z" />{!silent ? <><path d="M15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14" /></> : <path d="m16 9 6 6m0-6-6 6" />}</svg>
           </button>
-          <input type="range" min="0" max="1" step="0.05" value={muted ? 0 : volume} aria-label={t('learn.audioVolume')} onChange={(event) => changeVolume(Number(event.currentTarget.value))} />
+          <input data-testid="learn.audio.volume" type="range" min="0" max="1" step="0.05" value={muted ? 0 : volume} aria-label={t('learn.audioVolume')} aria-valuetext={`${Math.round((muted ? 0 : volume) * 100)}%`} onChange={(event) => changeVolume(Number(event.currentTarget.value))} />
         </div>
         {error && <div className="puptime-listener-error" role="alert" style={{ color: theme.danger }}>{t('learn.audioError')}</div>}
       </div>
@@ -249,18 +256,24 @@ const styles = StyleSheet.create({
 
 const webPlayerStyles = `
 .puptime-listener{flex-shrink:0;border-top:1px solid;padding:14px 24px max(14px,env(safe-area-inset-bottom));font-family:Avenir Next,Avenir,system-ui,sans-serif;z-index:2}
-.puptime-listener-inner{max-width:1280px;margin:0 auto;display:grid;grid-template-columns:44px minmax(130px,220px) 44px 44px minmax(140px,1fr) auto 64px 104px;align-items:center;gap:12px}
+.puptime-listener-inner{max-width:1280px;margin:0 auto;display:grid;grid-template-columns:44px minmax(130px,200px) 44px 44px minmax(120px,1fr) auto 76px 132px;align-items:center;gap:12px}
 .puptime-listener button,.puptime-listener select{font:inherit;color:inherit;cursor:pointer;border:0;background:transparent;min-height:44px;border-radius:8px}
 .puptime-listener button:hover:not(:disabled){opacity:.8}
+.puptime-listener button:active:not(:disabled){transform:scale(.96)}
 .puptime-listener button:disabled,.puptime-listener input:disabled,.puptime-listener select:disabled{opacity:.45;cursor:default}
 .puptime-listener button:focus-visible,.puptime-listener input:focus-visible,.puptime-listener select:focus-visible{outline:2px solid var(--audio-accent);outline-offset:3px}
 .puptime-listener .puptime-listener-play{width:44px;border-radius:50%;display:grid;place-items:center}
 .puptime-listener-copy{min-width:0}.puptime-listener-title{font-size:14px;line-height:21px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.puptime-listener-credit{font-size:12px;line-height:19px}.puptime-listener-skip{font-size:13px!important;font-weight:600!important}
-.puptime-listener input{accent-color:var(--audio-accent);cursor:pointer;min-width:0;margin:0;min-height:24px}
+.puptime-listener-credit{font-size:12px;line-height:19px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.puptime-listener .puptime-listener-skip{width:44px;border-radius:50%;display:grid;place-items:center;background:var(--audio-soft);color:var(--audio-accent)}
+.puptime-listener-skip text{font:600 11px Avenir Next,Avenir,system-ui,sans-serif}
+.puptime-listener input{accent-color:var(--audio-accent);cursor:pointer;min-width:0;margin:0;min-height:44px}
 .puptime-listener-progress{width:100%}.puptime-listener-time{font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
-.puptime-listener-speed{font-size:13px!important;width:64px}.puptime-listener-volume{display:flex;align-items:center;gap:4px}.puptime-listener-volume button{width:44px;display:grid;place-items:center}.puptime-listener-volume input{width:56px}
-@media(pointer:coarse){.puptime-listener-volume input{display:none}}
+.puptime-listener-speed-control{position:relative;width:76px}
+.puptime-listener .puptime-listener-speed{appearance:none;-webkit-appearance:none;font-size:13px;font-weight:650;font-variant-numeric:tabular-nums;width:100%;padding:0 24px 0 12px;border:1px solid var(--audio-border);border-radius:22px;background:var(--audio-soft)}
+.puptime-listener-speed-control>svg{position:absolute;right:10px;top:15px;pointer-events:none}
+.puptime-listener-volume{display:flex;align-items:center;gap:8px;min-width:0}.puptime-listener-volume button{width:44px;flex-shrink:0;display:grid;place-items:center}.puptime-listener-volume input{width:80px;flex:1}
 .puptime-listener-error{grid-column:1/-1;font-size:13px;line-height:20px}
-@media(max-width:900px){.puptime-listener{padding:10px 16px max(10px,env(safe-area-inset-bottom))}.puptime-listener-inner{grid-template-columns:44px 44px 44px 1fr 52px;gap:6px}.puptime-listener-copy{order:0;grid-column:1/5;grid-row:1}.puptime-listener-play{order:1}.puptime-listener-back{order:2}.puptime-listener-forward{order:3}.puptime-listener-time{order:4;text-align:center}.puptime-listener-speed{order:5;width:52px}.puptime-listener-progress{order:6;grid-column:1/-1}.puptime-listener-volume{order:0;grid-column:5;grid-row:1;justify-content:flex-end}.puptime-listener-volume input{display:none}.puptime-listener-error{order:7}}
+@media(max-width:1000px){.puptime-listener{padding:10px 16px max(10px,env(safe-area-inset-bottom))}.puptime-listener-inner{grid-template-columns:44px 44px 44px minmax(0,1fr) 76px;gap:8px}.puptime-listener-copy{grid-column:1/-1;grid-row:1;padding-right:156px}.puptime-listener-play{grid-column:1;grid-row:2}.puptime-listener-back{grid-column:2;grid-row:2}.puptime-listener-forward{grid-column:3;grid-row:2}.puptime-listener-time{grid-column:4;grid-row:2;text-align:center}.puptime-listener-speed-control{grid-column:5;grid-row:2}.puptime-listener-progress{grid-column:1/-1;grid-row:3}.puptime-listener-volume{grid-column:4/-1;grid-row:1;justify-content:flex-end}.puptime-listener-volume input{max-width:96px}.puptime-listener-error{grid-row:4}}
+@media(max-width:359px){.puptime-listener{padding-left:10px;padding-right:10px}.puptime-listener-inner{column-gap:6px}.puptime-listener-time{font-size:10px}}
 `;
