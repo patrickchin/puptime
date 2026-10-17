@@ -12,6 +12,7 @@ This document maps the requested change and records decisions as they are made. 
 - Support one puppy in the first cloud release, with multiple puppies designed into the data boundaries from the start and exposed in a later update. Use stable pet IDs separate from account IDs; scope activity, routines, active naps, reminders, and widget targets to their pet. Keep the initial one-puppy limit in product behavior rather than a database schema that can only represent one pet per account.
 - All local features are free. User-facing backend services, including cloud backup, device sync, and later shared-care sync, are paid optional features. Use Obsidian's free-local/paid-services model as the commercial reference. The old approximately US$1.99 upfront app price is superseded; service prices, billing cadence, and any trial remain undecided.
 - Include a walkthrough showcasing different parts of the app before the first log. It is skippable and replayable from Settings. Keep payment unobtrusive. The detailed optional cloud-enrollment sequence remains a design decision.
+- First-run puppy setup asks only for a name. A **Not now** action uses **My puppy** until the user renames it. No additional profile fields are required before logging. The display name does not determine the stable pet ID.
 - Aim to offer Apple sign-in, Google sign-in, and passwordless email codes. Verify platform availability, provider configuration, and recovery behavior before committing to the final flow.
 - The user will purchase a dedicated Puptime domain later. Proceed without choosing a domain now, and do not use `harpapro.com` for Puptime's sender identity or public URLs. Domain-independent development and service preparation may continue; live sender/domain configuration remains deferred.
 - Preserve offline logging and synchronize when connected. Include telemetry, Sentry crash/error reporting, operational reliability, and coordinated website, app, policy, and listing updates.
@@ -51,12 +52,12 @@ Proposed Puptime journey, incorporating the requested walkthrough and account-fr
 
 1. Show the local outcome: remember the puppy's day, spot patterns, and plan a routine.
 2. Walk through Log, Timeline/Insights, Schedule, and Home Screen widgets using clearly labeled example data. Show representative app interactions before the first real log; the exact screen count and interaction format need prototyping.
-3. Create the first puppy locally with the smallest useful set of fields. Also provide a discoverable sign-in/restore path for returning cloud customers so they need not create a duplicate puppy.
+3. Create the first puppy locally, asking only for its name. **Not now** continues using **My puppy** until it is renamed. Renaming must preserve the pet ID and all associated history. Also provide a discoverable sign-in/restore path for returning cloud customers so they need not create a duplicate puppy.
 4. Arrive at a useful Log screen. Offer a real first log when appropriate, without inventing historical activity or forcing a false entry.
 5. Offer cloud backup/sync from a discoverable setting or a user-initiated online action. Show the benefit, price, and what will happen to existing local data. Include account creation/recovery, purchase restoration or entitlement activation, and a recoverable initial sync; their detailed order needs design. Keep a clear way back to free local use. Do not put a purchase screen between the walkthrough and the first local log.
 6. Request notification permission when a user enables a reminder; showcasing reminders in the walkthrough does not require permission. Introduce actual widget setup when relevant.
 
-The walkthrough is confirmed to be skippable and replayable from Settings. The optional cloud-enrollment sequence, any cloud trial, pet fields, and permission order remain unresolved. Include accessible controls, reduced motion, localization, keyboard handling, back navigation, cancellation, retry, wrong-account recovery, and offline/error states. Fresh local setup must work without connectivity, authentication, or purchase verification.
+The walkthrough is confirmed to be skippable and replayable from Settings, and first-run puppy setup is name-only with **Not now**. The optional cloud-enrollment sequence, any cloud trial, and permission order remain unresolved. Include accessible controls, reduced motion, localization, keyboard handling, back navigation, cancellation, retry, wrong-account recovery, and offline/error states. Fresh local setup must work without connectivity, authentication, or purchase verification.
 
 Measure signup completion, setup completion, time to first useful log, subsequent return, and successful cross-device restore separately. A completed slideshow is not sufficient evidence of activation. Define metrics and targets before beta; establish a baseline rather than inventing conversion targets.
 
@@ -175,6 +176,7 @@ Run unit/integration checks and native end-to-end flows using dedicated task-nam
 | Fresh, returning, and upgrading user | Correct onboarding branch, preserved data, no duplicate puppy. |
 | Account-free first launch without connectivity | Walkthrough, setup, and local logging work without auth or purchase verification. |
 | Walkthrough skipped or replayed from Settings | Skipping reaches the remaining local setup/logging flow; replay preserves real history and account state and keeps example data separate. |
+| Puppy name skipped, then added or changed later | **Not now** reaches logging with **My puppy**; renaming preserves the pet ID, history, routine, and sync mapping. |
 | Populated local device enrolls in cloud | Existing history is preserved; an existing cloud puppy's name/history summary is shown and combining requires confirmation; declining leaves local data unattached; interrupted retries do not duplicate or mix account data. |
 | Email/provider login canceled, expired, throttled, unavailable, or changed | Clear recovery, retained setup progress, and safe provider linking without losing access to history. |
 | Cloud offer dismissed, purchase canceled, entitlement expired, or billing unavailable | Free local features and history remain accessible; remote access follows the agreed retention/entitlement policy. |
@@ -196,14 +198,14 @@ All repository changes go through GitHub pull requests. Release and merge readin
 
 ## Decision queue for the product interview
 
-Already settled: backup/device sync first; one puppy initially with multiple-pet data boundaries from the start; all local features free without an account and user-facing cloud services paid; carry existing local data into cloud when sync is enabled; confirm the puppy using its name/history summary before combining local history with existing cloud data; unobtrusive payment; a pre-log app walkthrough that can be skipped and replayed from Settings; aim for Apple, Google, and email-code login; dedicated domain purchase deferred, with no use of `harpapro.com` for Puptime's sender/public URLs.
+Already settled: backup/device sync first; one puppy initially with multiple-pet data boundaries from the start; all local features free without an account and user-facing cloud services paid; carry existing local data into cloud when sync is enabled; confirm the puppy using its name/history summary before combining local history with existing cloud data; unobtrusive payment; a pre-log app walkthrough that can be skipped and replayed from Settings; optional name-only puppy setup with **Not now** using **My puppy**; aim for Apple, Google, and email-code login; dedicated domain purchase deferred, with no use of `harpapro.com` for Puptime's sender/public URLs.
 
 Resolve the following in dependency order, with recommendations and concrete consequences rather than a bulk questionnaire:
 
 1. The recovery presentation when local history belongs to a different puppy than the one in an existing account; the first cloud release's one-puppy scope and confirmation before combining are settled.
 2. Paid-service amounts, billing cadence, entitlement/retention rules, and treatment of existing purchasers, after current market/cost research.
 3. Existing-installation upgrade presentation, local-data upload consent, and detailed cloud-enrollment ordering.
-4. Required pet setup fields and the pet identity needed for reliable cross-device restore.
+4. Existing-installation presentation of the new puppy profile; name-only optional setup and stable identity are settled.
 5. Which data restores across devices: activities, routines, custom activities, and preference boundaries.
 6. Cloud-session expiration and reauthentication, logout/deletion semantics, conflict visibility, and supported sync offline duration; free local access remains available.
 7. Onboarding activation goal, notification timing, and any optional cloud trial.
