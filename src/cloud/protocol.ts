@@ -42,7 +42,7 @@ const accountPreferences = z.strictObject({
 const schemas = { event: eventDataSchema, puppy, routine, customActivity, customization, accountPreferences };
 export type RecordKind = keyof typeof schemas;
 export type RecordData = z.infer<(typeof schemas)[RecordKind]>;
-export function recordDataSchema(kind: RecordKind) { return schemas[kind]; }
+export function recordDataSchema<Kind extends RecordKind>(kind: Kind): typeof schemas[Kind] { return schemas[kind]; }
 const common = {
   protocolVersion: z.literal(1), operationId: identifierSchema, deviceId: identifierSchema,
   recordId: recordIdSchema, petId: identifierSchema.nullable(), baseRevision: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),

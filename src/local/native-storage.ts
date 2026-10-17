@@ -6,9 +6,19 @@ import { isThemePreference, type ThemePreference } from '../theme.ts';
 import type { LocalDatabase, SqlExecutor } from './database.ts';
 import { petSettingKeys, storageKeys, type LegacyKey } from './legacy.ts';
 import { createLocalRepository } from './repository.ts';
+import { localChanges, readLocalSettingsRecords, type LocalChangeSink } from './sync-projection.ts';
+import { recordDataSchema } from '../cloud/protocol.ts';
 
-export function createNativeStorage(database: LocalDatabase, petId: string) {
-  const repository = createLocalRepository(database, petId);
+export function createNativeStorage(database: LocalDatabase, petId: string, onChange?: LocalChangeSink) {
+  const repository = createLocalRepository(database, petId, onChange);
+  function settingsWrite<T>(action:(sql:SqlExecutor)=>Promise<T>):Promise<T> {
+    return database.write(async sql=> {
+      const before=onChange?await readLocalSettingsRecords(sql,petId):[];
+      const result=await action(sql);
+      if (onChange) {const changes=localChanges(before,await readLocalSettingsRecords(sql,petId));if (changes.length) await onChange(sql,changes);}
+      return result;
+    });
+  }
   async function get(sql: SqlExecutor, key: LegacyKey) {
     const row = petSettingKeys.has(key)
       ? await sql.getFirstAsync<{ value: string }>('SELECT value FROM pet_settings WHERE pet_id=? AND key=?', petId, key)
@@ -49,6 +59,8 @@ export function createNativeStorage(database: LocalDatabase, petId: string) {
     loadEvents: repository.loadEvents, appendEvents: repository.appendEvents, importEvents: repository.importEvents,
     removeEvent: repository.removeEvent, updateEvent: repository.updateEvent, updateEventTime: repository.updateEventTime,
     loadSchedule: repository.loadSchedule, saveSchedule: repository.saveSchedule,
+    loadPuppyName:()=>database.read(async sql=>{const pet=await sql.getFirstAsync<{name:string}>('SELECT name FROM puppies WHERE id=?',petId);if (!pet) throw new Error('The local puppy could not be found.');return pet.name;}),
+    savePuppyName:(name:string)=>settingsWrite(async sql=>{const value=recordDataSchema('puppy').parse({name});if (!('name' in value)) throw new Error('Invalid puppy name.');await sql.runAsync('UPDATE puppies SET name=? WHERE id=?',value.name,petId);}),
     async shouldShowOnboarding() {
       return database.read(async (sql) => (await sql.getFirstAsync<{ value: string }>("SELECT value FROM metadata WHERE key='show_onboarding'"))?.value === 'true');
     },
@@ -59,12 +71,12 @@ export function createNativeStorage(database: LocalDatabase, petId: string) {
       });
     },
     loadThemePreference: () => database.read(async (sql) => { const value = await get(sql, storageKeys.theme); return isThemePreference(value) ? value : 'system'; }),
-    saveThemePreference: (value: ThemePreference) => database.write((sql) => set(sql, storageKeys.theme, value)),
+    saveThemePreference: (value: ThemePreference) => settingsWrite((sql) => set(sql, storageKeys.theme, value)),
     loadLanguagePreference: () => database.read(async (sql) => { const value = await get(sql, storageKeys.language); return isLanguagePreference(value) ? value : 'system'; }),
-    saveLanguagePreference: (value: LanguagePreference) => database.write((sql) => set(sql, storageKeys.language, value)),
+    saveLanguagePreference: (value: LanguagePreference) => settingsWrite((sql) => set(sql, storageKeys.language, value)),
     loadCustomActivities: (events?: PuppyEvent[]) => database.write((sql) => activities(sql, events)),
     async saveCustomActivity(label: string) {
-      return database.write(async (sql) => {
+      return settingsWrite(async (sql) => {
         const key = customActivityKey(label);
         const deleted = await strings(sql, storageKeys.deletedCustomActivities);
         if (deleted.includes(key)) await set(sql, storageKeys.deletedCustomActivities, JSON.stringify(deleted.filter((item) => item !== key)));
@@ -73,7 +85,7 @@ export function createNativeStorage(database: LocalDatabase, petId: string) {
       });
     },
     async deleteCustomActivity(label: string) {
-      return database.write(async (sql) => {
+      return settingsWrite(async (sql) => {
         const key = customActivityKey(label);
         await set(sql, storageKeys.deletedCustomActivities, JSON.stringify([...new Set([...await strings(sql, storageKeys.deletedCustomActivities), key])]));
         const next = normalizeCustomActivities((await activities(sql)).filter((item) => customActivityKey(item) !== key));
@@ -83,7 +95,7 @@ export function createNativeStorage(database: LocalDatabase, petId: string) {
       });
     },
     loadActivityCustomizations: () => database.read(customizations),
-    saveActivityCustomization: (key: ActivityKey, value: ActivityCustomization) => database.write(async (sql) => {
+    saveActivityCustomization: (key: ActivityKey, value: ActivityCustomization) => settingsWrite(async (sql) => {
       const next = { ...await customizations(sql), [key]: value };
       await set(sql, storageKeys.activityCustomizations, JSON.stringify(next)); return next;
     }),
@@ -92,10 +104,10 @@ export function createNativeStorage(database: LocalDatabase, petId: string) {
       if (raw === null) return [...DEFAULT_WIDGET_ACTIONS];
       return normalizeWidgetActions(await strings(sql, storageKeys.widgetActions), customActivities ?? await activities(sql));
     }),
-    saveWidgetActions: (actions: ActivityKey[]) => database.write(async (sql) => {
+    saveWidgetActions: (actions: ActivityKey[]) => settingsWrite(async (sql) => {
       await set(sql, storageKeys.widgetActions, JSON.stringify(normalizeWidgetActions(actions, await activities(sql))));
     }),
     loadNotificationPreferences: () => database.read(async (sql) => normalizeNotificationPreferences(await object(sql, storageKeys.notificationPreferences) ?? DEFAULT_NOTIFICATION_PREFERENCES)),
-    saveNotificationPreferences: (value: NotificationPreferences) => database.write((sql) => set(sql, storageKeys.notificationPreferences, JSON.stringify(normalizeNotificationPreferences(value)))),
+    saveNotificationPreferences: (value: NotificationPreferences) => settingsWrite((sql) => set(sql, storageKeys.notificationPreferences, JSON.stringify(normalizeNotificationPreferences(value)))),
   };
 }
