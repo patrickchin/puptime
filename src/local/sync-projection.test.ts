@@ -118,3 +118,22 @@ test('locally valid legacy values remain lossless even when cloud limits are nar
   const record=(await database.read(sql=>projection.readLocalRecords(sql,'pet-1'))).find(value=>value.kind==='event')!;
   assert.equal(record.localId,local.id); assert.equal(record.data.note,local.note);
 });
+
+test('applying an unchanged populated snapshot preserves cached rows and writes only the edited event',async t=>{
+ const {database,storage}=await setup(t);
+ await storage.appendEvents(Array.from({length:1000},(_,index)=>({...event,id:`row-${index}`,at:index})));
+ const before=await storage.loadEvents(),records=await database.read(sql=>projection.readLocalRecords(sql,'pet-1'));
+ await database.write(sql=>sql.execAsync('CREATE TABLE event_write_audit(id TEXT); CREATE TRIGGER count_event_updates AFTER UPDATE ON events BEGIN INSERT INTO event_write_audit(id) VALUES(NEW.id); END;'));
+ await database.write(sql=>projection.applyLocalRecords(sql,'pet-1',records,[]));
+ const unchanged=await storage.loadEvents();assert.equal(unchanged.filter((value,index)=>value===before[index]).length,1000);
+ const record=records.find(value=>value.kind==='event'&&value.localId==='row-500')!;record.data={...record.data,note:'only one edit'};
+ await database.write(sql=>projection.applyLocalRecords(sql,'pet-1',records,[]));
+ const after=await storage.loadEvents();assert.equal(after.filter((value,index)=>value===before[index]).length,999);
+ assert.deepEqual((await database.read(sql=>sql.getAllAsync<{id:string}>('SELECT id FROM event_write_audit'))).map(row=>row.id),['row-500']);
+});
+
+
+test('an empty new record cannot be skipped as a semantic no-op',async t=>{
+ const {database}=await setup(t);
+ await assert.rejects(database.write(sql=>projection.applyLocalRecords(sql,'pet-1',[{kind:'event',localId:'empty',data:{}}],[])));
+});

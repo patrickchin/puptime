@@ -75,7 +75,7 @@ CREATE INDEX IF NOT EXISTS local_revision_history ON local_revisions(pet_id,kind
 CREATE TABLE IF NOT EXISTS local_sync_owner (
   singleton INTEGER PRIMARY KEY CHECK(singleton=1), generation TEXT NOT NULL UNIQUE,
   account_id TEXT NOT NULL, device_id TEXT NOT NULL, cursor INTEGER NOT NULL DEFAULT 0 CHECK(cursor>=0),
-  pending_pet_id TEXT REFERENCES puppies(id), staging_cursor INTEGER NOT NULL DEFAULT 0 CHECK(staging_cursor>=0),
+  pending_pet_id TEXT REFERENCES puppies(id), resyncing INTEGER NOT NULL DEFAULT 0 CHECK(resyncing IN (0,1)), staging_cursor INTEGER NOT NULL DEFAULT 0 CHECK(staging_cursor>=0),
   staging_complete INTEGER NOT NULL DEFAULT 0 CHECK(staging_complete IN (0,1))
 );
 CREATE TABLE IF NOT EXISTS local_sync_pets (
@@ -95,6 +95,11 @@ CREATE INDEX IF NOT EXISTS local_sync_pending ON local_sync_outbox(generation,se
 CREATE TABLE IF NOT EXISTS local_sync_records (
   generation TEXT NOT NULL REFERENCES local_sync_owner(generation) ON DELETE CASCADE,
   record_id TEXT NOT NULL, body TEXT NOT NULL CHECK(json_valid(body)), PRIMARY KEY(generation,record_id)
+);
+CREATE TABLE IF NOT EXISTS local_sync_acks (
+  generation TEXT NOT NULL REFERENCES local_sync_owner(generation) ON DELETE CASCADE,
+  operation_id TEXT NOT NULL, mutation_json TEXT NOT NULL CHECK(json_valid(mutation_json)),
+  result_json TEXT NOT NULL CHECK(json_valid(result_json)), outcome TEXT NOT NULL DEFAULT 'accepted' CHECK(outcome IN ('accepted','rejected')), PRIMARY KEY(generation,operation_id)
 );
 CREATE TABLE IF NOT EXISTS local_sync_baseline (
   generation TEXT NOT NULL REFERENCES local_sync_owner(generation) ON DELETE CASCADE,
