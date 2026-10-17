@@ -1,34 +1,38 @@
-# Native Storage and Widget Cutover
+# iOS App Storage Cutover
 
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:executing-plans inline, TDD, one fresh whole-branch review. Follow the repository's dedicated-device and screenshot gates.
 
-**Goal:** Switch every native app/Android widget writer to the verified SQLite repository; preserve existing settings and historical behavior; make iOS widget taps durable independently of snapshot refreshes. This is phase 3b. No cloud upload yet; phase 3c adds owner-bound association/outbox/transport after this cutover is qualified.
+**Goal:** Switch the iOS app to the verified SQLite repository while preserving existing settings and history. This is phase 3b. No cloud upload yet; phase 3c adds owner-bound association/outbox/transport after this cutover is qualified. Android and widget changes are deferred by the user.
 
-**Architecture:** `storage.native.ts` lazily opens the shared app SQLite connection and delegates to a testable `createNativeStorage(database, petId)` facade. Web retains its existing backend. Events/routines use the foundation repository; settings read/modify/write operations use the same transaction connection. SQLite handles competing Android runtimes. iOS widget intents use standard SwiftUI/AppIntents and an app-group SQLite operation queue, avoiding the Expo JS timeline's read/replace race and truncation limit. Keep Expo's existing extension setup and public widget reload/legacy timeline APIs; own the small native widget source in the repo rather than patching dependency internals.
+**Architecture:** `storage.ios.ts` lazily opens the app SQLite connection and delegates to a testable `createNativeStorage(database, petId)` facade. Android and web retain their existing backend. Events/routines use the foundation repository; settings read/modify/write operations use the same serialized transaction connection. The existing widget integration is unchanged; its replacement remains on the unmerged deferred branch.
 
 **References:** `2026-10-17-native-persistence.md`, `../specs/2026-10-17-accounts-sync-design.md`, `docs/cloud-verification.md`.
+
+## Scope update
+
+User steering: focus on the iOS app; Android and widgets later. Completed widget work and its review finding are preserved, unmerged, on `codex/native-storage-cutover` (`bd99857`). The active iOS subset uses `src/storage.ios.ts`; Android keeps AsyncStorage and the existing widget transport remains in place. Stop further widget/Android work and qualification. The review found a stale snapshot boundary in the deferred transport; that code is not included in this iOS subset and must be fixed before its eventual merge.
 
 ## Invariants
 
 - No account required, no cloud association/upload/trial, no changed pricing.
 - Preserve all existing APIs, IDs, history, custom labels/deletion markers, customization, language/appearance and reminder preferences. Nap-log features are deferred: retain current controls and manual start/end/import behavior without introducing inferred completion.
-- App/widget success means a committed write. Any quota/lock/error leaves a retryable operation and shows failure; never confirm an unsaved action.
-- Per-puppy identity exists throughout. Native widget operations bind the puppy shown when tapped, and cannot be reassigned by a later active-puppy change.
+- App success means a committed write. Any quota/lock/error preserves existing data and reports failure; never confirm an unsaved action.
+- Per-puppy identity exists throughout. The schema supports more than one puppy without exposing multi-puppy UI.
 - Retain original AsyncStorage and migration snapshots. Future explicit local deletion must clear these, the app DB, widget queue and acknowledged-operation IDs.
 - No remote credentials or private user content in diagnostics/screenshots. Use synthetic populated history for verification.
 
 ### Task 1: Complete native storage facade
 
-**Files:** Add `src/local/native-storage.ts` and tests, `src/storage.native.ts`; extend database schema/migrations/tests as needed, using existing normalizers. Keep web `src/storage.ts` semantics intact.
+**Files:** Add `src/local/native-storage.ts` and tests, `src/storage.ios.ts`; extend database schema/migrations/tests as needed, using existing normalizers. Keep web `src/storage.ts` semantics intact.
 
 **Interfaces:** `createNativeStorage(database, petId)` exposes the same function names and return shapes imported from `storage` today. Every settings read/modify/write and related multi-key update is one database transaction. Historical custom activity derivation reads the transaction's event rows, avoiding nested queued database calls/deadlock. `shouldShowOnboarding` uses the migration's pre-default onboarding decision; completion persists atomically. Initialization caches success only and retries after errors.
 
 - [x] Write failing real-SQL compatibility tests for every existing settings API, onboarding, custom activity delete/recreate, history-derived labels, widget normalization, invalid/retired preferences and concurrent settings writers. Existing event/routine conformance stays in repository tests. Expected RED.
 - [x] Implement the facade with existing domain/normalization functions. Expose only the small SQL repository helpers necessary to share a transaction; do not call queued repository methods inside a database transaction.
-- [x] Add the native module selector and verify app/headless Android import the same database file; web still uses its previous implementation.
+- [x] Add the iOS module selector. Android and web keep their previous implementation; Android activation is deferred.
 - [x] Run full tests/typechecks/all-platform exports. Expected GREEN. Commit facade/cutover.
 
-### Task 2: Durable iOS widget operations and acknowledgment
+### Task 2: Durable iOS widget operations and acknowledgment (deferred)
 
 **Files:** Add `native/ios/PuptimeWidgetStore.swift`, `native/ios/PuptimeQuickLogWidget.swift`, a config plugin that copies owned source into the generated extension entry point, `src/widgets/queue.ios.ts`, shared queue/import helpers and tests; update existing widget sync/bridge and app refresh. Replace the old notification-only plugin while preserving its confirmation/reminder behavior.
 
@@ -39,15 +43,15 @@
 - [ ] Import legacy pending timeline values once without clearing newer work; migration preserves existing app edits and existing manual nap completion semantics. Persist completion/ack markers with the imported events.
 - [ ] Run Swift/Node/runtime checks and compile the actual extension. An OS intent error or visible retry state replaces any false success on storage failure. Commit durable widget transport.
 
-### Task 3: Dedicated-device cutover qualification
+### Task 3: Dedicated-device cutover qualification (iOS app first)
 
-**Devices:** Create `Puptime Native Storage ae0c` iOS simulator and `Puptime_Native_Storage_ae0c` Android AVD; do not reuse another worktree's device. Local builds only; no paid EAS operation required.
+**Device:** Dedicated `Puptime Native Storage ae0c` iPhone 17 / iOS 26.5 simulator, UDID `99EB738C-D283-4A4E-8EF7-6DED36E3A10F`. The separate Android AVD is shut down and deferred. Local builds only; no paid EAS operation required.
 
 - [ ] Populate legacy AsyncStorage with synthetic history/preferences before first new-backend launch. Verify exact migration fidelity, restart/relaunch idempotency, preserved originals, account-free offline CRUD/import/settings/routines, and interrupted/failed migration retry.
-- [ ] Exercise Android app/headless widget competing writes and iOS actual widget/intent queue, including app refresh during taps, >100 pending actions, import/ack interruption and failure feedback. Check existing reminder/confirmation behavior.
-- [ ] Run happy/edge Maestro flows on both dedicated devices; extend the matrix for storage/migration/queue cases. Use real SQLite quota/lock tests for fault isolation where OS disk exhaustion is unsafe; report that boundary explicitly.
-- [ ] On populated Android history, exercise editor/detail local state and record evidence that unchanged rows do not redraw. If a regression exists, fix it with focused evidence and repeat only affected checks.
-- [ ] Capture fresh app/history/settings and widget screenshots from affected native screens for the final response. Record commands/results and native limitations separately from exports/unit tests.
+- [ ] **Deferred:** Android/widget concurrent writes, intent queue and notification delivery qualification. Preserved evidence on the deferred branch does not qualify this iOS-only subset.
+- [ ] Run iOS app happy/edge Maestro flows and the actual migration-failure alert flow. Real SQLite quota/lock tests isolate storage failures; no OS-wide disk exhaustion is performed.
+- [ ] **Deferred:** Android populated-history editor/detail rendering qualification; no Android activation is part of this PR.
+- [ ] Capture fresh iOS app screenshots. Record commands/results and native limitations separately from exports/unit tests.
 - [ ] Commit verification changes/evidence.
 
 ### Task 4: Review, PR and next sync boundary

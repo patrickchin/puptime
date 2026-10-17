@@ -15,6 +15,10 @@ The user delegated remaining technical decisions and autonomous execution. Imple
 
 Create a precise subsystem plan at each boundary using the actual interfaces and verified dependencies from earlier work. Scope changes and technical rulings belong in the design/ledger rather than assumptions in code. Final price amounts and public release configuration remain revisable until the feature set is complete.
 
+## Current execution priority
+
+The user directed **iOS app first; Android and widgets later**. The in-progress widget branch is preserved at `codex/native-storage-cutover` (`bd99857`) and is not merged. The active `codex/ios-storage-cutover` branch contains the storage facade with an iOS-only platform selector. Android keeps its existing backend; no new widget transport is activated here. Finish iOS storage qualification/review, then implement iOS accounts, owner-bound offline synchronization, onboarding and iOS end-to-end coverage. Deferred tracks must not block that sequence.
+
 ## Implementation evidence
 
 - Foundation PR: https://github.com/patrickchin/puptime/pull/84. Shared validation/reconciliation and internal account SQLite storage implemented; 108 Node tests and 13 real local Workers runtime tests pass, including post-write rollback and simultaneous-device edits. Both typechecks, Android/iOS/web exports, and Worker bundle dry-run passed. Fresh review's two material schema/native normalization findings were reproduced RED and fixed GREEN. No customer-data HTTP route, deployment, app cloud UI, or live-service qualification is claimed from this phase.

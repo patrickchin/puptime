@@ -26,7 +26,7 @@ This is an evidence ledger, not a declaration that cloud features have shipped. 
 - Sessions are seeded administratively into the isolated staging D1 and signed using the installed identity library's cookie utility. This verifies deployed authentication/session checking and downstream services, **not** email delivery, Apple, or Google sign-in. Fixtures are deleted through the normal account lifecycle; no test-code endpoint or auth bypass is deployed.
 - Run with authenticated staging Wrangler access and `PUPTIME_STAGING_AUTH_SECRET` supplied privately: `node scripts/verify-cloud-staging.mjs`. The secret is stored in macOS Keychain service `com.puptime.cloudflare-auth-staging`, account `puptime`; never print it or put it in a command argument/log. Temporary administrative SQL files are mode 0600 and removed at exit.
 - This machine's configured DNS returned no staging address while public Cloudflare DNS returned valid A records. Verification used a process-local hostname lookup from that public DNS, retaining the staging hostname and TLS certificate validation. System DNS settings were not changed.
-- Fresh whole-branch review found overlapping-email-suffix verification cleanup. The regression reproduced the cross-account deletion, then passed with exact allowlisted Better Auth OTP identifiers. Full checks: **42 Workers runtime tests, 111 Node tests, both typechecks, Android/iOS/web exports**. The existing optional self-hosted simulator CI job is separate from native acceptance.
+- Fresh whole-branch review found overlapping-email-suffix verification cleanup. The regression reproduced the cross-account deletion, then passed with exact allowlisted Better Auth OTP identifiers. Full checks: **42 Workers runtime tests, 111 Node tests, both typechecks, Android/iOS/web exports**. The GitHub-hosted simulator job is separate from native acceptance; the earlier run built successfully but failed in its old widget warmup before Maestro. The iOS app cutover removes that widget prerequisite and must pass its own CI.
 
 ## Account lifecycle behavior
 
@@ -39,7 +39,7 @@ Account deletion requires explicit confirmation and recent authentication. The o
 ## Remaining release gates
 
 - [x] Apply staging migrations, deploy, and verify real HTTPS happy/edge API journeys with isolated synthetic fixtures.
-- [ ] Native transactional migration, widget acknowledgement, and cloud UI/runtime checks on dedicated iOS/Android devices.
+- [ ] iOS app transactional migration and runtime qualification (in progress below), followed by account/offline-sync UI checks. Android activation and widget replacement are deferred by user direction.
 - [ ] Dedicated domain and real verified email sender/inbox delivery; local previews do not prove SMTP delivery.
 - [ ] Real Apple/Google provider configuration and native callback/recovery checks.
 - [ ] Stripe/native billing events and resulting entitlement verified; sandbox evidence reported separately from any approved live transaction.
@@ -49,3 +49,12 @@ Account deletion requires explicit confirmation and recent authentication. The o
 - [ ] Production deployment and distributed app acceptance matrix, including documented unexecuted provider/store/physical-device checks.
 
 Do not tick a gate based on credentials being configured, a mock returning success, or a different environment passing. No live charges or paid resource upgrades are authorized by the current free-tier boundary.
+
+## iOS app storage cutover (qualification in progress)
+
+The active branch is `codex/ios-storage-cutover`. Only iOS selects the new SQLite facade; Android retains AsyncStorage. Widget transport changes are preserved unmerged on `codex/native-storage-cutover` (`bd99857`). A review found a stale snapshot boundary in that deferred transport; it must be corrected before future widget integration. It is absent from this iOS subset.
+
+- `npm test`: **138/138 pass**; app typecheck passes. Fresh Expo iOS prebuild, pods and ad-hoc-signed Release simulator build pass. The app is installed on the dedicated `Puptime Native Storage ae0c` iPhone 17 / iOS 26.5 simulator.
+- `scripts/verify-ios-migration-retry.mjs` and `.maestro/native/ios-migration-failure.yaml` exercise the actual installed iOS app, Expo SQLite and original AsyncStorage files with 1,000 synthetic records. An injected failure at record 501 produces the real load-error alert, rolls back all event/puppy/marker writes and preserves all ten original values. Removing the trigger and relaunching imports exactly all 1,000 full records and all ten snapshots, then relaunches successfully. The test backs up the disposable simulator data before replacing it.
+- Repeat: prepare with `node --disable-warning=ExperimentalWarning scripts/verify-ios-migration-retry.mjs <dedicated-UDID> <synthetic-fixture.json>`, run the native migration alert Maestro flow, then run the script with `recover <retained-backup/state.json>`. The tool rejects devices outside the task's dedicated naming convention and non-synthetic fixtures. It must not target a customer installation.
+- Full iOS Maestro suite, final screenshots, revised subset review and new PR CI are pending. Native cloud sync, real provider login, actual notification delivery, physical devices and store distribution are not proven by this storage check.

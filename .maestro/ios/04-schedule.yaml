@@ -6,10 +6,9 @@ tags:
 ---
 - launchApp:
     clearState: true
-- runFlow: ../helpers/skip-onboarding.yaml
-- setPermissions:
     permissions:
       notifications: deny
+- runFlow: ../helpers/skip-onboarding.yaml
 - extendedWaitUntil:
     visible:
       id: nav.schedule
@@ -39,6 +38,12 @@ tags:
     checked: false
 - tapOn:
     id: schedule.editor.reminder
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          text: ^(Don.t allow|不允许|No permitir)$
 - tapOn:
     text: ^(Not now|暂不|Ahora no)$
     retryTapIfNoChange: true

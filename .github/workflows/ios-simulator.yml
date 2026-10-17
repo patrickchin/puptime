@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-26-intel
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -21,6 +21,8 @@ jobs:
           distribution: temurin
           java-version: "17"
       - run: npm ci
+      - name: Test transactional storage
+        run: npm test
       - run: npx expo prebuild --platform ios --no-install
         env:
           CI: "1"
@@ -34,7 +36,9 @@ jobs:
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath build/ios-simulator \
-            CODE_SIGNING_ALLOWED=NO \
+            -jobs 2 \
+            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGN_IDENTITY=- \
             build
           test -d build/ios-simulator/Build/Products/Release-iphonesimulator/Puptime.app
           ditto -c -k --sequesterRsrc --keepParent \
@@ -43,7 +47,7 @@ jobs:
           unzip -tq build/Puptime-iOS-Simulator.zip
       - name: Install Maestro
         env:
-          MAESTRO_VERSION: "2.8.0"
+          MAESTRO_VERSION: "2.11.0"
         run: |
           curl -fsSL "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
@@ -52,25 +56,13 @@ jobs:
         env:
           MAESTRO_CLI_NO_ANALYTICS: "1"
         run: |
-          devices=$(xcrun simctl list devices available -j)
-          iphone_id=$(printf '%s' "$devices" | jq -r '[.devices | to_entries[] | select(.key | contains("iOS-26")) | .value[] | select(.name | test("iPhone.*Pro$"))][0].udid // [.devices | to_entries[] | select(.key | contains("iOS-26")) | .value[] | select(.name | startswith("iPhone"))][0].udid // empty')
-          test -n "$iphone_id"
-          trap 'xcrun simctl shutdown "$iphone_id" >/dev/null 2>&1 || true' EXIT
-          xcrun simctl boot "$iphone_id" 2>/dev/null || true
+          runtime_id=$(xcrun simctl list runtimes -j | jq -r '[.runtimes[] | select(.isAvailable and (.identifier | contains("iOS-26")))][-1].identifier // empty')
+          test -n "$runtime_id"
+          iphone_id=$(xcrun simctl create "Puptime CI $GITHUB_RUN_ID" com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro "$runtime_id")
+          trap 'xcrun simctl delete "$iphone_id" >/dev/null 2>&1 || true' EXIT
+          xcrun simctl boot "$iphone_id"
           xcrun simctl bootstatus "$iphone_id" -b
           xcrun simctl install "$iphone_id" build/ios-simulator/Build/Products/Release-iphonesimulator/Puptime.app
-          xcrun simctl launch "$iphone_id" com.patrickchin.puptime >/dev/null
-          sleep 5
-          xcrun simctl terminate "$iphone_id" com.patrickchin.puptime
-          group_container=$(xcrun simctl get_app_container "$iphone_id" com.patrickchin.puptime group.com.patrickchin.puptime 2>/dev/null || true)
-          widget_defaults="$group_container/Library/Preferences/group.com.patrickchin.puptime.plist"
-          if [ ! -f "$widget_defaults" ]; then
-            app_data=$(xcrun simctl get_app_container "$iphone_id" com.patrickchin.puptime data)
-            widget_defaults="$app_data/Library/Preferences/group.com.patrickchin.puptime.plist"
-          fi
-          swift scripts/verify-ios-widget.swift \
-            "$widget_defaults" \
-            build/ios-simulator/Build/Products/Release-iphonesimulator/Puptime.app/PlugIns/ExpoWidgetsTarget.appex/ExpoWidgets.bundle/ExpoWidgets.bundle
           maestro test \
             --platform ios \
             --device "$iphone_id" \
@@ -92,12 +84,13 @@ jobs:
       - name: Capture App Store screenshots
         timeout-minutes: 20
         run: |
-          devices=$(xcrun simctl list devices available -j)
-          iphone_id=$(printf '%s' "$devices" | jq -r '[.devices | to_entries[] | select(.key | contains("iOS-26")) | .value[] | select(.name | test("iPhone.*(Pro Max|Plus)"))][0].udid // [.devices | to_entries[] | select(.key | contains("iOS-26")) | .value[] | select(.name | startswith("iPhone"))][0].udid // empty')
-          ipad_id=$(printf '%s' "$devices" | jq -r '[.devices | to_entries[] | select(.key | contains("iOS-26")) | .value[] | select(.name | test("iPad Pro.*(13-inch|12.9-inch)"))][0].udid // [.devices | to_entries[] | select(.key | contains("iOS-26")) | .value[] | select(.name | startswith("iPad"))][0].udid // empty')
-          test -n "$iphone_id"
-          test -n "$ipad_id"
-          trap 'xcrun simctl shutdown "$iphone_id" >/dev/null 2>&1 || true; xcrun simctl shutdown "$ipad_id" >/dev/null 2>&1 || true' EXIT
+          runtime_id=$(xcrun simctl list runtimes -j | jq -r '[.runtimes[] | select(.isAvailable and (.identifier | contains("iOS-26")))][-1].identifier // empty')
+          ipad_type=$(xcrun simctl list devicetypes -j | jq -r '[.devicetypes[] | select(.name == "iPad Pro 13-inch (M4)")][0].identifier // empty')
+          test -n "$runtime_id"
+          test -n "$ipad_type"
+          iphone_id=$(xcrun simctl create "Puptime CI Photos $GITHUB_RUN_ID" com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max "$runtime_id")
+          ipad_id=$(xcrun simctl create "Puptime CI Tablet $GITHUB_RUN_ID" "$ipad_type" "$runtime_id")
+          trap 'xcrun simctl delete "$iphone_id" >/dev/null 2>&1 || true; xcrun simctl delete "$ipad_id" >/dev/null 2>&1 || true' EXIT
 
           capture_screenshot() {
             device_id="$1"
