@@ -16,12 +16,16 @@ tags:
 - tapOn:
     id: nav.schedule
     retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: screen.schedule
+    timeout: 30000
 - scrollUntilVisible:
     element:
       id: schedule.add
     direction: DOWN
-    visibilityPercentage: 80
-    centerElement: true
+    visibilityPercentage: 100
+    centerElement: false
 - tapOn:
     id: schedule.add
     retryTapIfNoChange: true
@@ -52,16 +56,16 @@ tags:
     element:
       id: schedule.editor.save
     direction: DOWN
-    visibilityPercentage: 80
-    centerElement: true
+    visibilityPercentage: 100
+    centerElement: false
 - tapOn:
     id: schedule.editor.save
 - scrollUntilVisible:
     element:
       id: schedule.entry.walk
-    direction: DOWN
-    visibilityPercentage: 80
-    centerElement: true
+    direction: UP
+    visibilityPercentage: 100
+    centerElement: false
 - tapOn:
     id: schedule.entry.walk
     retryTapIfNoChange: true
@@ -78,8 +82,8 @@ tags:
     element:
       id: schedule.editor.save
     direction: DOWN
-    visibilityPercentage: 80
-    centerElement: true
+    visibilityPercentage: 100
+    centerElement: false
 - tapOn:
     id: schedule.editor.save
 - assertVisible:
@@ -103,8 +107,8 @@ tags:
     element:
       id: schedule.entry.poop.remove
     direction: DOWN
-    visibilityPercentage: 80
-    centerElement: true
+    visibilityPercentage: 100
+    centerElement: false
 - tapOn:
     id: schedule.entry.poop.remove
 - tapOn:
