@@ -1,7 +1,8 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { type ComponentProps, type ComponentType, useEffect, useRef, useState } from 'react';
-import { Alert, BackHandler, Image, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { Alert, BackHandler, Image, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { useScreenDimensions } from '../use-screen-dimensions';
 import { useLocalization } from '../localization-context';
 import { GuideListener } from '../components/GuideListener';
 import { careArticles, careReviewedOn, careSources, findCareArticles, type CareArticle } from '../puppy-care';
@@ -48,7 +49,7 @@ function ArticleRow({ article, theme, onOpen, featured = false, wide = false }: 
   article: CareArticle; theme: Theme; onOpen: (id: string) => void; featured?: boolean; wide?: boolean;
 }) {
   const { t } = useLocalization();
-  const { width, fontScale } = useWindowDimensions();
+  const { width, fontScale } = useScreenDimensions();
   const largeText = fontScale > 1.5;
   const content = (
     <>
@@ -75,7 +76,7 @@ function ArticleRow({ article, theme, onOpen, featured = false, wide = false }: 
     ],
   };
   return Platform.OS === 'web'
-    ? <WebAnchor {...props} href={`#puppy-care/${article.id}`} accessibilityRole="link">{content}</WebAnchor>
+    ? <WebAnchor {...props} href={`/puppy-care/${article.id}`} accessibilityRole="link">{content}</WebAnchor>
     : <Pressable {...props} accessibilityRole="button" onPress={() => onOpen(article.id)}>{content}</Pressable>;
 }
 
@@ -85,9 +86,11 @@ export function LearnScreen({ theme, articleId, onArticleChange }: {
   onArticleChange?: (id: string | null) => void;
 }) {
   const { language, t } = useLocalization();
-  const { width, fontScale } = useWindowDimensions();
+  const { width, fontScale } = useScreenDimensions();
   const [localArticleId, setLocalArticleId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [audioReady, setAudioReady] = useState(Platform.OS !== 'web');
+  useEffect(() => { setAudioReady(true); }, []);
   const selectedId = articleId === undefined ? localArticleId : articleId;
   const article = careArticles.find((item) => item.id === selectedId);
   const invalidArticle = selectedId !== null && !article;
@@ -143,7 +146,7 @@ export function LearnScreen({ theme, articleId, onArticleChange }: {
         <View style={[styles.headingRow, article && styles.articleHeading, fontScale > 1.5 && styles.headingLargeText]}>
           <View style={[styles.rowCopy, fontScale > 1.5 && styles.columnCopy]}>
             <Text style={[styles.eyebrow, { color: theme.primary }]}>{article ? article.category.toUpperCase() : t('learn.eyebrow')}</Text>
-            <Text ref={heading} accessibilityRole="header" style={[styles.title, { color: theme.text, fontSize: theme.presentation.titleSize, lineHeight: theme.presentation.titleLineHeight, fontWeight: theme.presentation.titleWeight }]}>{title}</Text>
+            <Text ref={heading} accessibilityRole="header" aria-level={1} style={[styles.title, { color: theme.text, fontSize: theme.presentation.titleSize, lineHeight: theme.presentation.titleLineHeight, fontWeight: theme.presentation.titleWeight }]}>{title}</Text>
             {!article && <Text style={[styles.intro, { color: theme.textMuted }]}>{invalidArticle ? t('learn.notFoundBody') : t('learn.intro')}</Text>}
           </View>
           {article && <GuideImage article={article} style={[styles.heroImage, width < 360 && styles.smallFeaturedImage, wide && styles.heroImageWide]} />}
@@ -229,7 +232,7 @@ export function LearnScreen({ theme, articleId, onArticleChange }: {
       </View>
     </ScrollView>
   );
-  return <View style={{ flex: 1, minHeight: 0 }}>{content}{article && <GuideListener key={`audio:${article.id}`} article={article} theme={theme} />}</View>;
+  return <View style={{ flex: 1, minHeight: 0 }}>{content}{article && audioReady && <GuideListener key={`audio:${article.id}`} article={article} theme={theme} />}</View>;
 }
 
 const styles = StyleSheet.create({
