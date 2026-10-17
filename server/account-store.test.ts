@@ -123,10 +123,10 @@ test('invalid mutation data and unbounded cursors/pages are rejected', async () 
 });
 
 test('public worker health works while customer data routes stay inaccessible', async () => {
-  const health = await worker.fetch(new Request('https://puptime.test/health'));
+  const health = await worker.fetch(new Request('https://puptime.test/health'), env);
   expect(health.status).toBe(200);
   expect(await health.json()).toEqual({ service: 'puptime-api', status: 'ok', protocolVersion: 1 });
-  expect((await worker.fetch(new Request('https://puptime.test/api/accounts/other/pull'))).status).toBe(404);
+  expect((await worker.fetch(new Request('https://puptime.test/api/accounts/other/pull'), env)).status).toBe(404);
 });
 
 test('a storage failure after the record write rolls back records, history and operation acknowledgment', async () => {
