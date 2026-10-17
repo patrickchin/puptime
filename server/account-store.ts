@@ -68,7 +68,7 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
     }));
   }
   webSocketMessage(socket:WebSocket) {socket.close(1008,'Receive-only channel');}
-  webSocketClose(socket:WebSocket,code:number) {socket.close(code===1005?1000:code);}
+  webSocketClose(socket:WebSocket,_code:number) {socket.close(1000); }
   webSocketError(socket:WebSocket) {try{socket.close(1011,'Channel unavailable');}catch{}}
 
   #assertActive(): void {

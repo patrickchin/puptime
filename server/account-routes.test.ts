@@ -252,3 +252,11 @@ test('hibernation reconstruction restores only owner/session references and stil
   await settleSocket();expect(seen.messages.length).toBe(2);expect(seen.closed).toBe(true);
  }finally{socket.close();}
 });
+test('an abnormal peer close is acknowledged with a valid WebSocket close code',async()=>{
+ const user=await owner();await enroll(user);const response=await changes(user);expect(response.status).toBe(101);
+ const socket=response.webSocket!;observeSocket(socket);await settleSocket();
+ await runInDurableObject(env.ACCOUNTS.getByName(user.id),async(instance,state)=>{
+  expect(()=>instance.webSocketClose(state.getWebSockets()[0],1006)).not.toThrow();
+ });
+ socket.close();
+});

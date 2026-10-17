@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import { enrollmentSchema, identifierSchema, mutationSchema, pullPageSchema, pushResponseSchema, type Enrollment, type Mutation } from './protocol.ts';
 
+// React Native's maintained AbortController polyfill exposes aborted, but not
+// the newer throwIfAborted()/reason API. Preserve native and browser cancellation.
+export function throwIfAborted(signal?:AbortSignal):void {
+  if(signal?.aborted)throw signal.reason??Object.assign(new Error('Aborted'),{name:'AbortError'});
+}
 export function cloudBaseUrl(value:string|undefined,allowLocal=false):string|null {
   if (!value) return null;
   const url=new URL(value),host=url.hostname.toLowerCase();
@@ -30,7 +35,7 @@ export function createSdkRequest(fetchClient:(url:string,options:SdkOptions)=>Pr
   const base=cloudBaseUrl(origin,true);if (!base) throw new Error('Cloud origin is missing.');
   return async(path,options)=>{
     if (!/^\/api\/(?:config|account|cloud\/(?:trial|enroll)|sync\/push|sync\/pull\?after=\d+)$/.test(path)) throw new CloudApiError('invalid-request',400);
-    options.signal?.throwIfAborted();
+    throwIfAborted(options.signal);
     let retryAfter:string|null=null;
     const result=await fetchClient(`${base}${path}`,{...options,redirect:'error',credentials:'omit',retry:0,timeout:15000,onResponse:({response})=>{retryAfter=response.headers.get('retry-after');}});
     return {...result,retryAfter};
@@ -47,11 +52,11 @@ function category(status:number):CloudErrorCategory {
 }
 export function createCloudApi(request:CloudRequest) {
   async function call<Schema extends z.ZodType>(path:string,schema:Schema,body?:object,signal?:AbortSignal):Promise<z.infer<Schema>> {
-    signal?.throwIfAborted();
+    throwIfAborted(signal);
     let result:RequestResult;
     try {result=await request(path,{method:body?'POST':'GET',...(body?{body}:{}),signal});}
-    catch {signal?.throwIfAborted();throw new CloudApiError('network');}
-    signal?.throwIfAborted();
+    catch {throwIfAborted(signal);throw new CloudApiError('network');}
+    throwIfAborted(signal);
     if (result.error) throw new CloudApiError(category(result.error.status),result.error.status,retryDelay(result.retryAfter));
     const parsed=schema.safeParse(result.data);
     if (!parsed.success) throw new CloudApiError('invalid-response');

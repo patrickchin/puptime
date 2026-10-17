@@ -1,0 +1,35 @@
+appId: com.patrickchin.puptime
+name: iOS email sign-in leaves cloud disabled
+---
+- launchApp:
+    stopApp: false
+- scrollUntilVisible:
+    element:
+      id: account.code.input
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn:
+    id: account.code.input
+- eraseText
+- inputText: ${MAESTRO_TEST_CODE}
+- assertVisible:
+    id: account.code.input
+    text: ^[0-9]{6}$
+- tapOn: Sign-in code
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      id: account.verify
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn:
+    id: account.verify
+- extendedWaitUntil:
+    visible:
+      id: account.enable
+    timeout: 30000
+- assertVisible:
+    id: account.local.count
+    text: 1 activity log
+- assertNotVisible:
+    id: account.email.input

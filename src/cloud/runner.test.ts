@@ -134,3 +134,9 @@ test('server access remains authoritative when the device clock is ahead of its 
  const api={...remote.api,account:async()=>({...account,cloud:{...account.cloud,expiresAt:1}})};
  assert.equal((await make(sync,api).run(signal())).state,'synced');
 });
+test('the actual installed native AbortController can enroll, sync and fence a cancelled run',async t=>{
+ const {AbortController:NativeController}=await import('abort-controller');const {sync,storage}=await fixture(t),remote=server();await storage.appendEvents([event]);await prepare(sync);
+ const native=new NativeController(),signal=native.signal as unknown as AbortSignal;
+ assert.equal((await make(sync,remote.api).run(signal)).state,'synced');assert.ok(remote.changes.some(record=>record.kind==='event'));
+ native.abort();const before=remote.calls.length;await assert.rejects(make(sync,remote.api).run(signal),error=>error instanceof Error&&error.name==='AbortError');assert.equal(remote.calls.length,before);
+});

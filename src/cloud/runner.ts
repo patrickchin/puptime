@@ -1,4 +1,4 @@
-import { CloudApiError,type CloudApi,type CloudErrorCategory } from './api.ts';
+import { throwIfAborted,CloudApiError,type CloudApi,type CloudErrorCategory } from './api.ts';
 import type { createLocalSync } from '../local/sync-engine.ts';
 import type { pushResponseSchema } from './protocol.ts';
 import type { z } from 'zod';
@@ -15,13 +15,13 @@ export function createSyncRunner({sync,api,petId,deviceId,sessionAccountId,chang
       let requests=0;
       const initial=await sync.status(petId),accountId=sessionAccountId();
       const result=async(state:RunResult['state'],retryAfterMs:number|null=null,problem:RunResult['problem']=null):Promise<RunResult>=>{const status=await sync.status(petId);return {state,pending:status.pending,blocked:status.blocked,retryAfterMs,problem};};
-      signal.throwIfAborted();
+      throwIfAborted(signal);
       if (initial.state==='local') return result('idle');
       if (!accountId) return result('auth-required',null,'auth-required');
       if (initial.accountId!==accountId||!initial.generation) return result('auth-required',null,'account-mismatch');
       const fence={accountId,generation:initial.generation};
       async function guard() {
-        signal.throwIfAborted();const current=await sync.status(petId);
+        throwIfAborted(signal);const current=await sync.status(petId);
         if (sessionAccountId()!==accountId||current.generation!==fence.generation||current.accountId!==accountId) throw new OwnerChanged();
       }
       async function invoke<T>(action:()=>Promise<T>):Promise<T> {
@@ -81,7 +81,7 @@ export function createSyncRunner({sync,api,petId,deviceId,sessionAccountId,chang
           if (pushed.rejected.some(item=>item.error==='retry_later')) throw new CloudApiError('server-error',503);
         }
       } catch(error) {
-        signal.throwIfAborted();
+        throwIfAborted(signal);
         if (error instanceof OwnerChanged) return result('auth-required',null,'account-mismatch');
         if (error instanceof BudgetReached) return result('pending',0);
         if (!(error instanceof CloudApiError)) return result('error',null,'local-storage');

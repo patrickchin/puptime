@@ -71,3 +71,11 @@ test('trial duration is validated configuration and legacy staging defaults to i
  assert.equal((await client(async()=>({data:{...config,trialDays:21},error:null})).config()).trialDays,21);
  await assert.rejects(client(async()=>({data:{...config,trialDays:0},error:null})).config(),/invalid-response/);
 });
+test('installed React Native abort signals support requests and cancellation without throwIfAborted',async()=>{
+ const {AbortController:NativeController}=await import('abort-controller');const native=new NativeController();
+ const signal=native.signal as unknown as AbortSignal;assert.equal(typeof signal.throwIfAborted,'undefined');
+ let calls=0;
+ const request=api.createSdkRequest(async()=>{calls++;return {data:account,error:null};},'https://puptime.test');
+ const cloud=client(request);assert.deepEqual(await cloud.account(signal),account);assert.equal(calls,1);
+ native.abort();await assert.rejects(cloud.account(signal),error=>error instanceof Error&&error.name==='AbortError');assert.equal(calls,1);
+});
