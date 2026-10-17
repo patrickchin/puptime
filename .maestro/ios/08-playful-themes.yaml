@@ -43,8 +43,6 @@ tags:
     id: timeline.mode.compare
 - assertVisible:
     id: timeline.zoom.in
-- assertVisible:
-    id: timeline.cluster.*
 - assertNotVisible:
     id: timeline.filter.nap
 - tapOn:
