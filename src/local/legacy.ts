@@ -10,6 +10,7 @@ export const storageKeys = {
 } as const;
 export const legacyKeys = Object.values(storageKeys);
 export type LegacyKey = typeof legacyKeys[number];
+export const petSettingKeys = new Set<LegacyKey>([storageKeys.customActivities, storageKeys.deletedCustomActivities, storageKeys.activityCustomizations]);
 export type LegacySnapshot = {
   raw: Record<LegacyKey, string | null>;
   events: PuppyEvent[];

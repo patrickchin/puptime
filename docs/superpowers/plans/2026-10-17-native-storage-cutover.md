@@ -23,10 +23,10 @@
 
 **Interfaces:** `createNativeStorage(database, petId)` exposes the same function names and return shapes imported from `storage` today. Every settings read/modify/write and related multi-key update is one database transaction. Historical custom activity derivation reads the transaction's event rows, avoiding nested queued database calls/deadlock. `shouldShowOnboarding` uses the migration's pre-default onboarding decision; completion persists atomically. Initialization caches success only and retries after errors.
 
-- [ ] Write failing real-SQL compatibility tests for every existing settings API, onboarding, custom activity delete/recreate, history-derived labels, widget normalization, invalid/retired preferences and concurrent settings writers. Existing event/routine conformance stays in repository tests. Expected RED.
-- [ ] Implement the facade with existing domain/normalization functions. Expose only the small SQL repository helpers necessary to share a transaction; do not call queued repository methods inside a database transaction.
-- [ ] Add the native module selector and verify app/headless Android import the same database file; web still uses its previous implementation.
-- [ ] Run full tests/typechecks/all-platform exports. Expected GREEN. Commit facade/cutover.
+- [x] Write failing real-SQL compatibility tests for every existing settings API, onboarding, custom activity delete/recreate, history-derived labels, widget normalization, invalid/retired preferences and concurrent settings writers. Existing event/routine conformance stays in repository tests. Expected RED.
+- [x] Implement the facade with existing domain/normalization functions. Expose only the small SQL repository helpers necessary to share a transaction; do not call queued repository methods inside a database transaction.
+- [x] Add the native module selector and verify app/headless Android import the same database file; web still uses its previous implementation.
+- [x] Run full tests/typechecks/all-platform exports. Expected GREEN. Commit facade/cutover.
 
 ### Task 2: Durable iOS widget operations and acknowledgment
 
