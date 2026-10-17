@@ -63,3 +63,21 @@ test('personal preference records require account scope and reject OS/device sta
     assert.equal(mutationSchema.safeParse({ ...preference, patch: { [key]: true } }).success, false);
   }
 });
+
+test('cloud custom activity labels cannot exceed native normalization limits', () => {
+  const tooLong = 'a'.repeat(40) + 'b';
+  assert.equal(recordDataSchema('customActivity').safeParse({ label: tooLong }).success, false);
+  assert.equal(recordDataSchema('routine').safeParse({ type: 'custom', customLabel: tooLong, minutes: 480 }).success, false);
+  assert.equal(eventDataSchema.safeParse({ type: 'custom', customLabel: tooLong, at: 100, source: 'app' }).success, false);
+  assert.equal(mutationSchema.safeParse({ ...mutation, intent: 'patch', patch: { customLabel: tooLong } }).success, false);
+  assert.equal(recordDataSchema('puppy').safeParse({ name: tooLong }).success, true);
+});
+
+test('cloud activity keys match canonical native quick actions and custom activity keys', () => {
+  for (const key of ['bad', 'unknown', 'custom:', 'custom:  ', 'custom:Walk', `custom:${'a'.repeat(41)}`]) {
+    assert.equal(recordDataSchema('customization').safeParse({ activityKey: key, name: 'Rename' }).success, false, key);
+    assert.equal(recordDataSchema('accountPreferences').safeParse({ widgetActions: ['pee', key] }).success, false, key);
+  }
+  assert.equal(recordDataSchema('accountPreferences').safeParse({ widgetActions: ['pee', 'custom:训练'] }).success, true);
+  assert.equal(recordDataSchema('customization').safeParse({ activityKey: 'meal', emoji: 'unsupported' }).success, false);
+});

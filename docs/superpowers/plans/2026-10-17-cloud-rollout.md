@@ -14,3 +14,9 @@ The user delegated remaining technical decisions and autonomous execution. Imple
 8. [ ] **Later browser puppy logging.** After the native cloud release is qualified, design authenticated browser activity creation/edit/history/routine access against the existing API. Decide offline-browser scope at that boundary. It must not delay marketing/account-management delivery.
 
 Create a precise subsystem plan at each boundary using the actual interfaces and verified dependencies from earlier work. Scope changes and technical rulings belong in the design/ledger rather than assumptions in code. Final price amounts and public release configuration remain revisable until the feature set is complete.
+
+## Implementation evidence
+
+- Foundation PR: https://github.com/patrickchin/puptime/pull/84. Shared validation/reconciliation and internal account SQLite storage implemented; 108 Node tests and 13 real local Workers runtime tests pass, including post-write rollback and simultaneous-device edits. Both typechecks, Android/iOS/web exports, and Worker bundle dry-run passed. Fresh review's two material schema/native normalization findings were reproduced RED and fixed GREEN. No customer-data HTTP route, deployment, app cloud UI, or live-service qualification is claimed from this phase.
+- Next precise plan: `2026-10-17-identity-entitlements.md`.
+- Scope steering: no new nap recording for now. Preserve existing nap history. App-wide versus nap-specific-sync scope clarification is pending; no inferred nap completion is implemented.
