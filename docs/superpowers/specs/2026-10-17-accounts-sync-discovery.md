@@ -13,6 +13,7 @@ This document maps the requested change and records decisions as they are made. 
 - All local features are free. User-facing backend services, including cloud backup, device sync, and later shared-care sync, are paid optional features. Use Obsidian's free-local/paid-services model as the commercial reference. The old approximately US$1.99 upfront app price is superseded; service prices, billing cadence, and any trial remain undecided.
 - Include a walkthrough showcasing different parts of the app before the first log. Keep payment unobtrusive. Walkthrough skip/replay behavior and the detailed optional cloud-enrollment sequence remain design decisions.
 - Aim to offer Apple sign-in, Google sign-in, and passwordless email codes. Verify platform availability, provider configuration, and recovery behavior before committing to the final flow.
+- The user will purchase a dedicated Puptime domain later. Proceed without choosing a domain now, and do not use `harpapro.com` for Puptime's sender identity or public URLs. Domain-independent development and service preparation may continue; live sender/domain configuration remains deferred.
 - Preserve offline logging and synchronize when connected. Include telemetry, Sentry crash/error reporting, operational reliability, and coordinated website, app, policy, and listing updates.
 - Plan and question first; implementation follows an agreed design.
 
@@ -90,6 +91,8 @@ Model an account's collection of pets even while the first release exposes one p
 Specify authenticated linking and unlinking of login methods, including Apple private-relay addresses and a person returning through a different provider. Require reauthentication for sensitive account changes and prevent removal of the last usable login method. Make duplicate-account recovery explicit without silently moving another account's history.
 
 Choose data region, email sender/domain, backup/restore capability, retention, and budgets. Estimate recurring costs before provisioning paid production services. Preserve the existing preference for avoiding unnecessary idle database polling; event-triggered deletion or maintenance work still needs reliable completion.
+
+Domain purchase is explicitly deferred. For development, exercise email-code flows through a local/test mail preview transport rather than sending from `harpapro.com` or inventing a production sender. Keep the chosen public base URL, sender address, and provider callback URLs configurable. Preview codes must remain confined to non-production test infrastructure; do not emit them into production logs, analytics, or client responses. A missing production sender must fail clearly without falling back to a development transport or another product's domain. DNS verification, real email delivery, and final domain-specific OAuth validation are release gates once the domain is available; local previews do not satisfy those gates.
 
 Ready when: test accounts can authenticate across supported devices, own isolated data, recover access, and be deleted in staging; unauthorized access tests pass.
 
@@ -190,7 +193,7 @@ All repository changes go through GitHub pull requests. Release and merge readin
 
 ## Decision queue for the product interview
 
-Already settled: backup/device sync first; one puppy initially with multiple-pet data boundaries from the start; all local features free without an account and user-facing cloud services paid; carry existing local data into cloud when sync is enabled; confirm the puppy using its name/history summary before combining local history with existing cloud data; unobtrusive payment; a pre-log app walkthrough; aim for Apple, Google, and email-code login.
+Already settled: backup/device sync first; one puppy initially with multiple-pet data boundaries from the start; all local features free without an account and user-facing cloud services paid; carry existing local data into cloud when sync is enabled; confirm the puppy using its name/history summary before combining local history with existing cloud data; unobtrusive payment; a pre-log app walkthrough; aim for Apple, Google, and email-code login; dedicated domain purchase deferred, with no use of `harpapro.com` for Puptime's sender/public URLs.
 
 Resolve the following in dependency order, with recommendations and concrete consequences rather than a bulk questionnaire:
 
