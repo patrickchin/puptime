@@ -33,7 +33,7 @@
 ## File and interface map
 
 - `src/cloud/record-identity.ts`: reversible cloud record identifiers and field-difference helper.
-- `src/cloud/protocol.ts`, `server/account-routes.ts`: bounded encoded record IDs and shared response validation; preserve protocol version 1 because payload semantics are unchanged and no production client exists.
+- `src/cloud/protocol.ts`, `server/account-routes.ts`, `server/account-store.ts`: bounded encoded record IDs and shared response validation; preserve protocol version 1 because payload semantics are unchanged and no production client exists.
 - `src/local/sync-projection.ts`: convert existing SQL events/routines/settings to typed records, apply projected records to those same tables, preserve the original local IDs.
 - `src/local/sync-engine.ts`: schema, association generation, pending mutations, baseline staging, atomic acknowledgments and pull/rebase.
 - `src/local/repository.ts`, `src/local/native-storage.ts`: optional transaction change sink; no callback after commit and no nested database queue calls.
@@ -42,7 +42,7 @@
 
 ### Task 1: Lossless scoped cloud identity and response validation
 
-**Files:** Create `src/cloud/record-identity.ts`, its test; modify `src/cloud/protocol.ts`, `server/account-routes.ts` and relevant server tests.
+**Files:** Create `src/cloud/record-identity.ts`, its test; modify `src/cloud/protocol.ts`, `server/account-routes.ts`, `server/account-store.ts` and relevant server tests.
 
 **Interfaces:**
 - `cloudRecordId(kind: RecordKind, cloudPetId: string | null, localId: string): string`: puppy ID equals cloudPetId; preferences use `JSON.stringify(['accountPreferences'])`; other kinds use `JSON.stringify([kind, cloudPetId, localId])`.
@@ -50,11 +50,11 @@
 - `fieldPatch(before: Record<string, unknown> | null, after: Record<string, unknown>): Record<string, unknown>`: changed fields only; explicit null for removed optional fields. Ordered arrays are one field.
 - Export `cloudRecordSchema`, `mutationResultSchema`, `pullPageSchema` and `pushResponseSchema`; validate data by its discriminated kind, integer revision/sequence, unique operation IDs and bounded pages. Keep exported TypeScript types inferred/consistent.
 
-- [ ] RED: add identity round-trip assertions for a 256-character local ID, quotes/backslashes/Unicode, event vs routine same ID, identical IDs in two pets, preference/puppy namespace boundaries, malformed tuple and mismatched scope. Assert exact local ID preservation and distinct cloud IDs. Field diff tests assert `{note:null}` for a removed note and no patch for a semantic no-op.
-- [ ] RED: shared response validation rejects unknown kinds, invalid per-kind data, negative/unsafe cursor, mismatched pet scope and duplicate operation results. Existing server tests verify encoded IDs longer than 256 are accepted and history works through URL-encoded IDs.
-- [ ] Run `node --test src/cloud/record-identity.test.ts src/cloud/protocol.test.ts` and the affected Workers test. Expect failures before implementation.
-- [ ] GREEN: implement the codecs with JSON and existing Zod schemas. Increase the shared record-ID cap to 2048 characters, use it in the history route, retain request body/batch limits. Limit decoded local IDs to 256 characters; larger existing local IDs remain local and become an explicit cloud validation issue in Task 3. Do not silently re-ID records.
-- [ ] Run `npm test`, `npm run test:server`, both typechecks. Commit `feat: preserve scoped local identities in cloud records`.
+- [x] RED: add identity round-trip assertions for a 256-character local ID, quotes/backslashes/Unicode, event vs routine same ID, identical IDs in two pets, preference/puppy namespace boundaries, malformed tuple and mismatched scope. Assert exact local ID preservation and distinct cloud IDs. Field diff tests assert `{note:null}` for a removed note and no patch for a semantic no-op.
+- [x] RED: shared response validation rejects unknown kinds, invalid per-kind data, negative/unsafe cursor, mismatched pet scope and duplicate operation results. Existing server tests verify encoded IDs longer than 256 are accepted and history works through URL-encoded IDs.
+- [x] Run `node --test src/cloud/record-identity.test.ts src/cloud/protocol.test.ts` and the affected Workers test. Expect failures before implementation.
+- [x] GREEN: implement the codecs with JSON and existing Zod schemas. Increase the shared record-ID cap to 2048 characters, use it in the history route, retain request body/batch limits. Limit decoded local IDs to 256 characters; larger existing local IDs remain local and become an explicit cloud validation issue in Task 3. Do not silently re-ID records.
+- [x] Run `npm test`, `npm run test:server`, both typechecks. Commit `feat: preserve scoped local identities in cloud records`.
 
 ### Task 2: Transactional local projection and change capture
 

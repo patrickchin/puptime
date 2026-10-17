@@ -179,3 +179,16 @@ test('an interrupted deletion can be retried without reopening access to retaine
   expect((await deleteAccount(user)).status).toBe(200);
   expect((await call(user, 'account')).status).toBe(401);
 });
+
+test('scoped long Unicode record IDs survive push and URL-encoded history lookup', async () => {
+  const user = await owner(); await enroll(user);
+  const id = JSON.stringify(['event', 'pet-1', '训练 "quoted" \\ '.repeat(20)]);
+  expect(id.length).toBeGreaterThan(256);
+  expect(id.length).toBeLessThanOrEqual(2048);
+  const pushed = await call(user, 'sync/push', { mutations: [event(id)] });
+  expect(pushed.status).toBe(200);
+  expect((await pushed.json<{ accepted: unknown[] }>()).accepted).toHaveLength(1);
+  const response = await call(user, `records/${encodeURIComponent(id)}/history`);
+  expect(response.status).toBe(200);
+  expect((await response.json<{ revisions: { recordId: string }[] }>()).revisions[0].recordId).toBe(id);
+});
