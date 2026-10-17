@@ -119,10 +119,10 @@
 
 ### Task 5: Review, merge and native transport handoff
 
-- [ ] Self-review spec coverage and five Review Focus items; ensure each has an executed regression. Document any ruling and exact checks in this plan's ledger.
-- [ ] Fresh whole-branch reviewer checks transactions/identity/ownership/response trust and tests. Fix material findings with RED→GREEN evidence and rerun the affected/full suite.
+- [x] Self-review spec coverage and five Review Focus items; ensure each has an executed regression. Document any ruling and exact checks in this plan's ledger.
+- [x] Fresh whole-branch reviewer checks transactions/identity/ownership/response trust and tests. Fix material findings with RED→GREEN evidence and rerun the affected/full suite.
 - [ ] Create/attach a GitHub PR; require applicable CI to pass, then merge through GitHub. Update `docs/cloud-verification.md` with executed engine evidence, explicitly leaving actual network, native runtime and provider-login gates unchecked.
-- [ ] Write the next precise iOS client plan: official Better Auth Expo/SecureStore, authenticated bounded HTTP runner, explicit enrollment flow, AppState/Expo Network triggers/backoff, active-only invalidation subscription, nonintrusive Settings status and Maestro staging journeys. Native UI is not advertised as synced until this next phase is qualified.
+- [x] Write the next precise iOS client plan: official Better Auth Expo/SecureStore, authenticated bounded HTTP runner, explicit enrollment flow, AppState/Expo Network triggers/backoff, active-only invalidation subscription, nonintrusive Settings status and Maestro staging journeys. Native UI is not advertised as synced until this next phase is qualified.
 
 ## Self-review
 
