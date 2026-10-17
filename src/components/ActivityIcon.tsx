@@ -12,13 +12,11 @@ const artwork = {
 };
 
 function ActivityArtwork({ source, index, size }: { source: number; index: number; size: number }) {
-  const { width, height } = Image.resolveAssetSource(source);
   // Each transparent atlas contains three square cells; crop in the view, preserving the original artwork.
   const cell = size * 1.25;
-  const imageHeight = cell * height / (width / 3);
   return (
     <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ width: size, height: size, overflow: 'hidden' }}>
-      <Image source={source} accessible={false} resizeMode="stretch" style={{ position: 'absolute', width: cell * 3, height: imageHeight, left: -index * cell - (cell - size) / 2, top: (size - imageHeight) / 2 }} />
+      <Image source={source} accessible={false} resizeMode="stretch" style={{ position: 'absolute', width: cell * 3, height: cell, left: -index * cell - (cell - size) / 2, top: (size - cell) / 2 }} />
     </View>
   );
 }
