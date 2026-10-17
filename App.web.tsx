@@ -140,8 +140,8 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
         </View>
       </View>
 
-      <View style={[styles.hero, compact && styles.heroCompact]}>
-        <View style={[styles.heroCopy, compact && styles.heroCopyCompact]}>
+      <View style={[styles.hero, narrow && styles.heroStacked, compact && styles.heroCompact]}>
+        <View style={[styles.heroCopy, narrow && styles.heroCopyStacked]}>
           <Text
             accessibilityRole="header"
             aria-level={1}
@@ -160,7 +160,7 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
           <Text style={styles.note}>Open source · iPhone and Android</Text>
         </View>
 
-        <View style={[styles.dayCard, compact && styles.dayCardCompact]}>
+        <View style={[styles.dayCard, narrow && styles.dayCardStacked, compact && styles.dayCardCompact]}>
           <View style={[styles.dayRail, compact && styles.dayRailCompact]}>
             <Text style={styles.dayLabel}>EXAMPLE DAY</Text>
             {day.map(([time, label], index) => (
@@ -333,19 +333,25 @@ const styles = StyleSheet.create({
     paddingTop: 52,
     paddingBottom: 96,
   },
-  heroCompact: {
+  heroStacked: {
     flexDirection: 'column',
     alignItems: 'stretch',
+  },
+  heroCompact: {
     gap: 48,
     paddingHorizontal: 20,
     paddingTop: 46,
     paddingBottom: 64,
   },
   heroCopy: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 0,
+    flexBasis: 0,
     minWidth: 0,
   },
-  heroCopyCompact: {
+  heroCopyStacked: {
+    flexGrow: 0,
+    flexBasis: 'auto',
     width: '100%',
   },
   title: {
@@ -424,7 +430,9 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
   dayCard: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 0,
+    flexBasis: 0,
     minWidth: 0,
     height: 650,
     flexDirection: 'row',
@@ -435,6 +443,11 @@ const styles = StyleSheet.create({
     borderRadius: 44,
     padding: 28,
   },
+  dayCardStacked: {
+    flexGrow: 0,
+    flexBasis: 'auto',
+    width: '100%',
+  },
   dayCardCompact: {
     width: '100%',
     height: 580,
@@ -443,14 +456,16 @@ const styles = StyleSheet.create({
     paddingVertical: 22,
   },
   dayRail: {
-    width: 156,
+    width: '36%',
+    maxWidth: 156,
     alignSelf: 'stretch',
     justifyContent: 'space-around',
     paddingVertical: 42,
     zIndex: 2,
   },
   dayRailCompact: {
-    width: 104,
+    width: '30%',
+    maxWidth: 104,
     paddingVertical: 32,
   },
   dayLabel: {
@@ -494,7 +509,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   phone: {
-    width: 270,
+    width: '64%',
+    maxWidth: 270,
     maxHeight: 588,
     aspectRatio: 430 / 932,
     overflow: 'hidden',
@@ -505,7 +521,8 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '2.5deg' }],
   },
   phoneCompact: {
-    width: 238,
+    width: '70%',
+    maxWidth: 238,
     borderRadius: 34,
     borderWidth: 7,
     marginLeft: -8,
