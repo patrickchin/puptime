@@ -2,6 +2,8 @@
 
 The public origin is `https://puptime.pages.dev`. Cloudflare Pages builds `npm run build:web` and publishes `dist-web` from `main`. Submit changes through a PR. The native entry remains `index.ts`; `index.web.ts` uses Expo Router solely for static website routes.
 
+The `.node-version` file pins the shared Pages/CI runtime. The SEO build script uses Node's native TypeScript support; older Pages defaults such as Node 22.16 cannot execute it.
+
 ## Search
 
 The build renders the homepage, care library, and all 13 guides to HTML, including article text, headings, source links, titles, descriptions, canonical URLs, Open Graph/Twitter metadata, and JSON-LD. It generates `/sitemap.xml` and `/robots.txt`. Previously shared `/#puppy-care/...` links redirect in the browser to the corresponding clean URL. A top-level `404.html` prevents nonexistent pages from falling back to a successful homepage response. Preview hosts have `X-Robots-Tag: noindex`.
