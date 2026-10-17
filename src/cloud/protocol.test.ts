@@ -81,3 +81,27 @@ test('cloud activity keys match canonical native quick actions and custom activi
   assert.equal(recordDataSchema('accountPreferences').safeParse({ widgetActions: ['pee', 'custom:训练'] }).success, true);
   assert.equal(recordDataSchema('customization').safeParse({ activityKey: 'meal', emoji: 'unsupported' }).success, false);
 });
+
+test('sync responses reject invalid records, scopes, cursors and duplicate acknowledgments', async () => {
+  const protocol = await import('./protocol.ts');
+  assert.equal(typeof protocol.cloudRecordSchema?.safeParse, 'function');
+  const record = { id: 'id', petId: 'pet-1', kind: 'event', data: { type: 'pee', at: 1, source: 'app' }, revision: 1, sequence: 1, deleted: false, updatedAt: 10 };
+  assert.deepEqual(protocol.cloudRecordSchema.parse(record), record);
+  for (const invalid of [
+    { ...record, kind: 'unknown' }, { ...record, data: { ...record.data, at: NaN } },
+    { ...record, petId: null }, { ...record, revision: -1 }, { ...record, sequence: Number.MAX_SAFE_INTEGER + 1 },
+    { ...record, kind: 'puppy', data: { name: 'Pip' } },
+    { ...record, kind: 'accountPreferences', data: { language: 'en' } },
+  ]) assert.equal(protocol.cloudRecordSchema.safeParse(invalid).success, false);
+  const page = { changes: [record], cursor: 1, hasMore: false };
+  assert.deepEqual(protocol.pullPageSchema.parse(page), page);
+  for (const invalid of [{ ...page, cursor: -1 }, { ...page, cursor: Number.MAX_SAFE_INTEGER + 1 }, { ...page, cursor: 2 }, { ...page, resyncRequired: true }, { ...page, changes: [record,record] }]) {
+    assert.equal(protocol.pullPageSchema.safeParse(invalid).success, false);
+  }
+  assert.equal(protocol.pullPageSchema.safeParse({ changes: [], cursor: 0, hasMore: false, resyncRequired: true }).success, true);
+  const accepted = { operationId: 'op-1', record, sequence: 1, reason: 'created' };
+  assert.equal(protocol.mutationResultSchema.safeParse({ ...accepted, sequence: 2 }).success, false);
+  assert.equal(protocol.pushResponseSchema.safeParse({ accepted: [accepted], rejected: [] }).success, true);
+  assert.equal(protocol.pushResponseSchema.safeParse({ accepted: [accepted,accepted], rejected: [] }).success, false);
+  assert.equal(protocol.pushResponseSchema.safeParse({ accepted: [accepted], rejected: [{ operationId: 'op-1', error: 'conflict' }] }).success, false);
+});
