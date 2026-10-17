@@ -53,11 +53,13 @@
 ### Task 4: Review and handoff to native cutover
 
 - [x] Fresh whole-branch review of main..branch against this plan, addressing material findings with RED→GREEN regressions and green suite.
-- [ ] Create/attach PR, wait for applicable CI, merge through GitHub. No direct main push.
-- [ ] Record completed evidence and exact remaining phase 3b/3c interfaces; write the next precise plan before switching native app/widget writers.
+- [x] Create/attach PR, wait for applicable CI, merge through GitHub. No direct main push.
+- [x] Record completed evidence and exact remaining phase 3b/3c interfaces; write the next precise plan before switching native app/widget writers.
 
 ## Validation evidence before review
 
 130 Node tests (including 19 migration/SQLite/repository tests), 42 real Workers tests, both typechecks and Android/iOS/web exports pass. SQLite tests use temporary real files and separate connections; they cover exact originals, rollback/retry, concurrent initialization/writes, pet isolation, corruption, file capacity exhaustion and bounded persistent locks. A 1,000-event fixture preserves 999 unchanged object references after one note edit. This is not native app/widget runtime or render acceptance; native writers still use the previous backend until phase 3b.
 
 Fresh review of main..6130cd5 found no material P0–P2 issues, independently reran all130 Node tests and typecheck, and verified the installed Expo transaction implementation. Native runtime gates remain open.
+
+Merged PR86 through GitHub as `a4c6a08`. Applicable verify and Pages checks passed; optional self-hosted simulator build remained queued. Next plan: `2026-10-17-native-storage-cutover.md`. Phase3a has not claimed runtime acceptance.

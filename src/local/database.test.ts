@@ -72,7 +72,7 @@ test('new installs migrate once and newer schemas fail without touching their ro
   const empty = parseLegacySnapshot(legacyKeys.map((key) => [key, null]));
   await migrateLegacy(database, empty, () => 'pet-empty');
   assert.equal((await database.read((sql) => sql.getFirstAsync<{ value: string }>("SELECT value FROM metadata WHERE key = 'show_onboarding'")))!.value, 'true');
-  await database.write((sql) => sql.runAsync("UPDATE metadata SET value = '2' WHERE key = 'schema_version'"));
+  await database.write((sql) => sql.runAsync("UPDATE metadata SET value = '999' WHERE key = 'schema_version'"));
   await assert.rejects(migrateLegacy(database, empty), /newer|unsupported/i);
   assert.equal((await database.read((sql) => sql.getFirstAsync<{ count: number }>('SELECT COUNT(*) AS count FROM puppies')))!.count, 1);
 });
@@ -83,4 +83,21 @@ test('completed migration never re-reads or reparses retained legacy storage', a
   await migrateLegacy(database, async () => { reads++; return snapshot; }, () => 'pet-lazy');
   await migrateLegacy(database, async () => { throw new Error('Legacy source is now unavailable'); });
   assert.equal(reads, 1);
+});
+
+test('v1 upgrade assigns legacy custom settings to the existing puppy without re-reading originals', async (t) => {
+  const { database } = await setup(t);
+  await database.write(async (sql) => {
+    await sql.execAsync(localSchema);
+    await sql.runAsync('INSERT INTO puppies(id,name) VALUES (?,?)', 'pet-v1', 'Existing');
+    for (const [key,value] of Object.entries({ schema_version: '1', active_pet_id: 'pet-v1', migration_complete: '1', show_onboarding: 'false' })) {
+      await sql.runAsync('INSERT INTO metadata(key,value) VALUES (?,?)', key, value);
+    }
+    await sql.runAsync('INSERT INTO settings(key,value) VALUES (?,?)', 'puptime.customActivities.v1', '["Training"]');
+    await sql.runAsync('INSERT INTO settings(key,value) VALUES (?,?)', 'puptime.theme.v1', 'soft-play');
+  });
+  assert.deepEqual(await migrateLegacy(database, async () => { throw new Error('Must not read originals'); }), { petId: 'pet-v1', migrated: false });
+  assert.equal((await database.read((sql) => sql.getFirstAsync<{ value: string }>('SELECT value FROM pet_settings WHERE pet_id=? AND key=?', 'pet-v1','puptime.customActivities.v1')))!.value, '["Training"]');
+  assert.equal(await database.read((sql) => sql.getFirstAsync('SELECT value FROM settings WHERE key=?', 'puptime.customActivities.v1')), null);
+  assert.equal((await database.read((sql) => sql.getFirstAsync<{ value: string }>('SELECT value FROM settings WHERE key=?', 'puptime.theme.v1')))!.value, 'soft-play');
 });

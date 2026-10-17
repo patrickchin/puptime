@@ -1,5 +1,5 @@
 import { STARTER_SCHEDULE } from '../domain.ts';
-import { legacyKeys, storageKeys, type LegacySnapshot } from './legacy.ts';
+import { legacyKeys, petSettingKeys, storageKeys, type LegacySnapshot } from './legacy.ts';
 export type SqlValue = string | number | null | Uint8Array;
 export interface SqlExecutor {
   execAsync(sql: string): Promise<void>;
@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS routines (
   PRIMARY KEY(pet_id,id)
 );
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS pet_settings (pet_id TEXT NOT NULL REFERENCES puppies(id) ON DELETE CASCADE, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY(pet_id,key));
 CREATE TABLE IF NOT EXISTS legacy_snapshots (key TEXT PRIMARY KEY NOT NULL, raw_value TEXT);
 `;
 
@@ -70,11 +71,18 @@ export async function migrateLegacy(database: LocalDatabase, source: LegacySnaps
   return database.write(async (sql) => {
     await sql.execAsync(localSchema);
     const version = await sql.getFirstAsync<{ value: string }>("SELECT value FROM metadata WHERE key = 'schema_version'");
-    if (version && version.value !== '1') throw new Error('Unsupported or newer local database schema.');
+    if (version && !['1','2'].includes(version.value)) throw new Error('Unsupported or newer local database schema.');
     if (version) {
       const pet = await sql.getFirstAsync<{ value: string }>("SELECT value FROM metadata WHERE key = 'active_pet_id'");
       const complete = await sql.getFirstAsync<{ value: string }>("SELECT value FROM metadata WHERE key = 'migration_complete'");
       if (!pet || complete?.value !== '1' || !await sql.getFirstAsync('SELECT id FROM puppies WHERE id = ?', pet.value)) throw new Error('The local migration metadata is incomplete.');
+      if (version.value === '1') {
+        for (const key of petSettingKeys) {
+          await sql.runAsync('INSERT INTO pet_settings(pet_id,key,value) SELECT ?,key,value FROM settings WHERE key=?', pet.value, key);
+          await sql.runAsync('DELETE FROM settings WHERE key=?', key);
+        }
+        await sql.runAsync("UPDATE metadata SET value='2' WHERE key='schema_version'");
+      }
       return { petId: pet.value, migrated: false };
     }
     const snapshot = typeof source === 'function' ? await source() : source;
@@ -86,9 +94,12 @@ export async function migrateLegacy(database: LocalDatabase, source: LegacySnaps
     for (const key of legacyKeys) {
       const raw = snapshot.raw[key];
       await sql.runAsync('INSERT INTO legacy_snapshots(key,raw_value) VALUES (?,?)', key, raw);
-      if (raw !== null && key !== storageKeys.events && key !== storageKeys.schedule) await sql.runAsync('INSERT INTO settings(key,value) VALUES (?,?)', key, raw);
+      if (raw !== null && key !== storageKeys.events && key !== storageKeys.schedule) {
+        if (petSettingKeys.has(key)) await sql.runAsync('INSERT INTO pet_settings(pet_id,key,value) VALUES (?,?,?)', petId, key, raw);
+        else await sql.runAsync('INSERT INTO settings(key,value) VALUES (?,?)', key, raw);
+      }
     }
-    for (const [key, value] of Object.entries({ schema_version: '1', active_pet_id: petId, migration_complete: '1', show_onboarding: String(snapshot.showOnboarding) })) {
+    for (const [key, value] of Object.entries({ schema_version: '2', active_pet_id: petId, migration_complete: '1', show_onboarding: String(snapshot.showOnboarding) })) {
       await sql.runAsync('INSERT INTO metadata(key,value) VALUES (?,?)', key, value);
     }
     return { petId, migrated: true };

@@ -6,10 +6,9 @@ tags:
 ---
 - launchApp:
     clearState: true
-- runFlow: ../helpers/skip-onboarding.yaml
-- setPermissions:
     permissions:
       notifications: deny
+- runFlow: ../helpers/skip-onboarding.yaml
 - extendedWaitUntil:
     visible:
       id: nav.schedule
@@ -21,24 +20,28 @@ tags:
     element:
       id: schedule.add
     direction: DOWN
-    visibilityPercentage: 50
-- swipe:
-    start: 50%,70%
-    end: 50%,35%
-    duration: 400
-- waitForAnimationToEnd:
-    timeout: 5000
+    visibilityPercentage: 80
+    centerElement: true
 - tapOn:
     id: schedule.add
-- assertVisible:
-    id: schedule.editor
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: schedule.editor
+    timeout: 30000
 - tapOn:
-    id: schedule.editor.type.meal
+    id: schedule.editor.type.walk
 - assertVisible:
     id: schedule.editor.reminder
     checked: false
 - tapOn:
     id: schedule.editor.reminder
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          text: ^(Don.t allow|不允许|No permitir)$
 - tapOn:
     text: ^(Not now|暂不|Ahora no)$
     retryTapIfNoChange: true
@@ -49,48 +52,38 @@ tags:
     element:
       id: schedule.editor.save
     direction: DOWN
-    visibilityPercentage: 50
-- swipe:
-    start: 50%,70%
-    end: 50%,35%
-    duration: 400
-- waitForAnimationToEnd:
-    timeout: 5000
+    visibilityPercentage: 80
+    centerElement: true
 - tapOn:
     id: schedule.editor.save
 - scrollUntilVisible:
     element:
-      id: schedule.entry.meal
+      id: schedule.entry.walk
     direction: DOWN
-    visibilityPercentage: 50
-- swipe:
-    start: 50%,70%
-    end: 50%,35%
-    duration: 400
-- waitForAnimationToEnd:
-    timeout: 5000
+    visibilityPercentage: 80
+    centerElement: true
 - tapOn:
-    id: schedule.entry.meal
+    id: schedule.entry.walk
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: schedule.editor
+    timeout: 30000
 - assertVisible:
     id: schedule.editor.reminder
     checked: false
 - tapOn:
-    id: schedule.editor.type.walk
+    id: schedule.editor.type.poop
 - scrollUntilVisible:
     element:
       id: schedule.editor.save
     direction: DOWN
-    visibilityPercentage: 50
-- swipe:
-    start: 50%,70%
-    end: 50%,35%
-    duration: 400
-- waitForAnimationToEnd:
-    timeout: 5000
+    visibilityPercentage: 80
+    centerElement: true
 - tapOn:
     id: schedule.editor.save
 - assertVisible:
-    id: schedule.entry.walk
+    id: schedule.entry.poop
 - waitForAnimationToEnd:
     timeout: 5000
 - tapOn:
@@ -108,31 +101,23 @@ tags:
     retryTapIfNoChange: true
 - scrollUntilVisible:
     element:
-      id: schedule.entry.walk.remove
+      id: schedule.entry.poop.remove
     direction: DOWN
-    visibilityPercentage: 50
-- swipe:
-    start: 50%,70%
-    end: 50%,35%
-    duration: 400
-- waitForAnimationToEnd:
-    timeout: 5000
+    visibilityPercentage: 80
+    centerElement: true
 - tapOn:
-    id: schedule.entry.walk.remove
+    id: schedule.entry.poop.remove
 - tapOn:
     text: ^(Cancel|取消|Cancelar)$
     retryTapIfNoChange: true
 - assertVisible:
-    id: schedule.entry.walk
+    id: schedule.entry.poop
 - tapOn:
-    id: schedule.entry.walk.remove
+    id: schedule.entry.poop.remove
 - tapOn:
     text: ^(Remove|移除|Quitar)$
     retryTapIfNoChange: true
-- scrollUntilVisible:
-    element:
-      id: schedule.empty
-    direction: UP
-    visibilityPercentage: 50
+- assertNotVisible:
+    id: schedule.entry.poop
 - assertVisible:
-    id: schedule.empty
+    id: screen.schedule

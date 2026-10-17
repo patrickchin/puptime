@@ -1,0 +1,9 @@
+appId: com.patrickchin.puptime
+name: Native interrupted migration reports failure
+# Prepare only on the dedicated synthetic simulator with
+# scripts/verify-ios-migration-retry.mjs, then recover with its state file.
+---
+- extendedWaitUntil:
+    visible: Couldn’t load saved activity
+    timeout: 90000
+- tapOn: OK

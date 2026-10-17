@@ -60,6 +60,7 @@ export function createLocalRepository(database: LocalDatabase, petId: string) {
     events: events.map((event) => event.id === id ? { ...event, ...changes, ...(event.estimated ? { estimated: true } : {}) } : event), value: undefined,
   }))).events;
   return {
+    async readEventsInTransaction(sql: SqlExecutor) { return (await readEvents(sql)).map((row) => row.event); },
     async loadEvents() { return materialize(await database.read(readEvents)); },
     async appendEvents(incoming: PuppyEvent[]) {
       assertValidEvents(incoming);
