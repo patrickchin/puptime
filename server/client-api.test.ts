@@ -6,6 +6,7 @@ import { beforeAll, expect, inject, test } from 'vitest';
 import { createCloudApi, createSdkRequest } from '../src/cloud/api';
 import { cloudRecordId } from '../src/cloud/record-identity';
 import worker from './index';
+import * as controllers from '../src/cloud/account-controller';
 
 beforeAll(()=>applyD1Migrations(env.AUTH_DB,inject('migrations')));
 
@@ -24,12 +25,15 @@ test('installed auth SDK and cloud API carry explicit OTP, trial, enrollment and
   const updates=response.headers.getSetCookie();if(updates.length) cookie=updates.map(value=>value.split(';')[0]).join('; ');
   return response;
  }}});
+ expect(typeof controllers.createIdentityAdapter).toBe('function');
+ const identity=controllers.createIdentityAdapter({emailOtp:auth.emailOtp,signIn:auth.signIn,signOut:auth.signOut,getCookie:async()=>cookie});
  const api=createCloudApi(createSdkRequest((url,options)=>auth.$fetch<unknown>(url,options),'https://puptime.test'));
  expect((await api.config()).providers.email).toBe(true);
  const email=`sdk-${crypto.randomUUID()}@example.com`;
- expect((await auth.emailOtp.sendVerificationOtp({email,type:'sign-in'})).error).toBeNull();
+ expect((await identity.requestEmail(email)).error).toBeNull();
  const preview=await env.AUTH_DB.prepare('SELECT code FROM local_email_previews WHERE email=?').bind(email).first<{code:string}>();
- expect((await auth.signIn.emailOtp({email,otp:preview!.code})).error).toBeNull();
+ expect((await identity.verifyEmail(email,preview!.code)).error).toBeNull();
+ expect(await identity.hasCredentials()).toBe(true);
  const signedIn=await api.account();expect(signedIn.cloud.canSync).toBe(false);expect(signedIn.pets).toEqual([]);
  expect(paths).not.toContain('/api/cloud/trial');expect(paths).not.toContain('/api/cloud/enroll');expect(paths).not.toContain('/api/sync/push');
  expect((await api.startTrial()).cloud.canSync).toBe(true);
@@ -39,6 +43,6 @@ test('installed auth SDK and cloud API carry explicit OTP, trial, enrollment and
  expect((await api.push([mutation])).accepted).toHaveLength(1);
  expect((await api.pull(0)).changes[0].id).toBe(mutation.recordId);
  expect(paths.every(path=>!path.includes('/api/auth/api/'))).toBe(true);
- expect((await auth.signOut()).error).toBeNull();
+ expect((await identity.signOut()).error).toBeNull();
  await expect(api.account()).rejects.toMatchObject({category:'auth-required',status:401});
 });

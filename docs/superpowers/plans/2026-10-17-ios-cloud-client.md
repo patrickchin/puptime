@@ -16,7 +16,7 @@
 - Free local use remains usable without accounts, connectivity, provider configuration or entitlement.
 - Use free service tiers only; no live prices/catalog, real charges, paid upgrades or public store submissions. Staging is not production.
 - Display only server-configured providers; never expose local OTP previews on a deployed server or use harpapro.com.
-- Credentials stay inside the official SDK/SecureStore, never SQLite, logs, analytics, query strings, screenshots or test artifacts.
+- Credentials stay inside the official SDK/SecureStore, never SQLite, logs, analytics, application-defined URL parameters, screenshots or test artifacts. The official SDK owns its transient native OAuth callback handoff; do not parse, log or persist callback URLs.
 - One puppy UI, pet-scoped data; same-puppy confirmation before existing-cloud combination. User cancel preserves local history.
 - Separate sign-in, explicit trial and explicit local-history association. The configurable14-day trial has no payment details or automatic charge.
 - Pause upload on auth/entitlement failures; preserve local saves, pending mutations, server data and retry identity. Never label pending/blocked work synced.
