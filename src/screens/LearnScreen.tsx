@@ -30,11 +30,11 @@ function GuideImage({ article, style }: { article: CareArticle; style: Component
 
 const WebAnchor = Pressable as ComponentType<ComponentProps<typeof Pressable> & { href: string }>;
 
-function SourceLink({ id, theme, compact = false }: { id: string; theme: Theme; compact?: boolean }) {
+function SourceLink({ id, theme, small = false }: { id: string; theme: Theme; small?: boolean }) {
   const { t } = useLocalization();
   const source = careSources[id];
-  const label = compact ? source.publisher : `${source.publisher} · ${source.title}`;
-  const content = <Text style={[styles.linkText, compact && styles.citationText, { color: theme.primary }]}>{label} ↗</Text>;
+  const label = `${source.publisher} · ${source.title}`;
+  const content = <Text style={[styles.linkText, small && styles.referenceText, { color: small ? theme.textMuted : theme.primary }]}>{label} ↗</Text>;
   const linkStyle = ({ pressed }: { pressed: boolean }) => [styles.sourceLink, pressed && styles.pressed];
   return Platform.OS === 'web' ? (
     <WebAnchor href={source.url} accessibilityRole="link" accessibilityLabel={`${source.publisher}: ${source.title}`} style={linkStyle}>{content}</WebAnchor>
@@ -44,13 +44,13 @@ function SourceLink({ id, theme, compact = false }: { id: string; theme: Theme; 
   );
 }
 
-function ArticleRow({ article, theme, onOpen, featured = false, wide = false }: {
-  article: CareArticle; theme: Theme; onOpen: (id: string) => void; featured?: boolean; wide?: boolean;
+function ArticleRow({ article, theme, onOpen, featured = false, wide = false, plain = false }: {
+  article: CareArticle; theme: Theme; onOpen: (id: string) => void; featured?: boolean; wide?: boolean; plain?: boolean;
 }) {
   const { t } = useLocalization();
   const { width, fontScale } = useWindowDimensions();
   const largeText = fontScale > 1.5;
-  const content = (
+  const content = plain ? <Text style={[styles.linkText, { color: theme.primary }]}>{article.shortTitle} →</Text> : (
     <>
       <GuideImage article={article} style={featured ? [styles.featuredImage, width < 360 && styles.smallFeaturedImage] : [styles.cardImage, largeText && styles.cardImageLargeText]} />
       <View style={featured ? [styles.rowCopy, largeText && styles.columnCopy] : undefined}>
@@ -67,7 +67,7 @@ function ArticleRow({ article, theme, onOpen, featured = false, wide = false }: 
   const props = {
     testID: `learn.article.${article.id}`,
     accessibilityLabel: `${t('learn.read')}: ${article.shortTitle}`,
-    style: ({ pressed }: { pressed: boolean }) => [
+    style: ({ pressed }: { pressed: boolean }) => plain ? [styles.relatedLink, pressed && styles.pressed] : [
       styles.articleCard, featured ? styles.featured : wide ? styles.cardWide : styles.cardSmall,
       largeText && (featured ? styles.featuredLargeText : styles.cardLargeText),
       { borderColor: theme.border, backgroundColor: featured ? theme.primarySoft : theme.surface, borderRadius: theme.presentation.controlRadius },
@@ -77,6 +77,27 @@ function ArticleRow({ article, theme, onOpen, featured = false, wide = false }: 
   return Platform.OS === 'web'
     ? <WebAnchor {...props} href={`#puppy-care/${article.id}`} accessibilityRole="link">{content}</WebAnchor>
     : <Pressable {...props} accessibilityRole="button" onPress={() => onOpen(article.id)}>{content}</Pressable>;
+}
+
+function GuideReferences({ article, theme }: { article: CareArticle; theme: Theme }) {
+  const { t } = useLocalization();
+  const [expanded, setExpanded] = useState(false);
+  const sources = [...new Set(article.sections.flatMap((section) => section.sources))];
+  return <View style={[styles.references, { borderColor: theme.border }]}>
+    <Pressable testID="learn.sources.toggle" accessibilityRole="button" accessibilityState={{ expanded }} aria-expanded={expanded} onPress={() => setExpanded(!expanded)} style={({ pressed }) => [styles.referencesToggle, pressed && styles.pressed]}>
+      <Text style={[styles.referenceLabel, { color: theme.textMuted }]}>{t('learn.sources')}</Text>
+      <Text aria-hidden style={[styles.referenceLabel, { color: theme.textMuted }]}>{expanded ? '−' : '+'}</Text>
+    </Pressable>
+    {expanded && <View testID="learn.sources" style={styles.referenceContent}>
+      {sources.map((id) => <SourceLink key={id} id={id} theme={theme} small />)}
+      {!!article.videos?.length && <View style={styles.video}>
+        <Text style={[styles.referenceLabel, { color: theme.textMuted }]}>{t('learn.watch')}</Text>
+        {article.videos.map((id) => <View key={id}><SourceLink id={id} theme={theme} small /><Text style={[styles.meta, { color: theme.textMuted }]}>{careSources[id].note}</Text></View>)}
+      </View>}
+      <Text style={[styles.meta, { color: theme.textMuted }]}>{t('learn.scope')}</Text>
+      <Text style={[styles.meta, { color: theme.textMuted }]}>{t('learn.checked')} {careReviewedOn}</Text>
+    </View>}
+  </View>;
 }
 
 export function LearnScreen({ theme, articleId, onArticleChange }: {
@@ -93,18 +114,7 @@ export function LearnScreen({ theme, articleId, onArticleChange }: {
   const invalidArticle = selectedId !== null && !article;
   const open = (id: string | null) => onArticleChange ? onArticleChange(id) : setLocalArticleId(id);
   const heading = useRef<Text>(null);
-  const scroll = useRef<ScrollView>(null);
-  const sectionOffsets = useRef<number[]>([]);
-  const sectionHeadings = useRef<Array<Text | null>>([]);
   const wide = width >= 900;
-  const jumpToSection = (index: number) => {
-    scroll.current?.scrollTo({ y: (sectionOffsets.current[index] ?? 0) + 20, animated: false });
-    if (Platform.OS === 'web') {
-      const node = sectionHeadings.current[index] as unknown as HTMLElement | null;
-      node?.setAttribute('tabindex', '-1');
-      node?.focus({ preventScroll: true });
-    }
-  };
 
   useEffect(() => {
     if (Platform.OS !== 'web' || !heading.current) return;
@@ -123,14 +133,13 @@ export function LearnScreen({ theme, articleId, onArticleChange }: {
     return () => subscription.remove();
   }, [selectedId]);
 
-  const sources = article ? [...new Set(article.sections.flatMap((section) => section.sources))] : [];
   const results = findCareArticles(query);
   const sourceCount = Object.values(careSources).filter((source) => source.kind !== 'video').length;
   const videos = Object.keys(careSources).filter((id) => careSources[id].kind === 'video');
   const title = article?.shortTitle ?? (invalidArticle ? t('learn.notFound') : t('learn.title'));
 
   const content = (
-    <ScrollView ref={scroll} key={selectedId ?? 'library'} testID="screen.learn" style={{ backgroundColor: theme.background }} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+    <ScrollView key={selectedId ?? 'library'} testID="screen.learn" style={{ backgroundColor: theme.background }} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
       <View style={[styles.content, article && styles.articleContent]}>
         {selectedId !== null && (
           <Pressable testID="learn.back" accessibilityRole="button" onPress={() => open(null)} style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
@@ -140,55 +149,29 @@ export function LearnScreen({ theme, articleId, onArticleChange }: {
             <Text style={[styles.linkText, { color: theme.primary }]}>{t('learn.back')}</Text>
           </Pressable>
         )}
-        <View style={[styles.headingRow, article && styles.articleHeading, fontScale > 1.5 && styles.headingLargeText]}>
+        <View style={[styles.headingRow, fontScale > 1.5 && styles.headingLargeText]}>
           <View style={[styles.rowCopy, fontScale > 1.5 && styles.columnCopy]}>
-            <Text style={[styles.eyebrow, { color: theme.primary }]}>{article ? article.category.toUpperCase() : t('learn.eyebrow')}</Text>
+            {!article && <Text style={[styles.eyebrow, { color: theme.primary }]}>{t('learn.eyebrow')}</Text>}
             <Text ref={heading} accessibilityRole="header" style={[styles.title, { color: theme.text, fontSize: theme.presentation.titleSize, lineHeight: theme.presentation.titleLineHeight, fontWeight: theme.presentation.titleWeight }]}>{title}</Text>
             {!article && <Text style={[styles.intro, { color: theme.textMuted }]}>{invalidArticle ? t('learn.notFoundBody') : t('learn.intro')}</Text>}
           </View>
           {article && <GuideImage article={article} style={[styles.heroImage, width < 360 && styles.smallFeaturedImage, wide && styles.heroImageWide]} />}
         </View>
-        {article && <Text style={[styles.intro, { color: theme.textMuted }]}>{article.summary}</Text>}
         {language !== 'en' && <Text style={[styles.meta, { color: theme.textMuted }]}>{t('learn.english')}</Text>}
 
         {article ? (
           <>
-            <View testID="learn.glance" style={[styles.glance, { backgroundColor: article.image === 'urgent' ? theme.dangerSoft : theme.primarySoft, borderRadius: theme.presentation.controlRadius }]}>
-              <Text accessibilityRole="header" aria-level={2} style={[styles.sectionTitle, { color: theme.text }]}>{t('learn.glance')}</Text>
-              <View style={styles.glancePoints}>{article.glance.map((point) => <View key={point.label} style={[styles.glancePoint, { borderColor: theme.border, width: fontScale > 1.5 ? '100%' : article.glance.length === 4 ? '47.5%' : wide ? '31%' : '100%' }]}>
-                <Text style={[styles.glanceLabel, { color: theme.textMuted }]}>{point.label}</Text>
-                <Text style={[styles.glanceValue, { color: article.image === 'urgent' ? theme.danger : theme.primary }]}>{point.value}</Text>
-                <Text style={[styles.glanceDetail, { color: theme.text }]}>{point.detail}</Text>
-              </View>)}</View>
-              <Pressable testID="learn.viewSources" accessibilityRole="button" onPress={() => jumpToSection(article.sections.length)} style={({ pressed }) => [styles.sourceLink, pressed && styles.pressed]}><Text style={[styles.linkText, { color: theme.primary }]}>{t('learn.viewSources')} ↓</Text></Pressable>
-            </View>
-            <View style={styles.section}>
-              <Text accessibilityRole="header" aria-level={2} style={[styles.sectionTitle, { color: theme.text }]}>{t('learn.contents')}</Text>
-              <View style={styles.contents}>{article.sections.map((section, index) => <Pressable key={section.title} testID={`learn.section.${index}`} accessibilityRole="button" onPress={() => jumpToSection(index)} style={({ pressed }) => [styles.contentsLink, { borderColor: theme.border, backgroundColor: theme.surface }, pressed && styles.pressed]}>
-                <Text style={[styles.linkText, { color: theme.primary }]}>{section.title} ↓</Text>
-              </Pressable>)}</View>
-            </View>
-            {article.sections.map((section, index) => (
-              <View key={section.title} onLayout={(event) => { sectionOffsets.current[index] = event.nativeEvent.layout.y; }} style={styles.section}>
-                <Text ref={(node) => { sectionHeadings.current[index] = node; }} accessibilityRole="header" aria-level={2} style={[styles.sectionTitle, { color: theme.text }]}>{section.title}</Text>
+            {article.sections.map((section) => (
+              <View key={section.title} style={styles.section}>
+                <Text accessibilityRole="header" aria-level={2} style={[styles.sectionTitle, { color: theme.text }]}>{section.title}</Text>
                 {section.paragraphs.map((paragraph) => <Text key={paragraph} selectable style={[styles.body, { color: theme.text }]}>{paragraph}</Text>)}
-                <View style={styles.citations}>{section.sources.map((id) => <SourceLink key={id} id={id} theme={theme} compact />)}</View>
               </View>
             ))}
-            <View onLayout={(event) => { sectionOffsets.current[article.sections.length] = event.nativeEvent.layout.y; }} style={[styles.section, styles.divided, { borderColor: theme.border }]}>
-              <Text ref={(node) => { sectionHeadings.current[article.sections.length] = node; }} accessibilityRole="header" aria-level={2} style={[styles.sectionTitle, { color: theme.text }]}>{t('learn.sources')}</Text>
-              {sources.map((id) => <SourceLink key={id} id={id} theme={theme} />)}
-            </View>
-            {!!article.videos?.length && (
-              <View style={styles.section}>
-                <Text accessibilityRole="header" aria-level={2} style={[styles.sectionTitle, { color: theme.text }]}>{t('learn.watch')}</Text>
-                {article.videos.map((id) => <View key={id}><SourceLink id={id} theme={theme} /><Text style={[styles.rowSummary, { color: theme.textMuted }]}>{careSources[id].note}</Text></View>)}
-              </View>
-            )}
-            <View style={styles.section}>
+            <View style={[styles.section, styles.divided, { borderColor: theme.border }]}>
               <Text accessibilityRole="header" aria-level={2} style={[styles.sectionTitle, { color: theme.text }]}>{t('learn.next')}</Text>
-              <View style={styles.cards}>{article.related.map((id) => <ArticleRow key={id} article={careArticles.find((item) => item.id === id)!} theme={theme} onOpen={open} wide={false} />)}</View>
+              <View>{article.related.map((id) => <ArticleRow key={id} article={careArticles.find((item) => item.id === id)!} theme={theme} onOpen={open} plain />)}</View>
             </View>
+            <GuideReferences key={article.id} article={article} theme={theme} />
           </>
         ) : !invalidArticle ? (
           <>
@@ -222,10 +205,10 @@ export function LearnScreen({ theme, articleId, onArticleChange }: {
             </View>}
           </>
         ) : null}
-        <View style={[styles.section, styles.divided, { borderColor: theme.border }]}>
+        {!article && <View style={[styles.section, styles.divided, { borderColor: theme.border }]}>
           <Text style={[styles.meta, { color: theme.textMuted }]}>{t('learn.scope')}</Text>
           <Text style={[styles.meta, { color: theme.textMuted }]}>{t('learn.checked')} {careReviewedOn}</Text>
-        </View>
+        </View>}
       </View>
     </ScrollView>
   );
@@ -237,17 +220,16 @@ const styles = StyleSheet.create({
   content: { width: '100%', maxWidth: 1100, alignSelf: 'center' },
   articleContent: { maxWidth: 760 },
   headingRow: { flexDirection: 'row', gap: 16, alignItems: 'center' },
-  articleHeading: { marginBottom: 12 },
   headingLargeText: { flexDirection: 'column-reverse', alignItems: 'stretch' },
   eyebrow: { fontSize: 12, fontWeight: '700', letterSpacing: 1.6, marginBottom: 8 },
   title: { marginBottom: 12 },
   intro: { fontSize: 17, lineHeight: 25, marginBottom: 8 },
   meta: { fontSize: 13, lineHeight: 20, marginBottom: 8 },
   back: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginBottom: 16 },
-  heroImage: { width: 104, height: 104, borderRadius: 16 },
+  heroImage: { width: 72, height: 72, borderRadius: 12 },
   imageFrame: { overflow: 'hidden', backgroundColor: lightTheme.background },
   imageFill: { width: '100%', height: '100%' },
-  heroImageWide: { width: 160, height: 160 },
+  heroImageWide: { width: 96, height: 96 },
   featuredImage: { width: 100, height: 100, borderRadius: 12 },
   smallFeaturedImage: { width: 68, height: 68 },
   featuredTitle: { fontSize: 21, lineHeight: 28 },
@@ -274,19 +256,15 @@ const styles = StyleSheet.create({
   rowSummary: { fontSize: 14, lineHeight: 22 },
   cardTakeaway: { fontSize: 15, fontWeight: '600', lineHeight: 22 },
   cardContext: { fontSize: 12, lineHeight: 18, marginTop: 2 },
-  glance: { padding: 20, marginTop: 20 },
-  glancePoints: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  glancePoint: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 16, marginTop: 16, gap: 4 },
-  glanceLabel: { fontSize: 13, lineHeight: 20, fontWeight: '600' },
-  glanceValue: { fontSize: 23, lineHeight: 30, fontWeight: '800' },
-  glanceDetail: { fontSize: 15, lineHeight: 23 },
-  contents: { gap: 8 },
-  contentsLink: { minHeight: 48, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, justifyContent: 'center' },
   pressed: { opacity: 0.65 },
   sourceLink: { minHeight: 48, justifyContent: 'center', paddingVertical: 8 },
   linkText: { fontSize: 15, lineHeight: 23, fontWeight: '600', textDecorationLine: 'underline' },
-  citationText: { fontSize: 13, lineHeight: 20 },
-  citations: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 16 },
+  relatedLink: { minHeight: 48, justifyContent: 'center', paddingVertical: 10 },
+  references: { borderTopWidth: StyleSheet.hairlineWidth, marginTop: 28 },
+  referencesToggle: { minHeight: 48, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
+  referenceLabel: { fontSize: 13, lineHeight: 20, fontWeight: '600' },
+  referenceText: { fontSize: 13, lineHeight: 20, fontWeight: '400' },
+  referenceContent: { gap: 8 },
   divided: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 24 },
   video: { marginTop: 8 },
 });
