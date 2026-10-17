@@ -108,18 +108,29 @@ tags:
       id: schedule.entry.poop.remove
     direction: DOWN
     visibilityPercentage: 100
-    centerElement: false
+    centerElement: true
+    timeout: 45000
 - tapOn:
     id: schedule.entry.poop.remove
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: confirm.dialog
+    timeout: 10000
 - tapOn:
-    text: ^(Cancel|取消|Cancelar)$
+    id: confirm.cancel
     retryTapIfNoChange: true
 - assertVisible:
     id: schedule.entry.poop
 - tapOn:
     id: schedule.entry.poop.remove
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: confirm.dialog
+    timeout: 10000
 - tapOn:
-    text: ^(Remove|移除|Quitar)$
+    id: confirm.delete
     retryTapIfNoChange: true
 - assertNotVisible:
     id: schedule.entry.poop
