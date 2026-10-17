@@ -192,3 +192,63 @@ test('scoped long Unicode record IDs survive push and URL-encoded history lookup
   expect(response.status).toBe(200);
   expect((await response.json<{ revisions: { recordId: string }[] }>()).revisions[0].recordId).toBe(id);
 });
+
+async function changes(user:Owner|null,origin='https://puptime.test') {
+ return worker.fetch(new Request('https://puptime.test/api/sync/changes',{headers:{upgrade:'websocket',origin,...(user?{cookie:user.cookie}:{})}}),settings);
+}
+function observeSocket(socket:WebSocket) {
+ const messages:unknown[]=[];let closed=false;
+ socket.accept();socket.addEventListener('message',event=>{messages.push(JSON.parse(String(event.data)));});socket.addEventListener('close',()=>{closed=true;});
+ return {messages,get closed(){return closed;}};
+}
+const settleSocket=()=>new Promise(resolve=>setTimeout(resolve,30));
+test('change channel rejects anonymous, unentitled, wrong-origin and expired sessions',async()=>{
+ expect((await changes(null)).status).toBe(401);
+ const user=await owner();expect((await changes(user)).status).toBe(402);
+ await enroll(user);expect((await changes(user,'https://untrusted.example')).status).toBe(403);
+ await env.AUTH_DB.prepare('UPDATE session SET expiresAt=0 WHERE userId=?').bind(user.id).run();
+ expect((await changes(user)).status).toBe(401);
+});
+test('change channel sends durable metadata only to its owner, with no duplicate invalidation',async()=>{
+ const user=await owner(),other=await owner();await enroll(user);await enroll(other,'other-pet');
+ const response=await changes(user),otherResponse=await changes(other);expect(response.status).toBe(101);expect(otherResponse.status).toBe(101);
+ const socket=response.webSocket!,otherSocket=otherResponse.webSocket!;
+ try {
+  const seen=observeSocket(socket),otherSeen=observeSocket(otherSocket);await settleSocket();
+  expect(seen.messages).toEqual([{protocolVersion:1,cursor:0}]);expect(otherSeen.messages).toEqual([{protocolVersion:1,cursor:0}]);
+  const input=event();await call(user,'sync/push',{mutations:[input]});await settleSocket();
+  expect(seen.messages).toEqual([{protocolVersion:1,cursor:0},{protocolVersion:1,cursor:1}]);
+  expect(otherSeen.messages).toEqual([{protocolVersion:1,cursor:0}]);
+  await call(user,'sync/push',{mutations:[input]});await settleSocket();expect(seen.messages.length).toBe(2);
+ }finally{socket.close();otherSocket.close();}
+});
+test('revoked sessions and expired access stop subsequent change metadata; deleting the account closes its channel',async()=>{
+ for(const condition of ['revoked','expired','deleted'] as const){
+  const user=await owner();await enroll(user);const response=await changes(user);expect(response.status).toBe(101);
+  const socket=response.webSocket!,seen=observeSocket(socket);await settleSocket();
+  if(condition==='revoked')await env.AUTH_DB.prepare('DELETE FROM session WHERE userId=?').bind(user.id).run();
+  if(condition==='expired')await env.AUTH_DB.prepare('UPDATE cloud_accounts SET trial_started_at=0,trial_ends_at=1 WHERE account_id=?').bind(user.id).run();
+  if(condition==='deleted')expect((await deleteAccount(user)).status).toBe(200);
+  else await runInDurableObject(env.ACCOUNTS.getByName(user.id),async instance=>{instance.apply(event());});
+  await settleSocket();expect(seen.messages).toEqual([{protocolVersion:1,cursor:0}]);expect(seen.closed).toBe(true);socket.close();
+ }
+});
+test('hibernation reconstruction restores only owner/session references and still revalidates expiry',async()=>{
+ const user=await owner();await enroll(user);const response=await changes(user);expect(response.status).toBe(101);
+ const socket=response.webSocket!,seen=observeSocket(socket);await settleSocket();
+ try{
+  await runInDurableObject(env.ACCOUNTS.getByName(user.id),async(instance,state)=>{
+   const attachment=state.getWebSockets()[0].deserializeAttachment() as Record<string,string>;
+   expect(Object.keys(attachment).sort()).toEqual(['accountId','sessionId']);expect(attachment.accountId).toBe(user.id);expect(JSON.stringify(attachment)).not.toContain(user.cookie);
+   const {AccountStore}=await import('./account-store');
+   const reconstructed=new AccountStore(state,settings);
+   reconstructed.apply(event());
+  });
+  await settleSocket();expect(seen.messages).toEqual([{protocolVersion:1,cursor:0},{protocolVersion:1,cursor:1}]);
+  await env.AUTH_DB.prepare('UPDATE session SET expiresAt=0 WHERE userId=?').bind(user.id).run();
+  await runInDurableObject(env.ACCOUNTS.getByName(user.id),async(instance,state)=>{
+   const {AccountStore}=await import('./account-store');new AccountStore(state,settings).apply(event('later'));
+  });
+  await settleSocket();expect(seen.messages.length).toBe(2);expect(seen.closed).toBe(true);
+ }finally{socket.close();}
+});

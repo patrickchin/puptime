@@ -8,7 +8,7 @@ import { createAuth } from './auth';
 import { activateTrial, cloudAccess, getCloudAccount, trialDaysFromEnvironment, type CloudAccess, type CloudAccount } from './entitlements';
 
 type AccountEnv = { Bindings: Cloudflare.Env; Variables: {
-  user: { id: string; email: string; name: string }; sessionCreatedAt: number;
+  user: { id: string; email: string; name: string }; sessionCreatedAt: number; sessionId: string;
   store: DurableObjectStub<AccountStore>; cloud: CloudAccess; cloudAccount: CloudAccount | null;
 } };
 const syncAccess = createMiddleware<AccountEnv>(async (context, next) => {
@@ -37,6 +37,7 @@ const authenticated = createMiddleware<AccountEnv>(async (context, next) => {
   if (account?.state === 'deleting' && !(context.req.method === 'DELETE' && context.req.path === '/api/account')) return context.json({ error: 'account_deleting' }, 410);
   context.set('user', { id: user.id, email: user.email, name: user.name });
   context.set('sessionCreatedAt', new Date(session.createdAt).getTime());
+  context.set('sessionId',session.id);
   context.set('cloudAccount', account);
   context.set('cloud', cloudAccess(account, Date.now()));
   context.set('store', getAccountStore(context.env, user.id));
@@ -56,6 +57,14 @@ accountRoutes.post('/cloud/enroll', authenticated, syncAccess, validator('json',
 });
 accountRoutes.post('/sync/push', authenticated, syncAccess, validator('json', (value) => pushSchema.parse(value)), async (context) => {
   return context.json(await context.get('store').push(context.req.valid('json').mutations));
+});
+accountRoutes.get('/sync/changes', authenticated, syncAccess, async (context) => {
+  const origin=context.req.header('origin');
+  const allowed=[context.env.AUTH_BASE_URL?new URL(context.env.AUTH_BASE_URL).origin:'',...(context.env.WEB_ORIGINS??'').split(',')];
+  if(origin&&!allowed.includes(origin))return context.json({error:'untrusted_origin'},403);
+  if(context.req.header('upgrade')?.toLowerCase()!=='websocket')return context.json({error:'websocket_required'},426);
+  // Replace caller headers; ownership/session references come only from Better Auth.
+  return context.get('store').fetch(new Request('https://account.internal/changes',{headers:{upgrade:'websocket','x-puptime-account':context.get('user').id,'x-puptime-session':context.get('sessionId')}}));
 });
 accountRoutes.get('/sync/pull', authenticated, syncAccess, async (context) => {
   const after = afterSchema.parse(context.req.query('after') ?? 0);

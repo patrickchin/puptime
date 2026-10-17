@@ -110,6 +110,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
     read:()=>snapshot,
     subscribe(listener:()=>void){listeners.add(listener);return()=>{listeners.delete(listener);};},
     refresh,
+    invalidate(){kick(0,true);},
     requestEmail(email:string) {return perform(async()=>{
       const parsed=z.email().max(320).safeParse(email.trim());if(!parsed.success)return fail('invalid-email');
       if(!await canSignIn('email'))return 'error';
