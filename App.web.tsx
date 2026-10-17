@@ -1,16 +1,19 @@
-import { type ComponentProps, type ComponentType, useEffect, useState } from 'react';
+import { type ComponentProps, type ComponentType, useEffect } from 'react';
 import {
   Image,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from 'react-native';
+import { useScreenDimensions } from './src/use-screen-dimensions';
 import { LearnScreen } from './src/screens/LearnScreen';
 import { careArticles } from './src/puppy-care';
 import { lightTheme } from './src/theme';
+import { WebsiteMetadata } from './src/web/WebsiteMetadata';
+import { openAnalyticsSettings, WebsiteAnalytics } from './src/web/WebsiteAnalytics';
+import { captureWebsiteEvent } from './src/web/telemetry';
 
 const releaseUrl = 'https://github.com/patrickchin/puptime/releases/latest';
 const sourceUrl = 'https://github.com/patrickchin/puptime';
@@ -63,6 +66,11 @@ function LinkButton({
     <Anchor
       accessibilityRole="link"
       href={href}
+      onPress={() => {
+        if (href === releaseUrl || href === sourceUrl) {
+          captureWebsiteEvent('website_cta', { destination: href === releaseUrl ? 'android_download' : 'source' });
+        }
+      }}
       style={({ pressed }) => [
         styles.button,
         quiet && styles.buttonQuiet,
@@ -74,45 +82,53 @@ function LinkButton({
   );
 }
 
-export default function MarketingSite() {
-  const { width } = useWindowDimensions();
+export default function MarketingSite({ path = '/' }: { path?: string }) {
+  const { width } = useScreenDimensions();
   const compact = width < 760;
   const narrow = width < 1040;
-  const [hash, setHash] = useState(() => window.location.hash);
-  const learning = hash === '#puppy-care' || hash.startsWith('#puppy-care/');
-  const articleId = hash.startsWith('#puppy-care/') ? hash.slice('#puppy-care/'.length) : null;
+  const learning = path === '/puppy-care' || path.startsWith('/puppy-care/');
+  const articleId = path.startsWith('/puppy-care/') ? path.slice('/puppy-care/'.length) : null;
 
   useEffect(() => {
-    const update = () => setHash(window.location.hash);
-    window.addEventListener('hashchange', update);
-    return () => window.removeEventListener('hashchange', update);
+    // Keep previously shared guide links working after moving to crawlable URLs.
+    const hash = window.location.hash;
+    if (hash === '#puppy-care' || hash.startsWith('#puppy-care/')) {
+      const target = hash.slice(1);
+      if (target === 'puppy-care' || careArticles.some((article) => target === `puppy-care/${article.id}`)) {
+        window.location.replace(target === 'puppy-care' ? '/puppy-care/' : `/${target}`);
+      }
+    }
   }, []);
-  useEffect(() => {
-    document.title = learning ? `${careArticles.find((article) => article.id === articleId)?.title ?? 'Puppy care'} — Puptime` : 'Puptime — Puppy activity log';
-  }, [learning, articleId]);
 
   if (learning) return (
     <View style={styles.learningPage}>
+      <WebsiteMetadata path={path} />
+      <WebsiteAnalytics path={path} />
       <View style={[styles.header, compact && styles.headerCompact]}>
-        <Anchor accessibilityRole="link" href="#" style={styles.brand} accessibilityLabel="Puptime home">
+        <Anchor accessibilityRole="link" href="/" style={styles.brand} accessibilityLabel="Puptime home">
           <Image source={require('./assets/puptime-icon.png')} style={styles.logo} />
           <Text style={styles.brandName}>Puptime</Text>
         </Anchor>
-        <LinkButton href={releaseUrl}>Download</LinkButton>
+        <View style={styles.headerLinks}>
+          <Pressable accessibilityRole="button" onPress={openAnalyticsSettings} style={styles.navLink}><Text style={styles.textLink}>Analytics settings</Text></Pressable>
+          <LinkButton href={releaseUrl}>Download</LinkButton>
+        </View>
       </View>
-      <LearnScreen theme={lightTheme} articleId={articleId} onArticleChange={(id) => { window.location.hash = id ? `puppy-care/${id}` : 'puppy-care'; }} />
+      <LearnScreen theme={lightTheme} articleId={articleId} onArticleChange={(id) => { window.location.assign(id ? `/puppy-care/${id}` : '/puppy-care/'); }} />
     </View>
   );
 
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.pageContent}>
+      <WebsiteMetadata path={path} />
+      <WebsiteAnalytics path={path} />
       <View style={[styles.header, compact && styles.headerCompact]}>
         <View style={styles.brand}>
           <Image source={require('./assets/puptime-icon.png')} style={styles.logo} />
           <Text style={styles.brandName}>Puptime</Text>
         </View>
         <View style={styles.headerLinks}>
-          <Anchor accessibilityRole="link" href="#puppy-care" style={styles.navLink}>
+          <Anchor accessibilityRole="link" href="/puppy-care/" style={styles.navLink}>
             <Text style={styles.textLink}>Puppy care</Text>
           </Anchor>
           {!compact && (
@@ -128,6 +144,7 @@ export default function MarketingSite() {
         <View style={[styles.heroCopy, compact && styles.heroCopyCompact]}>
           <Text
             accessibilityRole="header"
+            aria-level={1}
             style={[styles.title, narrow && styles.titleNarrow, compact && styles.titleCompact]}
           >
             Puppy log
@@ -169,12 +186,12 @@ export default function MarketingSite() {
         <View style={[styles.careFeature, compact && styles.careFeatureCompact]}>
           <View style={styles.widgetCopy}>
             <Text style={styles.detailLabel}>NEW TO PUPPY LIFE?</Text>
-            <Text accessibilityRole="header" style={styles.widgetTitle}>How often is “often”?</Text>
+            <Text accessibilityRole="header" aria-level={2} style={styles.widgetTitle}>How often is “often”?</Text>
             <Text style={styles.widgetDescription}>Potty breaks, meals, sleep, and the first few weeks. Start with the essentials, then explore guides with sources from the Kennel Club, animal welfare charities, and veterinary specialists.</Text>
           </View>
           <View style={styles.careActions}>
-            <LinkButton href="#puppy-care/getting-started">Getting started</LinkButton>
-            <LinkButton href="#puppy-care" quiet>All puppy care guides</LinkButton>
+            <LinkButton href="/puppy-care/getting-started">Getting started</LinkButton>
+            <LinkButton href="/puppy-care/" quiet>All puppy care guides</LinkButton>
           </View>
         </View>
         <View style={[styles.detailGrid, compact && styles.detailGridCompact]}>
@@ -189,7 +206,7 @@ export default function MarketingSite() {
         <View style={[styles.widgetFeature, narrow && styles.widgetFeatureNarrow]}>
           <View style={styles.widgetCopy}>
             <Text style={styles.detailLabel}>IPHONE HOME SCREEN</Text>
-            <Text accessibilityRole="header" style={styles.widgetTitle}>The little things, one tap away.</Text>
+            <Text accessibilityRole="header" aria-level={2} style={styles.widgetTitle}>The little things, one tap away.</Text>
             <Text style={styles.widgetDescription}>
               Log a pee, poop, or meal straight from the Puptime widget. Your most recent time stays
               in view between visits.
@@ -232,7 +249,8 @@ export default function MarketingSite() {
       <View style={[styles.footer, compact && styles.footerCompact]}>
         <Text style={styles.footerLine}>Puptime</Text>
         <View style={[styles.footerLinks, compact && styles.footerLinksCompact]}>
-          <Anchor accessibilityRole="link" href="#puppy-care"><Text style={styles.textLink}>Puppy care</Text></Anchor>
+          <Pressable accessibilityRole="button" onPress={openAnalyticsSettings} style={styles.navLink}><Text style={styles.textLink}>Analytics settings</Text></Pressable>
+          <Anchor accessibilityRole="link" href="/puppy-care/"><Text style={styles.textLink}>Puppy care</Text></Anchor>
           <Anchor accessibilityRole="link" href={sourceUrl}>
             <Text style={styles.textLink}>GitHub</Text>
           </Anchor>
@@ -269,6 +287,8 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
   },
   headerCompact: {
+    flexWrap: 'wrap',
+    gap: 16,
     paddingHorizontal: 20,
     paddingTop: 18,
   },
@@ -680,5 +700,6 @@ const styles = StyleSheet.create({
   },
   footerLinksCompact: {
     width: '100%',
+    flexWrap: 'wrap',
   },
 });
