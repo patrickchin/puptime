@@ -68,8 +68,7 @@ export async function readLocalSettingsRecords(sql:SqlExecutor,petId:string):Pro
     }},
   ];
 }
-export async function readLocalRecords(sql:SqlExecutor,petId:string):Promise<LocalRecord[]> {
-  const records=await readLocalSettingsRecords(sql,petId);
+async function indexedRecords(sql:SqlExecutor,petId:string):Promise<LocalRecord[]> {
   const eventRows=await sql.getAllAsync<{id:string;at:number;body:string}>('SELECT id,at,body FROM events WHERE pet_id=? ORDER BY at DESC,rowid',petId);
   const routineRows=await sql.getAllAsync<{id:string;minutes:number;body:string}>('SELECT id,minutes,body FROM routines WHERE pet_id=? ORDER BY minutes,rowid',petId);
   const events:unknown=eventRows.map(row=>JSON.parse(row.body));
@@ -77,7 +76,10 @@ export async function readLocalRecords(sql:SqlExecutor,petId:string):Promise<Loc
   assertValidEvents(events); assertValidSchedule(routines);
   if (events.some((event,index)=>event.id!==eventRows[index].id||event.at!==eventRows[index].at)
     || routines.some((entry,index)=>entry.id!==routineRows[index].id||entry.minutes!==routineRows[index].minutes)) throw new Error('The saved record index is inconsistent.');
-  return [...records,...events.map(({id,...data})=>({kind:'event' as const,localId:id,data})),...routines.map(({id,...data})=>({kind:'routine' as const,localId:id,data}))];
+  return [...events.map(({id,...data})=>({kind:'event' as const,localId:id,data})),...routines.map(({id,...data})=>({kind:'routine' as const,localId:id,data}))];
+}
+export async function readLocalRecords(sql:SqlExecutor,petId:string):Promise<LocalRecord[]> {
+  return [...await readLocalSettingsRecords(sql,petId),...await indexedRecords(sql,petId)];
 }
 async function set(sql:SqlExecutor,petId:string,key:LegacyKey,value:string) {
   if (petSettingKeys.has(key)) await sql.runAsync('INSERT INTO pet_settings(pet_id,key,value) VALUES (?,?,?) ON CONFLICT(pet_id,key) DO UPDATE SET value=excluded.value',petId,key,value);
@@ -85,6 +87,7 @@ async function set(sql:SqlExecutor,petId:string,key:LegacyKey,value:string) {
 }
 export async function applyLocalRecords(sql:SqlExecutor,petId:string,records:LocalRecord[],deleted:Array<{kind:RecordKind;localId:string}>):Promise<void> {
   const state=await settings(sql,petId);
+  const existing=new Map((await indexedRecords(sql,petId)).map(record=>[JSON.stringify([record.kind,record.localId]),record.data]));
   let labels=state.labels,removed=state.deleted,customizations=state.customizations;
   let changedLabels=false,changedCustomizations=false;
   for (const record of deleted) {
@@ -96,6 +99,8 @@ export async function applyLocalRecords(sql:SqlExecutor,petId:string,records:Loc
     else throw new Error('Puppy and preference records cannot be removed from the local profile.');
   }
   for (const record of records) {
+    const previous=existing.get(JSON.stringify([record.kind,record.localId]));
+    if ((record.kind==='event'||record.kind==='routine')&&previous&&!Object.keys(fieldPatch(previous,record.data)).length) continue;
     if (record.kind==='event') {
       const values:unknown=[{...record.data,id:record.localId}];assertValidEvents(values);const value=values[0];
       await sql.runAsync('INSERT INTO events(pet_id,id,at,body) VALUES (?,?,?,?) ON CONFLICT(pet_id,id) DO UPDATE SET at=excluded.at,body=excluded.body',petId,value.id,value.at,JSON.stringify(value));

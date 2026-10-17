@@ -1,10 +1,10 @@
-import { enrollmentSchema, identifierSchema, mutationSchema, pullPageSchema, recordDataSchema, cloudRecordSchema, type CloudRecord, type Enrollment, type Mutation, type PullPage } from '../cloud/protocol.ts';
+import { enrollmentSchema, identifierSchema, mutationSchema, pullPageSchema, recordDataSchema, cloudRecordSchema, mutationResultSchema, pushResponseSchema, type MutationResult, type CloudRecord, type Enrollment, type Mutation, type PullPage } from '../cloud/protocol.ts';
 import { cloudRecordId, fieldPatch, localRecordId } from '../cloud/record-identity.ts';
-import { reconcileMutation, retainValidEventTiming } from '../cloud/reconcile.ts';
+import { ReconciliationError, reconcileMutation, retainValidEventTiming } from '../cloud/reconcile.ts';
 import type { LocalDatabase, SqlExecutor } from './database.ts';
 import { applyLocalRecords, localChangeSchema, localChanges, readLocalDeletedActivities, readLocalRecords, type LocalChange, type LocalChangeSink, type LocalRecord } from './sync-projection.ts';
 
-type Owner={generation:string;account_id:string;device_id:string;cursor:number;pending_pet_id:string|null;staging_cursor:number;staging_complete:number};
+type Owner={generation:string;account_id:string;device_id:string;cursor:number;pending_pet_id:string|null;staging_cursor:number;staging_complete:number;resyncing:number};
 type Binding={pet_id:string;cloud_pet_id:string|null;enrollment:string;status:'preparing'|'active'};
 type Fence={generation:string;accountId:string};
 type Outbox={operation_id:string;local_pet_id:string;local_kind:LocalChange['kind'];local_id:string;change_json:string;mutation_json:string|null;blocked_reason:string|null};
@@ -28,7 +28,17 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
   async function enqueue(sql:SqlExecutor,current:Owner,pet:Binding,original:LocalChange):Promise<Mutation|null> {
     let change=localChangeSchema.parse(original);
     const blocked=await sql.getAllAsync<Outbox>('SELECT * FROM local_sync_outbox WHERE generation=? AND local_pet_id=? AND local_kind=? AND local_id=? AND blocked_reason IS NOT NULL ORDER BY sequence',current.generation,pet.pet_id,change.kind,change.localId);
-    if (blocked.length) change={...change,before:localChangeSchema.parse(JSON.parse(blocked[0].change_json)).before};
+    if (blocked.length) {
+      const proposals=blocked.map(row=>localChangeSchema.parse(JSON.parse(row.change_json))),before=proposals[0].before;
+      let after:Record<string,unknown>={...before};
+      for (const proposal of [...proposals,original]) {
+        if (proposal.after===null) {after={};continue;}
+        for (const [field,value] of Object.entries(fieldPatch(proposal.before,proposal.after))) {if (value===null&&field!=='endedAt') delete after[field];else after[field]=value;}
+      }
+      // Combine explicit proposals, not snapshots that may include unrelated
+      // fields pulled from another device while this record was blocked.
+      change={...original,before,after:original.after===null?null:after};
+    }
     let recordId:string|undefined;
     // Only this pure input conversion can become blocked local work. Database
     // reads and writes stay outside validation catches, so corruption rolls back.
@@ -50,6 +60,71 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
     for (const row of blocked) await sql.runAsync('DELETE FROM local_sync_outbox WHERE operation_id=?',row.operation_id);
     await sql.runAsync('INSERT INTO local_sync_outbox(operation_id,generation,local_pet_id,local_kind,local_id,change_json,mutation_json,blocked_reason) VALUES (?,?,?,?,?,?,?,?)',operationId,current.generation,pet.pet_id,change.kind,change.localId,JSON.stringify(change),mutation?JSON.stringify(mutation):null,mutation?null:'cloud_validation');
     return mutation;
+  }
+  async function storeMirror(sql:SqlExecutor,current:Owner,input:CloudRecord):Promise<void> {
+    const record=cloudRecordSchema.parse(input);localRecordId(record);
+    const previous=await mirrored(sql,current.generation,record.id);
+    if (previous) {
+      if (previous.kind!==record.kind||previous.petId!==record.petId) throw new Error('Cloud record identity changed.');
+      if (record.sequence===previous.sequence&&JSON.stringify(record)!==JSON.stringify(previous)) throw new Error('Cloud record sequence changed contents.');
+      if (record.sequence>previous.sequence&&record.revision<=previous.revision) throw new Error('Cloud revision regressed.');
+      if (record.sequence<previous.sequence&&record.revision>=previous.revision) throw new Error('Cloud revision order is inconsistent.');
+      if (record.sequence<=previous.sequence) return;
+    }
+    await sql.runAsync('INSERT INTO local_sync_records(generation,record_id,body) VALUES (?,?,?) ON CONFLICT(generation,record_id) DO UPDATE SET body=excluded.body',current.generation,record.id,JSON.stringify(record));
+  }
+  async function projectOwner(sql:SqlExecutor,current:Owner,removed:CloudRecord[]=[],source:'cloud'|'restore'='cloud'):Promise<void> {
+    const pets=await sql.getAllAsync<Binding>("SELECT * FROM local_sync_pets WHERE generation=? AND status='active' ORDER BY rowid",current.generation);
+    const primary=pets[0];if (!primary) throw new Error('No enrolled puppy.');
+    const petByCloud=new Map(pets.map(pet=>[pet.cloud_pet_id,pet]));
+    function location(record:Pick<CloudRecord,'kind'|'petId'|'id'>) {
+      const localId=localRecordId(record),pet=record.kind==='accountPreferences'?primary:petByCloud.get(record.petId);
+      return pet?{pet,kind:record.kind,localId:record.kind==='puppy'?pet.pet_id:localId}:null;
+    }
+    const before=new Map<string,LocalRecord[]>(),projected=new Map<string,Map<string,LocalRecord>>(),deletions=new Map<string,Map<string,{kind:LocalRecord['kind'];localId:string}>>();
+    for (const pet of pets) {const values=await readLocalRecords(sql,pet.pet_id);before.set(pet.pet_id,values);projected.set(pet.pet_id,new Map(values.map(record=>[key(record),record])));deletions.set(pet.pet_id,new Map());}
+    function remove(record:Pick<CloudRecord,'kind'|'petId'|'id'>) {
+      const local=location(record);if (!local||local.kind==='puppy'||local.kind==='accountPreferences') return;
+      projected.get(local.pet.pet_id)!.delete(key(local));deletions.get(local.pet.pet_id)!.set(key(local),local);
+    }
+    for (const record of removed) remove(record);
+    const rows=await sql.getAllAsync<{body:string}>('SELECT body FROM local_sync_records WHERE generation=?',current.generation);
+    const working=new Map<string,CloudRecord>(rows.map(row=>{const record=cloudRecordSchema.parse(JSON.parse(row.body));localRecordId(record);return [record.id,record] as const;}));
+    const pending=await sql.getAllAsync<Outbox>('SELECT * FROM local_sync_outbox WHERE generation=? ORDER BY sequence',current.generation);
+    const raw:Array<{pet:Binding;change:LocalChange;recordId:string|undefined}>=[];
+    for (const row of pending) {
+      const pet=pets.find(pet=>pet.pet_id===row.local_pet_id);if (!pet) throw new Error('Pending operation puppy ownership changed.');
+      const change=localChangeSchema.parse(JSON.parse(row.change_json));
+      if (change.kind!==row.local_kind||change.localId!==row.local_id) throw new Error('Pending operation identity changed.');
+      let recordId:string|undefined;
+      try {recordId=cloudRecordId(change.kind,change.kind==='accountPreferences'?null:pet.cloud_pet_id,change.kind==='puppy'?pet.cloud_pet_id!:change.localId);} catch {}
+      if (!row.mutation_json||row.blocked_reason) {raw.push({pet,change,recordId});continue;}
+      const mutation=mutationSchema.parse(JSON.parse(row.mutation_json));
+      if (mutation.operationId!==row.operation_id||mutation.recordId!==recordId||mutation.kind!==change.kind||mutation.deviceId!==current.device_id||mutation.petId!==(change.kind==='accountPreferences'?null:pet.cloud_pet_id)) throw new Error('Pending operation identity changed.');
+      const base=working.get(mutation.recordId)??null;
+      // A lost acknowledgment can leave an already accepted create pending.
+      // Only the local preview changes intent; the stored request stays exact.
+      const preview={...mutation,intent:mutation.intent==='create'&&base?'patch' as const:mutation.intent,baseRevision:mutation.intent==='restore'?mutation.baseRevision:Math.min(mutation.baseRevision,base?.revision??0)} as Mutation;
+      try {working.set(mutation.recordId,reconcileMutation(base,preview,now()).record);}
+      catch (error) {if (!(error instanceof ReconciliationError)) throw error;if (!base) raw.push({pet,change,recordId});}
+    }
+    for (const record of working.values()) {
+      const local=location(record);if (!local) continue;
+      if (record.deleted) {remove(record);continue;}
+      projected.get(local.pet.pet_id)!.set(key(local),{kind:local.kind,localId:local.localId,data:record.data});
+      deletions.get(local.pet.pet_id)!.delete(key(local));
+    }
+    for (const item of raw) {
+      const base=item.recordId?working.get(item.recordId):undefined;if (base?.deleted) continue;
+      const values=projected.get(item.pet.pet_id)!,change=item.change;
+      if (change.after===null) {values.delete(key(change));deletions.get(item.pet.pet_id)!.set(key(change),change);continue;}
+      const data={...values.get(key(change))?.data};
+      for (const [field,value] of Object.entries(fieldPatch(change.before,change.after))) {if (value===null&&field!=='endedAt') delete data[field];else data[field]=value;}
+      if (change.kind==='event'&&base) {if ('estimated' in base.data&&base.data.estimated) data.estimated=true;retainValidEventTiming(base.data,data);}
+      values.set(key(change),{kind:change.kind,localId:change.localId,data});deletions.get(item.pet.pet_id)!.delete(key(change));
+    }
+    for (const pet of pets) await applyLocalRecords(sql,pet.pet_id,[...projected.get(pet.pet_id)!.values()],[...deletions.get(pet.pet_id)!.values()]);
+    for (const pet of pets) await retainRevisions(sql,pet.pet_id,localChanges(before.get(pet.pet_id)!,await readLocalRecords(sql,pet.pet_id)).filter(change=>pet.pet_id===primary.pet_id||change.kind!=='accountPreferences'),source);
   }
   return {
     changeSink(petId:string):LocalChangeSink {
@@ -77,7 +152,7 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
           if (previous.enrollment!==JSON.stringify(request)) throw new Error('Enrollment attempt cannot change.');
           return {generation:current!.generation};
         }
-        if (current?.pending_pet_id) throw new Error('Finish the pending enrollment first.');
+        if (current?.pending_pet_id||current?.resyncing) throw new Error('Finish the pending enrollment or baseline first.');
         if (!current) {
           const generation=await id(sql);
           await sql.runAsync('INSERT INTO local_sync_owner(singleton,generation,account_id,device_id,pending_pet_id) VALUES (1,?,?,?,?)',generation,input.accountId,input.deviceId,input.localPetId);
@@ -100,7 +175,7 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
       if (page.resyncRequired) throw new Error('A full baseline cannot request another resync.');
       await database.write(async sql=>{
         const current=await required(sql,input);
-        if (!current.pending_pet_id) throw new Error('No incomplete baseline is pending.');
+        if (!current.pending_pet_id&&!current.resyncing) throw new Error('No incomplete baseline is pending.');
         if (page.cursor===current.staging_cursor&&current.staging_complete===(page.hasMore?0:1)) {
           const duplicate=await Promise.all(page.changes.map(async record=>(await sql.getFirstAsync<{body:string}>('SELECT body FROM local_sync_baseline WHERE generation=? AND record_id=?',current.generation,record.id))?.body===JSON.stringify(record)));
           if (duplicate.every(Boolean)) return;
@@ -108,11 +183,8 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
         if (current.staging_complete) throw new Error('Baseline is already complete.');
         if (!page.changes.length&&page.cursor!==current.staging_cursor) throw new Error('Empty baseline cannot advance its cursor.');
         if (page.changes.some(record=>record.sequence<=current.staging_cursor)||page.cursor<current.staging_cursor) throw new Error('Baseline cursor did not progress.');
-        const pet=(await binding(sql,current.pending_pet_id))!,request=enrollmentSchema.parse(JSON.parse(pet.enrollment));
-        const cloudPetId=request.confirmedPetId??request.localPetId;
         for (const record of page.changes) {
           localRecordId(record);
-          if (record.petId!==null&&record.petId!==cloudPetId&&!await sql.getFirstAsync('SELECT pet_id FROM local_sync_pets WHERE generation=? AND cloud_pet_id=?',current.generation,record.petId)) throw new Error('Baseline puppy ownership mismatch.');
           await sql.runAsync('INSERT INTO local_sync_baseline(generation,record_id,body) VALUES (?,?,?) ON CONFLICT(generation,record_id) DO UPDATE SET body=excluded.body',current.generation,record.id,JSON.stringify(record));
         }
         await sql.runAsync('UPDATE local_sync_owner SET staging_cursor=?,staging_complete=? WHERE singleton=1',page.cursor,page.hasMore?0:1);
@@ -175,19 +247,108 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
         await sql.runAsync('DELETE FROM local_sync_baseline WHERE generation=?',current.generation);
       });
     },
+    async applySync(input:Fence&{accepted:MutationResult[];rejected?:Array<{operationId:string;error:'conflict'|'invalid_mutation'|'retry_later'}>;page:PullPage}):Promise<void> {
+      await database.write(async sql=>{
+        const current=await owner(sql,input);if (!current) return;
+        if (current.pending_pet_id||current.resyncing) throw new Error('Finish the pending baseline first.');
+        const {accepted,rejected}=pushResponseSchema.parse({accepted:input.accepted,rejected:input.rejected??[]}),page=pullPageSchema.parse(input.page);
+        if (page.resyncRequired) throw new Error('Reset the full baseline before applying a resync.');
+        if (page.cursor<current.cursor||(page.cursor>current.cursor&&page.changes.some(record=>record.sequence<=current.cursor))) throw new Error('Cloud cursor regressed or overlapped.');
+        for (const result of accepted) {
+          const row=await sql.getFirstAsync<Outbox>('SELECT * FROM local_sync_outbox WHERE generation=? AND operation_id=?',current.generation,result.operationId);
+          if (!row) {
+            const previous=await sql.getFirstAsync<{result_json:string}>("SELECT result_json FROM local_sync_acks WHERE generation=? AND operation_id=? AND outcome='accepted'",current.generation,result.operationId);
+            if (!previous||JSON.stringify(mutationResultSchema.parse(JSON.parse(previous.result_json)))!==JSON.stringify(result)) throw new Error('Unknown or changed acknowledgment operation.');
+            continue;
+          }
+          if (!row.mutation_json) throw new Error('Acknowledgment was not a sent operation.');
+          const mutation=mutationSchema.parse(JSON.parse(row.mutation_json));
+          if (mutation.recordId!==result.record.id||mutation.kind!==result.record.kind||mutation.petId!==result.record.petId||mutation.operationId!==result.operationId||mutation.deviceId!==current.device_id) throw new Error('Acknowledgment record identity changed.');
+          await storeMirror(sql,current,result.record);
+          await sql.runAsync('INSERT INTO local_sync_acks(generation,operation_id,mutation_json,result_json) VALUES (?,?,?,?)',current.generation,result.operationId,row.mutation_json,JSON.stringify(result));
+          await sql.runAsync('DELETE FROM local_sync_outbox WHERE generation=? AND operation_id=?',current.generation,result.operationId);
+        }
+        for (const record of page.changes) await storeMirror(sql,current,record);
+        for (const result of rejected) {
+          const previous=await sql.getFirstAsync<{result_json:string;outcome:string}>('SELECT result_json,outcome FROM local_sync_acks WHERE generation=? AND operation_id=?',current.generation,result.operationId);
+          if (previous) {
+            if (previous.outcome!=='rejected'||previous.result_json!==JSON.stringify(result)) throw new Error('Operation result changed.');
+            continue;
+          }
+          const row=await sql.getFirstAsync<Outbox>('SELECT * FROM local_sync_outbox WHERE generation=? AND operation_id=?',current.generation,result.operationId);
+          if (!row?.mutation_json) throw new Error('Unknown rejected operation.');
+          if (result.error==='retry_later') continue;
+          const mutation=mutationSchema.parse(JSON.parse(row.mutation_json));
+          if (mutation.operationId!==result.operationId||mutation.deviceId!==current.device_id) throw new Error('Rejected operation identity changed.');
+          await sql.runAsync("INSERT INTO local_sync_acks(generation,operation_id,mutation_json,result_json,outcome) VALUES (?,?,?,?,'rejected')",current.generation,result.operationId,row.mutation_json,JSON.stringify(result));
+          const base=await mirrored(sql,current.generation,mutation.recordId),change=localChangeSchema.parse(JSON.parse(row.change_json));
+          if (result.error==='invalid_mutation'||mutation.intent==='restore') {
+            await sql.runAsync('UPDATE local_sync_outbox SET blocked_reason=? WHERE generation=? AND operation_id=?',mutation.intent==='restore'?'restore_conflict':'cloud_rejected',current.generation,result.operationId);
+            continue;
+          }
+          if (!base&&change.after===null) {await sql.runAsync('DELETE FROM local_sync_outbox WHERE generation=? AND operation_id=?',current.generation,result.operationId);continue;}
+          const candidate=mutationSchema.safeParse({...mutation,operationId:await id(sql),baseRevision:base?.revision??0,intent:base?(mutation.intent==='create'?'patch':mutation.intent):'create',patch:base?mutation.patch:change.after});
+          let valid=candidate.success;
+          if (candidate.success) {
+            try {reconcileMutation(base,candidate.data,now());} catch (error) {if (!(error instanceof Error)) throw error;if (error.name!=='ZodError'&&!(error instanceof ReconciliationError)) throw error;valid=false;}
+          }
+          if (!candidate.success||!valid) {await sql.runAsync("UPDATE local_sync_outbox SET blocked_reason='cloud_rejected' WHERE generation=? AND operation_id=?",current.generation,result.operationId);continue;}
+          // The server confirmed rejection, so this is a new operation with a
+          // new ID. An in-flight or accepted request is never rewritten.
+          await sql.runAsync('DELETE FROM local_sync_outbox WHERE generation=? AND operation_id=?',current.generation,result.operationId);
+          await sql.runAsync('INSERT INTO local_sync_outbox(operation_id,generation,local_pet_id,local_kind,local_id,change_json,mutation_json) VALUES (?,?,?,?,?,?,?)',candidate.data.operationId,current.generation,row.local_pet_id,row.local_kind,row.local_id,row.change_json,JSON.stringify(candidate.data));
+        }
+        await projectOwner(sql,current);
+        // Push sequence is deliberately not a pull cursor.
+        await sql.runAsync('UPDATE local_sync_owner SET cursor=? WHERE generation=?',page.cursor,current.generation);
+      });
+    },
+    async resetBaseline(input:Fence):Promise<void> {
+      await database.write(async sql=>{const current=await required(sql,input);if (current.resyncing) return;if (current.pending_pet_id) throw new Error('Enrollment baseline is pending.');await sql.runAsync('DELETE FROM local_sync_baseline WHERE generation=?',current.generation);await sql.runAsync('UPDATE local_sync_owner SET resyncing=1,staging_cursor=0,staging_complete=0 WHERE generation=?',current.generation);});
+    },
+    async resyncState():Promise<(Fence&{stagingCursor:number;baselineComplete:boolean})|null> {
+      return database.read(async sql=>{const current=await owner(sql);return current?.resyncing?{generation:current.generation,accountId:current.account_id,stagingCursor:current.staging_cursor,baselineComplete:current.staging_complete===1}:null;});
+    },
+    async finishResync(input:Fence):Promise<void> {
+      await database.write(async sql=>{
+        const current=await required(sql,input);if (!current.resyncing) return;if (!current.staging_complete) throw new Error('The full baseline is incomplete.');
+        const former=(await sql.getAllAsync<{body:string}>('SELECT body FROM local_sync_records WHERE generation=?',current.generation)).map(row=>cloudRecordSchema.parse(JSON.parse(row.body)));
+        const rows=await sql.getAllAsync<{body:string}>('SELECT body FROM local_sync_baseline WHERE generation=?',current.generation);
+        await sql.runAsync('DELETE FROM local_sync_records WHERE generation=?',current.generation);
+        const present=new Set<string>();for (const row of rows) {const record=cloudRecordSchema.parse(JSON.parse(row.body));await storeMirror(sql,current,record);present.add(record.id);}
+        await projectOwner(sql,current,former.filter(record=>!present.has(record.id)));
+        await sql.runAsync('UPDATE local_sync_owner SET cursor=?,resyncing=0,staging_cursor=0,staging_complete=0 WHERE generation=?',current.staging_cursor,current.generation);
+        await sql.runAsync('DELETE FROM local_sync_baseline WHERE generation=?',current.generation);
+      });
+    },
+    async restore(input:Fence&{record:CloudRecord;data:Record<string,unknown>}):Promise<void> {
+      await database.write(async sql=>{
+        const current=await required(sql,input);if (current.pending_pet_id||current.resyncing) throw new Error('Finish the pending baseline first.');
+        const proposed=cloudRecordSchema.parse(input.record);localRecordId(proposed);const saved=await mirrored(sql,current.generation,proposed.id);
+        if (!saved||saved.revision!==proposed.revision||saved.sequence!==proposed.sequence||saved.kind!==proposed.kind||saved.petId!==proposed.petId) throw new Error('Restore requires the current record identity and revision.');
+        const pet=saved.kind==='accountPreferences'?await sql.getFirstAsync<Binding>("SELECT * FROM local_sync_pets WHERE generation=? AND status='active' ORDER BY rowid LIMIT 1",current.generation):await sql.getFirstAsync<Binding>("SELECT * FROM local_sync_pets WHERE generation=? AND cloud_pet_id=? AND status='active'",current.generation,saved.petId);
+        if (!pet) throw new Error('Restore puppy ownership changed.');
+        const data=recordDataSchema(saved.kind).parse(input.data),operationId=await id(sql);
+        const mutation=mutationSchema.parse({protocolVersion:1,operationId,deviceId:current.device_id,recordId:saved.id,petId:saved.petId,kind:saved.kind,baseRevision:saved.revision,intent:'restore',patch:data});
+        reconcileMutation(saved,mutation,now());
+        const change:LocalChange={kind:saved.kind,localId:saved.kind==='puppy'?pet.pet_id:localRecordId(saved),before:saved.deleted?null:saved.data,after:data};
+        await sql.runAsync('INSERT INTO local_sync_outbox(operation_id,generation,local_pet_id,local_kind,local_id,change_json,mutation_json) VALUES (?,?,?,?,?,?,?)',operationId,current.generation,pet.pet_id,change.kind,change.localId,JSON.stringify(change),JSON.stringify(mutation));
+        await projectOwner(sql,current,[],'restore');
+      });
+    },
     async detach(input:Fence):Promise<void> {await database.write(async sql=>{await required(sql,input);await sql.runAsync('DELETE FROM local_sync_owner WHERE generation=?',input.generation);});},
-    async status(petId:string):Promise<{state:'local'|'preparing'|'active';generation:string|null;accountId:string|null;pending:number;blocked:number;cursor:number}> {
+    async status(petId:string):Promise<{state:'local'|'preparing'|'active'|'resyncing';generation:string|null;accountId:string|null;pending:number;blocked:number;cursor:number}> {
       return database.read(async sql=>{
         const current=await owner(sql),pet=await binding(sql,petId);
         if (!current||!pet) return {state:'local',generation:null,accountId:null,pending:0,blocked:0,cursor:0};
         const counts=(await sql.getFirstAsync<{pending:number;blocked:number}>('SELECT COUNT(*) pending,COALESCE(SUM(blocked_reason IS NOT NULL),0) blocked FROM local_sync_outbox WHERE generation=?',current.generation))!;
-        return {state:pet.status,generation:current.generation,accountId:current.account_id,...counts,cursor:current.cursor};
+        return {state:current.resyncing?'resyncing':pet.status,generation:current.generation,accountId:current.account_id,...counts,cursor:current.cursor};
       });
     },
     async nextBatch(input:Fence):Promise<Mutation[]> {
       return database.read(async sql=>{
-        const current=await owner(sql,input);if (!current) return [];
-        const rows=await sql.getAllAsync<Outbox>('SELECT * FROM local_sync_outbox WHERE generation=? AND mutation_json IS NOT NULL ORDER BY sequence LIMIT 50',current.generation);
+        const current=await owner(sql,input);if (!current||current.pending_pet_id||current.resyncing) return [];
+        const rows=await sql.getAllAsync<Outbox>('SELECT * FROM local_sync_outbox WHERE generation=? AND mutation_json IS NOT NULL AND blocked_reason IS NULL ORDER BY sequence LIMIT 50',current.generation);
         const batch:Mutation[]=[];
         for (const row of rows) {
           const candidate=mutationSchema.parse(JSON.parse(row.mutation_json!));

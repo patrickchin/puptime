@@ -230,3 +230,161 @@ test('an empty page cannot invent cursor progress or complete another owner enro
  await assert.rejects(sync.completeAssociation({...owner,accountId:'account-1',cloudPetId:'unconfirmed'}),/baseline|confirm/i);
  assert.equal((await sync.enrollmentState())!.baselineComplete,false);
 });
+
+// Engine integration uses the production reconciler with deterministic server
+// order. Real Workers database/HTTP behavior is tested separately in server/.
+function replicaServer() {
+ const records=new Map<string,CloudRecord>();const operations=new Map<string,import('../cloud/protocol.ts').MutationResult>();const changes:CloudRecord[]=[];
+ return {
+  push(mutations:import('../cloud/protocol.ts').Mutation[]) {
+   const accepted:import('../cloud/protocol.ts').MutationResult[]=[];
+   for (const mutation of mutations) {
+    const previous=operations.get(mutation.operationId);if (previous) {accepted.push(previous);continue;}
+    const result=reconcileMutation(records.get(mutation.recordId)??null,mutation,1000);
+    const record={...result.record,revision:(records.get(mutation.recordId)?.revision??0)+1,sequence:changes.length+1};
+    records.set(record.id,record);changes.push(record);
+    const ack={operationId:mutation.operationId,record,sequence:record.sequence,reason:result.reason};operations.set(mutation.operationId,ack);accepted.push(ack);
+   }
+   return accepted;
+  },
+  pull(after:number) {const page=changes.filter(record=>record.sequence>after).slice(0,100);return {changes:page,cursor:page.at(-1)?.sequence??after,hasMore:changes.some(record=>record.sequence>(page.at(-1)?.sequence??after))};},
+  record(id:string) {return records.get(id)!;},
+ };
+}
+import { reconcileMutation } from '../cloud/reconcile.ts';
+async function cycle(sync:ReturnType<typeof engine.createLocalSync>,owner:{generation:string;accountId:string},server:ReturnType<typeof replicaServer>) {
+ const accepted=server.push(await sync.nextBatch(owner));const cursor=(await sync.status('local-pet')).cursor;
+ await sync.applySync({...owner,accepted,page:server.pull(cursor)});
+}
+
+test('acknowledging in-flight work preserves a later local edit and combines independent remote fields',async t=>{
+ const {sync,storage}=await setup(t);const owner=await activate(sync),server=replicaServer();
+ await cycle(sync,owner,server);await storage.appendEvents([event]);await cycle(sync,owner,server);
+ await storage.updateEvent(event.id,{note:'in flight'});const flight=await sync.nextBatch(owner);
+ await storage.updateEvent(event.id,{at:200});const later=(await sync.nextBatch(owner)).at(-1)!;
+ const accepted=server.push(flight);
+ assert.ok(flight[0].kind==='event');
+ const remote=server.record(flight[0].recordId);
+ server.push([{...flight[0],operationId:'remote-source',deviceId:'other-device',baseRevision:remote.revision,intent:'patch',patch:{source:'widget'}}]);
+ await sync.applySync({...owner,accepted,page:server.pull((await sync.status('local-pet')).cursor)});
+ assert.deepEqual(await sync.nextBatch(owner),[later]);
+ assert.deepEqual((await storage.loadEvents())[0],{...event,at:200,note:'in flight',source:'widget'});
+ await cycle(sync,owner,server);assert.equal((await sync.status('local-pet')).pending,0);
+ // A retried older acknowledgment must neither roll back the mirror nor edit.
+ await sync.applySync({...owner,accepted,page:server.pull((await sync.status('local-pet')).cursor)});
+ assert.equal((await storage.loadEvents())[0].at,200);
+});
+
+test('unknown acknowledgments and cursor-commit failure leave every pending operation intact',async t=>{
+ const {sync,storage,database}=await setup(t);const owner=await activate(sync),server=replicaServer();
+ const pending=await sync.nextBatch(owner),accepted=server.push(pending),page=server.pull(0);
+ await assert.rejects(sync.applySync({...owner,accepted:[{...accepted[0],operationId:'not-sent'}],page}),/acknowledg|operation/i);
+ assert.deepEqual(await sync.nextBatch(owner),pending);
+ await database.write(sql=>sql.execAsync("CREATE TRIGGER fail_cursor BEFORE UPDATE ON local_sync_owner WHEN NEW.cursor>OLD.cursor BEGIN SELECT RAISE(ABORT,'cursor interruption'); END;"));
+ await assert.rejects(sync.applySync({...owner,accepted,page}),/cursor interruption/);
+ assert.deepEqual(await sync.nextBatch(owner),pending);assert.equal((await sync.status('local-pet')).cursor,0);
+ await database.write(sql=>sql.execAsync('DROP TRIGGER fail_cursor'));
+ await sync.applySync({...owner,accepted,page});assert.equal((await sync.status('local-pet')).pending,0);
+ assert.deepEqual(await storage.loadEvents(),[]);
+});
+
+test('server deletion hides stale local edits; explicit restore requires the current deletion revision',async t=>{
+ const {sync,storage}=await setup(t);const owner=await activate(sync),server=replicaServer();await cycle(sync,owner,server);
+ await storage.appendEvents([event]);await cycle(sync,owner,server);
+ await storage.updateEvent(event.id,{note:'offline'});const pending=(await sync.nextBatch(owner))[0];
+ server.push([{...pending,operationId:'remote-delete',deviceId:'other-device',intent:'delete',patch:{}}]);
+ await sync.applySync({...owner,accepted:[],page:server.pull((await sync.status('local-pet')).cursor)});
+ assert.deepEqual(await storage.loadEvents(),[]);
+ await cycle(sync,owner,server);const deleted=server.record(pending.recordId);
+ await assert.rejects(sync.restore({...owner,record:{...deleted,revision:deleted.revision-1},data:{type:'pee',at:100,source:'app'}}),/revision/i);
+ await sync.restore({...owner,record:deleted,data:{type:'pee',at:100,source:'app',note:'restored'}});
+ assert.equal((await storage.loadEvents())[0].note,'restored');
+ assert.equal((await sync.nextBatch(owner))[0].intent,'restore');await cycle(sync,owner,server);assert.equal((await sync.status('local-pet')).pending,0);
+});
+
+test('a full resync stages replacement without erasing pending local edits',async t=>{
+ const {sync,storage}=await setup(t);const owner=await activate(sync),server=replicaServer();await cycle(sync,owner,server);
+ await storage.appendEvents([event]);await cycle(sync,owner,server);
+ await storage.updateEvent(event.id,{note:'keep pending'});const pending=await sync.nextBatch(owner);
+ await sync.resetBaseline(owner);assert.deepEqual(await sync.nextBatch(owner),[]);
+ assert.equal((await storage.loadEvents())[0].note,'keep pending');
+ const all=server.pull(0);await sync.stageBaseline({...owner,page:{changes:all.changes.slice(0,1),cursor:1,hasMore:true}});
+ await assert.rejects(sync.finishResync(owner),/baseline/i);
+ assert.equal((await storage.loadEvents())[0].note,'keep pending');
+ await sync.stageBaseline({...owner,page:{changes:all.changes.slice(1),cursor:all.cursor,hasMore:false}});
+ await sync.finishResync(owner);
+ assert.deepEqual(await sync.nextBatch(owner),pending);assert.equal((await storage.loadEvents())[0].note,'keep pending');
+});
+
+test('a response from a detached owner cannot change the next account or its local copy',async t=>{
+ const {sync,storage}=await setup(t);const owner=await activate(sync),server=replicaServer();
+ await storage.appendEvents([event]);const accepted=server.push(await sync.nextBatch(owner)),page=server.pull(0);
+ await sync.detach(owner);const next=await sync.prepareAssociation({...input,accountId:'account-2',enrollment:{...enrollment,operationId:'second-owner'}});
+ await storage.updateEvent(event.id,{note:'detached local edit'});
+ await sync.applySync({...owner,accepted,page});
+ assert.equal((await storage.loadEvents())[0].note,'detached local edit');assert.equal((await sync.status('local-pet')).generation,next.generation);
+ assert.equal((await sync.status('local-pet')).accountId,'account-2');
+});
+
+test('two SQLite clients combine offline changes and retry a server commit lost before local acknowledgment',async t=>{
+ const first=await setup(t),second=await setup(t),server=replicaServer();const one=await activate(first.sync);await cycle(first.sync,one,server);
+ const two=await second.sync.prepareAssociation({...input,deviceId:'device-2',enrollment:{...enrollment,deviceId:'device-2',confirmedPetId:'local-pet'}});
+ await second.sync.stageBaseline({...two,accountId:'account-1',page:server.pull(0)});await second.sync.completeAssociation({...two,accountId:'account-1',cloudPetId:'local-pet'});
+ const other={...two,accountId:'account-1'};
+ await first.storage.appendEvents([event]);const flight=await first.sync.nextBatch(one);server.push(flight);
+ // Pull can see an already committed create while its acknowledgment is lost.
+ await first.sync.applySync({...one,accepted:[],page:server.pull((await first.sync.status('local-pet')).cursor)});
+ await cycle(first.sync,one,server);await cycle(second.sync,other,server);
+ await first.storage.updateEvent(event.id,{note:'first offline'});await second.storage.updateEvent(event.id,{at:200});
+ await cycle(first.sync,one,server);await cycle(second.sync,other,server);await cycle(first.sync,one,server);
+ assert.deepEqual(await first.storage.loadEvents(),await second.storage.loadEvents());
+ assert.deepEqual((await first.storage.loadEvents())[0],{...event,at:200,note:'first offline'});
+});
+
+test('a concurrent initial create conflict becomes a fresh field patch after pulling current cloud state',async t=>{
+ const {sync,storage}=await setup(t);const owner=await activate(sync),server=replicaServer();await cycle(sync,owner,server);
+ await storage.appendEvents([event]);const pending=(await sync.nextBatch(owner))[0];
+ assert.ok(pending.kind==='event');
+ server.push([{...pending,operationId:'other-initial-copy',deviceId:'other-device',patch:{...pending.patch,note:'remote independent'}}]);
+ assert.throws(()=>server.push([pending]),/exists/i);
+ const response={...owner,accepted:[],rejected:[{operationId:pending.operationId,error:'conflict' as const}],page:server.pull((await sync.status('local-pet')).cursor)};
+ await sync.applySync(response);
+ const next=(await sync.nextBatch(owner))[0];assert.notEqual(next.operationId,pending.operationId);assert.equal(next.intent,'patch');assert.equal(next.baseRevision,1);
+ assert.equal((await storage.loadEvents())[0].note,'remote independent');
+ await sync.applySync(response);assert.deepEqual(await sync.nextBatch(owner),[next]);
+ await cycle(sync,owner,server);assert.equal((await sync.status('local-pet')).pending,0);
+});
+
+test('retryable rejections retain exact payloads; invalid work is visible and does not block other records',async t=>{
+ const {sync,storage}=await setup(t);const owner=await activate(sync),server=replicaServer();await cycle(sync,owner,server);
+ await storage.appendEvents([event,{...event,id:'independent'}]);const pending=await sync.nextBatch(owner),page=server.pull((await sync.status('local-pet')).cursor);
+ await sync.applySync({...owner,accepted:[],rejected:[{operationId:pending[0].operationId,error:'retry_later'}],page});
+ assert.deepEqual(await sync.nextBatch(owner),pending);
+ await sync.applySync({...owner,accepted:[],rejected:[{operationId:pending[0].operationId,error:'invalid_mutation'}],page});
+ assert.equal((await sync.status('local-pet')).blocked,1);assert.deepEqual(await sync.nextBatch(owner),[pending[1]]);
+ assert.equal((await storage.loadEvents()).length,2);
+});
+
+test('blocked local notes survive pulls and correcting them never queues unrelated remote fields',async t=>{
+ const {sync,storage}=await setup(t);const owner=await activate(sync),server=replicaServer();await cycle(sync,owner,server);
+ await storage.appendEvents([event]);await cycle(sync,owner,server);
+ const note='x'.repeat(17000);await storage.updateEvent(event.id,{note});
+ const record=server.record(cloudRecordId('event','local-pet',event.id));
+ server.push([{protocolVersion:1,operationId:'remote-time',deviceId:'other',recordId:record.id,petId:record.petId,kind:'event',baseRevision:record.revision,intent:'patch',patch:{at:200}}]);
+ await sync.applySync({...owner,accepted:[],page:server.pull((await sync.status('local-pet')).cursor)});
+ assert.equal((await storage.loadEvents())[0].at,200);assert.equal((await storage.loadEvents())[0].note,note);
+ await storage.updateEvent(event.id,{note:'corrected'});
+ const next=await sync.nextBatch(owner);assert.equal(next.length,1);assert.deepEqual(next[0].patch,{note:'corrected'});
+});
+
+test('a malformed scoped pull rolls back valid acknowledgments and an unbound puppy never joins local history',async t=>{
+ const {sync,storage,database}=await setup(t);const owner=await activate(sync),server=replicaServer();
+ const pending=await sync.nextBatch(owner),accepted=server.push(pending);
+ const wrong:CloudRecord={id:cloudRecordId('event','pet-other','same-id'),petId:'local-pet',kind:'event',data:{type:'meal',at:200,source:'app'},revision:1,sequence:accepted.at(-1)!.sequence+1,deleted:false,updatedAt:1};
+ await assert.rejects(sync.applySync({...owner,accepted,page:{changes:[wrong],cursor:wrong.sequence,hasMore:false}}),/identity/i);
+ assert.deepEqual(await sync.nextBatch(owner),pending);
+ const valid={...wrong,petId:'pet-other'};
+ await sync.applySync({...owner,accepted,page:server.pull(0)});
+ await sync.applySync({...owner,accepted:[],page:{changes:[valid],cursor:valid.sequence,hasMore:false}});
+ assert.deepEqual(await storage.loadEvents(),[]);assert.equal((await database.read(sql=>sql.getFirstAsync<{n:number}>('SELECT COUNT(*) n FROM puppies')))!.n,1);
+});
