@@ -11,11 +11,13 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version-file: .node-version
           cache: npm
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      - run: npm run test:web
+      - run: npm run build:web
       - run: npm run typecheck:server
       - run: npm run test:server
       - run: npx expo export --platform android --output-dir dist-android

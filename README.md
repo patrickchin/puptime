@@ -1,6 +1,6 @@
 # Puptime
 
-Puptime is a puppy activity log for Android and iOS. Data stays on the device.
+Puptime is a puppy activity log for Android and iOS. Data stays on the device. The public website has separate traffic analytics and optional product analytics; see [Privacy](PRIVACY.md).
 
 ## Screenshots
 
@@ -81,6 +81,8 @@ npm run android
 The widgets use native extensions, so they require a development or release build rather than Expo Go. Interactive iOS widget buttons require iOS 17 or newer.
 
 ## Checks and release build
+
+For the public website's static pages, analytics configuration, and Google indexing setup, see [Website operations](docs/website-operations.md).
 
 ```sh
 npm run typecheck

@@ -1,0 +1,19 @@
+import { copyFileSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { publicPaths, siteUrl } from '../src/web/site.ts';
+
+writeFileSync('dist-web/sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${publicPaths.map((path) => `  <url><loc>${siteUrl}${path}</loc></url>`).join('\n')}\n</urlset>\n`);
+writeFileSync('dist-web/robots.txt', `User-agent: *\nAllow: /\nSitemap: ${siteUrl}/sitemap.xml\n`);
+copyFileSync('assets/puptime-icon.png', 'dist-web/social-preview.png');
+// A top-level 404 disables Pages' SPA fallback for nonexistent guide URLs.
+copyFileSync('dist-web/+not-found.html', 'dist-web/404.html');
+for (const path of ['+not-found.html', '_sitemap.html', 'puppy-care/[id].html']) rmSync(`dist-web/${path}`, { force: true });
+// Cloudflare also protects preview deployments; keep that policy explicit in source.
+writeFileSync('dist-web/_headers', `/*\n  Referrer-Policy: strict-origin-when-cross-origin\n  X-Content-Type-Options: nosniff\nhttps://:preview.puptime.pages.dev/*\n  X-Robots-Tag: noindex\n`);
+for (const path of publicPaths) {
+  const filename = path === '/' ? 'index' : path === '/puppy-care/' ? 'puppy-care/index' : path.slice(1);
+  const html = readFileSync(`dist-web/${filename}.html`, 'utf8');
+  if (!html.includes('rel="canonical"') || !html.includes('<h1') || !html.includes('name="description"')) {
+    throw new Error(`Missing rendered SEO content: ${path}`);
+  }
+}
+console.log(`Verified static HTML and generated sitemap for ${publicPaths.length} public pages.`);

@@ -33,10 +33,11 @@
       "predictiveBackGestureEnabled": true
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "output": "static"
     },
     "plugins": [
-      "./plugins/withAndroidWidgetAgoRefresh",
+      "./plugins/withAndroidWidgetChronometer",
       [
         "react-native-android-widget",
         {
@@ -105,7 +106,13 @@
       ],
       "expo-secure-store",
       "expo-web-browser",
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-router",
+        {
+          "root": "./web"
+        }
+      ]
     ],
     "owner": "patchin",
     "extra": {
