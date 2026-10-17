@@ -29,6 +29,7 @@ import {
   type TimelineMark,
 } from '../analytics';
 import { activityFromKey, activityKey, customActivityKey, dateKey, formatDuration, isOpenNap, quickEventTypes, type Activity, type ActivityKey, type PuppyEvent } from '../domain';
+import { IllustratedTimelineTrack, TIMELINE_ART_GUTTER } from '../components/IllustratedTimelineTrack';
 import { DayTimeline } from '../components/DayTimeline';
 import { ActivityIcon } from '../components/ActivityIcon';
 import { useLocalization } from '../localization-context';
@@ -148,14 +149,15 @@ function TimelineDateLabel({
           backgroundColor: isToday ? theme.primarySoft : theme.background,
           borderColor: theme.presentation.iconProfile === 'default' ? theme.border : 'transparent',
           height: rowHeight,
+          borderRightWidth: theme.presentation.iconProfile === 'default' ? StyleSheet.hairlineWidth : 0,
           transform: [{ translateX: horizontalOffset }],
         },
       ]}
     >
-      <Text numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.5} style={[styles.weekday, { color: isToday ? theme.primary : theme.text }]}>
+      <Text numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.5} style={[styles.weekday, headingStyle(theme), { fontSize: theme.presentation.iconProfile === 'default' ? 10 : 13, lineHeight: theme.presentation.iconProfile === 'default' ? 13 : 18, color: isToday ? theme.primary : theme.text }]}>
         {isToday ? t('insights.today') : shortDay.format(day.date).toUpperCase()}
       </Text>
-      <Text numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.5} style={[styles.calendarDate, { color: theme.textMuted }]}>
+      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} maxFontSizeMultiplier={1.5} style={[styles.calendarDate, { color: theme.textMuted }]}>
         {shortDate.format(day.date)}
       </Text>
     </Animated.View>
@@ -186,7 +188,6 @@ function TimelineTrack({
   theme: Theme;
 }) {
   const { activityColors, activityLabel, language, t } = useLocalization();
-  const playful = theme.presentation.iconProfile !== 'default';
   const marks = day.marks.filter((mark) => selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label })));
   const recordedMarks = marks.filter((mark) => !mark.estimated);
   const interactiveMarks = marks.filter((mark) => !mark.estimated || savedEstimateIds.has(mark.id));
@@ -200,19 +201,19 @@ function TimelineTrack({
       style={[
         styles.timelineTrack,
         {
-          height: rowHeight - (playful ? 8 : 0),
-          marginVertical: playful ? 4 : 0,
-          borderBottomWidth: playful ? 0 : StyleSheet.hairlineWidth,
-          borderRadius: playful ? 18 : 0,
+          height: rowHeight,
+          marginVertical: 0,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderRadius: 0,
           backgroundColor: isToday ? theme.primarySoft : theme.surface,
           borderBottomColor: theme.border,
         },
       ]}
     >
-      {gridHours.filter((hour) => !playful || hour % 6 === 0).map((hour) => (
+      {gridHours.map((hour) => (
         <View key={hour} pointerEvents="none" style={[styles.gridLine, {
           backgroundColor: hour % 3 === 0 ? theme.textMuted : theme.border,
-          opacity: playful ? 0.18 : hour % 3 === 0 ? 0.4 : 1,
+          opacity: hour % 3 === 0 ? 0.4 : 1,
           left: `${(hour / 24) * 100}%`,
         }]} />
       ))}
@@ -224,7 +225,6 @@ function TimelineTrack({
             pointerEvents="none"
             style={[
               styles.durationMark,
-              playful && { top: (rowHeight - 8) / 2 - 9, bottom: (rowHeight - 8) / 2 - 9 },
               {
                 backgroundColor: color,
                 left: `${(mark.startBucket / TIMELINE_BUCKETS) * 100}%`,
@@ -243,7 +243,7 @@ function TimelineTrack({
           hitSlop={{ top: 3, bottom: 3 }}
           onPress={() => onSelectMarks([mark.id])}
           style={({ pressed }) => [styles.durationMark,
-            playful && { top: 0, bottom: 0 }, {
+            {
             left: `${(mark.startBucket / TIMELINE_BUCKETS) * 100}%`,
             width: `${((mark.endBucket! - mark.startBucket) / TIMELINE_BUCKETS) * 100}%`,
             backgroundColor: pressed ? theme.surface : 'transparent',
@@ -281,11 +281,7 @@ function TimelineTrack({
               },
             ]}
           >
-            {playful && pointMarks.length === 1 && colors.length === 1 && center >= 9 && center <= trackWidth - 9 ? (
-              <View pointerEvents="none" style={{ position: 'absolute', left: center - left - 9, top: (rowHeight - 26) * (pointMarks[0].type === 'pee' ? 0.05 : pointMarks[0].type === 'meal' ? 0.95 : 0.5), width: 18, alignItems: 'center' }}>
-                <ActivityIcon activity={{ type: pointMarks[0].type, customLabel: pointMarks[0].label }} theme={theme} size={18} color={colors[0]} />
-              </View>
-            ) : colors.length ? <View pointerEvents="none" style={[styles.pointMark, { left: center - left - markWidth / 2, backgroundColor: colors[0], top: playful ? (rowHeight - 8) / 2 - 10 : 3, height: playful ? 20 : rowHeight - 6, width: markWidth }]}>
+            {colors.length ? <View pointerEvents="none" style={[styles.pointMark, { left: center - left - markWidth / 2, backgroundColor: colors[0], top: 3, height: rowHeight - 6, width: markWidth }]}>
               {colors.length > 1 ? colors.map((color, index) => {
                 const continuesHorizontally = index < durationCount;
                 return (
@@ -371,6 +367,7 @@ function TimelineAxis({
   const { fontScale } = useWindowDimensions();
   const staggerLabels = trackWidth / 24 < 22 * Math.min(fontScale, 1.4);
   const playful = theme.presentation.iconProfile !== 'default';
+  const plotWidth = playful ? Math.max(1, trackWidth - TIMELINE_ART_GUTTER * 2) : trackWidth;
   const axisHeight = !playful && staggerLabels ? 42 : 30;
   const labelWidth = playful ? 48 : trackWidth / 12;
   return (
@@ -399,7 +396,7 @@ function TimelineAxis({
             maxFontSizeMultiplier={1.4}
             style={[
               styles.axisLabel,
-              hour === 0
+              playful ? { left: TIMELINE_ART_GUTTER + hour / 24 * plotWidth - labelWidth / 2, textAlign: 'center' } : hour === 0
                 ? styles.axisStart
                 : hour === 24
                   ? styles.axisEnd
@@ -411,7 +408,7 @@ function TimelineAxis({
           </Text>
         ))}
         {GRID_HOURS.filter((hour) => !playful || hour % 6 === 0).map((hour) => (
-          <View key={hour} style={[styles.axisTick, { left: `${(hour / 24) * 100}%`, backgroundColor: theme.textMuted }]} />
+          <View key={hour} style={[styles.axisTick, { left: (playful ? TIMELINE_ART_GUTTER : 0) + hour / 24 * plotWidth, backgroundColor: theme.textMuted }]} />
         ))}
       </View>
     </View>
@@ -454,19 +451,21 @@ function ComparisonTimelineScreen({ events, customActivities, theme }: { events:
   const { activityColors, activityLabel, language, t } = useLocalization();
   const { fontScale, height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const activityFilters: ActivityKey[] = useMemo(() => [...quickEventTypes, ...customActivities.map(customActivityKey)], [customActivities]);
+  const playful = theme.presentation.iconProfile !== 'default';
+  const RowTrack = playful ? IllustratedTimelineTrack : MemoTimelineTrack;
+  const activityFilters: ActivityKey[] = useMemo(() => playful ? ['pee', 'poop', 'meal'] : [...quickEventTypes, ...customActivities.map(customActivityKey)], [customActivities, playful]);
   const [selectedType, setSelectedType] = useState<ActivityKey | 'all'>('all');
   const selectedTypes = useMemo(() => selectedType === 'all' ? activityFilters : [selectedType], [activityFilters, selectedType]);
   useEffect(() => {
     if (selectedType !== 'all' && !activityFilters.includes(selectedType)) setSelectedType('all');
-  }, [customActivities, selectedType]);
+  }, [activityFilters, selectedType]);
   const [loadedDayCount, setLoadedDayCount] = useState(INITIAL_DAYS);
   const [timeScale, setTimeScale] = useState(1);
   const timeScaleLabel = timeScale.toFixed(2).replace(/0$/, '');
   const [nowTime, setNowTime] = useState(Date.now());
   const [selection, setSelection] = useState<string[]>([]);
   const [isLoadingEarlier, startLoadingEarlier] = useTransition();
-  const rowHeight = Math.round((theme.presentation.iconProfile === 'default' ? 52 : 68) * Math.min(fontScale, 1.5));
+  const rowHeight = Math.round((playful ? 80 : 52) * Math.min(fontScale, 1.5));
   const viewportWidth = width - insets.left - insets.right;
   const baseTrackWidth = Math.max(1, viewportWidth - DATE_COLUMN_WIDTH);
   const trackWidth = baseTrackWidth * timeScale;
@@ -516,10 +515,10 @@ function ComparisonTimelineScreen({ events, customActivities, theme }: { events:
   const didUserScroll = useRef(false);
   const timeScaleValue = useRef(timeScale);
   const pendingHorizontalOffset = useRef<number | null>(null);
-  const zoomMetrics = useRef({ baseTrackWidth, viewportWidth });
+  const zoomMetrics = useRef({ baseTrackWidth, viewportWidth, gutter: playful ? TIMELINE_ART_GUTTER : 0 });
   const pinch = useRef({ distance: 0, scale: 1, offset: 0, focalX: 0 });
   timeScaleValue.current = timeScale;
-  zoomMetrics.current = { baseTrackWidth, viewportWidth };
+  zoomMetrics.current = { baseTrackWidth, viewportWidth, gutter: playful ? TIMELINE_ART_GUTTER : 0 };
 
   useEffect(() => {
     const timer = setInterval(() => setNowTime(Date.now()), 60_000);
@@ -571,17 +570,17 @@ function ComparisonTimelineScreen({ events, customActivities, theme }: { events:
       const nextScale = Math.round(clamp(rawScale, MIN_TIME_SCALE, MAX_TIME_SCALE) * 20) / 20;
       if (Math.abs(nextScale - timeScaleValue.current) < 0.025) return;
 
-      const { baseTrackWidth: baseWidth, viewportWidth: viewport } = zoomMetrics.current;
+      const { baseTrackWidth: baseWidth, viewportWidth: viewport, gutter } = zoomMetrics.current;
       const focalX = Math.max(DATE_COLUMN_WIDTH, pinch.current.focalX);
       const oldTrackWidth = baseWidth * pinch.current.scale;
       const timeAtFocal = clamp(
-        (pinch.current.offset + focalX - DATE_COLUMN_WIDTH) / oldTrackWidth,
+        (pinch.current.offset + focalX - DATE_COLUMN_WIDTH - gutter) / Math.max(1, oldTrackWidth - gutter * 2),
         0,
         1,
       );
       const nextTrackWidth = baseWidth * nextScale;
       pendingHorizontalOffset.current = clamp(
-        timeAtFocal * nextTrackWidth - focalX + DATE_COLUMN_WIDTH,
+        gutter + timeAtFocal * Math.max(1, nextTrackWidth - gutter * 2) - focalX + DATE_COLUMN_WIDTH,
         0,
         Math.max(0, DATE_COLUMN_WIDTH + nextTrackWidth - viewport),
       );
@@ -605,16 +604,16 @@ function ComparisonTimelineScreen({ events, customActivities, theme }: { events:
       MAX_TIME_SCALE,
     );
     if (nextScale === timeScaleValue.current) return;
-    const { baseTrackWidth: baseWidth, viewportWidth: viewport } = zoomMetrics.current;
+    const { baseTrackWidth: baseWidth, viewportWidth: viewport, gutter } = zoomMetrics.current;
     const focalX = viewport / 2;
     const timeAtFocal = clamp(
-      (horizontalOffsetValue.current + focalX - DATE_COLUMN_WIDTH) / (baseWidth * timeScaleValue.current),
+      (horizontalOffsetValue.current + focalX - DATE_COLUMN_WIDTH - gutter) / Math.max(1, baseWidth * timeScaleValue.current - gutter * 2),
       0,
       1,
     );
     const nextTrackWidth = baseWidth * nextScale;
     pendingHorizontalOffset.current = clamp(
-      timeAtFocal * nextTrackWidth - focalX + DATE_COLUMN_WIDTH,
+      gutter + timeAtFocal * Math.max(1, nextTrackWidth - gutter * 2) - focalX + DATE_COLUMN_WIDTH,
       0,
       Math.max(0, DATE_COLUMN_WIDTH + nextTrackWidth - viewport),
     );
@@ -783,7 +782,7 @@ function ComparisonTimelineScreen({ events, customActivities, theme }: { events:
                 ]}
               >
                 {activity
-                  ? <ActivityIcon activity={activity} theme={theme} size={17} color={active ? color : theme.textMuted} />
+                  ? <ActivityIcon activity={activity} theme={theme} size={playful ? 24 : 17} color={active ? color : theme.textMuted} />
                   : <MaterialCommunityIcons accessibilityElementsHidden importantForAccessibility="no" name="layers-outline" size={17} color={active ? color : theme.textMuted} />}
                 <Text style={[styles.filterLabel, { color: active ? color : theme.textMuted }]}>{label}</Text>
                 {active ? (
@@ -847,7 +846,7 @@ function ComparisonTimelineScreen({ events, customActivities, theme }: { events:
                     theme={theme}
                   />
                   <View style={{ width: trackWidth }}>
-                    <MemoTimelineTrack
+                    <RowTrack
                       day={day}
                       selectedTypes={selectedTypes}
                       savedEstimateIds={savedEstimateIds}

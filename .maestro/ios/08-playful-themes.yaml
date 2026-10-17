@@ -14,6 +14,8 @@ tags:
 - tapOn:
     id: quick.pee
 - tapOn:
+    id: quick.poop
+- tapOn:
     id: quick.meal
 - tapOn:
     id: settings.open
@@ -41,6 +43,25 @@ tags:
     id: timeline.mode.compare
 - assertVisible:
     id: timeline.zoom.in
+- assertVisible:
+    id: timeline.cluster.*
+- assertNotVisible:
+    id: timeline.filter.nap
+- tapOn:
+    id: timeline.mark.point.*
+- assertVisible:
+    id: timeline.details
+- assertVisible:
+    id: timeline.details.event.*
+    text: Pee
+- assertVisible:
+    id: timeline.details.event.*
+    text: Poop
+- assertVisible:
+    id: timeline.details.event.*
+    text: Eat
+- tapOn:
+    id: timeline.details.close
 - tapOn:
     id: timeline.zoom.in
 - assertVisible:

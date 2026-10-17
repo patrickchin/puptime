@@ -37,6 +37,26 @@ export type TimelinePointCluster = {
 
 export type TimelineDurationRun = Pick<TimelineMark, 'type' | 'startBucket'> & { endBucket: number };
 
+export type TimelineMarkerGroup = { marks: TimelineMark[]; firstBucket: number; lastBucket: number; center: number };
+
+export function timelineMarkerGroups(marks: readonly TimelineMark[], trackWidth: number): TimelineMarkerGroup[] {
+  const groups: TimelineMarkerGroup[] = [];
+  const points = marks.filter((mark) => mark.endBucket === undefined).sort((a, b) => a.startBucket - b.startBucket);
+  for (const mark of points) {
+    const center = (mark.startBucket + 0.5) * trackWidth / TIMELINE_BUCKETS;
+    const last = groups[groups.length - 1];
+    // Merge connected collisions at this zoom level, rather than separating activities into lanes.
+    if (last && center - (last.lastBucket + 0.5) * trackWidth / TIMELINE_BUCKETS <= 42) {
+      last.marks.push(mark);
+      last.lastBucket = mark.startBucket;
+      last.center = ((last.firstBucket + last.lastBucket) / 2 + 0.5) * trackWidth / TIMELINE_BUCKETS;
+    } else {
+      groups.push({ marks: [mark], firstBucket: mark.startBucket, lastBucket: mark.startBucket, center });
+    }
+  }
+  return groups;
+}
+
 export type ActivityFrequencyStat = {
   type: EventType;
   customLabel?: string;
