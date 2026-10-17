@@ -2,7 +2,7 @@ import { isOpenNap, type PuppyEvent, type PuppyEventChanges, type ScheduleEntry 
 import { assertValidEvents, EventsImportError, EventsStorageError } from '../storage-validation.ts';
 import { assertValidSchedule } from './legacy.ts';
 import type { LocalDatabase, SqlExecutor } from './database.ts';
-import { localChanges, type LocalChangeSink } from './sync-projection.ts';
+import { localChanges, readLocalSettingsRecords, type LocalChangeSink } from './sync-projection.ts';
 
 type EventRow = { id: string; at: number; body: string; event: PuppyEvent };
 export function createLocalRepository(database: LocalDatabase, petId: string, onChange?: LocalChangeSink) {
@@ -33,6 +33,7 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
   async function mutateEvents<T>(action: (events: PuppyEvent[]) => { events: PuppyEvent[]; value: T }) {
     const committed = await database.write(async (sql) => {
       const rows = await readEvents(sql);
+      const beforeSettings=onChange?await readLocalSettingsRecords(sql,petId):[];
       const result = action(rows.map((row) => row.event));
       assertValidEvents(result.events);
       const previous = new Map(rows.map((row) => [row.id, row.body]));
@@ -47,7 +48,7 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
       }
       if (onChange) {
         const records = (events: PuppyEvent[]) => events.map(({id,...data})=>({kind:'event' as const,localId:id,data}));
-        const changes=localChanges(records(rows.map(row=>row.event)),records(result.events));
+        const changes=localChanges([...records(rows.map(row=>row.event)),...beforeSettings],[...records(result.events),...await readLocalSettingsRecords(sql,petId)]);
         if (changes.length) await onChange(sql,changes);
       }
       return { rows: saved, value: result.value };

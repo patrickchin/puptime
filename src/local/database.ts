@@ -98,7 +98,7 @@ CREATE TABLE IF NOT EXISTS local_sync_records (
 );
 CREATE TABLE IF NOT EXISTS local_sync_acks (
   generation TEXT NOT NULL REFERENCES local_sync_owner(generation) ON DELETE CASCADE,
-  operation_id TEXT NOT NULL, mutation_json TEXT NOT NULL CHECK(json_valid(mutation_json)),
+  operation_id TEXT NOT NULL, local_sequence INTEGER NOT NULL, mutation_json TEXT NOT NULL CHECK(json_valid(mutation_json)),
   result_json TEXT NOT NULL CHECK(json_valid(result_json)), outcome TEXT NOT NULL DEFAULT 'accepted' CHECK(outcome IN ('accepted','rejected')), PRIMARY KEY(generation,operation_id)
 );
 CREATE TABLE IF NOT EXISTS local_sync_baseline (

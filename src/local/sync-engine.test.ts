@@ -397,3 +397,67 @@ test('restoring a record with its own pending writes waits for their acknowledgm
  await assert.rejects(sync.restore({...owner,record,data:{type:'pee',at:100,source:'app'}}),/pending|acknowledg/i);
  assert.deepEqual(await sync.nextBatch(owner),pending);assert.equal((await storage.loadEvents())[0].note,'not yet acknowledged');
 });
+
+for (const acknowledgeLater of [false,true]) test(`conflict recovery preserves later same-field edits (acknowledged=${acknowledgeLater})`,async t=>{
+  const {sync,storage}=await setup(t);const owner=await activate(sync),server=replicaServer();await cycle(sync,owner,server);
+  await storage.appendEvents([{...event,note:'first'}]);const original=(await sync.nextBatch(owner))[0];
+  await storage.updateEvent(event.id,{note:'later'});const later=(await sync.nextBatch(owner))[1];
+  server.push([{...original,operationId:'other-create',deviceId:'other-device'}]);
+  const accepted=acknowledgeLater?server.push([later]):[];
+  if (acknowledgeLater) {
+   await sync.applySync({...owner,accepted,page:server.pull((await sync.status('local-pet')).cursor)});
+   assert.equal((await storage.loadEvents())[0].note,'later');
+  }
+  await sync.applySync({...owner,accepted,rejected:[{operationId:original.operationId,error:'conflict'}],page:server.pull((await sync.status('local-pet')).cursor)});
+  assert.equal((await storage.loadEvents())[0].note,'later',`later acknowledged=${acknowledgeLater}`);
+  const next=await sync.nextBatch(owner);
+  if (!acknowledgeLater) assert.equal(next.at(-1)!.operationId,later.operationId);
+  else assert.ok(next.every(mutation=>!('note' in mutation.patch)));
+  await cycle(sync,owner,server);
+  assert.equal((server.record(original.recordId).data as Record<string,unknown>).note,'later');
+});
+
+test('two puppy projections apply account preferences once and preserve independent pending fields',async t=>{
+ const {sync,storage,database}=await setup(t);const owner=await activate(sync),server=replicaServer();await cycle(sync,owner,server);
+ await database.write(sql=>sql.runAsync('INSERT INTO puppies(id,name) VALUES (?,?)','pet-2','Second puppy'));
+ const other=createNativeStorage(database,'pet-2',sync.changeSink('pet-2'));
+ await sync.prepareAssociation({...input,localPetId:'pet-2',enrollment:{...enrollment,operationId:'enroll-2',localPetId:'pet-2'}});
+ await sync.stageBaseline({...owner,page:server.pull(0)});await sync.completeAssociation({...owner,cloudPetId:'pet-2'});await cycle(sync,owner,server);
+ await other.saveThemePreference('soft-play');
+ const preferences=server.record(cloudRecordId('accountPreferences',null,'preferences'));
+ server.push([{protocolVersion:1,operationId:'remote-language',deviceId:'other-device',recordId:preferences.id,petId:null,kind:'accountPreferences',baseRevision:preferences.revision,intent:'patch',patch:{language:'es'}}]);
+ await sync.applySync({...owner,accepted:[],page:server.pull((await sync.status('local-pet')).cursor)});
+ assert.equal(await storage.loadLanguagePreference(),'es');assert.equal(await other.loadThemePreference(),'soft-play');
+ await cycle(sync,owner,server);assert.equal((server.record(preferences.id).data as Record<string,unknown>).language,'es');assert.equal((server.record(preferences.id).data as Record<string,unknown>).theme,'soft-play');
+});
+
+test('oversized escaped restores reject atomically without starving independent work',async t=>{
+ const {sync,storage}=await setup(t);const owner=await activate(sync),server=replicaServer();await cycle(sync,owner,server);
+ await storage.appendEvents([event]);await cycle(sync,owner,server);
+ const record=server.record(cloudRecordId('event','local-pet',event.id));
+ await assert.rejects(sync.restore({...owner,record,data:{...record.data,note:'\u0001'.repeat(16384)}}),/size|large|limit/i);
+ assert.equal((await sync.status('local-pet')).pending,0);assert.equal((await storage.loadEvents())[0].note,undefined);
+ await storage.appendEvents([{...event,id:'independent'}]);
+ assert.equal((await sync.nextBatch(owner))[0].recordId,cloudRecordId('event','local-pet','independent'));
+});
+
+test('empty incremental cursor advancement rolls back acknowledgments and every local effect',async t=>{
+ const {sync,storage}=await setup(t);const owner=await activate(sync),server=replicaServer();await cycle(sync,owner,server);
+ const cursor=(await sync.status('local-pet')).cursor;
+ await storage.appendEvents([event]);const pending=await sync.nextBatch(owner),accepted=server.push(pending);
+ await assert.rejects(sync.applySync({...owner,accepted,page:{changes:[],cursor:cursor+100,hasMore:false}}),/cursor/i);
+ assert.equal((await sync.status('local-pet')).cursor,cursor);assert.deepEqual(await sync.nextBatch(owner),pending);assert.deepEqual(await storage.loadEvents(),[event]);
+ await cycle(sync,owner,server);assert.equal((await sync.status('local-pet')).pending,0);
+});
+
+test('imported historical labels synchronize creation and later deletion without erasing history',async t=>{
+ const {sync,storage}=await setup(t);const owner=await activate(sync),server=replicaServer();await cycle(sync,owner,server);
+ await storage.importEvents([{...event,type:'custom',customLabel:'Training'}]);
+ const activityId=cloudRecordId('customActivity','local-pet','custom:training');
+ assert.ok((await sync.nextBatch(owner)).some(mutation=>mutation.recordId===activityId&&mutation.intent==='create'));
+ await cycle(sync,owner,server);assert.deepEqual(await storage.loadCustomActivities(),['Training']);assert.equal((await sync.status('local-pet')).pending,0);
+ await storage.deleteCustomActivity('Training');
+ assert.ok((await sync.nextBatch(owner)).some(mutation=>mutation.recordId===activityId&&mutation.intent==='delete'));
+ await cycle(sync,owner,server);assert.equal(server.record(activityId).deleted,true);assert.equal((await storage.loadEvents())[0].customLabel,'Training');
+ assert.deepEqual(await storage.loadCustomActivities(),[]);assert.equal((await sync.status('local-pet')).pending,0);
+});

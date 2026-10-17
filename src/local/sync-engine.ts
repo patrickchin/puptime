@@ -7,8 +7,9 @@ import { applyLocalRecords, localChangeSchema, localChanges, readLocalDeletedAct
 type Owner={generation:string;account_id:string;device_id:string;cursor:number;pending_pet_id:string|null;staging_cursor:number;staging_complete:number;resyncing:number};
 type Binding={pet_id:string;cloud_pet_id:string|null;enrollment:string;status:'preparing'|'active'};
 type Fence={generation:string;accountId:string};
-type Outbox={operation_id:string;local_pet_id:string;local_kind:LocalChange['kind'];local_id:string;change_json:string;mutation_json:string|null;blocked_reason:string|null};
+type Outbox={sequence:number;operation_id:string;local_pet_id:string;local_kind:LocalChange['kind'];local_id:string;change_json:string;mutation_json:string|null;blocked_reason:string|null};
 const key=(record:{kind:string;localId:string})=>JSON.stringify([record.kind,record.localId]);
+const requestFits=(mutations:Mutation[])=>new TextEncoder().encode(JSON.stringify({mutations})).byteLength<65536;
 export function createLocalSync(database:LocalDatabase,options:{newId?:()=>string;now?:()=>number}={}) {
   const now=options.now??Date.now;
   async function id(sql:SqlExecutor) {return identifierSchema.parse(options.newId?.()??(await sql.getFirstAsync<{id:string}>('SELECT lower(hex(randomblob(16))) id'))!.id);}
@@ -21,6 +22,18 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
   async function mirrored(sql:SqlExecutor,generation:string,recordId:string) {
     const row=await sql.getFirstAsync<{body:string}>('SELECT body FROM local_sync_records WHERE generation=? AND record_id=?',generation,recordId);
     return row?cloudRecordSchema.parse(JSON.parse(row.body)):null;
+  }
+  async function remainingPatch(sql:SqlExecutor,current:Owner,row:Outbox,mutation:Mutation,proposal:Record<string,unknown>):Promise<Record<string,unknown>|null> {
+    // A later local operation can be acknowledged before this one's rejection.
+    // Keep its fields authoritative without rewriting the older sent request.
+    const patch={...proposal};
+    const subsequent=await sql.getAllAsync<{mutation_json:string}>("SELECT mutation_json FROM local_sync_acks WHERE generation=? AND outcome='accepted' AND local_sequence>? AND json_extract(mutation_json,'$.recordId')=?",current.generation,row.sequence,mutation.recordId);
+    for (const saved of subsequent) {
+      const later=mutationSchema.parse(JSON.parse(saved.mutation_json));
+      if (later.intent==='delete'||later.intent==='restore') return null;
+      for (const field of Object.keys(later.patch)) delete patch[field];
+    }
+    return mutation.intent!=='delete'&&!Object.keys(patch).length?null:patch;
   }
   async function retainRevisions(sql:SqlExecutor,petId:string,changes:LocalChange[],source:'local'|'enrollment'|'cloud'|'restore') {
     for (const change of changes) await sql.runAsync('INSERT INTO local_revisions(pet_id,kind,local_id,before_data,after_data,created_at,source) VALUES (?,?,?,?,?,?,?)',petId,change.kind,change.localId,change.before===null?null:JSON.stringify(change.before),change.after===null?null:JSON.stringify(change.after),now(),source);
@@ -56,7 +69,7 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
     const operationId=await id(sql);
     const parsed=mutationSchema.safeParse({protocolVersion:1,operationId,deviceId:current.device_id,recordId,petId:change.kind==='accountPreferences'?null:pet.cloud_pet_id,kind:change.kind,baseRevision:base?.revision??0,intent,patch});
     let mutation=parsed.success&&(intent!=='create'||recordDataSchema(change.kind).safeParse(patch).success)?parsed.data:null;
-    if (mutation&&new TextEncoder().encode(JSON.stringify({mutations:[mutation]})).byteLength>=65536) mutation=null;
+    if (mutation&&!requestFits([mutation])) mutation=null;
     for (const row of blocked) await sql.runAsync('DELETE FROM local_sync_outbox WHERE operation_id=?',row.operation_id);
     await sql.runAsync('INSERT INTO local_sync_outbox(operation_id,generation,local_pet_id,local_kind,local_id,change_json,mutation_json,blocked_reason) VALUES (?,?,?,?,?,?,?,?)',operationId,current.generation,pet.pet_id,change.kind,change.localId,JSON.stringify(change),mutation?JSON.stringify(mutation):null,mutation?null:'cloud_validation');
     return mutation;
@@ -102,9 +115,10 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
       const mutation=mutationSchema.parse(JSON.parse(row.mutation_json));
       if (mutation.operationId!==row.operation_id||mutation.recordId!==recordId||mutation.kind!==change.kind||mutation.deviceId!==current.device_id||mutation.petId!==(change.kind==='accountPreferences'?null:pet.cloud_pet_id)) throw new Error('Pending operation identity changed.');
       const base=working.get(mutation.recordId)??null;
+      const patch=await remainingPatch(sql,current,row,mutation,mutation.patch);if (!patch) continue;
       // A lost acknowledgment can leave an already accepted create pending.
       // Only the local preview changes intent; the stored request stays exact.
-      const preview={...mutation,intent:mutation.intent==='create'&&base?'patch' as const:mutation.intent,baseRevision:mutation.intent==='restore'?mutation.baseRevision:Math.min(mutation.baseRevision,base?.revision??0)} as Mutation;
+      const preview={...mutation,patch,intent:mutation.intent==='create'&&base?'patch' as const:mutation.intent,baseRevision:mutation.intent==='restore'?mutation.baseRevision:Math.min(mutation.baseRevision,base?.revision??0)} as Mutation;
       try {working.set(mutation.recordId,reconcileMutation(base,preview,now()).record);}
       catch (error) {if (!(error instanceof ReconciliationError)) throw error;if (!base) raw.push({pet,change,recordId});}
     }
@@ -123,7 +137,7 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
       if (change.kind==='event'&&base) {if ('estimated' in base.data&&base.data.estimated) data.estimated=true;retainValidEventTiming(base.data,data);}
       values.set(key(change),{kind:change.kind,localId:change.localId,data});deletions.get(item.pet.pet_id)!.delete(key(change));
     }
-    for (const pet of pets) await applyLocalRecords(sql,pet.pet_id,[...projected.get(pet.pet_id)!.values()],[...deletions.get(pet.pet_id)!.values()]);
+    for (const pet of pets) await applyLocalRecords(sql,pet.pet_id,[...projected.get(pet.pet_id)!.values()].filter(record=>pet===primary||record.kind!=='accountPreferences'),[...deletions.get(pet.pet_id)!.values()]);
     for (const pet of pets) await retainRevisions(sql,pet.pet_id,localChanges(before.get(pet.pet_id)!,await readLocalRecords(sql,pet.pet_id)).filter(change=>pet.pet_id===primary.pet_id||change.kind!=='accountPreferences'),source);
   }
   return {
@@ -253,6 +267,7 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
         if (current.pending_pet_id||current.resyncing) throw new Error('Finish the pending baseline first.');
         const {accepted,rejected}=pushResponseSchema.parse({accepted:input.accepted,rejected:input.rejected??[]}),page=pullPageSchema.parse(input.page);
         if (page.resyncRequired) throw new Error('Reset the full baseline before applying a resync.');
+        if (!page.changes.length&&page.cursor!==current.cursor) throw new Error('Empty cloud page cannot advance its cursor.');
         if (page.cursor<current.cursor||(page.cursor>current.cursor&&page.changes.some(record=>record.sequence<=current.cursor))) throw new Error('Cloud cursor regressed or overlapped.');
         for (const result of accepted) {
           const row=await sql.getFirstAsync<Outbox>('SELECT * FROM local_sync_outbox WHERE generation=? AND operation_id=?',current.generation,result.operationId);
@@ -265,7 +280,7 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
           const mutation=mutationSchema.parse(JSON.parse(row.mutation_json));
           if (mutation.recordId!==result.record.id||mutation.kind!==result.record.kind||mutation.petId!==result.record.petId||mutation.operationId!==result.operationId||mutation.deviceId!==current.device_id) throw new Error('Acknowledgment record identity changed.');
           await storeMirror(sql,current,result.record);
-          await sql.runAsync('INSERT INTO local_sync_acks(generation,operation_id,mutation_json,result_json) VALUES (?,?,?,?)',current.generation,result.operationId,row.mutation_json,JSON.stringify(result));
+          await sql.runAsync('INSERT INTO local_sync_acks(generation,operation_id,local_sequence,mutation_json,result_json) VALUES (?,?,?,?,?)',current.generation,result.operationId,row.sequence,row.mutation_json,JSON.stringify(result));
           await sql.runAsync('DELETE FROM local_sync_outbox WHERE generation=? AND operation_id=?',current.generation,result.operationId);
         }
         for (const record of page.changes) await storeMirror(sql,current,record);
@@ -280,23 +295,25 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
           if (result.error==='retry_later') continue;
           const mutation=mutationSchema.parse(JSON.parse(row.mutation_json));
           if (mutation.operationId!==result.operationId||mutation.deviceId!==current.device_id) throw new Error('Rejected operation identity changed.');
-          await sql.runAsync("INSERT INTO local_sync_acks(generation,operation_id,mutation_json,result_json,outcome) VALUES (?,?,?,?,'rejected')",current.generation,result.operationId,row.mutation_json,JSON.stringify(result));
+          await sql.runAsync("INSERT INTO local_sync_acks(generation,operation_id,local_sequence,mutation_json,result_json,outcome) VALUES (?,?,?,?,?,'rejected')",current.generation,result.operationId,row.sequence,row.mutation_json,JSON.stringify(result));
           const base=await mirrored(sql,current.generation,mutation.recordId),change=localChangeSchema.parse(JSON.parse(row.change_json));
           if (result.error==='invalid_mutation'||mutation.intent==='restore') {
             await sql.runAsync('UPDATE local_sync_outbox SET blocked_reason=? WHERE generation=? AND operation_id=?',mutation.intent==='restore'?'restore_conflict':'cloud_rejected',current.generation,result.operationId);
             continue;
           }
           if (!base&&change.after===null) {await sql.runAsync('DELETE FROM local_sync_outbox WHERE generation=? AND operation_id=?',current.generation,result.operationId);continue;}
-          const candidate=mutationSchema.safeParse({...mutation,operationId:await id(sql),baseRevision:base?.revision??0,intent:base?(mutation.intent==='create'?'patch':mutation.intent):'create',patch:base?mutation.patch:change.after});
-          let valid=candidate.success;
+          const patch=await remainingPatch(sql,current,row,mutation,(base?mutation.patch:change.after)??{});
+          if (!patch) {await sql.runAsync('DELETE FROM local_sync_outbox WHERE generation=? AND operation_id=?',current.generation,result.operationId);continue;}
+          const candidate=mutationSchema.safeParse({...mutation,operationId:await id(sql),baseRevision:base?.revision??0,intent:base?(mutation.intent==='create'?'patch':mutation.intent):'create',patch});
+          let valid=candidate.success&&requestFits([candidate.data]);
           if (candidate.success) {
             try {reconcileMutation(base,candidate.data,now());} catch (error) {if (!(error instanceof Error)) throw error;if (error.name!=='ZodError'&&!(error instanceof ReconciliationError)) throw error;valid=false;}
           }
           if (!candidate.success||!valid) {await sql.runAsync("UPDATE local_sync_outbox SET blocked_reason='cloud_rejected' WHERE generation=? AND operation_id=?",current.generation,result.operationId);continue;}
           // The server confirmed rejection, so this is a new operation with a
-          // new ID. An in-flight or accepted request is never rewritten.
-          await sql.runAsync('DELETE FROM local_sync_outbox WHERE generation=? AND operation_id=?',current.generation,result.operationId);
-          await sql.runAsync('INSERT INTO local_sync_outbox(operation_id,generation,local_pet_id,local_kind,local_id,change_json,mutation_json) VALUES (?,?,?,?,?,?,?)',candidate.data.operationId,current.generation,row.local_pet_id,row.local_kind,row.local_id,row.change_json,JSON.stringify(candidate.data));
+          // new ID in the original queue position. Its old payload is retained
+          // in the receipt; an in-flight or accepted request is never rewritten.
+          await sql.runAsync('UPDATE local_sync_outbox SET operation_id=?,mutation_json=? WHERE generation=? AND operation_id=?',candidate.data.operationId,JSON.stringify(candidate.data),current.generation,result.operationId);
         }
         await projectOwner(sql,current);
         // Push sequence is deliberately not a pull cursor.
@@ -332,6 +349,7 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
         if (await sql.getFirstAsync('SELECT operation_id FROM local_sync_outbox WHERE generation=? AND local_pet_id=? AND local_kind=? AND local_id=? LIMIT 1',current.generation,pet.pet_id,saved.kind,localId)) throw new Error("Wait for this record's pending changes to be acknowledged before restoring.");
         const data=recordDataSchema(saved.kind).parse(input.data),operationId=await id(sql);
         const mutation=mutationSchema.parse({protocolVersion:1,operationId,deviceId:current.device_id,recordId:saved.id,petId:saved.petId,kind:saved.kind,baseRevision:saved.revision,intent:'restore',patch:data});
+        if (!requestFits([mutation])) throw new Error('Restore exceeds the cloud request size limit.');
         reconcileMutation(saved,mutation,now());
         const change:LocalChange={kind:saved.kind,localId:saved.kind==='puppy'?pet.pet_id:localRecordId(saved),before:saved.deleted?null:saved.data,after:data};
         await sql.runAsync('INSERT INTO local_sync_outbox(operation_id,generation,local_pet_id,local_kind,local_id,change_json,mutation_json) VALUES (?,?,?,?,?,?,?)',operationId,current.generation,pet.pet_id,change.kind,change.localId,JSON.stringify(change),JSON.stringify(mutation));
@@ -354,7 +372,7 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
         const batch:Mutation[]=[];
         for (const row of rows) {
           const candidate=mutationSchema.parse(JSON.parse(row.mutation_json!));
-          if (new TextEncoder().encode(JSON.stringify({mutations:[...batch,candidate]})).byteLength>=65536) break;
+          if (!requestFits([...batch,candidate])) break;
           batch.push(candidate);
         }
         return batch;
