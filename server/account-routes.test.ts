@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers';
-import { applyD1Migrations } from 'cloudflare:test';
+import { applyD1Migrations, runInDurableObject } from 'cloudflare:test';
 import { beforeAll, expect, inject, test } from 'vitest';
 import worker from './index';
 import type { Mutation } from '../src/cloud/protocol';
@@ -122,4 +122,47 @@ test('multi-page export stays at its captured snapshot while later edits remain 
   expect(revisions.some((line) => line.recordId === 'later-than-export')).toBe(false);
   expect(lines.at(-1)).toEqual({ type: 'complete', cursor: 101 });
   expect((await (await call(user, 'sync/pull?after=101')).json<{ changes: { id: string }[] }>()).changes[0].id).toBe('later-than-export');
+});
+
+async function deleteAccount(user: Owner) {
+  return worker.fetch(new Request('https://puptime.test/api/account', {
+    method: 'DELETE', headers: { origin: 'https://puptime.test', cookie: user.cookie, 'content-type': 'application/json' },
+    body: JSON.stringify({ confirm: true }),
+  }), settings);
+}
+
+test('explicit account deletion revokes sessions and removes all cloud history', async () => {
+  const user = await owner(); await enroll(user);
+  await call(user, 'sync/push', { mutations: [event()] });
+  expect((await deleteAccount(user)).status).toBe(200);
+  expect((await call(user, 'account')).status).toBe(401);
+  expect((await call(user, 'account/export')).status).toBe(401);
+  expect(await env.AUTH_DB.prepare('SELECT id FROM user WHERE id = ?').bind(user.id).first()).toBeNull();
+  const object = env.ACCOUNTS.get(env.ACCOUNTS.idFromName(user.id));
+  await runInDurableObject(object, (instance, state) => {
+    for (const table of ['records', 'revisions', 'operations', 'pets', 'enrollments', 'enrolled_devices']) {
+      expect(state.storage.sql.exec<{ count: number }>(`SELECT COUNT(*) AS count FROM ${table}`).one().count).toBe(0);
+    }
+    expect(() => instance.apply(event())).toThrow('deleted');
+    expect(() => instance.enroll({ operationId: 'old-device', deviceId: 'test-device', localPetId: 'pet-1', name: 'Old puppy' })).toThrow('deleted');
+  });
+});
+
+test('account deletion requires recent authentication and preserves data on rejection', async () => {
+  const user = await owner(); await enroll(user);
+  await call(user, 'sync/push', { mutations: [event()] });
+  await env.AUTH_DB.prepare('UPDATE session SET createdAt = 0 WHERE userId = ?').bind(user.id).run();
+  const response = await deleteAccount(user);
+  expect(response.status).toBe(401);
+  expect(await response.json()).toEqual({ error: 'reauthentication_required' });
+  expect((await call(user, 'account')).status).toBe(200);
+  expect((await (await call(user, 'sync/pull?after=0')).json<{ changes: unknown[] }>()).changes.length).toBe(1);
+});
+
+test('an interrupted deletion can be retried without reopening access to retained history', async () => {
+  const user = await owner(); await enroll(user);
+  await env.AUTH_DB.prepare("UPDATE cloud_accounts SET state = 'deleting' WHERE account_id = ?").bind(user.id).run();
+  expect((await call(user, 'account/export')).status).toBe(410);
+  expect((await deleteAccount(user)).status).toBe(200);
+  expect((await call(user, 'account')).status).toBe(401);
 });

@@ -11,7 +11,7 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
   constructor(ctx: DurableObjectState, env: Cloudflare.Env) {
     super(ctx, env);
     ctx.storage.transactionSync(() => {
-      ctx.storage.sql.exec('CREATE TABLE IF NOT EXISTS schema_metadata (version INTEGER NOT NULL)');
+      ctx.storage.sql.exec('CREATE TABLE IF NOT EXISTS schema_metadata (version INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS account_state (key TEXT PRIMARY KEY, value INTEGER NOT NULL)');
       const version = ctx.storage.sql.exec<{ version: number }>('SELECT version FROM schema_metadata').toArray()[0]?.version ?? 0;
       if (version > 2) throw new Error('Account schema requires a newer Worker.');
       if (version === 0) {
@@ -35,7 +35,24 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
     });
   }
 
+  #assertActive(): void {
+    if (this.ctx.storage.sql.exec<{ value: number }>("SELECT value FROM account_state WHERE key = 'retired'").toArray()[0]?.value) {
+      throw new ReconciliationError('This cloud account was deleted.');
+    }
+  }
+
+  retire(): void {
+    this.ctx.storage.transactionSync(() => {
+      this.ctx.storage.sql.exec(`
+        DELETE FROM records; DELETE FROM revisions; DELETE FROM operations;
+        DELETE FROM enrolled_devices; DELETE FROM enrollments; DELETE FROM pets;
+        INSERT INTO account_state(key, value) VALUES ('retired', 1) ON CONFLICT(key) DO UPDATE SET value = 1;
+      `);
+    });
+  }
+
   apply(input: Mutation): MutationResult {
+    this.#assertActive();
     const mutation = mutationSchema.parse(input);
     const payload = JSON.stringify(mutation);
     return this.ctx.storage.transactionSync(() => {
@@ -68,6 +85,7 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
   }
 
   enroll(input: Enrollment): { petId: string } {
+    this.#assertActive();
     const enrollment = enrollmentSchema.parse(input);
     const payload = JSON.stringify(enrollment);
     return this.ctx.storage.transactionSync(() => {
@@ -89,6 +107,7 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
   }
 
   summary(): { pets: { id: string; name: string; eventCount: number }[] } {
+    this.#assertActive();
     const pets = this.ctx.storage.sql.exec<{ id: string; initial_name: string }>('SELECT id, initial_name FROM pets ORDER BY created_at, id').toArray();
     return { pets: pets.map((pet) => {
       const profile = this.ctx.storage.sql.exec<JsonRow>('SELECT body FROM records WHERE id = ?', pet.id).toArray()[0];
@@ -130,12 +149,14 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
   }
 
   exportPage(after: number, through: number): Revision[] {
+    this.#assertActive();
     cursorSchema.parse(after); cursorSchema.parse(through);
     return this.ctx.storage.sql.exec<JsonRow>('SELECT body FROM revisions WHERE sequence > ? AND sequence <= ? ORDER BY sequence LIMIT 100', after, through)
       .toArray().map((row) => JSON.parse(row.body) as Revision);
   }
 
   pull(after: number, limit = 100): PullPage {
+    this.#assertActive();
     cursorSchema.parse(after);
     pageSizeSchema.parse(limit);
     const latest = this.ctx.storage.sql.exec<{ value: number }>('SELECT COALESCE(MAX(sequence), 0) AS value FROM revisions').one().value;
@@ -146,9 +167,16 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
   }
 
   history(recordId: string, beforeRevision = Number.MAX_SAFE_INTEGER): Revision[] {
+    this.#assertActive();
     z.string().min(1).max(256).parse(recordId);
     cursorSchema.parse(beforeRevision);
     return this.ctx.storage.sql.exec<JsonRow>('SELECT body FROM revisions WHERE record_id = ? AND revision < ? ORDER BY revision DESC LIMIT 50', recordId, beforeRevision)
       .toArray().map((row) => JSON.parse(row.body) as Revision);
   }
+}
+
+
+export function getAccountStore(env: Cloudflare.Env, accountId: string): DurableObjectStub<AccountStore> {
+  const namespace = env.ACCOUNT_JURISDICTION === 'eu' ? env.ACCOUNTS.jurisdiction('eu') : env.ACCOUNTS;
+  return namespace.get(namespace.idFromName(accountId));
 }

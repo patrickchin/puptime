@@ -86,3 +86,15 @@ test('an expired code cannot create a session', async () => {
   expect(response.status).toBe(400);
   expect(response.headers.get('set-cookie')).toBeNull();
 });
+
+test('public library deletion routes cannot bypass explicit account confirmation', async () => {
+  const auth = createAuth(settings);
+  const email = 'delete-confirmation@example.com';
+  await auth.handler(request('email-otp/send-verification-otp', { email, type: 'sign-in' }));
+  const preview = await env.AUTH_DB.prepare('SELECT code FROM local_email_previews WHERE email = ?').bind(email).first<{ code: string }>();
+  const login = await auth.handler(request('sign-in/email-otp', { email, otp: preview!.code }));
+  const cookie = login.headers.getSetCookie().map((value) => value.split(';')[0]).join('; ');
+  const response = await auth.handler(request('delete-user', {}, cookie));
+  expect(response.status).toBe(404);
+  expect(await auth.api.getSession({ headers: new Headers({ cookie }) })).not.toBeNull();
+});

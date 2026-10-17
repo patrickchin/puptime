@@ -4,6 +4,7 @@ import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { emailOTP } from 'better-auth/plugins';
 import { Resend } from 'resend';
 import { z } from 'zod';
+import { retireCloudAccount } from './account-lifecycle';
 
 function emailSenderAvailable(env: Cloudflare.Env): boolean {
   const sender = z.email().safeParse(env.EMAIL_FROM);
@@ -34,7 +35,7 @@ export function createAuth(env: Cloudflare.Env) {
     trustedOrigins: [base.origin, ...(env.WEB_ORIGINS ?? '').split(',').filter(Boolean), 'puptime://*'],
     emailAndPassword: { enabled: false },
     account: { accountLinking: { enabled: true, disableImplicitLinking: true } },
-    user: { deleteUser: { enabled: false } },
+    user: { deleteUser: { enabled: true, beforeDelete: (user) => retireCloudAccount(env, user) } },
     session: { expiresIn: 60 * 60 * 24 * 30, updateAge: 60 * 60 * 24, freshAge: 60 * 10, cookieCache: { enabled: false } },
     rateLimit: { enabled: true, storage: 'database', window: 60, max: 30 },
     logger: { disabled: true },
@@ -48,7 +49,7 @@ export function createAuth(env: Cloudflare.Env) {
       ...(providers.google ? { google: { clientId: env.GOOGLE_CLIENT_ID!, clientSecret: env.GOOGLE_CLIENT_SECRET! } } : {}),
       ...(providers.apple ? { apple: { clientId: env.APPLE_CLIENT_ID!, clientSecret: env.APPLE_CLIENT_SECRET!, appBundleIdentifier: 'com.patrickchin.puptime' } } : {}),
     },
-    disabledPaths: ['/email-otp/request-password-reset', '/forget-password/email-otp', '/email-otp/reset-password'],
+    disabledPaths: ['/email-otp/request-password-reset', '/forget-password/email-otp', '/email-otp/reset-password', '/delete-user', '/delete-user/callback'],
     plugins: [expo(), emailOTP({
       expiresIn: 300, allowedAttempts: 3, storeOTP: 'hashed',
       async sendVerificationOTP({ email, otp }) {

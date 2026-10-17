@@ -3,7 +3,7 @@ import { createMiddleware } from 'hono/factory';
 import { validator } from 'hono/validator';
 import { z } from 'zod';
 import { enrollmentSchema, mutationSchema, type Revision } from '../src/cloud/protocol';
-import type { AccountStore } from './account-store';
+import { getAccountStore, type AccountStore } from './account-store';
 import { createAuth } from './auth';
 import { activateTrial, cloudAccess, getCloudAccount, type CloudAccess, type CloudAccount } from './entitlements';
 
@@ -34,12 +34,12 @@ const authenticated = createMiddleware<AccountEnv>(async (context, next) => {
   if (!result.response) return context.json({ error: 'unauthorized' }, 401);
   const { user, session } = result.response;
   const account = await getCloudAccount(context.env.AUTH_DB, user.id);
-  if (account?.state === 'deleting') return context.json({ error: 'account_deleting' }, 410);
+  if (account?.state === 'deleting' && !(context.req.method === 'DELETE' && context.req.path === '/api/account')) return context.json({ error: 'account_deleting' }, 410);
   context.set('user', { id: user.id, email: user.email, name: user.name });
-  context.set('sessionCreatedAt', session.createdAt.getTime());
+  context.set('sessionCreatedAt', new Date(session.createdAt).getTime());
   context.set('cloudAccount', account);
   context.set('cloud', cloudAccess(account, Date.now()));
-  context.set('store', context.env.ACCOUNTS.get(context.env.ACCOUNTS.idFromName(user.id)));
+  context.set('store', getAccountStore(context.env, user.id));
   await next();
 });
 accountRoutes.get('/account', authenticated, async (context) => {
@@ -97,4 +97,10 @@ accountRoutes.get('/account/export', authenticated, async (context) => {
     'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store',
     'Content-Disposition': 'attachment; filename="puptime-cloud-export.ndjson"',
   } });
+});
+
+
+accountRoutes.delete('/account', authenticated, validator('json', (value) => z.strictObject({ confirm: z.literal(true) }).parse(value)), async (context) => {
+  if (!Number.isFinite(context.get('sessionCreatedAt')) || Date.now() - context.get('sessionCreatedAt') >= 600000) return context.json({ error: 'reauthentication_required' }, 401);
+  return createAuth(context.env).api.deleteUser({ headers: context.req.raw.headers, body: {}, asResponse: true });
 });
