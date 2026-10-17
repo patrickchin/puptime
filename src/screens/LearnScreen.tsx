@@ -229,7 +229,7 @@ export function LearnScreen({ theme, articleId, onArticleChange }: {
       </View>
     </ScrollView>
   );
-  return <View style={{ flex: 1, minHeight: 0 }}>{content}{article && <GuideListener key={article.id} article={article} theme={theme} />}</View>;
+  return <View style={{ flex: 1, minHeight: 0 }}>{content}{article && <GuideListener key={`audio:${article.id}`} article={article} theme={theme} />}</View>;
 }
 
 const styles = StyleSheet.create({
