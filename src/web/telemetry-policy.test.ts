@@ -22,6 +22,7 @@ test('telemetry drops unknown events and strips sensitive properties and URL val
 
 test('every public page has unique metadata and a clean canonical URL', () => {
   assert.equal(publicPaths.length, 15);
+  assert.equal(pageMetadata('/puppy-care').url, pageMetadata('/puppy-care/').url);
   assert.equal(new Set(publicPaths.map((path) => pageMetadata(path).title)).size, publicPaths.length);
   for (const path of publicPaths) {
     const meta = pageMetadata(path);

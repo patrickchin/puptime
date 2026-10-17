@@ -95,7 +95,7 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
     if (hash === '#puppy-care' || hash.startsWith('#puppy-care/')) {
       const target = hash.slice(1);
       if (target === 'puppy-care' || careArticles.some((article) => target === `puppy-care/${article.id}`)) {
-        window.location.replace(`/${target}`);
+        window.location.replace(target === 'puppy-care' ? '/puppy-care/' : `/${target}`);
       }
     }
   }, []);
@@ -114,7 +114,7 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
           <LinkButton href={releaseUrl}>Download</LinkButton>
         </View>
       </View>
-      <LearnScreen theme={lightTheme} articleId={articleId} onArticleChange={(id) => { window.location.assign(id ? `/puppy-care/${id}` : '/puppy-care'); }} />
+      <LearnScreen theme={lightTheme} articleId={articleId} onArticleChange={(id) => { window.location.assign(id ? `/puppy-care/${id}` : '/puppy-care/'); }} />
     </View>
   );
 
@@ -128,7 +128,7 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
           <Text style={styles.brandName}>Puptime</Text>
         </View>
         <View style={styles.headerLinks}>
-          <Anchor accessibilityRole="link" href="/puppy-care" style={styles.navLink}>
+          <Anchor accessibilityRole="link" href="/puppy-care/" style={styles.navLink}>
             <Text style={styles.textLink}>Puppy care</Text>
           </Anchor>
           {!compact && (
@@ -191,7 +191,7 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
           </View>
           <View style={styles.careActions}>
             <LinkButton href="/puppy-care/getting-started">Getting started</LinkButton>
-            <LinkButton href="/puppy-care" quiet>All puppy care guides</LinkButton>
+            <LinkButton href="/puppy-care/" quiet>All puppy care guides</LinkButton>
           </View>
         </View>
         <View style={[styles.detailGrid, compact && styles.detailGridCompact]}>
@@ -250,7 +250,7 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
         <Text style={styles.footerLine}>Puptime</Text>
         <View style={[styles.footerLinks, compact && styles.footerLinksCompact]}>
           <Pressable accessibilityRole="button" onPress={openAnalyticsSettings} style={styles.navLink}><Text style={styles.textLink}>Analytics settings</Text></Pressable>
-          <Anchor accessibilityRole="link" href="/puppy-care"><Text style={styles.textLink}>Puppy care</Text></Anchor>
+          <Anchor accessibilityRole="link" href="/puppy-care/"><Text style={styles.textLink}>Puppy care</Text></Anchor>
           <Anchor accessibilityRole="link" href={sourceUrl}>
             <Text style={styles.textLink}>GitHub</Text>
           </Anchor>

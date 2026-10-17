@@ -10,7 +10,7 @@ for (const path of ['+not-found.html', '_sitemap.html', 'puppy-care/[id].html'])
 // Cloudflare also protects preview deployments; keep that policy explicit in source.
 writeFileSync('dist-web/_headers', `/*\n  Referrer-Policy: strict-origin-when-cross-origin\n  X-Content-Type-Options: nosniff\nhttps://:preview.puptime.pages.dev/*\n  X-Robots-Tag: noindex\n`);
 for (const path of publicPaths) {
-  const filename = path === '/' ? 'index' : path === '/puppy-care' ? 'puppy-care/index' : path.slice(1);
+  const filename = path === '/' ? 'index' : path === '/puppy-care/' ? 'puppy-care/index' : path.slice(1);
   const html = readFileSync(`dist-web/${filename}.html`, 'utf8');
   if (!html.includes('rel="canonical"') || !html.includes('<h1') || !html.includes('name="description"')) {
     throw new Error(`Missing rendered SEO content: ${path}`);

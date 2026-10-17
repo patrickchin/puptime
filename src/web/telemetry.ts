@@ -15,7 +15,7 @@ export function storedConsent() {
 export async function setAnalyticsEnabled(enabled: boolean, path: string) {
   const current = ++generation;
   allowed = enabled && !privacySignalActive(navigator);
-  page = publicPaths.includes(path) ? path : '/404';
+  page = path === '/puppy-care' ? '/puppy-care/' : publicPaths.includes(path) ? path : '/404';
   if (!allowed) {
     client?.opt_out_capturing();
     client?.reset();
