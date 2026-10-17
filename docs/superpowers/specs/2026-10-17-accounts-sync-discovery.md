@@ -7,7 +7,7 @@ This document maps the requested change and records decisions as they are made. 
 ## Confirmed direction
 
 - Free local use requires no account. Signup is for optional account-backed cloud services. This supersedes the earlier mandatory-signup direction.
-- When a local user signs up and enables cloud sync, carry their existing device data into the service rather than starting an empty history. Authentication, purchase/entitlement, and data upload are distinct steps; creating an account alone must not silently upload local history. Reconciliation with data already in an account still needs a product decision.
+- When a local user signs up and enables cloud sync, carry their existing device data into the service rather than starting an empty history. Authentication, purchase/entitlement, and data upload are distinct steps; creating an account alone must not silently upload local history. If the account already contains a puppy, show its name and a history summary and ask whether the device's local history belongs to that puppy before combining them. The user confirmed this safeguard; duplicate-record/conflict rules and handling a different puppy remain to be specified.
 - First cloud release: backup and synchronization across one person's devices. Shared household care follows later. Ownership and identifiers must accommodate that extension without building invitations or roles now.
 - All local features are free. User-facing backend services, including cloud backup, device sync, and later shared-care sync, are paid optional features. Use Obsidian's free-local/paid-services model as the commercial reference. The old approximately US$1.99 upfront app price is superseded; service prices, billing cadence, and any trial remain undecided.
 - Include a walkthrough showcasing different parts of the app before the first log. Keep payment unobtrusive. Walkthrough skip/replay behavior and the detailed optional cloud-enrollment sequence remain design decisions.
@@ -106,7 +106,7 @@ Treat enrollment as an explicit, restartable transition, not an empty account re
 
 1. **Before enabling sync:** keep the full local app working without an account or network. Account creation or canceled payment does not discard local data or authorize its upload.
 2. **New account with no cloud data:** when the user enables the paid service, show which local puppy and data will be synchronized. Preserve existing event IDs and estimate labels, establish stable pet ownership, and include routines/custom activities according to the agreed sync scope. Device-specific permissions and preferences remain local unless deliberately included.
-3. **Account already containing data:** retrieve its pet summaries and offer an explicit choice before attaching local history to an existing pet or keeping it separate. Do not infer that two pets are the same from their names or silently combine histories. The exact choice and multiple-pet implications remain unresolved. A clean device should restore existing cloud data without creating another puppy.
+3. **Account already containing data:** retrieve its pet summaries, show the puppy's name and a history summary, and ask whether the local history belongs to that puppy. Combine histories only after explicit confirmation. Do not infer that two pets are the same from their names or silently combine histories. Declining or canceling must preserve local history and leave it unattached; supporting a different puppy in the cloud depends on the unresolved multiple-pet scope. A clean device should restore existing cloud data without creating another puppy.
 4. **While initial sync runs:** keep accepting local edits and widget actions. Save the account/pet mapping and migration progress durably, and reconcile changes made during upload. Use stable operation IDs so retrying after an interrupted response cannot duplicate the imported records.
 5. **On failure or cancellation:** preserve both the original local data and retry progress; show that backup is incomplete. Bind pending work to the intended account so another sign-in cannot receive it. Never describe local records as backed up before the server acknowledges them.
 6. **On completion:** verify the agreed data has been acknowledged and can be restored on another installation. Keep a working local copy for offline use. Define duplicate-record/conflict handling when both sources contain the same stable IDs; similar timestamps alone do not prove duplication.
@@ -166,7 +166,7 @@ Run unit/integration checks and native end-to-end flows using dedicated task-nam
 | --- | --- |
 | Fresh, returning, and upgrading user | Correct onboarding branch, preserved data, no duplicate puppy. |
 | Account-free first launch without connectivity | Walkthrough, setup, and local logging work without auth or purchase verification. |
-| Populated local device enrolls in cloud | Existing history is preserved; empty-account upload and existing-account reconciliation follow the approved mapping; interrupted retries do not duplicate or mix account data. |
+| Populated local device enrolls in cloud | Existing history is preserved; an existing cloud puppy's name/history summary is shown and combining requires confirmation; declining leaves local data unattached; interrupted retries do not duplicate or mix account data. |
 | Email/provider login canceled, expired, throttled, unavailable, or changed | Clear recovery, retained setup progress, and safe provider linking without losing access to history. |
 | Cloud offer dismissed, purchase canceled, entitlement expired, or billing unavailable | Free local features and history remain accessible; remote access follows the agreed retention/entitlement policy. |
 | Airplane mode, flaky requests, timeouts, server outage | Local logging remains durable; queued work retries safely. |
@@ -186,14 +186,14 @@ All repository changes go through GitHub pull requests. Release and merge readin
 
 ## Decision queue for the product interview
 
-Already settled: backup/device sync first; all local features free without an account and user-facing cloud services paid; carry existing local data into cloud when sync is enabled; unobtrusive payment; a pre-log app walkthrough; aim for Apple, Google, and email-code login.
+Already settled: backup/device sync first; all local features free without an account and user-facing cloud services paid; carry existing local data into cloud when sync is enabled; confirm the puppy using its name/history summary before combining local history with existing cloud data; unobtrusive payment; a pre-log app walkthrough; aim for Apple, Google, and email-code login.
 
 Resolve the following in dependency order, with recommendations and concrete consequences rather than a bulk questionnaire:
 
-1. How to reconcile a device's existing local puppy/history with an account that already contains data, including explicit pet mapping and duplicate/conflict behavior.
+1. Whether the first cloud release remains one-pet, and what to do when the user says local history belongs to a different puppy; confirmation before combining is settled.
 2. Paid-service amounts, billing cadence, entitlement/retention rules, and treatment of existing purchasers, after current market/cost research.
 3. Existing-installation upgrade presentation, local-data upload consent, and detailed cloud-enrollment ordering.
-4. Required pet setup and whether the first cloud release remains one-pet.
+4. Required pet setup fields and the pet identity needed for reliable cross-device restore.
 5. Which data restores across devices: activities, routines, custom activities, and preference boundaries.
 6. Cloud-session expiration and reauthentication, logout/deletion semantics, conflict visibility, and supported sync offline duration; free local access remains available.
 7. Walkthrough skip/replay behavior, onboarding activation goal, notification timing, and any optional cloud trial.
