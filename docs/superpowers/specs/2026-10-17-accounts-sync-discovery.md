@@ -6,10 +6,11 @@ This document maps the requested change and records decisions as they are made. 
 
 ## Confirmed direction
 
-- Add account-backed cloud services alongside free local use. Earlier discussion favored required signup; whether free local use also requires an account now needs explicit reconciliation. Do not assume that free means account-free or that the earlier mandatory gate still stands.
+- Free local use requires no account. Signup is for optional account-backed cloud services. This supersedes the earlier mandatory-signup direction.
+- When a local user signs up and enables cloud sync, carry their existing device data into the service rather than starting an empty history. Authentication, purchase/entitlement, and data upload are distinct steps; creating an account alone must not silently upload local history. Reconciliation with data already in an account still needs a product decision.
 - First cloud release: backup and synchronization across one person's devices. Shared household care follows later. Ownership and identifiers must accommodate that extension without building invitations or roles now.
 - All local features are free. User-facing backend services, including cloud backup, device sync, and later shared-care sync, are paid optional features. Use Obsidian's free-local/paid-services model as the commercial reference. The old approximately US$1.99 upfront app price is superseded; service prices, billing cadence, and any trial remain undecided.
-- Include a walkthrough showcasing different parts of the app before the first log. Keep payment unobtrusive. Walkthrough skip/replay behavior and account timing remain design decisions.
+- Include a walkthrough showcasing different parts of the app before the first log. Keep payment unobtrusive. Walkthrough skip/replay behavior and the detailed optional cloud-enrollment sequence remain design decisions.
 - Aim to offer Apple sign-in, Google sign-in, and passwordless email codes. Verify platform availability, provider configuration, and recovery behavior before committing to the final flow.
 - Preserve offline logging and synchronize when connected. Include telemetry, Sentry crash/error reporting, operational reliability, and coordinated website, app, policy, and listing updates.
 - Plan and question first; implementation follows an agreed design.
@@ -44,16 +45,16 @@ Public Page Flows indexing lists Finch onboarding steps including initial questi
 
 Prepare a small reference board covering: personal relevance, sign-in, minimal pet setup, first useful activity, permission timing, returning users, and interrupted setup. For each selected example record its actual screens, access/date, useful pattern, and Puptime adaptation. Avoid inferring quality from length or estimated revenue.
 
-Proposed Puptime journey, incorporating the requested walkthrough; account placement remains unresolved:
+Proposed Puptime journey, incorporating the requested walkthrough and account-free local use:
 
 1. Show the local outcome: remember the puppy's day, spot patterns, and plan a routine.
 2. Walk through Log, Timeline/Insights, Schedule, and Home Screen widgets using clearly labeled example data. Show representative app interactions before the first real log; the exact screen count and interaction format need prototyping.
-3. Create the first puppy with the smallest useful set of fields, or restore existing cloud data for a returning cloud customer. Do not make returning users create duplicate pets. Place account creation according to the pending free-local account decision.
+3. Create the first puppy locally with the smallest useful set of fields. Also provide a discoverable sign-in/restore path for returning cloud customers so they need not create a duplicate puppy.
 4. Arrive at a useful Log screen. Offer a real first log when appropriate, without inventing historical activity or forcing a false entry.
-5. Offer cloud backup/sync from a discoverable setting or a user-initiated online action. Proposed payment behavior: show the benefit and price there, with a clear way back to free local use. Do not put a purchase screen between the walkthrough and the first local log.
+5. Offer cloud backup/sync from a discoverable setting or a user-initiated online action. Show the benefit, price, and what will happen to existing local data. Include account creation/recovery, purchase restoration or entitlement activation, and a recoverable initial sync; their detailed order needs design. Keep a clear way back to free local use. Do not put a purchase screen between the walkthrough and the first local log.
 6. Request notification permission when a user enables a reminder; showcasing reminders in the walkthrough does not require permission. Introduce actual widget setup when relevant.
 
-Account-gate timing, walkthrough skip/replay behavior, any cloud trial, pet fields, and permission order remain unresolved. Recommended walkthrough behavior is skippable and replayable from Settings; that is a proposal, not a confirmed decision. Include accessible controls, reduced motion, localization, keyboard handling, back navigation, cancellation, retry, wrong-account recovery, and offline/error states.
+Walkthrough skip/replay behavior, the optional cloud-enrollment sequence, any cloud trial, pet fields, and permission order remain unresolved. Recommended walkthrough behavior is skippable and replayable from Settings; that is a proposal, not a confirmed decision. Include accessible controls, reduced motion, localization, keyboard handling, back navigation, cancellation, retry, wrong-account recovery, and offline/error states. Fresh local setup must work without connectivity, authentication, or purchase verification.
 
 Measure signup completion, setup completion, time to first useful log, subsequent return, and successful cross-device restore separately. A completed slideshow is not sufficient evidence of activation. Define metrics and targets before beta; establish a baseline rather than inventing conversion targets.
 
@@ -61,7 +62,7 @@ Measure signup completion, setup completion, time to first useful log, subsequen
 
 ### 0. Resolve the product and operating model
 
-Deliver a reviewed design covering the account gate, existing-user treatment, activation goal, minimum profile, pricing model, offline contract, supported countries, and operating budget. Confirm whether any public release or paying customers already exist rather than inferring this from repository metadata.
+Deliver a reviewed design covering optional cloud enrollment, existing-user treatment, activation goal, minimum profile, pricing model, offline contract, supported countries, and operating budget. Confirm whether any public release or paying customers already exist rather than inferring this from repository metadata.
 
 The free-local/paid-services boundary is settled. Research comparable puppy trackers and current backend/email/Sentry pricing after choosing realistic usage assumptions. Model active accounts, retained activity, restore traffic, email-code sends, telemetry volume, and support work at small, medium, and larger adoption. Compare viable cloud-service prices and billing cadences; no amount or cadence is approved by this draft. Decide how existing purchases would be recognized across stores and accounts if entitlements are introduced. [Obsidian's pricing page](https://obsidian.md/pricing) confirms a free app with optional paid Sync and Publish services; this is a model reference, not a decision to copy its prices, encryption, or feature set.
 
@@ -99,6 +100,19 @@ Migrate existing IDs, timestamps, notes, estimate provenance, routines, and rele
 
 Ready when: migration and app/widget writes survive interruption with no lost or duplicated acknowledged activity; switching accounts cannot mix their histories.
 
+#### Carry existing local data into cloud sync
+
+Treat enrollment as an explicit, restartable transition, not an empty account replacing the device database. Proposed behavior:
+
+1. **Before enabling sync:** keep the full local app working without an account or network. Account creation or canceled payment does not discard local data or authorize its upload.
+2. **New account with no cloud data:** when the user enables the paid service, show which local puppy and data will be synchronized. Preserve existing event IDs and estimate labels, establish stable pet ownership, and include routines/custom activities according to the agreed sync scope. Device-specific permissions and preferences remain local unless deliberately included.
+3. **Account already containing data:** retrieve its pet summaries and offer an explicit choice before attaching local history to an existing pet or keeping it separate. Do not infer that two pets are the same from their names or silently combine histories. The exact choice and multiple-pet implications remain unresolved. A clean device should restore existing cloud data without creating another puppy.
+4. **While initial sync runs:** keep accepting local edits and widget actions. Save the account/pet mapping and migration progress durably, and reconcile changes made during upload. Use stable operation IDs so retrying after an interrupted response cannot duplicate the imported records.
+5. **On failure or cancellation:** preserve both the original local data and retry progress; show that backup is incomplete. Bind pending work to the intended account so another sign-in cannot receive it. Never describe local records as backed up before the server acknowledges them.
+6. **On completion:** verify the agreed data has been acknowledged and can be restored on another installation. Keep a working local copy for offline use. Define duplicate-record/conflict handling when both sources contain the same stable IDs; similar timestamps alone do not prove duplication.
+
+Include fixtures for a populated local device with an empty account, populated local and cloud histories, a clean device with existing cloud data, repeated enrollment, account switching mid-enrollment, canceled purchase, and app/widget changes during interrupted initial upload. This enrollment specification is distinct from the storage-schema migration that an account-free user may receive in an app update.
+
 ### 4. Prove backup and synchronization end to end
 
 Define a versioned protocol with stable record IDs, unique operation IDs, idempotent retries, server revisions, deletion markers, and incremental pull cursors. An operation is acknowledged only after its durable server commit. Retries must survive the app being killed after commit but before receiving the response.
@@ -129,7 +143,7 @@ Ready when: a simulated incident is detected, understood from redacted evidence,
 
 | Surface | Required work |
 | --- | --- |
-| `App.web.tsx` | Explain the agreed backup/sync benefit, account requirement, offline limits, and actual pricing. Add support, privacy, terms, and account-deletion routes. Keep Learn useful. Connected web logging is a separate scope decision. |
+| `App.web.tsx` | Explain free account-free local use, the optional paid backup/sync benefit, cloud account requirement, offline limits, and actual pricing. Add support, privacy, terms, and account-deletion routes. Keep Learn useful. Connected web logging is a separate scope decision. |
 | App Settings | Account identity, last sync/pending state, retry, recovery, export, sign-out, and deletion. Define handling of unsynced work before destructive actions. |
 | `PRIVACY.md` and hosted policy | Actual cloud data flow, identity/email providers, Sentry/analytics, purposes, retention, deletion/backups, regions, user controls, and contact. Preserve accurate dictation disclosures. |
 | New terms | Operator identity, acceptable use, account responsibilities, cloud availability/offline limits, data ownership, deletion/termination, and any selected payment/refund terms. Adapt to launch markets and have legal review where needed. |
@@ -151,6 +165,8 @@ Run unit/integration checks and native end-to-end flows using dedicated task-nam
 | Failure or scenario | Required evidence |
 | --- | --- |
 | Fresh, returning, and upgrading user | Correct onboarding branch, preserved data, no duplicate puppy. |
+| Account-free first launch without connectivity | Walkthrough, setup, and local logging work without auth or purchase verification. |
+| Populated local device enrolls in cloud | Existing history is preserved; empty-account upload and existing-account reconciliation follow the approved mapping; interrupted retries do not duplicate or mix account data. |
 | Email/provider login canceled, expired, throttled, unavailable, or changed | Clear recovery, retained setup progress, and safe provider linking without losing access to history. |
 | Cloud offer dismissed, purchase canceled, entitlement expired, or billing unavailable | Free local features and history remain accessible; remote access follows the agreed retention/entitlement policy. |
 | Airplane mode, flaky requests, timeouts, server outage | Local logging remains durable; queued work retries safely. |
@@ -170,16 +186,16 @@ All repository changes go through GitHub pull requests. Release and merge readin
 
 ## Decision queue for the product interview
 
-Already settled: backup/device sync first; all local features free and user-facing cloud services paid; unobtrusive payment; a pre-log app walkthrough; aim for Apple, Google, and email-code login.
+Already settled: backup/device sync first; all local features free without an account and user-facing cloud services paid; carry existing local data into cloud when sync is enabled; unobtrusive payment; a pre-log app walkthrough; aim for Apple, Google, and email-code login.
 
 Resolve the following in dependency order, with recommendations and concrete consequences rather than a bulk questionnaire:
 
-1. Whether free local use is account-free, reconciling the earlier mandatory-signup direction with the new service boundary.
+1. How to reconcile a device's existing local puppy/history with an account that already contains data, including explicit pet mapping and duplicate/conflict behavior.
 2. Paid-service amounts, billing cadence, entitlement/retention rules, and treatment of existing purchasers, after current market/cost research.
-3. Existing-installation behavior, local-data upload consent, and first launch without connectivity.
+3. Existing-installation upgrade presentation, local-data upload consent, and detailed cloud-enrollment ordering.
 4. Required pet setup and whether the first cloud release remains one-pet.
 5. Which data restores across devices: activities, routines, custom activities, and preference boundaries.
-6. Offline access after session expiration, logout/deletion semantics, conflict visibility, and supported offline duration.
+6. Cloud-session expiration and reauthentication, logout/deletion semantics, conflict visibility, and supported sync offline duration; free local access remains available.
 7. Walkthrough skip/replay behavior, onboarding activation goal, notification timing, and any optional cloud trial.
 8. Launch countries, data region, operational budget, retention, telemetry controls, and support expectations.
 9. Whether owner web access belongs in this release or the website remains marketing/support/account lifecycle only.
