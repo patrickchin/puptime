@@ -1,11 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { assertValidEvents, EventsImportError, EventsStorageError } from './storage-validation.ts';
+import { storageKeys } from './local/legacy.ts';
+export { assertValidEvents, EventsImportError, EventsStorageError } from './storage-validation.ts';
 
 import { normalizeActivityCustomizations, type ActivityCustomization, type ActivityCustomizations } from './activity-customization.ts';
 import {
   customActivityKey,
   DEFAULT_WIDGET_ACTIONS,
   normalizeCustomActivities,
-  isEventType,
   isOpenNap,
   normalizeWidgetActions,
   STARTER_SCHEDULE,
@@ -22,16 +24,16 @@ import {
 } from './notification-config.ts';
 import { isThemePreference, type ThemePreference } from './theme.ts';
 
-const EVENTS_KEY = 'puptime.events.v1';
-const SCHEDULE_KEY = 'puptime.schedule.v1';
-const THEME_KEY = 'puptime.theme.v1';
-const LANGUAGE_KEY = 'puptime.language.v1';
-const WIDGET_ACTIONS_KEY = 'puptime.widgetActions.v1';
-const CUSTOM_ACTIVITIES_KEY = 'puptime.customActivities.v1';
-const DELETED_CUSTOM_ACTIVITIES_KEY = 'puptime.deletedCustomActivities.v1';
-const ACTIVITY_CUSTOMIZATIONS_KEY = 'puptime.activityCustomizations.v1';
-const NOTIFICATION_PREFERENCES_KEY = 'puptime.notificationPreferences.v1';
-const ONBOARDING_KEY = 'puptime.onboarding.v1';
+const EVENTS_KEY = storageKeys.events;
+const SCHEDULE_KEY = storageKeys.schedule;
+const THEME_KEY = storageKeys.theme;
+const LANGUAGE_KEY = storageKeys.language;
+const WIDGET_ACTIONS_KEY = storageKeys.widgetActions;
+const CUSTOM_ACTIVITIES_KEY = storageKeys.customActivities;
+const DELETED_CUSTOM_ACTIVITIES_KEY = storageKeys.deletedCustomActivities;
+const ACTIVITY_CUSTOMIZATIONS_KEY = storageKeys.activityCustomizations;
+const NOTIFICATION_PREFERENCES_KEY = storageKeys.notificationPreferences;
+const ONBOARDING_KEY = storageKeys.onboarding;
 
 // ponytail: This queue covers one JS runtime; use transactional storage if widget writers need a shared lock.
 let writeQueue = Promise.resolve();
@@ -51,47 +53,6 @@ export async function shouldShowOnboarding(): Promise<boolean> {
 
 export function completeOnboarding(): Promise<void> {
   return AsyncStorage.setItem(ONBOARDING_KEY, 'done');
-}
-
-export class EventsStorageError extends Error {
-  constructor() {
-    super('Saved activity data could not be read. The original data has been preserved.');
-    this.name = 'EventsStorageError';
-  }
-}
-
-export class EventsImportError extends Error {
-  constructor() {
-    super('Import would leave more than one nap in progress.');
-    this.name = 'EventsImportError';
-  }
-}
-
-function isTimestamp(value: unknown): value is number {
-  return typeof value === 'number'
-    && Number.isInteger(value)
-    && Number.isFinite(new Date(value).getTime());
-}
-
-export function assertValidEvents(value: unknown): asserts value is PuppyEvent[] {
-  if (!Array.isArray(value)) throw new TypeError('Activity data must be an array.');
-  const ids = new Set<string>();
-  for (const event of value) {
-    if (!event || typeof event !== 'object'
-      || typeof event.id !== 'string' || !event.id.trim() || ids.has(event.id)
-      || !isEventType(event.type) || !isTimestamp(event.at)
-      || (event.source !== 'app' && event.source !== 'widget')
-      || (event.note !== undefined && typeof event.note !== 'string')
-      || (event.customLabel !== undefined && typeof event.customLabel !== 'string')
-      || (event.estimated !== undefined && typeof event.estimated !== 'boolean')
-      || (event.endedAt !== undefined && (
-        event.type !== 'nap'
-        || (event.endedAt !== null && (!isTimestamp(event.endedAt) || event.endedAt < event.at))
-      ))) {
-      throw new TypeError('Activity data contains an invalid or duplicate event.');
-    }
-    ids.add(event.id);
-  }
 }
 
 function queueEventWrite<T>(operation: () => Promise<T>): Promise<T> {
