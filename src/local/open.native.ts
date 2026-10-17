@@ -3,7 +3,7 @@ import { openDatabaseAsync } from 'expo-sqlite';
 import { createLocalDatabase, migrateLegacy } from './database';
 import { legacyKeys, parseLegacySnapshot } from './legacy';
 
-// Not used by app/widget storage until the native cutover phase is qualified.
+// The iOS facade uses this private connection; Android activation is deferred.
 export async function openLocalDatabase() {
   const connection = await openDatabaseAsync('puptime-v2.db', { useNewConnection: true, enableChangeListener: true });
   try {
