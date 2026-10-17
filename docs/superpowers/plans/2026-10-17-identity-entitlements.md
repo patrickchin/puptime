@@ -1,6 +1,6 @@
 # Identity, Entitlements, and Account Lifecycle Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Protect the cloud record foundation with standard authentication, explicit cloud activation, recoverable local-puppy association, and subscription-independent export/deletion.
 
@@ -34,11 +34,11 @@
 
 **Interfaces:** `createAuth(env: Cloudflare.Env)` returns Better Auth configured for the request's D1 binding, exact origins/deep-link scheme, Expo plugin, hashed email OTPs, configured Apple/Google credentials, and disabled unverified automatic linking. `configuredProviders(env)` returns booleans only. `/api/auth/*` mounts the library handler; `/api/config` exposes configured providers/catalog availability without secrets. Auth configuration comes from environment, not hard-coded keys. The published Better Auth D1 schema generation output supplies migrations.
 
-- [ ] Write failing route/runtime tests: anonymous account endpoint denied, unsupported providers absent, missing production sender fails without code disclosure, and local OTP sign-in through a test-only controlled delivery channel. Capture codes in test infrastructure; never add a public code-returning endpoint.
-- [ ] Run server tests; expected FAIL for missing auth/config routes.
-- [ ] Install supported stable Better Auth/Hono dependencies; generate/inspect the library's D1 schema. Configure session/linking/origin/throttling rules using library options and production mail fail-closed behavior. Keep environment-specific D1 databases separate.
-- [ ] Run server tests and server/client typechecks; expected PASS, with successful local identity and session expiry/cancel cases recorded. Do not claim actual Apple/Google/email delivery until real configured provider checks pass.
-- [ ] Commit identity foundation.
+- [x] Write failing route/runtime tests: anonymous account endpoint denied, unsupported providers absent, missing production sender fails without code disclosure, and local OTP sign-in through a test-only controlled delivery channel. Capture codes in test infrastructure; never add a public code-returning endpoint.
+- [x] Run server tests; expected FAIL for missing auth/config routes.
+- [x] Install supported stable Better Auth/Hono dependencies; generate/inspect the library's D1 schema. Configure session/linking/origin/throttling rules using library options and production mail fail-closed behavior. Keep environment-specific D1 databases separate.
+- [x] Run server tests and server/client typechecks; expected PASS, with successful local identity and session expiry/cancel cases recorded. Do not claim actual Apple/Google/email delivery until real configured provider checks pass.
+- [x] Commit identity foundation.
 
 ### Task 2: Configurable cloud entitlement
 
@@ -46,11 +46,11 @@
 
 **Interfaces:** `cloudAccess(account: CloudAccount, now: number)` derives `{ canSync, canExport, source, expiresAt }` from server trial/paid state. `activateTrial(accountId: string, now: number)` is atomic/idempotent and does not restart an expired trial. Catalog product IDs and price labels are provider configuration; no amount is asserted as finalized. Default trial duration is configurable, initially 14 days without automatic billing.
 
-- [ ] Write failing tests for explicit first activation, duplicate activation, expiry boundary, paid overlap, no entitlement, cancellation retaining data, and export remaining available for every existing authenticated account.
-- [ ] Run focused tests; expected FAIL.
-- [ ] Implement D1-backed state using conditional writes and provider-independent entitlement projection. Never accept paid/trial flags from the client. Only billing adapters added later can update paid entitlements.
-- [ ] Run all Node/platform tests and typechecks; expected PASS.
-- [ ] Commit entitlements.
+- [x] Write failing tests for explicit first activation, duplicate activation, expiry boundary, paid overlap, no entitlement, cancellation retaining data, and export remaining available for every existing authenticated account.
+- [x] Run focused tests; expected FAIL.
+- [x] Implement D1-backed state using conditional writes and provider-independent entitlement projection. Never accept paid/trial flags from the client. Only billing adapters added later can update paid entitlements.
+- [x] Run all Node/platform tests and typechecks; expected PASS.
+- [x] Commit entitlements.
 
 ### Task 3: Authenticated enrollment, synchronization, and export
 
@@ -58,11 +58,11 @@
 
 **Interfaces:** `/api/account` GET returns identity/entitlement/puppy summary; `/api/cloud/trial` POST explicitly starts the trial. `/api/cloud/enroll` POST accepts the local pet identifier and explicit same-puppy confirmation when cloud history already exists. The account object atomically selects/returns its initial cloud pet ID; record operations must target an enrolled pet. `/api/sync/push` POST accepts at most 50 versioned mutations and acknowledges each committed operation; `/api/sync/pull` GET returns `PullPage`; `/api/records/:id/history` GET paginates revisions. `/api/account/export` GET streams complete paged data/settings/history for authenticated owners without requiring paid access. Server session determines all storage and ownership; no public account-selector route is added.
 
-- [ ] Write failing authenticated API tests for two accounts/two pets, unconfirmed association, concurrent initial enroll, correct server pet mapping, unauthorized/future/stale cursors, mutation validation/bounds, expired entitlement, complete multi-page export, and per-operation retry after a partial batch failure. Verify CSRF/origin behavior for web and native requests.
-- [ ] Run server tests; expected FAIL for missing routes/ownership enforcement.
-- [ ] Implement route protection, bounded input parsing, explicit enrollment transaction, and export. Authentication alone must not create a pet or start upload/trial. Reject unknown pet references and make first-release different-puppy recovery non-destructive.
-- [ ] Run all Node/platform tests and typechecks; expected PASS.
-- [ ] Commit protected sync/export.
+- [x] Write failing authenticated API tests for two accounts/two pets, unconfirmed association, concurrent initial enroll, correct server pet mapping, unauthorized/future/stale cursors, mutation validation/bounds, expired entitlement, complete multi-page export, and per-operation retry after a partial batch failure. Verify CSRF/origin behavior for web and native requests.
+- [x] Run server tests; expected FAIL for missing routes/ownership enforcement.
+- [x] Implement route protection, bounded input parsing, explicit enrollment transaction, and export. Authentication alone must not create a pet or start upload/trial. Reject unknown pet references and make first-release different-puppy recovery non-destructive.
+- [x] Run all Node/platform tests and typechecks; expected PASS.
+- [x] Commit protected sync/export.
 
 ### Task 4: Sign-out, deletion, and staging verification
 
@@ -70,8 +70,8 @@
 
 **Interfaces:** Sign-out uses Better Auth session invalidation. `/api/account` DELETE requires recent authentication and explicit confirmation; durable deletion state prevents further sync before cleanup. Retryable cleanup removes account object customer content and Better Auth identity/session records; old sessions/pet IDs cannot recreate content. Backup expiry and local-device retention are documented separately.
 
-- [ ] Write failing tests for sign-out/session replay, reauthentication requirement, repeated deletion, interruption/retry, old-device upload after deletion, and inaccessible account export/history after deletion.
-- [ ] Run tests; expected FAIL.
-- [ ] Implement lifecycle cleanup and retry state; keep a minimal non-content deletion marker only as required for race protection. Inventory every identity/account/history store involved.
-- [ ] Run complete tests/typechecks/Worker dry-run; expected PASS. Create only verified free-tier staging resources, apply migrations, deploy, and run real authenticated happy/edge API journeys with isolated synthetic accounts. Missing provider/domain delivery remains an explicit gate.
+- [x] Write failing tests for sign-out/session replay, reauthentication requirement, repeated deletion, interruption/retry, old-device upload after deletion, and inaccessible account export/history after deletion.
+- [x] Run tests; expected FAIL.
+- [x] Implement lifecycle cleanup and retry state; keep a minimal non-content deletion marker only as required for race protection. Inventory every identity/account/history store involved.
+- [x] Run complete tests/typechecks/Worker dry-run; expected PASS. Create only verified free-tier staging resources, apply migrations, deploy, and run real authenticated happy/edge API journeys with isolated synthetic accounts. Missing provider/domain delivery remains an explicit gate.
 - [ ] Conduct fresh whole-branch review; fix material findings using regression tests; create/attach PR, wait for applicable CI and merge through GitHub. Continue to native persistence with documented server interfaces.

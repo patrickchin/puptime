@@ -15,9 +15,8 @@ async function call(owner: Owner | null, path: string, body?: object) {
     ...(body ? { body: JSON.stringify(body) } : {}),
   }), settings);
 }
-async function owner(): Promise<Owner> {
+async function owner(email = `${crypto.randomUUID()}@example.com`): Promise<Owner> {
   const ip = `192.0.2.${clientNumber++}`;
-  const email = `${crypto.randomUUID()}@example.com`;
   const post = (path: string, body: object) => worker.fetch(new Request(`https://puptime.test/api/auth/${path}`, {
     method: 'POST', headers: { origin: 'https://puptime.test', 'cf-connecting-ip': ip, 'content-type': 'application/json' }, body: JSON.stringify(body),
   }), settings);
@@ -146,6 +145,20 @@ test('explicit account deletion revokes sessions and removes all cloud history',
     expect(() => instance.apply(event())).toThrow('deleted');
     expect(() => instance.enroll({ operationId: 'old-device', deviceId: 'test-device', localPetId: 'pet-1', name: 'Old puppy' })).toThrow('deleted');
   });
+});
+
+test('account deletion removes only its exact email verification identifiers', async () => {
+  const email = `${crypto.randomUUID()}@example.com`;
+  const user = await owner(email);
+  const identifiers = ['sign-in', 'email-verification', 'forget-password', 'change-email']
+    .flatMap((type) => [`${type}-otp-${email}`, `${type}-otp-m${email}`]);
+  for (const identifier of identifiers) {
+    await env.AUTH_DB.prepare('INSERT INTO verification(id, identifier, value, expiresAt, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind(crypto.randomUUID(), identifier, 'pending-code', Date.now() + 300000, Date.now(), Date.now()).run();
+  }
+  expect((await deleteAccount(user)).status).toBe(200);
+  const remaining = await env.AUTH_DB.prepare('SELECT identifier FROM verification WHERE value = ? ORDER BY identifier').bind('pending-code').all<{ identifier: string }>();
+  expect(remaining.results.map((row) => row.identifier)).toEqual(identifiers.filter((identifier) => identifier.endsWith(`m${email}`)).sort());
 });
 
 test('account deletion requires recent authentication and preserves data on rejection', async () => {
