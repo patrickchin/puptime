@@ -101,3 +101,13 @@ test('v1 upgrade assigns legacy custom settings to the existing puppy without re
   assert.equal(await database.read((sql) => sql.getFirstAsync('SELECT value FROM settings WHERE key=?', 'puptime.customActivities.v1')), null);
   assert.equal((await database.read((sql) => sql.getFirstAsync<{ value: string }>('SELECT value FROM settings WHERE key=?', 'puptime.theme.v1')))!.value, 'soft-play');
 });
+
+test('v2 upgrade adds empty sync state without rereading legacy or changing local records',async t=>{
+ const {database}=await setup(t);
+ await migrateLegacy(database,snapshot,()=> 'pet-v2');
+ await database.write(sql=>sql.runAsync("UPDATE metadata SET value='2' WHERE key='schema_version'"));
+ await migrateLegacy(database,async()=>{throw new Error('Legacy cannot be read during upgrade');});
+ assert.equal((await database.read(sql=>sql.getFirstAsync<{value:string}>("SELECT value FROM metadata WHERE key='schema_version'")))!.value,'3');
+ assert.equal((await database.read(sql=>sql.getFirstAsync<{n:number}>('SELECT COUNT(*) n FROM local_sync_owner')))!.n,0);
+ assert.deepEqual((await database.read(sql=>sql.getAllAsync<{body:string}>('SELECT body FROM events ORDER BY at'))).map(row=>JSON.parse(row.body)),[first,second]);
+});
