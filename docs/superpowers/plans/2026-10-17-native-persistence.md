@@ -45,13 +45,17 @@
 
 **Interfaces:** `createLocalRepository(db, petId)` exposes event append/import/update/delete/read and routine replace/read against that pet. Read methods return committed data. Write methods return only after commit; validation/read/modify/write occurs in the same exclusive transaction. Existing append/upsert, estimate preservation, CSV duplicate skipping and existing conflicting-open-nap import behavior remain unchanged. Do not introduce new nap handling.
 
-- [ ] Write failing tests for CRUD, same-ID isolation across two pets, failed write/rollback and retry, concurrent app/widget connections without lost writes, atomic routine replacement, duplicate import/no-op, existing estimate/import behavior, and corrupt row rejection. Expected RED.
-- [ ] Implement per-row storage and bound queries, with an event materialization cache preserving unchanged event object references across reads/edits. Test that updating one note does not replace every unchanged event object; actual populated Android render verification belongs in phase 3b.
-- [ ] Run full Node and Workers suites, both typechecks and Android/iOS/web exports. Expected GREEN.
-- [ ] Commit repository.
+- [x] Write failing tests for CRUD, same-ID isolation across two pets, failed write/rollback and retry, concurrent app/widget connections without lost writes, atomic routine replacement, duplicate import/no-op, existing estimate/import behavior, and corrupt row rejection. Expected RED.
+- [x] Implement per-row storage and bound queries, with an event materialization cache preserving unchanged event object references across reads/edits. Test that updating one note does not replace every unchanged event object; actual populated Android render verification belongs in phase 3b.
+- [x] Run full Node and Workers suites, both typechecks and Android/iOS/web exports. Expected GREEN.
+- [x] Commit repository.
 
 ### Task 4: Review and handoff to native cutover
 
 - [ ] Fresh whole-branch review of main..branch against this plan, addressing material findings with RED→GREEN regressions and green suite.
 - [ ] Create/attach PR, wait for applicable CI, merge through GitHub. No direct main push.
 - [ ] Record completed evidence and exact remaining phase 3b/3c interfaces; write the next precise plan before switching native app/widget writers.
+
+## Validation evidence before review
+
+130 Node tests (including 19 migration/SQLite/repository tests), 42 real Workers tests, both typechecks and Android/iOS/web exports pass. SQLite tests use temporary real files and separate connections; they cover exact originals, rollback/retry, concurrent initialization/writes, pet isolation, corruption, file capacity exhaustion and bounded persistent locks. A 1,000-event fixture preserves 999 unchanged object references after one note edit. This is not native app/widget runtime or render acceptance; native writers still use the previous backend until phase 3b.
