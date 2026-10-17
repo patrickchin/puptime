@@ -55,13 +55,13 @@
 
 ### Task 2: Restartable bounded sync runner
 
-**Interfaces:** `createSyncRunner({sync,api,petId,deviceId,sessionAccountId,changed,now?,random?})` provides `run(signal):Promise<RunResult>`. `RunResult` distinguishes idle/synced/pending/blocked/auth-required/expired/retry/error, contains counts and retry delay, never record contents. Run is serialized by the controller. Engine APIs are consumed unchanged; every response is passed with the captured account/generation fence.
+**Interfaces:** `createSyncRunner({sync,api,petId,deviceId,sessionAccountId,changed,random?})` provides `run(signal):Promise<RunResult>`. `RunResult` distinguishes idle/synced/pending/blocked/auth-required/expired/retry/error, contains counts and retry delay, never record contents. Run is serialized by the controller. Engine APIs are consumed unchanged; every response is passed with the captured account/generation fence.
 
-- [ ] RED real SQL: free/signed-in-unenrolled runs send no sync/trial/enrollment calls. Resume saved enrollment with its exact immutable request and persisted baseline cursor; response loss/reopen retries safely. Existing-cloud confirmation is never inferred by runner.
-- [ ] RED: push commits then fetch fails; retry resends identical IDs and preserves later local edits. Pull all100-record pages before applying confirmed rejections so a record on a later page is available. Persist every successful page; final accepted/rejected receipts use an empty page at the committed cursor. SQL failure leaves retry work intact.
-- [ ] RED: resyncRequired enters engine staging, resumes pages and commits only complete baseline; retained accepted push results retry idempotently. A changed account/generation or aborted credential read stops dispatch/apply. No tight loop on retry_later/empty progress.
-- [ ] RED: offline/401/402/410/429/5xx/timeouts/malformed data preserve local edits and queue. Use bounded exponential delay1s→60s with jitter, honor capped Retry-After;401/402 wait for explicit state refresh, no automatic retry storm. Drain bounded work per run and schedule continuation when more remains.
-- [ ] Implement with native AbortController and existing engine methods; no custom queue database. Run full tests/typechecks, commit runner.
+- [x] RED real SQL: free/signed-in-unenrolled runs send no sync/trial/enrollment calls. Resume saved enrollment with its exact immutable request and persisted baseline cursor; response loss/reopen retries safely. Existing-cloud confirmation is never inferred by runner.
+- [x] RED: push commits then fetch fails; retry resends identical IDs and preserves later local edits. Pull all100-record pages before applying confirmed rejections so a record on a later page is available. Persist every successful page; final accepted/rejected receipts use an empty page at the committed cursor. SQL failure leaves retry work intact.
+- [x] RED: resyncRequired enters engine staging, resumes pages and commits only complete baseline; retained accepted push results retry idempotently. A changed account/generation or aborted credential read stops dispatch/apply. No tight loop on retry_later/empty progress.
+- [x] RED: offline/401/402/410/429/5xx/timeouts/malformed data preserve local edits and queue. Use bounded exponential delay1s→60s with jitter, honor capped Retry-After;401/402 wait for explicit state refresh, no automatic retry storm. Drain bounded work per run and schedule continuation when more remains.
+- [x] Implement with native AbortController and existing engine methods; no custom queue database. Run full tests/typechecks, commit runner.
 
 ### Task 3: Shared iOS runtime and explicit account controller
 
