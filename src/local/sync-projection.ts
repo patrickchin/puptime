@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { normalizeActivityCustomizations } from '../activity-customization.ts';
 import { recordDataSchema, type RecordKind } from '../cloud/protocol.ts';
 import { fieldPatch } from '../cloud/record-identity.ts';
@@ -10,7 +11,9 @@ import type { SqlExecutor } from './database.ts';
 import { assertValidSchedule, petSettingKeys, storageKeys, type LegacyKey } from './legacy.ts';
 
 export type LocalRecord = { kind: RecordKind; localId: string; data: Record<string, unknown> };
-export type LocalChange = { kind: RecordKind; localId: string; before: Record<string, unknown> | null; after: Record<string, unknown> | null };
+const changeData=z.record(z.string(),z.unknown()).nullable();
+export const localChangeSchema=z.strictObject({kind:z.enum(['event','routine','puppy','customActivity','customization','accountPreferences']),localId:z.string().min(1),before:changeData,after:changeData}).refine(change=>change.before!==null||change.after!==null,'Invalid empty change.');
+export type LocalChange=z.infer<typeof localChangeSchema>;
 export type LocalChangeSink = (sql: SqlExecutor, changes: LocalChange[]) => Promise<void>;
 export function localChanges(before: LocalRecord[], after: LocalRecord[]): LocalChange[] {
   const key = (record: LocalRecord) => JSON.stringify([record.kind,record.localId]);
@@ -47,6 +50,8 @@ async function settings(sql: SqlExecutor, petId: string) {
   const labels=normalizeCustomActivities([...strings(storageKeys.customActivities),...historical.map(row=>row.label)],deleted);
   return {pet,values,labels,deleted,customizations:normalizeActivityCustomizations(object(storageKeys.activityCustomizations)),notification:normalizeNotificationPreferences(object(storageKeys.notificationPreferences)),widgetActions:values.has(storageKeys.widgetActions)?normalizeWidgetActions(strings(storageKeys.widgetActions),labels):[...DEFAULT_WIDGET_ACTIONS]};
 }
+
+export async function readLocalDeletedActivities(sql:SqlExecutor,petId:string):Promise<string[]> {return (await settings(sql,petId)).deleted;}
 
 export async function readLocalSettingsRecords(sql:SqlExecutor,petId:string):Promise<LocalRecord[]> {
   const state=await settings(sql,petId), n=state.notification;

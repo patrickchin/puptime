@@ -65,13 +65,48 @@ CREATE TABLE IF NOT EXISTS routines (
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS pet_settings (pet_id TEXT NOT NULL REFERENCES puppies(id) ON DELETE CASCADE, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY(pet_id,key));
 CREATE TABLE IF NOT EXISTS legacy_snapshots (key TEXT PRIMARY KEY NOT NULL, raw_value TEXT);
+CREATE TABLE IF NOT EXISTS local_revisions (
+  sequence INTEGER PRIMARY KEY AUTOINCREMENT, pet_id TEXT NOT NULL REFERENCES puppies(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL, local_id TEXT NOT NULL, before_data TEXT CHECK(before_data IS NULL OR json_valid(before_data)),
+  after_data TEXT CHECK(after_data IS NULL OR json_valid(after_data)), created_at INTEGER NOT NULL,
+  source TEXT NOT NULL CHECK(source IN ('local','enrollment','cloud','restore'))
+);
+CREATE INDEX IF NOT EXISTS local_revision_history ON local_revisions(pet_id,kind,local_id,sequence DESC);
+CREATE TABLE IF NOT EXISTS local_sync_owner (
+  singleton INTEGER PRIMARY KEY CHECK(singleton=1), generation TEXT NOT NULL UNIQUE,
+  account_id TEXT NOT NULL, device_id TEXT NOT NULL, cursor INTEGER NOT NULL DEFAULT 0 CHECK(cursor>=0),
+  pending_pet_id TEXT REFERENCES puppies(id), staging_cursor INTEGER NOT NULL DEFAULT 0 CHECK(staging_cursor>=0),
+  staging_complete INTEGER NOT NULL DEFAULT 0 CHECK(staging_complete IN (0,1))
+);
+CREATE TABLE IF NOT EXISTS local_sync_pets (
+  pet_id TEXT PRIMARY KEY REFERENCES puppies(id) ON DELETE CASCADE,
+  generation TEXT NOT NULL REFERENCES local_sync_owner(generation) ON DELETE CASCADE,
+  cloud_pet_id TEXT, enrollment TEXT NOT NULL CHECK(json_valid(enrollment)),
+  status TEXT NOT NULL CHECK(status IN ('preparing','active')), UNIQUE(generation,cloud_pet_id)
+);
+CREATE TABLE IF NOT EXISTS local_sync_outbox (
+  sequence INTEGER PRIMARY KEY AUTOINCREMENT, operation_id TEXT NOT NULL UNIQUE,
+  generation TEXT NOT NULL REFERENCES local_sync_owner(generation) ON DELETE CASCADE,
+  local_pet_id TEXT NOT NULL REFERENCES puppies(id) ON DELETE CASCADE,
+  local_kind TEXT NOT NULL, local_id TEXT NOT NULL, change_json TEXT NOT NULL CHECK(json_valid(change_json)),
+  mutation_json TEXT CHECK(mutation_json IS NULL OR json_valid(mutation_json)), blocked_reason TEXT
+);
+CREATE INDEX IF NOT EXISTS local_sync_pending ON local_sync_outbox(generation,sequence);
+CREATE TABLE IF NOT EXISTS local_sync_records (
+  generation TEXT NOT NULL REFERENCES local_sync_owner(generation) ON DELETE CASCADE,
+  record_id TEXT NOT NULL, body TEXT NOT NULL CHECK(json_valid(body)), PRIMARY KEY(generation,record_id)
+);
+CREATE TABLE IF NOT EXISTS local_sync_baseline (
+  generation TEXT NOT NULL REFERENCES local_sync_owner(generation) ON DELETE CASCADE,
+  record_id TEXT NOT NULL, body TEXT NOT NULL CHECK(json_valid(body)), PRIMARY KEY(generation,record_id)
+);
 `;
 
 export async function migrateLegacy(database: LocalDatabase, source: LegacySnapshot | (() => Promise<LegacySnapshot>), newId?: () => string): Promise<{ petId: string; migrated: boolean }> {
   return database.write(async (sql) => {
     await sql.execAsync(localSchema);
     const version = await sql.getFirstAsync<{ value: string }>("SELECT value FROM metadata WHERE key = 'schema_version'");
-    if (version && !['1','2'].includes(version.value)) throw new Error('Unsupported or newer local database schema.');
+    if (version && !['1','2','3'].includes(version.value)) throw new Error('Unsupported or newer local database schema.');
     if (version) {
       const pet = await sql.getFirstAsync<{ value: string }>("SELECT value FROM metadata WHERE key = 'active_pet_id'");
       const complete = await sql.getFirstAsync<{ value: string }>("SELECT value FROM metadata WHERE key = 'migration_complete'");
@@ -83,6 +118,7 @@ export async function migrateLegacy(database: LocalDatabase, source: LegacySnaps
         }
         await sql.runAsync("UPDATE metadata SET value='2' WHERE key='schema_version'");
       }
+      if (version.value !== '3') await sql.runAsync("UPDATE metadata SET value='3' WHERE key='schema_version'");
       return { petId: pet.value, migrated: false };
     }
     const snapshot = typeof source === 'function' ? await source() : source;
@@ -99,7 +135,7 @@ export async function migrateLegacy(database: LocalDatabase, source: LegacySnaps
         else await sql.runAsync('INSERT INTO settings(key,value) VALUES (?,?)', key, raw);
       }
     }
-    for (const [key, value] of Object.entries({ schema_version: '2', active_pet_id: petId, migration_complete: '1', show_onboarding: String(snapshot.showOnboarding) })) {
+    for (const [key, value] of Object.entries({ schema_version: '3', active_pet_id: petId, migration_complete: '1', show_onboarding: String(snapshot.showOnboarding) })) {
       await sql.runAsync('INSERT INTO metadata(key,value) VALUES (?,?)', key, value);
     }
     return { petId, migrated: true };
