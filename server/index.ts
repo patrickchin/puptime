@@ -5,6 +5,7 @@ import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
 import { accountRoutes } from './account-routes';
 import { configuredProviders, createAuth } from './auth';
+import { trialDaysFromEnvironment } from './entitlements';
 export { AccountStore } from './account-store';
 
 const app = new Hono<{ Bindings: Cloudflare.Env }>();
@@ -17,7 +18,7 @@ app.use('/api/*', cors({
   credentials: true,
 }));
 app.get('/health', (context) => context.json({ service: 'puptime-api', status: 'ok', protocolVersion: 1 }));
-app.get('/api/config', (context) => context.json({ protocolVersion: 1, providers: configuredProviders(context.env), pricingFinalized: false }));
+app.get('/api/config', (context) => context.json({ protocolVersion: 1, trialDays: trialDaysFromEnvironment(context.env.CLOUD_TRIAL_DAYS), providers: configuredProviders(context.env), pricingFinalized: false }));
 app.on(['GET', 'POST'], '/api/auth/*', (context) => createAuth(context.env).handler(context.req.raw));
 app.route('/api', accountRoutes);
 app.notFound((context) => context.json({ error: 'not_found' }, 404));

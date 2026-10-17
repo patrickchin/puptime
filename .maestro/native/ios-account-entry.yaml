@@ -1,0 +1,38 @@
+appId: com.patrickchin.puptime
+name: iOS optional account entry preserves free logging
+---
+- launchApp:
+    clearState: true
+- runFlow: ../helpers/skip-onboarding.yaml
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- tapOn:
+    id: quick.pee
+- assertVisible:
+    id: toast
+- tapOn:
+    id: settings.open
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: screen.settings
+    timeout: 10000
+- assertVisible:
+    id: settings.account.open
+- tapOn:
+    id: settings.account.open
+    retryTapIfNoChange: true
+- assertVisible:
+    id: screen.account
+- assertVisible:
+    id: account.local.summary
+- tapOn:
+    id: account.back
+- assertVisible:
+    id: screen.settings
+- tapOn:
+    id: settings.back
+- assertVisible:
+    id: screen.today

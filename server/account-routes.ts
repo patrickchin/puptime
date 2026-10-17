@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { enrollmentSchema, mutationSchema, recordIdSchema, type Revision } from '../src/cloud/protocol';
 import { getAccountStore, type AccountStore } from './account-store';
 import { createAuth } from './auth';
-import { activateTrial, cloudAccess, getCloudAccount, type CloudAccess, type CloudAccount } from './entitlements';
+import { activateTrial, cloudAccess, getCloudAccount, trialDaysFromEnvironment, type CloudAccess, type CloudAccount } from './entitlements';
 
 type AccountEnv = { Bindings: Cloudflare.Env; Variables: {
   user: { id: string; email: string; name: string }; sessionCreatedAt: number;
@@ -47,7 +47,7 @@ accountRoutes.get('/account', authenticated, async (context) => {
   return context.json({ user: context.get('user'), cloud: context.get('cloud'), ...summary });
 });
 accountRoutes.post('/cloud/trial', authenticated, validator('json', (value) => z.strictObject({}).parse(value)), async (context) => {
-  const account = await activateTrial(context.env.AUTH_DB, context.get('user').id, Date.now(), context.env.CLOUD_TRIAL_DAYS ? Number(context.env.CLOUD_TRIAL_DAYS) : 14);
+  const account = await activateTrial(context.env.AUTH_DB, context.get('user').id, Date.now(), trialDaysFromEnvironment(context.env.CLOUD_TRIAL_DAYS));
   return context.json({ cloud: cloudAccess(account, Date.now()) });
 });
 accountRoutes.post('/cloud/enroll', authenticated, syncAccess, validator('json', (value) => enrollmentSchema.parse(value)), async (context) => {

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { Mutation } from './protocol.ts';
 import * as api from './api.ts';
-const config={protocolVersion:1,providers:{apple:false,google:true,email:false},pricingFinalized:false};
+const config={protocolVersion:1,trialDays:14,providers:{apple:false,google:true,email:false},pricingFinalized:false};
 const account={user:{id:'account-1',email:'person@example.com',name:'Person'},cloud:{canSync:false,canExport:true,source:'none',expiresAt:null},pets:[]};
 const event:Mutation={protocolVersion:1,operationId:'op-1',deviceId:'device-1',recordId:'event-1',petId:'pet-1',baseRevision:0,intent:'create',kind:'event',patch:{type:'pee',at:100,source:'app'}};
 function client(request:import('./api.ts').CloudRequest) {assert.equal(typeof api.createCloudApi,'function');return api.createCloudApi(request);}
@@ -62,4 +62,12 @@ test('SDK request adapter fixes the credential origin, disables redirects and SD
  assert.deepEqual(await request('/api/account',{method:'GET',signal:controller.signal}),{data:account,error:null,retryAfter:'3'});
  for(const path of ['https://other.example/api/account','//other.example/api/account','/api/../private','/api/auth/get-session','/api/account?url=https://other.example']) await assert.rejects(request(path,{method:'GET'}));
  assert.equal(calls,1);
+});
+
+
+test('trial duration is validated configuration and legacy staging defaults to its verified fourteen days',async()=>{
+ const {trialDays,...legacy}=config;
+ assert.equal((await client(async()=>({data:legacy,error:null})).config()).trialDays,14);
+ assert.equal((await client(async()=>({data:{...config,trialDays:21},error:null})).config()).trialDays,21);
+ await assert.rejects(client(async()=>({data:{...config,trialDays:0},error:null})).config(),/invalid-response/);
 });

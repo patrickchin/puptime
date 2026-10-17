@@ -9,7 +9,7 @@ export function cloudBaseUrl(value:string|undefined,allowLocal=false):string|nul
     ||(url.protocol!=='https:'&&!(allowLocal&&url.protocol==='http:'&&['localhost','127.0.0.1','[::1]'].includes(host)))) throw new Error('Invalid Puptime cloud origin.');
   return url.origin;
 }
-export const cloudConfigSchema=z.strictObject({protocolVersion:z.literal(1),providers:z.strictObject({apple:z.boolean(),google:z.boolean(),email:z.boolean()}),pricingFinalized:z.boolean()});
+export const cloudConfigSchema=z.strictObject({protocolVersion:z.literal(1),trialDays:z.number().int().min(1).max(30).default(14),providers:z.strictObject({apple:z.boolean(),google:z.boolean(),email:z.boolean()}),pricingFinalized:z.boolean()});
 export const cloudAccessSchema=z.strictObject({canSync:z.boolean(),canExport:z.boolean(),source:z.enum(['none','trial','paid']),expiresAt:z.number().int().min(0).max(8640000000000000).nullable()})
   .refine(value=>value.canSync===(value.source!=='none')&&(value.source==='none'?value.expiresAt===null:value.expiresAt!==null));
 export const cloudAccountSchema=z.strictObject({user:z.strictObject({id:identifierSchema,email:z.email().max(320),name:z.string().max(256)}),cloud:cloudAccessSchema,pets:z.array(z.strictObject({id:identifierSchema,name:z.string().min(1).max(256),eventCount:z.number().int().min(0).max(Number.MAX_SAFE_INTEGER)}))});
