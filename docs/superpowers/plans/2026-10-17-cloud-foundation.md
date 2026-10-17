@@ -54,13 +54,13 @@
 
 ### Task 3: Transactional account store and platform checks
 
-**Files:** Create `server/account-store.ts`, `server/index.ts`, `server/account-store.test.ts`, `server/tsconfig.json`, `server/vitest.config.ts`, `wrangler.jsonc`; modify package scripts/lockfile and root tsconfig exclusion for server-only modules.
+**Files:** Create `server/account-store.ts`, `server/index.ts`, `server/account-store.test.ts`, `server/tsconfig.json`, `server/vitest.config.mts`, `wrangler.jsonc`; modify package scripts/lockfile and root tsconfig exclusion for server-only modules.
 
 **Interfaces:** The internal Durable Object exposes `apply(mutation: Mutation): MutationResult`, `pull(after: number, limit?: number): PullPage`, `history(recordId: string, beforeRevision?: number): Revision[]`. `apply` uses a SQLite synchronous transaction to atomically save normalized operation payload/result, record, revision, and sequence. Identical operation retries return the stored result; changed-payload retries throw. `pull` returns ordered immutable revision results (including deletion markers), a next cursor, and hasMore. The public Worker exposes `/health` only until authenticated routing is implemented.
 
-- [ ] Write platform integration tests that call a real local Durable Object binding: create/patch/delete/restore, duplicate/change-payload retry, two pets, competing naps, paginated pulls, history order, malformed operations, and object isolation. Assert no partial record/history changes on failure.
+- [ ] Write platform integration tests that call a real local Durable Object binding: create/patch/delete/restore, duplicate/change-payload retry, two pets, legacy nap validation, paginated pulls, history order, malformed operations, and object isolation. Assert no partial record/history changes on failure.
 - [ ] Run the configured server test command; expected FAIL for missing implementation.
-- [ ] Install supported stable Wrangler/Cloudflare types/test runtime dependencies. Implement parameter-bound SQL, migrations, indexed record/revision/operation tables, synchronous transactional commits, bounded page sizes, and complete domain invariants. Concurrent naps close only within the same pet and mark inferred completion estimated in its own revision. Do not expose an account-selector endpoint on the public Worker.
+- [ ] Install supported stable Wrangler/Cloudflare types/test runtime dependencies. Implement parameter-bound SQL, migrations, indexed record/revision/operation tables, synchronous transactional commits, bounded page sizes, and complete domain invariants. Preserve legacy nap data; do not add inferred nap completions after the user requested no nap recording for now. Do not expose an account-selector endpoint on the public Worker.
 - [ ] Run Node tests, platform integration tests, and both client/server typechecks; expected PASS. Run local Worker `/health` and confirm public account paths are unavailable. Production deployment waits for authenticated routing.
 - [ ] Record exact versions, checks and runtime limitations in the ledger; commit foundation.
 

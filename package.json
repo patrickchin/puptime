@@ -24,11 +24,16 @@
     "react-native": "0.86.3",
     "react-native-android-widget": "^0.22.1",
     "react-native-safe-area-context": "~5.7.0",
-    "react-native-web": "^0.21.2"
+    "react-native-web": "^0.21.2",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.4.4",
+    "@cloudflare/workers-types": "^5.20261016.1",
     "@types/react": "~19.2.2",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.0",
+    "wrangler": "^4.151.1"
   },
   "scripts": {
     "start": "expo start",
@@ -37,10 +42,13 @@
     "web": "expo start --web",
     "build:web": "expo export --platform web --output-dir dist-web",
     "typecheck": "tsc --noEmit",
-    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/*.test.ts",
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/*.test.ts src/cloud/*.test.ts",
     "test:e2e:ios": "maestro test --platform ios --config .maestro/config.yaml .maestro",
     "prebuild": "expo prebuild",
-    "build:android": "cd android && ./gradlew assembleRelease"
+    "build:android": "cd android && ./gradlew assembleRelease",
+    "test:server": "vitest run --config server/vitest.config.mts",
+    "typecheck:server": "tsc --noEmit -p server/tsconfig.json",
+    "dev:server": "wrangler dev"
   },
   "private": true
 }

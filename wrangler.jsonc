@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "puptime-api-staging",
+  "main": "server/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": { "bindings": [{ "name": "ACCOUNTS", "class_name": "AccountStore" }] },
+  "migrations": [{ "tag": "v1-account-records", "new_sqlite_classes": ["AccountStore"] }]
+}
