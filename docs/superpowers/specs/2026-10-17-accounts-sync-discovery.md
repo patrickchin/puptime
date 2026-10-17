@@ -13,6 +13,7 @@ This document maps the requested change and records decisions as they are made. 
 - All local features are free. User-facing backend services, including cloud backup, device sync, and later shared-care sync, are paid optional features. Use Obsidian's free-local/paid-services model as the commercial reference. The old approximately US$1.99 upfront app price is superseded; service prices, billing cadence, and any trial remain undecided.
 - Include a walkthrough showcasing different parts of the app before the first log. It is skippable and replayable from Settings. Keep payment unobtrusive. The detailed optional cloud-enrollment sequence remains a design decision.
 - First-run puppy setup asks only for a name. A **Not now** action uses **My puppy** until the user renames it. No additional profile fields are required before logging. The display name does not determine the stable pet ID.
+- Paid cloud sync includes the puppy profile, activity history, routines, custom activities, and personal account preferences: appearance, language, widget action choices/order, and notification preferences. Keep widget installation/size/placement, OS permission state, and **Notify on this device** local. Each future caregiver retains their own account preferences.
 - Aim to offer Apple sign-in, Google sign-in, and passwordless email codes. Verify platform availability, provider configuration, and recovery behavior before committing to the final flow.
 - The user will purchase a dedicated Puptime domain later. Proceed without choosing a domain now, and do not use `harpapro.com` for Puptime's sender identity or public URLs. Domain-independent development and service preparation may continue; live sender/domain configuration remains deferred.
 - Preserve offline logging and synchronize when connected. Include telemetry, Sentry crash/error reporting, operational reliability, and coordinated website, app, policy, and listing updates.
@@ -85,7 +86,7 @@ Ready when: the user approves the flow and its recovery states; representative u
 
 Evaluate the previously proposed Cloudflare/Neon/Drizzle/Better Auth stack first. Reuse existing Harpa/Parrot patterns only after inspecting them. Validate Expo SDK 57 compatibility, Apple/Google provider flows, email-code delivery, secure native credential storage, web sessions, callback URLs, and account linking. Latest documentation is not proof of compatibility with the app's pinned versions.
 
-Define account, pet, activity, routine, and synchronization records with authenticated ownership. Separate device preferences from synchronized pet data. Include database migrations, request validation, server-side authorization, bounded requests, login/code throttling, transactional writes, production secrets, staging isolation, and deployment rollback. Never trust a submitted account or pet ID as authorization. Do not automatically merge identities by an unverified matching email address.
+Define account, pet, activity, routine, account-preference, and synchronization records with authenticated ownership. Keep personal account preferences separate from synchronized pet data and device-specific state. Include database migrations, request validation, server-side authorization, bounded requests, login/code throttling, transactional writes, production secrets, staging isolation, and deployment rollback. Never trust a submitted account or pet ID as authorization. Do not automatically merge identities by an unverified matching email address.
 
 Model an account's collection of pets even while the first release exposes one puppy. Require an explicit pet ID in record ownership, storage keys/queries, sync operations, nap constraints, routine learning, reminder state, and widget targets. Migrate legacy global data to the initial stable pet ID. Avoid a unique account-to-pet relationship or a global one-open-nap constraint. Exercise two-pet fixtures in domain/storage/API isolation checks to prove the boundaries, while deferring pet-switching UI and multi-pet widget controls. This prepares the later update without building a second user-facing scope now.
 
@@ -112,7 +113,7 @@ Ready when: migration and app/widget writes survive interruption with no lost or
 Treat enrollment as an explicit, restartable transition, not an empty account replacing the device database. Proposed behavior:
 
 1. **Before enabling sync:** keep the full local app working without an account or network. Account creation or canceled payment does not discard local data or authorize its upload.
-2. **New account with no cloud data:** when the user enables the paid service, show which local puppy and data will be synchronized. Preserve existing event IDs and estimate labels, establish stable pet ownership, and include routines/custom activities according to the agreed sync scope. Device-specific permissions and preferences remain local unless deliberately included.
+2. **New account with no cloud data:** when the user enables the paid service, show which local puppy and data will be synchronized. Preserve existing event IDs and estimate labels, establish stable pet ownership, and carry over routines, custom activities, and the agreed account preferences. Device-specific widget installation/layout and notification permission/delivery state remain local.
 3. **Account already containing data:** retrieve its pet summaries, show the puppy's name and a history summary, and ask whether the local history belongs to that puppy. Combine histories only after explicit confirmation. Do not infer that two pets are the same from their names or silently combine histories. Declining or canceling must preserve local history and leave it unattached; the first cloud release supports one puppy, so do not silently create a second cloud pet. The exact recovery presentation needs design. A clean device should restore existing cloud data without creating another puppy.
 4. **While initial sync runs:** keep accepting local edits and widget actions. Save the account/pet mapping and migration progress durably, and reconcile changes made during upload. Use stable operation IDs so retrying after an interrupted response cannot duplicate the imported records.
 5. **On failure or cancellation:** preserve both the original local data and retry progress; show that backup is incomplete. Bind pending work to the intended account so another sign-in cannot receive it. Never describe local records as backed up before the server acknowledges them.
@@ -128,7 +129,17 @@ Preserve independent additions, retain pending edits during pulls, and prevent d
 
 Trigger synchronization on launch/resume, reconnection while active, relevant writes, and manual retry/refresh. Clarify the supported offline duration and full-resync behavior when old deletion markers or cursors expire. Plan for server-enforced logout or access revocation while an old device is offline. Do not promise that mobile operating systems run sync immediately while the app is closed.
 
-Show saved locally, pending upload, synced, and actionable failure states without disrupting one-tap logging. Separate local save failure from cloud failure. Define which pet data synchronizes and which preferences remain per device. Rebuild local reminders from reconciled state without sending duplicate historical notifications.
+Show saved locally, pending upload, synced, and actionable failure states without disrupting one-tap logging. Separate local save failure from cloud failure. Rebuild local reminders from reconciled state without sending duplicate historical notifications.
+
+The synchronized data boundary is confirmed:
+
+| Scope | Data and behavior |
+| --- | --- |
+| Pet | Puppy profile, activity history with notes/estimate provenance, routines, and custom activities. Keep records tied to their stable pet ID. |
+| Personal account | Appearance/theme selection, language selection, widget action choices/order, reminder lead time, enabled reminder types/delays, and widget-confirmation preference. Changes synchronize as part of the paid cloud service. |
+| Device | Widget installation, supported size/placement, OS notification permission, local scheduling identifiers, and **Notify on this device**. A user can keep a tablet silent while a phone alerts. |
+
+Synchronize the intent of **Follow system**, not the language or light/dark result resolved on a particular device. Render the shared widget action choices using each platform's supported layout. Restoring account preferences must not install a widget, grant notification permission, or override a device's notification-delivery choice. Keep account preferences personal when shared-care support arrives; changing one caregiver's settings must not change another caregiver's. Account-preference writes require the same durable retry and stale-update handling as other synchronized data; reconciliation of existing local/cloud preference edits follows the conflict policy still to be specified.
 
 Prove one full slice first: device A logs offline, survives restart, reconnects and uploads, and device B retrieves the same record once. Extend through edit, delete, undo, CSV import, routine, and widget cases. A server replica is not sufficient backup: test database restoration and account-level recovery too.
 
@@ -184,6 +195,7 @@ Run unit/integration checks and native end-to-end flows using dedicated task-nam
 | Kill before/after local write, upload, acknowledgment, or cursor update | No acknowledged changes disappear; retries do not duplicate records. |
 | Two devices edit/delete the same record | The approved conflict policy is visible and deterministic. |
 | Two-pet domain/storage/API fixtures | Queries, authorization, sync, routines, and nap/reminder state remain isolated by pet even though the first release UI supports one puppy. |
+| Account preferences restored across devices | Selected theme/language, widget actions/order, and reminder preferences restore; **Follow system** resolves independently; widget placement and notification permission/device delivery stay local. |
 | App and widget write concurrently | Both writes survive; correct account/pet and nap state. |
 | Duplicate CSV import and estimated activities | Stable IDs and estimate provenance remain intact. |
 | Logout, account switch, account deletion, later offline reconnect | No cross-account leakage or deleted-data resurrection. |
@@ -198,7 +210,7 @@ All repository changes go through GitHub pull requests. Release and merge readin
 
 ## Decision queue for the product interview
 
-Already settled: backup/device sync first; one puppy initially with multiple-pet data boundaries from the start; all local features free without an account and user-facing cloud services paid; carry existing local data into cloud when sync is enabled; confirm the puppy using its name/history summary before combining local history with existing cloud data; unobtrusive payment; a pre-log app walkthrough that can be skipped and replayed from Settings; optional name-only puppy setup with **Not now** using **My puppy**; aim for Apple, Google, and email-code login; dedicated domain purchase deferred, with no use of `harpapro.com` for Puptime's sender/public URLs.
+Already settled: backup/device sync first; one puppy initially with multiple-pet data boundaries from the start; all local features free without an account and user-facing cloud services paid; sync puppy data and personal account preferences while keeping OS/widget placement and notification delivery state local; carry existing local data into cloud when sync is enabled; confirm the puppy using its name/history summary before combining local history with existing cloud data; unobtrusive payment; a pre-log app walkthrough that can be skipped and replayed from Settings; optional name-only puppy setup with **Not now** using **My puppy**; aim for Apple, Google, and email-code login; dedicated domain purchase deferred, with no use of `harpapro.com` for Puptime's sender/public URLs.
 
 Resolve the following in dependency order, with recommendations and concrete consequences rather than a bulk questionnaire:
 
@@ -206,7 +218,7 @@ Resolve the following in dependency order, with recommendations and concrete con
 2. Paid-service amounts, billing cadence, entitlement/retention rules, and treatment of existing purchasers, after current market/cost research.
 3. Existing-installation upgrade presentation, local-data upload consent, and detailed cloud-enrollment ordering.
 4. Existing-installation presentation of the new puppy profile; name-only optional setup and stable identity are settled.
-5. Which data restores across devices: activities, routines, custom activities, and preference boundaries.
+5. Reconciliation of existing local/cloud account preferences and concurrent edits; the sync scope and device-state boundary are settled.
 6. Cloud-session expiration and reauthentication, logout/deletion semantics, conflict visibility, and supported sync offline duration; free local access remains available.
 7. Onboarding activation goal, notification timing, and any optional cloud trial.
 8. Launch countries, data region, operational budget, retention, telemetry controls, and support expectations.
