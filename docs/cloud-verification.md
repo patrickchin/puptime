@@ -50,7 +50,7 @@ Account deletion requires explicit confirmation and recent authentication. The o
 
 Do not tick a gate based on credentials being configured, a mock returning success, or a different environment passing. No live charges or paid resource upgrades are authorized by the current free-tier boundary.
 
-## iOS app storage cutover (qualification in progress)
+## iOS app storage cutover
 
 The active branch is `codex/ios-storage-cutover`. Only iOS selects the new SQLite facade; Android retains AsyncStorage. Widget transport changes are preserved unmerged on `codex/native-storage-cutover` (`bd99857`). A review found a stale snapshot boundary in that deferred transport; it must be corrected before future widget integration. It is absent from this iOS subset.
 
