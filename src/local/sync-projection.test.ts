@@ -137,3 +137,25 @@ test('an empty new record cannot be skipped as a semantic no-op',async t=>{
  const {database}=await setup(t);
  await assert.rejects(database.write(sql=>projection.applyLocalRecords(sql,'pet-1',[{kind:'event',localId:'empty',data:{}}],[])));
 });
+
+test('local commit signals fire only after successful changed writes, never for reads, no-ops or projection',async t=>{
+ const {database}=await setup(t);let commits=0;
+ const storage=createNativeStorage(database,'pet-1',undefined,()=>{commits++;});
+ await storage.appendEvents([event]);assert.equal(commits,1);
+ await storage.importEvents([event]);await storage.saveSchedule([]);await storage.saveThemePreference('system');await storage.loadCustomActivities();assert.equal(commits,1);
+ await storage.updateEvent(event.id,{note:'saved'});await storage.saveSchedule([{id:'routine',type:'meal',minutes:300}]);await storage.saveThemePreference('soft-play');assert.equal(commits,4);
+ await database.write(sql=>projection.applyLocalRecords(sql,'pet-1',[{kind:'event',localId:event.id,data:{type:'pee',at:200,source:'app',estimated:true}}],[]));assert.equal(commits,4);
+});
+
+test('a deferred SQL commit failure emits no local signal and advisory listener errors cannot turn a committed save into failure',async t=>{
+ const {database}=await setup(t);let commits=0,fail=false;
+ await database.write(sql=>sql.execAsync('CREATE TABLE commit_parent(id TEXT PRIMARY KEY); CREATE TABLE commit_child(parent_id TEXT REFERENCES commit_parent(id) DEFERRABLE INITIALLY DEFERRED);'));
+ const storage=createNativeStorage(database,'pet-1',async sql=>{if(fail)await sql.runAsync("INSERT INTO commit_child(parent_id) VALUES ('missing')");},()=>{commits++;});
+ fail=true;await assert.rejects(storage.appendEvents([event]),/FOREIGN KEY/i);assert.equal(commits,0);assert.deepEqual(await storage.loadEvents(),[]);
+ await assert.rejects(storage.saveSchedule([{id:'routine',type:'meal',minutes:300}]),/FOREIGN KEY/i);assert.equal(commits,0);
+ await assert.rejects(storage.saveThemePreference('soft-play'),/FOREIGN KEY/i);assert.equal(commits,0);assert.equal(await storage.loadThemePreference(),'system');
+ fail=false;
+ let advisoryCalls=0;const advisory=createNativeStorage(database,'pet-1',async()=>{},()=>{advisoryCalls++;throw new Error('listener failed');});
+ await advisory.appendEvents([event]);await advisory.saveThemePreference('soft-play');await advisory.saveSchedule([{id:'routine',type:'meal',minutes:300}]);
+ assert.equal(advisoryCalls,3);assert.equal((await storage.loadEvents()).length,1);assert.equal(await storage.loadThemePreference(),'soft-play');assert.equal((await storage.loadSchedule()).length,1);
+});

@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { createLocalDatabase,migrateLegacy } from './database.ts';
+import { legacyKeys,parseLegacySnapshot } from './legacy.ts';
+import { sqliteTestConnection } from './sqlite-test-adapter.ts';
+import * as runtime from './runtime-factory.ts';
+async function database() {const db=await createLocalDatabase(sqliteTestConnection(':memory:'));await migrateLegacy(db,parseLegacySnapshot(legacyKeys.map(key=>[key,key==='puptime.schedule.v1'?'[]':null])),()=> 'pet-1');return db;}
+
+test('the local runtime shares the storage transaction and engine, retaining free revisions without upload work',async t=>{
+ const db=await database();t.after(()=>db.close());let signals=0;
+ assert.equal(typeof runtime.createLocalRuntime,'function');
+ const local=await runtime.createLocalRuntime(db,'pet-1',()=>{signals++;});
+ assert.equal(local.database,db);assert.equal(local.petId,'pet-1');assert.match(local.deviceId,/^[a-f0-9]{32}$/);
+ await local.storage.appendEvents([{id:'one',type:'pee',at:100,source:'app'}]);assert.equal(signals,1);
+ assert.equal((await local.sync.status('pet-1')).state,'local');assert.equal((await local.sync.status('pet-1')).pending,0);
+ assert.equal((await db.read(sql=>sql.getFirstAsync<{n:number}>('SELECT COUNT(*) n FROM local_revisions')))!.n,1);
+ const another=await runtime.createLocalRuntime(db,'pet-1');assert.equal(another.deviceId,local.deviceId);
+});
+
+test('an invalid retained device identity fails without silently changing history or assigning a new identity',async t=>{
+ const db=await database();t.after(()=>db.close());assert.equal(typeof runtime.createLocalRuntime,'function');
+ await db.write(async sql=>{await sql.runAsync("INSERT INTO metadata(key,value) VALUES ('cloud_device_id','broken device id')");await sql.runAsync("INSERT INTO events(pet_id,id,at,body) VALUES ('pet-1','one',100,?)",JSON.stringify({id:'one',type:'pee',at:100,source:'app'}));});
+ await assert.rejects(runtime.createLocalRuntime(db,'pet-1'));
+ assert.equal((await db.read(sql=>sql.getFirstAsync<{value:string}>("SELECT value FROM metadata WHERE key='cloud_device_id'")))!.value,'broken device id');
+ assert.equal((await db.read(sql=>sql.getFirstAsync<{n:number}>('SELECT COUNT(*) n FROM events')))!.n,1);
+});

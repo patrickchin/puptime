@@ -15,6 +15,10 @@ const changeData=z.record(z.string(),z.unknown()).nullable();
 export const localChangeSchema=z.strictObject({kind:z.enum(['event','routine','puppy','customActivity','customization','accountPreferences']),localId:z.string().min(1),before:changeData,after:changeData}).refine(change=>change.before!==null||change.after!==null,'Invalid empty change.');
 export type LocalChange=z.infer<typeof localChangeSchema>;
 export type LocalChangeSink = (sql: SqlExecutor, changes: LocalChange[]) => Promise<void>;
+export function notifyLocalCommit(callback?:()=>void):void {
+  // Scheduling is advisory; listener failure cannot undo an acknowledged save.
+  try {callback?.();} catch {}
+}
 export function localChanges(before: LocalRecord[], after: LocalRecord[]): LocalChange[] {
   const key = (record: LocalRecord) => JSON.stringify([record.kind,record.localId]);
   const old = new Map(before.map(record=>[key(record),record]));

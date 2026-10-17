@@ -6,18 +6,21 @@ import { isThemePreference, type ThemePreference } from '../theme.ts';
 import type { LocalDatabase, SqlExecutor } from './database.ts';
 import { petSettingKeys, storageKeys, type LegacyKey } from './legacy.ts';
 import { createLocalRepository } from './repository.ts';
-import { localChanges, readLocalSettingsRecords, type LocalChangeSink } from './sync-projection.ts';
+import { localChanges, notifyLocalCommit, readLocalSettingsRecords, type LocalChangeSink } from './sync-projection.ts';
 import { recordDataSchema } from '../cloud/protocol.ts';
 
-export function createNativeStorage(database: LocalDatabase, petId: string, onChange?: LocalChangeSink) {
-  const repository = createLocalRepository(database, petId, onChange);
-  function settingsWrite<T>(action:(sql:SqlExecutor)=>Promise<T>):Promise<T> {
-    return database.write(async sql=> {
-      const before=onChange?await readLocalSettingsRecords(sql,petId):[];
+export function createNativeStorage(database: LocalDatabase, petId: string, onChange?: LocalChangeSink, afterCommit?:()=>void) {
+  const repository = createLocalRepository(database, petId, onChange,afterCommit);
+  async function settingsWrite<T>(action:(sql:SqlExecutor)=>Promise<T>):Promise<T> {
+    let changed=false;
+    const result=await database.write(async sql=> {
+      const before=(onChange||afterCommit)?await readLocalSettingsRecords(sql,petId):[];
       const result=await action(sql);
-      if (onChange) {const changes=localChanges(before,await readLocalSettingsRecords(sql,petId));if (changes.length) await onChange(sql,changes);}
+      if (onChange||afterCommit) {const changes=localChanges(before,await readLocalSettingsRecords(sql,petId));if (changes.length) {await onChange?.(sql,changes);changed=true;}}
       return result;
     });
+    if (changed) notifyLocalCommit(afterCommit);
+    return result;
   }
   async function get(sql: SqlExecutor, key: LegacyKey) {
     const row = petSettingKeys.has(key)

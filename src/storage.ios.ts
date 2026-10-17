@@ -3,19 +3,10 @@ import type { ActivityKey, PuppyEvent, PuppyEventChanges, ScheduleEntry } from '
 import type { LanguagePreference } from './localization';
 import type { NotificationPreferences } from './notification-config';
 import type { ThemePreference } from './theme';
-import { createNativeStorage } from './local/native-storage';
-import { openLocalDatabase } from './local/open.native';
+import { getLocalRuntime } from './local/runtime.ios';
 export { assertValidEvents, EventsImportError, EventsStorageError } from './storage-validation';
 
-type Storage = ReturnType<typeof createNativeStorage>;
-let initialized: Promise<Storage> | undefined;
-function storage(): Promise<Storage> {
-  initialized ??= openLocalDatabase().then(({ database, petId }) => createNativeStorage(database, petId)).catch((error) => {
-    initialized = undefined;
-    throw error;
-  });
-  return initialized;
-}
+const storage=async()=>(await getLocalRuntime()).storage;
 
 export const shouldShowOnboarding = async () => (await storage()).shouldShowOnboarding();
 export const completeOnboarding = async () => (await storage()).completeOnboarding();

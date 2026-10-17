@@ -2,10 +2,10 @@ import { isOpenNap, type PuppyEvent, type PuppyEventChanges, type ScheduleEntry 
 import { assertValidEvents, EventsImportError, EventsStorageError } from '../storage-validation.ts';
 import { assertValidSchedule } from './legacy.ts';
 import type { LocalDatabase, SqlExecutor } from './database.ts';
-import { localChanges, readLocalSettingsRecords, type LocalChangeSink } from './sync-projection.ts';
+import { localChanges, notifyLocalCommit, readLocalSettingsRecords, type LocalChangeSink } from './sync-projection.ts';
 
 type EventRow = { id: string; at: number; body: string; event: PuppyEvent };
-export function createLocalRepository(database: LocalDatabase, petId: string, onChange?: LocalChangeSink) {
+export function createLocalRepository(database: LocalDatabase, petId: string, onChange?: LocalChangeSink, afterCommit?:()=>void) {
   const cache = new Map<string, { body: string; event: PuppyEvent }>();
   async function requirePet(sql: SqlExecutor) {
     if (!await sql.getFirstAsync('SELECT id FROM puppies WHERE id=?', petId)) throw new Error('The local puppy could not be found.');
@@ -31,9 +31,10 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
     });
   }
   async function mutateEvents<T>(action: (events: PuppyEvent[]) => { events: PuppyEvent[]; value: T }) {
+    let changed=false;
     const committed = await database.write(async (sql) => {
       const rows = await readEvents(sql);
-      const beforeSettings=onChange?await readLocalSettingsRecords(sql,petId):[];
+      const beforeSettings=(onChange||afterCommit)?await readLocalSettingsRecords(sql,petId):[];
       const result = action(rows.map((row) => row.event));
       assertValidEvents(result.events);
       const previous = new Map(rows.map((row) => [row.id, row.body]));
@@ -46,13 +47,14 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
         if (previous.get(event.id) !== body) await sql.runAsync('INSERT INTO events(pet_id,id,at,body) VALUES (?,?,?,?) ON CONFLICT(pet_id,id) DO UPDATE SET at=excluded.at,body=excluded.body', petId, event.id, event.at, body);
         saved.push({ id: event.id, at: event.at, body, event });
       }
-      if (onChange) {
+      if (onChange||afterCommit) {
         const records = (events: PuppyEvent[]) => events.map(({id,...data})=>({kind:'event' as const,localId:id,data}));
         const changes=localChanges([...records(rows.map(row=>row.event)),...beforeSettings],[...records(result.events),...await readLocalSettingsRecords(sql,petId)]);
-        if (changes.length) await onChange(sql,changes);
+        if (changes.length) {await onChange?.(sql,changes);changed=true;}
       }
       return { rows: saved, value: result.value };
     });
+    if (changed) notifyLocalCommit(afterCommit);
     return { events: materialize(committed.rows), value: committed.value };
   }
   async function readSchedule(sql: SqlExecutor): Promise<ScheduleEntry[]> {
@@ -94,6 +96,7 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
     loadSchedule: () => database.read(readSchedule),
     async saveSchedule(entries: ScheduleEntry[]) {
       assertValidSchedule(entries);
+      let changed=false;
       await database.write(async (sql) => {
         const before=await readSchedule(sql);
         const previous = new Map(before.map((entry) => [entry.id, JSON.stringify(entry)]));
@@ -103,12 +106,13 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
           const body = JSON.stringify(entry);
           if (previous.get(entry.id) !== body) await sql.runAsync('INSERT INTO routines(pet_id,id,minutes,body) VALUES (?,?,?,?) ON CONFLICT(pet_id,id) DO UPDATE SET minutes=excluded.minutes,body=excluded.body', petId, entry.id, entry.minutes, body);
         }
-        if (onChange) {
+        if (onChange||afterCommit) {
           const records = (values: ScheduleEntry[]) => values.map(({id,...data})=>({kind:'routine' as const,localId:id,data}));
           const changes=localChanges(records(before),records(entries));
-          if (changes.length) await onChange(sql,changes);
+          if (changes.length) {await onChange?.(sql,changes);changed=true;}
         }
       });
+      if (changed) notifyLocalCommit(afterCommit);
     },
   };
 }
