@@ -388,3 +388,12 @@ test('a malformed scoped pull rolls back valid acknowledgments and an unbound pu
  await sync.applySync({...owner,accepted:[],page:{changes:[valid],cursor:valid.sequence,hasMore:false}});
  assert.deepEqual(await storage.loadEvents(),[]);assert.equal((await database.read(sql=>sql.getFirstAsync<{n:number}>('SELECT COUNT(*) n FROM puppies')))!.n,1);
 });
+
+test('restoring a record with its own pending writes waits for their acknowledgments',async t=>{
+ const {sync,storage}=await setup(t);const owner=await activate(sync),server=replicaServer();await cycle(sync,owner,server);
+ await storage.appendEvents([event]);await cycle(sync,owner,server);
+ await storage.updateEvent(event.id,{note:'not yet acknowledged'});const pending=await sync.nextBatch(owner);
+ const record=server.record(pending[0].recordId);
+ await assert.rejects(sync.restore({...owner,record,data:{type:'pee',at:100,source:'app'}}),/pending|acknowledg/i);
+ assert.deepEqual(await sync.nextBatch(owner),pending);assert.equal((await storage.loadEvents())[0].note,'not yet acknowledged');
+});

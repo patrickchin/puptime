@@ -328,6 +328,8 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
         if (!saved||saved.revision!==proposed.revision||saved.sequence!==proposed.sequence||saved.kind!==proposed.kind||saved.petId!==proposed.petId) throw new Error('Restore requires the current record identity and revision.');
         const pet=saved.kind==='accountPreferences'?await sql.getFirstAsync<Binding>("SELECT * FROM local_sync_pets WHERE generation=? AND status='active' ORDER BY rowid LIMIT 1",current.generation):await sql.getFirstAsync<Binding>("SELECT * FROM local_sync_pets WHERE generation=? AND cloud_pet_id=? AND status='active'",current.generation,saved.petId);
         if (!pet) throw new Error('Restore puppy ownership changed.');
+        const localId=saved.kind==='puppy'?pet.pet_id:localRecordId(saved);
+        if (await sql.getFirstAsync('SELECT operation_id FROM local_sync_outbox WHERE generation=? AND local_pet_id=? AND local_kind=? AND local_id=? LIMIT 1',current.generation,pet.pet_id,saved.kind,localId)) throw new Error("Wait for this record's pending changes to be acknowledged before restoring.");
         const data=recordDataSchema(saved.kind).parse(input.data),operationId=await id(sql);
         const mutation=mutationSchema.parse({protocolVersion:1,operationId,deviceId:current.device_id,recordId:saved.id,petId:saved.petId,kind:saved.kind,baseRevision:saved.revision,intent:'restore',patch:data});
         reconcileMutation(saved,mutation,now());
