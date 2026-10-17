@@ -28,8 +28,12 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.4.4",
+    "@cloudflare/workers-types": "^5.20261016.1",
     "@types/react": "~19.2.2",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.0",
+    "wrangler": "^4.151.1"
   },
   "scripts": {
     "start": "expo start",
@@ -41,7 +45,10 @@
     "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/*.test.ts src/cloud/*.test.ts",
     "test:e2e:ios": "maestro test --platform ios --config .maestro/config.yaml .maestro",
     "prebuild": "expo prebuild",
-    "build:android": "cd android && ./gradlew assembleRelease"
+    "build:android": "cd android && ./gradlew assembleRelease",
+    "test:server": "vitest run --config server/vitest.config.mts",
+    "typecheck:server": "tsc --noEmit -p server/tsconfig.json",
+    "dev:server": "wrangler dev"
   },
   "private": true
 }

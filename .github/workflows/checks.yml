@@ -16,5 +16,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      - run: npm run typecheck:server
+      - run: npm run test:server
       - run: npx expo export --platform android --output-dir dist-android
       - run: npx expo export --platform ios --output-dir dist-ios
