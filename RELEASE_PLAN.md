@@ -1,5 +1,7 @@
 # Puptime release plan
 
+> **Direction update — October 17, 2026:** The account-free launch sequence and fixed-price assumption below are historical. The new direction is an account-based app with offline logging and cloud backup/device sync first, with sharing later. Pricing is being reconsidered; Apple, Google, and email-code sign-in are the intended options. See the [accounts and cloud discovery roadmap](docs/superpowers/specs/2026-10-17-accounts-sync-discovery.md) for confirmed decisions, proposed work, and unresolved questions. Implementation and the final release scope are not yet approved. Current implemented behavior remains local-only.
+
 Agreed on October 11, 2026. Release the existing app for one pet at about US$1.99, then add multiple pets, then optional online sharing. This is one app receiving updates. Everyday logging remains usable without an account.
 
 | Update | Scope | Ready when |
