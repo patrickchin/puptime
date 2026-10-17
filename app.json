@@ -37,6 +37,7 @@
       "output": "static"
     },
     "plugins": [
+      "./plugins/withAndroidWidgetChronometer",
       [
         "react-native-android-widget",
         {
