@@ -74,4 +74,6 @@
 - [x] Run tests; expected FAIL.
 - [x] Implement lifecycle cleanup and retry state; keep a minimal non-content deletion marker only as required for race protection. Inventory every identity/account/history store involved.
 - [x] Run complete tests/typechecks/Worker dry-run; expected PASS. Create only verified free-tier staging resources, apply migrations, deploy, and run real authenticated happy/edge API journeys with isolated synthetic accounts. Missing provider/domain delivery remains an explicit gate.
-- [ ] Conduct fresh whole-branch review; fix material findings using regression tests; create/attach PR, wait for applicable CI and merge through GitHub. Continue to native persistence with documented server interfaces.
+- [x] Conduct fresh whole-branch review; fix material findings using regression tests; create/attach PR, wait for applicable CI and merge through GitHub. Continue to native persistence with documented server interfaces.
+
+Completed through PR85 (squash `2adfd99`). Applicable verify/Pages CI passed; the optional self-hosted native simulator build remained queued. Deployed fixtures were removed: remote identity/session/cloud-account counts all zero after verification.
