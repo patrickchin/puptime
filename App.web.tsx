@@ -110,7 +110,7 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
           <Text style={styles.brandName}>Puptime</Text>
         </Anchor>
         <View style={styles.headerLinks}>
-          <Pressable accessibilityRole="button" onPress={openAnalyticsSettings}><Text style={styles.textLink}>Analytics settings</Text></Pressable>
+          <Pressable accessibilityRole="button" onPress={openAnalyticsSettings} style={styles.navLink}><Text style={styles.textLink}>Analytics settings</Text></Pressable>
           <LinkButton href={releaseUrl}>Download</LinkButton>
         </View>
       </View>
