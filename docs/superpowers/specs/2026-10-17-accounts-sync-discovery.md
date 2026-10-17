@@ -6,9 +6,10 @@ This document maps the requested change and records decisions as they are made. 
 
 ## Confirmed direction
 
-- Move toward an account-based product with a backend and database, replacing the previous commitment to account-free everyday use. Exact placement of the account gate and treatment of existing installations still need a decision.
+- Add account-backed cloud services alongside free local use. Earlier discussion favored required signup; whether free local use also requires an account now needs explicit reconciliation. Do not assume that free means account-free or that the earlier mandatory gate still stands.
 - First cloud release: backup and synchronization across one person's devices. Shared household care follows later. Ownership and identifiers must accommodate that extension without building invitations or roles now.
-- Revisit pricing before finalizing onboarding. The old approximately US$1.99 upfront price is no longer a settled launch assumption. A subscription has not been selected.
+- All local features are free. User-facing backend services, including cloud backup, device sync, and later shared-care sync, are paid optional features. Use Obsidian's free-local/paid-services model as the commercial reference. The old approximately US$1.99 upfront app price is superseded; service prices, billing cadence, and any trial remain undecided.
+- Include a walkthrough showcasing different parts of the app before the first log. Keep payment unobtrusive. Walkthrough skip/replay behavior and account timing remain design decisions.
 - Aim to offer Apple sign-in, Google sign-in, and passwordless email codes. Verify platform availability, provider configuration, and recovery behavior before committing to the final flow.
 - Preserve offline logging and synchronize when connected. Include telemetry, Sentry crash/error reporting, operational reliability, and coordinated website, app, policy, and listing updates.
 - Plan and question first; implementation follows an agreed design.
@@ -43,15 +44,16 @@ Public Page Flows indexing lists Finch onboarding steps including initial questi
 
 Prepare a small reference board covering: personal relevance, sign-in, minimal pet setup, first useful activity, permission timing, returning users, and interrupted setup. For each selected example record its actual screens, access/date, useful pattern, and Puptime adaptation. Avoid inferring quality from length or estimated revenue.
 
-Proposed Puptime journey, pending product decisions:
+Proposed Puptime journey, incorporating the requested walkthrough; account placement remains unresolved:
 
-1. Show the outcome: remember the puppy's day and keep it safe across devices.
-2. Create or recover the account using the selected methods; preserve progress when returning from another app.
-3. Create the first puppy with the smallest useful set of fields, or restore existing cloud data. Do not make returning users create duplicate pets.
+1. Show the local outcome: remember the puppy's day, spot patterns, and plan a routine.
+2. Walk through Log, Timeline/Insights, Schedule, and Home Screen widgets using clearly labeled example data. Show representative app interactions before the first real log; the exact screen count and interaction format need prototyping.
+3. Create the first puppy with the smallest useful set of fields, or restore existing cloud data for a returning cloud customer. Do not make returning users create duplicate pets. Place account creation according to the pending free-local account decision.
 4. Arrive at a useful Log screen. Offer a real first log when appropriate, without inventing historical activity or forcing a false entry.
-5. Introduce reminders when a user enables a reminder, and widgets when relevant. Keep optional steps dismissible.
+5. Offer cloud backup/sync from a discoverable setting or a user-initiated online action. Proposed payment behavior: show the benefit and price there, with a clear way back to free local use. Do not put a purchase screen between the walkthrough and the first local log.
+6. Request notification permission when a user enables a reminder; showcasing reminders in the walkthrough does not require permission. Introduce actual widget setup when relevant.
 
-Account-gate timing, any trial/paywall, pet fields, and permission order remain unresolved. Required signup does not imply requiring every onboarding screen. Include accessible controls, reduced motion, localization, keyboard handling, back navigation, cancellation, retry, wrong-account recovery, and offline/error states.
+Account-gate timing, walkthrough skip/replay behavior, any cloud trial, pet fields, and permission order remain unresolved. Recommended walkthrough behavior is skippable and replayable from Settings; that is a proposal, not a confirmed decision. Include accessible controls, reduced motion, localization, keyboard handling, back navigation, cancellation, retry, wrong-account recovery, and offline/error states.
 
 Measure signup completion, setup completion, time to first useful log, subsequent return, and successful cross-device restore separately. A completed slideshow is not sufficient evidence of activation. Define metrics and targets before beta; establish a baseline rather than inventing conversion targets.
 
@@ -61,13 +63,17 @@ Measure signup completion, setup completion, time to first useful log, subsequen
 
 Deliver a reviewed design covering the account gate, existing-user treatment, activation goal, minimum profile, pricing model, offline contract, supported countries, and operating budget. Confirm whether any public release or paying customers already exist rather than inferring this from repository metadata.
 
-Research comparable puppy trackers and current backend/email/Sentry pricing after choosing realistic usage assumptions. Model active accounts, retained activity, restore traffic, email-code sends, telemetry volume, and support work at small, medium, and larger adoption. Compare one-time, recurring, and other viable funding approaches; no new price is approved by this draft. Decide how existing purchases would be recognized across stores and accounts if entitlements are introduced.
+The free-local/paid-services boundary is settled. Research comparable puppy trackers and current backend/email/Sentry pricing after choosing realistic usage assumptions. Model active accounts, retained activity, restore traffic, email-code sends, telemetry volume, and support work at small, medium, and larger adoption. Compare viable cloud-service prices and billing cadences; no amount or cadence is approved by this draft. Decide how existing purchases would be recognized across stores and accounts if entitlements are introduced. [Obsidian's pricing page](https://obsidian.md/pricing) confirms a free app with optional paid Sync and Publish services; this is a model reference, not a decision to copy its prices, encryption, or feature set.
+
+Specify cloud entitlements, purchase restoration, cross-platform access, cancellation, refunds, payment failure, and expiry. A lost entitlement must not block free local features or erase local history. Decide remote retention and download/export access after expiry before implementing billing. Enforce paid cloud access on the server without making local feature access depend on a network entitlement check. Developer-operated diagnostics such as Sentry are operational infrastructure, not a paid customer feature; decide their privacy controls separately.
+
+Translate unobtrusive payment into reviewable behavior: recommend upgrades only when a user chooses a cloud feature or opens its Settings entry, no recurring unsolicited upgrade dialogs, and no payment requirement for the first local log. Keep prices, renewal conditions, and cancellation clear at the purchase decision. These interaction rules are proposed interpretations to review with the prototype.
 
 Ready when: unresolved business choices cannot silently change the sign-up flow, data ownership, or launch scope.
 
 ### 1. Specify and prototype onboarding
 
-Review the reference board, produce a clickable flow using Puptime's existing visual language, and test fresh signup, returning signup, and upgrading an existing installation. Define every required, optional, loading, rejected, canceled, and retry state. Test small phones, large text, screen readers, keyboard autofill, and interrupted verification. Avoid adding instructional prose for controls whose labels and state already explain them.
+Review the reference board, produce a clickable walkthrough using Puptime's existing visual language, and test first local use, opting into cloud, returning cloud use, and upgrading an existing installation. Showcase app sections before the first log. Define every required, optional, loading, rejected, canceled, and retry state, including leaving an upgrade offer and continuing locally. Test small phones, large text, screen readers, keyboard autofill, and interrupted verification. Avoid adding instructional prose for controls whose labels and state already explain them.
 
 Ready when: the user approves the flow and its recovery states; representative users can reach useful logging without assistance. Detailed screen implementation follows that approval.
 
@@ -87,7 +93,7 @@ Ready when: test accounts can authenticate across supported devices, own isolate
 
 Proposed default: use a transactional local database for records and the pending-operation queue if it simplifies proven app/widget consistency. Evaluate Expo SQLite against the native widget paths before selecting it. SQLite provides persistence and transactions, not synchronization by itself. Do not introduce a sync framework without comparing its guarantees, compatibility, maintenance, and cost with the required behavior.
 
-Every acknowledged local change must durably save both its new state and the work required to synchronize it. Cover activity creation, automatic editor saves, deletion, undo, CSV imports, naps, custom activities, routine changes, and notification actions. Audit iOS widget snapshot replacement and Android concurrent writes specifically; a successful main-app save test is insufficient.
+Every acknowledged local change must durably save its new state and, when cloud sync is enabled, the work required to synchronize it. Free local use must not create a growing upload queue for a service the user has not enabled. Enabling sync needs a recoverable initial upload of existing data. Cover activity creation, automatic editor saves, deletion, undo, CSV imports, naps, custom activities, routine changes, and notification actions. Audit iOS widget snapshot replacement and Android concurrent writes specifically; a successful main-app save test is insufficient.
 
 Migrate existing IDs, timestamps, notes, estimate provenance, routines, and relevant preferences into the correct account/pet namespace. Keep a recoverable original until migration is validated. Make migration restartable and idempotent. Handle existing cloud data, multiple source devices, storage exhaustion, corruption, app termination, and interrupted imports without silently overwriting history. Never silently upload an existing local history to a newly signed-in account.
 
@@ -146,6 +152,7 @@ Run unit/integration checks and native end-to-end flows using dedicated task-nam
 | --- | --- |
 | Fresh, returning, and upgrading user | Correct onboarding branch, preserved data, no duplicate puppy. |
 | Email/provider login canceled, expired, throttled, unavailable, or changed | Clear recovery, retained setup progress, and safe provider linking without losing access to history. |
+| Cloud offer dismissed, purchase canceled, entitlement expired, or billing unavailable | Free local features and history remain accessible; remote access follows the agreed retention/entitlement policy. |
 | Airplane mode, flaky requests, timeouts, server outage | Local logging remains durable; queued work retries safely. |
 | Kill before/after local write, upload, acknowledgment, or cursor update | No acknowledged changes disappear; retries do not duplicate records. |
 | Two devices edit/delete the same record | The approved conflict policy is visible and deterministic. |
@@ -163,17 +170,17 @@ All repository changes go through GitHub pull requests. Release and merge readin
 
 ## Decision queue for the product interview
 
-Already settled: backup/device sync first; reconsider pricing; aim for Apple, Google, and email-code login.
+Already settled: backup/device sync first; all local features free and user-facing cloud services paid; unobtrusive payment; a pre-log app walkthrough; aim for Apple, Google, and email-code login.
 
 Resolve the following in dependency order, with recommendations and concrete consequences rather than a bulk questionnaire:
 
-1. Pricing/funding constraints and treatment of existing purchasers, after current market/cost research.
-2. Signup gate timing and the reason a new user sees for creating an account.
+1. Whether free local use is account-free, reconciling the earlier mandatory-signup direction with the new service boundary.
+2. Paid-service amounts, billing cadence, entitlement/retention rules, and treatment of existing purchasers, after current market/cost research.
 3. Existing-installation behavior, local-data upload consent, and first launch without connectivity.
 4. Required pet setup and whether the first cloud release remains one-pet.
 5. Which data restores across devices: activities, routines, custom activities, and preference boundaries.
 6. Offline access after session expiration, logout/deletion semantics, conflict visibility, and supported offline duration.
-7. Onboarding activation goal, notification timing, and any trial/payment placement.
+7. Walkthrough skip/replay behavior, onboarding activation goal, notification timing, and any optional cloud trial.
 8. Launch countries, data region, operational budget, retention, telemetry controls, and support expectations.
 9. Whether owner web access belongs in this release or the website remains marketing/support/account lifecycle only.
 
