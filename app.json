@@ -102,7 +102,9 @@
           "enableBackgroundPlayback": true,
           "enableBackgroundRecording": false
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-web-browser"
     ],
     "owner": "patchin",
     "extra": {

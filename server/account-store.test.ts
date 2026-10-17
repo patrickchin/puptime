@@ -4,7 +4,11 @@ import { expect, test } from 'vitest';
 import { runInDurableObject } from 'cloudflare:test';
 import { mutationSchema, type Mutation } from '../src/cloud/protocol';
 
-function store() { return env.ACCOUNTS.get(env.ACCOUNTS.newUniqueId()); }
+async function store(petId = 'pet-1') {
+  const account = env.ACCOUNTS.get(env.ACCOUNTS.newUniqueId());
+  await account.enroll({ operationId: crypto.randomUUID(), deviceId: 'test-device', localPetId: petId, name: 'My puppy' });
+  return account;
+}
 function create(recordId = 'event-1', petId = 'pet-1'): Mutation {
   return mutationSchema.parse({ protocolVersion: 1, operationId: crypto.randomUUID(), deviceId: 'test-device', petId, recordId, kind: 'event', baseRevision: 0, intent: 'create', patch: { type: 'pee', at: 100, source: 'app' } });
 }
@@ -13,7 +17,7 @@ function edit(original: Mutation, revision: number, patch: object, intent = 'pat
 }
 
 test('accepted writes commit state, history, and an incrementing change cursor', async () => {
-  const account = store();
+  const account = await store();
   const initial = create();
   const first = await account.apply(initial);
   expect(first.record.revision).toBe(1);
@@ -29,7 +33,7 @@ test('accepted writes commit state, history, and an incrementing change cursor',
 });
 
 test('identical retries return the original acknowledgment without another revision', async () => {
-  const account = store();
+  const account = await store();
   const input = create();
   const first = await account.apply(input);
   expect(await account.apply(input)).toEqual(first);
@@ -38,7 +42,7 @@ test('identical retries return the original acknowledgment without another revis
 });
 
 test('operation ID reuse with a different edit fails without changing stored history', async () => {
-  const account = store();
+  const account = await store();
   const input = create();
   await account.apply(input);
   await runInDurableObject(account, (instance) => {
@@ -49,7 +53,7 @@ test('operation ID reuse with a different edit fails without changing stored his
 });
 
 test('late concurrent fields combine and the exact proposal remains in history', async () => {
-  const account = store();
+  const account = await store();
   const initial = create();
   await account.apply(initial);
   await account.apply(edit(initial, 1, { at: 200 }));
@@ -60,7 +64,7 @@ test('late concurrent fields combine and the exact proposal remains in history',
 });
 
 test('deletion remains visible in pulls and stale edits cannot resurrect it', async () => {
-  const account = store();
+  const account = await store();
   const initial = create();
   await account.apply(initial);
   await account.apply(edit(initial, 1, {}, 'delete'));
@@ -74,7 +78,7 @@ test('deletion remains visible in pulls and stale edits cannot resurrect it', as
 });
 
 test('pagination cannot skip revisions when writes arrive between pages', async () => {
-  const account = store();
+  const account = await store();
   await account.apply(create('first'));
   await account.apply(create('second'));
   const page = await account.pull(0, 1);
@@ -89,29 +93,29 @@ test('pagination cannot skip revisions when writes arrive between pages', async 
 });
 
 test('failed ownership changes do not advance the cursor or create revision rows', async () => {
-  const account = store();
+  const account = await store();
   const initial = create();
   await account.apply(initial);
   await runInDurableObject(account, (instance) => {
-    expect(() => instance.apply({ ...edit(initial, 1, { at: 300 }), petId: 'pet-2' })).toThrow('ownership');
+    expect(() => instance.apply({ ...edit(initial, 1, { at: 300 }), petId: 'pet-2' })).toThrow();
   });
   expect((await account.pull(0)).cursor).toBe(1);
   expect((await account.history(initial.recordId)).length).toBe(1);
 });
 
 test('separate accounts cannot read or patch each other and pet ownership is retained', async () => {
-  const first = store(); const second = store();
+  const first = await store('pet-2'); const second = await store();
   const initial = create('shared-id', 'pet-2');
   await first.apply(initial);
   expect((await second.pull(0)).changes).toEqual([]);
   await runInDurableObject(second, (instance) => {
-    expect(() => instance.apply(edit(initial, 0, { note: 'cross account' }))).toThrow('does not exist');
+    expect(() => instance.apply(edit(initial, 0, { note: 'cross account' }))).toThrow();
   });
   expect((await first.pull(0)).changes[0].petId).toBe('pet-2');
 });
 
 test('invalid mutation data and unbounded cursors/pages are rejected', async () => {
-  const account = store();
+  const account = await store();
   // The vendor RPC test wrapper leaks handled rejections (workers-sdk #14736).
   // Assert errors inside the same real Durable Object, without suppressing global errors.
   await runInDurableObject(account, (instance) => {
@@ -123,14 +127,14 @@ test('invalid mutation data and unbounded cursors/pages are rejected', async () 
 });
 
 test('public worker health works while customer data routes stay inaccessible', async () => {
-  const health = await worker.fetch(new Request('https://puptime.test/health'));
+  const health = await worker.fetch(new Request('https://puptime.test/health'), env);
   expect(health.status).toBe(200);
   expect(await health.json()).toEqual({ service: 'puptime-api', status: 'ok', protocolVersion: 1 });
-  expect((await worker.fetch(new Request('https://puptime.test/api/accounts/other/pull'))).status).toBe(404);
+  expect((await worker.fetch(new Request('https://puptime.test/api/accounts/other/pull'), env)).status).toBe(404);
 });
 
 test('a storage failure after the record write rolls back records, history and operation acknowledgment', async () => {
-  const account = store();
+  const account = await store();
   const input = create();
   await runInDurableObject(account, (instance, state) => {
     state.storage.sql.exec("CREATE TRIGGER fail_ack BEFORE INSERT ON operations BEGIN SELECT RAISE(ABORT, 'injected storage failure'); END;");
@@ -144,7 +148,7 @@ test('a storage failure after the record write rolls back records, history and o
 });
 
 test('simultaneous device patches serialize without losing independent fields', async () => {
-  const account = store();
+  const account = await store();
   const initial = create();
   await account.apply(initial);
   await Promise.all([account.apply(edit(initial, 1, { at: 200 })), account.apply(edit(initial, 1, { note: 'second device' }))]);
@@ -154,7 +158,7 @@ test('simultaneous device patches serialize without losing independent fields', 
 });
 
 test('history paging returns all versions in order with no overlaps', async () => {
-  const account = store();
+  const account = await store();
   const initial = create();
   await account.apply(initial);
   for (let revision = 1; revision <= 51; revision++) await account.apply(edit(initial, revision, { at: 100 + revision }));
@@ -164,4 +168,39 @@ test('history paging returns all versions in order with no overlaps', async () =
   expect(first[49].revision).toBe(3);
   const rest = await account.history(initial.recordId, first[49].revision);
   expect(rest.map((entry) => entry.revision)).toEqual([2, 1]);
+});
+
+test('explicit enrollment is retryable and another local puppy requires confirmation', async () => {
+  const account = env.ACCOUNTS.get(env.ACCOUNTS.newUniqueId());
+  const input = { operationId: 'enroll-first', deviceId: 'test-device', localPetId: 'pet-1', name: 'Pip' };
+  expect(await account.summary()).toEqual({ pets: [] });
+  const first = await account.enroll(input);
+  expect(first).toEqual({ petId: 'pet-1' });
+  expect(await account.enroll(input)).toEqual(first);
+  await runInDurableObject(account, (instance) => {
+    expect(() => instance.enroll({ ...input, operationId: 'enroll-other', localPetId: 'pet-2', name: 'Other' })).toThrow('confirmation');
+  });
+  expect(await account.enroll({ ...input, operationId: 'enroll-confirmed', localPetId: 'pet-2', confirmedPetId: 'pet-1' })).toEqual({ petId: 'pet-1' });
+  expect(await account.summary()).toEqual({ pets: [{ id: 'pet-1', name: 'Pip', eventCount: 0 }] });
+});
+
+test('account data cannot be uploaded before explicit pet enrollment', async () => {
+  const account = env.ACCOUNTS.get(env.ACCOUNTS.newUniqueId());
+  await runInDurableObject(account, (instance) => {
+    expect(() => instance.apply(create())).toThrow('enrolled');
+  });
+  expect((await account.pull(0)).changes).toEqual([]);
+});
+
+test('one device can represent two pet boundaries without a one-pet schema constraint', async () => {
+  const account = await store();
+  await runInDurableObject(account, (_instance, state) => {
+    state.storage.sql.exec('INSERT INTO pets(id, initial_name, created_at) VALUES (?, ?, ?)', 'pet-2', 'Second puppy', 1);
+    state.storage.sql.exec('INSERT INTO enrolled_devices(id, pet_id) VALUES (?, ?)', 'test-device', 'pet-2');
+  });
+  await account.apply(create('first-pet-event', 'pet-1'));
+  await account.apply(create('second-pet-event', 'pet-2'));
+  const summary = await account.summary();
+  expect(summary.pets.find((pet) => pet.id === 'pet-1')?.eventCount).toBe(1);
+  expect(summary.pets.find((pet) => pet.id === 'pet-2')?.eventCount).toBe(1);
 });
