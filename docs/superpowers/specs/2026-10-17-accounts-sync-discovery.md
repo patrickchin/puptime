@@ -135,6 +135,8 @@ Ready when: the failure matrix below passes and a clean second installation rest
 
 ### 5. Add observability as the foundations are built
 
+Access preparation completed October 17, 2026: the user approved a separate `puptime-release-upload` organization token in the existing Sentry organization, with `org:ci` for source-map uploads, release creation, and code mappings. It is stored in macOS Keychain (service `com.puptime.sentry-release-upload`, account `puptime`) and the `patrickchin/puptime` repository's `SENTRY_AUTH_TOKEN` Actions secret. CLI authentication and the scope were verified. This permission is organization-wide, not restricted to Puptime. No credential value belongs in source or documentation. SDK/build integration, dedicated Puptime Sentry projects, symbol uploads, and end-to-end crash-report verification remain implementation work.
+
 Integrate Sentry before beta so identity, migration, and sync work are observable from their first staging tests. Cover handled errors, unhandled JavaScript errors, native crashes, API failures, and release/environment metadata. Upload source maps and native debug symbols from each build channel actually used. Verify widget-extension crash coverage separately.
 
 Prove a deliberate staging error and native crash produce readable reports from release builds. Verify source-map/debug-symbol association, delivery after an offline period where supported, and grouping by release. Sentry helps locate failures; fixing and regression-checking the causes remains a separate action.
