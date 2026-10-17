@@ -1,5 +1,5 @@
 import { isOpenNap, type PuppyEvent, type PuppyEventChanges, type ScheduleEntry } from '../domain.ts';
-import { assertValidEvents, EventsImportError, EventsStorageError } from '../storage-validation.ts';
+import { assertValidEvents, EventDeletedError, EventsImportError, EventsStorageError } from '../storage-validation.ts';
 import { assertValidSchedule } from './legacy.ts';
 import type { LocalDatabase, SqlExecutor } from './database.ts';
 import { localChanges, notifyLocalCommit, readLocalSettingsRecords, type LocalChangeSink } from './sync-projection.ts';
@@ -65,9 +65,10 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
     if (entries.some((entry, index) => entry.id !== rows[index].id || entry.minutes !== rows[index].minutes)) throw new Error('The saved routine index is inconsistent.');
     return entries;
   }
-  const updateEvent = async (id: string, changes: PuppyEventChanges): Promise<PuppyEvent[]> => (await mutateEvents((events) => ({
-    events: events.map((event) => event.id === id ? { ...event, ...changes, ...(event.estimated ? { estimated: true } : {}) } : event), value: undefined,
-  }))).events;
+  const updateEvent = async (id: string, changes: PuppyEventChanges): Promise<PuppyEvent[]> => (await mutateEvents((events) => {
+    if (!events.some(event => event.id === id)) throw new EventDeletedError();
+    return { events: events.map((event) => event.id === id ? { ...event, ...changes, ...(event.estimated ? { estimated: true } : {}) } : event), value: undefined };
+  })).events;
   return {
     async readEventsInTransaction(sql: SqlExecutor) { return (await readEvents(sql)).map((row) => row.event); },
     async loadEvents() { return materialize(await database.read(readEvents)); },

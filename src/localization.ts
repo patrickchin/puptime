@@ -1,3 +1,4 @@
+import { accountEnglish,accountChinese,accountSpanish } from './cloud/account-copy.ts';
 import type { EventType, PuppyEvent } from './domain';
 
 export type AppLanguage = 'en' | 'zh-Hans' | 'es';
@@ -6,6 +7,7 @@ export type LanguagePreference = 'system' | AppLanguage;
 export const languageChoices: readonly LanguagePreference[] = ['system', 'en', 'zh-Hans', 'es'];
 
 const english = {
+  ...accountEnglish,
   "learn.audioTitle": "Listen to this guide",
   "learn.audioCredit": "English · {voice} · ElevenLabs",
   "learn.audioPlay": "Play",
@@ -274,6 +276,12 @@ const english = {
   'editor.close': 'Close log editor',
   'editor.retryA11y': 'Couldn’t save changes. Retry now',
   'editor.retry': 'Couldn’t save. Tap to retry.',
+  'editor.deletedTitle': 'Activity deleted',
+  'editor.deletedBody': 'This activity was deleted. Your draft has not been saved.',
+  'editor.keepDraft': 'Keep editing',
+  'editor.discardDraft': 'Discard draft',
+  'editor.shareDraft': 'Share draft',
+  'editor.shareError': 'Couldn’t share the draft. Please try again.',
   'editor.customNameStatus': 'Add a custom name to save this activity.',
   'editor.saving': 'Saving changes…',
   'editor.activity': 'ACTIVITY',
@@ -487,6 +495,7 @@ export type MessageKey = keyof typeof english;
 type Dictionary = Record<MessageKey, string>;
 
 const simplifiedChinese: Dictionary = {
+  ...accountChinese,
   "learn.audioTitle": "收听本篇指南",
   "learn.audioCredit": "英语 · {voice} · ElevenLabs",
   "learn.audioPlay": "播放",
@@ -755,6 +764,12 @@ const simplifiedChinese: Dictionary = {
   'editor.close': '关闭记录编辑器',
   'editor.retryA11y': '无法保存更改，立即重试',
   'editor.retry': '无法保存，点此重试。',
+  'editor.deletedTitle': '记录已删除',
+  'editor.deletedBody': '此记录已被删除，草稿尚未保存。',
+  'editor.keepDraft': '继续编辑',
+  'editor.discardDraft': '舍弃草稿',
+  'editor.shareDraft': '分享草稿',
+  'editor.shareError': '无法分享草稿，请重试。',
   'editor.customNameStatus': '添加自定义名称后才能保存。',
   'editor.saving': '正在保存更改…',
   'editor.activity': '活动',
@@ -965,6 +980,7 @@ const simplifiedChinese: Dictionary = {
 };
 
 const spanish: Dictionary = {
+  ...accountSpanish,
   "learn.audioTitle": "Escuchar esta guía",
   "learn.audioCredit": "Inglés · {voice} · ElevenLabs",
   "learn.audioPlay": "Reproducir",
@@ -1233,6 +1249,12 @@ const spanish: Dictionary = {
   'editor.close': 'Cerrar editor del registro',
   'editor.retryA11y': 'No se pudieron guardar los cambios. Reintentar ahora',
   'editor.retry': 'No se pudo guardar. Toca para reintentar.',
+  'editor.deletedTitle': 'Actividad eliminada',
+  'editor.deletedBody': 'Esta actividad se eliminó. Tu borrador no se ha guardado.',
+  'editor.keepDraft': 'Seguir editando',
+  'editor.discardDraft': 'Descartar borrador',
+  'editor.shareDraft': 'Compartir borrador',
+  'editor.shareError': 'No se pudo compartir el borrador. Inténtalo de nuevo.',
   'editor.customNameStatus': 'Añade un nombre personalizado para guardar esta actividad.',
   'editor.saving': 'Guardando cambios…',
   'editor.activity': 'ACTIVIDAD',

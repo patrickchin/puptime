@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, FlatList, Image, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Image, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { QuickActions } from '../components/QuickActions';
 import { ActivityIcon } from '../components/ActivityIcon';
@@ -20,6 +20,8 @@ import {
   type PuppyEventChanges,
 } from '../domain';
 import { useLocalization } from '../localization-context';
+import { createEventEditor,eventEditValues,type EventEditValues } from '../event-editor';
+import { EventDeletedError } from '../storage-validation';
 import { groupLogHistory } from '../log-history';
 import { headingStyle, spacing, surfaceTreatment, type Theme } from '../theme';
 
@@ -28,28 +30,19 @@ const editableEventTypes = eventTypes.filter((type) => type !== 'nap');
 const autoSaveDelayMs = 450;
 const olderDaysPerPage = 7;
 
-type Draft = {
+type Draft = EventEditValues & {
   event: PuppyEvent;
-  type: EventType;
-  customLabel: string;
-  at: number;
-  endedAt?: number | null;
-  note: string;
   field: 'start' | 'end';
 };
 
-type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'error' | 'deleted';
 
 export type LogEditRequest = { eventId: string; focusNote?: boolean };
 
 function createDraft(event: PuppyEvent): Draft {
   return {
     event,
-    type: event.type,
-    customLabel: event.customLabel ?? '',
-    at: event.at,
-    endedAt: event.endedAt,
-    note: event.note ?? '',
+    ...eventEditValues(event),
     field: 'start',
   };
 }
@@ -60,16 +53,6 @@ function samePersistedDraft(left: Draft, right: Draft): boolean {
     && left.at === right.at
     && left.endedAt === right.endedAt
     && left.note === right.note;
-}
-
-function draftChanges(draft: Draft): PuppyEventChanges {
-  return {
-    type: draft.type,
-    customLabel: normalizeCustomLabel(draft.customLabel),
-    at: Math.min(draft.at, Date.now()),
-    endedAt: draft.endedAt,
-    note: draft.note,
-  };
 }
 
 function dateLabel(value: number, locale: string): string {
@@ -132,6 +115,8 @@ export function LogScreen({
   const [loadedOlderDays, setLoadedOlderDays] = useState(olderDaysPerPage);
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
   const draftRef = useRef<Draft | null>(null);
+  const draftSaverRef=useRef<ReturnType<typeof createEventEditor>|null>(null);
+  const onSaveRef=useRef(onSave);onSaveRef.current=onSave;
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const revisionRef = useRef(0);
   const savedRevisionRef = useRef(0);
@@ -161,6 +146,7 @@ export function LogScreen({
     setFocusNote(shouldFocusNote);
     setCustomTouched(false);
     const next = createDraft(event);
+    draftSaverRef.current=createEventEditor(event,changes=>onSaveRef.current(event,changes));
     draftRef.current = next;
     setDraft(next);
   }, [clearSaveTimer]);
@@ -172,7 +158,9 @@ export function LogScreen({
   const persistDraft = (next: Draft, revision: number, session: number): Promise<boolean> => {
     setSaveStatus('saving');
     inFlightRevisionRef.current = revision;
-    const save = onSave(next.event, draftChanges(next))
+    const saver=draftSaverRef.current;
+    if(!saver){setSaveStatus('error');return Promise.resolve(false);}
+    const save = saver.save(next)
       .then(() => {
         if (sessionRef.current === session) {
           savedRevisionRef.current = Math.max(savedRevisionRef.current, revision);
@@ -180,9 +168,9 @@ export function LogScreen({
         }
         return true;
       })
-      .catch(() => {
+      .catch((error:unknown) => {
         if (sessionRef.current === session && revisionRef.current === revision) {
-          setSaveStatus('error');
+          setSaveStatus(error instanceof EventDeletedError?'deleted':'error');
         }
         return false;
       })
@@ -310,6 +298,7 @@ export function LogScreen({
     clearSaveTimer();
     sessionRef.current += 1;
     draftRef.current = null;
+    draftSaverRef.current=null;
     Keyboard.dismiss();
     setCustomTouched(false);
     setSaveStatus('idle');
@@ -321,6 +310,13 @@ export function LogScreen({
 
   const requestCloseEditor = async () => {
     if (closingRef.current) return;
+    if (saveStatus === 'deleted') {
+      Alert.alert(t('editor.deletedTitle'),t('editor.deletedBody'),[
+        {text:t('editor.keepDraft'),style:'cancel'},
+        {text:t('editor.discardDraft'),style:'destructive',onPress:closeEditor},
+      ]);
+      return;
+    }
     if (customInvalid) {
       setCustomTouched(true);
       return;
@@ -573,6 +569,18 @@ export function LogScreen({
                 <MaterialCommunityIcons name="close" size={22} color={theme.text} />
               </Pressable>
             </View>
+
+            {saveStatus === 'deleted' ? (
+              <Pressable
+                testID="editor.shareDeletedDraft"
+                accessibilityRole="button"
+                onPress={() => {const current=draftRef.current;if(current)void Share.share({message:[activityLabel({type:current.type,customLabel:current.customLabel}),new Date(current.at).toISOString(),current.note].filter(Boolean).join('\n')}).catch(()=>Alert.alert(t('editor.shareError')));}}
+                style={[styles.saveStatus,{backgroundColor:theme.surface,borderColor:theme.danger}]}
+              >
+                <MaterialCommunityIcons name="share-variant-outline" color={theme.danger} size={18}/>
+                <Text style={[styles.saveStatusText,{color:theme.danger}]}>{t('editor.deletedBody')} {t('editor.shareDraft')}</Text>
+              </Pressable>
+            ) : null}
 
             {saveStatus === 'error' ? (
               <Pressable
