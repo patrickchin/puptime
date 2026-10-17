@@ -1,0 +1,39 @@
+appId: com.patrickchin.puptime
+name: iOS existing cloud puppy requires confirmation before combining history
+---
+- launchApp:
+    clearState: true
+    clearKeychain: false
+- runFlow: ../helpers/skip-onboarding.yaml
+- extendedWaitUntil:
+    visible:
+      id: quick.pee
+    timeout: 90000
+- tapOn:
+    id: quick.pee
+- tapOn:
+    id: settings.open
+- tapOn:
+    id: settings.account.open
+- extendedWaitUntil:
+    visible:
+      id: account.samePuppy
+    timeout: 30000
+- assertVisible:
+    id: account.samePuppy
+    checked: false
+- assertVisible:
+    id: account.enable
+    enabled: false
+- tapOn:
+    id: account.back
+- assertVisible:
+    id: screen.settings
+- tapOn:
+    id: settings.account.open
+- assertVisible:
+    id: account.samePuppy
+    checked: false
+- assertVisible:
+    id: account.enable
+    enabled: false

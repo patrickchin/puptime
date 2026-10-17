@@ -1,0 +1,30 @@
+appId: com.patrickchin.puptime
+name: iOS confirmed same puppy combines local and cloud history
+---
+- launchApp:
+    stopApp: false
+- scrollUntilVisible:
+    element:
+      id: account.samePuppy
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn:
+    id: account.samePuppy
+- assertVisible:
+    id: account.samePuppy
+    checked: true
+- scrollUntilVisible:
+    element:
+      id: account.enable
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn:
+    id: account.enable
+- extendedWaitUntil:
+    visible:
+      id: account.status
+      text: Up to date
+    timeout: 30000
+- assertVisible:
+    id: account.local.count
+    text: ${MAESTRO_EXPECTED_COUNT} activity logs
