@@ -4,9 +4,9 @@ import { customActivityKey, eventTypes, isQuickEventType, normalizeCustomLabel }
 import { activityEmojis } from '../activity-customization.ts';
 
 const timestamp = z.number().int().min(-8640000000000000).max(8640000000000000);
-const identifier = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/);
+export const identifierSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/);
 // Existing CSV records can have user-supplied IDs. SQL binds them as values.
-const recordId = z.string().min(1).max(256).refine((value) => !!value.trim() && !/[\u0000-\u001f\u007f]/.test(value));
+export const recordIdSchema = z.string().min(1).max(2048).refine((value) => !!value.trim() && !/[\u0000-\u001f\u007f]/.test(value));
 const label = z.string().trim().min(1).max(256);
 const customLabel = z.string().trim().min(1).max(40);
 const activityKey = z.string().refine((value) => isQuickEventType(value) || (value.startsWith('custom:')
@@ -44,8 +44,8 @@ export type RecordKind = keyof typeof schemas;
 export type RecordData = z.infer<(typeof schemas)[RecordKind]>;
 export function recordDataSchema(kind: RecordKind) { return schemas[kind]; }
 const common = {
-  protocolVersion: z.literal(1), operationId: identifier, deviceId: identifier,
-  recordId, petId: identifier.nullable(), baseRevision: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+  protocolVersion: z.literal(1), operationId: identifierSchema, deviceId: identifierSchema,
+  recordId: recordIdSchema, petId: identifierSchema.nullable(), baseRevision: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
   intent: z.enum(['create', 'patch', 'delete', 'restore']),
 };
 const eventPatch = eventObject.partial().extend({ note: eventFields.note.nullable(), customLabel: eventFields.customLabel.nullable() });
@@ -64,22 +64,61 @@ export const mutationSchema = z.discriminatedUnion('kind', [
   }
 });
 export type Mutation = z.infer<typeof mutationSchema>;
+const revisionReasons = ['created', 'updated', 'merged', 'deleted', 'preserved-deletion', 'restored', 'preserved-timing', 'inferred-nap-end'] as const;
+const recordMetadata = {
+  id: recordIdSchema, petId: identifierSchema.nullable(),
+  revision: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
+  sequence: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
+  deleted: z.boolean(), updatedAt: timestamp,
+};
+export const cloudRecordSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ ...recordMetadata, kind: z.literal('event'), data: eventDataSchema }),
+  z.strictObject({ ...recordMetadata, kind: z.literal('puppy'), data: puppy }),
+  z.strictObject({ ...recordMetadata, kind: z.literal('routine'), data: routine }),
+  z.strictObject({ ...recordMetadata, kind: z.literal('customActivity'), data: customActivity }),
+  z.strictObject({ ...recordMetadata, kind: z.literal('customization'), data: customization }),
+  z.strictObject({ ...recordMetadata, kind: z.literal('accountPreferences'), data: accountPreferences }),
+]).refine((record) => (record.kind === 'accountPreferences') === (record.petId === null)
+  && (record.kind !== 'puppy' || record.id === record.petId), 'Invalid record scope.');
+// Reconciliation constructs a provisional revision-zero record before the
+// store assigns committed metadata. Network responses use the stricter schema.
 export type CloudRecord = {
   id: string; petId: string | null; kind: RecordKind; data: RecordData;
   revision: number; sequence: number; deleted: boolean; updatedAt: number;
 };
-export type RevisionReason = 'created' | 'updated' | 'merged' | 'deleted' | 'preserved-deletion' | 'restored' | 'preserved-timing' | 'inferred-nap-end';
+export type RevisionReason = typeof revisionReasons[number];
+export const mutationResultSchema = z.strictObject({
+  operationId: identifierSchema, record: cloudRecordSchema,
+  sequence: recordMetadata.sequence, reason: z.enum(revisionReasons),
+}).refine((result) => result.sequence === result.record.sequence, 'Mismatched acknowledgment sequence.');
+export const pullPageSchema = z.strictObject({
+  changes: z.array(cloudRecordSchema).max(100),
+  cursor: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER), hasMore: z.boolean(),
+  resyncRequired: z.boolean().optional(),
+}).refine((page) => page.resyncRequired
+  ? !page.changes.length && page.cursor === 0 && !page.hasMore
+  : (!page.hasMore || page.changes.length > 0)
+    && (page.changes.length === 0 || page.changes.at(-1)!.sequence === page.cursor)
+    && page.changes.every((record, index) => index === 0 || record.sequence > page.changes[index - 1].sequence),
+'Invalid change cursor or page order.');
+export const pushResponseSchema = z.strictObject({
+  accepted: z.array(mutationResultSchema).max(50),
+  rejected: z.array(z.strictObject({ operationId: identifierSchema, error: z.enum(['conflict', 'invalid_mutation', 'retry_later']) })).max(50),
+}).refine((response) => {
+  const ids = [...response.accepted, ...response.rejected].map((result) => result.operationId);
+  return ids.length <= 50 && new Set(ids).size === ids.length;
+}, 'Invalid or duplicate operation results.');
 export type Revision = {
   recordId: string; revision: number; sequence: number; operationId: string; deviceId: string;
   acceptedAt: number; baseRevision: number; intent: Mutation['intent']; proposal: Mutation['patch'];
   before: CloudRecord | null; after: CloudRecord; reason: RevisionReason;
 };
-export type MutationResult = { operationId: string; record: CloudRecord; sequence: number; reason: RevisionReason };
-export type PullPage = { changes: CloudRecord[]; cursor: number; hasMore: boolean };
+export type MutationResult = Omit<z.infer<typeof mutationResultSchema>, 'record'> & { record: CloudRecord };
+export type PullPage = Omit<z.infer<typeof pullPageSchema>, 'changes'> & { changes: CloudRecord[] };
 
 
 export const enrollmentSchema = z.strictObject({
-  operationId: identifier, deviceId: identifier, localPetId: identifier, name: label,
-  confirmedPetId: identifier.optional(),
+  operationId: identifierSchema, deviceId: identifierSchema, localPetId: identifierSchema, name: label,
+  confirmedPetId: identifierSchema.optional(),
 });
 export type Enrollment = z.infer<typeof enrollmentSchema>;
