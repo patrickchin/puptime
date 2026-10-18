@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { assertValidEvents, EventsImportError, EventsStorageError } from './storage-validation.ts';
 import { storageKeys } from './local/legacy.ts';
 import { applyScheduleEntryEdit } from './schedule-editor.ts';
+import type { FinishOnboardingOptions } from './onboarding.ts';
 export { assertValidEvents, EventsImportError, EventsStorageError } from './storage-validation.ts';
 
 import { normalizeActivityCustomizations, type ActivityCustomization, type ActivityCustomizations } from './activity-customization.ts';
@@ -52,7 +53,7 @@ export async function shouldShowOnboarding(): Promise<boolean> {
   return entries.every(([, value]) => value === null);
 }
 
-export function completeOnboarding(): Promise<void> {
+export function completeOnboarding(_options?:FinishOnboardingOptions): Promise<void> {
   return AsyncStorage.setItem(ONBOARDING_KEY, 'done');
 }
 
