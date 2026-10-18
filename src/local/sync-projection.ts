@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { normalizeActivityCustomizations } from '../activity-customization.ts';
-import { recordDataSchema, type RecordKind } from '../cloud/protocol.ts';
+import { recordDataSchema,localIdSchema, type RecordKind } from '../cloud/protocol.ts';
+import {eventDataFromSql,routineDataFromSql,eventSqlValues,routineSqlValues,upsertEventSql,upsertRoutineSql,type EventSqlRow,type RoutineSqlRow} from '../record-sql.ts';
 import { fieldPatch } from '../cloud/record-identity.ts';
 import { customActivityKey, DEFAULT_WIDGET_ACTIONS, normalizeCustomActivities, normalizeWidgetActions } from '../domain.ts';
 import { isLanguagePreference } from '../localization.ts';
@@ -49,7 +50,7 @@ async function settings(sql: SqlExecutor, petId: string) {
     if (typeof value!=='object'||Array.isArray(value)) throw new Error('Saved settings contain an invalid object.');
     return value;
   }
-  const historical=await sql.getAllAsync<{label:string}>("SELECT DISTINCT json_extract(body,'$.customLabel') label FROM events WHERE pet_id=? AND json_extract(body,'$.type')='custom'",petId);
+  const historical=await sql.getAllAsync<{label:string}>("SELECT DISTINCT custom_label label FROM events WHERE pet_id=? AND type='custom'",petId);
   const deleted=strings(storageKeys.deletedCustomActivities);
   const labels=normalizeCustomActivities([...strings(storageKeys.customActivities),...historical.map(row=>row.label)],deleted);
   return {pet,values,labels,deleted,customizations:normalizeActivityCustomizations(object(storageKeys.activityCustomizations)),notification:normalizeNotificationPreferences(object(storageKeys.notificationPreferences)),widgetActions:values.has(storageKeys.widgetActions)?normalizeWidgetActions(strings(storageKeys.widgetActions),labels):[...DEFAULT_WIDGET_ACTIONS]};
@@ -73,12 +74,10 @@ export async function readLocalSettingsRecords(sql:SqlExecutor,petId:string):Pro
   ];
 }
 async function indexedRecords(sql:SqlExecutor,petId:string):Promise<LocalRecord[]> {
-  const eventRows=await sql.getAllAsync<{id:string;at:number;body:string}>('SELECT id,at,body FROM events WHERE pet_id=? ORDER BY at DESC,rowid',petId);
-  const routineRows=await sql.getAllAsync<{id:string;minutes:number;body:string}>('SELECT id,minutes,body FROM routines WHERE pet_id=? ORDER BY minutes,rowid',petId);
-  const events=parseEvents(eventRows.map(row=>JSON.parse(row.body)));
-  const routines=parseSchedule(routineRows.map(row=>JSON.parse(row.body)));
-  if (events.some((event,index)=>event.id!==eventRows[index].id||event.at!==eventRows[index].at)
-    || routines.some((entry,index)=>entry.id!==routineRows[index].id||entry.minutes!==routineRows[index].minutes)) throw new Error('The saved record index is inconsistent.');
+  const eventRows=await sql.getAllAsync<EventSqlRow&{id:string}>('SELECT * FROM events WHERE pet_id=? ORDER BY at DESC,id DESC',petId);
+  const routineRows=await sql.getAllAsync<RoutineSqlRow&{id:string}>('SELECT * FROM routines WHERE pet_id=? ORDER BY minutes,id',petId);
+  const events=eventRows.map(row=>({id:localIdSchema.parse(row.id),...eventDataFromSql(row)}));
+  const routines=routineRows.map(row=>({id:localIdSchema.parse(row.id),...routineDataFromSql(row)}));
   return [...events.map(({id,...data})=>({kind:'event' as const,localId:id,data})),...routines.map(({id,...data})=>({kind:'routine' as const,localId:id,data}))];
 }
 export async function readLocalRecords(sql:SqlExecutor,petId:string):Promise<LocalRecord[]> {
@@ -106,10 +105,10 @@ export async function applyLocalRecords(sql:SqlExecutor,petId:string,records:Loc
     if ((record.kind==='event'||record.kind==='routine')&&previous&&!Object.keys(fieldPatch(previous,record.data)).length) continue;
     if (record.kind==='event') {
       const [value]=parseEvents([{...record.data,id:record.localId}]);
-      await sql.runAsync('INSERT INTO events(pet_id,id,at,body) VALUES (?,?,?,?) ON CONFLICT(pet_id,id) DO UPDATE SET at=excluded.at,body=excluded.body',petId,value.id,value.at,JSON.stringify(value));
+      await sql.runAsync(upsertEventSql,petId,value.id,...eventSqlValues(value));
     } else if (record.kind==='routine') {
       const [value]=parseSchedule([{...record.data,id:record.localId}]);
-      await sql.runAsync('INSERT INTO routines(pet_id,id,minutes,body) VALUES (?,?,?,?) ON CONFLICT(pet_id,id) DO UPDATE SET minutes=excluded.minutes,body=excluded.body',petId,value.id,value.minutes,JSON.stringify(value));
+      await sql.runAsync(upsertRoutineSql,petId,value.id,...routineSqlValues(value));
     } else if (record.kind==='puppy') {
       const data=recordDataSchema('puppy').parse(record.data);
       if (!('name' in data)) throw new Error('Invalid puppy profile.');

@@ -1,5 +1,6 @@
 import { STARTER_SCHEDULE } from '../domain.ts';
 import { identifierSchema } from '../cloud/protocol.ts';
+import {eventSqlDefinition,routineSqlDefinition,routineSqlValues,upsertRoutineSql} from '../record-sql.ts';
 export type SqlValue = string | number | null | Uint8Array;
 export interface SqlExecutor {
   execAsync(sql: string): Promise<void>;
@@ -53,14 +54,15 @@ CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY NOT NULL, value TEXT N
 CREATE TABLE IF NOT EXISTS puppies (id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS events (
   pet_id TEXT NOT NULL REFERENCES puppies(id) ON DELETE CASCADE,
-  id TEXT NOT NULL, at INTEGER NOT NULL, body TEXT NOT NULL CHECK(json_valid(body)),
-  PRIMARY KEY(pet_id,id)
+  id TEXT NOT NULL CHECK(length(id) BETWEEN 1 AND 256),
+  ${eventSqlDefinition}, PRIMARY KEY(pet_id,id)
 );
-CREATE INDEX IF NOT EXISTS events_by_pet_time ON events(pet_id,at DESC,id);
+CREATE INDEX IF NOT EXISTS events_by_pet_time ON events(pet_id,at DESC,id DESC);
+CREATE INDEX IF NOT EXISTS events_by_pet_activity ON events(pet_id,type,custom_label,at DESC,id DESC);
 CREATE TABLE IF NOT EXISTS routines (
   pet_id TEXT NOT NULL REFERENCES puppies(id) ON DELETE CASCADE,
-  id TEXT NOT NULL, minutes INTEGER NOT NULL CHECK(minutes BETWEEN 0 AND 1439), body TEXT NOT NULL CHECK(json_valid(body)),
-  PRIMARY KEY(pet_id,id)
+  id TEXT NOT NULL CHECK(length(id) BETWEEN 1 AND 256),
+  ${routineSqlDefinition}, PRIMARY KEY(pet_id,id)
 );
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS pet_settings (pet_id TEXT NOT NULL REFERENCES puppies(id) ON DELETE CASCADE, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY(pet_id,key));
@@ -125,7 +127,7 @@ export async function initializeLocalDatabase(database: LocalDatabase, newId?: (
     await sql.execAsync(localSchema);
     const petId = identifierSchema.parse(newId ? newId() : (await sql.getFirstAsync<{ id: string }>('SELECT lower(hex(randomblob(16))) AS id'))!.id);
     await sql.runAsync('INSERT INTO puppies(id,name) VALUES (?,?)', petId, 'My puppy');
-    for (const routine of STARTER_SCHEDULE) await sql.runAsync('INSERT INTO routines(pet_id,id,minutes,body) VALUES (?,?,?,?)', petId, routine.id, routine.minutes, JSON.stringify(routine));
+    for (const {id,...data} of STARTER_SCHEDULE) await sql.runAsync(upsertRoutineSql,petId,id,...routineSqlValues(data));
     for (const [key, value] of Object.entries({ schema_version: '4', active_pet_id: petId, show_onboarding: 'true' })) {
       await sql.runAsync('INSERT INTO metadata(key,value) VALUES (?,?)', key, value);
     }

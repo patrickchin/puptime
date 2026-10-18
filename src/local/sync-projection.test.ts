@@ -85,12 +85,12 @@ test('projection round trip preserves exact IDs, history and independent puppy s
   assert.deepEqual(await storage.loadCustomActivities(),['Training']); assert.equal(changes.length,0);
 });
 
-test('snapshot and apply reject corrupt indexes and invalid batches without partial projection', async t => {
+test('snapshot and apply reject corrupt fields and invalid batches without partial projection', async t => {
   const {database,storage}=await setup(t);
   await storage.appendEvents([event]);
-  await database.write(sql=>sql.runAsync('UPDATE events SET at=999 WHERE pet_id=? AND id=?','pet-1',event.id));
-  await assert.rejects(database.read(sql=>projection.readLocalRecords(sql,'pet-1')),/index/i);
-  await database.write(sql=>sql.runAsync('UPDATE events SET at=100 WHERE pet_id=? AND id=?','pet-1',event.id));
+  await database.write(sql=>sql.execAsync("PRAGMA ignore_check_constraints=ON; UPDATE events SET source='corrupt'; PRAGMA ignore_check_constraints=OFF;"));
+  await assert.rejects(database.read(sql=>projection.readLocalRecords(sql,'pet-1')),/invalid/i);
+  await database.write(sql=>sql.runAsync("UPDATE events SET source='app' WHERE pet_id=? AND id=?",'pet-1',event.id));
   await assert.rejects(database.write(sql=>projection.applyLocalRecords(sql,'pet-1',[
     {kind:'event',localId:'new-valid',data:{type:'meal',at:200,source:'app'}},
     {kind:'routine',localId:'invalid',data:{type:'meal',minutes:1500}},

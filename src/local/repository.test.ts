@@ -18,6 +18,36 @@ async function setup(t: TestContext) {
   return { database, path, repository: createLocalRepository(database, 'pet-1') };
 }
 
+test('current event and routine fields are SQL columns with exact optional-value round trips',async t=>{
+  const {repository,database}=await setup(t);
+  for(const table of ['events','routines']){
+    const columns=await database.read(sql=>sql.getAllAsync<{name:string}>(`PRAGMA table_info(${table})`));
+    assert.ok(!columns.some(row=>row.name==='body'),'Current core data must not be a JSON body.');
+    assert.ok(columns.some(row=>row.name==='type'));assert.ok(columns.some(row=>row.name==='custom_label'));
+  }
+  const events:PuppyEvent[]=[
+    {id:'point',type:'nap',at:100,source:'app'},
+    {id:'open',type:'nap',at:200,endedAt:null,source:'widget',note:'',estimated:false},
+    {id:'closed',type:'nap',at:300,endedAt:400,source:'app',estimated:true,note:'🐾 训练\nkept'},
+    {id:'custom',type:'custom',customLabel:'Training',at:500,source:'app'},
+  ];
+  await repository.appendEvents(events);
+  const saved=await repository.loadEvents();
+  for(const event of events)assert.deepEqual(saved.find(row=>row.id===event.id),event);
+  const open=await database.read(sql=>sql.getFirstAsync<{end_state:number;ended_at:number|null;estimated:number;note:string}>('SELECT end_state,ended_at,estimated,note FROM events WHERE id=?','open'));
+  assert.deepEqual({...open},{end_state:1,ended_at:null,estimated:0,note:''});
+  const point=await database.read(sql=>sql.getFirstAsync<{end_state:number;estimated:number|null}>('SELECT end_state,estimated FROM events WHERE id=?','point'));
+  assert.deepEqual({...point},{end_state:0,estimated:null});
+  const routines=[{id:'point',type:'pee' as const,minutes:100},{id:'false',type:'custom' as const,customLabel:'Training',minutes:200,reminder:false,toleranceMinutes:0},{id:'true',type:'meal' as const,minutes:300,reminder:true,toleranceMinutes:1440}];
+  await repository.saveSchedule(routines);assert.deepEqual(await repository.loadSchedule(),routines);
+  const reminders=await database.read(sql=>sql.getAllAsync<{reminder:number|null}>('SELECT reminder FROM routines ORDER BY minutes'));
+  assert.deepEqual(reminders.map(row=>row.reminder),[null,0,1]);
+  await assert.rejects(database.write(sql=>sql.runAsync("UPDATE events SET type='unsupported' WHERE id='point'")),/constraint/i);
+  await assert.rejects(database.write(sql=>sql.runAsync("UPDATE events SET end_state=2,ended_at=99 WHERE id='point'")),/constraint/i);
+  await assert.rejects(database.write(sql=>sql.runAsync("UPDATE routines SET minutes=1440 WHERE id='false'")),/constraint/i);
+  assert.deepEqual(await repository.loadEvents(),saved);
+});
+
 test('transactional CRUD returns committed history and retains estimate provenance and optional clears', async (t) => {
   const { repository } = await setup(t);
   const first = { ...event(), estimated: true, note: 'keep' };
@@ -35,7 +65,7 @@ test('transactional CRUD returns committed history and retains estimate provenan
 test('duplicate CSV import does not write and preserves existing conflicting-open-nap import behavior', async (t) => {
   const { repository, database } = await setup(t);
   await repository.appendEvents([{ ...event(), note: 'newer' }]);
-  assert.deepEqual(await repository.importEvents([event(), event('second')]), { events: [{ ...event(), note: 'newer' }, event('second')], imported: 1, skipped: 1 });
+  assert.deepEqual(await repository.importEvents([event(), event('second')]), { events: [event('second'),{ ...event(), note: 'newer' }], imported: 1, skipped: 1 });
   const before = (await database.read((sql) => sql.getFirstAsync<{ count: number }>('SELECT total_changes() AS count')))!.count;
   assert.equal((await repository.importEvents([event(), event('second')])).imported, 0);
   assert.equal((await database.read((sql) => sql.getFirstAsync<{ count: number }>('SELECT total_changes() AS count')))!.count, before);
@@ -97,11 +127,10 @@ test('event and routine identity are pet-scoped and routine replacement is atomi
 test('corrupt saved rows reject reads and edits while retaining the original bytes', async (t) => {
   const { repository, database } = await setup(t);
   await repository.appendEvents([event()]);
-  const body = JSON.stringify({ ...event(), id: 'wrong-id' });
-  await database.write((sql) => sql.runAsync('UPDATE events SET body=? WHERE id=?', body, 'first'));
+  await database.write(sql=>sql.execAsync("PRAGMA ignore_check_constraints=ON; UPDATE events SET source='corrupt' WHERE id='first'; PRAGMA ignore_check_constraints=OFF;"));
   await assert.rejects(repository.loadEvents(), EventsStorageError);
   await assert.rejects(repository.updateEvent('first', { note: 'overwrite' }), EventsStorageError);
-  assert.equal((await database.read((sql) => sql.getFirstAsync<{ body: string }>('SELECT body FROM events')))!.body, body);
+  assert.equal((await database.read(sql=>sql.getFirstAsync<{source:string}>("SELECT source FROM events WHERE id='first'")))!.source,'corrupt');
 });
 
 test('SQLite disk quota failure acknowledges no partial batch and recovers after capacity returns', async (t) => {

@@ -3,6 +3,8 @@ import {parseEvents,parseSchedule,EventDeletedError,EventsImportError,EventsStor
 import type { LocalDatabase, SqlExecutor } from './database.ts';
 import { applyScheduleEntryEdit } from '../schedule-editor.ts';
 import { localChanges, notifyLocalCommit, readLocalSettingsRecords, type LocalChangeSink } from './sync-projection.ts';
+import {localIdSchema} from '../cloud/protocol.ts';
+import {eventDataFromSql,routineDataFromSql,eventSqlValues,routineSqlValues,upsertEventSql,upsertRoutineSql,type EventSqlRow,type RoutineSqlRow} from '../record-sql.ts';
 
 type EventRow = { id: string; at: number; body: string; event: PuppyEvent };
 export function createLocalRepository(database: LocalDatabase, petId: string, onChange?: LocalChangeSink, afterCommit?:()=>void) {
@@ -12,11 +14,9 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
   }
   async function readEvents(sql: SqlExecutor): Promise<EventRow[]> {
     await requirePet(sql);
-    const rows = await sql.getAllAsync<{ id: string; at: number; body: string }>('SELECT id,at,body FROM events WHERE pet_id=? ORDER BY at DESC,rowid ASC', petId);
+    const rows=await sql.getAllAsync<EventSqlRow&{id:string}>('SELECT * FROM events WHERE pet_id=? ORDER BY at DESC,id DESC',petId);
     try {
-      const events = parseEvents(rows.map((row) => JSON.parse(row.body)));
-      if (events.some((event, index) => event.id !== rows[index].id || event.at !== rows[index].at)) throw new Error('Inconsistent activity index.');
-      return rows.map((row, index) => ({ ...row, event: events[index] }));
+      return rows.map(row=>{const event={id:localIdSchema.parse(row.id),...eventDataFromSql(row)};return {id:event.id,at:event.at,body:JSON.stringify(event),event};});
     } catch { throw new EventsStorageError(); }
   }
   function materialize(rows: EventRow[]): PuppyEvent[] {
@@ -39,11 +39,11 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
       const previous = new Map(rows.map((row) => [row.id, row.body]));
       const next = new Map(result.events.map((event) => [event.id, event]));
       for (const row of rows) if (!next.has(row.id)) await sql.runAsync('DELETE FROM events WHERE pet_id=? AND id=?', petId, row.id);
-      const sorted = [...result.events].sort((a, b) => b.at - a.at);
+      const sorted = [...result.events].sort((a,b)=>b.at-a.at||(a.id<b.id?1:a.id>b.id?-1:0));
       const saved: EventRow[] = [];
       for (const event of sorted) {
         const body = JSON.stringify(event);
-        if (previous.get(event.id) !== body) await sql.runAsync('INSERT INTO events(pet_id,id,at,body) VALUES (?,?,?,?) ON CONFLICT(pet_id,id) DO UPDATE SET at=excluded.at,body=excluded.body', petId, event.id, event.at, body);
+        if (previous.get(event.id) !== body) await sql.runAsync(upsertEventSql,petId,event.id,...eventSqlValues(event));
         saved.push({ id: event.id, at: event.at, body, event });
       }
       if (onChange||afterCommit) {
@@ -58,9 +58,8 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
   }
   async function readSchedule(sql: SqlExecutor): Promise<ScheduleEntry[]> {
     await requirePet(sql);
-    const rows = await sql.getAllAsync<{ id: string; minutes: number; body: string }>('SELECT id,minutes,body FROM routines WHERE pet_id=? ORDER BY minutes,rowid', petId);
-    const entries=parseSchedule(rows.map((row) => JSON.parse(row.body)));
-    if (entries.some((entry, index) => entry.id !== rows[index].id || entry.minutes !== rows[index].minutes)) throw new Error('The saved routine index is inconsistent.');
+    const rows=await sql.getAllAsync<RoutineSqlRow&{id:string}>('SELECT * FROM routines WHERE pet_id=? ORDER BY minutes,id',petId);
+    const entries=rows.map(row=>({id:localIdSchema.parse(row.id),...routineDataFromSql(row)}));
     return entries;
   }
   const updateEvent = async (id: string, changes: PuppyEventChanges): Promise<PuppyEvent[]> => (await mutateEvents((events) => {
@@ -76,7 +75,7 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
       for(const id of previous.keys())if(!ids.has(id))await sql.runAsync('DELETE FROM routines WHERE pet_id=? AND id=?',petId,id);
       for(const entry of entries){
         const body=JSON.stringify(entry);
-        if(previous.get(entry.id)!==body)await sql.runAsync('INSERT INTO routines(pet_id,id,minutes,body) VALUES (?,?,?,?) ON CONFLICT(pet_id,id) DO UPDATE SET minutes=excluded.minutes,body=excluded.body',petId,entry.id,entry.minutes,body);
+        if(previous.get(entry.id)!==body)await sql.runAsync(upsertRoutineSql,petId,entry.id,...routineSqlValues(entry));
       }
       if(onChange||afterCommit){
         const records=(values:ScheduleEntry[])=>values.map(({id,...data})=>({kind:'routine' as const,localId:id,data}));

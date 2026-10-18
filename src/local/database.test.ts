@@ -93,10 +93,10 @@ test('unsupported or incomplete database is unchanged',async t=>{
 test('foreign keys and pet-scoped IDs apply on the configured transaction connection',async t=>{
   const {database}=await setup(t);await initialize(database,()=> 'pet-1');
   const event={id:'same',type:'pee',at:100,source:'app'};
-  await assert.rejects(database.write(sql=>sql.runAsync('INSERT INTO events(pet_id,id,at,body) VALUES(?,?,?,?)','missing-pet',event.id,event.at,JSON.stringify(event))),/FOREIGN KEY/);
+  await assert.rejects(database.write(sql=>sql.runAsync('INSERT INTO events(pet_id,id,type,at,source) VALUES(?,?,?,?,?)','missing-pet',event.id,event.type,event.at,event.source)),/FOREIGN KEY/);
   await database.write(async sql=>{
     await sql.runAsync('INSERT INTO puppies(id,name) VALUES (?,?)','pet-2','Second');
-    for(const petId of ['pet-1','pet-2'])await sql.runAsync('INSERT INTO events(pet_id,id,at,body) VALUES(?,?,?,?)',petId,event.id,event.at,JSON.stringify(event));
+    for(const petId of ['pet-1','pet-2'])await sql.runAsync('INSERT INTO events(pet_id,id,type,at,source) VALUES(?,?,?,?,?)',petId,event.id,event.type,event.at,event.source);
   });
   assert.equal((await database.read(sql=>sql.getFirstAsync<{n:number}>('SELECT COUNT(*) n FROM events WHERE id=?',event.id)))!.n,2);
 });

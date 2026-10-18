@@ -133,7 +133,7 @@ try{
   try{
     assert.equal(native.prepare('SELECT count(*) n FROM events').get().n,context.expectedAfterCombine);
     assert.equal(native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n,0);
-    assert.ok(native.prepare('SELECT body FROM events').all().some(row=>JSON.parse(row.body).note==='Independent HTTP client edit'));
+    assert.ok(native.prepare('SELECT note FROM events').all().some(row=>row.note==='Independent HTTP client edit'));
   }finally{native.close();}
   context.expectedCount=context.expectedAfterCombine;writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});
   console.log('PASS confirmed existing-cloud association preserves old remote edits and the new local log.');
@@ -291,7 +291,7 @@ try{
   const native=new DatabaseSync(join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite/puptime-v2.db'),{readOnly:true});
   try{
     let seen=false;
-    for(let i=0;i<100;i++){seen=native.prepare('SELECT body FROM events').all().some(row=>JSON.parse(row.body).note==='Independent HTTP client edit');if(seen)break;await new Promise(resolve=>setTimeout(resolve,100));}
+    for(let i=0;i<100;i++){seen=native.prepare('SELECT note FROM events').all().some(row=>row.note==='Independent HTTP client edit');if(seen)break;await new Promise(resolve=>setTimeout(resolve,100));}
     assert.ok(seen,'Foreground native change subscription must pull the independent HTTP update.');
   }finally{native.close();}
   console.log('PASS installed iOS change channel receives independent HTTP edits and commits them through the normal sync runner.');

@@ -1,12 +1,14 @@
 import { DurableObject } from 'cloudflare:workers';
 import { z } from 'zod';
-import { enrollmentSchema, mutationSchema, recordIdSchema, type Enrollment, type CloudRecord, type Mutation, type MutationResult, type PullPage, type Revision } from '../src/cloud/protocol';
+import { cloudRecordSchema,eventDataSchema,routineDataSchema,enrollmentSchema, mutationSchema, recordIdSchema, type Enrollment, type CloudRecord, type Mutation, type MutationResult, type PullPage, type Revision } from '../src/cloud/protocol';
 import {cloudAccess,getCloudAccount} from './entitlements';
+import {eventSqlDefinition,routineSqlDefinition,eventSqlColumns,routineSqlColumns,eventSqlValues,routineSqlValues,eventDataFromSql,routineDataFromSql,type EventSqlRow,type RoutineSqlRow} from '../src/record-sql';
 import { reconcileMutation, ReconciliationError } from '../src/cloud/reconcile';
 
 const cursorSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const pageSizeSchema = z.number().int().min(1).max(100);
 type JsonRow = { body: string };
+type RecordRow={id:string;pet_id:string|null;kind:CloudRecord['kind'];revision:number;sequence:number;deleted:number;updated_at:number;data_json:string|null};
 
 export class AccountStore extends DurableObject<Cloudflare.Env> {
   constructor(ctx: DurableObjectState, env: Cloudflare.Env) {
@@ -16,21 +18,31 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
       if(tables.includes('schema_metadata')){
         const versions=ctx.storage.sql.exec<{version:number}>('SELECT version FROM schema_metadata').toArray();
         if(versions.length!==1||versions[0].version!==3)throw new Error('Unsupported development or newer account schema.');
-        if(['account_state','records','revisions','operations','pets','enrollments','enrolled_devices'].some(name=>!tables.includes(name)))throw new Error('The account database schema is incomplete.');
+        if(['account_state','records','record_events','record_routines','revisions','operations','pets','enrollments','enrolled_devices'].some(name=>!tables.includes(name)))throw new Error('The account database schema is incomplete.');
         return;
       }
       if(tables.some(name=>!name.startsWith('sqlite_')&&!name.startsWith('__cf_')))throw new Error('The existing account database schema is incomplete.');
       ctx.storage.sql.exec(`
         CREATE TABLE schema_metadata (version INTEGER NOT NULL);
         CREATE TABLE account_state (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
-        CREATE TABLE records (id TEXT PRIMARY KEY, body TEXT NOT NULL);
+        CREATE TABLE pets (id TEXT PRIMARY KEY, initial_name TEXT NOT NULL, created_at INTEGER NOT NULL);
+        CREATE TABLE records (
+          id TEXT PRIMARY KEY NOT NULL, pet_id TEXT REFERENCES pets(id),
+          kind TEXT NOT NULL CHECK(kind IN ('event','routine','puppy','customActivity','customization','accountPreferences')),
+          revision INTEGER NOT NULL CHECK(revision>=1), sequence INTEGER NOT NULL UNIQUE CHECK(sequence>=1),
+          deleted INTEGER NOT NULL CHECK(deleted IN (0,1)), updated_at INTEGER NOT NULL,
+          data_json TEXT,
+          CHECK((kind='accountPreferences' AND pet_id IS NULL) OR (kind!='accountPreferences' AND pet_id IS NOT NULL)),
+          CHECK((kind IN ('event','routine') AND data_json IS NULL) OR (kind NOT IN ('event','routine') AND data_json IS NOT NULL AND json_valid(data_json)))
+        );
+        CREATE TABLE record_events(record_id TEXT PRIMARY KEY NOT NULL REFERENCES records(id) ON DELETE CASCADE, ${eventSqlDefinition});
+        CREATE TABLE record_routines(record_id TEXT PRIMARY KEY NOT NULL REFERENCES records(id) ON DELETE CASCADE, ${routineSqlDefinition});
         CREATE TABLE revisions (sequence INTEGER PRIMARY KEY, record_id TEXT NOT NULL, revision INTEGER NOT NULL, body TEXT NOT NULL, UNIQUE(record_id, revision));
         CREATE INDEX revisions_by_record ON revisions(record_id, revision DESC);
         CREATE TABLE operations (id TEXT PRIMARY KEY, payload TEXT NOT NULL, result TEXT NOT NULL);
-        CREATE TABLE pets (id TEXT PRIMARY KEY, initial_name TEXT NOT NULL, created_at INTEGER NOT NULL);
         CREATE TABLE enrollments (id TEXT PRIMARY KEY, payload TEXT NOT NULL, result TEXT NOT NULL);
         CREATE TABLE enrolled_devices (id TEXT NOT NULL, pet_id TEXT NOT NULL REFERENCES pets(id), PRIMARY KEY(id, pet_id));
-        CREATE INDEX records_by_pet_kind ON records(json_extract(body, '$.petId'), json_extract(body, '$.kind'), json_extract(body, '$.deleted'));
+        CREATE INDEX records_by_pet_kind ON records(pet_id,kind,deleted);
         INSERT INTO schema_metadata(version) VALUES (3);
       `);
     });
@@ -71,6 +83,23 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
   webSocketClose(socket:WebSocket,_code:number) {socket.close(1000); }
   webSocketError(socket:WebSocket) {try{socket.close(1011,'Channel unavailable');}catch{}}
 
+  #record(id:string):CloudRecord|null {
+    const row=this.ctx.storage.sql.exec<RecordRow>('SELECT * FROM records WHERE id=?',id).toArray()[0];
+    if(!row)return null;
+    if(row.deleted!==0&&row.deleted!==1)throw new Error('Invalid saved deletion state.');
+    const data=row.kind==='event'?eventDataFromSql(this.ctx.storage.sql.exec<EventSqlRow>('SELECT * FROM record_events WHERE record_id=?',id).one())
+      :row.kind==='routine'?routineDataFromSql(this.ctx.storage.sql.exec<RoutineSqlRow>('SELECT * FROM record_routines WHERE record_id=?',id).one())
+      :JSON.parse(row.data_json!);
+    return cloudRecordSchema.parse({id:row.id,petId:row.pet_id,kind:row.kind,revision:row.revision,sequence:row.sequence,deleted:row.deleted===1,updatedAt:row.updated_at,data});
+  }
+  #saveRecord(record:CloudRecord):void {
+    const core=record.kind==='event'||record.kind==='routine';
+    this.ctx.storage.sql.exec('INSERT INTO records(id,pet_id,kind,revision,sequence,deleted,updated_at,data_json) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET pet_id=excluded.pet_id,kind=excluded.kind,revision=excluded.revision,sequence=excluded.sequence,deleted=excluded.deleted,updated_at=excluded.updated_at,data_json=excluded.data_json',
+      record.id,record.petId,record.kind,record.revision,record.sequence,record.deleted?1:0,record.updatedAt,core?null:JSON.stringify(record.data));
+    if(record.kind==='event')this.ctx.storage.sql.exec(`INSERT INTO record_events(record_id,${eventSqlColumns.join(',')}) VALUES(${Array(1+eventSqlColumns.length).fill('?').join(',')}) ON CONFLICT(record_id) DO UPDATE SET ${eventSqlColumns.map(column=>`${column}=excluded.${column}`).join(',')}`,record.id,...eventSqlValues(eventDataSchema.parse(record.data)));
+    if(record.kind==='routine')this.ctx.storage.sql.exec(`INSERT INTO record_routines(record_id,${routineSqlColumns.join(',')}) VALUES(${Array(1+routineSqlColumns.length).fill('?').join(',')}) ON CONFLICT(record_id) DO UPDATE SET ${routineSqlColumns.map(column=>`${column}=excluded.${column}`).join(',')}`,record.id,...routineSqlValues(routineDataSchema.parse(record.data)));
+  }
+
   #assertActive(): void {
     if (this.ctx.storage.sql.exec<{ value: number }>("SELECT value FROM account_state WHERE key = 'retired'").toArray()[0]?.value) {
       throw new ReconciliationError('This cloud account was deleted.');
@@ -103,8 +132,7 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
         if (prior.payload !== payload) throw new ReconciliationError('Operation ID was already used for different content.');
         return JSON.parse(prior.result) as MutationResult;
       }
-      const stored = this.ctx.storage.sql.exec<JsonRow>('SELECT body FROM records WHERE id = ?', mutation.recordId).toArray()[0];
-      const before = stored ? JSON.parse(stored.body) as CloudRecord : null;
+      const before=this.#record(mutation.recordId);
       const acceptedAt = Date.now();
       const reconciled = reconcileMutation(before, mutation, acceptedAt);
       const sequence = this.ctx.storage.sql.exec<{ value: number }>('SELECT COALESCE(MAX(sequence), 0) + 1 AS value FROM revisions').one().value;
@@ -115,7 +143,7 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
         proposal: mutation.patch, before, after: record, reason: reconciled.reason,
       };
       const result: MutationResult = { operationId: mutation.operationId, record, sequence, reason: reconciled.reason };
-      this.ctx.storage.sql.exec('INSERT INTO records(id, body) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET body = excluded.body', record.id, JSON.stringify(record));
+      this.#saveRecord(record);
       this.ctx.storage.sql.exec('INSERT INTO revisions(sequence, record_id, revision, body) VALUES (?, ?, ?, ?)', sequence, record.id, record.revision, JSON.stringify(revision));
       this.ctx.storage.sql.exec('INSERT INTO operations(id, payload, result) VALUES (?, ?, ?)', mutation.operationId, payload, JSON.stringify(result));
       return result;
@@ -150,9 +178,8 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
     this.#assertActive();
     const pets = this.ctx.storage.sql.exec<{ id: string; initial_name: string }>('SELECT id, initial_name FROM pets ORDER BY created_at, id').toArray();
     return { pets: pets.map((pet) => {
-      const profile = this.ctx.storage.sql.exec<JsonRow>('SELECT body FROM records WHERE id = ?', pet.id).toArray()[0];
-      const record = profile ? JSON.parse(profile.body) as CloudRecord : null;
-      const eventCount = this.ctx.storage.sql.exec<{ value: number }>("SELECT COUNT(*) AS value FROM records WHERE json_extract(body, '$.petId') = ? AND json_extract(body, '$.kind') = 'event' AND json_extract(body, '$.deleted') = 0", pet.id).one().value;
+      const record=this.#record(pet.id);
+      const eventCount = this.ctx.storage.sql.exec<{ value: number }>("SELECT COUNT(*) AS value FROM records WHERE pet_id=? AND kind='event' AND deleted=0", pet.id).one().value;
       return { id: pet.id, name: record?.kind === 'puppy' && !record.deleted && 'name' in record.data && typeof record.data.name === 'string' ? record.data.name : pet.initial_name, eventCount };
     }) };
   }
