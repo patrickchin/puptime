@@ -1,5 +1,5 @@
 import type { ScheduleEntry } from './domain.ts';
-import { assertValidSchedule } from './local/legacy.ts';
+import { assertValidSchedule } from './storage-validation.ts';
 export class ScheduleEntryDeletedError extends Error {
   constructor(){super('This routine was removed. Your draft has been kept.');this.name='ScheduleEntryDeletedError';}
 }

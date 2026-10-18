@@ -3,8 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test, { type TestContext } from 'node:test';
-import { createLocalDatabase, migrateLegacy } from './database.ts';
-import { legacyKeys, parseLegacySnapshot } from './legacy.ts';
+import { createLocalDatabase, initializeLocalDatabase } from './database.ts';
 import { sqliteTestConnection } from './sqlite-test-adapter.ts';
 import { createNativeStorage } from './native-storage.ts';
 import * as projection from './sync-projection.ts';
@@ -14,7 +13,7 @@ async function setup(t: TestContext) {
   const directory = await mkdtemp(join(tmpdir(), 'puptime-projection-'));
   const database = await createLocalDatabase(sqliteTestConnection(join(directory,'data.db')));
   t.after(async () => { await database.close(); await rm(directory,{recursive:true,force:true}); });
-  await migrateLegacy(database,parseLegacySnapshot(legacyKeys.map(key=>[key,key==='puptime.schedule.v1'?'[]':null])),()=> 'pet-1');
+  await initializeLocalDatabase(database,()=> 'pet-1');await database.write(sql=>sql.runAsync('DELETE FROM routines'));
   const changes: LocalChange[][] = [];
   const storage = createNativeStorage(database, 'pet-1', async (sql, batch) => {
     assert.equal((await sql.getFirstAsync<{n:number}>('SELECT COUNT(*) n FROM puppies'))!.n, 1);
@@ -86,12 +85,24 @@ test('projection round trip preserves exact IDs, history and independent puppy s
   assert.deepEqual(await storage.loadCustomActivities(),['Training']); assert.equal(changes.length,0);
 });
 
-test('snapshot and apply reject corrupt indexes and invalid batches without partial projection', async t => {
+test('remote event projection materializes custom labels without resurrecting a deleted activity',async t=>{
+ const {database,storage}=await setup(t);
+ const record={kind:'event' as const,localId:'remote-custom',data:{type:'custom',customLabel:'Training',at:100,source:'app'}};
+ await database.write(sql=>projection.applyLocalRecords(sql,'pet-1',[record],[]));
+ assert.equal((await database.read(sql=>sql.getFirstAsync<{value:string}>("SELECT value FROM pet_settings WHERE key='puptime.customActivities.v1'")))!.value,'["Training"]');
+ await storage.deleteCustomActivity('Training');
+ await database.write(sql=>projection.applyLocalRecords(sql,'pet-1',[{...record,data:{...record.data,note:'remote note'}}],[]));
+ assert.deepEqual(await storage.loadCustomActivities(),[]);assert.equal((await storage.loadEvents())[0].note,'remote note');
+ await database.write(sql=>projection.applyLocalRecords(sql,'pet-1',[{kind:'customActivity',localId:'custom:training',data:{label:'Training'}}],[]));
+ assert.deepEqual(await storage.loadCustomActivities(),['Training']);
+});
+
+test('snapshot and apply reject corrupt fields and invalid batches without partial projection', async t => {
   const {database,storage}=await setup(t);
   await storage.appendEvents([event]);
-  await database.write(sql=>sql.runAsync('UPDATE events SET at=999 WHERE pet_id=? AND id=?','pet-1',event.id));
-  await assert.rejects(database.read(sql=>projection.readLocalRecords(sql,'pet-1')),/index/i);
-  await database.write(sql=>sql.runAsync('UPDATE events SET at=100 WHERE pet_id=? AND id=?','pet-1',event.id));
+  await database.write(sql=>sql.execAsync("PRAGMA ignore_check_constraints=ON; UPDATE events SET source='corrupt'; PRAGMA ignore_check_constraints=OFF;"));
+  await assert.rejects(database.read(sql=>projection.readLocalRecords(sql,'pet-1')),/invalid/i);
+  await database.write(sql=>sql.runAsync("UPDATE events SET source='app' WHERE pet_id=? AND id=?",'pet-1',event.id));
   await assert.rejects(database.write(sql=>projection.applyLocalRecords(sql,'pet-1',[
     {kind:'event',localId:'new-valid',data:{type:'meal',at:200,source:'app'}},
     {kind:'routine',localId:'invalid',data:{type:'meal',minutes:1500}},
@@ -110,9 +121,9 @@ test('partial preference projection merges reminder fields and preserves local-o
   assert.equal(changes.length,0);
 });
 
-test('locally valid legacy values remain lossless even when cloud limits are narrower', async t => {
+test('current boundary values remain lossless across change capture and projection', async t => {
   const {database,storage,changes}=await setup(t);
-  const local={...event,id:'legacy'.repeat(100),note:'训练'.repeat(17000)};
+  const local={...event,id:'历史 / '.repeat(40),note:'训练'.repeat(8192)};
   await storage.appendEvents([local]);
   assert.equal(changes[0][0].localId,local.id); assert.equal(changes[0][0].after!.note,local.note);
   const record=(await database.read(sql=>projection.readLocalRecords(sql,'pet-1'))).find(value=>value.kind==='event')!;

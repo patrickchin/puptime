@@ -12,7 +12,7 @@ import {createLocalRuntime} from '../src/local/runtime-factory.ts';
 const udid=process.argv[2],app='com.patrickchin.puptime';
 const simctl=(...args)=>execFileSync('xcrun',['simctl',...args],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
 const devices=Object.values(JSON.parse(simctl('list','devices','available','-j')).devices).flat();
-assert.equal(devices.find(device=>device.udid===udid)?.name,'Puptime Native Storage ae0c');
+assert.ok(devices.find(device=>device.udid===udid)?.name.startsWith('Puptime Native Storage '));
 const output=mkdtempSync(join(tmpdir(),'puptime-onboarding-failure-'));
 const flow=file=>execFileSync(process.env.MAESTRO_BIN??'maestro',['--device',udid,'test',resolve('.maestro/native',file),'--test-output-dir',join(output,file)],{stdio:'inherit',env:{...process.env,MAESTRO_CLI_NO_ANALYTICS:'1'}});
 try{simctl('terminate',udid,app);}catch{}
@@ -28,7 +28,7 @@ try{
   await storage.appendEvents([{id:'retained-before-completion',type:'pee',at:1700000000000,source:'app'}]);
 }finally{await writer.close();}
 const database=new DatabaseSync(path);database.exec('PRAGMA busy_timeout=5000');
-const tables=['metadata','puppies','events','routines','settings','pet_settings','local_revisions','local_sync_owner','local_sync_pets','local_sync_outbox','local_sync_records','local_sync_acks','local_sync_baseline','legacy_snapshots'];
+const tables=['metadata','puppies','events','routines','settings','pet_settings','local_revisions','local_sync_owner','local_sync_pets','local_sync_outbox','local_sync_records','local_sync_acks','local_sync_baseline'];
 const snapshot=()=>Object.fromEntries(tables.map(table=>[table,database.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all().map(row=>({...row}))]));
 try{
   const before=snapshot();assert.equal(before.events.length,1);

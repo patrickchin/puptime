@@ -23,6 +23,21 @@ import { latestQuickEventTimes, type PuppyEvent, type ScheduleEntry } from './do
 const day = new Date(2026, 8, 10);
 const at = (hour: number, minute: number) => new Date(2026, 8, 10, hour, minute).getTime();
 
+test('dense completed days can be analyzed without blocking activity screens', () => {
+  const now = new Date(2026, 8, 15, 12);
+  const events: PuppyEvent[] = Array.from({length: 14 * 1440}, (_, index) => ({
+    id: `dense-${index}`, type: 'pee', source: 'app',
+    at: new Date(2026, 8, 1, 0, index).getTime(),
+  }));
+  const started = performance.now();
+  const result = suggestScheduleFromEvents(events, 14, now);
+  const elapsed = performance.now() - started;
+  assert.equal(result.sourceEvents, events.length);
+  assert.equal(result.daysAnalyzed, 14);
+  assert.ok(result.entries.length > 0);
+  assert.ok(elapsed < 1000, `dense analysis took ${Math.round(elapsed)}ms`);
+});
+
 test('matches each event to only one nearby schedule entry of the same type', () => {
   const schedule: ScheduleEntry[] = [
     { id: 'a', type: 'pee', minutes: 7 * 60 },

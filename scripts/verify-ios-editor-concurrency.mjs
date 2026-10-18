@@ -17,14 +17,14 @@ const database=new DatabaseSync(join(simctl('get_app_container',udid,app,'data')
 database.exec('PRAGMA busy_timeout=5000');
 async function waitFor(check){for(let i=0;i<100;i++){if(check())return;await new Promise(resolve=>setTimeout(resolve,100));}assert.fail('Native SQLite save did not reach the expected state.');}
 try {
- await waitFor(()=>JSON.parse(database.prepare('SELECT body FROM events').get()?.body??'{}').note==='local first');
- const row=database.prepare('SELECT pet_id,id,body FROM events').get();
+ await waitFor(()=>database.prepare('SELECT note FROM events').get()?.note==='local first');
+ const row=database.prepare('SELECT pet_id,id,at FROM events').get();
  assert.equal(database.prepare('SELECT count(*) AS n FROM events').get().n,1,'The flow must prepare its own disposable single event.');
- const original=JSON.parse(row.body),remoteAt=original.at-60000;
- database.prepare('UPDATE events SET at=?,body=? WHERE pet_id=? AND id=?').run(remoteAt,JSON.stringify({...original,at:remoteAt}),row.pet_id,row.id);
+ const remoteAt=row.at-60000;
+ database.prepare('UPDATE events SET at=? WHERE pet_id=? AND id=?').run(remoteAt,row.pet_id,row.id);
  flow('ios-editor-concurrency-after.yaml');
- await waitFor(()=>JSON.parse(database.prepare('SELECT body FROM events WHERE pet_id=? AND id=?').get(row.pet_id,row.id).body).note==='local second');
- assert.equal(JSON.parse(database.prepare('SELECT body FROM events WHERE pet_id=? AND id=?').get(row.pet_id,row.id).body).at,remoteAt,'Editing the note must preserve the independent committed timestamp.');
+ await waitFor(()=>database.prepare('SELECT note FROM events WHERE pet_id=? AND id=?').get(row.pet_id,row.id).note==='local second');
+ assert.equal(database.prepare('SELECT at FROM events WHERE pet_id=? AND id=?').get(row.pet_id,row.id).at,remoteAt,'Editing the note must preserve the independent committed timestamp.');
  console.log('PASS installed iOS editor preserves an independent timestamp during note autosave.');
  database.prepare('DELETE FROM events WHERE pet_id=? AND id=?').run(row.pet_id,row.id);
  flow('ios-editor-deletion.yaml');

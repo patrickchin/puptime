@@ -3,111 +3,100 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test, { type TestContext } from 'node:test';
-import { createLocalDatabase, localSchema, migrateLegacy } from './database.ts';
-import { legacyKeys, parseLegacySnapshot } from './legacy.ts';
+import {createLocalDatabase,initializeLocalDatabase as initialize,type SqlConnection} from './database.ts';
 import { sqliteTestConnection } from './sqlite-test-adapter.ts';
-const first = { id: 'event-1', type: 'pee', at: 100, note: '保留\nall notes', source: 'app', estimated: true };
-const second = { id: 'event-2', type: 'nap', at: 200, endedAt: 300, source: 'widget' };
-const routine = { id: 'same-id', type: 'meal', minutes: 700, reminder: true };
-const values = { 'puptime.events.v1': JSON.stringify([first, second]), 'puptime.schedule.v1': JSON.stringify([routine]), 'puptime.theme.v1': 'soft-play' };
-const snapshot = parseLegacySnapshot(legacyKeys.map((key) => [key, values[key as keyof typeof values] ?? null]));
-async function setup(t: TestContext) {
-  const directory = await mkdtemp(join(tmpdir(), 'puptime-sqlite-'));
-  const path = join(directory, 'data.db');
-  const database = await createLocalDatabase(sqliteTestConnection(path));
-  t.after(async () => { await database.close(); await rm(directory, { recursive: true, force: true }); });
-  return { database, path };
+import { STARTER_SCHEDULE } from '../domain.ts';
+
+async function setup(t:TestContext,wrap=(connection:SqlConnection)=>connection) {
+  const directory=await mkdtemp(join(tmpdir(),'puptime-initialize-'));
+  const path=join(directory,'data.db');
+  const database=await createLocalDatabase(wrap(sqliteTestConnection(path)));
+  t.after(async()=>{await database.close();await rm(directory,{recursive:true,force:true});});
+  return {database,path};
+}
+async function snapshot(database:Awaited<ReturnType<typeof createLocalDatabase>>) {
+  return database.read(async sql=>{
+    const schema=await sql.getAllAsync<{name:string;sql:string}>("SELECT name,sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name");
+    const rows:Record<string,Record<string,unknown>[]>=Object.fromEntries(await Promise.all(schema.map(async({name})=>[name,(await sql.getAllAsync<Record<string,unknown>>(`SELECT * FROM "${name.replaceAll('"','""')}" ORDER BY rowid`)).map(row=>({...row}))])));
+    return {schema,rows};
+  });
 }
 
-test('atomic migration preserves original values and per-record fields across reopen', async (t) => {
-  const { database, path } = await setup(t);
-  assert.deepEqual(await migrateLegacy(database, snapshot, () => 'pet-1'), { petId: 'pet-1', migrated: true });
-  const rows = await database.read((sql) => sql.getAllAsync<{ body: string }>('SELECT body FROM events ORDER BY at'));
-  assert.deepEqual(rows.map((row) => JSON.parse(row.body)), [first, second]);
-  assert.deepEqual(await database.read((sql) => sql.getAllAsync<{ body: string }>('SELECT body FROM routines')).then((rows) => rows.map((row) => JSON.parse(row.body))), [routine]);
-  const originals = await database.read((sql) => sql.getAllAsync<{ key: string; raw_value: string | null }>('SELECT key, raw_value FROM legacy_snapshots'));
-  assert.deepEqual(Object.fromEntries(originals.map((row) => [row.key, row.raw_value])), snapshot.raw);
-  await database.write((sql) => sql.runAsync('UPDATE events SET body = json_set(body, \'$.note\', ?) WHERE id = ?', 'Newer edit', first.id));
-  const reopened = await createLocalDatabase(sqliteTestConnection(path));
-  try {
-    assert.deepEqual(await migrateLegacy(reopened, snapshot, () => 'must-not-create'), { petId: 'pet-1', migrated: false });
-    assert.equal(JSON.parse((await reopened.read((sql) => sql.getFirstAsync<{ body: string }>('SELECT body FROM events WHERE id = ?', first.id)))!.body).note, 'Newer edit');
-    assert.equal((await reopened.read((sql) => sql.getFirstAsync<{ count: number }>('SELECT COUNT(*) AS count FROM puppies')))!.count, 1);
-  } finally { await reopened.close(); }
-});
-
-test('partial migration failure rolls back records, snapshots and success marker, then retries', async (t) => {
-  const { database } = await setup(t);
-  await database.write((sql) => sql.execAsync(localSchema + "CREATE TRIGGER fail_migration BEFORE INSERT ON events WHEN NEW.id = 'event-2' BEGIN SELECT RAISE(ABORT, 'storage failure'); END;"));
-  await assert.rejects(migrateLegacy(database, snapshot, () => 'pet-1'), /storage failure/);
-  for (const table of ['events', 'routines', 'puppies', 'legacy_snapshots', 'metadata']) {
-    assert.equal((await database.read((sql) => sql.getFirstAsync<{ count: number }>(`SELECT COUNT(*) AS count FROM ${table}`)))!.count, 0);
-  }
-  await database.write((sql) => sql.execAsync('DROP TRIGGER fail_migration'));
-  assert.equal((await migrateLegacy(database, snapshot, () => 'pet-1')).migrated, true);
-});
-
-test('separate connection initializers serialize without duplicating the initial puppy', async (t) => {
-  const { database, path } = await setup(t);
-  const other = await createLocalDatabase(sqliteTestConnection(path));
-  try {
-    const results = await Promise.all([migrateLegacy(database, snapshot, () => 'pet-first'), migrateLegacy(other, snapshot, () => 'pet-second')]);
-    assert.equal(results.filter((result) => result.migrated).length, 1);
-    assert.equal(results[0].petId, results[1].petId);
-  } finally { await other.close(); }
-});
-
-test('foreign keys and pet-scoped IDs apply on the transaction connection', async (t) => {
-  const { database } = await setup(t); await migrateLegacy(database, snapshot, () => 'pet-1');
-  await assert.rejects(database.write((sql) => sql.runAsync('INSERT INTO events(pet_id,id,at,body) VALUES (?,?,?,?)', 'missing-pet', first.id, first.at, JSON.stringify(first))), /FOREIGN KEY/);
-  await database.write(async (sql) => {
-    await sql.runAsync('INSERT INTO puppies(id,name) VALUES (?,?)', 'pet-2', 'Second');
-    await sql.runAsync('INSERT INTO events(pet_id,id,at,body) VALUES (?,?,?,?)', 'pet-2', first.id, first.at, JSON.stringify(first));
+test('direct initialization is atomic and reopens without reseeding',async t=>{
+  const {database,path}=await setup(t);
+  assert.deepEqual(await initialize(database,()=> 'pet-1'),{petId:'pet-1'});
+  const initial=await snapshot(database);
+  assert.equal(initial.rows.puppies.length,1);
+  assert.deepEqual(initial.rows.puppies,[{id:'pet-1',name:'My puppy'}]);
+  assert.equal(initial.rows.routines.length,STARTER_SCHEDULE.length);
+  assert.ok(initial.rows.metadata.some(row=>(row as {key:string;value:string}).key==='schema_version'&&(row as {value:string}).value==='4'));
+  assert.ok(initial.rows.metadata.some(row=>(row as {key:string;value:string}).key==='show_onboarding'&&(row as {value:string}).value==='true'));
+  assert.ok(!initial.schema.some(row=>row.name==='legacy_snapshots'));
+  assert.ok(!initial.rows.metadata.some(row=>(row as {key:string}).key==='migration_complete'));
+  await database.write(async sql=>{
+    await sql.runAsync('UPDATE puppies SET name=? WHERE id=?','Biscuit','pet-1');
+    await sql.runAsync("UPDATE metadata SET value='false' WHERE key='show_onboarding'");
+    await sql.runAsync('INSERT INTO settings(key,value) VALUES (?,?)','puptime.theme.v1','soft-play');
   });
-  assert.equal((await database.read((sql) => sql.getFirstAsync<{ count: number }>('SELECT COUNT(*) AS count FROM events WHERE id = ?', first.id)))!.count, 2);
+  const before=await snapshot(database),reopened=await createLocalDatabase(sqliteTestConnection(path));
+  try{
+    assert.deepEqual(await initialize(reopened,()=>{throw new Error('Reopen must not generate another ID');}),{petId:'pet-1'});
+    assert.deepEqual(await snapshot(reopened),before);
+  }finally{await reopened.close();}
 });
 
-test('new installs migrate once and newer schemas fail without touching their rows', async (t) => {
-  const { database } = await setup(t);
-  const empty = parseLegacySnapshot(legacyKeys.map((key) => [key, null]));
-  await migrateLegacy(database, empty, () => 'pet-empty');
-  assert.equal((await database.read((sql) => sql.getFirstAsync<{ value: string }>("SELECT value FROM metadata WHERE key = 'show_onboarding'")))!.value, 'true');
-  await database.write((sql) => sql.runAsync("UPDATE metadata SET value = '999' WHERE key = 'schema_version'"));
-  await assert.rejects(migrateLegacy(database, empty), /newer|unsupported/i);
-  assert.equal((await database.read((sql) => sql.getFirstAsync<{ count: number }>('SELECT COUNT(*) AS count FROM puppies')))!.count, 1);
-});
-
-test('completed migration never re-reads or reparses retained legacy storage', async (t) => {
-  const { database } = await setup(t);
-  let reads = 0;
-  await migrateLegacy(database, async () => { reads++; return snapshot; }, () => 'pet-lazy');
-  await migrateLegacy(database, async () => { throw new Error('Legacy source is now unavailable'); });
-  assert.equal(reads, 1);
-});
-
-test('v1 upgrade assigns legacy custom settings to the existing puppy without re-reading originals', async (t) => {
-  const { database } = await setup(t);
-  await database.write(async (sql) => {
-    await sql.execAsync(localSchema);
-    await sql.runAsync('INSERT INTO puppies(id,name) VALUES (?,?)', 'pet-v1', 'Existing');
-    for (const [key,value] of Object.entries({ schema_version: '1', active_pet_id: 'pet-v1', migration_complete: '1', show_onboarding: 'false' })) {
-      await sql.runAsync('INSERT INTO metadata(key,value) VALUES (?,?)', key, value);
+test('initialization failure rolls back and retries',async t=>{
+  let inject=true;
+  const {database}=await setup(t,connection=>({...connection,async execAsync(sql){
+    await connection.execAsync(sql);
+    if(inject&&/CREATE TABLE IF NOT EXISTS routines/.test(sql)){
+      inject=false;
+      await connection.execAsync("CREATE TRIGGER fail_initial_starter BEFORE INSERT ON routines WHEN NEW.id='starter-2' BEGIN SELECT RAISE(ABORT,'initial storage failure'); END;");
     }
-    await sql.runAsync('INSERT INTO settings(key,value) VALUES (?,?)', 'puptime.customActivities.v1', '["Training"]');
-    await sql.runAsync('INSERT INTO settings(key,value) VALUES (?,?)', 'puptime.theme.v1', 'soft-play');
-  });
-  assert.deepEqual(await migrateLegacy(database, async () => { throw new Error('Must not read originals'); }), { petId: 'pet-v1', migrated: false });
-  assert.equal((await database.read((sql) => sql.getFirstAsync<{ value: string }>('SELECT value FROM pet_settings WHERE pet_id=? AND key=?', 'pet-v1','puptime.customActivities.v1')))!.value, '["Training"]');
-  assert.equal(await database.read((sql) => sql.getFirstAsync('SELECT value FROM settings WHERE key=?', 'puptime.customActivities.v1')), null);
-  assert.equal((await database.read((sql) => sql.getFirstAsync<{ value: string }>('SELECT value FROM settings WHERE key=?', 'puptime.theme.v1')))!.value, 'soft-play');
+  }}));
+  await assert.rejects(initialize(database,()=> 'pet-1'),/initial storage failure/);
+  assert.deepEqual((await snapshot(database)).schema,[],'DDL and partially inserted puppy/routine must roll back together.');
+  assert.deepEqual(await initialize(database,()=> 'pet-1'),{petId:'pet-1'});
+  const saved=await snapshot(database);
+  assert.equal(saved.rows.puppies.length,1);assert.equal(saved.rows.routines.length,STARTER_SCHEDULE.length);
 });
 
-test('v2 upgrade adds empty sync state without rereading legacy or changing local records',async t=>{
- const {database}=await setup(t);
- await migrateLegacy(database,snapshot,()=> 'pet-v2');
- await database.write(sql=>sql.runAsync("UPDATE metadata SET value='2' WHERE key='schema_version'"));
- await migrateLegacy(database,async()=>{throw new Error('Legacy cannot be read during upgrade');});
- assert.equal((await database.read(sql=>sql.getFirstAsync<{value:string}>("SELECT value FROM metadata WHERE key='schema_version'")))!.value,'3');
- assert.equal((await database.read(sql=>sql.getFirstAsync<{n:number}>('SELECT COUNT(*) n FROM local_sync_owner')))!.n,0);
- assert.deepEqual((await database.read(sql=>sql.getAllAsync<{body:string}>('SELECT body FROM events ORDER BY at'))).map(row=>JSON.parse(row.body)),[first,second]);
+test('separate initializers choose one puppy',async t=>{
+  const {database,path}=await setup(t),other=await createLocalDatabase(sqliteTestConnection(path));
+  try{
+    const results=await Promise.all([initialize(database,()=> 'pet-first'),initialize(other,()=> 'pet-second')]);
+    assert.equal(results[0].petId,results[1].petId);
+    const saved=await snapshot(database);
+    assert.equal(saved.rows.puppies.length,1);assert.equal(saved.rows.routines.length,STARTER_SCHEDULE.length);
+  }finally{await other.close();}
+});
+
+test('unsupported or incomplete database is unchanged',async t=>{
+  const {database}=await setup(t);
+  await database.write(sql=>sql.execAsync("CREATE TABLE metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL); CREATE TABLE development_rows(id INTEGER PRIMARY KEY,note TEXT); INSERT INTO metadata VALUES ('schema_version','3'); INSERT INTO development_rows VALUES(1,'preserve development data');"));
+  const old=await snapshot(database);
+  await assert.rejects(initialize(database),/unsupported|development/i);
+  assert.deepEqual(await snapshot(database),old,'Version rejection must precede new DDL or data changes.');
+  await database.write(sql=>sql.execAsync('DROP TABLE development_rows; DROP TABLE metadata;'));
+  await initialize(database,()=> 'pet-1');
+  await database.write(sql=>sql.runAsync("UPDATE metadata SET value='999' WHERE key='schema_version'"));
+  const newer=await snapshot(database);
+  await assert.rejects(initialize(database),/unsupported|newer/i);assert.deepEqual(await snapshot(database),newer);
+  await database.write(async sql=>{
+    await sql.runAsync("UPDATE metadata SET value='4' WHERE key='schema_version'");
+    await sql.runAsync("DELETE FROM metadata WHERE key='active_pet_id'");
+  });
+  const incomplete=await snapshot(database);
+  await assert.rejects(initialize(database),/incomplete|active puppy/i);assert.deepEqual(await snapshot(database),incomplete);
+});
+
+test('foreign keys and pet-scoped IDs apply on the configured transaction connection',async t=>{
+  const {database}=await setup(t);await initialize(database,()=> 'pet-1');
+  const event={id:'same',type:'pee',at:100,source:'app'};
+  await assert.rejects(database.write(sql=>sql.runAsync('INSERT INTO events(pet_id,id,type,at,source) VALUES(?,?,?,?,?)','missing-pet',event.id,event.type,event.at,event.source)),/FOREIGN KEY/);
+  await database.write(async sql=>{
+    await sql.runAsync('INSERT INTO puppies(id,name) VALUES (?,?)','pet-2','Second');
+    for(const petId of ['pet-1','pet-2'])await sql.runAsync('INSERT INTO events(pet_id,id,type,at,source) VALUES(?,?,?,?,?)',petId,event.id,event.type,event.at,event.source);
+  });
+  assert.equal((await database.read(sql=>sql.getFirstAsync<{n:number}>('SELECT COUNT(*) n FROM events WHERE id=?',event.id)))!.n,2);
 });

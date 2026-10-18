@@ -190,6 +190,14 @@ export function activityFrequencyStats(
   };
 }
 
+export function activityMonthDate(at:number):Date {
+  const source=new Date(at),month=new Date(0);
+  month.setFullYear(source.getFullYear(),source.getMonth(),1);
+  month.setHours(12,0,0,0);
+  // The first supported month begins partway through it; keep a valid date.
+  return Number.isFinite(month.getTime())?month:source;
+}
+
 export function monthlyActivityStats(
   events: PuppyEvent[],
   types?: readonly EventType[],
@@ -206,7 +214,7 @@ export function monthlyActivityStats(
     const date = new Date(event.at);
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     const month = months.get(key) ?? {
-      date: new Date(date.getFullYear(), date.getMonth(), 1, 12),
+      date: activityMonthDate(event.at),
       total: 0,
       estimatedTotal: 0,
       recordedDays: new Set<string>(),
@@ -220,7 +228,7 @@ export function monthlyActivityStats(
   });
 
   return [...months.entries()]
-    .sort(([left], [right]) => right.localeCompare(left))
+    .sort(([,left], [,right]) => right.date.getTime()-left.date.getTime())
     .map(([key, month]) => ({
       key,
       date: month.date,
@@ -260,7 +268,6 @@ export function suggestScheduleFromEvents(
     byTypeAndDay.set(key, activity);
     const times = activity.days.get(day) ?? [];
     times.push(minutes);
-    times.sort((a, b) => a - b);
     activity.days.set(day, times);
   });
 
@@ -275,23 +282,37 @@ export function suggestScheduleFromEvents(
 
     // ponytail: nearby occurrences share a clock-time window; use sequence alignment if distinct routines within three hours need separating.
     for (let index = 0; index < 8 && remaining.length; index += 1) {
+      const timesByDay = new Map<string, number[]>();
+      for (const sample of remaining) {
+        const times = timesByDay.get(sample.day) ?? [];
+        times.push(sample.minutes);
+        timesByDay.set(sample.day, times);
+      }
       let best: number[] = [];
       let bestCenter = 0;
       let bestSpread = Infinity;
-      for (const candidate of remaining) {
-        const byDay = new Map<string, number>();
-        for (const sample of remaining) {
-          const offset = clockOffset(sample.minutes, candidate.minutes);
-          const previous = byDay.get(sample.day);
-          if (Math.abs(offset) <= 90 && (previous === undefined || Math.abs(offset) < Math.abs(previous))) {
-            byDay.set(sample.day, offset);
+      // Only clock minutes distinguish candidates. Sorted daily times let us
+      // find the nearest occurrence without comparing every pair of logs.
+      for (const candidate of new Set(remaining.map((sample) => sample.minutes))) {
+        const offsets: number[] = [];
+        for (const times of timesByDay.values()) {
+          let low = 0, high = times.length;
+          while (low < high) {
+            const middle = (low + high) >>> 1;
+            if (times[middle] < candidate) low = middle + 1;
+            else high = middle;
           }
+          const before = times[(low + times.length - 1) % times.length];
+          const after = times[low % times.length];
+          const beforeOffset = clockOffset(before, candidate), afterOffset = clockOffset(after, candidate);
+          const offset = Math.abs(beforeOffset) < Math.abs(afterOffset)
+            || (Math.abs(beforeOffset) === Math.abs(afterOffset) && before < after) ? beforeOffset : afterOffset;
+          if (Math.abs(offset) <= 90) offsets.push(offset);
         }
-        const offsets = [...byDay.values()];
         const spread = offsets.reduce((sum, value) => sum + Math.abs(value), 0) / offsets.length;
         if (offsets.length > best.length || (offsets.length === best.length && spread < bestSpread)) {
           best = offsets;
-          bestCenter = candidate.minutes;
+          bestCenter = candidate;
           bestSpread = spread;
         }
       }

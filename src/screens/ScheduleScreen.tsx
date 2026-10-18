@@ -15,6 +15,8 @@ import {
 } from 'react-native';
 
 import { scheduleStatusesForDay, suggestScheduleFromEvents, type ScheduleStatus } from '../analytics';
+import {activityWindowBounds,useActivityWindow,type ActivityViewProps} from '../activity-view';
+import {ActivityLoadState} from '../components/ActivityLoadState';
 import { ActivityIcon } from '../components/ActivityIcon';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { DateTimeSelector } from '../components/DateTimeSelector';
@@ -27,7 +29,9 @@ import { ScheduleEntryDeletedError } from '../schedule-editor';
 type Draft = { id?: string; type: EventType; customLabel?: string; minutes: number; reminder: boolean; toleranceMinutes?: number };
 
 export function ScheduleScreen({
-  events,
+  events:projectedEvents,
+  activity,
+  refreshToken,
   schedule,
   customActivities,
   onChange,
@@ -44,7 +48,7 @@ export function ScheduleScreen({
   onRemoveEntry:(id:string)=>Promise<void>;
   onRequestReminderPermission: () => Promise<boolean>;
   theme: Theme;
-}) {
+}&ActivityViewProps) {
   const { activityColors, activityLabel, locale, t } = useLocalization();
   const [draft, setDraft] = useState<Draft | null>(null);
   const originalDraft=useRef<ScheduleEntry|undefined>(undefined);
@@ -57,6 +61,9 @@ export function ScheduleScreen({
   const [reviewingSuggestion, setReviewingSuggestion] = useState(false);
   const [applyingSuggestion, setApplyingSuggestion] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const bounds=activityWindowBounds(now,14);
+  const window=useActivityWindow(activity,projectedEvents,bounds.from,bounds.until,refreshToken);
+  const events=window.events;
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30_000);
@@ -65,7 +72,7 @@ export function ScheduleScreen({
 
   const statuses = scheduleStatusesForDay(events, schedule, new Date(now), 30, now);
   const suggestion = suggestScheduleFromEvents(events, 14, new Date(now));
-  const canSuggest = suggestion.entries.length > 0;
+  const canSuggest = suggestion.entries.length > 0&&!window.loading&&!window.error;
   const completed = statuses.filter((item) => item.status === 'done').length;
   const due = statuses.filter((item) => item.status === 'due').length;
   const missed = statuses.filter((item) => item.status === 'missed').length;
@@ -176,6 +183,7 @@ export function ScheduleScreen({
   return (
     <>
       <ScrollView testID="screen.schedule" contentContainerStyle={styles.content}>
+        <ActivityLoadState loading={window.loading} error={window.error} onRetry={window.retry} theme={theme}/>
         <Text
           numberOfLines={1}
           style={[

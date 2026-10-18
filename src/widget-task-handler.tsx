@@ -57,9 +57,9 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
         : type === 'nap'
           ? createNapEvent('widget', at)
           : createEvent(activity.type, 'widget', at, activity.customLabel);
-      const nextEvents = openNap
-        ? await updateEvent(openNap.id, { endedAt: event.endedAt })
-        : await appendEvents([event]);
+      if (openNap) await updateEvent(openNap.id, { endedAt: event.endedAt });
+      else await appendEvents([event]);
+      const nextEvents=await loadEvents();
       const [preferences, languagePreference] = await Promise.all([
         loadNotificationPreferences(),
         loadLanguagePreference(),

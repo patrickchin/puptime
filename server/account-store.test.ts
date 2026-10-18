@@ -3,6 +3,7 @@ import worker from './index';
 import { expect, test } from 'vitest';
 import { runInDurableObject } from 'cloudflare:test';
 import { mutationSchema, type Mutation } from '../src/cloud/protocol';
+import { AccountStore } from './account-store';
 
 async function store(petId = 'pet-1') {
   const account = env.ACCOUNTS.get(env.ACCOUNTS.newUniqueId());
@@ -15,6 +16,61 @@ function create(recordId = 'event-1', petId = 'pet-1'): Mutation {
 function edit(original: Mutation, revision: number, patch: object, intent = 'patch'): Mutation {
   return mutationSchema.parse({ ...original, operationId: crypto.randomUUID(), baseRevision: revision, intent, patch });
 }
+
+test('fresh account uses one complete first-release schema baseline',async()=>{
+  const account=await store();
+  await runInDurableObject(account,(_instance,state)=>{
+    expect(state.storage.sql.exec<{version:number}>('SELECT version FROM schema_metadata').one().version).toBe(3);
+    const names=state.storage.sql.exec<{name:string}>("SELECT name FROM sqlite_master WHERE type='table'").toArray().map(row=>row.name);
+    for(const name of ['records','revisions','operations','pets','enrollments','enrolled_devices','account_state'])expect(names).toContain(name);
+  });
+});
+
+test('unsupported account schema rejection preserves stored rows and table definitions',async()=>{
+  const account=await store();
+  await account.apply(create());
+  await runInDurableObject(account,(_instance,state)=>{
+    for(const version of [1,2,999]){
+      state.storage.sql.exec('UPDATE schema_metadata SET version=?',version);
+      const before=state.storage.sql.exec('SELECT name,sql FROM sqlite_master ORDER BY name').toArray();
+      const records=state.storage.sql.exec('SELECT * FROM records').toArray();
+      expect(()=>new AccountStore(state,env)).toThrow(/unsupported/i);
+      expect(state.storage.sql.exec('SELECT name,sql FROM sqlite_master ORDER BY name').toArray()).toEqual(before);
+      expect(state.storage.sql.exec('SELECT * FROM records').toArray()).toEqual(records);
+    }
+  });
+});
+
+test('current cloud event and routine payloads use constrained columns and preserve optional fields',async()=>{
+  const account=await store();
+  const event=mutationSchema.parse({...create(),patch:{type:'nap',at:100,endedAt:null,source:'app',note:'',estimated:false}});
+  const saved=await account.apply(event);
+  const routine=mutationSchema.parse({...create('routine-1'),kind:'routine',patch:{type:'custom',customLabel:'Training',minutes:60,reminder:false,toleranceMinutes:0}});
+  const savedRoutine=await account.apply(routine);
+  await runInDurableObject(account,(_instance,state)=>{
+    const columns=state.storage.sql.exec<{name:string}>('PRAGMA table_info(records)').toArray().map(row=>row.name);
+    expect(columns).not.toContain('body');expect(columns).toContain('pet_id');expect(columns).toContain('kind');
+    const row=state.storage.sql.exec<{end_state:number;ended_at:number|null;note:string;estimated:number}>('SELECT end_state,ended_at,note,estimated FROM record_events WHERE record_id=?',event.recordId).one();
+    expect(row).toEqual({end_state:1,ended_at:null,note:'',estimated:0});
+    const entry=state.storage.sql.exec<{custom_label:string;reminder:number;tolerance_minutes:number}>('SELECT custom_label,reminder,tolerance_minutes FROM record_routines WHERE record_id=?',routine.recordId).one();
+    expect(entry).toEqual({custom_label:'Training',reminder:0,tolerance_minutes:0});
+    expect(()=>state.storage.sql.exec('UPDATE record_routines SET minutes=1440 WHERE record_id=?',routine.recordId)).toThrow(/constraint/i);
+  });
+  expect((await account.pull(0)).changes).toEqual([saved.record,savedRoutine.record]);
+  expect((await account.apply(edit(event,1,{note:'updated'}))).record.data).toEqual({type:'nap',at:100,endedAt:null,source:'app',note:'updated',estimated:false});
+});
+
+test('account retirement removes typed payloads and foreign keys reject orphans',async()=>{
+  const account=await store();await account.apply(create());
+  await account.apply(mutationSchema.parse({...create('routine-1'),kind:'routine',patch:{type:'meal',minutes:60}}));
+  await runInDurableObject(account,(_instance,state)=>{
+    expect(()=>state.storage.sql.exec("INSERT INTO record_events(record_id,type,at,source) VALUES('missing','pee',100,'app')")).toThrow(/foreign key/i);
+  });
+  await account.retire();
+  await runInDurableObject(account,(_instance,state)=>{
+    for(const table of ['records','record_events','record_routines','revisions','operations'])expect(state.storage.sql.exec<{n:number}>(`SELECT COUNT(*) n FROM ${table}`).one().n).toBe(0);
+  });
+});
 
 test('accepted writes commit state, history, and an incrementing change cursor', async () => {
   const account = await store();

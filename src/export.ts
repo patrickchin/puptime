@@ -1,4 +1,5 @@
 import { dateKey, eventLabel, isEventType, type PuppyEvent } from './domain.ts';
+import { parseEvents } from './storage-validation.ts';
 
 const HEADERS = [
   'Date',
@@ -138,10 +139,6 @@ export function csvToEvents(csv: string): PuppyEvent[] {
     if (estimated !== 'true' && estimated !== 'false') {
       throw new CsvImportError(`Invalid estimated flag on row ${rowNumber}.`);
     }
-    if (note.length > 300 || customLabel.length > 40) {
-      throw new CsvImportError(`Note or custom label is too long on row ${rowNumber}.`);
-    }
-
     const at = isoTimestamp(startedAt, rowNumber);
     const event: PuppyEvent = {
       id,
@@ -164,6 +161,7 @@ export function csvToEvents(csv: string): PuppyEvent[] {
       throw new CsvImportError(`Non-nap activity has a nap state or end time on row ${rowNumber}.`);
     }
     ids.add(id);
-    return event;
+    try { return parseEvents([event])[0]; }
+    catch { throw new CsvImportError(`Invalid activity fields on row ${rowNumber}.`); }
   });
 }

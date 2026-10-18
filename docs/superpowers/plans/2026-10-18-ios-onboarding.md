@@ -1,4 +1,6 @@
-# iOS Interactive Onboarding Implementation Plan
+# iOS Feature Walkthrough Implementation Plan
+
+This historical plan covers the feature walkthrough. Full first-launch onboarding—optional account creation/sign-in, puppy profile creation or restore, contextual permissions, resumable setup, and the first real log—is unfinished phase 4 work in `2026-10-17-cloud-rollout.md`. Passing these walkthrough tasks does not complete onboarding.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans inline with TDD and one fresh whole-branch review. Continue under existing autonomous authorization; no implementer subagents or additional review passes.
 

@@ -43,6 +43,7 @@ import { ScheduleScreen } from './src/screens/ScheduleScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { AccountScreen } from './src/screens/AccountScreen';
 import { useCloud } from './src/cloud/use-cloud';
+import {getActivityData,type ActivityQueries} from './src/activity-data';
 import { TimelineScreen } from './src/screens/TimelineScreen';
 import {
   ADD_NOTE_ACTION,
@@ -113,6 +114,11 @@ export default function App() {
   languageRef.current = language;
   const [tab, setTab] = useState<Tab>('log');
   const [events, setEvents] = useState<PuppyEvent[]>([]);
+  const [activity,setActivity]=useState<ActivityQueries>();
+  const activityRef=useRef<ActivityQueries|undefined>(undefined);
+  const [refreshToken,setRefreshToken]=useState(0);
+  const [eventCount,setEventCount]=useState(0);
+  const refreshGeneration=useRef(0);
   const [customActivities, setCustomActivities] = useState<string[]>([]);
   const [activityCustomizations, setActivityCustomizations] = useState<ActivityCustomizations>({});
   const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
@@ -131,9 +137,19 @@ export default function App() {
   }, [language]);
 
   const refresh = useCallback(async () => {
+    const generation=++refreshGeneration.current;
+    const data=await getActivityData();
+    activityRef.current=data;
     const pending = await readPendingWidgetEvents();
-    const nextEvents = pending.length ? await appendEvents(pending) : await loadEvents();
+    if (pending.length) await appendEvents(pending);
+    let nextEvents:PuppyEvent[],count:number;
+    if(data){const [latest,summary]=await Promise.all([data.latestEvents(),data.summary()]);nextEvents=latest;count=summary.eventCount;}
+    else{nextEvents=await loadEvents();count=nextEvents.length;}
+    if(generation!==refreshGeneration.current)return nextEvents;
+    setActivity(data);
     setEvents(nextEvents);
+    setEventCount(count);
+    setRefreshToken(value=>value+1);
     const nextCustomActivities = await loadCustomActivities(nextEvents);
     setCustomActivities(nextCustomActivities);
     const [nextSchedule, nextWidgetActions, nextTheme, nextLanguagePreference, nextNotificationPreferences, nextPermission, nextActivityCustomizations] = await Promise.all([
@@ -145,13 +161,14 @@ export default function App() {
       getNotificationPermissionState(),
       loadActivityCustomizations(),
     ]);
+    if(generation!==refreshGeneration.current)return nextEvents;
     setSchedule(nextSchedule);
     setWidgetActions(nextWidgetActions);
     setThemePreference(nextTheme);
     setLanguagePreference(nextLanguagePreference);
     setNotificationPreferences(nextNotificationPreferences);
     setNotificationPermission(nextPermission);
-    setActivityCustomizations(nextActivityCustomizations);
+    setActivityCustomizations(current=>JSON.stringify(current)===JSON.stringify(nextActivityCustomizations)?current:nextActivityCustomizations);
     void Promise.all([
       syncScheduleReminders(
         nextSchedule,
@@ -168,11 +185,11 @@ export default function App() {
     return nextEvents;
   }, []);
 
-  const refreshFromCloud=useCallback(async()=>{
+  const refreshCommittedState=useCallback(async()=>{
     try{await refresh();}
     catch{Alert.alert(translate(languageRef.current,'app.loadErrorTitle'),translate(languageRef.current,'app.loadErrorBody'));}
   },[refresh]);
-  const cloud=useCloud(refreshFromCloud);
+  const cloud=useCloud(refreshCommittedState);
 
   useEffect(() => {
     let mounted = true;
@@ -263,9 +280,14 @@ export default function App() {
     const eventId = typeof data.eventId === 'string' ? data.eventId : undefined;
     const type = isQuickEventType(data.type) || (typeof data.type === 'string' && data.type.startsWith('custom:')) ? data.type : undefined;
     const at = typeof data.at === 'number' ? data.at : undefined;
-    const event = nextEvents.find((candidate) => candidate.id === eventId)
+    const dataSource=activityRef.current;
+    const requested=eventId&&dataSource?await dataSource.getEvent(eventId):nextEvents.find(candidate=>candidate.id===eventId);
+    const candidates=!requested&&type&&at!==undefined&&dataSource
+      ?await dataSource.eventsBetween(Math.max(-8640000000000000,at-60000),Math.min(8640000000000001,at+60001))
+      :nextEvents;
+    const event = requested
       ?? (type && at !== undefined
-        ? nextEvents.find((candidate) => (
+        ? candidates.find((candidate) => (
             activityKey(candidate) === type
             && (
               (candidate.source === 'widget' && Math.abs(candidate.at - at) < 60_000)
@@ -276,9 +298,8 @@ export default function App() {
     if (!event) return;
 
     if (response.actionIdentifier === ADD_NOTE_ACTION && response.userText?.trim()) {
-      const updatedEvents = await updateEvent(event.id, { note: normalizeNote(response.userText) });
-      setEvents(updatedEvents);
-      updateHomeWidget(updatedEvents).catch(() => undefined);
+      await updateEvent(event.id, { note: normalizeNote(response.userText) });
+      await refreshCommittedState();
     }
     setAccountVisible(false);
     setSettingsVisible(false);
@@ -287,7 +308,7 @@ export default function App() {
       eventId: event.id,
       focusNote: response.actionIdentifier === ADD_NOTE_ACTION && !response.userText?.trim(),
     });
-  }, [initialOnboardingCheck, refresh]);
+  }, [initialOnboardingCheck, refresh, refreshCommittedState]);
 
   useEffect(() => {
     const initialResponse = Notifications.getLastNotificationResponse();
@@ -313,24 +334,22 @@ export default function App() {
   const displayPastLabel = (event: PuppyEvent) => activityCustomizations[activityKey(event)]?.name ?? localizedEventPastLabel(language, event);
 
   const persistLogEvent = async (type: EventType, customLabel?: string) => {
-    if (type === 'custom' && customLabel) setCustomActivities(await saveCustomActivity(customLabel));
+    if (Platform.OS !== 'ios' && type === 'custom' && customLabel) setCustomActivities(await saveCustomActivity(customLabel));
     const now = Date.now();
     if (type === 'nap') {
-      const openNap = (await loadEvents()).find(isOpenNap);
+      const openNap = (activityRef.current?await activityRef.current.latestEvents():await loadEvents()).find(isOpenNap);
       if (openNap) {
         const event = { ...openNap, endedAt: Math.max(openNap.at, now) };
-        const nextEvents = await updateEvent(openNap.id, { endedAt: event.endedAt });
-        setEvents(nextEvents);
+        await updateEvent(openNap.id, { endedAt: event.endedAt });
         setUndoState({ event, restore: openNap, message: translate(language, 'app.napEnded') });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-        updateHomeWidget(nextEvents).catch(() => undefined);
+        await refreshCommittedState();
         return;
       }
     }
 
     const event = type === 'nap' ? createNapEvent('app', now) : createEvent(type, 'app', now, customLabel);
-    const nextEvents = await appendEvents([event]);
-    setEvents(nextEvents);
+    await appendEvents([event],{restoreCustomActivities:type==='custom'});
     setUndoState({
       event,
       message: type === 'nap'
@@ -338,8 +357,7 @@ export default function App() {
         : translate(language, 'app.logged', { activity: displayPastLabel(event) }),
     });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-    syncPottyReminders(nextEvents, notificationPreferences, language).catch(() => undefined);
-    updateHomeWidget(nextEvents).catch(() => undefined);
+    await refreshCommittedState();
   };
 
   const logEvent = (type: EventType, customLabel?: string) => {
@@ -347,10 +365,8 @@ export default function App() {
   };
 
   const deleteEvent = async (event: PuppyEvent) => {
-    const nextEvents = await removeEvent(event.id);
-    setEvents(nextEvents);
-    syncPottyReminders(nextEvents, notificationPreferences, language).catch(() => undefined);
-    updateHomeWidget(nextEvents).catch(() => undefined);
+    await removeEvent(event.id);
+    await refreshCommittedState();
   };
 
   const importActivity = async () => {
@@ -358,11 +374,8 @@ export default function App() {
       const incoming = await pickEventsCsv();
       if (incoming === null) return;
       const result = await importEvents(incoming);
-      setEvents(result.events);
       setUndoState(null);
-      void loadCustomActivities(result.events).then(setCustomActivities).catch(() => undefined);
-      syncPottyReminders(result.events, notificationPreferences, language).catch(() => undefined);
-      updateHomeWidget(result.events).catch(() => undefined);
+      await refreshCommittedState();
       Alert.alert(translate(language, 'insights.importedTitle'), translate(language, 'insights.importedBody', {
         imported: result.imported,
         skipped: result.skipped,
@@ -383,26 +396,22 @@ export default function App() {
     event: PuppyEvent,
     changes: PuppyEventChanges,
   ) => {
-    if ((changes.type??event.type)==='custom'&&changes.customLabel&&activityKey({type:'custom',customLabel:changes.customLabel})!==activityKey(event)) {
+    const restoreCustomActivities=!!((changes.type??event.type)==='custom'&&changes.customLabel&&activityKey({type:'custom',customLabel:changes.customLabel})!==activityKey(event));
+    if (Platform.OS !== 'ios' && restoreCustomActivities && changes.customLabel) {
       setCustomActivities(await saveCustomActivity(changes.customLabel));
     }
-    const nextEvents=await updateEvent(event.id,changes);
-    setEvents(nextEvents);
+    await updateEvent(event.id,changes,{restoreCustomActivities});
     Haptics.selectionAsync().catch(() => undefined);
-    syncPottyReminders(nextEvents, notificationPreferences, language).catch(() => undefined);
-    updateHomeWidget(nextEvents).catch(() => undefined);
+    await refreshCommittedState();
   };
 
   const persistUndo = async () => {
     if (!undoState) return;
-    const nextEvents = undoState.restore
-      ? await appendEvents([undoState.restore])
-      : await removeEvent(undoState.event.id);
-    setEvents(nextEvents);
+    if (undoState.restore) await appendEvents([undoState.restore]);
+    else await removeEvent(undoState.event.id);
     setUndoState(null);
     Haptics.selectionAsync().catch(() => undefined);
-    syncPottyReminders(nextEvents, notificationPreferences, language).catch(() => undefined);
-    updateHomeWidget(nextEvents).catch(() => undefined);
+    await refreshCommittedState();
   };
 
   const undo = () => {
@@ -424,9 +433,13 @@ export default function App() {
       Alert.alert(translate(language, 'app.routineSaved'), translate(language, 'app.reminderError'));
     }
   };
-  const changeSchedule = async (nextSchedule:ScheduleEntry[]) => {await saveSchedule(nextSchedule);await applySavedSchedule(await loadSchedule());};
-  const changeScheduleEntry = async (entry:ScheduleEntry,original?:ScheduleEntry) => applySavedSchedule(await saveScheduleEntry(entry,original));
-  const deleteScheduleEntry = async (id:string) => applySavedSchedule(await removeScheduleEntry(id));
+  const refreshCommittedSchedule=async()=>{
+    try{await applySavedSchedule(await loadSchedule());}
+    catch{Alert.alert(translate(language,'app.loadErrorTitle'),translate(language,'app.loadErrorBody'));}
+  };
+  const changeSchedule = async (nextSchedule:ScheduleEntry[]) => {await saveSchedule(nextSchedule);await refreshCommittedSchedule();};
+  const changeScheduleEntry = async (entry:ScheduleEntry,original?:ScheduleEntry) => {await saveScheduleEntry(entry,original);await refreshCommittedSchedule();};
+  const deleteScheduleEntry = async (id:string) => {await removeScheduleEntry(id);await refreshCommittedSchedule();};
 
   const chooseTheme = (preference: ThemePreference) => {
     saveThemePreference(preference)
@@ -553,12 +566,14 @@ export default function App() {
       );
     }
     if (tab === 'learn') return <LearnScreen theme={theme} />;
-    if (tab === 'timeline') return <TimelineScreen events={events} customActivities={customActivities} theme={theme} />;
-    if (tab === 'insights') return <InsightsScreen events={events} customActivities={customActivities} onImport={importActivity} theme={theme} />;
+    if (tab === 'timeline') return <TimelineScreen events={events} activity={activity} refreshToken={refreshToken} customActivities={customActivities} theme={theme} />;
+    if (tab === 'insights') return <InsightsScreen events={events} activity={activity} refreshToken={refreshToken} customActivities={customActivities} onImport={importActivity} theme={theme} />;
     if (tab === 'schedule') {
       return (
         <ScheduleScreen
           events={events}
+          activity={activity}
+          refreshToken={refreshToken}
           schedule={schedule}
           customActivities={customActivities}
           onChange={changeSchedule}
@@ -572,6 +587,8 @@ export default function App() {
     return (
       <LogScreen
         events={events}
+        activity={activity}
+        refreshToken={refreshToken}
         customActivities={customActivities}
         editRequest={editRequest}
         onEditRequestHandled={() => setEditRequest(null)}
@@ -589,6 +606,8 @@ export default function App() {
     activityCustomizations,
     editRequest,
     events,
+    activity,
+    refreshToken,
     language,
     languagePreference,
     notificationPermission,
@@ -658,7 +677,7 @@ export default function App() {
             onClose={() => setPreferencePicker(null)}
           />
           <Modal visible={accountVisible&&cloud.available} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={()=>setAccountVisible(false)}>
-            {accountVisible?<SafeAreaProvider><AccountScreen cloud={cloud} theme={theme} eventCount={events.length} onBack={()=>setAccountVisible(false)} onOpenActivity={()=>{setAccountVisible(false);setSettingsVisible(false);setTab('log');}}/></SafeAreaProvider>:null}
+            {accountVisible?<SafeAreaProvider><AccountScreen cloud={cloud} theme={theme} eventCount={eventCount} onBack={()=>setAccountVisible(false)} onOpenActivity={()=>{setAccountVisible(false);setSettingsVisible(false);setTab('log');}}/></SafeAreaProvider>:null}
           </Modal>
         </SafeAreaView>
       </LocalizationProvider>

@@ -12,7 +12,7 @@ name: Completed onboarding remains complete after installing the Release update
     id: settings.open
 - assertVisible:
     id: settings.puppy.name
-    text: .*Mochi.*
+    text: ${EXPECTED_PUPPY_NAME}
 - takeScreenshot: completed-upgrade-keeps-puppy-name
 - tapOn:
     id: settings.back

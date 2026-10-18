@@ -5,6 +5,7 @@ import { activityEmojis } from '../activity-customization.ts';
 
 const timestamp = z.number().int().min(-8640000000000000).max(8640000000000000);
 export const identifierSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/);
+export const localIdSchema = z.string().min(1).max(256).refine((id) => !!id.trim() && !/[\u0000-\u001f\u007f]/.test(id));
 // Existing CSV records can have user-supplied IDs. SQL binds them as values.
 export const recordIdSchema = z.string().min(1).max(2048).refine((value) => !!value.trim() && !/[\u0000-\u001f\u007f]/.test(value));
 const label = z.string().trim().min(1).max(256);
@@ -26,7 +27,7 @@ export const eventDataSchema = eventObject.superRefine((event, context) => {
 const puppy = z.strictObject({ name: label });
 const routineFields = { type: z.enum(eventTypes), customLabel: customLabel.optional(), minutes: z.number().int().min(0).max(1439), reminder: z.boolean().optional(), toleranceMinutes: z.number().int().min(0).max(1440).optional() };
 const routineObject = z.strictObject(routineFields);
-const routine = routineObject.refine((data) => data.type !== 'custom' || !!data.customLabel, 'Custom activity requires a label.');
+export const routineDataSchema = routineObject.refine((data) => data.type !== 'custom' || !!data.customLabel, 'Custom activity requires a label.');
 const customization = z.strictObject({ activityKey, name: customLabel.optional(), emoji: z.enum(activityEmojis).optional(), color: z.number().int().min(0).max(6).optional() });
 const customActivity = z.strictObject({ label: customLabel });
 const accountPreferences = z.strictObject({
@@ -39,7 +40,7 @@ const accountPreferences = z.strictObject({
   pottyAfterPeeDelayMinutes: z.union([z.literal(15), z.literal(30), z.literal(45), z.literal(60), z.literal(120), z.literal(180), z.literal(240)]).optional(),
   pottyAfterMealDelayMinutes: z.union([z.literal(15), z.literal(30), z.literal(45), z.literal(60), z.literal(120), z.literal(180), z.literal(240)]).optional(),
 });
-const schemas = { event: eventDataSchema, puppy, routine, customActivity, customization, accountPreferences };
+const schemas = { event: eventDataSchema, puppy, routine: routineDataSchema, customActivity, customization, accountPreferences };
 export type RecordKind = keyof typeof schemas;
 export type RecordData = z.infer<(typeof schemas)[RecordKind]>;
 export function recordDataSchema<Kind extends RecordKind>(kind: Kind): typeof schemas[Kind] { return schemas[kind]; }
@@ -74,7 +75,7 @@ const recordMetadata = {
 export const cloudRecordSchema = z.discriminatedUnion('kind', [
   z.strictObject({ ...recordMetadata, kind: z.literal('event'), data: eventDataSchema }),
   z.strictObject({ ...recordMetadata, kind: z.literal('puppy'), data: puppy }),
-  z.strictObject({ ...recordMetadata, kind: z.literal('routine'), data: routine }),
+  z.strictObject({ ...recordMetadata, kind: z.literal('routine'), data: routineDataSchema }),
   z.strictObject({ ...recordMetadata, kind: z.literal('customActivity'), data: customActivity }),
   z.strictObject({ ...recordMetadata, kind: z.literal('customization'), data: customization }),
   z.strictObject({ ...recordMetadata, kind: z.literal('accountPreferences'), data: accountPreferences }),

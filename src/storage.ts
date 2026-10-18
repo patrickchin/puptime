@@ -1,8 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { assertValidEvents, EventsImportError, EventsStorageError } from './storage-validation.ts';
-import { storageKeys } from './local/legacy.ts';
+import { parseEvents, parseSchedule, EventsImportError, EventsStorageError } from './storage-validation.ts';
+import { storageKeys } from './local/settings.ts';
 import { applyScheduleEntryEdit } from './schedule-editor.ts';
 import type { FinishOnboardingOptions } from './onboarding.ts';
+import type { EventWriteOptions } from './domain.ts';
 export { assertValidEvents, EventsImportError, EventsStorageError } from './storage-validation.ts';
 
 import { normalizeActivityCustomizations, type ActivityCustomization, type ActivityCustomizations } from './activity-customization.ts';
@@ -65,7 +66,7 @@ function queueEventWrite<T>(operation: () => Promise<T>): Promise<T> {
 }
 
 async function writeEvents(events: PuppyEvent[]): Promise<PuppyEvent[]> {
-  assertValidEvents(events);
+  events=parseEvents(events);
   const sorted = [...events].sort((a, b) => b.at - a.at);
   await AsyncStorage.setItem(EVENTS_KEY, JSON.stringify(sorted));
   return sorted;
@@ -85,17 +86,16 @@ export async function loadEvents(): Promise<PuppyEvent[]> {
   const stored = await AsyncStorage.getItem(EVENTS_KEY);
   if (stored === null) return [];
   try {
-    const events: unknown = JSON.parse(stored);
-    assertValidEvents(events);
+    const events = parseEvents(JSON.parse(stored));
     return events.sort((a, b) => b.at - a.at);
   } catch {
     throw new EventsStorageError();
   }
 }
 
-export function appendEvents(incoming: PuppyEvent[]): Promise<PuppyEvent[]> {
+export function appendEvents(incoming: PuppyEvent[],_options?:EventWriteOptions): Promise<PuppyEvent[]> {
   return queueEventWrite(async () => {
-    assertValidEvents(incoming);
+    incoming=parseEvents(incoming);
     const current = await loadEvents();
     const byId = new Map(current.map((event) => [event.id, event]));
     incoming.forEach((event) => byId.set(event.id, {
@@ -113,7 +113,7 @@ export function importEvents(incoming: PuppyEvent[]): Promise<{
   skipped: number;
 }> {
   return queueEventWrite(async () => {
-    assertValidEvents(incoming);
+    incoming=parseEvents(incoming);
     const current = await loadEvents();
     const ids = new Set(current.map((event) => event.id));
     const additions = incoming.filter((event) => !ids.has(event.id));
@@ -135,6 +135,7 @@ export function updateEventTime(id: string, at: number): Promise<PuppyEvent[]> {
 export function updateEvent(
   id: string,
   changes: PuppyEventChanges,
+  _options?:EventWriteOptions,
 ): Promise<PuppyEvent[]> {
   return queueEventWrite(async () => writeEvents((await loadEvents())
     .map((event) => (event.id === id ? { ...event, ...changes } : event))));
@@ -152,7 +153,7 @@ export async function loadSchedule(): Promise<ScheduleEntry[]> {
 export async function saveSchedule(schedule: ScheduleEntry[]): Promise<void> {
   await AsyncStorage.setItem(
     SCHEDULE_KEY,
-    JSON.stringify([...schedule].sort((a, b) => a.minutes - b.minutes)),
+    JSON.stringify(parseSchedule(schedule).sort((a, b) => a.minutes - b.minutes)),
   );
 }
 

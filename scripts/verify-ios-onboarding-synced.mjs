@@ -26,7 +26,7 @@ const directory=join(simctl('get_app_container',udid,app,'data'),'Documents/SQLi
 cpSync(directory,join(output,'previous-synthetic-sqlite'),{recursive:true});
 const path=join(directory,'puptime-v2.db'),inspection=new DatabaseSync(path,{readOnly:true});
 inspection.exec('PRAGMA busy_timeout=5000');
-const tables=['metadata','puppies','events','routines','settings','pet_settings','local_revisions','local_sync_owner','local_sync_pets','local_sync_outbox','local_sync_records','local_sync_acks','local_sync_baseline','legacy_snapshots'];
+const tables=['metadata','puppies','events','routines','settings','pet_settings','local_revisions','local_sync_owner','local_sync_pets','local_sync_outbox','local_sync_records','local_sync_acks','local_sync_baseline'];
 const snapshot=()=>Object.fromEntries(tables.map(table=>[table,inspection.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all().map(row=>({...row}))]));
 let database,remote,stoppedPid;
 try {
@@ -45,12 +45,12 @@ try {
   const files=readdirSync(join(state.persist,'v3/do'),{recursive:true}).filter(file=>typeof file==='string'&&file.endsWith('.sqlite'));
   for(const file of files){
     const candidate=new DatabaseSync(join(state.persist,'v3/do',file),{readOnly:true});
-    if(candidate.prepare("SELECT name FROM sqlite_master WHERE name='records'").get()&&candidate.prepare("SELECT id FROM records WHERE json_extract(body,'$.petId')=? LIMIT 1").get(pet.cloud_pet_id)){
+    if(candidate.prepare("SELECT name FROM sqlite_master WHERE name='records'").get()&&candidate.prepare("SELECT id FROM records WHERE pet_id=? LIMIT 1").get(pet.cloud_pet_id)){
       assert.equal(remote,undefined,'Synthetic puppy must belong to exactly one account store.');remote=candidate;
     }else candidate.close();
   }
   assert.ok(remote,'Actual local Worker account store must contain the enrolled puppy.');
-  const cloudCount=()=>remote.prepare("SELECT count(*) n FROM records WHERE json_extract(body,'$.petId')=? AND json_extract(body,'$.kind')='event' AND json_extract(body,'$.deleted')=0").get(pet.cloud_pet_id).n;
+  const cloudCount=()=>remote.prepare("SELECT count(*) n FROM records WHERE pet_id=? AND kind='event' AND deleted=0").get(pet.cloud_pet_id).n;
   assert.equal(cloudCount(),expected);
   const before=snapshot();
   flow('ios-onboarding-replay-populated.yaml');

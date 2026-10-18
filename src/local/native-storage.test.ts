@@ -3,21 +3,66 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test, { type TestContext } from 'node:test';
-import { createLocalDatabase, migrateLegacy } from './database.ts';
-import { legacyKeys, parseLegacySnapshot } from './legacy.ts';
+import { createLocalDatabase, initializeLocalDatabase } from './database.ts';
 import { sqliteTestConnection } from './sqlite-test-adapter.ts';
 import { createNativeStorage } from './native-storage.ts';
 import { createLocalRuntime } from './runtime-factory.ts';
 import { DEFAULT_NOTIFICATION_PREFERENCES, type NotificationPreferences } from '../notification-config.ts';
 import type { PuppyEvent } from '../domain.ts';
+import { csvToEvents, eventsToCsv } from '../export.ts';
 async function setup(t: TestContext) {
   const directory = await mkdtemp(join(tmpdir(),'puptime-native-settings-'));
   const path = join(directory,'data.db');
   const database = await createLocalDatabase(sqliteTestConnection(path));
   t.after(async () => { await database.close(); await rm(directory,{recursive:true,force:true}); });
-  await migrateLegacy(database,parseLegacySnapshot(legacyKeys.map((key) => [key,null])),()=> 'pet-1');
+  await initializeLocalDatabase(database,()=> 'pet-1');
   return { database, path, storage:createNativeStorage(database,'pet-1') };
 }
+
+test('local writes enforce cloud field limits without committing invalid creation edit or import',async t=>{
+  const {database}=await setup(t),{storage}=await createLocalRuntime(database,'pet-1');
+  const saved:PuppyEvent={id:'x'.repeat(256),type:'custom',customLabel:'c'.repeat(40),at:8640000000000000,source:'app',note:'n'.repeat(16384)};
+  await storage.appendEvents([saved]);
+  assert.deepEqual(await storage.loadEvents(),[saved]);
+  const snapshot=()=>database.read(async sql=>Object.fromEntries(await Promise.all(['events','routines','puppies','pet_settings','local_revisions','local_sync_outbox'].map(async table=>[table,(await sql.getAllAsync<Record<string,unknown>>(`SELECT * FROM ${table} ORDER BY rowid`)).map(row=>({...row}))]))));
+  const before=await snapshot();
+  for(const invalid of [
+    {...saved,id:'x'.repeat(257)}, {...saved,id:'control\u0001'}, {...saved,id:'too-long-note',note:'n'.repeat(16385)},
+    {...saved,id:'too-long-label',customLabel:'c'.repeat(41)}, {...saved,id:'missing-custom-label',customLabel:undefined},
+    {...saved,id:'wrong-time',at:8640000000000001},
+  ]){
+    await assert.rejects(storage.appendEvents([invalid]),TypeError);
+    await assert.rejects(storage.importEvents([invalid]),TypeError);
+    assert.deepEqual(await snapshot(),before);
+  }
+  await assert.rejects(storage.updateEvent(saved.id,{note:'n'.repeat(16385)}),TypeError);
+  await assert.rejects(storage.saveScheduleEntry({id:'routine',type:'custom',customLabel:'c'.repeat(41),minutes:1}),TypeError);
+  assert.deepEqual(await snapshot(),before);
+});
+
+test('CSV restores long valid notes and rejects invalid files before importing any row',async t=>{
+  const {database,storage}=await setup(t);
+  const events:PuppyEvent[]=[301,16384].map(length=>({id:'csv-'+length,type:'pee',at:length,source:'app',note:'n'.repeat(length)}));
+  assert.deepEqual(await storage.importEvents(csvToEvents(eventsToCsv(events))),{imported:2,skipped:0});
+  assert.deepEqual(await storage.loadEvents(),[...events].reverse());
+  const before=await database.read(sql=>sql.getAllAsync('SELECT * FROM local_revisions ORDER BY rowid'));
+  for(const invalid of [{...events[0],id:'bad-note',note:'n'.repeat(16385)},{...events[0],id:'x'.repeat(257)}]){
+    await assert.rejects(async()=>storage.importEvents(csvToEvents(eventsToCsv([{...events[0],id:'would-be-imported'},invalid]))));
+    assert.deepEqual(await storage.loadEvents(),[...events].reverse());
+    assert.deepEqual(await database.read(sql=>sql.getAllAsync('SELECT * FROM local_revisions ORDER BY rowid')),before);
+  }
+});
+
+test('local writers persist parsed canonical labels in records and revision capture',async t=>{
+  const {database}=await setup(t),{storage}=await createLocalRuntime(database,'pet-1');
+  await storage.appendEvents([{id:'canonical-event',type:'custom',customLabel:' Training ',at:100,source:'app'}]);
+  await storage.saveScheduleEntry({id:'canonical-routine',type:'custom',customLabel:' Medicine ',minutes:100});
+  assert.equal((await storage.loadEvents())[0].customLabel,'Training');
+  assert.equal((await storage.loadSchedule()).find(row=>row.id==='canonical-routine')!.customLabel,'Medicine');
+  const revisions=await database.read(sql=>sql.getAllAsync<{kind:string;local_id:string;after_data:string}>('SELECT kind,local_id,after_data FROM local_revisions'));
+  assert.equal(JSON.parse(revisions.find(row=>row.kind==='event'&&row.local_id==='canonical-event')!.after_data).customLabel,'Training');
+  assert.equal(JSON.parse(revisions.find(row=>row.kind==='routine'&&row.local_id==='canonical-routine')!.after_data).customLabel,'Medicine');
+});
 
 test('native facade preserves onboarding, theme, language, routines and notification choices', async (t) => {
   const {storage}=await setup(t);

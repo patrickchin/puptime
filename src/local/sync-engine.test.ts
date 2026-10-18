@@ -3,8 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test, { type TestContext } from 'node:test';
-import { createLocalDatabase, migrateLegacy } from './database.ts';
-import { legacyKeys, parseLegacySnapshot } from './legacy.ts';
+import { createLocalDatabase, initializeLocalDatabase } from './database.ts';
 import { sqliteTestConnection } from './sqlite-test-adapter.ts';
 import { createNativeStorage } from './native-storage.ts';
 import { cloudRecordId } from '../cloud/record-identity.ts';
@@ -16,7 +15,7 @@ async function setup(t:TestContext) {
   const path=join(directory,'data.db');
   const database=await createLocalDatabase(sqliteTestConnection(path));
   t.after(async()=>{await database.close();await rm(directory,{recursive:true,force:true});});
-  await migrateLegacy(database,parseLegacySnapshot(legacyKeys.map(key=>[key,key==='puptime.schedule.v1'?'[]':null])),()=> 'local-pet');
+  await initializeLocalDatabase(database,()=> 'local-pet');await database.write(sql=>sql.runAsync('DELETE FROM routines'));
   assert.equal(typeof engine.createLocalSync,'function');
   const sync=engine.createLocalSync(database);
   const storage=createNativeStorage(database,'local-pet',sync.changeSink('local-pet'));
@@ -32,6 +31,31 @@ async function activate(sync:ReturnType<typeof engine.createLocalSync>) {
  return {generation,accountId:input.accountId};
 }
 
+test('explicit event label restoration shares event rollback revisions and upload work',async t=>{
+ const {sync,storage,database}=await setup(t);
+ await storage.saveCustomActivity('Training');await storage.deleteCustomActivity('Training');
+ await storage.appendEvents([event]);const fence=await activate(sync),options={restoreCustomActivities:true};
+ const snapshot=()=>database.read(async sql=>Object.fromEntries(await Promise.all(['events','pet_settings','local_revisions','local_sync_outbox'].map(async table=>[table,await sql.getAllAsync(`SELECT * FROM ${table} ORDER BY rowid`)]))));
+ let before=await snapshot();
+ await assert.rejects(storage.updateEvent('deleted',{type:'custom',customLabel:'Training'},options),/deleted/);
+ assert.deepEqual(await snapshot(),before);
+ await database.write(sql=>sql.execAsync("CREATE TRIGGER fail_label_queue BEFORE INSERT ON local_sync_outbox WHEN json_extract(NEW.mutation_json,'$.kind')='customActivity' BEGIN SELECT RAISE(ABORT,'label queue failure'); END;"));
+ await assert.rejects(storage.updateEvent(event.id,{type:'custom',customLabel:'Training'},options),/label queue failure/);
+ assert.deepEqual(await snapshot(),before);
+ await database.write(sql=>sql.execAsync('DROP TRIGGER fail_label_queue'));
+ const prior=new Set((await sync.nextBatch(fence)).map(row=>row.operationId));
+ await storage.updateEvent(event.id,{type:'custom',customLabel:'Training'},options);
+ assert.deepEqual(await storage.loadCustomActivities(),['Training']);
+ assert.deepEqual((await sync.nextBatch(fence)).filter(row=>!prior.has(row.operationId)).map(row=>row.kind),['event','customActivity']);
+ await storage.deleteCustomActivity('Training');before=await snapshot();
+ await database.write(sql=>sql.execAsync("CREATE TRIGGER fail_new_event BEFORE INSERT ON events BEGIN SELECT RAISE(ABORT,'event failure'); END;"));
+ const custom={...event,id:'new-custom',type:'custom' as const,customLabel:'Training'};
+ await assert.rejects(storage.appendEvents([custom],options),/event failure/);assert.deepEqual(await snapshot(),before);
+ await database.write(sql=>sql.execAsync('DROP TRIGGER fail_new_event'));
+ await storage.importEvents([{...custom,id:'historical-import'}]);assert.deepEqual(await storage.loadCustomActivities(),[]);
+ await storage.appendEvents([custom],options);assert.deepEqual(await storage.loadCustomActivities(),['Training']);
+});
+
 test('free writes and preparing enrollment never create upload work; activation is restartable',async t=>{
  const {sync,storage,database,path}=await setup(t);
  await storage.appendEvents([event]);
@@ -40,7 +64,7 @@ test('free writes and preparing enrollment never create upload work; activation 
  assert.deepEqual(await sync.nextBatch({generation,accountId:'account-1'}),[]);
  await storage.updateEvent('event-1',{note:'after prepare'});
  const other=await createLocalDatabase(sqliteTestConnection(path));t.after(()=>other.close());
- await migrateLegacy(other,async()=>{throw new Error('Must not read legacy again');});
+ await initializeLocalDatabase(other);
  const reopened=engine.createLocalSync(other);
  assert.deepEqual(await reopened.enrollmentState(),{generation,accountId:'account-1',request:enrollment,stagingCursor:0,baselineComplete:false});
  assert.deepEqual(await reopened.prepareAssociation(input),{generation});
@@ -93,7 +117,7 @@ test('joining cloud combines confirmed local fields, remote-only records and clo
  assert.ok(!batch.some(value=>value.kind==='accountPreferences'||value.kind==='puppy'));
 });
 
-test('local edits queue immutable exact changes, while malformed legacy values remain local and blocked',async t=>{
+test('local edits queue immutable exact changes and oversized serialized requests stay recoverable',async t=>{
  const {sync,storage}=await setup(t);const owner=await activate(sync);
  await storage.appendEvents([event]);
  const before=await sync.nextBatch(owner);
@@ -102,9 +126,9 @@ test('local edits queue immutable exact changes, while malformed legacy values r
  const after=await sync.nextBatch(owner);
  assert.deepEqual(after.slice(0,before.length),before);
  assert.deepEqual(after.at(-2)!.patch,{note:'first'});assert.deepEqual(after.at(-1)!.patch,{at:200});
- await storage.appendEvents([{...event,id:'oversized',note:'x'.repeat(17000)}]);
+ await storage.appendEvents([{...event,id:'oversized',note:'\u0001'.repeat(12000)}]);
  assert.equal((await sync.status('local-pet')).blocked,1);
- assert.equal((await storage.loadEvents()).find(value=>value.id==='oversized')!.note!.length,17000);
+ assert.equal((await storage.loadEvents()).find(value=>value.id==='oversized')!.note!.length,12000);
  assert.ok(!(await sync.nextBatch(owner)).some(value=>value.recordId===cloudRecordId('event','local-pet','oversized')));
  await storage.updateEvent('oversized',{note:'corrected'});
  assert.equal((await sync.status('local-pet')).blocked,0);
@@ -119,7 +143,7 @@ test('batch limits count UTF-8 request bytes and blocked records do not starve v
  assert.ok(batch.length>0&&batch.length<=50);
  assert.ok(Buffer.byteLength(JSON.stringify({mutations:batch}))<65536);
  assert.ok(batch.filter(value=>value.kind==='event').length<=1);
- await storage.appendEvents([{...event,id:'z'.repeat(300)}]);
+ await storage.appendEvents([{...event,id:'serialized-too-large',note:'\u0001'.repeat(12000)}]);
  assert.equal((await sync.status('local-pet')).blocked,1);
  assert.ok((await sync.nextBatch(owner)).length>0);
 });
@@ -193,11 +217,11 @@ test('initial association preserves a locally deleted custom activity and its hi
  assert.equal(deletion.intent,'delete');assert.equal(deletion.baseRevision,1);
 });
 
-test('an oversized legacy note does not block initial combination or valid timing preservation',async t=>{
- const {sync,storage}=await setup(t);const note='x'.repeat(17000);
- await storage.appendEvents([{id:'legacy-nap',type:'nap',at:300,source:'app',note}]);
+test('an oversized serialized note does not block initial combination or valid timing preservation',async t=>{
+ const {sync,storage}=await setup(t);const note='\u0001'.repeat(12000);
+ await storage.appendEvents([{id:'serialized-nap',type:'nap',at:300,source:'app',note}]);
  const {generation}=await sync.prepareAssociation(input);
- const record:CloudRecord={id:cloudRecordId('event','local-pet','legacy-nap'),petId:'local-pet',kind:'event',data:{type:'nap',at:100,endedAt:200,source:'app'},revision:1,sequence:1,deleted:false,updatedAt:1};
+ const record:CloudRecord={id:cloudRecordId('event','local-pet','serialized-nap'),petId:'local-pet',kind:'event',data:{type:'nap',at:100,endedAt:200,source:'app'},revision:1,sequence:1,deleted:false,updatedAt:1};
  await sync.stageBaseline({generation,accountId:'account-1',page:{changes:[record],cursor:1,hasMore:false}});
  await sync.completeAssociation({generation,accountId:'account-1',cloudPetId:'local-pet'});
  const saved=(await storage.loadEvents())[0];assert.equal(saved.note,note);assert.equal(saved.at,100);assert.equal(saved.endedAt,200);
@@ -368,7 +392,7 @@ test('retryable rejections retain exact payloads; invalid work is visible and do
 test('blocked local notes survive pulls and correcting them never queues unrelated remote fields',async t=>{
  const {sync,storage}=await setup(t);const owner=await activate(sync),server=replicaServer();await cycle(sync,owner,server);
  await storage.appendEvents([event]);await cycle(sync,owner,server);
- const note='x'.repeat(17000);await storage.updateEvent(event.id,{note});
+ const note='\u0001'.repeat(12000);await storage.updateEvent(event.id,{note});
  const record=server.record(cloudRecordId('event','local-pet',event.id));
  server.push([{protocolVersion:1,operationId:'remote-time',deviceId:'other',recordId:record.id,petId:record.petId,kind:'event',baseRevision:record.revision,intent:'patch',patch:{at:200}}]);
  await sync.applySync({...owner,accepted:[],page:server.pull((await sync.status('local-pet')).cursor)});
