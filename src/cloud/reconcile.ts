@@ -7,6 +7,16 @@ export class ReconciliationError extends Error {
   constructor(message: string) { super(message); this.name = 'ReconciliationError'; }
 }
 
+// Shared by server reconciliation and lossless local projection when another
+// legacy field cannot yet pass cloud validation. No timestamps are inferred.
+export function retainValidEventTiming(current:Record<string,unknown>,candidate:Record<string,unknown>):boolean {
+  if (candidate.type!=='nap'||typeof candidate.at!=='number'||typeof candidate.endedAt!=='number'||candidate.endedAt>=candidate.at) return false;
+  for (const key of ['type','at','endedAt'] as const) {
+    if (key in current) candidate[key]=current[key];else delete candidate[key];
+  }
+  return true;
+}
+
 export function reconcileMutation(
   current: CloudRecord | null, input: Mutation, now: number,
 ): { record: CloudRecord; reason: RevisionReason } {
@@ -38,14 +48,7 @@ export function reconcileMutation(
   if (mutation.kind === 'event') {
     if (current?.kind === 'event' && 'estimated' in current.data && current.data.estimated) candidate.estimated = true;
     if (candidate.type !== 'nap') delete candidate.endedAt;
-    if (current && mutation.intent === 'patch' && candidate.type === 'nap'
-      && typeof candidate.at === 'number' && typeof candidate.endedAt === 'number' && candidate.endedAt < candidate.at) {
-      for (const key of ['type', 'at', 'endedAt'] as const) {
-        if (key in current.data) candidate[key] = current.data[key as keyof typeof current.data];
-        else delete candidate[key];
-      }
-      reason = 'preserved-timing';
-    }
+    if (current && mutation.intent === 'patch' && retainValidEventTiming(current.data,candidate)) reason='preserved-timing';
     eventDataSchema.parse(candidate);
   }
   const data = recordDataSchema(mutation.kind).parse(candidate);

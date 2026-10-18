@@ -47,15 +47,15 @@ User steering: focus on the iOS app; Android and widgets later. Completed widget
 
 **Device:** Dedicated `Puptime Native Storage ae0c` iPhone 17 / iOS 26.5 simulator, UDID `99EB738C-D283-4A4E-8EF7-6DED36E3A10F`. The separate Android AVD is shut down and deferred. Local builds only; no paid EAS operation required.
 
-- [ ] Populate legacy AsyncStorage with synthetic history/preferences before first new-backend launch. Verify exact migration fidelity, restart/relaunch idempotency, preserved originals, account-free offline CRUD/import/settings/routines, and interrupted/failed migration retry.
+- [x] Populate legacy AsyncStorage with synthetic history/preferences before first new-backend launch. Verify exact migration fidelity, restart/relaunch idempotency, preserved originals, account-free offline CRUD/import/settings/routines, and interrupted/failed migration retry.
 - [ ] **Deferred:** Android/widget concurrent writes, intent queue and notification delivery qualification. Preserved evidence on the deferred branch does not qualify this iOS-only subset.
-- [ ] Run iOS app happy/edge Maestro flows and the actual migration-failure alert flow. Real SQLite quota/lock tests isolate storage failures; no OS-wide disk exhaustion is performed.
+- [x] Run iOS app happy/edge Maestro flows and the actual migration-failure alert flow. Real SQLite quota/lock tests isolate storage failures; no OS-wide disk exhaustion is performed.
 - [ ] **Deferred:** Android populated-history editor/detail rendering qualification; no Android activation is part of this PR.
-- [ ] Capture fresh iOS app screenshots. Record commands/results and native limitations separately from exports/unit tests.
-- [ ] Commit verification changes/evidence.
+- [x] Capture fresh iOS app screenshots. Record commands/results and native limitations separately from exports/unit tests.
+- [x] Commit verification changes/evidence.
 
 ### Task 4: Review, PR and next sync boundary
 
-- [ ] Fresh whole-branch review; material findings receive RED→GREEN regressions and full green suite.
+- [x] Fresh whole-branch review; material findings receive RED→GREEN regressions and full green suite.
 - [ ] Create/attach PR; applicable CI passes; merge through GitHub.
 - [ ] Record evidence and write phase 3c's precise owner-bound association/outbox/pull-rebase/transport plan against the now-real native transaction interfaces. Phase 3 remains unchecked until native synchronization fault tests pass.

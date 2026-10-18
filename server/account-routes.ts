@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import { validator } from 'hono/validator';
 import { z } from 'zod';
-import { enrollmentSchema, mutationSchema, type Revision } from '../src/cloud/protocol';
+import { enrollmentSchema, mutationSchema, recordIdSchema, type Revision } from '../src/cloud/protocol';
 import { getAccountStore, type AccountStore } from './account-store';
 import { createAuth } from './auth';
 import { activateTrial, cloudAccess, getCloudAccount, type CloudAccess, type CloudAccount } from './entitlements';
@@ -63,7 +63,7 @@ accountRoutes.get('/sync/pull', authenticated, syncAccess, async (context) => {
   return context.json(await context.get('store').pullForClient(after, limit));
 });
 accountRoutes.get('/records/:id/history', authenticated, syncAccess, async (context) => {
-  const id = z.string().min(1).max(256).parse(context.req.param('id'));
+  const id = recordIdSchema.parse(context.req.param('id'));
   const before = afterSchema.parse(context.req.query('beforeRevision') ?? Number.MAX_SAFE_INTEGER);
   return context.json({ revisions: await context.get('store').history(id, before) });
 });

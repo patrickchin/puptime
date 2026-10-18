@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { z } from 'zod';
-import { enrollmentSchema, mutationSchema, type Enrollment, type CloudRecord, type Mutation, type MutationResult, type PullPage, type Revision } from '../src/cloud/protocol';
+import { enrollmentSchema, mutationSchema, recordIdSchema, type Enrollment, type CloudRecord, type Mutation, type MutationResult, type PullPage, type Revision } from '../src/cloud/protocol';
 import { reconcileMutation, ReconciliationError } from '../src/cloud/reconcile';
 
 const cursorSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
@@ -168,7 +168,7 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
 
   history(recordId: string, beforeRevision = Number.MAX_SAFE_INTEGER): Revision[] {
     this.#assertActive();
-    z.string().min(1).max(256).parse(recordId);
+    recordIdSchema.parse(recordId);
     cursorSchema.parse(beforeRevision);
     return this.ctx.storage.sql.exec<JsonRow>('SELECT body FROM revisions WHERE record_id = ? AND revision < ? ORDER BY revision DESC LIMIT 50', recordId, beforeRevision)
       .toArray().map((row) => JSON.parse(row.body) as Revision);
