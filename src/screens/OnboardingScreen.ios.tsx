@@ -15,7 +15,8 @@ type PracticeActivity = (typeof practiceActions)[number];
 
 export function OnboardingScreen({theme, mode, notificationPermission, onAllowNotifications, onOpenSystemSettings, onFinish}:OnboardingScreenProps) {
   const {t,activityLabel,activityColors,locale}=useLocalization();
-  const largeText=useWindowDimensions().fontScale>=1.5;
+  const {fontScale,height:windowHeight}=useWindowDimensions();
+  const largeText=fontScale>=1.5;
   const [step,setStep]=useState(0);
   const [practice,setPractice]=useState<PracticeActivity|null>(null);
   const [practiceReminder,setPracticeReminder]=useState(false);
@@ -73,7 +74,7 @@ export function OnboardingScreen({theme, mode, notificationPermission, onAllowNo
     catch{Alert.alert(t('schedule.reminderErrorTitle'),t('schedule.reminderErrorBody'));}
     finally{locked.current=false;if(mounted.current)setBusy(false);}
   }
-  const puppy=(height=145)=>(
+  const puppy=(height=windowHeight<750?100:145)=>(
     <Animated.View style={[styles.puppy,{height,transform:[{translateY:bounce.interpolate({inputRange:[0,1],outputRange:[0,-9]})},{scale:bounce.interpolate({inputRange:[0,1],outputRange:[1,1.04]})}]}]}>
       <Image source={require('../../assets/puppy-journal.png')} accessible={false} style={styles.puppyImage} resizeMode="contain"/>
     </Animated.View>

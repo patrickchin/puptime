@@ -1,0 +1,13 @@
+appId: com.patrickchin.puptime
+name: Inspect practice feedback before any compact-screen scrolling
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: onboarding.step.0
+    timeout: 90000
+- takeScreenshot: compact-initial
+- tapOn:
+    id: onboarding.demo.meal
+- takeScreenshot: compact-practice-unscrolled
