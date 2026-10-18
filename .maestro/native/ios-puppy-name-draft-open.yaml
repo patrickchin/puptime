@@ -1,0 +1,9 @@
+appId: com.patrickchin.puptime
+name: Keep an unsaved puppy name draft open
+---
+- tapOn:
+    id: settings.puppy.name
+- eraseText: 20
+- inputText: Local draft
+- assertVisible: Local draft
+- takeScreenshot: puppy-name-open-draft

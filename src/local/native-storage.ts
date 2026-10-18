@@ -8,6 +8,7 @@ import { petSettingKeys, storageKeys, type LegacyKey } from './legacy.ts';
 import { createLocalRepository } from './repository.ts';
 import { localChanges, notifyLocalCommit, readLocalSettingsRecords, type LocalChangeSink } from './sync-projection.ts';
 import { recordDataSchema } from '../cloud/protocol.ts';
+import type { FinishOnboardingOptions } from '../onboarding.ts';
 
 export function createNativeStorage(database: LocalDatabase, petId: string, onChange?: LocalChangeSink, afterCommit?:()=>void) {
   const repository = createLocalRepository(database, petId, onChange,afterCommit);
@@ -68,8 +69,13 @@ export function createNativeStorage(database: LocalDatabase, petId: string, onCh
     async shouldShowOnboarding() {
       return database.read(async (sql) => (await sql.getFirstAsync<{ value: string }>("SELECT value FROM metadata WHERE key='show_onboarding'"))?.value === 'true');
     },
-    async completeOnboarding() {
-      await database.write(async (sql) => {
+    async completeOnboarding(options?:FinishOnboardingOptions) {
+      await settingsWrite(async (sql) => {
+        if(options?.puppyName!==undefined){
+          const value=recordDataSchema('puppy').parse({name:options.puppyName.trim()||'My puppy'});
+          if(!('name' in value))throw new Error('Invalid puppy name.');
+          await sql.runAsync('UPDATE puppies SET name=? WHERE id=?',value.name,petId);
+        }
         await sql.runAsync("UPDATE metadata SET value='false' WHERE key='show_onboarding'");
         await set(sql, storageKeys.onboarding, 'done');
       });

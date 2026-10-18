@@ -1,0 +1,23 @@
+appId: com.patrickchin.puptime
+name: Practice feedback works with the actual iOS motion preference
+---
+- assertVisible:
+    id: onboarding.step.0
+- takeScreenshot: motion-practice-before
+- tapOn:
+    id: onboarding.demo.meal
+- assertVisible:
+    id: onboarding.demo.row
+    text: .*Eat.*
+- takeScreenshot: motion-practice-after
+- tapOn:
+    id: onboarding.demo.pee
+- assertVisible:
+    id: onboarding.demo.row
+    text: .*Pee.*
+- tapOn:
+    id: onboarding.demo.poop
+- assertVisible:
+    id: onboarding.demo.row
+    text: .*Poop.*
+- takeScreenshot: motion-practice-feedback

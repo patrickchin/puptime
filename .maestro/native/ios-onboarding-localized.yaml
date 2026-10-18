@@ -1,0 +1,65 @@
+appId: com.patrickchin.puptime
+name: Localized onboarding keeps practice and optional setup usable
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: onboarding.step.0
+      text: ${EXPECTED_LOG_TITLE}
+    timeout: 90000
+- assertVisible:
+    id: onboarding.skip
+    text: ${EXPECTED_SKIP}
+- tapOn:
+    id: onboarding.demo.meal
+- assertVisible:
+    id: onboarding.demo.row
+    text: ${EXPECTED_SAMPLE}
+- takeScreenshot: localized-log-practice
+- tapOn:
+    id: onboarding.primary
+- assertVisible:
+    id: onboarding.step.1
+    text: ${EXPECTED_TIMELINE_TITLE}
+- scrollUntilVisible:
+    element:
+      id: onboarding.demo.timeline.today
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- takeScreenshot: localized-timeline
+- tapOn:
+    id: onboarding.primary
+- assertVisible:
+    id: onboarding.step.2
+    text: ${EXPECTED_ROUTINE_TITLE}
+- scrollUntilVisible:
+    element:
+      id: onboarding.demo.routine.reminder
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- tapOn:
+    id: onboarding.demo.routine.reminder
+- assertVisible:
+    id: onboarding.demo.routine.reminder
+    checked: true
+- takeScreenshot: localized-routine
+- tapOn:
+    id: onboarding.primary
+- assertVisible:
+    id: onboarding.step.3
+    text: ${EXPECTED_READY_TITLE}
+- scrollUntilVisible:
+    element:
+      id: onboarding.name.input
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- takeScreenshot: localized-optional-name
+- tapOn:
+    id: onboarding.later
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000

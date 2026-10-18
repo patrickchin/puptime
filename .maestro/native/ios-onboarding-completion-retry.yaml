@@ -1,0 +1,13 @@
+appId: com.patrickchin.puptime
+name: Retained onboarding draft completes after storage recovers
+---
+- assertVisible:
+    id: onboarding.name.input
+    text: Biscuit
+- tapOn:
+    id: onboarding.primary
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- takeScreenshot: onboarding-completion-retry

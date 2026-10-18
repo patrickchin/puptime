@@ -1,0 +1,10 @@
+appId: com.patrickchin.puptime
+name: Completed onboarding remains completed after restart
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- assertNotVisible:
+    id: screen.onboarding

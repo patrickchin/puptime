@@ -1,0 +1,16 @@
+appId: com.patrickchin.puptime
+name: Failed puppy rename keeps the committed name and offers the draft again
+---
+- tapOn:
+    id: settings.puppy.name
+- eraseText: 20
+- inputText: Retry biscuit
+- tapOn: Save
+- assertVisible: Couldn’t save the name
+- takeScreenshot: puppy-name-failure
+- tapOn: Try again
+- assertVisible: Retry biscuit
+- tapOn: Cancel
+- assertVisible:
+    id: settings.puppy.name
+    text: .*Mochi.*

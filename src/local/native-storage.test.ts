@@ -7,6 +7,7 @@ import { createLocalDatabase, migrateLegacy } from './database.ts';
 import { legacyKeys, parseLegacySnapshot } from './legacy.ts';
 import { sqliteTestConnection } from './sqlite-test-adapter.ts';
 import { createNativeStorage } from './native-storage.ts';
+import { createLocalRuntime } from './runtime-factory.ts';
 import { DEFAULT_NOTIFICATION_PREFERENCES, type NotificationPreferences } from '../notification-config.ts';
 import type { PuppyEvent } from '../domain.ts';
 async function setup(t: TestContext) {
@@ -28,6 +29,68 @@ test('native facade preserves onboarding, theme, language, routines and notifica
   const preferences:NotificationPreferences={...DEFAULT_NOTIFICATION_PREFERENCES,reminderLeadMinutes:5,widgetConfirmations:true,pottyAfterMeal:{enabled:false,delayMinutes:60}};
   await storage.saveNotificationPreferences(preferences); assert.deepEqual(await storage.loadNotificationPreferences(),preferences);
   await storage.saveSchedule([]); assert.deepEqual(await storage.loadSchedule(),[]);
+});
+
+test('onboarding commits the supplied puppy name with completion', async (t) => {
+  const {database}=await setup(t);
+  const {storage}=await createLocalRuntime(database,'pet-1');
+  await storage.completeOnboarding({puppyName:'  Biscuit  '});
+  assert.equal(await storage.loadPuppyName(),'Biscuit');
+  assert.equal(await storage.shouldShowOnboarding(),false);
+  assert.equal((await database.read(sql=>sql.getFirstAsync<{n:number}>("SELECT count(*) n FROM local_revisions WHERE kind='puppy'")))?.n,1);
+  assert.equal((await database.read(sql=>sql.getFirstAsync<{n:number}>('SELECT count(*) n FROM local_sync_outbox')))?.n,0);
+  assert.deepEqual(await storage.loadEvents(),[]);
+});
+
+test('omitting an onboarding name preserves the existing puppy name', async (t) => {
+  const {storage}=await setup(t);
+  await storage.savePuppyName('Mochi');
+  await storage.completeOnboarding();
+  assert.equal(await storage.loadPuppyName(),'Mochi');
+});
+
+test('an explicitly blank onboarding name uses My puppy', async (t) => {
+  const {storage}=await setup(t);
+  await storage.savePuppyName('Mochi');
+  await storage.completeOnboarding({puppyName:'  '});
+  assert.equal(await storage.loadPuppyName(),'My puppy');
+  assert.equal(await storage.shouldShowOnboarding(),false);
+});
+
+test('invalid onboarding names cannot complete setup', async (t) => {
+  const {storage}=await setup(t);
+  await assert.rejects(storage.completeOnboarding({puppyName:'x'.repeat(257)}));
+  assert.equal(await storage.loadPuppyName(),'My puppy');
+  assert.equal(await storage.shouldShowOnboarding(),true);
+});
+
+test('onboarding naming is scoped to its puppy and repeated completion is idempotent', async (t) => {
+  const {database}=await setup(t);
+  await database.write(sql=>sql.runAsync('INSERT INTO puppies(id,name) VALUES (?,?)','pet-2','Nori'));
+  const {storage}=await createLocalRuntime(database,'pet-1');
+  await Promise.all([storage.completeOnboarding({puppyName:'Biscuit'}),storage.completeOnboarding({puppyName:'Biscuit'})]);
+  const rows=await database.read(sql=>sql.getAllAsync<{id:string;name:string}>('SELECT id,name FROM puppies ORDER BY id'));
+  assert.deepEqual(rows.map(({id,name})=>[id,name]),[['pet-1','Biscuit'],['pet-2','Nori']]);
+  assert.equal((await database.read(sql=>sql.getFirstAsync<{n:number}>("SELECT count(*) n FROM local_revisions WHERE kind='puppy'")))?.n,1);
+});
+
+test('failed onboarding completion rolls back the name, marker and revision before retry', async (t) => {
+  const {database}=await setup(t);
+  const {storage}=await createLocalRuntime(database,'pet-1');
+  const event:PuppyEvent={id:'kept-before-onboarding',type:'pee',at:100,source:'app'};
+  await storage.appendEvents([event]);
+  const revisions=await database.read(sql=>sql.getAllAsync('SELECT * FROM local_revisions ORDER BY sequence'));
+  await database.write(sql=>sql.execAsync("CREATE TRIGGER fail_onboarding BEFORE UPDATE OF value ON metadata WHEN OLD.key='show_onboarding' BEGIN SELECT RAISE(ABORT,'injected onboarding failure'); END;"));
+  await assert.rejects(storage.completeOnboarding({puppyName:'Biscuit'}),/injected onboarding failure/);
+  assert.equal(await storage.loadPuppyName(),'My puppy');
+  assert.equal(await storage.shouldShowOnboarding(),true);
+  assert.deepEqual(await database.read(sql=>sql.getAllAsync('SELECT * FROM local_revisions ORDER BY sequence')),revisions);
+  assert.deepEqual(await storage.loadEvents(),[event]);
+  assert.equal((await database.read(sql=>sql.getFirstAsync<{n:number}>('SELECT count(*) n FROM local_sync_outbox')))?.n,0);
+  await database.write(sql=>sql.execAsync('DROP TRIGGER fail_onboarding'));
+  await storage.completeOnboarding({puppyName:'Biscuit'});
+  assert.equal(await storage.loadPuppyName(),'Biscuit');
+  assert.equal(await storage.shouldShowOnboarding(),false);
 });
 
 test('custom labels, deletion markers and customizations survive delete/recreate without changing history', async (t) => {

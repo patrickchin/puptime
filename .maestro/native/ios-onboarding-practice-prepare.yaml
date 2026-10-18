@@ -1,0 +1,11 @@
+appId: com.patrickchin.puptime
+name: Prepare an isolated first-run puppy profile
+---
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: unset
+- extendedWaitUntil:
+    visible:
+      id: onboarding.step.0
+    timeout: 90000

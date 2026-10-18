@@ -1,0 +1,12 @@
+appId: com.patrickchin.puptime
+name: Puppy rename retry saves once the storage failure is removed
+---
+- tapOn:
+    id: settings.puppy.name
+- eraseText: 20
+- inputText: Retry biscuit
+- tapOn: Save
+- assertVisible:
+    id: settings.puppy.name
+    text: .*Retry biscuit.*
+- takeScreenshot: puppy-name-retry-saved

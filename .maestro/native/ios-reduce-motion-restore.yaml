@@ -1,0 +1,20 @@
+appId: com.patrickchin.puptime
+name: Restore the dedicated simulator’s original Reduce Motion preference
+---
+- launchApp:
+    appId: com.apple.Preferences
+    stopApp: false
+- runFlow:
+    when:
+      visible:
+        id: REDUCE_MOTION
+        text: ^1$
+    commands:
+      - tapOn:
+          point: 84%,18%
+- assertVisible:
+    id: REDUCE_MOTION
+    text: ^0$
+- launchApp:
+    appId: com.patrickchin.puptime
+    stopApp: false

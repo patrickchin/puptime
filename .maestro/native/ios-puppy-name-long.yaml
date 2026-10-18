@@ -1,0 +1,12 @@
+appId: com.patrickchin.puptime
+name: Long Unicode puppy names remain readable and durable
+---
+- tapOn:
+    id: settings.puppy.name
+- eraseText: 20
+- inputText: "Mochi 🐾 Biscuit Biscuit Biscuit Biscuit Biscuit Biscuit Biscuit Biscuit Biscuit Biscuit Biscuit Biscuit Biscuit Biscuit Biscuit Biscuit Biscuit Biscuit Biscuit Biscuit Biscuit Biscuit Biscuit Biscuit Biscuit Biscuit Biscuit "
+- tapOn: Save
+- assertVisible:
+    id: settings.puppy.name
+    text: .*Mochi.*
+- takeScreenshot: puppy-name-long-unicode

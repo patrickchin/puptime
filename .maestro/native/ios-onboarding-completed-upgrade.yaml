@@ -1,0 +1,20 @@
+appId: com.patrickchin.puptime
+name: Completed onboarding remains complete after installing the Release update
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- assertNotVisible:
+    id: screen.onboarding
+- tapOn:
+    id: settings.open
+- assertVisible:
+    id: settings.puppy.name
+    text: .*Mochi.*
+- takeScreenshot: completed-upgrade-keeps-puppy-name
+- tapOn:
+    id: settings.back
+- assertVisible:
+    id: screen.today

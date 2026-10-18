@@ -1,0 +1,58 @@
+appId: com.patrickchin.puptime
+name: iOS practice tour teaches logging without creating puppy history
+---
+- launchApp:
+    stopApp: false
+- extendedWaitUntil:
+    visible:
+      id: onboarding.step.0
+    timeout: 90000
+- assertVisible:
+    id: onboarding.demo.pee
+- tapOn:
+    id: onboarding.demo.pee
+- assertVisible:
+    id: onboarding.demo.row
+    text: .*Pee.*
+- tapOn:
+    id: onboarding.demo.poop
+- assertVisible:
+    id: onboarding.demo.row
+    text: .*Poop.*
+- tapOn:
+    id: onboarding.demo.meal
+- assertVisible:
+    id: onboarding.demo.row
+    text: .*Eat.*
+- takeScreenshot: onboarding-practice-log
+- tapOn:
+    id: onboarding.primary
+- assertVisible:
+    id: onboarding.demo.timeline.today
+- takeScreenshot: onboarding-practice-timeline
+- tapOn:
+    id: onboarding.primary
+- assertVisible:
+    id: onboarding.demo.routine.reminder
+    checked: false
+- tapOn:
+    id: onboarding.demo.routine.reminder
+- assertVisible:
+    id: onboarding.demo.routine.reminder
+    checked: true
+- takeScreenshot: onboarding-practice-routine
+- tapOn:
+    id: onboarding.primary
+- assertVisible:
+    id: onboarding.name.input
+- tapOn:
+    id: onboarding.name.input
+- inputText: Biscuit
+- hideKeyboard
+- takeScreenshot: onboarding-optional-name
+- tapOn:
+    id: onboarding.primary
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000

@@ -1,0 +1,25 @@
+appId: com.patrickchin.puptime
+name: Normal installed client acknowledges populated cloud history
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- tapOn:
+    id: settings.open
+- assertVisible:
+    id: settings.puppy.name
+    text: .*Mochi.*
+- tapOn:
+    id: settings.account.open
+- extendedWaitUntil:
+    visible:
+      id: account.status
+      text: Up to date
+    timeout: 90000
+- tapOn:
+    id: account.back
+- assertVisible:
+    id: screen.settings
+- takeScreenshot: puppy-name-current-settings

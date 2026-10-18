@@ -4,6 +4,8 @@ import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 're
 
 import { customActivityKey, quickEventTypes, type ActivityKey, type EventType } from '../domain';
 import { ActivityIcon } from '../components/ActivityIcon';
+import { SettingsRow } from '../components/SettingsRow';
+import { PuppyNameSetting } from '../components/PuppyNameSetting';
 import type { CloudHandle } from '../cloud/use-cloud';
 import { useAccountSnapshot } from '../cloud/use-account-snapshot';
 import { accountStatus } from '../cloud/account-status';
@@ -217,6 +219,7 @@ export function SettingsScreen({
       </View>
 
       {cloudHandle?.available&&onOpenAccount?<AccountSettingsRow cloud={cloudHandle} theme={theme} onOpen={onOpenAccount}/>:null}
+      <PuppyNameSetting theme={theme} cloud={cloudHandle}/>
       <SectionLabel label={t('settings.personalization')} theme={theme} />
       <View style={[styles.card, surfaceTreatment(theme), { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
         <SettingsRow
@@ -505,57 +508,6 @@ function AccountSettingsRow({cloud,theme,onOpen}:{cloud:CloudHandle;theme:Theme;
   </View>;
 }
 
-function SettingsRow({
-  testID,
-  icon,
-  label,
-  detail,
-  hint,
-  onPress,
-  theme,
-  wrap=false,
-}: {
-  testID: string;
-  wrap?: boolean;
-  icon: keyof typeof MaterialCommunityIcons.glyphMap;
-  label: string;
-  detail: string;
-  hint?: string;
-  onPress: () => void;
-  theme: Theme;
-}) {
-  return (
-    <Pressable
-      testID={testID}
-      accessibilityRole="button"
-      accessibilityLabel={`${label}. ${detail}`}
-      accessibilityHint={hint}
-      onPress={onPress}
-      style={({ pressed }) => [styles.settingsRow, pressed && { backgroundColor: theme.primarySoft }]}
-    >
-      <View style={[styles.rowIcon, { backgroundColor: theme.primarySoft, borderRadius: theme.presentation.iconRadius }]}>
-        <MaterialCommunityIcons
-          accessibilityElementsHidden
-          importantForAccessibility="no"
-          name={icon}
-          size={21}
-          color={theme.primary}
-        />
-      </View>
-      <View style={styles.rowCopy}>
-        <Text numberOfLines={wrap?undefined:1} style={[styles.rowLabel, { color: theme.text }]}>{label}</Text>
-        <Text numberOfLines={wrap?undefined:1} adjustsFontSizeToFit={!wrap} minimumFontScale={0.85} style={[styles.rowHint, { color: theme.textMuted }]}>{detail}</Text>
-      </View>
-      <MaterialCommunityIcons
-        accessibilityElementsHidden
-        importantForAccessibility="no"
-        name="chevron-right"
-        size={23}
-        color={theme.textMuted}
-      />
-    </Pressable>
-  );
-}
 
 function PottyReminderRule({
   testID,
@@ -661,7 +613,6 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 11, lineHeight: 15, fontWeight: '800', marginTop: spacing.md, marginBottom: 8 },
   card: { borderWidth: 1, borderRadius: 22, padding: 8, marginBottom: spacing.sm },
   divider: { height: StyleSheet.hairlineWidth, marginHorizontal: 8 },
-  settingsRow: { minHeight: 68, paddingHorizontal: 8, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 11 },
   permissionRow: { minHeight: 72, paddingHorizontal: 8, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 11, borderRadius: 14 },
   toggleRow: { minHeight: 86, paddingHorizontal: 8, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 11 },
   rowIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },

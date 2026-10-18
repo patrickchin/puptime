@@ -1,0 +1,30 @@
+appId: com.patrickchin.puptime
+name: Failed onboarding completion retains the screen and name draft
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: onboarding.step.0
+    timeout: 90000
+- tapOn:
+    id: onboarding.primary
+- tapOn:
+    id: onboarding.primary
+- tapOn:
+    id: onboarding.primary
+- tapOn:
+    id: onboarding.name.input
+- inputText: Biscuit
+- tapOn:
+    id: onboarding.primary
+- assertVisible: Couldn’t save settings
+- takeScreenshot: onboarding-completion-failure
+- tapOn: OK
+- assertVisible:
+    id: onboarding.step.3
+- assertVisible:
+    id: onboarding.name.input
+    text: Biscuit
+- assertNotVisible:
+    id: screen.today
+- takeScreenshot: onboarding-completion-retained-draft

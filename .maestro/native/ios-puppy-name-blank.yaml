@@ -1,0 +1,12 @@
+appId: com.patrickchin.puptime
+name: A blank rename is rejected without changing the saved name
+---
+- tapOn:
+    id: settings.puppy.name
+- eraseText: 20
+- tapOn: Save
+- assertVisible: Enter a name from 1 to 256 characters.
+- tapOn: Cancel
+- assertVisible:
+    id: settings.puppy.name
+    text: .*Remote Mochi.*

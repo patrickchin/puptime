@@ -6,9 +6,8 @@ tags:
 ---
 - launchApp:
     clearState: true
-- setPermissions:
     permissions:
-      notifications: allow
+      notifications: unset
 - extendedWaitUntil:
     visible:
       id: onboarding.step.0
@@ -22,6 +21,10 @@ tags:
 - assertVisible:
     id: onboarding.step.3
 - tapOn:
+    id: onboarding.notifications.allow
+- tapOn: Allow
+- assertVisible: Allowed
+- tapOn:
     id: onboarding.primary
 - extendedWaitUntil:
     visible:
@@ -33,6 +36,7 @@ tags:
     element:
       id: settings.notifications.permission
     direction: DOWN
-    visibilityPercentage: 50
+    visibilityPercentage: 100
 - assertVisible:
     id: settings.notifications.permission
+    text: .*Allowed.*

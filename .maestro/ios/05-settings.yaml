@@ -20,7 +20,10 @@ tags:
     element:
       id: settings.widget.action.walk
     direction: DOWN
-    visibilityPercentage: 50
+    visibilityPercentage: 100
+    centerElement: true
+- waitForAnimationToEnd:
+    timeout: 5000
 - assertVisible:
     id: settings.widget.action.pee
     text: checkbox, checked
@@ -42,7 +45,10 @@ tags:
     element:
       id: settings.notifications.lead.15
     direction: DOWN
-    visibilityPercentage: 50
+    visibilityPercentage: 100
+    centerElement: true
+- waitForAnimationToEnd:
+    timeout: 5000
 - swipe:
     start: 50%,70%
     end: 50%,35%
@@ -70,7 +76,10 @@ tags:
     element:
       id: settings.widget.action.walk
     direction: DOWN
-    visibilityPercentage: 50
+    visibilityPercentage: 100
+    centerElement: true
+- waitForAnimationToEnd:
+    timeout: 5000
 - assertVisible:
     id: settings.widget.action.walk
     text: checkbox, checked
@@ -78,7 +87,10 @@ tags:
     element:
       id: settings.notifications.lead.15
     direction: DOWN
-    visibilityPercentage: 50
+    visibilityPercentage: 100
+    centerElement: true
+- waitForAnimationToEnd:
+    timeout: 5000
 - swipe:
     start: 50%,70%
     end: 50%,35%
@@ -92,14 +104,19 @@ tags:
     element:
       id: settings.theme.open
     direction: UP
-    visibilityPercentage: 50
+    visibilityPercentage: 100
+    centerElement: true
+- waitForAnimationToEnd:
+    timeout: 5000
 - tapOn:
     id: settings.theme.open
-- scrollUntilVisible:
-    element:
-      id: appearance.theme.puppy-journal
-    direction: DOWN
-    visibilityPercentage: 50
+    retryTapIfNoChange: true
+- assertVisible:
+    id: appearance.close
+- waitForAnimationToEnd:
+    timeout: 5000
+- assertVisible:
+    id: appearance.theme.puppy-journal
 - tapOn:
     id: appearance.theme.puppy-journal
 - tapOn:
@@ -110,11 +127,13 @@ tags:
     id: screen.settings
 - tapOn:
     id: settings.theme.open
-- scrollUntilVisible:
-    element:
-      id: appearance.theme.puppy-journal
-    direction: DOWN
-    visibilityPercentage: 50
+    retryTapIfNoChange: true
+- assertVisible:
+    id: appearance.close
+- waitForAnimationToEnd:
+    timeout: 5000
+- assertVisible:
+    id: appearance.theme.puppy-journal
 - assertVisible:
     id: appearance.theme.puppy-journal
     text: radio button, checked
@@ -132,7 +151,10 @@ tags:
     element:
       id: settings.back
     direction: UP
-    visibilityPercentage: 50
+    visibilityPercentage: 100
+    centerElement: true
+- waitForAnimationToEnd:
+    timeout: 5000
 - tapOn:
     id: settings.back
     retryTapIfNoChange: true
@@ -149,11 +171,13 @@ tags:
     retryTapIfNoChange: true
 - tapOn:
     id: settings.theme.open
-- scrollUntilVisible:
-    element:
-      id: appearance.theme.puppy-journal
-    direction: DOWN
-    visibilityPercentage: 50
+    retryTapIfNoChange: true
+- assertVisible:
+    id: appearance.close
+- waitForAnimationToEnd:
+    timeout: 5000
+- assertVisible:
+    id: appearance.theme.puppy-journal
 - assertVisible:
     id: appearance.theme.puppy-journal
     text: radio button, checked
@@ -170,7 +194,10 @@ tags:
     element:
       id: settings.widget.action.walk
     direction: DOWN
-    visibilityPercentage: 50
+    visibilityPercentage: 100
+    centerElement: true
+- waitForAnimationToEnd:
+    timeout: 5000
 - assertVisible:
     id: settings.widget.action.walk
     text: checkbox, checked
@@ -178,7 +205,10 @@ tags:
     element:
       id: settings.notifications.lead.15
     direction: DOWN
-    visibilityPercentage: 50
+    visibilityPercentage: 100
+    centerElement: true
+- waitForAnimationToEnd:
+    timeout: 5000
 - swipe:
     start: 50%,70%
     end: 50%,35%

@@ -1,0 +1,13 @@
+appId: com.patrickchin.puptime
+name: Foreground projection refresh preserves an open name draft
+---
+- pressKey: Home
+- launchApp:
+    stopApp: false
+- assertVisible: Local draft
+- takeScreenshot: puppy-name-draft-survives-projection
+- tapOn: Cancel
+- assertVisible:
+    id: settings.puppy.name
+    text: .*Remote Mochi.*
+- takeScreenshot: puppy-name-projection-saved-label

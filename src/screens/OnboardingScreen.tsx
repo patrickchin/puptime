@@ -4,8 +4,8 @@ import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'reac
 
 import { EVENT_META } from '../domain';
 import { useLocalization } from '../localization-context';
-import type { NotificationPermissionState } from '../reminders';
-import { spacing, type Theme } from '../theme';
+import type { OnboardingScreenProps } from '../onboarding';
+import { spacing } from '../theme';
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 
@@ -16,14 +16,7 @@ export function OnboardingScreen({
   onOpenSystemSettings,
   onFinish,
   onBack,
-}: {
-  theme: Theme;
-  notificationPermission: NotificationPermissionState;
-  onAllowNotifications: () => Promise<boolean>;
-  onOpenSystemSettings: () => void;
-  onFinish: () => Promise<void>;
-  onBack: () => boolean;
-}) {
+}: OnboardingScreenProps) {
   const { t } = useLocalization();
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
