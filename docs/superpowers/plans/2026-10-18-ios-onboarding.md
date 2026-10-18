@@ -44,9 +44,9 @@
 
 **Interfaces:** add FinishOnboardingOptions; completeOnboarding(options?) trims/validates supplied puppyName, defaults supplied blank to My puppy, preserves the existing name when omitted. Uses current petId and settingsWrite/changeSink.
 
-- [ ] Write actual-SQL tests: supplied name Biscuit saves with completion; omitted input preserves an existing renamed puppy; blank input becomes My puppy; second pet identity/name remain unchanged; protocol-overlong input rejects without completion.
-- [ ] Add an UPDATE metadata trigger failure: name, completion marker, local revisions and outbox all roll back; removing trigger permits retry; repeated identical completion does not invent a name revision. Run targeted tests and observe expected RED.
-- [ ] Implement signatures/transaction and platform forwarding; no new schema or hand-built persistence queue. Run targeted tests then npm test and both typechecks, expect PASS. Commit.
+- [x] Write actual-SQL tests: supplied name Biscuit saves with completion; omitted input preserves an existing renamed puppy; blank input becomes My puppy; second pet identity/name remain unchanged; protocol-overlong input rejects without completion.
+- [x] Add an UPDATE metadata trigger failure: name, completion marker, local revisions and outbox all roll back; removing trigger permits retry; repeated identical completion does not invent a name revision. Run targeted tests and observe expected RED.
+- [x] Implement signatures/transaction and platform forwarding; no new schema or hand-built persistence queue. Run targeted tests then npm test and both typechecks, expect PASS. Commit.
 
 ### Task 2: Four-stop interactive iOS walkthrough
 
