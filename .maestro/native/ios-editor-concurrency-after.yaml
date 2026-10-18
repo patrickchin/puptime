@@ -1,0 +1,13 @@
+appId: com.patrickchin.puptime
+name: iOS editor saves a note after independent remote update
+---
+- assertVisible:
+    id: editor
+- tapOn:
+    id: editor.note.input
+- eraseText
+- setClipboard: local second
+- pasteText
+- assertVisible:
+    id: editor.note.input
+    text: local second

@@ -7,7 +7,7 @@ beforeAll(() => applyD1Migrations(env.AUTH_DB, inject('migrations')));
 test('public configuration exposes provider availability without credentials or finalized prices', async () => {
   const response = await worker.fetch(new Request('https://puptime.test/api/config'), env);
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({ protocolVersion: 1, providers: { apple: false, google: false, email: false }, pricingFinalized: false });
+  expect(await response.json()).toEqual({ protocolVersion: 1, trialDays: 14, providers: { apple: false, google: false, email: false }, pricingFinalized: false });
 });
 
 test('account access requires authentication and cannot select another user by URL', async () => {

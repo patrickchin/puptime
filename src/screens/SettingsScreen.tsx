@@ -4,6 +4,9 @@ import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 're
 
 import { customActivityKey, quickEventTypes, type ActivityKey, type EventType } from '../domain';
 import { ActivityIcon } from '../components/ActivityIcon';
+import type { CloudHandle } from '../cloud/use-cloud';
+import { useAccountSnapshot } from '../cloud/use-account-snapshot';
+import { accountStatus } from '../cloud/account-status';
 import { useLocalization } from '../localization-context';
 import type { LanguagePreference } from '../localization';
 import {
@@ -45,6 +48,8 @@ export function SettingsScreen({
   onOpenSystemSettings,
   onOpenSchedule,
   onOpenGuide,
+  cloudHandle,
+  onOpenAccount,
 }: {
   theme: Theme;
   themePreference: ThemePreference;
@@ -62,6 +67,8 @@ export function SettingsScreen({
   onOpenSystemSettings: () => void;
   onOpenSchedule: () => void;
   onOpenGuide: () => void;
+  cloudHandle?: CloudHandle;
+  onOpenAccount?: () => void;
 }) {
   const { activityColors, activityLabel, t } = useLocalization();
   const [savingWidget, setSavingWidget] = useState(false);
@@ -209,6 +216,7 @@ export function SettingsScreen({
         </Text>
       </View>
 
+      {cloudHandle?.available&&onOpenAccount?<AccountSettingsRow cloud={cloudHandle} theme={theme} onOpen={onOpenAccount}/>:null}
       <SectionLabel label={t('settings.personalization')} theme={theme} />
       <View style={[styles.card, surfaceTreatment(theme), { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
         <SettingsRow
@@ -490,6 +498,13 @@ function SectionLabel({ label, theme }: { label: string; theme: Theme }) {
   );
 }
 
+function AccountSettingsRow({cloud,theme,onOpen}:{cloud:CloudHandle;theme:Theme;onOpen:()=>void}) {
+  const {t}=useLocalization(),state=useAccountSnapshot(cloud.controller);
+  return <View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}>
+    <SettingsRow testID="settings.account.open" wrap icon="cloud-outline" label={t('account.title')} detail={t(`account.status.${accountStatus(state)}`)} onPress={onOpen} theme={theme}/>
+  </View>;
+}
+
 function SettingsRow({
   testID,
   icon,
@@ -498,8 +513,10 @@ function SettingsRow({
   hint,
   onPress,
   theme,
+  wrap=false,
 }: {
   testID: string;
+  wrap?: boolean;
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
   label: string;
   detail: string;
@@ -526,8 +543,8 @@ function SettingsRow({
         />
       </View>
       <View style={styles.rowCopy}>
-        <Text numberOfLines={1} style={[styles.rowLabel, { color: theme.text }]}>{label}</Text>
-        <Text adjustsFontSizeToFit minimumFontScale={0.85} numberOfLines={1} style={[styles.rowHint, { color: theme.textMuted }]}>{detail}</Text>
+        <Text numberOfLines={wrap?undefined:1} style={[styles.rowLabel, { color: theme.text }]}>{label}</Text>
+        <Text numberOfLines={wrap?undefined:1} adjustsFontSizeToFit={!wrap} minimumFontScale={0.85} style={[styles.rowHint, { color: theme.textMuted }]}>{detail}</Text>
       </View>
       <MaterialCommunityIcons
         accessibilityElementsHidden
@@ -565,7 +582,7 @@ function PottyReminderRule({
       <View style={styles.pottyRuleRow}>
         <View style={styles.rowCopy}>
           <Text style={[styles.pottyRuleLabel, { color: theme.text }]}>{label}</Text>
-          <Text style={[styles.rowHint, { color: theme.textMuted }]}>{detail}</Text>
+          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} style={[styles.rowHint, { color: theme.textMuted }]}>{detail}</Text>
         </View>
         <Switch
           testID={`${testID}.enabled`}

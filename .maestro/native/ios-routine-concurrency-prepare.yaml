@@ -1,0 +1,12 @@
+appId: com.patrickchin.puptime
+name: iOS routine concurrency prepares an isolated local profile
+---
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- runFlow: ../helpers/skip-onboarding.yaml
+- tapOn:
+    id: quick.pee
+- assertVisible:
+    id: toast

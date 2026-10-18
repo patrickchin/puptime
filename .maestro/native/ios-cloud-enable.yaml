@@ -1,0 +1,21 @@
+appId: com.patrickchin.puptime
+name: iOS explicit cloud activation synchronizes local history
+---
+- launchApp:
+    stopApp: false
+- scrollUntilVisible:
+    element:
+      id: account.enable
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn:
+    id: account.enable
+- extendedWaitUntil:
+    visible:
+      id: account.retry
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: account.status
+      text: Up to date
+    timeout: 30000

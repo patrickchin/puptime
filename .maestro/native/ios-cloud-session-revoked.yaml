@@ -1,0 +1,21 @@
+appId: com.patrickchin.puptime
+name: iOS revoked session requires sign-in and preserves local ownership
+---
+- launchApp:
+    stopApp: false
+- scrollUntilVisible:
+    element:
+      id: account.retry
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn:
+    id: account.retry
+- extendedWaitUntil:
+    visible:
+      id: account.email.input
+    timeout: 30000
+- assertVisible:
+    id: account.status
+    text: Sign in again to sync
+- assertNotVisible:
+    id: account.enable

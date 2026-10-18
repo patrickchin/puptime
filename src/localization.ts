@@ -1,3 +1,4 @@
+import { accountEnglish,accountChinese,accountSpanish } from './cloud/account-copy.ts';
 import type { EventType, PuppyEvent } from './domain';
 
 export type AppLanguage = 'en' | 'zh-Hans' | 'es';
@@ -6,6 +7,7 @@ export type LanguagePreference = 'system' | AppLanguage;
 export const languageChoices: readonly LanguagePreference[] = ['system', 'en', 'zh-Hans', 'es'];
 
 const english = {
+  ...accountEnglish,
   "learn.audioTitle": "Listen to this guide",
   "learn.audioCredit": "English · {voice} · ElevenLabs",
   "learn.audioPlay": "Play",
@@ -274,6 +276,12 @@ const english = {
   'editor.close': 'Close log editor',
   'editor.retryA11y': 'Couldn’t save changes. Retry now',
   'editor.retry': 'Couldn’t save. Tap to retry.',
+  'editor.deletedTitle': 'Activity deleted',
+  'editor.deletedBody': 'This activity was deleted. Your draft has not been saved.',
+  'editor.keepDraft': 'Keep editing',
+  'editor.discardDraft': 'Discard draft',
+  'editor.shareDraft': 'Share draft',
+  'editor.shareError': 'Couldn’t share the draft. Please try again.',
   'editor.customNameStatus': 'Add a custom name to save this activity.',
   'editor.saving': 'Saving changes…',
   'editor.activity': 'ACTIVITY',
@@ -342,6 +350,8 @@ const english = {
   'schedule.status.upcoming': 'Upcoming',
   'schedule.saveErrorTitle': 'Couldn’t save the routine',
   'schedule.saveErrorBody': 'Your previous routine is still available. Please try again.',
+  'schedule.removedErrorTitle': 'Routine was removed',
+  'schedule.removedErrorBody': 'Your draft is still open, but this routine can’t be updated.',
   'schedule.notificationsOff': 'Notifications are off',
   'schedule.notificationsBody': 'Allow Puptime notifications in system settings to use daily routine reminders.',
   'schedule.notNow': 'Not now',
@@ -487,6 +497,7 @@ export type MessageKey = keyof typeof english;
 type Dictionary = Record<MessageKey, string>;
 
 const simplifiedChinese: Dictionary = {
+  ...accountChinese,
   "learn.audioTitle": "收听本篇指南",
   "learn.audioCredit": "英语 · {voice} · ElevenLabs",
   "learn.audioPlay": "播放",
@@ -755,6 +766,12 @@ const simplifiedChinese: Dictionary = {
   'editor.close': '关闭记录编辑器',
   'editor.retryA11y': '无法保存更改，立即重试',
   'editor.retry': '无法保存，点此重试。',
+  'editor.deletedTitle': '记录已删除',
+  'editor.deletedBody': '此记录已被删除，草稿尚未保存。',
+  'editor.keepDraft': '继续编辑',
+  'editor.discardDraft': '舍弃草稿',
+  'editor.shareDraft': '分享草稿',
+  'editor.shareError': '无法分享草稿，请重试。',
   'editor.customNameStatus': '添加自定义名称后才能保存。',
   'editor.saving': '正在保存更改…',
   'editor.activity': '活动',
@@ -823,6 +840,8 @@ const simplifiedChinese: Dictionary = {
   'schedule.status.upcoming': '即将到来',
   'schedule.saveErrorTitle': '无法保存日程',
   'schedule.saveErrorBody': '之前的日程仍然可用，请重试。',
+  'schedule.removedErrorTitle': '日程已被删除',
+  'schedule.removedErrorBody': '草稿仍然保留，但无法更新这条已删除的日程。',
   'schedule.notificationsOff': '通知已关闭',
   'schedule.notificationsBody': '请在系统设置中允许 Puptime 通知，以使用每日提醒。',
   'schedule.notNow': '暂不',
@@ -965,6 +984,7 @@ const simplifiedChinese: Dictionary = {
 };
 
 const spanish: Dictionary = {
+  ...accountSpanish,
   "learn.audioTitle": "Escuchar esta guía",
   "learn.audioCredit": "Inglés · {voice} · ElevenLabs",
   "learn.audioPlay": "Reproducir",
@@ -1233,6 +1253,12 @@ const spanish: Dictionary = {
   'editor.close': 'Cerrar editor del registro',
   'editor.retryA11y': 'No se pudieron guardar los cambios. Reintentar ahora',
   'editor.retry': 'No se pudo guardar. Toca para reintentar.',
+  'editor.deletedTitle': 'Actividad eliminada',
+  'editor.deletedBody': 'Esta actividad se eliminó. Tu borrador no se ha guardado.',
+  'editor.keepDraft': 'Seguir editando',
+  'editor.discardDraft': 'Descartar borrador',
+  'editor.shareDraft': 'Compartir borrador',
+  'editor.shareError': 'No se pudo compartir el borrador. Inténtalo de nuevo.',
   'editor.customNameStatus': 'Añade un nombre personalizado para guardar esta actividad.',
   'editor.saving': 'Guardando cambios…',
   'editor.activity': 'ACTIVIDAD',
@@ -1301,6 +1327,8 @@ const spanish: Dictionary = {
   'schedule.status.upcoming': 'Próximo',
   'schedule.saveErrorTitle': 'No se pudo guardar la rutina',
   'schedule.saveErrorBody': 'Tu rutina anterior sigue disponible. Inténtalo de nuevo.',
+  'schedule.removedErrorTitle': 'Se eliminó la rutina',
+  'schedule.removedErrorBody': 'El borrador sigue abierto, pero esta rutina ya no se puede actualizar.',
   'schedule.notificationsOff': 'Las notificaciones están desactivadas',
   'schedule.notificationsBody': 'Permite las notificaciones de Puptime en los ajustes del sistema para usar recordatorios diarios.',
   'schedule.notNow': 'Ahora no',

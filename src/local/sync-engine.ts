@@ -184,6 +184,17 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
         return {generation:current.generation,accountId:current.account_id,request:enrollmentSchema.parse(JSON.parse(pet.enrollment)),stagingCursor:current.staging_cursor,baselineComplete:current.staging_complete===1};
       });
     },
+    async cancelEnrollment(input:Fence&{operationId:string}):Promise<void> {
+      await database.write(async sql=>{
+        const current=await required(sql,input),pet=current.pending_pet_id?await binding(sql,current.pending_pet_id):null;
+        if(!pet||pet.status!=='preparing'||enrollmentSchema.parse(JSON.parse(pet.enrollment)).operationId!==input.operationId)throw new Error('Enrollment attempt changed.');
+        if(current.resyncing||current.staging_cursor||current.staging_complete||await sql.getFirstAsync('SELECT record_id FROM local_sync_baseline WHERE generation=? LIMIT 1',current.generation))throw new Error('A baseline already began; retain the saved enrollment.');
+        if(await sql.getFirstAsync('SELECT operation_id FROM local_sync_outbox WHERE generation=? AND local_pet_id=? LIMIT 1',current.generation,pet.pet_id))throw new Error('Retain enrollment with pending uploads.');
+        await sql.runAsync('DELETE FROM local_sync_pets WHERE generation=? AND pet_id=?',current.generation,pet.pet_id);
+        if(await sql.getFirstAsync('SELECT pet_id FROM local_sync_pets WHERE generation=? LIMIT 1',current.generation))await sql.runAsync('UPDATE local_sync_owner SET pending_pet_id=NULL,staging_cursor=0,staging_complete=0 WHERE generation=?',current.generation);
+        else await sql.runAsync('DELETE FROM local_sync_owner WHERE generation=?',current.generation);
+      });
+    },
     async stageBaseline(input:Fence&{page:PullPage}):Promise<void> {
       const page=pullPageSchema.parse(input.page);
       if (page.resyncRequired) throw new Error('A full baseline cannot request another resync.');

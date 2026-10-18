@@ -1,6 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { z } from 'zod';
 import { enrollmentSchema, mutationSchema, recordIdSchema, type Enrollment, type CloudRecord, type Mutation, type MutationResult, type PullPage, type Revision } from '../src/cloud/protocol';
+import {cloudAccess,getCloudAccount} from './entitlements';
 import { reconcileMutation, ReconciliationError } from '../src/cloud/reconcile';
 
 const cursorSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
@@ -35,6 +36,41 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
     });
   }
 
+  async fetch(request:Request):Promise<Response> {
+    const accountId=request.headers.get('x-puptime-account'),sessionId=request.headers.get('x-puptime-session');
+    if(new URL(request.url).pathname!=='/changes'||request.headers.get('upgrade')?.toLowerCase()!=='websocket')return new Response(null,{status:404});
+    if(!accountId||!sessionId||getAccountStore(this.env,accountId).id.toString()!==this.ctx.id.toString())return new Response(null,{status:401});
+    if(!await this.#channelAccess({accountId,sessionId}))return new Response(null,{status:401});
+    const [client,server]=Object.values(new WebSocketPair());
+    this.ctx.acceptWebSocket(server);
+    server.serializeAttachment({accountId,sessionId});
+    server.send(JSON.stringify({protocolVersion:1,cursor:this.#cursor()}));
+    return new Response(null,{status:101,webSocket:client});
+  }
+
+  #cursor():number {return this.ctx.storage.sql.exec<{value:number}>('SELECT COALESCE(MAX(sequence),0) AS value FROM revisions').one().value;}
+  async #channelAccess({accountId,sessionId}:{accountId:string;sessionId:string}):Promise<boolean> {
+    this.#assertActive();
+    // Recheck the SDK-managed session row, without persisting a cookie/token in
+    // hibernation attachments or introducing a second credential mechanism.
+    const session=await this.env.AUTH_DB.prepare('SELECT id FROM session WHERE id=? AND userId=? AND expiresAt>?').bind(sessionId,accountId,Date.now()).first();
+    const account=await getCloudAccount(this.env.AUTH_DB,accountId);
+    this.#assertActive();
+    return !!session&&cloudAccess(account,Date.now()).canSync;
+  }
+  async #notify(cursor:number):Promise<void> {
+    await Promise.all(this.ctx.getWebSockets().map(async socket=>{
+      try {
+        const attachment=socket.deserializeAttachment() as {accountId:string;sessionId:string}|null;
+        if(!attachment||!await this.#channelAccess(attachment)){socket.close(1008,'Access expired');return;}
+        socket.send(JSON.stringify({protocolVersion:1,cursor}));
+      }catch{try{socket.close(1011,'Channel unavailable');}catch{}}
+    }));
+  }
+  webSocketMessage(socket:WebSocket) {socket.close(1008,'Receive-only channel');}
+  webSocketClose(socket:WebSocket,_code:number) {socket.close(1000); }
+  webSocketError(socket:WebSocket) {try{socket.close(1011,'Channel unavailable');}catch{}}
+
   #assertActive(): void {
     if (this.ctx.storage.sql.exec<{ value: number }>("SELECT value FROM account_state WHERE key = 'retired'").toArray()[0]?.value) {
       throw new ReconciliationError('This cloud account was deleted.');
@@ -42,6 +78,7 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
   }
 
   retire(): void {
+    for(const socket of this.ctx.getWebSockets())socket.close(1008,'Account deleted');
     this.ctx.storage.transactionSync(() => {
       this.ctx.storage.sql.exec(`
         DELETE FROM records; DELETE FROM revisions; DELETE FROM operations;
@@ -55,7 +92,8 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
     this.#assertActive();
     const mutation = mutationSchema.parse(input);
     const payload = JSON.stringify(mutation);
-    return this.ctx.storage.transactionSync(() => {
+    const beforeCursor=this.#cursor();
+    const result=this.ctx.storage.transactionSync(() => {
       const device = this.ctx.storage.sql.exec<{ pet_id: string }>('SELECT pet_id FROM enrolled_devices WHERE id = ? AND (? IS NULL OR pet_id = ?) LIMIT 1', mutation.deviceId, mutation.petId, mutation.petId).toArray()[0];
       if (!device || (mutation.petId !== null && mutation.petId !== device.pet_id)) {
         throw new ReconciliationError('Pet is not enrolled for this account.');
@@ -82,6 +120,8 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
       this.ctx.storage.sql.exec('INSERT INTO operations(id, payload, result) VALUES (?, ?, ?)', mutation.operationId, payload, JSON.stringify(result));
       return result;
     });
+    if(result.sequence>beforeCursor)this.ctx.waitUntil(this.#notify(result.sequence));
+    return result;
   }
 
   enroll(input: Enrollment): { petId: string } {

@@ -1,0 +1,12 @@
+appId: com.patrickchin.puptime
+name: iOS sign-in rate limiting offers a recoverable wait
+---
+- launchApp:
+    stopApp: false
+- assertVisible:
+    id: account.error
+    text: Too many attempts. Wait a moment, then try again.
+- assertVisible:
+    id: account.code.input
+- assertNotVisible:
+    id: account.enable

@@ -8,6 +8,10 @@ export type CloudAccess = {
   canSync: boolean; canExport: boolean; source: 'paid' | 'trial' | 'none'; expiresAt: number | null;
 };
 
+export function trialDaysFromEnvironment(value:string|undefined):number {
+  return z.number().int().min(1).max(30).parse(value?Number(value):14);
+}
+
 export function cloudAccess(account: CloudAccount | null, now: number): CloudAccess {
   if (account?.state === 'deleting') return { canSync: false, canExport: false, source: 'none', expiresAt: null };
   const trial = account?.trialStartedAt !== null && account?.trialStartedAt !== undefined

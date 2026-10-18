@@ -3,7 +3,7 @@ import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Appearance, AppState, BackHandler, Linking, StyleSheet, useColorScheme, View } from 'react-native';
+import { Alert, Appearance, AppState, BackHandler, Linking, Modal, StyleSheet, useColorScheme, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { BottomNav, type Tab } from './src/components/BottomNav';
@@ -27,7 +27,6 @@ import {
   isOpenNap,
   isQuickEventType,
   normalizeCustomLabel,
-  normalizeEventTypeChange,
   normalizeNote,
   type ActivityKey,
   type EventType,
@@ -41,6 +40,8 @@ import { LogScreen, type LogEditRequest } from './src/screens/LogScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { ScheduleScreen } from './src/screens/ScheduleScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
+import { AccountScreen } from './src/screens/AccountScreen';
+import { useCloud } from './src/cloud/use-cloud';
 import { TimelineScreen } from './src/screens/TimelineScreen';
 import {
   ADD_NOTE_ACTION,
@@ -74,6 +75,8 @@ import {
   loadWidgetActions,
   removeEvent,
   saveSchedule,
+  saveScheduleEntry,
+  removeScheduleEntry,
   saveCustomActivity,
   saveLanguagePreference,
   saveNotificationPreferences,
@@ -98,6 +101,7 @@ export default function App() {
   const [languagePreference, setLanguagePreference] = useState<LanguagePreference>('system');
   const [preferencePicker, setPreferencePicker] = useState<'theme' | 'language' | null>(null);
   const [settingsVisible, setSettingsVisible] = useState(false);
+  const [accountVisible,setAccountVisible]=useState(false);
   const [onboardingVisible, setOnboardingVisible] = useState<boolean | null>(null);
   const [guideOpenedFromSettings, setGuideOpenedFromSettings] = useState(false);
   const [scheduleOpenedFromSettings, setScheduleOpenedFromSettings] = useState(false);
@@ -163,6 +167,12 @@ export default function App() {
     return nextEvents;
   }, []);
 
+  const refreshFromCloud=useCallback(async()=>{
+    try{await refresh();}
+    catch{Alert.alert(translate(languageRef.current,'app.loadErrorTitle'),translate(languageRef.current,'app.loadErrorBody'));}
+  },[refresh]);
+  const cloud=useCloud(refreshFromCloud);
+
   useEffect(() => {
     let mounted = true;
     const reload = async () => {
@@ -201,6 +211,7 @@ export default function App() {
   useEffect(() => {
     if (onboardingVisible !== false) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if(accountVisible){setAccountVisible(false);return true;}
       if (preferencePicker !== null) {
         setPreferencePicker(null);
         return true;
@@ -222,7 +233,7 @@ export default function App() {
       return false;
     });
     return () => subscription.remove();
-  }, [onboardingVisible, preferencePicker, scheduleOpenedFromSettings, settingsVisible, tab]);
+  }, [accountVisible,onboardingVisible, preferencePicker, scheduleOpenedFromSettings, settingsVisible, tab]);
 
   useEffect(() => {
     configureNotificationActions(language).catch(() => undefined);
@@ -231,6 +242,7 @@ export default function App() {
   const handleNotificationResponse = useCallback(async (response: Notifications.NotificationResponse) => {
     const data = response.notification.request.content.data;
     if (data?.kind === POTTY_REMINDER_NOTIFICATION_KIND) {
+      setAccountVisible(false);
       setSettingsVisible(false);
       setTab('log');
       return;
@@ -267,6 +279,7 @@ export default function App() {
       setEvents(updatedEvents);
       updateHomeWidget(updatedEvents).catch(() => undefined);
     }
+    setAccountVisible(false);
     setSettingsVisible(false);
     setTab('log');
     setEditRequest({
@@ -369,17 +382,10 @@ export default function App() {
     event: PuppyEvent,
     changes: PuppyEventChanges,
   ) => {
-    const type = normalizeEventTypeChange(event, changes.type ?? event.type);
-    if (type === 'custom' && changes.customLabel && activityKey({ type, customLabel: changes.customLabel }) !== activityKey(event)) {
+    if ((changes.type??event.type)==='custom'&&changes.customLabel&&activityKey({type:'custom',customLabel:changes.customLabel})!==activityKey(event)) {
       setCustomActivities(await saveCustomActivity(changes.customLabel));
     }
-    const nextEvents = await updateEvent(event.id, {
-      ...changes,
-      type,
-      endedAt: type === 'nap' ? changes.endedAt : undefined,
-      customLabel: type === 'custom' ? normalizeCustomLabel(changes.customLabel) : undefined,
-      note: normalizeNote(changes.note),
-    });
+    const nextEvents=await updateEvent(event.id,changes);
     setEvents(nextEvents);
     Haptics.selectionAsync().catch(() => undefined);
     syncPottyReminders(nextEvents, notificationPreferences, language).catch(() => undefined);
@@ -402,8 +408,7 @@ export default function App() {
     void persistUndo().catch(showSaveError);
   };
 
-  const changeSchedule = async (nextSchedule: ScheduleEntry[]) => {
-    await saveSchedule(nextSchedule);
+  const applySavedSchedule = async (nextSchedule: ScheduleEntry[]) => {
     setSchedule(nextSchedule);
     try {
       const synced = await syncScheduleReminders(
@@ -418,6 +423,9 @@ export default function App() {
       Alert.alert(translate(language, 'app.routineSaved'), translate(language, 'app.reminderError'));
     }
   };
+  const changeSchedule = async (nextSchedule:ScheduleEntry[]) => {await saveSchedule(nextSchedule);await applySavedSchedule(await loadSchedule());};
+  const changeScheduleEntry = async (entry:ScheduleEntry,original?:ScheduleEntry) => applySavedSchedule(await saveScheduleEntry(entry,original));
+  const deleteScheduleEntry = async (id:string) => applySavedSchedule(await removeScheduleEntry(id));
 
   const chooseTheme = (preference: ThemePreference) => {
     saveThemePreference(preference)
@@ -515,6 +523,8 @@ export default function App() {
           notificationPermission={notificationPermission}
           routineReminderCount={schedule.filter((entry) => entry.reminder).length}
           onBack={() => setSettingsVisible(false)}
+          cloudHandle={cloud}
+          onOpenAccount={()=>setAccountVisible(true)}
           onOpenPicker={setPreferencePicker}
           onWidgetActionsChange={changeWidgetActions}
           onNotificationPreferencesChange={changeNotificationPreferences}
@@ -545,6 +555,8 @@ export default function App() {
           schedule={schedule}
           customActivities={customActivities}
           onChange={changeSchedule}
+          onSaveEntry={changeScheduleEntry}
+          onRemoveEntry={deleteScheduleEntry}
           onRequestReminderPermission={requestNotifications}
           theme={theme}
         />
@@ -565,6 +577,7 @@ export default function App() {
     );
   }, [
     changeWidgetActions,
+    cloud,
     customActivities,
     activityCustomizations,
     editRequest,
@@ -636,6 +649,9 @@ export default function App() {
             onSelectLanguage={chooseLanguage}
             onClose={() => setPreferencePicker(null)}
           />
+          <Modal visible={accountVisible&&cloud.available} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={()=>setAccountVisible(false)}>
+            {accountVisible?<SafeAreaProvider><AccountScreen cloud={cloud} theme={theme} eventCount={events.length} onBack={()=>setAccountVisible(false)} onOpenActivity={()=>{setAccountVisible(false);setSettingsVisible(false);setTab('log');}}/></SafeAreaProvider>:null}
+          </Modal>
         </SafeAreaView>
       </LocalizationProvider>
     </SafeAreaProvider>

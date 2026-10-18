@@ -1,0 +1,34 @@
+appId: com.patrickchin.puptime
+name: iOS email sign-in rejects a wrong code
+---
+- launchApp:
+    stopApp: false
+- scrollUntilVisible:
+    element:
+      id: account.code.input
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn:
+    id: account.code.input
+- eraseText
+- inputText: ${MAESTRO_TEST_CODE}
+- assertVisible:
+    id: account.code.input
+    text: ^[0-9]{6}$
+- tapOn: Sign-in code
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      id: account.verify
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn:
+    id: account.verify
+- extendedWaitUntil:
+    visible:
+      id: account.error
+    timeout: 20000
+- assertVisible:
+    id: account.code.input
+- assertNotVisible:
+    id: account.enable

@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Keyboard,
@@ -22,6 +22,7 @@ import { customActivityKey, formatMinutes, formatScheduleWindow, quickEventTypes
 import type { PuppyEvent } from '../domain';
 import { useLocalization } from '../localization-context';
 import { spacing, surfaceTreatment, type Theme } from '../theme';
+import { ScheduleEntryDeletedError } from '../schedule-editor';
 
 type Draft = { id?: string; type: EventType; customLabel?: string; minutes: number; reminder: boolean; toleranceMinutes?: number };
 
@@ -30,6 +31,8 @@ export function ScheduleScreen({
   schedule,
   customActivities,
   onChange,
+  onSaveEntry,
+  onRemoveEntry,
   onRequestReminderPermission,
   theme,
 }: {
@@ -37,11 +40,14 @@ export function ScheduleScreen({
   schedule: ScheduleEntry[];
   customActivities: string[];
   onChange: (schedule: ScheduleEntry[]) => Promise<void>;
+  onSaveEntry:(entry:ScheduleEntry,original?:ScheduleEntry)=>Promise<void>;
+  onRemoveEntry:(id:string)=>Promise<void>;
   onRequestReminderPermission: () => Promise<boolean>;
   theme: Theme;
 }) {
   const { activityColors, activityLabel, locale, t } = useLocalization();
   const [draft, setDraft] = useState<Draft | null>(null);
+  const originalDraft=useRef<ScheduleEntry|undefined>(undefined);
   const [showTimeSelector, setShowTimeSelector] = useState(false);
   const [pendingRemove, setPendingRemove] = useState<ScheduleEntry | null>(null);
   const [removing, setRemoving] = useState(false);
@@ -80,7 +86,7 @@ export function ScheduleScreen({
   const openNew = () => {
     const now = new Date();
     const rounded = Math.round((now.getHours() * 60 + now.getMinutes()) / 15) * 15;
-    setDraft({ type: 'pee', minutes: rounded % (24 * 60), reminder: false });
+    originalDraft.current=undefined;setDraft({ type: 'pee', minutes: rounded % (24 * 60), reminder: false });
     setShowTimeSelector(false);
   };
 
@@ -96,10 +102,10 @@ export function ScheduleScreen({
     };
     setSaving(true);
     try {
-      await onChange([...schedule.filter((item) => item.id !== entry.id), entry].sort((a, b) => a.minutes - b.minutes));
+      await onSaveEntry(entry,originalDraft.current);
       setDraft(null);
-    } catch {
-      Alert.alert(t('schedule.saveErrorTitle'), t('schedule.saveErrorBody'));
+    } catch(error) {
+      Alert.alert(t(error instanceof ScheduleEntryDeletedError?'schedule.removedErrorTitle':'schedule.saveErrorTitle'), t(error instanceof ScheduleEntryDeletedError?'schedule.removedErrorBody':'schedule.saveErrorBody'));
     } finally {
       setSaving(false);
     }
@@ -138,7 +144,7 @@ export function ScheduleScreen({
     setRemoving(true);
     setRemoveFailed(false);
     try {
-      await onChange(schedule.filter((item) => item.id !== pendingRemove.id));
+      await onRemoveEntry(pendingRemove.id);
       setPendingRemove(null);
     } catch {
       setRemoveFailed(true);
@@ -340,7 +346,7 @@ export function ScheduleScreen({
                   status: presentation.label,
                   reminder: entry.reminder ? t('schedule.reminderOn') : '',
                 })}
-                onPress={() => { setDraft({ ...entry, reminder: Boolean(entry.reminder) }); setShowTimeSelector(false); }}
+                onPress={() => { originalDraft.current={...entry,reminder:Boolean(entry.reminder)};setDraft({...originalDraft.current,reminder:Boolean(entry.reminder)}); setShowTimeSelector(false); }}
                 style={({ pressed }) => [
                   styles.scheduleRow,
                   surfaceTreatment(theme),

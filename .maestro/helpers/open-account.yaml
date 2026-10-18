@@ -1,0 +1,30 @@
+appId: com.patrickchin.puptime
+---
+- runFlow:
+    when:
+      notVisible:
+        id: screen.account
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: screen.today
+          commands:
+            - scrollUntilVisible:
+                element:
+                  id: settings.open
+                direction: UP
+                visibilityPercentage: 100
+            - tapOn:
+                id: settings.open
+      - runFlow:
+          when:
+            visible:
+              id: screen.settings
+          commands:
+            - tapOn:
+                id: settings.account.open
+- extendedWaitUntil:
+    visible:
+      id: screen.account
+    timeout: 30000

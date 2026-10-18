@@ -3,19 +3,10 @@ import type { ActivityKey, PuppyEvent, PuppyEventChanges, ScheduleEntry } from '
 import type { LanguagePreference } from './localization';
 import type { NotificationPreferences } from './notification-config';
 import type { ThemePreference } from './theme';
-import { createNativeStorage } from './local/native-storage';
-import { openLocalDatabase } from './local/open.native';
+import { getLocalRuntime } from './local/runtime.ios';
 export { assertValidEvents, EventsImportError, EventsStorageError } from './storage-validation';
 
-type Storage = ReturnType<typeof createNativeStorage>;
-let initialized: Promise<Storage> | undefined;
-function storage(): Promise<Storage> {
-  initialized ??= openLocalDatabase().then(({ database, petId }) => createNativeStorage(database, petId)).catch((error) => {
-    initialized = undefined;
-    throw error;
-  });
-  return initialized;
-}
+const storage=async()=>(await getLocalRuntime()).storage;
 
 export const shouldShowOnboarding = async () => (await storage()).shouldShowOnboarding();
 export const completeOnboarding = async () => (await storage()).completeOnboarding();
@@ -27,6 +18,8 @@ export const updateEventTime = async (id: string, at: number) => (await storage(
 export const updateEvent = async (id: string, changes: PuppyEventChanges) => (await storage()).updateEvent(id, changes);
 export const loadSchedule = async () => (await storage()).loadSchedule();
 export const saveSchedule = async (schedule: ScheduleEntry[]) => (await storage()).saveSchedule(schedule);
+export const saveScheduleEntry = async (entry:ScheduleEntry,original?:ScheduleEntry) => (await storage()).saveScheduleEntry(entry,original);
+export const removeScheduleEntry = async (id:string) => (await storage()).removeScheduleEntry(id);
 export const loadThemePreference = async () => (await storage()).loadThemePreference();
 export const saveThemePreference = async (value: ThemePreference) => (await storage()).saveThemePreference(value);
 export const loadLanguagePreference = async () => (await storage()).loadLanguagePreference();

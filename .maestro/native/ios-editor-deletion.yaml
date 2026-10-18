@@ -1,0 +1,30 @@
+appId: com.patrickchin.puptime
+name: iOS editor retains a draft after remote deletion
+---
+- assertVisible:
+    id: editor
+- tapOn:
+    id: editor.note.input
+- eraseText
+- setClipboard: retained deleted draft
+- pasteText
+- extendedWaitUntil:
+    visible:
+      id: editor.shareDeletedDraft
+    timeout: 10000
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: editor.close
+    direction: UP
+    centerElement: false
+- tapOn:
+    id: editor.close
+- tapOn: Keep editing
+- assertVisible:
+    id: editor
+- tapOn:
+    id: editor.close
+- tapOn: Discard draft
+- assertNotVisible:
+    id: editor

@@ -1,0 +1,23 @@
+appId: com.patrickchin.puptime
+name: iOS restarts authenticated cloud setup without losing local history
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: settings.open
+    timeout: 90000
+- tapOn:
+    id: settings.open
+- tapOn:
+    id: settings.account.open
+- extendedWaitUntil:
+    visible:
+      id: account.retry
+    timeout: 30000
+- tapOn:
+    id: account.retry
+- extendedWaitUntil:
+    visible:
+      id: account.status
+      text: Up to date
+    timeout: 30000

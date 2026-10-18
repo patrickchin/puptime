@@ -1,0 +1,25 @@
+appId: com.patrickchin.puptime
+name: iOS logs locally while the cloud service is unavailable
+---
+- launchApp:
+    stopApp: false
+- scrollUntilVisible:
+    element:
+      id: account.back
+    direction: UP
+    visibilityPercentage: 100
+- tapOn:
+    id: account.back
+- tapOn:
+    id: settings.back
+- tapOn:
+    id: quick.poop
+- assertVisible:
+    id: toast
+- tapOn:
+    id: settings.open
+- tapOn:
+    id: settings.account.open
+- assertVisible:
+    id: account.local.count
+    text: ${MAESTRO_EXPECTED_COUNT} activity logs

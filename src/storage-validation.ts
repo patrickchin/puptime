@@ -7,6 +7,13 @@ export class EventsStorageError extends Error {
   }
 }
 
+export class EventDeletedError extends Error {
+  constructor() {
+    super('This activity was deleted. Your draft has not been saved.');
+    this.name = 'EventDeletedError';
+  }
+}
+
 export class EventsImportError extends Error {
   constructor() {
     super('Import would leave more than one nap in progress.');

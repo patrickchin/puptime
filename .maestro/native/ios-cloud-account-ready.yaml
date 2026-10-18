@@ -1,0 +1,23 @@
+appId: com.patrickchin.puptime
+name: iOS cloud qualification begins with acknowledged history
+---
+- launchApp:
+    stopApp: false
+- runFlow:
+    when:
+      visible: ^Sign out on this iPhone\?$
+    commands:
+      - tapOn: Cancel
+- runFlow: ../helpers/open-account.yaml
+- runFlow:
+    when:
+      visible:
+        id: account.refresh
+    commands:
+      - tapOn:
+          id: account.refresh
+- extendedWaitUntil:
+    visible:
+      id: account.status
+      text: Up to date
+    timeout: 30000

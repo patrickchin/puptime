@@ -1,0 +1,27 @@
+appId: com.patrickchin.puptime
+name: iOS optional email sign-in preserves local history
+---
+- launchApp:
+    clearState: true
+    clearKeychain: true
+- runFlow: ../helpers/skip-onboarding.yaml
+- tapOn:
+    id: quick.pee
+- tapOn:
+    id: settings.open
+- tapOn:
+    id: settings.account.open
+- extendedWaitUntil:
+    visible:
+      id: account.email.input
+    timeout: 30000
+- tapOn:
+    id: account.email.input
+- setClipboard: ${TEST_EMAIL}
+- pasteText
+- tapOn:
+    id: account.sendCode
+- extendedWaitUntil:
+    visible:
+      id: account.code.input
+    timeout: 30000

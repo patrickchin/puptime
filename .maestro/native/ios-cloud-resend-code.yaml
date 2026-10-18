@@ -1,0 +1,19 @@
+appId: com.patrickchin.puptime
+name: iOS email sign-in can request a fresh code
+---
+- launchApp:
+    stopApp: false
+- tapOn: Sign-in code
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      id: account.resend
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn:
+    id: account.resend
+- assertVisible:
+    id: account.resend
+    enabled: true
+- assertVisible:
+    id: account.code.input

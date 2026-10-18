@@ -4,6 +4,12 @@ Execution design: `docs/superpowers/specs/2026-10-17-accounts-sync-design.md`.
 
 The user delegated remaining technical decisions and autonomous execution. Implement in this order, using independently reviewed PRs. Do not wait between completed phases for routine permission. Update this file and the execution ledger with evidence; an unchecked item is not implemented.
 
+Acceptance includes review videos of new features, steps and meaningful test
+journeys. Record the real iOS app and actual service-test output, label recorded
+reruns and evidence scope, omit credential entry, and keep a linked gallery with
+logs outside the worktree. Follow `docs/review-videos.md`. Group unit tests by
+suite; give end-to-end journeys individual clips or chapters.
+
 1. [x] **Cloud record and synchronization foundation.** Versioned validated operations, deterministic field merging, durable revision history, idempotency and incremental pull, per-account SQLite Durable Object. No unauthenticated public route to customer data. Detailed plan: `2026-10-17-cloud-foundation.md`.
 2. [x] **Identity, entitlement, and account lifecycle server.** Better Auth with D1 and Expo authentication support; configured Apple/Google/email-code login; trial/access checks, protected account routing, explicit puppy association, full export, sign-out/deletion. Billing catalog stays configurable. Real sender/provider availability is a separate verified gate.
 3. [ ] **Transactional native persistence and sync.** Expo SQLite migration preserving originals, app/widget transactions, restartable enrollment/outbox, pull/rebase, notification preferences, iOS pending-operation acknowledgment. Two-client fault tests before wiring ordinary UI to cloud.
@@ -17,7 +23,7 @@ Create a precise subsystem plan at each boundary using the actual interfaces and
 
 ## Current execution priority
 
-The user directed **iOS app first; Android and widgets later**. The in-progress widget branch is preserved at `codex/native-storage-cutover` (`bd99857`) and is not merged. The active `codex/ios-storage-cutover` branch contains the storage facade with an iOS-only platform selector. Android keeps its existing backend; no new widget transport is activated here. Finish iOS storage qualification/review, then implement iOS accounts, owner-bound offline synchronization, onboarding and iOS end-to-end coverage. Deferred tracks must not block that sequence.
+The user directed **iOS app first; Android only when explicitly resumed, and widgets later**. The in-progress widget branch is preserved at `codex/native-storage-cutover` (`bd99857`) and is not merged. PR88's iOS storage cutover has merged after green native CI. The engine is in PR93; the iOS account/cloud client has completed its single review fix pass and is being prepared for PR/CI integration. Android remains unverified and keeps its existing backend; no new widget transport is activated here. Continue iOS lifecycle/history, onboarding, billing/web and observability after this client slice. Deferred tracks must not block that sequence.
 
 ## Implementation evidence
 

@@ -1,0 +1,41 @@
+appId: com.patrickchin.puptime
+name: iOS routine keeps an activity draft while another writer changes fields
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 30000
+- waitForAnimationToEnd
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            notVisible:
+              id: screen.schedule
+          commands:
+            - tapOn:
+                id: nav.schedule
+                retryTapIfNoChange: true
+            - waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: screen.schedule
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: schedule.entry.walk
+    direction: DOWN
+    visibilityPercentage: 100
+- extendedWaitUntil:
+    visible:
+      id: schedule.entry.walk
+    timeout: 30000
+- tapOn:
+    id: schedule.entry.walk
+- assertVisible:
+    id: schedule.editor.reminder
+    checked: false
+- tapOn:
+    id: schedule.editor.type.poop

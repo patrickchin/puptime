@@ -1,0 +1,33 @@
+appId: com.patrickchin.puptime
+name: iOS reauthentication resumes sync without another trial
+---
+- launchApp:
+    stopApp: false
+- scrollUntilVisible:
+    element:
+      id: account.code.input
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn:
+    id: account.code.input
+- eraseText
+- inputText: ${MAESTRO_TEST_CODE}
+- tapOn: Sign-in code
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      id: account.verify
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn:
+    id: account.verify
+- extendedWaitUntil:
+    visible:
+      id: account.status
+      text: Up to date
+    timeout: 30000
+- assertVisible:
+    id: account.local.count
+    text: ${MAESTRO_EXPECTED_COUNT} activity logs
+- assertNotVisible:
+    id: account.enable
