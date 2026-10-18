@@ -36,7 +36,7 @@
 - src/storage.ios.ts: forwards options to the existing storage. src/storage.ts: accepts optional options for type compatibility, preserves existing non-iOS behavior.
 - src/screens/OnboardingScreen.ios.tsx: complete iOS walkthrough, React-only demo state and accessible bounded motion. Existing OnboardingScreen.tsx retains Android UI and consumes the compatible shared props.
 - App.tsx: passes mode, guards replay callbacks, navigates only after commit; no new global profile state/cache.
-- src/components/PuppyNameSetting.ios.tsx and inert PuppyNameSetting.tsx: native name row/prompt with mounted guards and subscribeLocalWrites; inserted in SettingsScreen.tsx.
+- src/components/PuppyNameSetting.ios.tsx and inert PuppyNameSetting.tsx: native name row/prompt with mounted guards, subscribeLocalWrites and the existing account snapshot; inserted in SettingsScreen.tsx.
 - src/localization.ts: localized onboarding/name labels; preserve legacy onboarding keys for deferred platform.
 - .maestro/native/ios-onboarding-*.yaml and scripts/verify-ios-onboarding.mjs: actual UI/data acceptance. Update existing iOS onboarding flows for the separate notification control.
 
@@ -59,7 +59,7 @@
 
 ### Task 3: Safe replay, permissions and later rename
 
-**Interfaces:** PuppyNameSetting({theme}) native component uses getLocalRuntime()/subscribeLocalWrites(), runtime.storage.loadPuppyName()/savePuppyName(). Non-iOS component returns null. Existing permission callbacks remain separate from finish.
+**Interfaces:** PuppyNameSetting({theme,cloud}) native component uses getLocalRuntime()/subscribeLocalWrites(), runtime.storage.loadPuppyName()/savePuppyName(); cloud:CloudHandle supplies the existing account snapshot for remote projection notifications. Non-iOS component returns null. Existing permission callbacks remain separate from finish.
 
 - [ ] Extend native qualifier with populated history/name/preferences/owner/outbox snapshot: replay all demos and finish/Skip, then compare exact durable snapshot and OS permission. Replay has no name or permission action. Observe expected RED before guards/UI finish.
 - [ ] Add iOS Settings row with actual saved name, native prompt and localized validation/error. Reload saved name on local commit, preserve an open prompt draft; commit only explicit Save and keep old saved label on error. No account/trial changes.

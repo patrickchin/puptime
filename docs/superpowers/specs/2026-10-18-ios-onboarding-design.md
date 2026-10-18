@@ -15,7 +15,7 @@ Reuse the existing theme: background #F5F3EC, surface #FFFEFA, ink #17231E, prim
 
 Skip completes first-run onboarding using the existing puppy name, even if a name draft was entered. Start logging commits a supplied trimmed name or My puppy together with completion. Completion failure keeps the screen/draft open. Back preserves in-memory choices. Existing completed installations stay completed. Replay closes to Settings and leaves records, name, preferences, ownership, outbox and notification permission unchanged.
 
-Name is pet-scoped and stable identity never changes. Accept the current puppy protocol's 1–256 character name after trimming; blank first-run input means My puppy. Add a small iOS Settings puppy-name row using the existing native name setter and a native edit prompt, so the name can be changed later. Show the actual saved value only after a successful commit; failures retain the old value. Subscribe to the existing local commit signal so a remote name projection is reflected without resetting an open draft. No new account/trial/enrollment behavior.
+Name is pet-scoped and stable identity never changes. Accept the current puppy protocol's 1–256 character name after trimming; blank first-run input means My puppy. Add a small iOS Settings puppy-name row using the existing native name setter and a native edit prompt, so the name can be changed later. Show the actual saved value only after a successful commit; failures retain the old value. Subscribe to the existing local commit signal and the account snapshot’s committed local name so local and remote name projections are reflected without resetting an open draft. No new account/trial/enrollment behavior.
 
 ## Platform and interaction requirements
 
