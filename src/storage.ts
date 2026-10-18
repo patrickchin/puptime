@@ -3,6 +3,7 @@ import { parseEvents, parseSchedule, EventsImportError, EventsStorageError } fro
 import { storageKeys } from './local/settings.ts';
 import { applyScheduleEntryEdit } from './schedule-editor.ts';
 import type { FinishOnboardingOptions } from './onboarding.ts';
+import type { EventWriteOptions } from './domain.ts';
 export { assertValidEvents, EventsImportError, EventsStorageError } from './storage-validation.ts';
 
 import { normalizeActivityCustomizations, type ActivityCustomization, type ActivityCustomizations } from './activity-customization.ts';
@@ -92,7 +93,7 @@ export async function loadEvents(): Promise<PuppyEvent[]> {
   }
 }
 
-export function appendEvents(incoming: PuppyEvent[]): Promise<PuppyEvent[]> {
+export function appendEvents(incoming: PuppyEvent[],_options?:EventWriteOptions): Promise<PuppyEvent[]> {
   return queueEventWrite(async () => {
     incoming=parseEvents(incoming);
     const current = await loadEvents();
@@ -134,6 +135,7 @@ export function updateEventTime(id: string, at: number): Promise<PuppyEvent[]> {
 export function updateEvent(
   id: string,
   changes: PuppyEventChanges,
+  _options?:EventWriteOptions,
 ): Promise<PuppyEvent[]> {
   return queueEventWrite(async () => writeEvents((await loadEvents())
     .map((event) => (event.id === id ? { ...event, ...changes } : event))));

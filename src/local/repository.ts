@@ -1,4 +1,4 @@
-import { type PuppyEvent, type PuppyEventChanges, type ScheduleEntry } from '../domain.ts';
+import { type EventWriteOptions, type PuppyEvent, type PuppyEventChanges, type ScheduleEntry } from '../domain.ts';
 import { parseEvents, parseSchedule, EventDeletedError, EventsImportError, EventsStorageError } from '../storage-validation.ts';
 import type { LocalDatabase, SqlExecutor } from './database.ts';
 import { applyScheduleEntryEdit } from '../schedule-editor.ts';
@@ -56,16 +56,16 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
     else await sql.runAsync('DELETE FROM events WHERE pet_id=? AND id=?',petId,before!.id);
     return changes;
   }
-  async function eventLabels(sql:SqlExecutor,changes:LocalChange[]) {
+  async function eventLabels(sql:SqlExecutor,changes:LocalChange[],options:EventWriteOptions={}) {
     const labels=changes.flatMap(change=>change.after?.type==='custom'?[String(change.after.customLabel)]:[]);
-    return [...changes,...await retainCustomActivities(sql,petId,labels)];
+    return [...changes,...await retainCustomActivities(sql,petId,labels,options.restoreCustomActivities)];
   }
-  async function updateEvent(id:string,changes:PuppyEventChanges):Promise<void> {
+  async function updateEvent(id:string,changes:PuppyEventChanges,options:EventWriteOptions={}):Promise<void> {
     await commit(async sql=>{
       const before=await readEvent(sql,id);
       if (!before) throw new EventDeletedError();
       const [after]=parseEvents([{...before,...changes,...(before.estimated?{estimated:true}:{})}]);
-      return {changes:await eventLabels(sql,await writeEvent(sql,before,after)),value:undefined};
+      return {changes:await eventLabels(sql,await writeEvent(sql,before,after),options),value:undefined};
     });
   }
   function routineFromRow(row:RoutineSqlRow&{id:string}):ScheduleEntry {return {id:localIdSchema.parse(row.id),...routineDataFromSql(row)};}
@@ -86,7 +86,7 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
   }
   return {
     async loadEvents() { return materialize(await database.read(readEvents)); },
-    async appendEvents(incoming:PuppyEvent[]):Promise<void> {
+    async appendEvents(incoming:PuppyEvent[],options:EventWriteOptions={}):Promise<void> {
       incoming=parseEvents(incoming);
       await commit(async sql=>{
         const changes:LocalChange[]=[];
@@ -95,7 +95,7 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
           const [after]=parseEvents([{...before,...event,...(before?.estimated?{estimated:true}:{})}]);
           changes.push(...await writeEvent(sql,before,after));
         }
-        return {changes:await eventLabels(sql,changes),value:undefined};
+        return {changes:await eventLabels(sql,changes,options),value:undefined};
       });
     },
     async importEvents(incoming:PuppyEvent[]):Promise<{imported:number;skipped:number}> {

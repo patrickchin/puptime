@@ -9,6 +9,7 @@ import { createNativeStorage } from './native-storage.ts';
 import { createLocalRuntime } from './runtime-factory.ts';
 import { DEFAULT_NOTIFICATION_PREFERENCES, type NotificationPreferences } from '../notification-config.ts';
 import type { PuppyEvent } from '../domain.ts';
+import { csvToEvents, eventsToCsv } from '../export.ts';
 async function setup(t: TestContext) {
   const directory = await mkdtemp(join(tmpdir(),'puptime-native-settings-'));
   const path = join(directory,'data.db');
@@ -37,6 +38,19 @@ test('local writes enforce cloud field limits without committing invalid creatio
   await assert.rejects(storage.updateEvent(saved.id,{note:'n'.repeat(16385)}),TypeError);
   await assert.rejects(storage.saveScheduleEntry({id:'routine',type:'custom',customLabel:'c'.repeat(41),minutes:1}),TypeError);
   assert.deepEqual(await snapshot(),before);
+});
+
+test('CSV restores long valid notes and rejects invalid files before importing any row',async t=>{
+  const {database,storage}=await setup(t);
+  const events:PuppyEvent[]=[301,16384].map(length=>({id:'csv-'+length,type:'pee',at:length,source:'app',note:'n'.repeat(length)}));
+  assert.deepEqual(await storage.importEvents(csvToEvents(eventsToCsv(events))),{imported:2,skipped:0});
+  assert.deepEqual(await storage.loadEvents(),[...events].reverse());
+  const before=await database.read(sql=>sql.getAllAsync('SELECT * FROM local_revisions ORDER BY rowid'));
+  for(const invalid of [{...events[0],id:'bad-note',note:'n'.repeat(16385)},{...events[0],id:'x'.repeat(257)}]){
+    await assert.rejects(async()=>storage.importEvents(csvToEvents(eventsToCsv([{...events[0],id:'would-be-imported'},invalid]))));
+    assert.deepEqual(await storage.loadEvents(),[...events].reverse());
+    assert.deepEqual(await database.read(sql=>sql.getAllAsync('SELECT * FROM local_revisions ORDER BY rowid')),before);
+  }
 });
 
 test('local writers persist parsed canonical labels in records and revision capture',async t=>{

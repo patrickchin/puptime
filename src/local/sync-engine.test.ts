@@ -31,6 +31,31 @@ async function activate(sync:ReturnType<typeof engine.createLocalSync>) {
  return {generation,accountId:input.accountId};
 }
 
+test('explicit event label restoration shares event rollback revisions and upload work',async t=>{
+ const {sync,storage,database}=await setup(t);
+ await storage.saveCustomActivity('Training');await storage.deleteCustomActivity('Training');
+ await storage.appendEvents([event]);const fence=await activate(sync),options={restoreCustomActivities:true};
+ const snapshot=()=>database.read(async sql=>Object.fromEntries(await Promise.all(['events','pet_settings','local_revisions','local_sync_outbox'].map(async table=>[table,await sql.getAllAsync(`SELECT * FROM ${table} ORDER BY rowid`)]))));
+ let before=await snapshot();
+ await assert.rejects(storage.updateEvent('deleted',{type:'custom',customLabel:'Training'},options),/deleted/);
+ assert.deepEqual(await snapshot(),before);
+ await database.write(sql=>sql.execAsync("CREATE TRIGGER fail_label_queue BEFORE INSERT ON local_sync_outbox WHEN json_extract(NEW.mutation_json,'$.kind')='customActivity' BEGIN SELECT RAISE(ABORT,'label queue failure'); END;"));
+ await assert.rejects(storage.updateEvent(event.id,{type:'custom',customLabel:'Training'},options),/label queue failure/);
+ assert.deepEqual(await snapshot(),before);
+ await database.write(sql=>sql.execAsync('DROP TRIGGER fail_label_queue'));
+ const prior=new Set((await sync.nextBatch(fence)).map(row=>row.operationId));
+ await storage.updateEvent(event.id,{type:'custom',customLabel:'Training'},options);
+ assert.deepEqual(await storage.loadCustomActivities(),['Training']);
+ assert.deepEqual((await sync.nextBatch(fence)).filter(row=>!prior.has(row.operationId)).map(row=>row.kind),['event','customActivity']);
+ await storage.deleteCustomActivity('Training');before=await snapshot();
+ await database.write(sql=>sql.execAsync("CREATE TRIGGER fail_new_event BEFORE INSERT ON events BEGIN SELECT RAISE(ABORT,'event failure'); END;"));
+ const custom={...event,id:'new-custom',type:'custom' as const,customLabel:'Training'};
+ await assert.rejects(storage.appendEvents([custom],options),/event failure/);assert.deepEqual(await snapshot(),before);
+ await database.write(sql=>sql.execAsync('DROP TRIGGER fail_new_event'));
+ await storage.importEvents([{...custom,id:'historical-import'}]);assert.deepEqual(await storage.loadCustomActivities(),[]);
+ await storage.appendEvents([custom],options);assert.deepEqual(await storage.loadCustomActivities(),['Training']);
+});
+
 test('free writes and preparing enrollment never create upload work; activation is restartable',async t=>{
  const {sync,storage,database,path}=await setup(t);
  await storage.appendEvents([event]);

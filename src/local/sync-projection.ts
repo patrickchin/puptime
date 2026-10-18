@@ -86,7 +86,7 @@ async function set(sql:SqlExecutor,petId:string,key:StorageKey,value:string) {
   if (petSettingKeys.has(key)) await sql.runAsync('INSERT INTO pet_settings(pet_id,key,value) VALUES (?,?,?) ON CONFLICT(pet_id,key) DO UPDATE SET value=excluded.value',petId,key,value);
   else await sql.runAsync('INSERT INTO settings(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',key,value);
 }
-export async function retainCustomActivities(sql:SqlExecutor,petId:string,incoming:string[]):Promise<LocalChange[]> {
+export async function retainCustomActivities(sql:SqlExecutor,petId:string,incoming:string[],restore=false):Promise<LocalChange[]> {
   if (!incoming.length) return [];
   async function strings(key:StorageKey):Promise<string[]> {
     const row=await sql.getFirstAsync<{value:string}>('SELECT value FROM pet_settings WHERE pet_id=? AND key=?',petId,key);
@@ -96,7 +96,10 @@ export async function retainCustomActivities(sql:SqlExecutor,petId:string,incomi
     return value;
   }
   const stored=await strings(storageKeys.customActivities),deleted=await strings(storageKeys.deletedCustomActivities);
-  const before=normalizeCustomActivities(stored,deleted),after=normalizeCustomActivities([...before,...incoming],deleted);
+  const before=normalizeCustomActivities(stored,deleted);
+  const restored=new Set<string>(restore?incoming.map(customActivityKey):[]),remaining=deleted.filter(key=>!restored.has(key));
+  if(remaining.length!==deleted.length)await set(sql,petId,storageKeys.deletedCustomActivities,JSON.stringify(remaining));
+  const after=normalizeCustomActivities([...before,...incoming],remaining);
   if (JSON.stringify(stored)!==JSON.stringify(after)) await set(sql,petId,storageKeys.customActivities,JSON.stringify(after));
   const records=(labels:string[])=>labels.map(label=>({kind:'customActivity' as const,localId:customActivityKey(label),data:{label}}));
   return localChanges(records(before),records(after));

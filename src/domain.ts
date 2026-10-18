@@ -39,6 +39,7 @@ export type QuickEventTimes = Partial<Record<ActivityKey, number>>;
 export type PuppyEventChanges = Partial<
   Pick<PuppyEvent, 'type' | 'at' | 'endedAt' | 'customLabel' | 'note'>
 >;
+export type EventWriteOptions = { restoreCustomActivities?: boolean };
 
 export type ScheduleEntry = {
   id: string;

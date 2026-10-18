@@ -334,7 +334,7 @@ export default function App() {
   const displayPastLabel = (event: PuppyEvent) => activityCustomizations[activityKey(event)]?.name ?? localizedEventPastLabel(language, event);
 
   const persistLogEvent = async (type: EventType, customLabel?: string) => {
-    if (type === 'custom' && customLabel) setCustomActivities(await saveCustomActivity(customLabel));
+    if (Platform.OS !== 'ios' && type === 'custom' && customLabel) setCustomActivities(await saveCustomActivity(customLabel));
     const now = Date.now();
     if (type === 'nap') {
       const openNap = (activityRef.current?await activityRef.current.latestEvents():await loadEvents()).find(isOpenNap);
@@ -349,7 +349,7 @@ export default function App() {
     }
 
     const event = type === 'nap' ? createNapEvent('app', now) : createEvent(type, 'app', now, customLabel);
-    await appendEvents([event]);
+    await appendEvents([event],{restoreCustomActivities:type==='custom'});
     setUndoState({
       event,
       message: type === 'nap'
@@ -396,10 +396,11 @@ export default function App() {
     event: PuppyEvent,
     changes: PuppyEventChanges,
   ) => {
-    if ((changes.type??event.type)==='custom'&&changes.customLabel&&activityKey({type:'custom',customLabel:changes.customLabel})!==activityKey(event)) {
+    const restoreCustomActivities=!!((changes.type??event.type)==='custom'&&changes.customLabel&&activityKey({type:'custom',customLabel:changes.customLabel})!==activityKey(event));
+    if (Platform.OS !== 'ios' && restoreCustomActivities && changes.customLabel) {
       setCustomActivities(await saveCustomActivity(changes.customLabel));
     }
-    await updateEvent(event.id,changes);
+    await updateEvent(event.id,changes,{restoreCustomActivities});
     Haptics.selectionAsync().catch(() => undefined);
     await refreshCommittedState();
   };

@@ -52,7 +52,7 @@ test('round-trips stable IDs, notes, sources, custom labels and estimate provena
       note: 'First line, "hello"\r\n第二行\nThird line', source: 'widget', estimated: true,
     },
     { id: 'evt_c3d4', type: 'pee', at: at + 1, source: 'app' },
-    { id: 'evt_e5f6', type: 'custom', at: at + 2, source: 'app' },
+    { id: 'evt_e5f6', type: 'custom', customLabel: 'Training', at: at + 2, source: 'app' },
     { id: 'evt_g7h8', type: 'custom', customLabel: 'Other', at: at + 3, source: 'app' },
   ];
 
@@ -110,8 +110,9 @@ test('rejects bad record fields and duplicate IDs before returning any data', ()
     csv.replace(',widget,2,,false,', ',widget,2,,maybe,'),
     csv.replace(new Date(at + 1).toISOString(), '2026-02-30T00:00:00.001Z'),
     csv.replace(new Date(at + 1).toISOString(), 'not-a-date'),
-    eventsToCsv([{ id: '1', type: 'pee', at, source: 'app', note: 'n'.repeat(301) }]),
+    eventsToCsv([{ id: '1', type: 'pee', at, source: 'app', note: 'n'.repeat(16385) }]),
     eventsToCsv([{ id: '1', type: 'custom', at, source: 'app', customLabel: 'n'.repeat(41) }]),
+    eventsToCsv([{ id: '1', type: 'custom', at, source: 'app' }]),
   ]) {
     assert.throws(() => csvToEvents(invalid), CsvImportError);
   }
