@@ -84,10 +84,10 @@
 
 **Interfaces:** current qualifiers seed direct baseline, compare current SQL values/revisions/ownership/outbox and retain recovery backups outside checkout. Only isolated synthetic data may be replaced explicitly after scope checks. Local/staging schemas and provider/build scopes are labelled.
 
-- [ ] Update all onboarding/account/sync qualifiers that snapshot legacy tables or manipulate body JSON; remove migration-only scripts/journeys and update docs. Add direct baseline native init/reopen/storage-failure acceptance. Existing older development simulator data is backed up; no automatic shipping conversion.
-- [ ] Start a fresh isolated local Worker/data directory after preserving/stopping only the owned old fixture. Run independent persistent SQLite+HTTP two-client enrollment/offline/restart/conflict/retry/export/deletion matrix against typed server, recording actual output and exact data. Inspect staging account/schema scope before any deployment/transition; do not reset shared/auth resources indiscriminately.
-- [ ] Build fresh signed standalone Release; run actual first-run/replay/name/storage recovery plus configured Maestro11flow regression. Run populated1k/10k/100k affected-screen qualification and report device timings/query work; capture fresh screenshots and videos. Re-run only changed/failed/required cases.
-- [ ] Run npm test, npm run test:server, npm run typecheck and npm run typecheck:server; compare every planned assertion to actual evidence and ledger deviations. Commit and use task-done; expect PASS.
+- [x] Update all onboarding/account/sync qualifiers that snapshot legacy tables or manipulate body JSON; remove migration-only scripts/journeys and update docs. Add direct baseline native init/reopen/storage-failure acceptance. Existing older development simulator data is backed up; no automatic shipping conversion.
+- [x] Start a fresh isolated local Worker/data directory after preserving/stopping only the owned old fixture. Run independent persistent SQLite+HTTP two-client enrollment/offline/restart/conflict/retry/export/deletion matrix against typed server, recording actual output and exact data. Inspect staging account/schema scope before any deployment/transition; do not reset shared/auth resources indiscriminately.
+- [x] Build fresh signed standalone Release; run actual first-run/replay/name/storage recovery plus configured Maestro11flow regression. Run populated1k/10k/100k affected-screen qualification and report device timings/query work; capture fresh screenshots and videos. Re-run only changed/failed/required cases.
+- [x] Run npm test, npm run test:server, npm run typecheck and npm run typecheck:server; compare every planned assertion to actual evidence and ledger deviations. Commit and use task-done; expect PASS.
 
 ## Integration gate after Tasks 1–6
 

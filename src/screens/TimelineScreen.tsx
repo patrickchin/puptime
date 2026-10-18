@@ -385,7 +385,7 @@ function TimelineAxis({
           },
         ]}
       >
-        <Text style={[styles.axisDateText, { color: theme.textMuted }]}>{t('timeline.date')}</Text>
+        <Text maxFontSizeMultiplier={1.4} style={[styles.axisDateText, { color: theme.textMuted }]}>{t('timeline.date')}</Text>
       </Animated.View>
       <View
         accessibilityElementsHidden
@@ -672,11 +672,10 @@ function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken
           { backgroundColor: theme.background, borderColor: theme.border },
         ]}
       >
-        <View style={styles.headingRow}>
-          <View style={styles.headingCopy}>
+        <View style={[styles.headingRow,fontScale>=1.5&&!isCompactHeight&&styles.headingRowStacked]}>
+          <View style={[styles.headingCopy,fontScale>=1.5&&!isCompactHeight&&styles.headingCopyStacked]}>
             <Text
-              numberOfLines={1}
-              adjustsFontSizeToFit
+              maxFontSizeMultiplier={2}
               style={[
                 styles.title,
                 {
@@ -692,7 +691,7 @@ function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken
               {t('timeline.title')}
             </Text>
             {isCompactHeight ? (
-              <Text testID="timeline.range" style={[styles.rangeText, { flex: 0, color: theme.text }]}>
+              <Text testID="timeline.range" maxFontSizeMultiplier={2} style={[styles.rangeText, { flex: 0, color: theme.text }]}>
                 {rangeDescription}
               </Text>
             ) : null}
@@ -700,6 +699,7 @@ function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken
           <View
             style={[
               styles.zoomControl,
+              fontScale>=1.5&&!isCompactHeight&&{alignSelf:'flex-start'},
               {
                 backgroundColor: theme.surface,
                 borderColor: theme.border,
@@ -747,7 +747,7 @@ function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken
 
         {!isCompactHeight ? (
           <View style={styles.timelineMeta}>
-            <Text testID="timeline.range" style={[styles.rangeText, { color: theme.text }]}>
+            <Text testID="timeline.range" maxFontSizeMultiplier={2} style={[styles.rangeText, { color: theme.text }]}>
               {rangeDescription}
             </Text>
           </View>
@@ -1032,7 +1032,9 @@ const styles = StyleSheet.create({
   },
   headerCompact: { paddingTop: spacing.xs, paddingBottom: spacing.xs, gap: spacing.xs },
   headingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  headingRowStacked: { flexDirection: 'column', alignItems: 'stretch' },
   headingCopy: { flex: 1, minWidth: 0 },
+  headingCopyStacked: { flex: 0, width: '100%' },
   title: { fontSize: 28, lineHeight: 34, fontWeight: '800' },
   zoomControl: {
     minWidth: 140,

@@ -13,7 +13,7 @@ const simctl=(...args)=>execFileSync('xcrun',['simctl',...args],{encoding:'utf8'
 const devices=Object.values(JSON.parse(simctl('list','devices','available','-j')).devices).flat();
 assert.ok(devices.find(device=>device.udid===udid)?.name.startsWith('Puptime Native Storage '));
 const output=mkdtempSync(join(tmpdir(),'puptime-onboarding-release-'));
-const flow=file=>execFileSync(process.env.MAESTRO_BIN??'maestro',['--device',udid,'test',resolve('.maestro/native',file),'--test-output-dir',join(output,file)],{stdio:'inherit',env:{...process.env,MAESTRO_CLI_NO_ANALYTICS:'1'}});
+const flow=(file,expectedName)=>execFileSync(process.env.MAESTRO_BIN??'maestro',['--device',udid,'test',...(expectedName?['-e','EXPECTED_PUPPY_NAME='+expectedName]:[]),resolve('.maestro/native',file),'--test-output-dir',join(output,file)],{stdio:'inherit',env:{...process.env,MAESTRO_CLI_NO_ANALYTICS:'1'}});
 try{simctl('terminate',udid,app);}catch{}
 const directory=join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite');
 cpSync(directory,join(output,'previous-synthetic-sqlite'),{recursive:true});
@@ -28,7 +28,7 @@ function snapshot(){
 const before=snapshot();
 assert.equal(before.metadata.find(row=>row.key==='show_onboarding').value,'false');assert.ok(before.events.length>=1000);
 simctl('install',udid,'/tmp/puptime-native-storage-release-derived/Build/Products/Release-iphonesimulator/Puptime.app');
-flow('ios-onboarding-completed-upgrade.yaml');
+flow('ios-onboarding-completed-upgrade.yaml','.*'+before.puppies[0].name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'.*');
 assert.deepEqual(snapshot(),before,'Installing the Release update must preserve all local tables and completion state.');
 console.log('PASS standalone Release upgrade preserves the completed populated installation, identity, preferences, revisions and sync metadata exactly; no forced onboarding.');
 execFileSync(process.execPath,['--disable-warning=MODULE_TYPELESS_PACKAGE_JSON',resolve('scripts/verify-ios-onboarding.mjs'),udid],{stdio:'inherit'});

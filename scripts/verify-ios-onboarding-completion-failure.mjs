@@ -12,7 +12,7 @@ import {createLocalRuntime} from '../src/local/runtime-factory.ts';
 const udid=process.argv[2],app='com.patrickchin.puptime';
 const simctl=(...args)=>execFileSync('xcrun',['simctl',...args],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
 const devices=Object.values(JSON.parse(simctl('list','devices','available','-j')).devices).flat();
-assert.equal(devices.find(device=>device.udid===udid)?.name,'Puptime Native Storage ae0c');
+assert.ok(devices.find(device=>device.udid===udid)?.name.startsWith('Puptime Native Storage '));
 const output=mkdtempSync(join(tmpdir(),'puptime-onboarding-failure-'));
 const flow=file=>execFileSync(process.env.MAESTRO_BIN??'maestro',['--device',udid,'test',resolve('.maestro/native',file),'--test-output-dir',join(output,file)],{stdio:'inherit',env:{...process.env,MAESTRO_CLI_NO_ANALYTICS:'1'}});
 try{simctl('terminate',udid,app);}catch{}

@@ -137,8 +137,40 @@ restacked branch and PR integration remain pending.
 
 ## First-release SQL cleanup in progress
 
-The user confirmed there are no released users and removed the old development-format compatibility requirement. Native startup now directly initializes baseline4 without AsyncStorage import or retained raw snapshots; unsupported/incomplete databases reject without schema/data changes. Server fresh initialization is consolidated at baseline3. These are unmerged development changes. Native event/routine columns and typed server metadata/payload tables now pass local SQLite, Workers and independent persistent-SQLite/HTTP checks. Targeted mutations, bounded actual iOS consumers, performance measurements and native/deployed qualification remain required in the same plan.
+The user confirmed there are no released users and removed the old development-format compatibility requirement. Native startup now directly initializes baseline4 without AsyncStorage import or retained raw snapshots; unsupported/incomplete databases reject without schema/data changes. Server fresh initialization is consolidated at baseline3. These are unmerged development changes. Native event/routine columns, typed server payload tables, targeted writes and bounded iOS consumers pass the local and native checks below. The SQL candidate remains unmerged; whole-branch review and exact-head CI remain required.
 
 The migration-only scripts `verify-ios-migration-retry.mjs`, `verify-ios-schema-upgrade.mjs` and the interrupted-migration native journey are retired. Their historical recordings/logs and earlier PR evidence remain preserved; the commands above describe earlier qualification, not current repeat instructions. Current tests retain atomic initialization, real SQL rollback/retry, concurrent initializer/reopen, foreign-key isolation and version-guard coverage. Existing local-data enrollment, pending-operation recovery and malformed-data protection remain current requirements.
 
-See `docs/superpowers/specs/2026-10-18-clean-sql-storage-design.md` and its implementation plan. No live service reset/deployment or new native build is claimed from the initial code checks. The previous isolated local Worker state is preserved outside checkout before its owned process was stopped; shared/deployed stores are unchanged.
+See `docs/superpowers/specs/2026-10-18-clean-sql-storage-design.md` and its implementation plan. The initial code checks did not qualify deployment or native behavior; subsequent evidence is recorded below. Earlier isolated local Worker persistence remains preserved outside checkout. No shared database or Durable Object reset occurred.
+
+### October 19 SQL candidate qualification
+
+The bounded iOS implementation passes 256 Node/53 Workers tests and base, iOS and server typechecks. Actual native checks preserve 100,000 records while exercising paged history, unchanged-row rendering, direct old-notification lookup, independent draft/deletion recovery, date navigation, read retry, postcommit read failure and complete CSV export. These are local Debug checks, not authenticated distributed-Release or provider-delivery evidence.
+
+The repeatable query/render observer now lives under `scripts/native-activity-probe`. It wraps actual Expo SQLite results and actual component bodies; it does not substitute data, add a memo boundary, record bound SQL values, or enable itself in ordinary builds. Its initialization fault creates a trigger inside the production initializer's real native transaction. The fault test proves full table/puppy rollback, successful retry, and a cold reopen without reseeding.
+
+Use a fresh dedicated simulator named `Puptime Native Storage …` with the Debug app installed. Start Metro explicitly with the test configuration:
+
+```sh
+EXPO_NO_DOTENV=1 EXPO_PUBLIC_CLOUD_API_URL= EXPO_PUBLIC_CLOUD_ALLOW_LOCAL=0 \
+EXPO_OVERRIDE_METRO_CONFIG="$PWD/scripts/native-activity-probe/metro.config.cjs" \
+npx expo start --localhost --port 8083 --max-workers 2
+
+node scripts/verify-ios-sql-initialization.mjs SIMULATOR_UDID
+node scripts/verify-ios-activity.mjs SIMULATOR_UDID 1000 --replace-synthetic
+node scripts/verify-ios-activity.mjs SIMULATOR_UDID 10000 --replace-synthetic
+node scripts/verify-ios-activity.mjs SIMULATOR_UDID 100000 --replace-synthetic
+```
+
+Initialization requires a never-opened database. Population checks refuse owned profiles and unmarked populated history, back up the prior synthetic SQLite files after stopping the app, and seed a marked current-baseline fixture. They verify actual SQL row counts/timings, one edited-row render, keyset paging, requested date windows, SQL summaries and every exported ID/note. Only the explicit CSV export may read the complete dataset. Outputs and backups remain outside checkout. A whole date window may legitimately include all records in a small fixture; this is distinct from an unbounded history read.
+
+The first-release standalone simulator Release builds and passes ad-hoc signature verification; its bundle contains none of the observer/fault markers. The installed Release preserves every SQL table when updated over 100,000 synthetic records. Feature-walkthrough first-run/replay, naming/restart/cancel and completion-failure rollback/retry pass; these are not full first-launch onboarding acceptance. Maximum-text chart layout, rotation and zoom pass on iPhone 17 and iPhone 13 mini, including both themes. The current Release full regression and native SDK network reruns are recorded separately below. Stop the test Metro and omit its configuration when building Release. `scripts/verify-ios-timeline-heading.mjs` checks actual rendered pixels on the dedicated iPhone 17; the original 9-pixel title fails and the corrected 67-pixel title passes.
+
+Staging now serves SQL candidate version `bff50626-a5ab-42be-adbe-23f86bd85325`. The immediate read-only deployment guard found zero users, sessions and cloud accounts; no database or Durable Object reset occurred. Previous version `9e5afbc6-b863-408b-b2b8-24e413e6faef` is recorded for rollback. Current-schema independent persistent-SQLite/HTTPS/WSS and service boundary checks pass, including 1,000 records, interrupted baselines, lost replies/restart, concurrent field merge, full resync with pending work, detach/reassociation, expiry/export and retirement. A final read-only query confirms zero users, sessions and cloud accounts after cleanup. These use administrative synthetic sessions, not inbox or social-provider authentication. This host's OS DNS returns NXDOMAIN for the provider hostname; the optional `node --require ./scripts/staging-dns.cjs …` qualification resolver uses Cloudflare DNS-over-HTTPS while retaining the normal hostname and TLS certificate checks. It changes no system DNS setting. Ordinary DNS reachability remains unverified from this host. Sender, social providers and finalized prices remain disabled; no public cloud-release claim follows from this deployment.
+
+
+The current standalone SQL Release passes **11/11 Maestro flows** (332.213 seconds, zero failures). Recorded checks 99/101 qualify populated installation preservation and actual completion SQL failure/retry; 106 is the final full regression, and 107/110/112 cover the corrected chart heading and largest-text layouts. Code checks 113 pass 256 Node tests, 53 Workers tests and all three typechecks.
+
+A dependency-matched installed Debug app using the default Metro configuration and isolated local typed server passes official SDK email request/verification, explicit activation, enrollment and foreground remote-change delivery (114/115). Sign-in alone preserves one local event, zero queued uploads and no trial. Verification-code entry is unrecorded; the helper discards raw private artifacts and redacts its newly created startup logs. This uses local email previews, not real inbox delivery.
+
+Native recording 116 verifies 1,000 added events reach the real HTTP service; acknowledged walkthrough replay preserves every local table and cloud count. During a real outage of only the owned local service, another quick log remains durable and queued, replay leaves the pending state unchanged, and normal recovery drains the same backlog. Independent service tests 86/96/97 cover local and staging fault boundaries. Full first-launch account/profile/permissions onboarding, device-only delivery controls, real providers, billing, Sentry and distributed Release qualification remain required under rollout phase 4 onward.

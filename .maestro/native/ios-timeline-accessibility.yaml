@@ -1,0 +1,41 @@
+appId: com.patrickchin.puptime
+name: Timeline remains usable at maximum text size
+---
+- launchApp
+- runFlow: ../helpers/skip-onboarding.yaml
+- tapOn:
+    id: quick.pee
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 10000
+- tapOn:
+    id: nav.timeline
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: timeline.range
+    timeout: 30000
+- assertVisible:
+    id: timeline.mark.point.*
+- takeScreenshot: timeline-largest-portrait
+- setOrientation: LANDSCAPE_LEFT
+- waitForAnimationToEnd:
+    timeout: 5000
+- repeat:
+    times: 6
+    commands:
+      - swipe:
+          start: 70%,72%
+          end: 70%,55%
+          duration: 400
+- assertVisible:
+    id: timeline.mark.point.*
+- tapOn:
+    id: timeline.zoom.in
+    retryTapIfNoChange: true
+- assertVisible:
+    id: timeline.zoom.value
+    text: .*1.5×
+- takeScreenshot: timeline-largest-landscape
+- setOrientation: PORTRAIT
