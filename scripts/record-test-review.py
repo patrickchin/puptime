@@ -63,6 +63,8 @@ finally:
     assert encoder.wait() == 0, 'Video export failed.'
 destination.with_suffix('.json').write_text(json.dumps(dict(title=title, scope=scope,
     rendered_actual_output=True, exit_code=result, elapsed_seconds=round(elapsed, 2),
-    video=destination.name, log=destination.with_suffix('.log').name), indent=2)+'\n')
+    video=destination.name, log=destination.with_suffix('.log').name,
+    chapters=[dict(seconds=round(stamp, 1), title=line) for stamp, line in events
+              if line.startswith(('PASS ', 'Waiting '))]), indent=2)+'\n')
 print('Review video:', destination)
 sys.exit(result)
