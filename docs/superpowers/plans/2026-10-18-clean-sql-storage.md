@@ -68,9 +68,9 @@
 
 **Interfaces:** createActivityQueries(database,petId) returns getEvent(id), eventsPage({before?:{at:number,id:string},limit?:number}), eventsBetween(from,until), latestEvents(), summary(), monthlyStats(). Page default200, at DESC/id DESC cursor, returns {events,next}. Date windows include overlapping durations. summary returns {eventCount,earliestAt}. monthlyStats matches existing MonthlyActivityStat[]. Native activity-data exposes these stable callbacks; base returns undefined. No listener bus.
 
-- [ ] Write real SQL tests for ties/cursor boundaries, empty pages, invalid cursors/limits, two-pet isolation, date boundaries/DST/overlapping duration state, latest candidates and monthly-stat parity including estimates/empty months. Assert actual EXPLAIN QUERY PLAN uses relevant pet/time indexes. Observe RED.
-- [ ] Implement bound queries and codecs, existing pure10-day frequency computation over a requested date window, SQLCOUNT/MIN/month groups and latest-per-activity/open-duration candidates. Preserve unchanged row object references in a small per-query cache. Do not add an all-history fallback for a bad query.
-- [ ] Test1k/10k/100k fixtures, reporting rows returned/decoded and timings separately for pages, date windows, one edit and full export. No blanket latency assertion from desktop SQL alone. Run Node/Workers/types, expect PASS and commit.
+- [x] Write real SQL tests for ties/cursor boundaries, empty pages, invalid cursors/limits, two-pet isolation, date boundaries/DST/overlapping duration state, latest candidates and monthly-stat parity including estimates/empty months. Assert actual EXPLAIN QUERY PLAN uses relevant pet/time indexes. Observe RED.
+- [x] Implement bound queries and codecs, existing pure10-day frequency computation over a requested date window, SQLCOUNT/MIN/month groups and latest-per-activity/open-duration candidates. Preserve unchanged row object references in a small per-query cache. Do not add an all-history fallback for a bad query.
+- [x] Test1k/10k/100k fixtures, reporting rows returned/decoded and timings separately for pages, date windows, one edit and full export. No blanket latency assertion from desktop SQL alone. Run Node/Workers/types, expect PASS and commit.
 
 ### Task 5: Actual bounded iOS consumers
 
