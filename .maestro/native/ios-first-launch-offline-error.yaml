@@ -1,0 +1,15 @@
+appId: com.patrickchin.puptime
+name: First-open cloud outage gives one clear recovery message
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: setup.step.cloud
+    timeout: 90000
+- extendedWaitUntil:
+    visible:
+      id: setup.cloud.error
+    timeout: 35000
+- assertNotVisible:
+    id: account.error
+- takeScreenshot: setup-cloud-offline

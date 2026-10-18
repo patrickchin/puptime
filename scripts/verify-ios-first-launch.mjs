@@ -2,7 +2,7 @@
 // uses the real SQLite write boundary; no fake completion or account service.
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {cpSync,mkdtempSync,writeFileSync} from 'node:fs';
+import {cpSync,existsSync,mkdtempSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
@@ -14,9 +14,11 @@ assert.ok(devices.find(device=>device.udid===udid)?.name.startsWith('Puptime Nat
 try{simctl('terminate',udid,app);}catch{}
 const output=mkdtempSync(join(tmpdir(),'puptime-first-launch-native-'));
 const directory=()=>join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite');
-const previous=new DatabaseSync(join(directory(),'puptime-v2.db'),{readOnly:true});
-try{assert.equal(previous.prepare('SELECT COUNT(*) n FROM local_sync_owner').get().n,0,'Preserve owned history.');}finally{previous.close();}
-cpSync(directory(),join(output,'previous-synthetic-sqlite'),{recursive:true});
+if(existsSync(directory())){
+ const previous=new DatabaseSync(join(directory(),'puptime-v2.db'),{readOnly:true});
+ try{assert.equal(previous.prepare('SELECT COUNT(*) n FROM local_sync_owner').get().n,0,'Preserve owned history.');}finally{previous.close();}
+ cpSync(directory(),join(output,'previous-synthetic-sqlite'),{recursive:true});
+}
 function run(name,file){execFileSync('maestro',['--device',udid,'test',file,'--test-output-dir',join(output,name)],{stdio:'inherit',env:{...process.env,MAESTRO_CLI_NO_ANALYTICS:'1'}});}
 function flow(name,body){const file=join(output,name+'.yaml');writeFileSync(file,'appId: '+app+'\n---\n'+body);run(name,file);}
 run('profile-prepare',resolve('.maestro/native/ios-first-launch-profile-prepare.yaml'));

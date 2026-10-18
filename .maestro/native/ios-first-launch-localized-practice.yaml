@@ -1,0 +1,75 @@
+appId: com.patrickchin.puptime
+name: Localized first-open practice, permission choice and ready screen
+---
+- scrollUntilVisible:
+    element:
+      id: setup.local
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: setup.local
+- assertVisible:
+    id: onboarding.step.0
+    text: ${EXPECTED_LOG}
+- scrollUntilVisible:
+    element:
+      id: onboarding.demo.meal
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: onboarding.demo.meal
+- assertVisible:
+    id: onboarding.demo.row
+    text: ${EXPECTED_SAMPLE}
+- takeScreenshot: first-open-practice
+- scrollUntilVisible:
+    element:
+      id: onboarding.primary
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: onboarding.primary
+- assertVisible:
+    id: onboarding.step.1
+- scrollUntilVisible:
+    element:
+      id: onboarding.primary
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: onboarding.primary
+- assertVisible:
+    id: onboarding.step.2
+- scrollUntilVisible:
+    element:
+      id: onboarding.demo.routine.reminder
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: onboarding.demo.routine.reminder
+- assertVisible:
+    id: onboarding.demo.routine.reminder
+    checked: true
+- scrollUntilVisible:
+    element:
+      id: onboarding.primary
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: onboarding.primary
+- assertVisible:
+    id: setup.step.reminders
+    text: ${EXPECTED_REMINDERS}
+- takeScreenshot: first-open-reminders
+- scrollUntilVisible:
+    element:
+      id: setup.reminders.later
+    direction: DOWN
+    visibilityPercentage: 100
+- waitForAnimationToEnd
+- tapOn:
+    id: setup.reminders.later
+- assertVisible:
+    id: setup.step.ready
+    text: ${EXPECTED_READY}
+- takeScreenshot: first-open-ready

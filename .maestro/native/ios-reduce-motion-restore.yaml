@@ -11,7 +11,7 @@ name: Restore the dedicated simulator’s original Reduce Motion preference
         text: ^1$
     commands:
       - tapOn:
-          point: 84%,18%
+          point: ${MOTION_SWITCH_POINT}
 - assertVisible:
     id: REDUCE_MOTION
     text: ^0$

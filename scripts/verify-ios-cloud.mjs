@@ -12,7 +12,7 @@ import {sqliteTestConnection} from '../src/local/sqlite-test-adapter.ts';
 import {createLocalRuntime} from '../src/local/runtime-factory.ts';
 import {cloudRecordId} from '../src/cloud/record-identity.ts';
 const [phase,udid]=process.argv.slice(2),app='com.patrickchin.puptime';
-assert.ok(['first-launch-restore-request','first-launch-restore-verify','first-launch-restore','first-launch-request','first-launch-verify','first-launch-enable','request','verify','auth-faults','rate-limited','enable','resume','outage','preview','combine','signout','access-recovery','auto-expiry','enrollment-race'].includes(phase),'Use a supported native cloud qualification phase.');
+assert.ok(['first-launch-local-recovered','first-launch-local-fallback','first-launch-restore-request','first-launch-restore-verify','first-launch-restore','first-launch-request','first-launch-verify','first-launch-enable','request','verify','auth-faults','rate-limited','enable','resume','outage','preview','combine','signout','access-recovery','auto-expiry','enrollment-race'].includes(phase),'Use a supported native cloud qualification phase.');
 const state=JSON.parse(readFileSync('/tmp/puptime-native-cloud-state.json','utf8'));
 assert.ok(basename(state.directory).startsWith('puptime-native-cloud-'));assert.equal(state.url,'http://127.0.0.1:8793');
 const simctl=(...args)=>execFileSync('xcrun',['simctl',...args],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
@@ -76,9 +76,46 @@ function mutateAuthFixture(query){
   catch{throw new Error('Isolated native fixture update failed; private output withheld.');}
   finally{rmSync(path,{force:true});}
 }
+async function verifyLocalRecovery(native){
+ const snapshot=()=>Object.fromEntries(['metadata','puppies','events','routines','settings','pet_settings','local_revisions','local_sync_owner','local_sync_pets','local_sync_outbox','local_sync_records','local_sync_acks','local_sync_baseline'].map(table=>[table,native.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all().map(row=>({...row}))]));
+ const before=snapshot();assert.equal(before.events.length,2);assert.equal(before.local_sync_owner.length,0);assert.equal(before.local_sync_outbox.length,0);
+ flow('ios-first-launch-offline-recovered.yaml');assert.deepEqual(snapshot(),before,'Reconnect never silently changes the explicit local choice.');
+ const cookie=await fixtureCookie(),summary=await (await fetch(state.url+'/api/account',{headers:{cookie,origin:state.url}})).json();
+ assert.equal(summary.user.id,context.userId);assert.equal(summary.pets[0].eventCount,1);
+ assert.deepEqual({...database.prepare('SELECT trial_started_at,trial_ends_at FROM cloud_accounts WHERE account_id=?').get(context.userId)},context.trial);
+ console.log('PASS recovered service retains SDK sign-in but never silently re-enrolls/uploads the local choice; every local table, cloud copy and original trial stay intact.');
+}
 try{
- if(phase==='first-launch-restore-request'){
-  simctl('terminate',udid,app);
+ if(phase==='first-launch-local-recovered'){
+  const native=new DatabaseSync(join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite/puptime-v2.db'),{readOnly:true});
+  try{await verifyLocalRecovery(native);}finally{native.close();}
+ }else if(phase==='first-launch-local-fallback'){
+  try{simctl('terminate',udid,app);}catch(error){if(!String(error.stderr??'').includes('found nothing to terminate'))throw error;}
+  const nativeDirectory=join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite'),nativePath=join(nativeDirectory,'puptime-v2.db');
+  const native=new DatabaseSync(nativePath);native.exec('PRAGMA busy_timeout=5000');
+  const backup=mkdtempSync(join(state.directory,'first-launch-fallback-backup-'));
+  cpSync(nativeDirectory,join(backup,'SQLite'),{recursive:true});
+  try{
+   assert.equal(native.prepare('SELECT account_id FROM local_sync_owner').get().account_id,context.userId);
+   assert.equal(native.prepare('SELECT cloud_pet_id FROM local_sync_pets').get().cloud_pet_id,context.localPetId);
+   assert.equal(native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n,0);assert.equal(native.prepare('SELECT count(*) n FROM events').get().n,1);
+   native.exec("BEGIN;UPDATE metadata SET value='true' WHERE key='show_onboarding';UPDATE metadata SET value='cloud' WHERE key='first_launch_step';DELETE FROM settings WHERE key='puptime.onboarding.v1';COMMIT;");
+   const core=()=>Object.fromEntries(['puppies','events','routines','settings','pet_settings','local_revisions'].map(table=>[table,native.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all().map(row=>({...row}))]));
+   const before=core();
+   const pids=execFileSync('lsof',['-t','-iTCP:8793','-sTCP:LISTEN'],{encoding:'utf8'}).trim().split(/\s+/);assert.equal(pids.length,1);
+   const pid=Number(pids[0]),parent=execFileSync('ps',['-p',String(pid),'-o','ppid='],{encoding:'utf8'}).trim();
+   assert.ok(execFileSync('ps',['-p',parent,'-o','command='],{encoding:'utf8'}).includes(state.config),'Pause only the isolated local fixture.');
+   process.kill(pid,'SIGSTOP');
+   try{
+    flow('ios-first-launch-offline-error.yaml');assert.deepEqual(core(),before);
+    flow('ios-first-launch-offline-local.yaml');
+    assert.equal(native.prepare('SELECT count(*) n FROM events').get().n,2);assert.equal(native.prepare('SELECT count(*) n FROM local_sync_owner').get().n,0);assert.equal(native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n,0);
+    console.log('PASS native unfinished cloud setup shows one offline error and completes locally during a real service outage; retained history plus one actual offline log, no owner or upload queue.');
+   }finally{process.kill(pid,'SIGCONT');}
+   await verifyLocalRecovery(native);
+  }finally{native.close();}
+ }else if(phase==='first-launch-restore-request'){
+  try{simctl('terminate',udid,app);}catch(error){if(!String(error.stderr??'').includes('found nothing to terminate'))throw error;}
   const nativeDirectory=join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite');
   const native=new DatabaseSync(join(nativeDirectory,'puptime-v2.db'),{readOnly:true});
   try{

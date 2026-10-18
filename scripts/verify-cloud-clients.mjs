@@ -2,7 +2,7 @@
 // administrative synthetic session, not email/provider-delivery evidence.
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {mkdtempSync,readFileSync,writeFileSync,rmSync} from 'node:fs';
+import {existsSync,mkdtempSync,readFileSync,writeFileSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {serializeSignedCookie} from 'better-call';
@@ -23,7 +23,7 @@ const directory=mkdtempSync(join(tmpdir(),`puptime-http-${mode}-`)),owners=[],cl
 function sql(query){
  const path=join(directory,'fixture.sql');writeFileSync(path,query,{mode:0o600});
  const options=local?['--local','--config',local.config,'--persist-to',local.persist]:['--remote','--env','staging'];
- try{execFileSync('npx',['wrangler','d1','execute','AUTH_DB',...options,'--file',path,'--json'],{stdio:['ignore','pipe','pipe'],env:{...process.env,CI:'1'}});}catch{throw new Error('Administrative fixture SQL failed; private output withheld.');}
+ try{execFileSync('npx',['wrangler','d1','execute','AUTH_DB',...options,'--file',path,'--json'],{stdio:['ignore','pipe','pipe'],env:{...process.env,CI:'1'}});}catch(error){const raw=String(error.stdout??'')+'\n'+String(error.stderr??'');const codes=[...raw.matchAll(/(?:code[:\"\s]+)([0-9]{3,6})/gi)].map(match=>match[1]);throw new Error('Administrative fixture SQL failed (exit '+error.status+', numeric codes '+codes.join(',')+'); private output withheld.');}
 }
 async function fixture(){
  const id=crypto.randomUUID(),token=crypto.randomUUID(),now=Date.now();
@@ -59,15 +59,16 @@ async function channel(owner){
  await until(()=>observed.messages.length>0,'Change channel did not send its initial cursor.');return observed;
 }
 let primary,remote,sessionId,success=false;
-async function open(name){
- const path=join(directory,name+'.db'),database=await createLocalDatabase(sqliteTestConnection(path));
- await initializeLocalDatabase(database,()=> name);await database.write(sql=>sql.runAsync('DELETE FROM routines'));
+async function open(name,{pristine=false}={}){
+ const path=join(directory,name+'.db'),fresh=!existsSync(path),database=await createLocalDatabase(sqliteTestConnection(path));
+ await initializeLocalDatabase(database,()=> name);if(fresh&&!pristine)await database.write(sql=>sql.runAsync('DELETE FROM routines'));
  const runtime=await createLocalRuntime(database,name);
  const runner=createSyncRunner({sync:runtime.sync,api:remote.api,petId:name,deviceId:runtime.deviceId,sessionAccountId:()=>sessionId,changed:()=>{},random:()=>1});
  const client={...runtime,name,runner,closed:false,async close(){if(!this.closed){this.closed=true;await database.close();}}};clients.push(client);return client;
 }
-async function prepare(client,confirmedPetId){
- return client.sync.prepareAssociation({accountId:primary.id,localPetId:client.name,deviceId:client.deviceId,enrollment:{operationId:crypto.randomUUID(),deviceId:client.deviceId,localPetId:client.name,name:'HTTP puppy',...(confirmedPetId?{confirmedPetId}:{})}});
+async function prepare(client,confirmedPetId,mode='combine'){
+ const name=mode==='restore'?(await remote.api.account()).pets.find(pet=>pet.id===confirmedPetId).name:'HTTP puppy';
+ return client.sync.prepareAssociation({accountId:primary.id,localPetId:client.name,deviceId:client.deviceId,mode,enrollment:{operationId:crypto.randomUUID(),deviceId:client.deviceId,localPetId:client.name,name,...(confirmedPetId?{confirmedPetId}:{})}});
 }
 async function run(client){const before=remote.calls;const result=await client.runner.run(new AbortController().signal);assert.ok(remote.calls-before<=20,'Each runner invocation must remain bounded.');return result;}
 async function drain(client){for(let i=0;i<15;i++){const result=await run(client);if(result.state==='synced')return;assert.ok(['pending','retry'].includes(result.state),`Unexpected runner state: ${result.state}/${result.problem}`);}assert.fail('Backlog failed to finish in bounded runs.');}
@@ -94,6 +95,36 @@ try{
  assert.equal(primaryChannel.invalid,false);assert.equal(otherChannel.invalid,false);assert.ok(otherChannel.messages.every(message=>message.cursor===0),'A second owner must never receive the primary cursor.');
  console.log(`PASS ${mode}:authenticated WebSocket carries only protocol/cursor metadata after actual commits, with independent owner isolation.`);
  console.log(`PASS ${mode}:1000 real HTTP uploads, lost enrollment/push replies and disk restart preserve exact requests/history, including encoded long IDs.`);
+ await a.storage.savePuppyName('Cloud Basil');
+ await a.storage.saveScheduleEntry({id:'starter-1',type:'pee',minutes:500,reminder:true});
+ await a.storage.saveThemePreference('soft-play');await a.storage.saveLanguagePreference('es');await drain(a);
+ async function cloudSnapshot(){
+  const changes=[];let cursor=0;
+  for(let pageNumber=0;pageNumber<20;pageNumber++){
+   const page=await remote.api.pull(cursor);changes.push(...page.changes);
+   if(!page.hasMore)return {changes,cursor:page.cursor};
+   assert.ok(page.cursor>cursor);cursor=page.cursor;
+  }
+  assert.fail('Synthetic cloud snapshot must finish in bounded pages.');
+ }
+ const beforeRestore=await cloudSnapshot();
+ let restored=await open('restore-c',{pristine:true});await restored.storage.saveFirstLaunchProfile('Fresh local draft');await prepare(restored,cloudPet,'restore');
+ const restorePull=remote.api.pull,restorePush=remote.api.push;let restorePages=0,interruptRestore=true;
+ remote.api.pull=async(...args)=>{const page=await restorePull(...args);if(interruptRestore&&++restorePages===3){interruptRestore=false;throw new CloudApiError('network');}return page;};
+ remote.api.push=async()=>{throw new Error('A pristine restore must never send local defaults.');};
+ try{
+  assert.equal((await run(restored)).state,'retry');const intent=await restored.sync.enrollmentState();assert.equal(intent.mode,'restore');
+  assert.equal(await restored.storage.loadPuppyName(),'Fresh local draft');assert.equal((await restored.storage.loadEvents()).length,0);assert.equal((await restored.storage.loadSchedule()).length,12);
+  await restored.close();restored=await open('restore-c',{pristine:true});assert.deepEqual(await restored.sync.enrollmentState(),intent);await drain(restored);
+ }finally{remote.api.pull=restorePull;remote.api.push=restorePush;}
+ assert.equal(await restored.storage.loadPuppyName(),'Cloud Basil');assert.deepEqual(await restored.storage.loadEvents(),[...events].reverse());
+ assert.deepEqual(await restored.storage.loadSchedule(),[{id:'starter-1',type:'pee',minutes:500,reminder:true}]);
+ assert.equal(await restored.storage.loadThemePreference(),'soft-play');assert.equal(await restored.storage.loadLanguagePreference(),'es');assert.equal(await restored.storage.loadNotificationDelivery(),false);
+ assert.equal((await restored.sync.status(restored.name)).pending,0);
+ assert.equal((await restored.database.read(sql=>sql.getFirstAsync('SELECT count(*) n FROM puppies'))).n,1);
+ assert.equal((await restored.database.read(sql=>sql.getFirstAsync('SELECT cloud_pet_id FROM local_sync_pets'))).cloud_pet_id,cloudPet);
+ assert.deepEqual(await cloudSnapshot(),beforeRestore);
+ console.log(`PASS ${mode}:pristine restore resumes a lost middle HTTP baseline after disk restart, restores1000 exact events/name/routine/preferences, retains one local puppy/device opt-out and sends no defaults or cloud changes.`);
  let b=await open('local-b');await prepare(b,cloudPet);
  const pull=remote.api.pull;let pages=0,interrupt=true;
  remote.api.pull=async(...args)=>{const result=await pull(...args);if(interrupt&&++pages===3){interrupt=false;throw new CloudApiError('network');}return result;};

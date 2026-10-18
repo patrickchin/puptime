@@ -43,6 +43,8 @@ tags:
     element:
       id: settings.guide.open
     direction: UP
+    centerElement: true
+- waitForAnimationToEnd
 - tapOn:
     id: settings.guide.open
 - assertVisible:

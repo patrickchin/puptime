@@ -12,7 +12,10 @@ const devices=Object.values(JSON.parse(simctl('list','devices','available','-j')
 assert.ok(devices.find(device=>device.udid===udid)?.name.startsWith('Puptime Native Storage '),'Use the dedicated synthetic simulator.');
 const output=mkdtempSync(join(tmpdir(),'puptime-onboarding-permissions-'));
 try{simctl('terminate',udid,app);}catch{}
-cpSync(join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite'),join(output,'previous-synthetic-sqlite'),{recursive:true});
+const directory=join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite');
+const previous=new DatabaseSync(join(directory,'puptime-v2.db'),{readOnly:true});
+try{assert.equal(previous.prepare('SELECT count(*) n FROM local_sync_owner').get().n,0,'Preserve owned history.');}finally{previous.close();}
+cpSync(directory,join(output,'previous-synthetic-sqlite'),{recursive:true});
 for(const [file,choice,name] of [['ios/00-onboarding.yaml','Not now','Biscuit'],['ios/00-onboarding-notifications.yaml','Allow','My puppy'],['native/ios-onboarding-notifications-denied.yaml','Deny','My puppy']]) {
   execFileSync(process.env.MAESTRO_BIN??'maestro',['--device',udid,'test',resolve('.maestro',file),'--test-output-dir',join(output,choice)],{stdio:'inherit',env:{...process.env,MAESTRO_CLI_NO_ANALYTICS:'1'}});
   const database=new DatabaseSync(join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite/puptime-v2.db'),{readOnly:true});
