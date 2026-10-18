@@ -1,10 +1,14 @@
-import { enrollmentSchema, identifierSchema, mutationSchema, pullPageSchema, recordDataSchema, cloudRecordSchema, mutationResultSchema, pushResponseSchema, type MutationResult, type CloudRecord, type Enrollment, type Mutation, type PullPage } from '../cloud/protocol.ts';
+import {z} from 'zod';
+import { enrollmentSchema, identifierSchema, localIdSchema, eventDataSchema, mutationSchema, pullPageSchema, recordDataSchema, cloudRecordSchema, mutationResultSchema, pushResponseSchema, type MutationResult, type CloudRecord, type Enrollment, type Mutation, type PullPage } from '../cloud/protocol.ts';
 import { cloudRecordId, fieldPatch, localRecordId } from '../cloud/record-identity.ts';
 import { ReconciliationError, reconcileMutation, retainValidEventTiming } from '../cloud/reconcile.ts';
 import type { LocalDatabase, SqlExecutor } from './database.ts';
-import { applyLocalRecords, localChangeSchema, localChanges, readLocalDeletedActivities, readLocalRecords, type LocalChange, type LocalChangeSink, type LocalRecord } from './sync-projection.ts';
-import { STARTER_SCHEDULE } from '../domain.ts';
+import { applyLocalRecords, localChangeSchema, localChanges, notifyLocalCommit, retainCustomActivities, readLocalDeletedActivities, readLocalRecords, type LocalChange, type LocalChangeSink, type LocalRecord } from './sync-projection.ts';
+import { STARTER_SCHEDULE,type PuppyEvent } from '../domain.ts';
 import { firstLaunchStepSchema } from '../first-launch.ts';
+import {EventHistoryError,type EventHistoryRestore} from '../event-history.ts';
+import {readEventHistoryEntry,readEventHistoryHead} from './event-history.ts';
+import {writeEventRecord} from './repository.ts';
 
 export class RestoreNeedsConfirmationError extends Error {
   constructor(){super('Restore requires confirmation because this setup is no longer pristine.');this.name='RestoreNeedsConfirmationError';}
@@ -16,7 +20,8 @@ type Fence={generation:string;accountId:string};
 type Outbox={sequence:number;operation_id:string;local_pet_id:string;local_kind:LocalChange['kind'];local_id:string;change_json:string;mutation_json:string|null;blocked_reason:string|null};
 const key=(record:{kind:string;localId:string})=>JSON.stringify([record.kind,record.localId]);
 const requestFits=(mutations:Mutation[])=>new TextEncoder().encode(JSON.stringify({mutations})).byteLength<65536;
-export function createLocalSync(database:LocalDatabase,options:{newId?:()=>string;now?:()=>number}={}) {
+const historySelection=z.strictObject({source:z.literal('local'),sequence:z.number().int().min(1).max(Number.MAX_SAFE_INTEGER)});
+export function createLocalSync(database:LocalDatabase,options:{newId?:()=>string;now?:()=>number;afterCommit?:()=>void}={}) {
   const now=options.now??Date.now;
   async function id(sql:SqlExecutor) {return identifierSchema.parse(options.newId?.()??(await sql.getFirstAsync<{id:string}>('SELECT lower(hex(randomblob(16))) id'))!.id);}
   async function owner(sql:SqlExecutor,fence?:Fence):Promise<Owner|null> {
@@ -165,6 +170,22 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
     }
     for (const pet of pets) await applyLocalRecords(sql,pet.pet_id,[...projected.get(pet.pet_id)!.values()].filter(record=>pet===primary||record.kind!=='accountPreferences'),[...deletions.get(pet.pet_id)!.values()]);
     for (const pet of pets) await retainRevisions(sql,pet.pet_id,localChanges(before.get(pet.pet_id)!,await readLocalRecords(sql,pet.pet_id)).filter(change=>pet.pet_id===primary.pet_id||change.kind!=='accountPreferences'),source);
+  }
+  async function restoreRecord(sql:SqlExecutor,input:Fence&{record:CloudRecord;data:Record<string,unknown>}):Promise<void> {
+    const current=await required(sql,input);if (current.pending_pet_id||current.resyncing) throw new Error('Finish the pending baseline first.');
+    const proposed=cloudRecordSchema.parse(input.record);localRecordId(proposed);const saved=await mirrored(sql,current.generation,proposed.id);
+    if (!saved||saved.revision!==proposed.revision||saved.sequence!==proposed.sequence||saved.kind!==proposed.kind||saved.petId!==proposed.petId) throw new Error('Restore requires the current record identity and revision.');
+    const pet=saved.kind==='accountPreferences'?await sql.getFirstAsync<Binding>("SELECT * FROM local_sync_pets WHERE generation=? AND status='active' ORDER BY rowid LIMIT 1",current.generation):await sql.getFirstAsync<Binding>("SELECT * FROM local_sync_pets WHERE generation=? AND cloud_pet_id=? AND status='active'",current.generation,saved.petId);
+    if (!pet) throw new Error('Restore puppy ownership changed.');
+    const localId=saved.kind==='puppy'?pet.pet_id:localRecordId(saved);
+    if (await sql.getFirstAsync('SELECT operation_id FROM local_sync_outbox WHERE generation=? AND local_pet_id=? AND local_kind=? AND local_id=? LIMIT 1',current.generation,pet.pet_id,saved.kind,localId)) throw new Error("Wait for this record's pending changes to be acknowledged before restoring.");
+    const data=recordDataSchema(saved.kind).parse(input.data),operationId=await id(sql);
+    const mutation=mutationSchema.parse({protocolVersion:1,operationId,deviceId:current.device_id,recordId:saved.id,petId:saved.petId,kind:saved.kind,baseRevision:saved.revision,intent:'restore',patch:data});
+    if (!requestFits([mutation])) throw new Error('Restore exceeds the cloud request size limit.');
+    reconcileMutation(saved,mutation,now());
+    const change:LocalChange={kind:saved.kind,localId:saved.kind==='puppy'?pet.pet_id:localRecordId(saved),before:saved.deleted?null:saved.data,after:data};
+    await sql.runAsync('INSERT INTO local_sync_outbox(operation_id,generation,local_pet_id,local_kind,local_id,change_json,mutation_json) VALUES (?,?,?,?,?,?,?)',operationId,current.generation,pet.pet_id,change.kind,change.localId,JSON.stringify(change),JSON.stringify(mutation));
+    await projectOwner(sql,current,[],'restore');
   }
   return {
     changeSink(petId:string):LocalChangeSink {
@@ -396,22 +417,39 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
       });
     },
     async restore(input:Fence&{record:CloudRecord;data:Record<string,unknown>}):Promise<void> {
-      await database.write(async sql=>{
-        const current=await required(sql,input);if (current.pending_pet_id||current.resyncing) throw new Error('Finish the pending baseline first.');
-        const proposed=cloudRecordSchema.parse(input.record);localRecordId(proposed);const saved=await mirrored(sql,current.generation,proposed.id);
-        if (!saved||saved.revision!==proposed.revision||saved.sequence!==proposed.sequence||saved.kind!==proposed.kind||saved.petId!==proposed.petId) throw new Error('Restore requires the current record identity and revision.');
-        const pet=saved.kind==='accountPreferences'?await sql.getFirstAsync<Binding>("SELECT * FROM local_sync_pets WHERE generation=? AND status='active' ORDER BY rowid LIMIT 1",current.generation):await sql.getFirstAsync<Binding>("SELECT * FROM local_sync_pets WHERE generation=? AND cloud_pet_id=? AND status='active'",current.generation,saved.petId);
-        if (!pet) throw new Error('Restore puppy ownership changed.');
-        const localId=saved.kind==='puppy'?pet.pet_id:localRecordId(saved);
-        if (await sql.getFirstAsync('SELECT operation_id FROM local_sync_outbox WHERE generation=? AND local_pet_id=? AND local_kind=? AND local_id=? LIMIT 1',current.generation,pet.pet_id,saved.kind,localId)) throw new Error("Wait for this record's pending changes to be acknowledged before restoring.");
-        const data=recordDataSchema(saved.kind).parse(input.data),operationId=await id(sql);
-        const mutation=mutationSchema.parse({protocolVersion:1,operationId,deviceId:current.device_id,recordId:saved.id,petId:saved.petId,kind:saved.kind,baseRevision:saved.revision,intent:'restore',patch:data});
-        if (!requestFits([mutation])) throw new Error('Restore exceeds the cloud request size limit.');
-        reconcileMutation(saved,mutation,now());
-        const change:LocalChange={kind:saved.kind,localId:saved.kind==='puppy'?pet.pet_id:localRecordId(saved),before:saved.deleted?null:saved.data,after:data};
-        await sql.runAsync('INSERT INTO local_sync_outbox(operation_id,generation,local_pet_id,local_kind,local_id,change_json,mutation_json) VALUES (?,?,?,?,?,?,?)',operationId,current.generation,pet.pet_id,change.kind,change.localId,JSON.stringify(change),JSON.stringify(mutation));
-        await projectOwner(sql,current,[],'restore');
+      await database.write(sql=>restoreRecord(sql,input));
+    },
+    async restoreEventHistory(input:EventHistoryRestore&{petId:string}):Promise<PuppyEvent> {
+      const petId=identifierSchema.parse(input.petId),eventId=localIdSchema.parse(input.eventId),selection=historySelection.parse(input.selection);
+      const result=await database.write(async sql=>{
+        const head=await readEventHistoryHead(sql,petId,eventId);
+        if(JSON.stringify(head)!==JSON.stringify(input.expected))throw new EventHistoryError('stale');
+        const current=await owner(sql),pet=await binding(sql,petId);
+        if(pet&&(pet.status!=='active'||current?.pending_pet_id||current?.resyncing))throw new EventHistoryError('pending');
+        if(pet&&await sql.getFirstAsync('SELECT operation_id FROM local_sync_outbox WHERE generation=? AND local_pet_id=? AND local_kind=? AND local_id=? LIMIT 1',current!.generation,petId,'event',eventId))throw new EventHistoryError('pending');
+        const selected=await readEventHistoryEntry(sql,petId,eventId,selection.sequence);
+        if(!selected?.after)throw new EventHistoryError('unavailable');
+        const latest=head.sequence===null?null:await readEventHistoryEntry(sql,petId,eventId,head.sequence);
+        const previous=head.event??latest?.after??latest?.before,cloudData=head.cloudRecord?.kind==='event'?eventDataSchema.parse(head.cloudRecord.data):null;
+        if(selected.after.type==='nap'||previous?.type==='nap'||cloudData?.type==='nap')throw new EventHistoryError('unsupported');
+        const {id:_,...snapshot}=selected.after;
+        const desired={id:eventId,...eventDataSchema.parse({...snapshot,...(previous?.estimated||cloudData?.estimated?{estimated:true}:{})})};
+        if(head.event&&!Object.keys(fieldPatch(head.event,desired)).length)return {event:head.event,changed:false};
+        if(pet){
+          if(!head.owner||!head.cloudRecord)throw new EventHistoryError('unavailable');
+          const {id:__,...data}=desired;
+          await restoreRecord(sql,{...head.owner,record:head.cloudRecord,data});
+        }else{
+          const changes=await writeEventRecord(sql,petId,head.event,desired);
+          changes.push(...await retainCustomActivities(sql,petId,desired.type==='custom'?[desired.customLabel!]:[]));
+          await retainRevisions(sql,petId,changes,'restore');
+        }
+        const committed=(await readEventHistoryHead(sql,petId,eventId)).event;
+        if(!committed)throw new EventHistoryError('unavailable');
+        return {event:committed,changed:true};
       });
+      if(result.changed)notifyLocalCommit(options.afterCommit);
+      return result.event;
     },
     async detach(input:Fence):Promise<void> {await database.write(async sql=>{await required(sql,input);await sql.runAsync('DELETE FROM local_sync_owner WHERE generation=?',input.generation);await clearRestoreIntent(sql);});},
     async status(petId:string):Promise<{state:'local'|'preparing'|'active'|'resyncing';generation:string|null;accountId:string|null;pending:number;blocked:number;cursor:number}> {

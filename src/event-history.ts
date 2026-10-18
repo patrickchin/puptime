@@ -10,7 +10,13 @@ export type EventHistoryHead={
  event:PuppyEvent|null;cloudRecord:CloudRecord|null;
 };
 export type EventHistoryPage={entries:EventHistoryEntry[];next:number|null;head:EventHistoryHead};
+export type EventHistorySelection={source:'local';sequence:number};
+export type EventHistoryRestore={eventId:string;selection:EventHistorySelection;expected:EventHistoryHead};
+export type EventHistoryProblem='read'|'stale'|'pending'|'unavailable'|'unsupported';
 export class EventHistoryError extends Error {
- readonly category='read';
- constructor(){super('Log history could not be read. Saved data has been preserved.');this.name='EventHistoryError';}
+ readonly category:EventHistoryProblem;
+ constructor(category:EventHistoryProblem='read'){
+  super({read:'Log history could not be read. Saved data has been preserved.',stale:'This log or its owner changed. Reload history before restoring.',pending:'Wait for this log or its baseline to finish syncing before restoring.',unavailable:'This version is no longer available to restore.',unsupported:'Restoring nap versions is not available yet.'}[category]);
+  this.name='EventHistoryError';this.category=category;
+ }
 }
