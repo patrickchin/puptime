@@ -3,7 +3,7 @@ import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Appearance, AppState, BackHandler, Linking, Modal, StyleSheet, useColorScheme, View } from 'react-native';
+import { Alert, Appearance, AppState, BackHandler, Linking, Modal, Platform, StyleSheet, useColorScheme, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { BottomNav, type Tab } from './src/components/BottomNav';
@@ -38,6 +38,7 @@ import { InsightsScreen } from './src/screens/InsightsScreen';
 import { LearnScreen } from './src/screens/LearnScreen';
 import { LogScreen, type LogEditRequest } from './src/screens/LogScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
+import type { FinishOnboardingOptions } from './src/onboarding';
 import { ScheduleScreen } from './src/screens/ScheduleScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { AccountScreen } from './src/screens/AccountScreen';
@@ -499,9 +500,15 @@ export default function App() {
     return granted;
   };
 
-  const finishOnboarding = async () => {
+  const finishOnboarding = async (options?:FinishOnboardingOptions) => {
+    if(Platform.OS==='ios'&&guideOpenedFromSettings){
+      setOnboardingVisible(false);
+      setGuideOpenedFromSettings(false);
+      setSettingsVisible(true);
+      return;
+    }
     try {
-      await completeOnboarding();
+      await completeOnboarding(Platform.OS==='ios'?options:undefined);
       setOnboardingVisible(false);
       setGuideOpenedFromSettings(false);
       navigateToTab('log');
@@ -606,6 +613,7 @@ export default function App() {
             {onboardingVisible === null || (!fontsLoaded && !fontError) ? null : onboardingVisible ? (
               <OnboardingScreen
                 theme={theme}
+                mode={guideOpenedFromSettings?'replay':'first-run'}
                 notificationPermission={notificationPermission}
                 onAllowNotifications={requestNotifications}
                 onOpenSystemSettings={() => Linking.openSettings().catch(() => undefined)}
