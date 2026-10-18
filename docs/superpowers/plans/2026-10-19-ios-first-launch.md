@@ -88,15 +88,15 @@ Use real provider labels, bounded form content and the existing theme. Public re
 
 ### Task 4: Complete first-open UI and reuse sign-in/walkthrough
 
-**Files:** `src/components/AccountSignIn.tsx`, `src/screens/AccountScreen.tsx`, `src/screens/FirstLaunchScreen.ios.tsx`, `src/screens/OnboardingScreen.ios.tsx`, `src/onboarding.ts`, `App.tsx`, `src/localization.ts`; tests `.maestro/ios/00-onboarding*.yaml`, `.maestro/native/ios-first-launch-*.yaml`, `scripts/verify-ios-first-launch.mjs`.
+**Files:** `src/components/AccountSignIn.tsx`, `src/screens/AccountScreen.tsx`, `src/screens/FirstLaunchScreen.ios.tsx` and its deferred-platform wrapper, `src/first-launch.ts`, `src/cloud/use-cloud.ios.ts`, `src/cloud/handle.ts`, `src/screens/OnboardingScreen.ios.tsx`, `src/onboarding.ts`, `App.tsx`, `src/localization.ts`; tests `.maestro/ios/00-onboarding*.yaml`, `.maestro/native/ios-first-launch-*.yaml`, `scripts/verify-ios-first-launch.mjs`, `scripts/verify-ios-cloud.mjs` and the shared Maestro setup helpers.
 
 **Interfaces:** `FirstLaunchScreen.ios` consumes the existing `CloudHandle`, Task1 storage, Task2 controller and Task3 delivery functions plus existing theme/permission callbacks. Extract `AccountSignIn` from current Settings form; do not duplicate identity logic. Extend tour props with an embedded preview mode that ends after three practice stops, never writes setup/profile state, and keeps replay behavior intact. App distinguishes first-open setup from Settings replay.
 
-- [ ] Add native flows before implementation for welcome/local route, committed name/restart, name failure/retry, configured account request/verification/cancel, returning restore, permissions, final completion and first real save. Initial expected failure is the current app opening directly into the feature walkthrough. Keep the actual SQL invariants in the qualifier, not source-pattern assertions.
-- [ ] Implement the design contract with loading/error/offline/busy/disabled/recovery states. Block duplicate actions while committing; preserve typed names on failed writes. Account completion is SDK state, cloud activation remains separate. Back/Skip uses durable meaningful boundaries without repeating completed external actions.
-- [ ] Give iOS startup an inline retry on storage/setup-read failure instead of silently treating it as completed or showing false empty history. Preserve the deferred platform path. Reuse existing load-state UI where possible.
-- [ ] Wire contextual permissions and device Settings control, three languages, keyboard/large-text scrolling and reduced motion. Samples remain component state and replay leaves every real table/account binding alone.
-- [ ] Run Node/Workers/all types and affected native flows; expect PASS. Inspect fresh actual screens and fix observable clipping/overlap. Commit `feat: add complete iOS first-launch onboarding`.
+- [x] Add native flows before implementation for welcome/local route, committed name/restart, name failure/retry, configured account request/verification/cancel, returning restore, permissions, final completion and first real save. Initial expected failure is the current app opening directly into the feature walkthrough. Keep the actual SQL invariants in the qualifier, not source-pattern assertions.
+- [x] Implement the design contract with loading/error/offline/busy/disabled/recovery states. Block duplicate actions while committing; preserve typed names on failed writes. Account completion is SDK state, cloud activation remains separate. Back/Skip uses durable meaningful boundaries without repeating completed external actions.
+- [x] Give iOS startup an inline retry on storage/setup-read failure instead of silently treating it as completed or showing false empty history. Preserve the deferred platform path. Reuse existing load-state UI where possible.
+- [x] Wire contextual permissions and device Settings control, three languages, keyboard/large-text scrolling and reduced motion. Samples remain component state and replay leaves every real table/account binding alone.
+- [x] Run Node/Workers/all types and affected native flows; expect PASS. Inspect fresh actual screens and fix observable clipping/overlap. Commit `feat: add complete iOS first-launch onboarding`.
 
 ### Task 5: Full first-open qualification and integration
 

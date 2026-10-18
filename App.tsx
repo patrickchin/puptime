@@ -3,7 +3,7 @@ import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Appearance, AppState, BackHandler, Linking, Modal, Platform, StyleSheet, useColorScheme, View } from 'react-native';
+import { ActivityIndicator,Alert, Appearance, AppState, BackHandler, Linking, Modal, Platform, Pressable,StyleSheet,Text,useColorScheme, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { BottomNav, type Tab } from './src/components/BottomNav';
@@ -38,6 +38,8 @@ import { InsightsScreen } from './src/screens/InsightsScreen';
 import { LearnScreen } from './src/screens/LearnScreen';
 import { LogScreen, type LogEditRequest } from './src/screens/LogScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
+import {FirstLaunchScreen,loadInitialSetup} from './src/screens/FirstLaunchScreen';
+import type {FirstLaunchProgress} from './src/first-launch';
 import type { FinishOnboardingOptions } from './src/onboarding';
 import { ScheduleScreen } from './src/screens/ScheduleScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
@@ -108,7 +110,10 @@ export default function App() {
   const [onboardingVisible, setOnboardingVisible] = useState<boolean | null>(null);
   const [guideOpenedFromSettings, setGuideOpenedFromSettings] = useState(false);
   const [scheduleOpenedFromSettings, setScheduleOpenedFromSettings] = useState(false);
-  const [initialOnboardingCheck] = useState(shouldShowOnboarding);
+  const [firstLaunch,setFirstLaunch]=useState<FirstLaunchProgress|null>(null);
+  const [startupFailed,setStartupFailed]=useState(false);
+  const startupLoading=useRef(false);
+  const [initialOnboardingCheck]=useState(()=>shouldShowOnboarding().catch(()=>false));
   const theme = resolveTheme(themePreference, colorScheme);
   const language = resolveLanguage(languagePreference);
   const languageRef = useRef(language);
@@ -195,6 +200,22 @@ export default function App() {
   },[refresh]);
   const cloud=useCloud(refreshCommittedState);
 
+  const openJournal=useCallback(async()=>{
+    if(startupLoading.current)return;
+    startupLoading.current=true;setStartupFailed(false);
+    try{
+      let setup:FirstLaunchProgress|null;
+      if(Platform.OS==='ios'){setup=await loadInitialSetup();await refresh();}
+      else{
+        const shown=await initialOnboardingCheck;
+        try{await refresh();}catch{Alert.alert(translate(languageRef.current,'app.loadErrorTitle'),translate(languageRef.current,'app.loadErrorBody'));}
+        setup=shown?{step:'welcome',puppyName:'My puppy'}:null;
+      }
+      setFirstLaunch(setup);setOnboardingVisible(setup!==null);onboardingChecked.current=true;
+    }catch{setStartupFailed(true);}
+    finally{startupLoading.current=false;}
+  },[refresh,initialOnboardingCheck]);
+
   useEffect(() => {
     let mounted = true;
     const reload = async () => {
@@ -206,12 +227,7 @@ export default function App() {
         }
       }
     };
-    void (async () => {
-      const showOnboarding = await initialOnboardingCheck.catch(() => false);
-      onboardingChecked.current = true;
-      await reload();
-      if (mounted) setOnboardingVisible(showOnboarding);
-    })();
+    void openJournal();
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active' && onboardingChecked.current) void reload();
     });
@@ -219,7 +235,7 @@ export default function App() {
       mounted = false;
       subscription.remove();
     };
-  }, [initialOnboardingCheck, refresh]);
+  }, [openJournal, refresh]);
 
   useEffect(() => {
     Appearance.setColorScheme(themePreference === 'system' ? 'unspecified' : theme.isDark ? 'dark' : 'light');
@@ -539,6 +555,8 @@ export default function App() {
     }
     try {
       await completeOnboarding(Platform.OS==='ios'?options:undefined);
+      if(Platform.OS==='ios')await refresh();
+      setFirstLaunch(null);
       setOnboardingVisible(false);
       setGuideOpenedFromSettings(false);
       navigateToTab('log');
@@ -649,7 +667,12 @@ export default function App() {
         >
           <StatusBar style={theme.isDark ? 'light' : 'dark'} />
           <View style={styles.screen}>
-            {onboardingVisible === null || (!fontsLoaded && !fontError) ? null : onboardingVisible ? (
+            {onboardingVisible === null || (!fontsLoaded && !fontError) ? Platform.OS==='ios'?<View testID="setup.loading" style={styles.startup}>
+              {startupFailed?<>
+                <Text testID="setup.loadError" accessibilityRole="alert" style={[styles.startupText,{color:theme.text}]}>{translate(language,'setup.loadError')}</Text>
+                <Pressable testID="setup.retry" accessibilityRole="button" onPress={()=>{cloud.retry?.();void openJournal();}} style={[styles.startupRetry,{backgroundColor:theme.primary}]}><Text style={[styles.startupText,{color:theme.onPrimary}]}>{translate(language,'setup.retry')}</Text></Pressable>
+              </>:<><ActivityIndicator color={theme.primary}/><Text style={[styles.startupText,{color:theme.textMuted}]}>{translate(language,'setup.loading')}</Text></>}
+            </View>:null : onboardingVisible ? guideOpenedFromSettings?(
               <OnboardingScreen
                 theme={theme}
                 mode={guideOpenedFromSettings?'replay':'first-run'}
@@ -665,7 +688,7 @@ export default function App() {
                   return true;
                 }}
               />
-            ) : screen}
+            ):firstLaunch?<FirstLaunchScreen progress={firstLaunch} cloud={cloud} theme={theme} notificationPermission={notificationPermission} onAllowNotifications={requestNotifications} onDisableNotifications={()=>changeNotificationDelivery(false)} onOpenSystemSettings={()=>{void Linking.openSettings().catch(()=>undefined);}} onFinish={finishOnboarding}/>:null : screen}
             {!onboardingVisible && undoState ? (
               <Toast
                 message={undoState.message}
@@ -708,4 +731,7 @@ export default function App() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   screen: { flex: 1 },
+  startup:{flex:1,alignItems:'center',justifyContent:'center',padding:24,gap:16},
+  startupText:{fontSize:16,lineHeight:24,textAlign:'center'},
+  startupRetry:{minHeight:48,paddingHorizontal:24,paddingVertical:12,borderRadius:12},
 });

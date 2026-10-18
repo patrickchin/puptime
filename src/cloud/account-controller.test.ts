@@ -89,6 +89,35 @@ test('first-launch restore confirmation pauses automatic retries until an explic
  assert.equal((await runtime.sync.status('pet-1')).state,'local');
 });
 
+test('first-launch local recovery remains available without a configured identity client',async t=>{
+ const {runtime}=await fixture(t,{pristine:true});
+ assert.equal(typeof controllerModule.continueFirstLaunchLocally,'function');
+ await runtime.sync.prepareAssociation({accountId:'account-1',localPetId:'pet-1',deviceId:runtime.deviceId,enrollment:{operationId:'offline-restore',deviceId:runtime.deviceId,localPetId:'pet-1',name:'Basil',confirmedPetId:'cloud-pet'},mode:'restore'});
+ assert.equal(await controllerModule.continueFirstLaunchLocally(runtime),'ok');
+ assert.equal((await runtime.sync.status('pet-1')).state,'local');assert.equal((await runtime.storage.loadSchedule()).length,12);
+ await runtime.storage.completeOnboarding();assert.equal(await controllerModule.continueFirstLaunchLocally(runtime),'cancelled');
+});
+
+test('first-launch duplicate email taps dispatch one request and keep the original challenge',async t=>{
+ const {controller,state}=await fixture(t);await controller.refresh();
+ assert.deepEqual(await Promise.all([controller.requestEmail('person@example.com'),controller.requestEmail('person@example.com')]),['ok','cancelled']);
+ assert.deepEqual(state.requested,['person@example.com']);assert.equal(controller.read().codeSentTo,'person@example.com');
+ assert.equal(controller.read().problem,null);assert.equal(state.trialCalls,0);
+});
+
+test('first-launch duplicate verification taps never replay a consumed code or replace successful sign-in with an error',async t=>{
+ const {controller,state,runtime}=await fixture(t);await controller.refresh();await controller.requestEmail('person@example.com');
+ assert.deepEqual(await Promise.all([controller.verifyEmail('person@example.com','123456'),controller.verifyEmail('person@example.com','123456')]),['ok','cancelled']);
+ assert.equal(state.verifications,1);assert.equal(controller.read().account!.user.id,'account-1');assert.equal(controller.read().problem,null);
+ assert.equal(state.trialCalls,0);assert.equal((await runtime.sync.status('pet-1')).state,'local');
+});
+
+test('first-launch duplicate social taps keep a successful account instead of reporting an account mismatch',async t=>{
+ const {controller,state}=await fixture(t);await controller.refresh();
+ assert.deepEqual(await Promise.all([controller.signInSocial('google'),controller.signInSocial('google')]),['ok','cancelled']);
+ assert.equal(controller.read().account!.user.id,'account-1');assert.equal(controller.read().problem,null);assert.equal(state.trialCalls,0);
+});
+
 test('configuration and sign-in are optional and never implicitly activate trial or associate local history',async t=>{
  const {controller,runtime,state}=await fixture(t);await runtime.storage.appendEvents([event]);
  await controller.refresh();assert.equal(controller.read().account,null);assert.equal(controller.read().config!.providers.email,true);

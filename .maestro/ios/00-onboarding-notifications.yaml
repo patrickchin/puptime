@@ -1,5 +1,5 @@
 appId: com.patrickchin.puptime
-name: iOS onboarding notification opt in
+name: iOS first-open notification opt in
 tags:
   - ios
   - smoke
@@ -8,24 +8,22 @@ tags:
     clearState: true
     permissions:
       notifications: unset
-- extendedWaitUntil:
-    visible:
-      id: onboarding.step.0
-    timeout: 90000
+- runFlow: ../helpers/first-launch-to-reminders.yaml
+- scrollUntilVisible:
+    element:
+      id: setup.reminders.allow
+    direction: DOWN
 - tapOn:
-    id: onboarding.primary
-- tapOn:
-    id: onboarding.primary
-- tapOn:
-    id: onboarding.primary
-- assertVisible:
-    id: onboarding.step.3
-- tapOn:
-    id: onboarding.notifications.allow
+    id: setup.reminders.allow
 - tapOn: Allow
-- assertVisible: Allowed
+- assertVisible:
+    id: setup.step.ready
+- scrollUntilVisible:
+    element:
+      id: setup.finish
+    direction: DOWN
 - tapOn:
-    id: onboarding.primary
+    id: setup.finish
 - extendedWaitUntil:
     visible:
       id: screen.today
@@ -36,7 +34,6 @@ tags:
     element:
       id: settings.notifications.permission
     direction: DOWN
-    visibilityPercentage: 100
 - assertVisible:
     id: settings.notifications.permission
     text: .*Allowed.*

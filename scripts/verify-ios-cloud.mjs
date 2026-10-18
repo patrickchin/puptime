@@ -3,22 +3,23 @@
 // Retain only redacted summaries/post-login screenshots, never raw auth traces.
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {existsSync,mkdtempSync,readFileSync,readdirSync,rmSync,writeFileSync} from 'node:fs';
+import {cpSync,existsSync,mkdtempSync,readFileSync,readdirSync,rmSync,writeFileSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {basename,join,resolve} from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
 import {createLocalDatabase} from '../src/local/database.ts';
 import {sqliteTestConnection} from '../src/local/sqlite-test-adapter.ts';
 import {createLocalRuntime} from '../src/local/runtime-factory.ts';
+import {cloudRecordId} from '../src/cloud/record-identity.ts';
 const [phase,udid]=process.argv.slice(2),app='com.patrickchin.puptime';
-assert.ok(['request','verify','auth-faults','rate-limited','enable','resume','outage','preview','combine','signout','access-recovery','auto-expiry','enrollment-race'].includes(phase),'Use a supported native cloud qualification phase.');
+assert.ok(['first-launch-restore-request','first-launch-restore-verify','first-launch-restore','first-launch-request','first-launch-verify','first-launch-enable','request','verify','auth-faults','rate-limited','enable','resume','outage','preview','combine','signout','access-recovery','auto-expiry','enrollment-race'].includes(phase),'Use a supported native cloud qualification phase.');
 const state=JSON.parse(readFileSync('/tmp/puptime-native-cloud-state.json','utf8'));
 assert.ok(basename(state.directory).startsWith('puptime-native-cloud-'));assert.equal(state.url,'http://127.0.0.1:8793');
 const simctl=(...args)=>execFileSync('xcrun',['simctl',...args],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
 const devices=Object.values(JSON.parse(simctl('list','devices','available','-j')).devices).flat();
 assert.ok(devices.find(device=>device.udid===udid)?.name.startsWith('Puptime Native Storage '),'Use the dedicated disposable simulator.');
-const contextPath=join(state.directory,'native-fixture.json');
-const context=phase==='request'?{email:`native-${crypto.randomUUID()}@example.invalid`,udid}:JSON.parse(readFileSync(contextPath,'utf8'));
+const contextPath=join(state.directory,phase.startsWith('first-launch-')?'first-launch-fixture.json':'native-fixture.json');
+const context=['request','first-launch-request'].includes(phase)?{email:`native-${crypto.randomUUID()}@example.invalid`,udid}:JSON.parse(readFileSync(contextPath,'utf8'));
 assert.equal(context.udid,udid);
 function authDatabase(){
  const files=readdirSync(join(state.persist,'v3/d1'),{recursive:true}).filter(file=>typeof file==='string'&&file.endsWith('.sqlite'));
@@ -76,7 +77,123 @@ function mutateAuthFixture(query){
   finally{rmSync(path,{force:true});}
 }
 try{
- if(phase==='request'){
+ if(phase==='first-launch-restore-request'){
+  simctl('terminate',udid,app);
+  const nativeDirectory=join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite');
+  const native=new DatabaseSync(join(nativeDirectory,'puptime-v2.db'),{readOnly:true});
+  try{
+   assert.equal(native.prepare('SELECT account_id FROM local_sync_owner').get().account_id,context.userId);
+   assert.equal(native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n,0,'Back up and acknowledge the synthetic source before resetting it.');
+   assert.equal(native.prepare('SELECT count(*) n FROM puppies').get().n,1);
+   assert.equal(native.prepare('SELECT cloud_pet_id FROM local_sync_pets').get().cloud_pet_id,context.localPetId);
+  }finally{native.close();}
+  const backup=mkdtempSync(join(state.directory,'first-launch-source-backup-'));
+  cpSync(nativeDirectory,join(backup,'SQLite'),{recursive:true});
+  const cookie=await fixtureCookie();
+  const summary=await (await fetch(state.url+'/api/account',{headers:{cookie,origin:state.url}})).json();
+  assert.equal(summary.user.id,context.userId);assert.equal(summary.pets[0].id,context.localPetId);assert.equal(summary.pets[0].eventCount,1);
+  const pull=async()=>{const response=await fetch(state.url+'/api/sync/pull?after=0',{headers:{cookie,origin:state.url}});assert.equal(response.status,200);const page=await response.json();assert.equal(page.hasMore,false);return page;};
+  const initial=await pull(),deviceId='first-launch-independent-restore';
+  await post('/api/cloud/enroll',{operationId:crypto.randomUUID(),deviceId,localPetId:'first-launch-other-device',name:'Review',confirmedPetId:context.localPetId},cookie);
+  const puppy=initial.changes.find(record=>record.kind==='puppy'),routine=initial.changes.find(record=>record.id===cloudRecordId('routine',context.localPetId,'starter-1'));
+  const event=initial.changes.find(record=>record.kind==='event'),preferences=initial.changes.find(record=>record.kind==='accountPreferences');
+  assert.ok(puppy&&routine&&event&&preferences);
+  const mutations=[[puppy,{name:'Basil'}],[routine,{minutes:500,reminder:true}],[event,{note:'Cloud restore review'}],[preferences,{theme:'soft-play',language:'es'}]].map(([record,patch])=>({protocolVersion:1,operationId:crypto.randomUUID(),deviceId,recordId:record.id,petId:record.petId,kind:record.kind,baseRevision:record.revision,intent:'patch',patch}));
+  const result=await (await post('/api/sync/push',{mutations},cookie)).json();assert.deepEqual(result.rejected,[]);
+  context.restoreBaseline=await pull();context.restoreBackup=backup;
+  writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});
+  flow('ios-first-launch-restore-request.yaml');
+  console.log('PASS source native SQLite backed up, independent same-owner HTTP client customized cloud name/routine/preferences/history, and fresh local setup explicitly requests returning sign-in.');
+ }else if(phase==='first-launch-restore-verify'){
+  flow('ios-cloud-resend-code.yaml');
+  code=database.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(context.email).code;
+  flow('ios-first-launch-account-verify.yaml');
+  assert.equal(database.prepare('SELECT id FROM user WHERE email=?').get(context.email).id,context.userId);
+  assert.deepEqual({...database.prepare('SELECT trial_started_at,trial_ends_at FROM cloud_accounts WHERE account_id=?').get(context.userId)},context.trial);
+  const native=new DatabaseSync(join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite/puptime-v2.db'),{readOnly:true});
+  try{
+   assert.notEqual(native.prepare('SELECT id FROM puppies').get().id,context.localPetId);
+   assert.equal(native.prepare('SELECT count(*) n FROM events').get().n,0);
+   assert.equal(native.prepare('SELECT count(*) n FROM local_sync_owner').get().n,0);
+   assert.equal(native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n,0);
+  }finally{native.close();}
+  console.log('PASS actual native SDK returning sign-in exposes the existing cloud puppy on fresh SQLite without restoring, starting another trial or uploading anything.');
+ }else if(phase==='first-launch-restore'){
+  flow('ios-first-launch-restore.yaml');
+  const nativePath=join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite/puptime-v2.db');
+  const local=await createLocalDatabase(sqliteTestConnection(nativePath));
+  try{
+   const pet=await local.read(sql=>sql.getFirstAsync("SELECT value FROM metadata WHERE key='active_pet_id'"));
+   assert.notEqual(pet.value,context.localPetId);
+   assert.equal((await local.read(sql=>sql.getFirstAsync('SELECT count(*) n FROM puppies'))).n,1);
+   assert.equal((await local.read(sql=>sql.getFirstAsync('SELECT count(*) n FROM local_sync_pets'))).n,1);
+   const runtime=await createLocalRuntime(local,pet.value),{storage}=runtime;
+   assert.equal(await storage.loadPuppyName(),'Basil');assert.equal(await storage.loadLanguagePreference(),'es');assert.equal(await storage.loadThemePreference(),'soft-play');
+   const schedule=await storage.loadSchedule(),routine=schedule.find(entry=>entry.id==='starter-1');assert.equal(schedule.length,12);assert.equal(routine.minutes,500);assert.equal(routine.reminder,true);
+   const events=await storage.loadEvents();assert.equal(events.length,1);assert.equal(events[0].note,'Cloud restore review');
+   assert.equal(await storage.loadNotificationDelivery(),false);assert.equal(await storage.loadFirstLaunch(),null);
+   const status=await runtime.sync.status(pet.value);assert.equal(status.accountId,context.userId);assert.equal(status.state,'active');assert.equal(status.pending,0);
+   const binding=await local.read(sql=>sql.getFirstAsync('SELECT cloud_pet_id FROM local_sync_pets'));assert.equal(binding.cloud_pet_id,context.localPetId);
+  }finally{await local.close();}
+  const cookie=await fixtureCookie(),response=await fetch(state.url+'/api/sync/pull?after=0',{headers:{cookie,origin:state.url}});assert.equal(response.status,200);
+  assert.deepEqual(await response.json(),context.restoreBaseline,'A pristine restore never uploads name/routine/settings defaults or changes the remote baseline.');
+  assert.deepEqual({...database.prepare('SELECT trial_started_at,trial_ends_at FROM cloud_accounts WHERE account_id=?').get(context.userId)},context.trial);
+  console.log('PASS actual native restore preserves confirmed cloud ID/name/routine/event/preferences, uses one new stable local puppy, leaves device alerts off, uploads no defaults, and preserves the exact cloud baseline and trial.');
+ }else if(phase==='first-launch-request'){
+  const native=new DatabaseSync(join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite/puptime-v2.db'),{readOnly:true});
+  try{assert.equal(native.prepare('SELECT count(*) n FROM local_sync_owner').get().n,0,'Preserve owned history.');}finally{native.close();}
+  writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});
+  flow('ios-first-launch-account-request.yaml');
+  assert.ok(database.prepare('SELECT id FROM local_email_previews WHERE email=?').get(context.email));
+  assert.equal(database.prepare('SELECT id FROM user WHERE email=?').get(context.email),undefined);
+  flow('ios-first-launch-account-cancel.yaml');
+  assert.equal(database.prepare('SELECT id FROM user WHERE email=?').get(context.email),undefined);
+  flow('ios-first-launch-account-email.yaml');
+  console.log('PASS actual first-open SDK email request, local challenge exit/return, and explicit resend after restart; no account is created before verification.');
+ }else if(phase==='first-launch-verify'){
+  code=database.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(context.email).code;
+  mutateAuthFixture(`UPDATE verification SET expiresAt=0 WHERE identifier='sign-in-otp-${context.email}';`);
+  flow('ios-cloud-expired-code.yaml');
+  assert.equal(database.prepare('SELECT id FROM user WHERE email=?').get(context.email),undefined);
+  flow('ios-cloud-resend-code.yaml');
+  code=database.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(context.email).code;
+  const correct=code;code=String((Number(code[0])+1)%10)+code.slice(1);
+  flow('ios-cloud-wrong-code.yaml');
+  assert.equal(database.prepare('SELECT id FROM user WHERE email=?').get(context.email),undefined);
+  code=correct;flow('ios-first-launch-account-verify.yaml');
+  const user=database.prepare('SELECT id FROM user WHERE email=?').get(context.email);assert.ok(user);
+  assert.equal(database.prepare('SELECT account_id FROM cloud_accounts WHERE account_id=?').get(user.id),undefined,'Account creation alone never starts a trial.');
+  const native=new DatabaseSync(join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite/puptime-v2.db'),{readOnly:true});
+  try{
+   assert.equal(native.prepare('SELECT count(*) n FROM events').get().n,0);assert.equal(native.prepare('SELECT name FROM puppies').get().name,'Maple');
+   assert.equal(native.prepare('SELECT count(*) n FROM local_sync_owner').get().n,0);assert.equal(native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n,0);
+   assert.equal(native.prepare("SELECT value FROM metadata WHERE key='first_launch_step'").get().value,'cloud');
+   context.userId=user.id;context.localPetId=native.prepare('SELECT id FROM puppies').get().id;
+   writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});
+  }finally{native.close();}
+  console.log('PASS actual first-open SDK expired/wrong-code recovery and verified new account; Maple/profile remain local, cloud checkpoint resumes, no trial/enrollment/upload.');
+ }else if(phase==='first-launch-enable'){
+  flow('ios-first-launch-account-enable.yaml');
+  const trial=database.prepare('SELECT trial_started_at,trial_ends_at FROM cloud_accounts WHERE account_id=?').get(context.userId);
+  assert.ok(trial);assert.equal(trial.trial_ends_at-trial.trial_started_at,14*86400000);
+  const native=new DatabaseSync(join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite/puptime-v2.db'),{readOnly:true});
+  try{
+   let drained=false;for(let i=0;i<120;i++){drained=native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n===0;if(drained)break;await new Promise(resolve=>setTimeout(resolve,250));}assert.ok(drained);
+   assert.equal(native.prepare('SELECT account_id FROM local_sync_owner').get().account_id,context.userId);
+   assert.equal(native.prepare('SELECT count(*) n FROM events').get().n,1);
+   assert.equal(native.prepare('SELECT id FROM puppies').get().id,context.localPetId);
+   const binding=native.prepare('SELECT cloud_pet_id FROM local_sync_pets').get();assert.equal(binding.cloud_pet_id,context.localPetId);
+   context.trial={...trial};writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});
+   const files=readdirSync(join(state.persist,'v3/do'),{recursive:true}).filter(file=>typeof file==='string'&&file.endsWith('.sqlite'));
+   let found=0;
+   for(const file of files){const remote=new DatabaseSync(join(state.persist,'v3/do',file),{readOnly:true});try{
+    if(!remote.prepare("SELECT name FROM sqlite_master WHERE name='records'").get()||!remote.prepare('SELECT id FROM records WHERE pet_id=? LIMIT 1').get(context.localPetId))continue;
+    found++;assert.equal(remote.prepare("SELECT count(*) n FROM records WHERE pet_id=? AND kind='event' AND deleted=0").get(context.localPetId).n,1);
+    assert.equal(remote.prepare('SELECT count(*) n FROM pets').get().n,1);
+   }finally{remote.close();}}assert.equal(found,1);
+  }finally{native.close();}
+  console.log('PASS explicit first-open trial, enrollment, walkthrough exit and first real log through the official native SDK/HTTP runner; one stable puppy and one acknowledged cloud event.');
+ }else if(phase==='request'){
   writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});
   flow('ios-cloud-request-email.yaml');
   assert.ok(database.prepare('SELECT id FROM local_email_previews WHERE email=?').get(context.email));

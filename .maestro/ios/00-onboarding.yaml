@@ -1,37 +1,31 @@
 appId: com.patrickchin.puptime
-name: iOS first launch onboarding and replay
+name: iOS first-open profile account choice practice and replay
 tags:
   - ios
   - smoke
 ---
-- launchApp:
-    clearState: true
-    permissions:
-      notifications: unset
-- extendedWaitUntil:
-    visible:
-      id: onboarding.step.0
-    timeout: 90000
+- runFlow: ../native/ios-first-launch-profile-prepare.yaml
+- scrollUntilVisible:
+    element:
+      id: setup.profile.next
+    direction: DOWN
 - tapOn:
-    id: onboarding.primary
+    id: setup.profile.next
 - assertVisible:
-    id: onboarding.step.1
-- tapOn:
-    id: onboarding.primary
-- assertVisible:
-    id: onboarding.step.2
-- tapOn:
-    id: onboarding.primary
-- assertVisible:
-    id: onboarding.step.3
-- tapOn:
-    id: onboarding.later
-- extendedWaitUntil:
-    visible:
-      id: screen.today
-    timeout: 90000
+    id: setup.step.account
 - stopApp
 - launchApp
+- extendedWaitUntil:
+    visible:
+      id: setup.step.account
+    timeout: 90000
+- runFlow: ../native/ios-first-launch-local-walkthrough.yaml
+- scrollUntilVisible:
+    element:
+      id: setup.finish
+    direction: DOWN
+- tapOn:
+    id: setup.finish
 - extendedWaitUntil:
     visible:
       id: screen.today
@@ -42,7 +36,6 @@ tags:
     element:
       id: settings.notifications.permission
     direction: DOWN
-    visibilityPercentage: 100
 - assertVisible:
     id: settings.notifications.permission
     text: .*Needed for reminders and confirmations.*
@@ -50,8 +43,6 @@ tags:
     element:
       id: settings.guide.open
     direction: UP
-    visibilityPercentage: 100
-    centerElement: true
 - tapOn:
     id: settings.guide.open
 - assertVisible:

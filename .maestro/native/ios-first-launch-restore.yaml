@@ -1,0 +1,36 @@
+appId: com.patrickchin.puptime
+name: Restore the confirmed cloud puppy without uploading local defaults
+---
+- assertVisible:
+    id: setup.cloud.puppy
+- tapOn:
+    id: setup.cloud.enable
+- extendedWaitUntil:
+    visible:
+      id: setup.cloud.active
+    timeout: 60000
+- tapOn:
+    id: setup.cloud.next
+- tapOn:
+    id: onboarding.skip
+- scrollUntilVisible:
+    element:
+      id: setup.reminders.later
+    direction: DOWN
+- tapOn:
+    id: setup.reminders.later
+- assertVisible:
+    id: setup.step.ready
+- takeScreenshot: first-open-restored-ready
+- scrollUntilVisible:
+    element:
+      id: setup.finish
+    direction: DOWN
+- tapOn:
+    id: setup.finish
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 30000
+- assertVisible:
+    id: event.pee.edit

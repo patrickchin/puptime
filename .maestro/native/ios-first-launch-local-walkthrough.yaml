@@ -1,0 +1,57 @@
+appId: com.patrickchin.puptime
+name: Local onboarding practice and reminder choice
+---
+- scrollUntilVisible:
+    element:
+      id: setup.local
+    direction: DOWN
+- tapOn:
+    id: setup.local
+- assertVisible:
+    id: onboarding.step.0
+- scrollUntilVisible:
+    element:
+      id: onboarding.demo.pee
+    direction: DOWN
+- tapOn:
+    id: onboarding.demo.pee
+- scrollUntilVisible:
+    element:
+      id: onboarding.primary
+    direction: DOWN
+- tapOn:
+    id: onboarding.primary
+- assertVisible:
+    id: onboarding.step.1
+- scrollUntilVisible:
+    element:
+      id: onboarding.primary
+    direction: DOWN
+- tapOn:
+    id: onboarding.primary
+- assertVisible:
+    id: onboarding.step.2
+- scrollUntilVisible:
+    element:
+      id: onboarding.demo.routine.reminder
+    direction: DOWN
+- tapOn:
+    id: onboarding.demo.routine.reminder
+- scrollUntilVisible:
+    element:
+      id: onboarding.primary
+    direction: DOWN
+- tapOn:
+    id: onboarding.primary
+- assertVisible:
+    id: setup.step.reminders
+- takeScreenshot: first-open-reminders
+- scrollUntilVisible:
+    element:
+      id: setup.reminders.later
+    direction: DOWN
+- tapOn:
+    id: setup.reminders.later
+- assertVisible:
+    id: setup.step.ready
+- takeScreenshot: first-open-ready
