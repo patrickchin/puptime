@@ -133,7 +133,7 @@ export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPerm
    {step==='cloud'?<>
     <Text style={bodyStyle}>{t('setup.cloudBody')}</Text>
     {cloudError?<Text testID="setup.cloud.error" accessibilityRole="alert" style={[styles.body,{color:theme.danger}]}>{t(cloudError)}</Text>:null}
-    {!account?<AccountSignIn cloud={cloud} theme={theme} showIntro={false}/>:<>
+    {!account?<AccountSignIn cloud={cloud} theme={theme} showIntro={false} showError={false}/>:<>
      <Text style={[styles.caption,{color:theme.textMuted}]}>{account.user.email}</Text>
      {existing?<View testID="setup.cloud.puppy" style={cardStyle}>
       <Text style={[styles.label,{color:theme.primary}]}>{t('account.cloudPuppy')}</Text>
