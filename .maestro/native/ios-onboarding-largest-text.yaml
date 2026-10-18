@@ -85,6 +85,12 @@ name: Small iPhone onboarding with the largest accessibility text
     direction: DOWN
     visibilityPercentage: 100
     centerElement: true
+- swipe:
+    start: 50%,50%
+    end: 50%,35%
+    duration: 600
+- waitForAnimationToEnd:
+    timeout: 5000
 - takeScreenshot: largest-text-keyboard
 - tapOn:
     id: onboarding.primary
