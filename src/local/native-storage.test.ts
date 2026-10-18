@@ -10,7 +10,7 @@ import { createLocalRuntime } from './runtime-factory.ts';
 import { DEFAULT_NOTIFICATION_PREFERENCES, type NotificationPreferences } from '../notification-config.ts';
 import type { PuppyEvent } from '../domain.ts';
 import { csvToEvents, eventsToCsv } from '../export.ts';
-import { readLocalRecords } from './sync-projection.ts';
+import { readLocalRecords,applyLocalRecords } from './sync-projection.ts';
 async function setup(t: TestContext) {
   const directory = await mkdtemp(join(tmpdir(),'puptime-native-settings-'));
   const path = join(directory,'data.db');
@@ -19,6 +19,36 @@ async function setup(t: TestContext) {
   await initializeLocalDatabase(database,()=> 'pet-1');
   return { database, path, storage:createNativeStorage(database,'pet-1') };
 }
+
+test('device notification delivery stays local across preference projection and reopen',async t=>{
+ const first=await setup(t),second=await setup(t);
+ assert.equal(await first.storage.loadNotificationDelivery(),false);
+ assert.equal(await second.storage.loadNotificationDelivery(),false);
+ await first.storage.saveNotificationDelivery(true);
+ const records=await first.database.read(sql=>readLocalRecords(sql,'pet-1'));
+ await second.database.write(sql=>applyLocalRecords(sql,'pet-1',records,[]));
+ assert.equal(await first.storage.loadNotificationDelivery(),true);
+ assert.equal(await second.storage.loadNotificationDelivery(),false);
+ assert.ok(!JSON.stringify(records).includes('notify_on_device'));
+ const reopened=await createLocalDatabase(sqliteTestConnection(first.path));
+ try{assert.equal(await createNativeStorage(reopened,'pet-1').loadNotificationDelivery(),true);}finally{await reopened.close();}
+ assert.equal((await first.database.read(sql=>sql.getFirstAsync<{n:number}>('SELECT COUNT(*) n FROM local_revisions')))!.n,0);
+ assert.equal((await first.database.read(sql=>sql.getFirstAsync<{n:number}>('SELECT COUNT(*) n FROM local_sync_outbox')))!.n,0);
+ await first.storage.saveNotificationDelivery(false);assert.equal(await first.storage.loadNotificationDelivery(),false);
+});
+
+test('device delivery preserves legacy completion and rejects corrupt flags without rewriting them',async t=>{
+ const {database,storage}=await setup(t);
+ await database.write(sql=>sql.runAsync("DELETE FROM metadata WHERE key='notify_on_device'"));
+ assert.equal(await storage.loadNotificationDelivery(),false);
+ await storage.completeOnboarding();
+ await database.write(sql=>sql.runAsync("DELETE FROM metadata WHERE key='notify_on_device'"));
+ assert.equal(await storage.loadNotificationDelivery(),true);
+ await assert.rejects(storage.saveNotificationDelivery('true' as never));
+ await database.write(sql=>sql.runAsync("INSERT INTO metadata(key,value) VALUES ('notify_on_device','invalid')"));
+ await assert.rejects(storage.loadNotificationDelivery());
+ assert.equal((await database.read(sql=>sql.getFirstAsync<{value:string}>("SELECT value FROM metadata WHERE key='notify_on_device'")))!.value,'invalid');
+});
 
 test('first-launch profile checkpoints reopen with the same puppy and stay out of cloud records',async t=>{
  const {database,path}=await setup(t),{storage}=await createLocalRuntime(database,'pet-1');

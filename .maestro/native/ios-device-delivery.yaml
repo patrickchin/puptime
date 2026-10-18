@@ -1,0 +1,20 @@
+appId: com.patrickchin.puptime
+name: Device notification delivery setting
+---
+- launchApp:
+    permissions:
+      notifications: allow
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- tapOn:
+    id: settings.open
+- scrollUntilVisible:
+    element:
+      id: settings.notifications.deviceDelivery
+    direction: DOWN
+    centerElement: true
+- assertVisible:
+    id: settings.notifications.deviceDelivery
+- takeScreenshot: device-delivery-off

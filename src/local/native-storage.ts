@@ -85,6 +85,15 @@ export function createNativeStorage(database: LocalDatabase, petId: string, onCh
       return database.read(async (sql) => (await sql.getFirstAsync<{ value: string }>("SELECT value FROM metadata WHERE key='show_onboarding'"))?.value === 'true');
     },
     loadFirstLaunch:()=>database.read(firstLaunch),
+    loadNotificationDelivery:()=>database.read(async sql=>{
+      const flag=await sql.getFirstAsync<{value:string}>("SELECT value FROM metadata WHERE key='notify_on_device'");
+      if(flag){if(!['true','false'].includes(flag.value))throw new Error('Saved device notification choice is invalid.');return flag.value==='true';}
+      return await firstLaunch(sql)===null;
+    }),
+    async saveNotificationDelivery(enabled:boolean) {
+      if(typeof enabled!=='boolean')throw new TypeError('Invalid device notification choice.');
+      await database.write(sql=>sql.runAsync("INSERT INTO metadata(key,value) VALUES ('notify_on_device',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",String(enabled)));
+    },
     async saveFirstLaunchStep(step:FirstLaunchStep) {
       firstLaunchStepSchema.parse(step);
       await database.write(async sql=>{

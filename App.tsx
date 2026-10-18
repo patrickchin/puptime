@@ -43,6 +43,7 @@ import { ScheduleScreen } from './src/screens/ScheduleScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { AccountScreen } from './src/screens/AccountScreen';
 import { useCloud } from './src/cloud/use-cloud';
+import {getNotificationDelivery,setNotificationDelivery} from './src/cloud/notification-delivery';
 import {getActivityData,type ActivityQueries} from './src/activity-data';
 import { TimelineScreen } from './src/screens/TimelineScreen';
 import {
@@ -127,6 +128,7 @@ export default function App() {
     ...DEFAULT_NOTIFICATION_PREFERENCES,
   });
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionState>('requestable');
+  const [notificationDelivery,setDelivery]=useState(false);
   const [undoState, setUndoState] = useState<{ event: PuppyEvent; message: string; restore?: PuppyEvent } | null>(null);
   const [editRequest, setEditRequest] = useState<LogEditRequest | null>(null);
   const handledNotificationResponses = useRef(new Set<string>());
@@ -152,7 +154,7 @@ export default function App() {
     setRefreshToken(value=>value+1);
     const nextCustomActivities = await loadCustomActivities(nextEvents);
     setCustomActivities(nextCustomActivities);
-    const [nextSchedule, nextWidgetActions, nextTheme, nextLanguagePreference, nextNotificationPreferences, nextPermission, nextActivityCustomizations] = await Promise.all([
+    const [nextSchedule, nextWidgetActions, nextTheme, nextLanguagePreference, nextNotificationPreferences, nextPermission, nextActivityCustomizations,nextDelivery] = await Promise.all([
       loadSchedule(),
       loadWidgetActions(nextCustomActivities),
       loadThemePreference(),
@@ -160,6 +162,7 @@ export default function App() {
       loadNotificationPreferences(),
       getNotificationPermissionState(),
       loadActivityCustomizations(),
+      getNotificationDelivery(),
     ]);
     if(generation!==refreshGeneration.current)return nextEvents;
     setSchedule(nextSchedule);
@@ -168,6 +171,7 @@ export default function App() {
     setLanguagePreference(nextLanguagePreference);
     setNotificationPreferences(nextNotificationPreferences);
     setNotificationPermission(nextPermission);
+    setDelivery(nextDelivery);
     setActivityCustomizations(current=>JSON.stringify(current)===JSON.stringify(nextActivityCustomizations)?current:nextActivityCustomizations);
     void Promise.all([
       syncScheduleReminders(
@@ -497,8 +501,12 @@ export default function App() {
   };
 
   const requestNotifications = async () => {
-    const granted = await requestReminderPermission(language);
-    setNotificationPermission(await getNotificationPermissionState());
+    let granted:boolean;
+    try{granted=await requestReminderPermission(language);}
+    finally{
+      const [permission,delivery]=await Promise.all([getNotificationPermissionState(),getNotificationDelivery()]);
+      setNotificationPermission(permission);setDelivery(delivery);
+    }
     if (granted) {
       await Promise.all([
         syncScheduleReminders(
@@ -511,6 +519,15 @@ export default function App() {
       ]);
     }
     return granted;
+  };
+
+  const changeNotificationDelivery=async(enabled:boolean)=>{
+    if(enabled){await requestNotifications();return;}
+    await setNotificationDelivery(false);setDelivery(false);
+    await Promise.all([
+      syncScheduleReminders(schedule,notificationPreferences.reminderLeadMinutes,language),
+      syncPottyReminders(events,notificationPreferences,language),
+    ]);
   };
 
   const finishOnboarding = async (options?:FinishOnboardingOptions) => {
@@ -541,6 +558,8 @@ export default function App() {
           customActivities={customActivities}
           notificationPreferences={notificationPreferences}
           notificationPermission={notificationPermission}
+          notificationDelivery={Platform.OS==='ios'?notificationDelivery:undefined}
+          onNotificationDeliveryChange={changeNotificationDelivery}
           routineReminderCount={schedule.filter((entry) => entry.reminder).length}
           onBack={() => setSettingsVisible(false)}
           cloudHandle={cloud}
@@ -611,6 +630,7 @@ export default function App() {
     language,
     languagePreference,
     notificationPermission,
+    notificationDelivery,
     notificationPreferences,
     schedule,
     settingsVisible,

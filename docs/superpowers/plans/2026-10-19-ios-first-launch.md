@@ -78,13 +78,13 @@ Use real provider labels, bounded form content and the existing theme. Public re
 
 ### Task 3: Device-only reminder delivery
 
-**Files:** `src/cloud/notification-delivery.ts`, `src/cloud/notification-delivery.ios.ts`, `src/reminders.ts`, `src/local/native-storage.ts`, `src/screens/SettingsScreen.tsx`, `App.tsx`, `src/localization.ts`; tests `src/local/native-storage.test.ts` and `.maestro/native/ios-device-delivery.yaml` with a native SQLite/notification inspection qualifier.
+**Files:** `src/cloud/notification-delivery.ts`, `src/cloud/notification-delivery.ios.ts`, `src/reminders.ts`, `src/local/native-storage.ts`, `src/screens/SettingsScreen.tsx`, `App.tsx`, `src/localization.ts`; tests `src/local/native-storage.test.ts`, `src/reminders.test.ts` and `.maestro/native/ios-device-delivery.yaml` with `scripts/verify-ios-device-delivery.mjs` and an opt-in read-only notification-center Metro observer.
 
 **Interfaces:** `getNotificationDelivery():Promise<boolean>` and `setNotificationDelivery(enabled:boolean):Promise<void>` in the platform-selected module. iOS uses local metadata; base retains existing behavior. Actual scheduling requires local intent and current OS permission. Existing `requestReminderPermission` records explicit opt-in before its OS action; Not now records false. Existing completed development installations with no flag retain prior permission-based behavior; fresh setup defaults off.
 
-- [ ] Add failing checks for two devices sharing reminder preferences with only one delivery intent, allow/deny/block/defer, OS permission changes, disabling/canceling only Puptime's notifications, and no old-alert replay after restore. Assert delivery state is absent from cloud records.
-- [ ] Reuse the existing scheduling and permission entrypoints; add one authoritative local gate for schedule/potty delivery and accurate Settings control. Do not request another permission or change deferred widget behavior.
-- [ ] Run real local storage tests and the current reminder checks/all types; expect PASS. Native permission evidence belongs to Task5. Commit `feat: keep notification delivery local to each iPhone`.
+- [x] Add failing checks for two devices sharing reminder preferences with only one delivery intent, allow/deny/block/defer, OS permission changes, disabling/canceling only Puptime's notifications, and no old-alert replay after restore. Assert delivery state is absent from cloud records.
+- [x] Reuse the existing scheduling and permission entrypoints; add one authoritative local gate for schedule/potty delivery and accurate Settings control. Do not request another permission or change deferred widget behavior.
+- [x] Run real local storage tests and the current reminder checks/all types; expect PASS. Native permission evidence belongs to Task5. Commit `feat: keep notification delivery local to each iPhone`.
 
 ### Task 4: Complete first-open UI and reuse sign-in/walkthrough
 

@@ -41,12 +41,14 @@ export function SettingsScreen({
   customActivities,
   notificationPreferences,
   notificationPermission,
+  notificationDelivery,
   routineReminderCount,
   onBack,
   onOpenPicker,
   onWidgetActionsChange,
   onNotificationPreferencesChange,
   onRequestNotificationPermission,
+  onNotificationDeliveryChange,
   onOpenSystemSettings,
   onOpenSchedule,
   onOpenGuide,
@@ -60,12 +62,14 @@ export function SettingsScreen({
   customActivities: string[];
   notificationPreferences: NotificationPreferences;
   notificationPermission: NotificationPermissionState;
+  notificationDelivery?:boolean;
   routineReminderCount: number;
   onBack: () => void;
   onOpenPicker: (mode: 'theme' | 'language') => void;
   onWidgetActionsChange: (actions: ActivityKey[]) => Promise<void>;
   onNotificationPreferencesChange: (preferences: NotificationPreferences) => Promise<void>;
   onRequestNotificationPermission: () => Promise<boolean>;
+  onNotificationDeliveryChange?: (enabled:boolean)=>Promise<void>;
   onOpenSystemSettings: () => void;
   onOpenSchedule: () => void;
   onOpenGuide: () => void;
@@ -75,6 +79,7 @@ export function SettingsScreen({
   const { activityColors, activityLabel, t } = useLocalization();
   const [savingWidget, setSavingWidget] = useState(false);
   const [savingNotifications, setSavingNotifications] = useState(false);
+  const [savingDelivery,setSavingDelivery]=useState(false);
 
   const themeLabel = t(`theme.${themePreference}.name`);
   const languageLabel = languagePreference === 'system' ? t('language.system') : languageLabels[languagePreference];
@@ -142,7 +147,7 @@ export function SettingsScreen({
     key: 'pottyAfterPee' | 'pottyAfterMeal',
     enabled: boolean,
   ) => {
-    if (enabled && notificationPermission !== 'granted' && !(await requestNotifications())) return;
+    if (enabled && (notificationPermission !== 'granted'||notificationDelivery===false) && !(await requestNotifications())) return;
     await saveNotifications({
       ...notificationPreferences,
       [key]: { ...notificationPreferences[key], enabled },
@@ -356,6 +361,24 @@ export function SettingsScreen({
             />
           ) : null}
         </Pressable>
+
+        {notificationDelivery!==undefined&&onNotificationDeliveryChange?<>
+          <View style={[styles.divider,{backgroundColor:theme.border}]}/>
+          <View style={styles.permissionRow}>
+            <View style={styles.rowCopy}>
+              <Text style={[styles.rowLabel,{color:theme.text}]}>{t('settings.deviceDelivery')}</Text>
+              <Text style={[styles.rowHint,{color:theme.textMuted}]}>{t('settings.deviceDeliveryDetail')}</Text>
+            </View>
+            <Switch testID="settings.notifications.deviceDelivery" accessibilityLabel={t('settings.deviceDelivery')}
+              value={notificationDelivery&&notificationPermission==='granted'} disabled={savingDelivery}
+              hitSlop={8} ios_backgroundColor={theme.border}
+              trackColor={{true:theme.primary}} onValueChange={async enabled=>{
+                if(savingDelivery)return;setSavingDelivery(true);
+                try{if(enabled)await requestNotifications();else await onNotificationDeliveryChange(false);}
+                catch{showSaveError();}finally{setSavingDelivery(false);}
+              }}/>
+          </View>
+        </>:null}
 
         <View style={[styles.divider, { backgroundColor: theme.border }]} />
         <View style={styles.pottyBlock}>
