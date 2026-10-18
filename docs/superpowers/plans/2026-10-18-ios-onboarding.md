@@ -52,10 +52,10 @@
 
 **Interfaces:** OnboardingScreenProps mode:'first-run'|'replay', onFinish(options?:FinishOnboardingOptions):Promise<void>, existing notification/back callbacks. App's replay finish bypasses setup writes; first-run awaits native completion before hiding. Legacy screen keeps current runtime behavior.
 
-- [ ] Write native acceptance flow before implementation: three practice activity choices, timeline example, routine demo toggle, optional name/Skip, zero real events/routine changes through completion. Observe RED for missing native demo controls.
-- [ ] Implement platform-selected screen using the spec's four stops, existing art/tokens, one brief tap-triggered Animated puppy response and local demo state. Next never depends on practice, final Start never depends on notification/name. Keep visible Practice/Example labels; no storage import or analytics.
-- [ ] Wire App mode/finish and localized labels; Skip passes no name, Start passes draft, replay ending returns Settings. Keep busy/failed-save draft and disable duplicate finish. Capture actual light-mode walkthrough; expect full flow PASS and actual SQLite event/routine contents unchanged.
-- [ ] Run npm test/typechecks, native affected flow and exact SQL acceptance via qualifier, expect PASS. Commit.
+- [x] Write native acceptance flow before implementation: three practice activity choices, timeline example, routine demo toggle, optional name/Skip, zero real events/routine changes through completion. Observe RED for missing native demo controls.
+- [x] Implement platform-selected screen using the spec's four stops, existing art/tokens, one brief tap-triggered Animated puppy response and local demo state. Next never depends on practice, final Start never depends on notification/name. Keep visible Practice/Example labels; no storage import or analytics.
+- [x] Wire App mode/finish and localized labels; Skip passes no name, Start passes draft, replay ending returns Settings. Keep busy/failed-save draft and disable duplicate finish. Capture actual light-mode walkthrough; expect full flow PASS and actual SQLite event/routine contents unchanged.
+- [x] Run npm test/typechecks, native affected flow and exact SQL acceptance via qualifier, expect PASS. Commit.
 
 ### Task 3: Safe replay, permissions and later rename
 
