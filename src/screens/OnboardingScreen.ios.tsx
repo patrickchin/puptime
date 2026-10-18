@@ -74,7 +74,7 @@ export function OnboardingScreen({theme, mode, notificationPermission, onAllowNo
     catch{Alert.alert(t('schedule.reminderErrorTitle'),t('schedule.reminderErrorBody'));}
     finally{locked.current=false;if(mounted.current)setBusy(false);}
   }
-  const puppy=(height=windowHeight<750?100:145)=>(
+  const puppy=(height=windowHeight<750?80:145)=>(
     <Animated.View style={[styles.puppy,{height,transform:[{translateY:bounce.interpolate({inputRange:[0,1],outputRange:[0,-9]})},{scale:bounce.interpolate({inputRange:[0,1],outputRange:[1,1.04]})}]}]}>
       <Image source={require('../../assets/puppy-journal.png')} accessible={false} style={styles.puppyImage} resizeMode="contain"/>
     </Animated.View>
@@ -90,7 +90,7 @@ export function OnboardingScreen({theme, mode, notificationPermission, onAllowNo
         {step>0?<View style={[step===3&&!replay?styles.footerChoices:undefined,largeText&&styles.largeChoices]}>
           <Pressable testID="onboarding.back" accessibilityRole="button" disabled={busy} onPress={()=>{Keyboard.dismiss();setStep(step-1);}} style={styles.back}><Text style={[styles.backText,{color:theme.textMuted}]}>{t('onboarding.back')}</Text></Pressable>
           {step===3&&!replay?<Pressable testID="onboarding.later" accessibilityRole="button" disabled={busy} onPress={()=>void finish(true)} style={styles.back}><Text style={[styles.backText,{color:theme.textMuted}]}>{t('onboarding.later')}</Text></Pressable>:null}
-        </View>:null}
+        </View>:!largeText?<View style={styles.backSlot}/>:null}
       </View>
   );
 
@@ -185,6 +185,7 @@ export function OnboardingScreen({theme, mode, notificationPermission, onAllowNo
 }
 
 const styles=StyleSheet.create({
+  backSlot:{height:44},
   largeTitle:{fontSize:25,lineHeight:31,letterSpacing:-0.3},largeActions:{flexDirection:'column'},largeAction:{flex:0,flexDirection:'row',justifyContent:'flex-start',gap:16,padding:16},largeDayRow:{flexDirection:'column',alignItems:'stretch',gap:10},largeDayLabel:{width:'100%'},largeTrack:{flex:0,width:'100%'},largeNotification:{flexDirection:'column',alignItems:'flex-start'},largeCopy:{flex:0},largeAllow:{maxWidth:'100%'},scrollFooter:{paddingHorizontal:0,marginTop:24},largeChoices:{flexDirection:'column'},
   root:{flex:1},flex:{flex:1},topBar:{minHeight:58,paddingHorizontal:spacing.lg,flexDirection:'row',alignItems:'center',justifyContent:'space-between'},brand:{flexDirection:'row',alignItems:'center',gap:8},brandText:{fontSize:17},skip:{minWidth:55,minHeight:44,justifyContent:'center',alignItems:'flex-end'},skipText:{fontSize:15,fontWeight:'700'},
   progress:{flexDirection:'row',gap:6,marginHorizontal:spacing.lg,marginBottom:20},progressMark:{flex:1,height:4,borderRadius:4},content:{paddingHorizontal:spacing.lg,paddingBottom:24},title:{fontSize:33,lineHeight:39,letterSpacing:-0.8},body:{fontSize:16,lineHeight:23,marginTop:9},puppy:{alignItems:'center',justifyContent:'center',marginTop:12,marginBottom:8},puppyImage:{width:210,height:'100%'},

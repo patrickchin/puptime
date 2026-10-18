@@ -1,0 +1,27 @@
+appId: com.patrickchin.puptime
+name: Set the real iOS Reduce Motion preference before practice
+---
+- launchApp:
+    appId: com.apple.Preferences
+    stopApp: false
+- assertVisible:
+    id: REDUCE_MOTION
+- runFlow:
+    when:
+      visible:
+        id: REDUCE_MOTION
+        text: ^${OTHER_MOTION_VALUE}$
+    commands:
+      - tapOn:
+          point: 84%,18%
+- assertVisible:
+    id: REDUCE_MOTION
+    text: ^${MOTION_VALUE}$
+- takeScreenshot: actual-ios-motion-setting
+- launchApp:
+    appId: com.patrickchin.puptime
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: onboarding.step.0
+    timeout: 90000

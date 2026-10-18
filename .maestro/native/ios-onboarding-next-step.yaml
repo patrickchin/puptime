@@ -1,0 +1,8 @@
+appId: com.patrickchin.puptime
+name: Advance to the next onboarding stop
+---
+- tapOn:
+    id: onboarding.primary
+- assertVisible:
+    id: onboarding.step.${NEXT_STEP}
+- takeScreenshot: onboarding-navigation-step
