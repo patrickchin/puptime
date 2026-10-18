@@ -1,0 +1,44 @@
+appId: com.patrickchin.puptime
+name: iOS pending sign-out cancels safely and keeps offline history
+---
+- launchApp
+- runFlow: ../helpers/open-account.yaml
+- extendedWaitUntil:
+    visible:
+      id: account.signOut
+      enabled: true
+    timeout: 40000
+- scrollUntilVisible:
+    element:
+      id: account.signOut
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn:
+    id: account.signOut
+- assertVisible: ^Sign out on this iPhone\?$
+- tapOn: Cancel
+- assertVisible:
+    id: account.signOut
+- tapOn:
+    id: account.signOut
+- assertVisible: ^Sign out on this iPhone\?$
+- tapOn:
+    text: ^Sign out$
+    rightOf:
+      text: ^Cancel$
+- extendedWaitUntil:
+    visible:
+      id: account.status
+      text: Stored on this iPhone
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: account.local.count
+    direction: UP
+    visibilityPercentage: 100
+- assertVisible:
+    id: account.local.count
+    text: ${MAESTRO_EXPECTED_COUNT} activity logs
+- assertVisible:
+    id: account.status
+    text: Stored on this iPhone

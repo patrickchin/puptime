@@ -103,3 +103,12 @@ test('disposing during configuration loading prevents subsequent account and tri
  const request=controller.refresh();await tick();controller.stop();release();await request;
  assert.equal(accountCalls,0);assert.equal(state.trialCalls,0);
 });
+test('cold-start service failure still permits confirmed local sign-out of a saved association',async t=>{
+ const {controller,runtime,state,api}=await fixture(t);state.credentials=true;state.signOutFails=true;
+ await enrollLocal(runtime);await runtime.storage.appendEvents([event]);
+ api.config=async()=>{throw new CloudApiError('network');};
+ await controller.refresh();assert.equal(controller.read().account,null);assert.equal(controller.read().sync!.accountId,'account-1');
+ assert.equal(await controller.signOut({}),'pending-confirmation-required');assert.equal(state.credentials,true);
+ assert.equal(await controller.signOut({confirmPending:true}),'ok');assert.equal(state.credentials,false);assert.equal(controller.read().sync!.accountId,null);
+ assert.deepEqual(await runtime.storage.loadEvents(),[event]);assert.equal(controller.read().problem,'remote-sign-out-unconfirmed');
+});

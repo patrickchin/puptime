@@ -8,7 +8,7 @@ import {homedir} from 'node:os';
 import {basename,join,resolve} from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
 const [phase,udid]=process.argv.slice(2),app='com.patrickchin.puptime';
-assert.ok(['request','verify','enable','resume','outage','preview','combine'].includes(phase),'Use request, verify, enable, resume, outage, preview or combine.');
+assert.ok(['request','verify','enable','resume','outage','preview','combine','signout'].includes(phase),'Use request, verify, enable, resume, outage, preview, combine or signout.');
 const state=JSON.parse(readFileSync('/tmp/puptime-native-cloud-state.json','utf8'));
 assert.ok(basename(state.directory).startsWith('puptime-native-cloud-'));assert.equal(state.url,'http://127.0.0.1:8793');
 const simctl=(...args)=>execFileSync('xcrun',['simctl',...args],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
@@ -43,6 +43,18 @@ function flow(name){
   }
   rmSync(output,{recursive:true,force:true});
  }
+}
+const post=async(path,body,cookie='')=>{
+    const response=await fetch(state.url+path,{method:'POST',headers:{origin:state.url,'content-type':'application/json',...(cookie?{cookie}:{})},body:JSON.stringify(body),redirect:'error'});
+    assert.equal(response.status,200,'The isolated service request must succeed.');return response;
+  };
+
+async function fixtureCookie(){
+  await post('/api/auth/email-otp/send-verification-otp',{email:context.email,type:'sign-in'});
+  code=database.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(context.email).code;
+  const login=await post('/api/auth/sign-in/email-otp',{email:context.email,otp:code});
+  const cookie=login.headers.getSetCookie().map(value=>value.split(';')[0]).join('; ');
+  assert.ok(cookie);return cookie;
 }
 try{
  if(phase==='request'){
@@ -84,42 +96,51 @@ try{
   }finally{native.close();}
   context.expectedCount=context.expectedAfterCombine;writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});
   console.log('PASS confirmed existing-cloud association preserves old remote edits and the new local log.');
- }else if(phase==='outage'){
+ }else if(phase==='outage'||phase==='signout'){
+  flow('ios-cloud-account-ready.yaml');
   const native=new DatabaseSync(join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite/puptime-v2.db'),{readOnly:true});
   const pids=execFileSync('lsof',['-t','-iTCP:8793','-sTCP:LISTEN'],{encoding:'utf8'}).trim().split(/\s+/);assert.equal(pids.length,1);
   const pid=Number(pids[0]),parent=execFileSync('ps',['-p',String(pid),'-o','ppid='],{encoding:'utf8'}).trim();
   const command=execFileSync('ps',['-p',parent,'-o','command='],{encoding:'utf8'});assert.ok(command.includes(state.config),'Only the isolated local backend may be suspended.');
   assert.equal(native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n,0);
-  context.expectedCount=native.prepare('SELECT count(*) n FROM events').get().n+1;
+  const previousCloudCount=native.prepare('SELECT count(*) n FROM events').get().n;
+  context.expectedCount=previousCloudCount+1;
   writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});
   process.kill(pid,'SIGSTOP');
   try{
     flow('ios-cloud-outage-log.yaml');
     assert.equal(native.prepare('SELECT count(*) n FROM events').get().n,context.expectedCount);
     assert.ok(native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n>0);
-    // Let the configured15s HTTP deadline expire while the local save remains durable.
-    await new Promise(resolve=>setTimeout(resolve,16000));
-    console.log('PASS installed iOS logging remains durable during a real local service outage.');
+    if(phase==='signout'){
+      flow('ios-cloud-pending-signout.yaml');
+      assert.equal(native.prepare('SELECT count(*) n FROM events').get().n,context.expectedCount);
+      assert.equal(native.prepare('SELECT count(*) n FROM local_sync_owner').get().n,0);
+      assert.equal(native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n,0);
+      console.log('PASS native pending sign-out supports Cancel, clears SDK credentials and detaches without deleting offline logs.');
+    }else{
+      // Let the configured15s HTTP deadline expire while the local save remains durable.
+      await new Promise(resolve=>setTimeout(resolve,16000));
+      console.log('PASS installed iOS logging remains durable during a real local service outage.');
+    }
   }finally{process.kill(pid,'SIGCONT');}
   try{
+    if(phase==='signout'){
+      const cookie=await fixtureCookie();
+      const response=await fetch(state.url+'/api/account',{headers:{cookie,origin:state.url},redirect:'error'});assert.equal(response.status,200);
+      const account=await response.json();assert.equal(account.pets[0].eventCount,previousCloudCount);
+      console.log('PASS offline sign-out preserves the cloud copy and never sends its detached pending log.');
+    }else{
     let drained=false;
     for(let i=0;i<200;i++){drained=native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n===0;if(drained)break;await new Promise(resolve=>setTimeout(resolve,250));}
     assert.ok(drained,'Native retry must acknowledge the outage backlog automatically after service recovery.');
     console.log('PASS installed iOS automatically synchronizes its retained backlog after service recovery.');
+    }
   }finally{native.close();}
  }else{
   flow(phase==='resume'?'ios-cloud-resume.yaml':'ios-cloud-enable.yaml');
   const cloud=database.prepare('SELECT trial_started_at,trial_ends_at FROM cloud_accounts WHERE account_id=?').get(context.userId);assert.ok(cloud);assert.equal(cloud.trial_ends_at-cloud.trial_started_at,14*86400000);
   console.log('PASS explicit native activation grants the configured trial and reaches acknowledged sync.');
-  const post=async(path,body,cookie='')=>{
-    const response=await fetch(state.url+path,{method:'POST',headers:{origin:state.url,'content-type':'application/json',...(cookie?{cookie}:{})},body:JSON.stringify(body),redirect:'error'});
-    assert.equal(response.status,200,'The isolated service request must succeed.');return response;
-  };
-  await post('/api/auth/email-otp/send-verification-otp',{email:context.email,type:'sign-in'});
-  code=database.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(context.email).code;
-  const login=await post('/api/auth/sign-in/email-otp',{email:context.email,otp:code});
-  const cookie=login.headers.getSetCookie().map(value=>value.split(';')[0]).join('; ');
-  assert.ok(cookie);
+  const cookie=await fixtureCookie();
   const pulled=await fetch(state.url+'/api/sync/pull?after=0',{headers:{cookie,origin:state.url},redirect:'error'});assert.equal(pulled.status,200);
   const page=await pulled.json(),event=page.changes.find(record=>record.kind==='event');assert.ok(event,'Native initial history must reach the real HTTP service.');
   assert.equal(page.changes.filter(record=>record.kind==='event').length,context.expectedCount??1);

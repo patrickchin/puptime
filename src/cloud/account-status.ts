@@ -1,7 +1,11 @@
 import type { AccountSnapshot } from './account-controller.ts';
 export function accountStatus(state:AccountSnapshot|null) {
   if(!state||(!state.account&&!state.sync?.accountId))return 'local';
-  if(!state.account)return 'auth';
+  if(!state.account){
+    if(!state.online||state.problem==='network')return 'offline';
+    if(state.problem&&!['auth-required','account-deleted'].includes(state.problem))return 'paused';
+    return state.busy?'checking':'auth';
+  }
   if(state.sync?.accountId&&state.sync.accountId!==state.account.user.id)return 'mismatch';
   if(!state.sync?.accountId||state.sync.state==='local')return 'notEnabled';
   if(!state.online)return 'offline';

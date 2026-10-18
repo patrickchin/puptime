@@ -102,6 +102,7 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
           </View>)}
           <AccountButton theme={theme} testID="account.signOut" label={t('account.signOut')} disabled={busy} onPress={signOut}/>
         </View>)}
+        {!account&&state?.sync?.accountId?<AccountButton theme={theme} testID="account.signOut" label={t('account.signOut')} disabled={busy} onPress={signOut}/>:null}
         <Pressable accessibilityRole="link" accessibilityLabel={t('account.privacy')} onPress={()=>{void Linking.openURL('https://github.com/patrickchin/puptime/blob/main/PRIVACY.md').catch(()=>Alert.alert(t('learn.linkError'),t('learn.linkErrorBody')));}} style={styles.privacy}><Text style={[styles.body,{color:theme.primary,textDecorationLine:'underline'}]}>{t('account.privacy')}</Text></Pressable>
       </ScrollView>
     </KeyboardAvoidingView>

@@ -21,3 +21,9 @@ test('owner mismatch, expiry and lost authentication have priority over a stale 
  assert.equal(status({...state,account:{...state.account!,cloud:{canSync:false,canExport:true,source:'none',expiresAt:null}}}),'expired');
  assert.equal(status({...state,problem:'expired'}),'expired');assert.equal(status({...state,problem:'sign-out-failed'}),'paused');
 });
+test('an unavailable cloud after cold start does not claim authentication expired',()=>{
+ assert.equal(status({...state,account:null,problem:'network'}),'offline');
+ assert.equal(status({...state,account:null,problem:'server-error'}),'paused');
+ assert.equal(status({...state,account:null,busy:true,run:null}),'checking');
+ assert.equal(status({...state,account:null,problem:'auth-required'}),'auth');
+});
