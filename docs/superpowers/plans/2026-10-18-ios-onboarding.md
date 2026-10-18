@@ -66,14 +66,17 @@
 - [x] Record native rename/restart, cancel, non-BMP/long name, and injected SQL failure/retry. Independent production SQLite name write during open prompt must not change draft; after cancel saved label reflects newest commit. Preserve petId and populated events.
 - [x] Record first-run notification Not now/Allow/denied; completion is independent, no automatic prompt from routine demo or replay. Update existing 00-onboarding/notification flows to assert the separate explicit action and retained first-log access. Run affected native/storage checks, full Node and types, expect PASS. Commit.
 
-### Task 4: Accessibility, Release qualification and integration
+### Task 4: Accessibility and Release qualification
 
 **Interfaces:** qualifier emits credential-free PASS summaries/screenshots; recorder scripts retain current and redesigned videos outside checkout.
 
-- [ ] Run actual small-screen/large-text, dark/default/named themes, Spanish/Chinese, keyboard and Reduce Motion journeys. Inspect all four stops and practice feedback. Correct clipping/overlap/inert targets; capture fresh screenshots and full design video.
-- [ ] Build fresh standalone iOS Release on the dedicated task simulator. Run new first-run/replay/name/notification cases and whole configured11-flow suite. Verify completed-upgrade installs do not get forced onboarding. Record affected and suite videos plus exact SQL/service boundary evidence.
-- [ ] Run npm test, npm run test:server, npm run typecheck, npm run typecheck:server. Record counts and compare each planned assertion against actual output; ledger deviations. Expect all PASS.
-- [ ] One fresh whole-branch review per executing-plans, one material RED→GREEN fix pass; ledger all rulings/minors and no re-review. Create/attach PR depending on clientPR96 until parent merges. Require applicable CI before PR merge; preserve existing verification ledgers/artifacts and continue the full rollout afterward.
+- [x] Run actual small-screen/large-text, dark/default/named themes, Spanish/Chinese, keyboard and Reduce Motion journeys. Inspect all four stops and practice feedback. Correct clipping/overlap/inert targets; capture fresh screenshots and full design video.
+- [x] Build fresh standalone iOS Release on the dedicated task simulator. Run new first-run/replay/name/notification cases and whole configured11-flow suite. Verify completed-upgrade installs do not get forced onboarding. Record affected and suite videos plus exact SQL/service boundary evidence.
+- [x] Run npm test, npm run test:server, npm run typecheck, npm run typecheck:server. Record counts and compare each planned assertion against actual output; ledger deviations. Expect all PASS.
+
+### Integration gate after Tasks 1–4
+
+- [ ] One fresh whole-branch review per executing-plans, one material RED→GREEN fix pass; ledger all rulings/minors and no re-review. Base the branch/PR on main after merged client PR96. Create and attach the PR, require applicable CI before merge, preserve verification ledgers/artifacts and continue the full rollout afterward.
 
 ## Plan self-review
 
