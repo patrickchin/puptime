@@ -1,6 +1,8 @@
-# iOS onboarding: a small first success
+# iOS feature walkthrough: a small first success
 
 Date: October18,2026. Extends the agreed optional-cloud design and the user's latest priority: onboarding should be exceptionally well designed, easy and fun. Execution remains autonomous; implementation uses the native inline Superpowers workflow, one fresh final review and PR-only integration.
+
+Scope clarification: this document and its historical onboarding filenames describe the feature walkthrough only, including its limited optional name/notification ending. The user means the complete first-open account/profile/permissions journey by onboarding. That broader setup remains required under the accounts-sync design and cloud rollout phase 4; walkthrough completion or replay must not be used as proof that it is delivered.
 
 ## Product and design contract
 
