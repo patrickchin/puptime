@@ -8,7 +8,7 @@ import {homedir} from 'node:os';
 import {basename,join,resolve} from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
 const [phase,udid]=process.argv.slice(2),app='com.patrickchin.puptime';
-assert.ok(['request','verify','enable','resume','outage','preview','combine','signout'].includes(phase),'Use request, verify, enable, resume, outage, preview, combine or signout.');
+assert.ok(['request','verify','auth-faults','rate-limited','enable','resume','outage','preview','combine','signout','access-recovery'].includes(phase),'Use request, verify, auth-faults, rate-limited, enable, resume, outage, preview, combine, signout or access-recovery.');
 const state=JSON.parse(readFileSync('/tmp/puptime-native-cloud-state.json','utf8'));
 assert.ok(basename(state.directory).startsWith('puptime-native-cloud-'));assert.equal(state.url,'http://127.0.0.1:8793');
 const simctl=(...args)=>execFileSync('xcrun',['simctl',...args],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
@@ -45,8 +45,16 @@ function flow(name){
  }
 }
 const post=async(path,body,cookie='')=>{
-    const response=await fetch(state.url+path,{method:'POST',headers:{origin:state.url,'content-type':'application/json',...(cookie?{cookie}:{})},body:JSON.stringify(body),redirect:'error'});
-    assert.equal(response.status,200,'The isolated service request must succeed.');return response;
+    for(let attempt=0;attempt<2;attempt++){
+      const response=await fetch(state.url+path,{method:'POST',headers:{origin:state.url,'content-type':'application/json',...(cookie?{cookie}:{})},body:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(15000)});
+      if(response.status===429&&attempt===0){
+        const seconds=Number(response.headers.get('retry-after'));
+        const delay=Number.isFinite(seconds)&&seconds>0?Math.min(60000,Math.ceil(seconds*1000)):60000;
+        console.log('Waiting for the real service rate-limit window before the administrative HTTP fixture retries.');
+        await new Promise(resolve=>setTimeout(resolve,delay));continue;
+      }
+      assert.equal(response.status,200,'The isolated service request must succeed.');return response;
+    }
   };
 
 async function fixtureCookie(){
@@ -56,13 +64,43 @@ async function fixtureCookie(){
   const cookie=login.headers.getSetCookie().map(value=>value.split(';')[0]).join('; ');
   assert.ok(cookie);return cookie;
 }
+function mutateAuthFixture(query){
+  assert.match(context.email,/^native-[a-f0-9-]{36}@example\.invalid$/);
+  const path=join(state.directory,'private-native-fixture.sql');
+  writeFileSync(path,query,{mode:0o600});
+  try{execFileSync('npx',['wrangler','d1','execute','AUTH_DB','--local','--config',state.config,'--persist-to',state.persist,'--file',path,'--json'],{stdio:['ignore','pipe','pipe'],env:{...process.env,CI:'1'}});}
+  catch{throw new Error('Isolated native fixture update failed; private output withheld.');}
+  finally{rmSync(path,{force:true});}
+}
 try{
  if(phase==='request'){
   writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});
   flow('ios-cloud-request-email.yaml');
   assert.ok(database.prepare('SELECT id FROM local_email_previews WHERE email=?').get(context.email));
   console.log('PASS official native SDK requested a local-only preview code.');
- }else if(phase==='verify'){
+ }else if(phase==='rate-limited'){
+  code=database.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(context.email).code;
+  flow('ios-cloud-rate-limited-code.yaml');
+  console.log('PASS native SDK rate limiting offers a recoverable wait message, without claiming sign-in succeeded.');
+ }else if(phase==='verify'||phase==='auth-faults'){
+  if(phase==='auth-faults'){
+    flow('ios-cloud-cancel-code.yaml');
+    assert.equal(database.prepare('SELECT id FROM user WHERE email=?').get(context.email),undefined,'Cancelling a challenge must not create an account.');
+    code=database.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(context.email).code;
+    mutateAuthFixture(`UPDATE verification SET expiresAt=0 WHERE identifier='sign-in-otp-${context.email}';`);
+    flow('ios-cloud-expired-code.yaml');
+    assert.equal(database.prepare('SELECT id FROM user WHERE email=?').get(context.email),undefined,'An expired native challenge must not create an account.');
+    flow('ios-cloud-resend-code.yaml');
+    code=database.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(context.email).code;
+    await post('/api/auth/sign-in/email-otp',{email:context.email,otp:code});
+    flow('ios-cloud-wrong-code.yaml');
+    console.log('PASS native challenge cancellation preserves free use; expired and already-consumed codes are rejected by the real SDK/service.');
+    // Keep the installed plugin's three-attempt/minute security limit enabled.
+    // Multiple fault scenarios share this isolated backend/IP; recovery needs
+    // its actual window to elapse rather than clearing the rate-limit table.
+    console.log('Waiting for the real OTP rate-limit window before recovery.');
+    await new Promise(resolve=>setTimeout(resolve,60000));
+  }
   flow('ios-cloud-resend-code.yaml');
   code=database.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(context.email)?.code;
   assert.match(code??'',/^\d{6}$/);
@@ -96,6 +134,59 @@ try{
   }finally{native.close();}
   context.expectedCount=context.expectedAfterCombine;writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});
   console.log('PASS confirmed existing-cloud association preserves old remote edits and the new local log.');
+ }else if(phase==='access-recovery'){
+  assert.match(context.userId,/^[A-Za-z0-9_-]+$/);
+  // Restore only this synthetic entitlement after an interrupted qualifier.
+  // Persist this non-secret control state before the next injected fault.
+  let trial=context.accessRecovery?.trial??database.prepare('SELECT trial_started_at,trial_ends_at FROM cloud_accounts WHERE account_id=?').get(context.userId);
+  assert.ok(trial);
+  if(trial.trial_ends_at<=Date.now()){
+    const started=Date.now();trial={trial_started_at:started,trial_ends_at:started+14*86400000};
+    console.log('Restoring an abandoned synthetic entitlement before qualification.');
+  }
+  context.accessRecovery={trial};writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});
+  mutateAuthFixture(`UPDATE cloud_accounts SET trial_started_at=${trial.trial_started_at},trial_ends_at=${trial.trial_ends_at} WHERE account_id='${context.userId}';`);
+  flow('ios-cloud-access-restored.yaml');
+  flow('ios-cloud-account-ready.yaml');
+  const native=new DatabaseSync(join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite/puptime-v2.db'),{readOnly:true});
+  const previousCount=native.prepare('SELECT count(*) n FROM events').get().n;
+  const originalOwner=native.prepare('SELECT generation,account_id FROM local_sync_owner').get();
+  try{
+    mutateAuthFixture(`UPDATE cloud_accounts SET trial_started_at=0,trial_ends_at=1 WHERE account_id='${context.userId}';`);
+    flow('ios-cloud-access-expired.yaml');
+    context.expectedCount=previousCount+1;
+    flow('ios-cloud-outage-log.yaml');
+    assert.equal(native.prepare('SELECT count(*) n FROM events').get().n,context.expectedCount);
+    assert.ok(native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n>0);
+    const cookie=await fixtureCookie();
+    const account=await (await fetch(state.url+'/api/account',{headers:{cookie,origin:state.url}})).json();
+    assert.equal(account.cloud.canSync,false);assert.equal(account.pets[0].eventCount,previousCount);
+    const exported=await fetch(state.url+'/api/account/export',{headers:{cookie,origin:state.url}});assert.equal(exported.status,200);
+    assert.equal(JSON.parse((await exported.text()).trim().split('\n').at(-1)).type,'complete');
+    mutateAuthFixture(`UPDATE cloud_accounts SET trial_started_at=${trial.trial_started_at},trial_ends_at=${trial.trial_ends_at} WHERE account_id='${context.userId}';`);
+    flow('ios-cloud-access-restored.yaml');
+    assert.equal(native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n,0);
+    console.log('PASS installed iOS entitlement expiry keeps local writes/pending work and cloud export; restoring access drains the same history.');
+    mutateAuthFixture(`UPDATE session SET expiresAt=0 WHERE userId='${context.userId}';`);
+    flow('ios-cloud-session-revoked.yaml');
+    context.expectedCount++;
+    flow('ios-cloud-outage-log.yaml');
+    assert.equal(native.prepare('SELECT count(*) n FROM events').get().n,context.expectedCount);
+    assert.ok(native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n>0);
+    assert.deepEqual(native.prepare('SELECT generation,account_id FROM local_sync_owner').get(),originalOwner);
+    flow('ios-cloud-signin-again.yaml');
+    code=database.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(context.email).code;
+    flow('ios-cloud-recover-code.yaml');
+    assert.equal(native.prepare('SELECT count(*) n FROM events').get().n,context.expectedCount);
+    assert.equal(native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n,0);
+    assert.deepEqual(native.prepare('SELECT generation,account_id FROM local_sync_owner').get(),originalOwner);
+    assert.deepEqual({...database.prepare('SELECT trial_started_at,trial_ends_at FROM cloud_accounts WHERE account_id=?').get(context.userId)},{...trial});
+    delete context.accessRecovery;writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});
+    console.log('PASS installed iOS revoked session preserves local logging/owner/backlog; actual SDK reauthentication resumes without another trial or association.');
+  }finally{
+    native.close();
+    mutateAuthFixture(`UPDATE cloud_accounts SET trial_started_at=${trial.trial_started_at},trial_ends_at=${trial.trial_ends_at} WHERE account_id='${context.userId}';`);
+  }
  }else if(phase==='outage'||phase==='signout'){
   flow('ios-cloud-account-ready.yaml');
   const native=new DatabaseSync(join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite/puptime-v2.db'),{readOnly:true});

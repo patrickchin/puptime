@@ -1,0 +1,17 @@
+appId: com.patrickchin.puptime
+name: iOS restored access drains the retained backlog
+---
+- launchApp:
+    stopApp: false
+- scrollUntilVisible:
+    element:
+      id: account.retry
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn:
+    id: account.retry
+- extendedWaitUntil:
+    visible:
+      id: account.status
+      text: Up to date
+    timeout: 30000

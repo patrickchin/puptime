@@ -1,0 +1,30 @@
+appId: com.patrickchin.puptime
+name: iOS sign-in challenge can be left without affecting local use
+---
+- launchApp:
+    stopApp: false
+- tapOn: Sign-in code
+- scrollUntilVisible:
+    element:
+      id: account.back
+    direction: UP
+    visibilityPercentage: 100
+- tapOn:
+    id: account.back
+- tapOn:
+    id: settings.back
+- assertVisible:
+    id: quick.pee
+- tapOn:
+    id: settings.open
+- tapOn:
+    id: settings.account.open
+- extendedWaitUntil:
+    visible:
+      id: account.code.input
+    timeout: 10000
+- assertVisible:
+    id: account.local.count
+    text: 1 activity log
+- assertNotVisible:
+    id: account.enable

@@ -1,0 +1,20 @@
+appId: com.patrickchin.puptime
+name: iOS expiry pauses sync and retains the local puppy
+---
+- launchApp:
+    stopApp: false
+- scrollUntilVisible:
+    element:
+      id: account.retry
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn:
+    id: account.retry
+- extendedWaitUntil:
+    visible:
+      id: account.status
+      text: Cloud sync paused
+    timeout: 30000
+- assertVisible: Your local logs and cloud copy are kept while sync is paused.
+- assertNotVisible:
+    id: account.enable

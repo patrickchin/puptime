@@ -1,0 +1,20 @@
+appId: com.patrickchin.puptime
+name: iOS existing local history can reauthenticate its owner
+---
+- launchApp:
+    stopApp: false
+- scrollUntilVisible:
+    element:
+      id: account.email.input
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn:
+    id: account.email.input
+- setClipboard: ${TEST_EMAIL}
+- pasteText
+- tapOn:
+    id: account.sendCode
+- extendedWaitUntil:
+    visible:
+      id: account.code.input
+    timeout: 30000

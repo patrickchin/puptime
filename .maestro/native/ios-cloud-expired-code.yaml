@@ -1,0 +1,10 @@
+appId: com.patrickchin.puptime
+name: iOS sign-in rejects an expired code and offers recovery
+---
+- runFlow: ios-cloud-wrong-code.yaml
+- assertVisible:
+    id: account.error
+    text: This code has expired. Request a new one.
+- assertVisible:
+    id: account.resend
+    enabled: true

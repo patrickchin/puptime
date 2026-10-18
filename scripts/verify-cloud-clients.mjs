@@ -20,7 +20,7 @@ assert.equal(base,mode==='local'?'http://127.0.0.1:8793':'https://puptime-api-st
 const origin=mode==='local'?base:'https://puptime.pages.dev';
 const secret=mode==='local'?readFileSync(join(local.directory,'.dev.vars'),'utf8').match(/^AUTH_SECRET=(.+)$/m)?.[1]:process.env.PUPTIME_STAGING_AUTH_SECRET;
 assert.ok(secret?.length>=32,'Supply the private staging auth secret through the environment.');
-const directory=mkdtempSync(join(tmpdir(),`puptime-http-${mode}-`)),owners=[],clients=[];
+const directory=mkdtempSync(join(tmpdir(),`puptime-http-${mode}-`)),owners=[],clients=[],channels=[];
 function sql(query){
  const path=join(directory,'fixture.sql');writeFileSync(path,query,{mode:0o600});
  const options=local?['--local','--config',local.config,'--persist-to',local.persist]:['--remote','--env','staging'];
@@ -39,6 +39,26 @@ async function response(owner,path,{method='GET',body,signal}={}){
 function transport(owner){let count=0;const api=createCloudApi(async(path,options)=>{
  count++;const result=await response(owner,path,options);return {data:await result.json(),error:result.ok?null:{status:result.status},retryAfter:result.headers.get('retry-after')};
  });return {api,get calls(){return count;}};}
+async function until(check,message){for(let i=0;i<150;i++){if(check())return;await new Promise(resolve=>setTimeout(resolve,100));}assert.fail(message);}
+async function channel(owner){
+ // Node's built-in Undici WebSocket supports header options, like the actual
+ // React Native constructor. Keep bearer credentials out of the URL/payload.
+ const socket=new WebSocket(base.replace(/^http/,'ws')+'/api/sync/changes',{headers:{cookie:owner.cookie,origin}});
+ const observed={socket,owner,messages:[],invalid:false,closed:false,opened:false};channels.push(observed);
+ socket.addEventListener('open',()=>{observed.opened=true;});
+ socket.addEventListener('close',()=>{observed.closed=true;});
+ socket.addEventListener('error',()=>{observed.invalid=true;});
+ socket.addEventListener('message',event=>{
+  try{
+   assert.equal(typeof event.data,'string');assert.ok(event.data.length<=256);
+   const value=JSON.parse(event.data);assert.deepEqual(Object.keys(value).sort(),['cursor','protocolVersion']);
+   assert.equal(value.protocolVersion,1);assert.ok(Number.isSafeInteger(value.cursor)&&value.cursor>=0);
+   observed.messages.push(value);
+  }catch{observed.invalid=true;}
+ });
+ await until(()=>observed.opened||observed.invalid,'Authenticated change channel did not open.');assert.equal(observed.invalid,false);
+ await until(()=>observed.messages.length>0,'Change channel did not send its initial cursor.');return observed;
+}
 let primary,remote,sessionId,success=false;
 async function open(name){
  const path=join(directory,name+'.db'),database=await createLocalDatabase(sqliteTestConnection(path));
@@ -56,6 +76,8 @@ async function history(recordId){const result=await response(primary,`/api/recor
 try{
  primary=await fixture();remote=transport(primary);sessionId=primary.id;
  await remote.api.startTrial();
+ const other=await fixture();assert.equal((await response(other,'/api/cloud/trial',{method:'POST',body:{}})).status,200);
+ const primaryChannel=await channel(primary),otherChannel=await channel(other);
  let a=await open('local-a');
  const events=Array.from({length:1000},(_,index)=>({id:index===0?'old-export-犬/'+ 'x'.repeat(230):`history-${String(index).padStart(4,'0')}`,type:index%2?'meal':'pee',at:1000000+index,source:'app',note:`Fixture history ${index}`}));
  await a.storage.appendEvents(events);assert.equal((await a.sync.status(a.name)).pending,0);
@@ -69,6 +91,9 @@ try{
  const cloudPet=(await remote.api.account()).pets[0].id;const firstId=cloudRecordId('event',cloudPet,events[0].id);
  assert.equal((await history(firstId)).length,1,'Lost committed push retries must not duplicate history.');
  assert.equal((await remote.api.account()).pets[0].eventCount,1000);
+ await until(()=>primaryChannel.messages.some(message=>message.cursor>0),'Committed HTTP changes must reach the actual socket.');
+ assert.equal(primaryChannel.invalid,false);assert.equal(otherChannel.invalid,false);assert.ok(otherChannel.messages.every(message=>message.cursor===0),'A second owner must never receive the primary cursor.');
+ console.log(`PASS ${mode}:authenticated WebSocket carries only protocol/cursor metadata after actual commits, with independent owner isolation.`);
  console.log(`PASS ${mode}:1000 real HTTP uploads, lost enrollment/push replies and disk restart preserve exact requests/history, including encoded long IDs.`);
  let b=await open('local-b');await prepare(b,cloudPet);
  const pull=remote.api.pull;let pages=0,interrupt=true;
@@ -99,7 +124,7 @@ try{
  assert.equal((await b.storage.loadEvents()).length,1001);assert.equal(new Set((await b.storage.loadEvents()).map(event=>event.id)).size,1001);
  assert.equal((await remote.api.account()).pets[0].eventCount,1001,'Reconnecting detached history must not duplicate the old cloud copy.');
  console.log(`PASS ${mode}:detachment, free offline logging and confirmed reassociation preserve1000 prior records without duplicating them.`);
- const other=await fixture(),before=remote.calls;sessionId=other.id;assert.equal((await run(a)).problem,'account-mismatch');assert.equal(remote.calls,before);sessionId=primary.id;
+ const before=remote.calls;sessionId=other.id;assert.equal((await run(a)).problem,'account-mismatch');assert.equal(remote.calls,before);sessionId=primary.id;
  sql(`UPDATE cloud_accounts SET trial_started_at=0,trial_ends_at=1 WHERE account_id='${primary.id}';`);
  await a.storage.appendEvents([{id:'expired-offline-event',type:'poop',at:2000000,source:'app'}]);
  assert.equal((await run(a)).state,'expired');assert.equal((await a.storage.loadEvents()).length,1002);assert.ok((await a.sync.status(a.name)).pending>0);
@@ -110,7 +135,14 @@ try{
 }finally{
  for(const client of clients)await client.close();
  let cleaned=true;
- for(const owner of owners){try{const result=await response(owner,'/api/account',{method:'DELETE',body:{confirm:true}});if(result.status!==200){cleaned=false;console.error('Fixture cleanup requires attention:',result.status);}}catch{cleaned=false;console.error('Fixture cleanup request failed.');}}
+ for(const owner of owners){try{const result=await response(owner,'/api/account',{method:'DELETE',body:{confirm:true}});if(result.status!==200){cleaned=false;console.error('Fixture cleanup requires attention:',result.status);}else for(const observed of channels.filter(item=>item.owner===owner))await until(()=>observed.closed,'Account retirement must close the actual socket.');}catch{cleaned=false;console.error('Fixture cleanup or channel retirement failed.');}}
+ for(const observed of channels)observed.socket.close();
+ if(cleaned&&channels.length)console.log(`PASS ${mode}:normal account retirement closes both authenticated change channels.`);
  writeFileSync(join(directory,'fixture.sql'),'-- private fixture SQL removed\n',{mode:0o600});
- if(cleaned&&success)rmSync(directory,{recursive:true,force:true});else console.error('Synthetic SQLite recovery state retained at',directory);
+ if(cleaned&&success)rmSync(directory,{recursive:true,force:true});else {
+  // Retain identifiers for administrative recovery, never session tokens/cookies.
+  writeFileSync(join(directory,'fixture-metadata.json'),JSON.stringify({base,owners:owners.map(owner=>owner.id)}),{mode:0o600});
+  console.error('Synthetic SQLite recovery state retained at',directory);
+ }
+ if(!cleaned)process.exitCode=1;
 }
