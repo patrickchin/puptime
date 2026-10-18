@@ -130,3 +130,35 @@ test('persistent external write locks stop after bounded retries without losing 
   assert.equal((await repository.loadEvents()).length, 2);
   assert.equal((await database.read((sql) => sql.getFirstAsync<{ count: number }>('SELECT COUNT(*) AS count FROM events')))!.count, 2);
 });
+
+test('routine field edits preserve independently committed fields and newly added routines',async t=>{
+ const {repository}=await setup(t);
+ const original={id:'routine',type:'meal' as const,minutes:600,reminder:false,toleranceMinutes:15};
+ const remote={...original,reminder:true,toleranceMinutes:30};
+ const added={id:'other-device',type:'walk' as const,minutes:700};
+ await repository.saveSchedule([original]);await repository.saveSchedule([remote,added]);
+ assert.equal(typeof repository.saveScheduleEntry,'function');
+ assert.deepEqual(await repository.saveScheduleEntry({...original,minutes:615},original),[{...remote,minutes:615},added]);
+});
+
+test('saving a deleted routine rejects without resurrection, preserving other current routines',async t=>{
+ const {repository}=await setup(t);
+ const original={id:'removed',type:'meal' as const,minutes:600};
+ const other={id:'kept',type:'walk' as const,minutes:700};
+ await repository.saveSchedule([original,other]);await repository.saveSchedule([other]);
+ assert.equal(typeof repository.saveScheduleEntry,'function');
+ await assert.rejects(repository.saveScheduleEntry({...original,minutes:615},original),/removed|deleted/i);
+ assert.deepEqual(await repository.loadSchedule(),[other]);
+});
+
+test('routine edits validate and roll back atomically while deletion touches only the selected identity',async t=>{
+ const {repository,database}=await setup(t);
+ const first={id:'first',type:'meal' as const,minutes:600},other={id:'other',type:'walk' as const,minutes:700};
+ await repository.saveSchedule([first,other]);
+ assert.equal(typeof repository.saveScheduleEntry,'function');assert.equal(typeof repository.removeScheduleEntry,'function');
+ await assert.rejects(repository.saveScheduleEntry({...first,minutes:1440},first));
+ await database.write(sql=>sql.execAsync("CREATE TRIGGER fail_routine_patch BEFORE UPDATE ON routines BEGIN SELECT RAISE(ABORT,'synthetic write failure'); END;"));
+ await assert.rejects(repository.saveScheduleEntry({...first,minutes:615},first),/write failure/);
+ assert.deepEqual(await repository.loadSchedule(),[first,other]);
+ assert.deepEqual(await repository.removeScheduleEntry('first'),[other]);
+});

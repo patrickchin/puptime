@@ -18,6 +18,8 @@ export const updateEventTime = async (id: string, at: number) => (await storage(
 export const updateEvent = async (id: string, changes: PuppyEventChanges) => (await storage()).updateEvent(id, changes);
 export const loadSchedule = async () => (await storage()).loadSchedule();
 export const saveSchedule = async (schedule: ScheduleEntry[]) => (await storage()).saveSchedule(schedule);
+export const saveScheduleEntry = async (entry:ScheduleEntry,original?:ScheduleEntry) => (await storage()).saveScheduleEntry(entry,original);
+export const removeScheduleEntry = async (id:string) => (await storage()).removeScheduleEntry(id);
 export const loadThemePreference = async () => (await storage()).loadThemePreference();
 export const saveThemePreference = async (value: ThemePreference) => (await storage()).saveThemePreference(value);
 export const loadLanguagePreference = async () => (await storage()).loadLanguagePreference();

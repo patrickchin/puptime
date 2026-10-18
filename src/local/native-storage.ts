@@ -62,6 +62,7 @@ export function createNativeStorage(database: LocalDatabase, petId: string, onCh
     loadEvents: repository.loadEvents, appendEvents: repository.appendEvents, importEvents: repository.importEvents,
     removeEvent: repository.removeEvent, updateEvent: repository.updateEvent, updateEventTime: repository.updateEventTime,
     loadSchedule: repository.loadSchedule, saveSchedule: repository.saveSchedule,
+    saveScheduleEntry:repository.saveScheduleEntry,removeScheduleEntry:repository.removeScheduleEntry,
     loadPuppyName:()=>database.read(async sql=>{const pet=await sql.getFirstAsync<{name:string}>('SELECT name FROM puppies WHERE id=?',petId);if (!pet) throw new Error('The local puppy could not be found.');return pet.name;}),
     savePuppyName:(name:string)=>settingsWrite(async sql=>{const value=recordDataSchema('puppy').parse({name});if (!('name' in value)) throw new Error('Invalid puppy name.');await sql.runAsync('UPDATE puppies SET name=? WHERE id=?',value.name,petId);}),
     async shouldShowOnboarding() {

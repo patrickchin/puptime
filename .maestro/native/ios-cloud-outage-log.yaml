@@ -3,6 +3,11 @@ name: iOS logs locally while the cloud service is unavailable
 ---
 - launchApp:
     stopApp: false
+- scrollUntilVisible:
+    element:
+      id: account.back
+    direction: UP
+    visibilityPercentage: 100
 - tapOn:
     id: account.back
 - tapOn:

@@ -7,8 +7,11 @@ import {existsSync,mkdtempSync,readFileSync,readdirSync,rmSync,writeFileSync} fr
 import {homedir} from 'node:os';
 import {basename,join,resolve} from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
+import {createLocalDatabase} from '../src/local/database.ts';
+import {sqliteTestConnection} from '../src/local/sqlite-test-adapter.ts';
+import {createLocalRuntime} from '../src/local/runtime-factory.ts';
 const [phase,udid]=process.argv.slice(2),app='com.patrickchin.puptime';
-assert.ok(['request','verify','auth-faults','rate-limited','enable','resume','outage','preview','combine','signout','access-recovery'].includes(phase),'Use request, verify, auth-faults, rate-limited, enable, resume, outage, preview, combine, signout or access-recovery.');
+assert.ok(['request','verify','auth-faults','rate-limited','enable','resume','outage','preview','combine','signout','access-recovery','auto-expiry','enrollment-race'].includes(phase),'Use a supported native cloud qualification phase.');
 const state=JSON.parse(readFileSync('/tmp/puptime-native-cloud-state.json','utf8'));
 assert.ok(basename(state.directory).startsWith('puptime-native-cloud-'));assert.equal(state.url,'http://127.0.0.1:8793');
 const simctl=(...args)=>execFileSync('xcrun',['simctl',...args],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
@@ -134,6 +137,49 @@ try{
   }finally{native.close();}
   context.expectedCount=context.expectedAfterCombine;writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});
   console.log('PASS confirmed existing-cloud association preserves old remote edits and the new local log.');
+ }else if(phase==='auto-expiry'){
+  assert.match(context.userId,/^[A-Za-z0-9_-]+$/);flow('ios-cloud-account-ready.yaml');
+  const native=new DatabaseSync(join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite/puptime-v2.db'),{readOnly:true});
+  const trial=database.prepare('SELECT trial_started_at,trial_ends_at FROM cloud_accounts WHERE account_id=?').get(context.userId);
+  context.expectedCount=native.prepare('SELECT count(*) n FROM events').get().n+1;
+  try{
+    mutateAuthFixture(`UPDATE cloud_accounts SET trial_started_at=0,trial_ends_at=1 WHERE account_id='${context.userId}';`);
+    flow('ios-cloud-outage-log.yaml');flow('ios-cloud-expired-status.yaml');
+    assert.equal(native.prepare('SELECT count(*) n FROM events').get().n,context.expectedCount);
+    assert.ok(native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n>0);
+  }finally{native.close();mutateAuthFixture(`UPDATE cloud_accounts SET trial_started_at=${trial.trial_started_at},trial_ends_at=${trial.trial_ends_at} WHERE account_id='${context.userId}';`);}
+  flow('ios-cloud-access-restored.yaml');writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});
+  console.log('PASS installed iOS discovers expiry from its automatic local-edit sync, shows the paused entitlement and recovers its retained work.');
+ }else if(phase==='enrollment-race'){
+  assert.match(context.userId,/^[A-Za-z0-9_-]+$/);
+  // Crash/restart fixture: production engine saves the original explicit intent
+  // before a second real HTTP device wins enrollment. Native SDK credentials
+  // remain owned by SecureStore; no session is injected into the installed app.
+  simctl('terminate',udid,app);
+  const nativePath=join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite/puptime-v2.db');
+  const local=await createLocalDatabase(sqliteTestConnection(nativePath));
+  try{
+    const pet=await local.read(sql=>sql.getFirstAsync("SELECT value FROM metadata WHERE key='active_pet_id'"));
+    const runtime=await createLocalRuntime(local,pet.value);assert.equal((await runtime.sync.status(pet.value)).state,'local');
+    const cookie=await fixtureCookie();
+    const account=await (await fetch(state.url+'/api/account',{headers:{cookie,origin:state.url}})).json();
+    if(!account.cloud.canSync)await post('/api/cloud/trial',{},cookie);
+    await runtime.sync.prepareAssociation({accountId:context.userId,localPetId:pet.value,deviceId:runtime.deviceId,enrollment:{operationId:crypto.randomUUID(),deviceId:runtime.deviceId,localPetId:pet.value,name:'My puppy'}});
+    if(!account.pets.length)await post('/api/cloud/enroll',{operationId:crypto.randomUUID(),deviceId:'native-race-other-device',localPetId:'native-race-cloud-pet',name:'Other device puppy'},cookie);
+    else assert.equal(account.pets[0].id,'native-race-cloud-pet','Only this synthetic interrupted race may resume.');
+  }finally{await local.close();}
+  flow('ios-cloud-enrollment-rejected.yaml');
+  const native=new DatabaseSync(nativePath,{readOnly:true});
+  try{
+    assert.equal(native.prepare('SELECT count(*) n FROM local_sync_owner').get().n,0);
+    assert.equal(native.prepare('SELECT count(*) n FROM events').get().n,1);
+    assert.equal(native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n,0);
+    context.expectedCount=2;flow('ios-cloud-outage-log.yaml');flow('ios-cloud-existing-combine.yaml');
+    assert.equal(native.prepare('SELECT count(*) n FROM events').get().n,2);
+    assert.equal(native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n,0);
+  }finally{native.close();}
+  writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});
+  console.log('PASS installed iOS recovers a real enrollment409 after restart, retains free logging and requires same-puppy confirmation before combining.');
  }else if(phase==='access-recovery'){
   assert.match(context.userId,/^[A-Za-z0-9_-]+$/);
   // Restore only this synthetic entitlement after an interrupted qualifier.

@@ -1,0 +1,13 @@
+appId: com.patrickchin.puptime
+name: iOS automatic sync discovery explains expired access
+---
+- extendedWaitUntil:
+    visible:
+      id: account.status
+      text: Cloud sync paused
+    timeout: 30000
+- assertVisible: Your local logs and cloud copy are kept while sync is paused.
+- assertVisible:
+    id: account.lastSynced
+- assertNotVisible:
+    id: account.enable

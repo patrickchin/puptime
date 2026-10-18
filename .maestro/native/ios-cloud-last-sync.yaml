@@ -1,0 +1,13 @@
+appId: com.patrickchin.puptime
+name: iOS acknowledged synchronization shows its last success time
+---
+- launchApp
+- runFlow: ../helpers/open-account.yaml
+- extendedWaitUntil:
+    visible:
+      id: account.status
+      text: Up to date
+    timeout: 30000
+- assertVisible:
+    id: account.lastSynced
+    text: Last synced .+

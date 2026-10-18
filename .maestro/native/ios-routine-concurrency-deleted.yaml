@@ -1,0 +1,34 @@
+appId: com.patrickchin.puptime
+name: iOS removed routine retains its rejected editor draft
+---
+- pressKey: Home
+- launchApp:
+    stopApp: false
+- assertVisible:
+    id: schedule.editor
+- scrollUntilVisible:
+    element:
+      id: schedule.editor.save
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn:
+    id: schedule.editor.save
+- extendedWaitUntil:
+    visible: Routine was removed
+    timeout: 10000
+- assertVisible: Your draft is still open, but this routine can’t be updated.
+- takeScreenshot: routine-removed-draft
+- tapOn: OK
+- assertVisible:
+    id: schedule.editor
+- scrollUntilVisible:
+    element:
+      id: schedule.editor.close
+    direction: UP
+    visibilityPercentage: 100
+- tapOn:
+    id: schedule.editor.close
+- assertNotVisible:
+    id: schedule.editor
+- assertNotVisible:
+    id: schedule.entry.walk

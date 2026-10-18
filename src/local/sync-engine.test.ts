@@ -461,3 +461,29 @@ test('imported historical labels synchronize creation and later deletion without
  await cycle(sync,owner,server);assert.equal(server.record(activityId).deleted,true);assert.equal((await storage.loadEvents())[0].customLabel,'Training');
  assert.deepEqual(await storage.loadCustomActivities(),[]);assert.equal((await sync.status('local-pet')).pending,0);
 });
+
+test('confirmed enrollment rejection releases only its exact untouched preparation and retains local history',async t=>{
+ const {sync,storage}=await setup(t);await storage.appendEvents([event]);const owner=await sync.prepareAssociation(input);
+ assert.equal(typeof sync.cancelEnrollment,'function');
+ await assert.rejects(sync.cancelEnrollment({...owner,accountId:'account-1',operationId:'wrong'}));
+ await sync.cancelEnrollment({...owner,accountId:'account-1',operationId:enrollment.operationId});
+ assert.equal((await sync.status('local-pet')).state,'local');assert.deepEqual(await storage.loadEvents(),[event]);
+ assert.equal(await sync.enrollmentState(),null);
+});
+
+test('enrollment cancellation cannot discard a baseline that already began or another active puppy queue',async t=>{
+ const {sync,storage,database}=await setup(t);const owner=await activate(sync);await storage.appendEvents([event]);
+ const before=await sync.nextBatch(owner);
+ await database.write(sql=>sql.runAsync('INSERT INTO puppies(id,name) VALUES (?,?)','pet-2','Second'));
+ const next={...enrollment,operationId:'second-enroll',localPetId:'pet-2'};
+ await sync.prepareAssociation({...input,localPetId:'pet-2',enrollment:next});
+ assert.equal(typeof sync.cancelEnrollment,'function');
+ await sync.cancelEnrollment({...owner,operationId:next.operationId});
+ assert.equal((await sync.status('local-pet')).state,'active');assert.deepEqual(await sync.nextBatch(owner),before);
+ assert.equal((await sync.status('pet-2')).state,'local');
+ await sync.prepareAssociation({...input,localPetId:'pet-2',enrollment:next});
+ await sync.stageBaseline({...owner,page:{changes:[],cursor:0,hasMore:false}});
+ await assert.rejects(sync.cancelEnrollment({...owner,operationId:next.operationId}),/baseline/i);
+ assert.ok(await sync.enrollmentState());
+ assert.deepEqual(await database.read(async sql=>(await sql.getAllAsync<{mutation_json:string}>('SELECT mutation_json FROM local_sync_outbox ORDER BY sequence')).map(row=>JSON.parse(row.mutation_json))),before);
+});

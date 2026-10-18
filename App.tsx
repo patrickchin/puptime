@@ -75,6 +75,8 @@ import {
   loadWidgetActions,
   removeEvent,
   saveSchedule,
+  saveScheduleEntry,
+  removeScheduleEntry,
   saveCustomActivity,
   saveLanguagePreference,
   saveNotificationPreferences,
@@ -406,8 +408,7 @@ export default function App() {
     void persistUndo().catch(showSaveError);
   };
 
-  const changeSchedule = async (nextSchedule: ScheduleEntry[]) => {
-    await saveSchedule(nextSchedule);
+  const applySavedSchedule = async (nextSchedule: ScheduleEntry[]) => {
     setSchedule(nextSchedule);
     try {
       const synced = await syncScheduleReminders(
@@ -422,6 +423,9 @@ export default function App() {
       Alert.alert(translate(language, 'app.routineSaved'), translate(language, 'app.reminderError'));
     }
   };
+  const changeSchedule = async (nextSchedule:ScheduleEntry[]) => {await saveSchedule(nextSchedule);await applySavedSchedule(await loadSchedule());};
+  const changeScheduleEntry = async (entry:ScheduleEntry,original?:ScheduleEntry) => applySavedSchedule(await saveScheduleEntry(entry,original));
+  const deleteScheduleEntry = async (id:string) => applySavedSchedule(await removeScheduleEntry(id));
 
   const chooseTheme = (preference: ThemePreference) => {
     saveThemePreference(preference)
@@ -551,6 +555,8 @@ export default function App() {
           schedule={schedule}
           customActivities={customActivities}
           onChange={changeSchedule}
+          onSaveEntry={changeScheduleEntry}
+          onRemoveEntry={deleteScheduleEntry}
           onRequestReminderPermission={requestNotifications}
           theme={theme}
         />

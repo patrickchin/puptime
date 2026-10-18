@@ -47,17 +47,25 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
   function runOnce() {
     if (!eligible()) return;if(running){rerun=true;return;}
     const controller=new AbortController();aborter=controller;rerun=false;emit({running:true});
-    let nextDelay:number|null=null;
+    let nextDelay:number|null=null,confirmEnrollment=false;
     running=(async()=>{
       try {
         const result=await runner.run(controller.signal);
         if(controller.signal.aborted||disposed)return;
         await localState();
+        confirmEnrollment=result.problem==='confirmation-required';
         emit({run:result,problem:result.problem,...(result.state==='synced'?{lastSyncedAt:Date.now()}:{}),...(result.state==='auth-required'?{account:null}:{})});
         if(['auth-required','expired','error'].includes(result.state))suspended=true;
         nextDelay=result.retryAfterMs;
       }catch{if(!controller.signal.aborted&&!disposed)fail('local-storage');}
-      finally{running=null;aborter=null;emit({running:false});if(!controller.signal.aborted&&(nextDelay!==null||rerun))kick(nextDelay??0);}
+      finally{
+        running=null;aborter=null;emit({running:false});
+        if(!controller.signal.aborted&&confirmEnrollment&&!disposed){
+          // Refresh outside the runner promise: account-change handling may
+          // await transport shutdown and must never await its own promise.
+          void refresh().then(()=>{if(!disposed&&snapshot.sync?.state==='local'&&snapshot.account?.pets.length)emit({problem:'confirmation-required'});});
+        }else if(!controller.signal.aborted&&(nextDelay!==null||rerun))kick(nextDelay??0);
+      }
     })();
   }
   async function pauseTransport() {suspended=true;rerun=false;cancelTimer();aborter?.abort();if(running)await running;}

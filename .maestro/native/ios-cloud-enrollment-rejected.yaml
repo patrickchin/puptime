@@ -1,0 +1,29 @@
+appId: com.patrickchin.puptime
+name: iOS rejected enrollment returns to current puppy confirmation
+---
+- launchApp
+- runFlow: ../helpers/open-account.yaml
+- extendedWaitUntil:
+    visible:
+      id: account.local.count
+      text: 1 activity log
+    timeout: 30000
+- assertVisible:
+    id: account.local.count
+    text: 1 activity log
+- scrollUntilVisible:
+    element:
+      id: account.samePuppy
+    direction: DOWN
+    visibilityPercentage: 100
+- assertVisible:
+    id: account.samePuppy
+    checked: false
+- scrollUntilVisible:
+    element:
+      id: account.enable
+    direction: DOWN
+    visibilityPercentage: 100
+- assertVisible:
+    id: account.enable
+    enabled: false

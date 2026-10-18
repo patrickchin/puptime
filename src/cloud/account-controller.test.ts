@@ -112,3 +112,35 @@ test('cold-start service failure still permits confirmed local sign-out of a sav
  assert.equal(await controller.signOut({confirmPending:true}),'ok');assert.equal(state.credentials,false);assert.equal(controller.read().sync!.accountId,null);
  assert.deepEqual(await runtime.storage.loadEvents(),[event]);assert.equal(controller.read().problem,'remote-sign-out-unconfirmed');
 });
+
+test('automatic runner expiry exposes a paused entitlement without another manual account refresh',async t=>{
+ const {controller,runtime,state,timers}=await fixture(t);
+ state.credentials=true;state.summary.cloud={canSync:true,canExport:true,source:'trial',expiresAt:8640000000000000};await enrollLocal(runtime);
+ controller.setActive(true);await controller.refresh();
+ state.summary.cloud={canSync:false,canExport:true,source:'none',expiresAt:null};
+ await runtime.storage.appendEvents([event]);await tick();
+ const pending=timers.find(timer=>!timer.cancelled)!;pending.cancelled=true;pending.fn();
+ for(let i=0;i<50&&controller.read().running;i++)await tick();
+ assert.equal(controller.read().run!.state,'expired');
+ assert.equal(controller.read().problem,'expired');
+ assert.ok(controller.read().sync!.pending>0);assert.deepEqual(await runtime.storage.loadEvents(),[event]);
+ const {accountStatus}=await import('./account-status.ts');assert.equal(accountStatus(controller.read()),'expired');
+ assert.equal(timers.filter(timer=>!timer.cancelled).length,0);
+});
+
+test('another device winning first enrollment returns to explicit puppy confirmation without logout or losing local work',async t=>{
+ const {controller,runtime,state,api,timers}=await fixture(t);state.credentials=true;await runtime.storage.appendEvents([event]);
+ const requests:Parameters<CloudApi['enroll']>[0][]=[];
+ api.enroll=async request=>{requests.push(request);state.summary.pets=[{id:'other-device-pet',name:'Cloud puppy',eventCount:3}];throw new CloudApiError('conflict',409);};
+ controller.setActive(true);await controller.refresh();assert.equal(await controller.enableCloud({}),'ok');
+ const pending=timers.find(timer=>!timer.cancelled)!;pending.cancelled=true;pending.fn();
+ for(let i=0;i<50&&controller.read().running;i++)await tick();
+ assert.equal((await runtime.sync.status(runtime.petId)).state,'local');
+ assert.equal(controller.read().problem,'confirmation-required');assert.equal(controller.read().account!.pets[0].id,'other-device-pet');
+ assert.deepEqual(await runtime.storage.loadEvents(),[event]);assert.equal(state.trialCalls,1);
+ await controller.retry();assert.equal(requests.length,1);
+ assert.equal(await controller.enableCloud({}),'confirmation-required');assert.equal((await runtime.sync.status(runtime.petId)).state,'local');
+ assert.equal(await controller.enableCloud({confirmedPetId:'other-device-pet'}),'ok');
+ const saved=await runtime.sync.enrollmentState();assert.equal(saved!.request.confirmedPetId,'other-device-pet');
+ assert.notEqual(saved!.request.operationId,requests[0].operationId);assert.equal(state.trialCalls,1);
+});

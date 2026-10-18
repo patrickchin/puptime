@@ -5,9 +5,10 @@ import type { z } from 'zod';
 
 type Sync=ReturnType<typeof createLocalSync>;
 type PushResult=z.infer<typeof pushResponseSchema>;
-export type RunResult={state:'idle'|'synced'|'pending'|'blocked'|'auth-required'|'expired'|'retry'|'error';pending:number;blocked:number;retryAfterMs:number|null;problem:CloudErrorCategory|'local-storage'|'account-mismatch'|null};
+export type RunResult={state:'idle'|'synced'|'pending'|'blocked'|'auth-required'|'expired'|'retry'|'error';pending:number;blocked:number;retryAfterMs:number|null;problem:CloudErrorCategory|'local-storage'|'account-mismatch'|'confirmation-required'|null};
 class BudgetReached extends Error {}
 class OwnerChanged extends Error {}
+class EnrollmentRejected extends Error {}
 export function createSyncRunner({sync,api,petId,deviceId,sessionAccountId,changed,random=Math.random}:{sync:Sync;api:Pick<CloudApi,'account'|'enroll'|'push'|'pull'>;petId:string;deviceId:string;sessionAccountId:()=>string|null;changed:()=>void;random?:()=>number}) {
   let failures=0;
   return {
@@ -40,7 +41,14 @@ export function createSyncRunner({sync,api,petId,deviceId,sessionAccountId,chang
       async function resumeEnrollment() {
         let state=await sync.enrollmentState();if (!state) return;
         if (state.request.localPetId!==petId||state.request.deviceId!==deviceId) throw new CloudApiError('invalid-request');
-        const enrolled=await invoke(()=>api.enroll(state!.request,signal));
+        let enrolled:{petId:string};
+        try{enrolled=await invoke(()=>api.enroll(state!.request,signal));}
+        catch(error){
+          if(error instanceof CloudApiError&&error.category==='conflict'){
+            await guard();await sync.cancelEnrollment({...fence,operationId:state.request.operationId});throw new EnrollmentRejected();
+          }
+          throw error;
+        }
         while (!state.baselineComplete) {
           const page=await invoke(()=>api.pull(state!.stagingCursor,signal));
           if (page.resyncRequired) throw new CloudApiError('invalid-response');
@@ -66,7 +74,7 @@ export function createSyncRunner({sync,api,petId,deviceId,sessionAccountId,chang
       try {
         const account=await invoke(()=>api.account(signal));
         if (account.user.id!==accountId) throw new OwnerChanged();
-        if (!account.cloud.canSync) return result('expired');
+        if (!account.cloud.canSync) return result('expired',null,'expired');
         await resumeEnrollment();if (await sync.resyncState()) await resumeBaseline();
         await pull();
         for (;;) {
@@ -83,6 +91,7 @@ export function createSyncRunner({sync,api,petId,deviceId,sessionAccountId,chang
       } catch(error) {
         throwIfAborted(signal);
         if (error instanceof OwnerChanged) return result('auth-required',null,'account-mismatch');
+        if (error instanceof EnrollmentRejected) return result('idle',null,'confirmation-required');
         if (error instanceof BudgetReached) return result('pending',0);
         if (!(error instanceof CloudApiError)) return result('error',null,'local-storage');
         if (error.category==='auth-required') return result('auth-required',null,error.category);

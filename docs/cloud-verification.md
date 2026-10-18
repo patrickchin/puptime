@@ -107,3 +107,30 @@ Qualification scripts/flows: `scripts/verify-ios-cloud.mjs`, `scripts/verify-ios
 - Native email challenge cancellation and expired/consumed-code rejection pass against the real local identity service. The combined fault sequence reached the installed OTP plugin's real three-attempt/minute limit; the actual native wait message was verified, followed by a fresh-code successful SDK sign-in after the window elapsed. Sign-in still retains one local event with no trial/outbox. The harness keeps the rate limiter enabled and waits its real window between clustered scenarios. Evidence: `/tmp/puptime-ios-cloud-auth-faults.log` (first recovery attempt rate-limited), `/tmp/puptime-ios-cloud-rate-limited.log`, `/tmp/puptime-ios-cloud-auth-recovered.log` (successful recovery).
 - Native entitlement/session recovery passes against actual local service state: expiry retains new local logs and pending mutations while authenticated cloud export remains available; restoring access drains them. Revoking the real sessions produces the sign-in-required state, retains further local edits and the exact owner/generation, and actual SDK reauthentication drains the backlog without another trial or association. Final run retains six native logs with an empty outbox. The harness restores only its captured synthetic entitlement after an interrupted run; its previous SQLite row-prototype assertion error was fixed by comparing the actual column values. Evidence: `/tmp/puptime-ios-cloud-access-recovery-3.log` (exit0), screenshot `build/verification/ios-cloud-client/account-access-recovered.png`.
 - Updated staging service checks pass public health, anonymous isolation, unconfigured email failing closed, ownership, trusted-origin rejection, explicit trial/enrollment, idempotent replies, partial batches, automatic merge, expiry/export, deletion confirmation/recent authentication and revoked old-device rejection. Evidence: `/tmp/puptime-client-live-staging-service.log` (exit0). These remain synthetic service checks, not inbox/social-provider delivery.
+
+### Final client review fixes and review recordings
+
+One fresh whole-branch review found three material recovery/editor defects and
+an omitted last-success label. The single fix pass now preserves independent
+routine fields, rejects saving a remotely deleted routine while retaining its
+draft, exposes runner-discovered entitlement expiry, and cancels only a
+confirmed rejected enrollment intent so the app can request same-puppy
+confirmation. Ambiguous network failures retain their original retry identity.
+The account screen displays the acknowledged last successful sync time.
+
+Current checks pass **241 Node tests, 49 Workers tests and both typechecks**.
+Actual installed iOS Debug journeys pass automatic expiry/recovery, an HTTP409
+enrollment race with restart and explicit confirmation, and the last-success
+display. The routine native test passes independent time/reminder changes plus
+deletion/draft retention. Its second writer uses production SQLite APIs to
+represent a committed remote projection; it does not claim HTTP delivery. When
+OS notification permission is off, the flow checks and dismisses the actual
+saved-but-not-scheduled alert before inspecting the saved routine. Android
+verification remains explicitly deferred by the user.
+
+The user's review-video requirement now accompanies new feature acceptance.
+See `docs/review-videos.md` for the recording commands and evidence boundaries.
+Retain MP4s, result/chapters JSON and logs outside the worktree; label reruns,
+local/staging, Debug/Release and synthetic fixtures accurately. Authentication
+code entry is omitted from recordings. Full Release/CI acceptance of the final
+restacked branch and PR integration remain pending.

@@ -1,0 +1,32 @@
+appId: com.patrickchin.puptime
+name: iOS routine saves only the changed activity after current data refreshes
+---
+- pressKey: Home
+- launchApp:
+    stopApp: false
+- assertVisible:
+    id: schedule.editor
+- scrollUntilVisible:
+    element:
+      id: schedule.editor.save
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn:
+    id: schedule.editor.save
+- extendedWaitUntil:
+    notVisible:
+      id: schedule.editor
+    timeout: 10000
+- runFlow:
+    when:
+      visible: Routine saved
+    commands:
+      - assertVisible: Notifications are off, so reminders could not be scheduled.
+      - tapOn: OK
+- tapOn:
+    id: schedule.entry.poop
+- assertVisible:
+    id: schedule.editor.reminder
+    checked: true
+- tapOn:
+    id: schedule.editor.type.walk

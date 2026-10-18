@@ -2,6 +2,7 @@ import { isOpenNap, type PuppyEvent, type PuppyEventChanges, type ScheduleEntry 
 import { assertValidEvents, EventDeletedError, EventsImportError, EventsStorageError } from '../storage-validation.ts';
 import { assertValidSchedule } from './legacy.ts';
 import type { LocalDatabase, SqlExecutor } from './database.ts';
+import { applyScheduleEntryEdit } from '../schedule-editor.ts';
 import { localChanges, notifyLocalCommit, readLocalSettingsRecords, type LocalChangeSink } from './sync-projection.ts';
 
 type EventRow = { id: string; at: number; body: string; event: PuppyEvent };
@@ -69,6 +70,26 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
     if (!events.some(event => event.id === id)) throw new EventDeletedError();
     return { events: events.map((event) => event.id === id ? { ...event, ...changes, ...(event.estimated ? { estimated: true } : {}) } : event), value: undefined };
   })).events;
+  async function mutateSchedule(action:(current:ScheduleEntry[])=>ScheduleEntry[]):Promise<ScheduleEntry[]> {
+    let changed=false;
+    const saved=await database.write(async sql=>{
+      const before=await readSchedule(sql),entries=action(before);assertValidSchedule(entries);
+      const previous=new Map(before.map(entry=>[entry.id,JSON.stringify(entry)]));
+      const ids=new Set(entries.map(entry=>entry.id));
+      for(const id of previous.keys())if(!ids.has(id))await sql.runAsync('DELETE FROM routines WHERE pet_id=? AND id=?',petId,id);
+      for(const entry of entries){
+        const body=JSON.stringify(entry);
+        if(previous.get(entry.id)!==body)await sql.runAsync('INSERT INTO routines(pet_id,id,minutes,body) VALUES (?,?,?,?) ON CONFLICT(pet_id,id) DO UPDATE SET minutes=excluded.minutes,body=excluded.body',petId,entry.id,entry.minutes,body);
+      }
+      if(onChange||afterCommit){
+        const records=(values:ScheduleEntry[])=>values.map(({id,...data})=>({kind:'routine' as const,localId:id,data}));
+        const changes=localChanges(records(before),records(entries));
+        if(changes.length){await onChange?.(sql,changes);changed=true;}
+      }
+      return entries;
+    });
+    if(changed)notifyLocalCommit(afterCommit);return saved;
+  }
   return {
     async readEventsInTransaction(sql: SqlExecutor) { return (await readEvents(sql)).map((row) => row.event); },
     async loadEvents() { return materialize(await database.read(readEvents)); },
@@ -96,24 +117,9 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
     async removeEvent(id: string) { return (await mutateEvents((events) => ({ events: events.filter((event) => event.id !== id), value: undefined }))).events; },
     loadSchedule: () => database.read(readSchedule),
     async saveSchedule(entries: ScheduleEntry[]) {
-      assertValidSchedule(entries);
-      let changed=false;
-      await database.write(async (sql) => {
-        const before=await readSchedule(sql);
-        const previous = new Map(before.map((entry) => [entry.id, JSON.stringify(entry)]));
-        const ids = new Set(entries.map((entry) => entry.id));
-        for (const id of previous.keys()) if (!ids.has(id)) await sql.runAsync('DELETE FROM routines WHERE pet_id=? AND id=?', petId, id);
-        for (const entry of entries) {
-          const body = JSON.stringify(entry);
-          if (previous.get(entry.id) !== body) await sql.runAsync('INSERT INTO routines(pet_id,id,minutes,body) VALUES (?,?,?,?) ON CONFLICT(pet_id,id) DO UPDATE SET minutes=excluded.minutes,body=excluded.body', petId, entry.id, entry.minutes, body);
-        }
-        if (onChange||afterCommit) {
-          const records = (values: ScheduleEntry[]) => values.map(({id,...data})=>({kind:'routine' as const,localId:id,data}));
-          const changes=localChanges(records(before),records(entries));
-          if (changes.length) {await onChange?.(sql,changes);changed=true;}
-        }
-      });
-      if (changed) notifyLocalCommit(afterCommit);
+      await mutateSchedule(()=>entries);
     },
+    saveScheduleEntry:(entry:ScheduleEntry,original?:ScheduleEntry)=>mutateSchedule(current=>applyScheduleEntryEdit(current,entry,original)),
+    removeScheduleEntry:(id:string)=>mutateSchedule(current=>current.filter(entry=>entry.id!==id)),
   };
 }

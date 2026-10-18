@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { assertValidEvents, EventsImportError, EventsStorageError } from './storage-validation.ts';
 import { storageKeys } from './local/legacy.ts';
+import { applyScheduleEntryEdit } from './schedule-editor.ts';
 export { assertValidEvents, EventsImportError, EventsStorageError } from './storage-validation.ts';
 
 import { normalizeActivityCustomizations, type ActivityCustomization, type ActivityCustomizations } from './activity-customization.ts';
@@ -153,6 +154,14 @@ export async function saveSchedule(schedule: ScheduleEntry[]): Promise<void> {
     JSON.stringify([...schedule].sort((a, b) => a.minutes - b.minutes)),
   );
 }
+
+let scheduleWrites=Promise.resolve();
+function mutateSchedule(action:(current:ScheduleEntry[])=>ScheduleEntry[]):Promise<ScheduleEntry[]> {
+  const result=scheduleWrites.then(async()=>{const entries=action(await loadSchedule());await saveSchedule(entries);return entries;});
+  scheduleWrites=result.then(()=>undefined,()=>undefined);return result;
+}
+export const saveScheduleEntry=(entry:ScheduleEntry,original?:ScheduleEntry)=>mutateSchedule(current=>applyScheduleEntryEdit(current,entry,original));
+export const removeScheduleEntry=(id:string)=>mutateSchedule(current=>current.filter(entry=>entry.id!==id));
 
 export async function loadThemePreference(): Promise<ThemePreference> {
   const stored = await AsyncStorage.getItem(THEME_KEY);

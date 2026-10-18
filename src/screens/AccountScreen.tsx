@@ -18,6 +18,7 @@ function problemKey(problem:AccountProblem|null):MessageKey|null {
   if(problem==='too-many-attempts'||problem==='rate-limited')return 'account.error.attempts';
   if(problem==='network')return 'account.error.network';
   if(problem==='trial-unavailable')return 'account.error.trial';
+  if(problem==='confirmation-required')return 'account.error.enrollmentConflict';
   if(problem==='account-mismatch')return 'account.error.mismatch';
   if(problem==='sign-out-failed')return 'account.error.signOut';
   if(problem==='remote-sign-out-unconfirmed')return 'account.error.remoteSignOut';
@@ -94,6 +95,7 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
             </View>):null}
             <AccountButton theme={theme} testID="account.enable" label={existing?t('account.combine'):account.cloud.canSync?t('account.enable'):t('account.startTrial',{days})} primary disabled={busy||!state!.online||!!existing&&!samePuppy} loading={busy} onPress={()=>{void cloud.controller!.enableCloud({...(existing?{confirmedPetId:existing.id}:{})});}}/>
           </View>):(<View style={cardStyle}>
+            {state!.lastSyncedAt!==null?<Text testID="account.lastSynced" style={[styles.body,bodyStyle]}>{t('account.lastSynced',{date:new Intl.DateTimeFormat(locale,{dateStyle:'medium',timeStyle:'short'}).format(state!.lastSyncedAt)})}</Text>:null}
             {state!.sync!.pending?<Text style={[styles.body,{color:theme.text}]}>{t('account.pending',{count:state!.sync!.pending})}</Text>:null}
             {state!.sync!.blocked?<><Text style={[styles.body,bodyStyle]}>{t('account.blocked',{count:state!.sync!.blocked})}</Text><AccountButton theme={theme} testID="account.viewLogs" label={t('account.viewLogs')} onPress={onOpenActivity}/></>:null}
             {status==='expired'||status==='offline'||status==='paused'?<Text style={[styles.body,bodyStyle]}>{t('account.pausedBody')}</Text>:null}
