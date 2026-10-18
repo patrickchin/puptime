@@ -7,6 +7,8 @@ import { useLocalization } from '../localization-context';
 import { headingStyle, type Theme } from '../theme';
 import { timelineDayEvents, timelineDetailTime, timelineFormatters } from '../timeline-format';
 import { ActivityIcon } from './ActivityIcon';
+import {activityWindowBounds,useActivityWindow,type ActivityViewProps} from '../activity-view';
+import {ActivityLoadState} from './ActivityLoadState';
 
 const DayMoment = memo(function DayMoment({ event, index, last, day, now, theme }: {
   event: PuppyEvent; index: number; last: boolean; day: number; now: number; theme: Theme;
@@ -34,10 +36,13 @@ const DayMoment = memo(function DayMoment({ event, index, last, day, now, theme 
   );
 });
 
-export function DayTimeline({ events, theme }: { events: PuppyEvent[]; theme: Theme }) {
+export function DayTimeline({events:projectedEvents,activity,refreshToken,theme}:{events:PuppyEvent[];theme:Theme}&ActivityViewProps) {
   const { language, t } = useLocalization();
   const [day, setDay] = useState(() => new Date().setHours(0, 0, 0, 0));
   const [now, setNow] = useState(Date.now);
+  const bounds=activityWindowBounds(day,0);
+  const window=useActivityWindow(activity,projectedEvents,bounds.from,bounds.until,refreshToken);
+  const events=window.events;
   // Only a running nap needs a ticking duration; completed moments keep stable props.
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 60_000);
@@ -60,6 +65,7 @@ export function DayTimeline({ events, theme }: { events: PuppyEvent[]; theme: Th
       contentContainerStyle={styles.content}
       ListHeaderComponent={
         <>
+          <ActivityLoadState loading={window.loading} error={window.error} onRetry={window.retry} theme={theme}/>
           <View style={styles.dateRow}>
             <Pressable testID="timeline.day.previous" accessibilityRole="button" accessibilityLabel={t('timeline.previousDay')} onPress={() => changeDay(-1)} style={({ pressed }) => [styles.dateButton, { backgroundColor: pressed ? theme.primarySoft : theme.surfaceRaised }]}>
               <MaterialCommunityIcons name="chevron-left" size={26} color={theme.primary} />
@@ -79,7 +85,7 @@ export function DayTimeline({ events, theme }: { events: PuppyEvent[]; theme: Th
         </>
       }
       renderItem={({ item, index }) => <DayMoment event={item} index={index} last={index === moments.length - 1} day={day} now={isOpenNap(item) ? now : 0} theme={theme} />}
-      ListEmptyComponent={<Text style={[styles.empty, { color: theme.textMuted }]}>{t('timeline.dayEmpty')}</Text>}
+      ListEmptyComponent={!window.loading&&!window.error?<Text style={[styles.empty, { color: theme.textMuted }]}>{t('timeline.dayEmpty')}</Text>:null}
     />
   );
 }

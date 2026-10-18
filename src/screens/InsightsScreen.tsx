@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useMemo, useState } from 'react';
+import { useEffect,useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -22,6 +22,9 @@ import {
   type PuppyEvent,
 } from '../domain';
 import { ActivityIcon } from '../components/ActivityIcon';
+import {ActivityLoadState} from '../components/ActivityLoadState';
+import {activityWindowBounds,useActivityWindow,type ActivityViewProps} from '../activity-view';
+import {loadEvents} from '../storage';
 import { useLocalization } from '../localization-context';
 import { shareEventsCsv } from '../share-export';
 import { spacing, type Theme } from '../theme';
@@ -153,7 +156,9 @@ function MonthlyRow({
 }
 
 export function InsightsScreen({
-  events,
+  events:projectedEvents,
+  activity,
+  refreshToken,
   customActivities,
   onImport,
   theme,
@@ -162,18 +167,29 @@ export function InsightsScreen({
   customActivities: string[];
   onImport: () => Promise<void>;
   theme: Theme;
-}) {
+}&ActivityViewProps) {
   const { activityColors, activityLabel, language, t } = useLocalization();
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [showAllMonths, setShowAllMonths] = useState(false);
   const now = new Date();
+  const bounds=activityWindowBounds(now.getTime(),FREQUENCY_DAYS-1);
+  const window=useActivityWindow(activity,projectedEvents,bounds.from,bounds.until,refreshToken);
+  const events=window.events;
+  const [savedMonths,setSavedMonths]=useState<MonthlyActivityStat[]>([]);
+  const [monthError,setMonthError]=useState(false),[monthLoading,setMonthLoading]=useState(!!activity),[monthAttempt,setMonthAttempt]=useState(0);
+  useEffect(()=>{
+    if(!activity)return;let current=true;setMonthError(false);setMonthLoading(true);
+    void activity.monthlyStats().then(value=>{if(current){setSavedMonths(value);setMonthLoading(false);}}).catch(()=>{if(current){setMonthError(true);setMonthLoading(false);}});
+    return()=>{current=false;};
+  },[activity,refreshToken,monthAttempt]);
   const frequency = activityFrequencyStats(events, ['pee', 'poop', ...customActivities.map((customLabel) => ({ type: 'custom' as const, customLabel }))], FREQUENCY_DAYS, now);
-  const monthly = useMemo(() => monthlyActivityStats(events), [events]);
+  const monthly = useMemo(() => activity?savedMonths:monthlyActivityStats(events), [activity,savedMonths,events]);
   const visibleMonths = showAllMonths ? monthly : monthly.slice(0, MONTH_PREVIEW_COUNT);
   const maxMonthlyAverage = Math.max(1, ...monthly.map((stat) => stat.averagePerRecordedDay));
   const currentMonthKey = dateKey(now).slice(0, 7);
-  const exportDisabled = exporting || importing || events.length === 0;
+  const hasRecords=activity?monthly.some(month=>month.total+month.estimatedTotal>0):events.length>0;
+  const exportDisabled = exporting || importing || !hasRecords;
 
   async function importActivity() {
     if (importing || exporting) return;
@@ -191,7 +207,7 @@ export function InsightsScreen({
     if (exportDisabled) return;
     setExporting(true);
     try {
-      await shareEventsCsv(events);
+      await shareEventsCsv(activity?await loadEvents():events);
     } catch {
       Alert.alert(t('insights.exportErrorTitle'), t('insights.exportErrorBody'));
     } finally {
@@ -201,6 +217,7 @@ export function InsightsScreen({
 
   return (
     <ScrollView testID="screen.insights" contentContainerStyle={styles.content}>
+      <ActivityLoadState loading={window.loading||monthLoading} error={window.error||monthError} onRetry={()=>{window.retry();setMonthAttempt(value=>value+1);}} theme={theme}/>
       <Text
         numberOfLines={1}
         style={[

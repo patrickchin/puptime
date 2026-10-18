@@ -43,6 +43,7 @@ import { ScheduleScreen } from './src/screens/ScheduleScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { AccountScreen } from './src/screens/AccountScreen';
 import { useCloud } from './src/cloud/use-cloud';
+import {getActivityData,type ActivityQueries} from './src/activity-data';
 import { TimelineScreen } from './src/screens/TimelineScreen';
 import {
   ADD_NOTE_ACTION,
@@ -113,6 +114,11 @@ export default function App() {
   languageRef.current = language;
   const [tab, setTab] = useState<Tab>('log');
   const [events, setEvents] = useState<PuppyEvent[]>([]);
+  const [activity,setActivity]=useState<ActivityQueries>();
+  const activityRef=useRef<ActivityQueries|undefined>(undefined);
+  const [refreshToken,setRefreshToken]=useState(0);
+  const [eventCount,setEventCount]=useState(0);
+  const refreshGeneration=useRef(0);
   const [customActivities, setCustomActivities] = useState<string[]>([]);
   const [activityCustomizations, setActivityCustomizations] = useState<ActivityCustomizations>({});
   const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
@@ -131,10 +137,19 @@ export default function App() {
   }, [language]);
 
   const refresh = useCallback(async () => {
+    const generation=++refreshGeneration.current;
+    const data=await getActivityData();
+    activityRef.current=data;
     const pending = await readPendingWidgetEvents();
     if (pending.length) await appendEvents(pending);
-    const nextEvents = await loadEvents();
+    let nextEvents:PuppyEvent[],count:number;
+    if(data){const [latest,summary]=await Promise.all([data.latestEvents(),data.summary()]);nextEvents=latest;count=summary.eventCount;}
+    else{nextEvents=await loadEvents();count=nextEvents.length;}
+    if(generation!==refreshGeneration.current)return nextEvents;
+    setActivity(data);
     setEvents(nextEvents);
+    setEventCount(count);
+    setRefreshToken(value=>value+1);
     const nextCustomActivities = await loadCustomActivities(nextEvents);
     setCustomActivities(nextCustomActivities);
     const [nextSchedule, nextWidgetActions, nextTheme, nextLanguagePreference, nextNotificationPreferences, nextPermission, nextActivityCustomizations] = await Promise.all([
@@ -146,13 +161,14 @@ export default function App() {
       getNotificationPermissionState(),
       loadActivityCustomizations(),
     ]);
+    if(generation!==refreshGeneration.current)return nextEvents;
     setSchedule(nextSchedule);
     setWidgetActions(nextWidgetActions);
     setThemePreference(nextTheme);
     setLanguagePreference(nextLanguagePreference);
     setNotificationPreferences(nextNotificationPreferences);
     setNotificationPermission(nextPermission);
-    setActivityCustomizations(nextActivityCustomizations);
+    setActivityCustomizations(current=>JSON.stringify(current)===JSON.stringify(nextActivityCustomizations)?current:nextActivityCustomizations);
     void Promise.all([
       syncScheduleReminders(
         nextSchedule,
@@ -264,9 +280,14 @@ export default function App() {
     const eventId = typeof data.eventId === 'string' ? data.eventId : undefined;
     const type = isQuickEventType(data.type) || (typeof data.type === 'string' && data.type.startsWith('custom:')) ? data.type : undefined;
     const at = typeof data.at === 'number' ? data.at : undefined;
-    const event = nextEvents.find((candidate) => candidate.id === eventId)
+    const dataSource=activityRef.current;
+    const requested=eventId&&dataSource?await dataSource.getEvent(eventId):nextEvents.find(candidate=>candidate.id===eventId);
+    const candidates=!requested&&type&&at!==undefined&&dataSource
+      ?await dataSource.eventsBetween(Math.max(-8640000000000000,at-60000),Math.min(8640000000000001,at+60001))
+      :nextEvents;
+    const event = requested
       ?? (type && at !== undefined
-        ? nextEvents.find((candidate) => (
+        ? candidates.find((candidate) => (
             activityKey(candidate) === type
             && (
               (candidate.source === 'widget' && Math.abs(candidate.at - at) < 60_000)
@@ -316,7 +337,7 @@ export default function App() {
     if (type === 'custom' && customLabel) setCustomActivities(await saveCustomActivity(customLabel));
     const now = Date.now();
     if (type === 'nap') {
-      const openNap = (await loadEvents()).find(isOpenNap);
+      const openNap = (activityRef.current?await activityRef.current.latestEvents():await loadEvents()).find(isOpenNap);
       if (openNap) {
         const event = { ...openNap, endedAt: Math.max(openNap.at, now) };
         await updateEvent(openNap.id, { endedAt: event.endedAt });
@@ -544,12 +565,14 @@ export default function App() {
       );
     }
     if (tab === 'learn') return <LearnScreen theme={theme} />;
-    if (tab === 'timeline') return <TimelineScreen events={events} customActivities={customActivities} theme={theme} />;
-    if (tab === 'insights') return <InsightsScreen events={events} customActivities={customActivities} onImport={importActivity} theme={theme} />;
+    if (tab === 'timeline') return <TimelineScreen events={events} activity={activity} refreshToken={refreshToken} customActivities={customActivities} theme={theme} />;
+    if (tab === 'insights') return <InsightsScreen events={events} activity={activity} refreshToken={refreshToken} customActivities={customActivities} onImport={importActivity} theme={theme} />;
     if (tab === 'schedule') {
       return (
         <ScheduleScreen
           events={events}
+          activity={activity}
+          refreshToken={refreshToken}
           schedule={schedule}
           customActivities={customActivities}
           onChange={changeSchedule}
@@ -563,6 +586,8 @@ export default function App() {
     return (
       <LogScreen
         events={events}
+        activity={activity}
+        refreshToken={refreshToken}
         customActivities={customActivities}
         editRequest={editRequest}
         onEditRequestHandled={() => setEditRequest(null)}
@@ -580,6 +605,8 @@ export default function App() {
     activityCustomizations,
     editRequest,
     events,
+    activity,
+    refreshToken,
     language,
     languagePreference,
     notificationPermission,
@@ -649,7 +676,7 @@ export default function App() {
             onClose={() => setPreferencePicker(null)}
           />
           <Modal visible={accountVisible&&cloud.available} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={()=>setAccountVisible(false)}>
-            {accountVisible?<SafeAreaProvider><AccountScreen cloud={cloud} theme={theme} eventCount={events.length} onBack={()=>setAccountVisible(false)} onOpenActivity={()=>{setAccountVisible(false);setSettingsVisible(false);setTab('log');}}/></SafeAreaProvider>:null}
+            {accountVisible?<SafeAreaProvider><AccountScreen cloud={cloud} theme={theme} eventCount={eventCount} onBack={()=>setAccountVisible(false)} onOpenActivity={()=>{setAccountVisible(false);setSettingsVisible(false);setTab('log');}}/></SafeAreaProvider>:null}
           </Modal>
         </SafeAreaView>
       </LocalizationProvider>

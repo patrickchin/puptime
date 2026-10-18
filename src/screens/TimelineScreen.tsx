@@ -31,6 +31,8 @@ import {
 import { activityFromKey, activityKey, customActivityKey, dateKey, formatDuration, isOpenNap, quickEventTypes, type Activity, type ActivityKey, type PuppyEvent } from '../domain';
 import { IllustratedTimelineTrack, TIMELINE_ART_GUTTER } from '../components/IllustratedTimelineTrack';
 import { DayTimeline } from '../components/DayTimeline';
+import {ActivityLoadState} from '../components/ActivityLoadState';
+import {activityWindowBounds,useActivityWindow,type ActivityViewProps} from '../activity-view';
 import { ActivityIcon } from '../components/ActivityIcon';
 import { useLocalization } from '../localization-context';
 import { translate, type AppLanguage } from '../localization';
@@ -419,12 +421,13 @@ const MemoTimelineDateLabel = memo(TimelineDateLabel);
 const MemoTimelineTrack = memo(TimelineTrack);
 const MemoTimelineAxis = memo(TimelineAxis);
 
-export function TimelineScreen(props: { events: PuppyEvent[]; customActivities: string[]; theme: Theme }) {
+type TimelineProps={events:PuppyEvent[];customActivities:string[];theme:Theme}&ActivityViewProps;
+export function TimelineScreen(props: TimelineProps) {
   if (props.theme.presentation.iconProfile === 'default') return <ComparisonTimelineScreen {...props} />;
   return <PlayfulTimelineScreen {...props} />;
 }
 
-function PlayfulTimelineScreen(props: { events: PuppyEvent[]; customActivities: string[]; theme: Theme }) {
+function PlayfulTimelineScreen(props: TimelineProps) {
   const { t } = useLocalization();
   const { theme } = props;
   const [mode, setMode] = useState<'day' | 'compare'>(() => theme.presentation.iconProfile === 'soft-play' ? 'compare' : 'day');
@@ -440,14 +443,14 @@ function PlayfulTimelineScreen(props: { events: PuppyEvent[]; customActivities: 
       {mode === 'day' ? (
         <View testID="screen.timeline" style={{ flex: 1 }}>
           <Text style={[styles.dayViewTitle, headingStyle(theme), { color: theme.text }]}>{t('timeline.title')}</Text>
-          <DayTimeline events={props.events} theme={theme} />
+          <DayTimeline events={props.events} activity={props.activity} refreshToken={props.refreshToken} theme={theme} />
         </View>
       ) : <ComparisonTimelineScreen {...props} />}
     </View>
   );
 }
 
-function ComparisonTimelineScreen({ events, customActivities, theme }: { events: PuppyEvent[]; customActivities: string[]; theme: Theme }) {
+function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken,customActivities,theme }:TimelineProps) {
   const { activityColors, activityLabel, language, t } = useLocalization();
   const { fontScale, height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -463,6 +466,16 @@ function ComparisonTimelineScreen({ events, customActivities, theme }: { events:
   const [timeScale, setTimeScale] = useState(1);
   const timeScaleLabel = timeScale.toFixed(2).replace(/0$/, '');
   const [nowTime, setNowTime] = useState(Date.now());
+  const bounds=activityWindowBounds(nowTime,Math.max(loadedDayCount-1,INITIAL_DAYS));
+  const window=useActivityWindow(activity,projectedEvents,bounds.from,bounds.until,refreshToken);
+  const events=window.events;
+  const [summary,setSummary]=useState<{eventCount:number;earliestAt:number|null}|null>(null);
+  const [summaryError,setSummaryError]=useState(false),[summaryAttempt,setSummaryAttempt]=useState(0);
+  useEffect(()=>{
+    if(!activity)return;let current=true;setSummaryError(false);
+    void activity.summary().then(value=>{if(current)setSummary(value);}).catch(()=>{if(current)setSummaryError(true);});
+    return()=>{current=false;};
+  },[activity,refreshToken,summaryAttempt]);
   const [selection, setSelection] = useState<string[]>([]);
   const [isLoadingEarlier, startLoadingEarlier] = useTransition();
   const rowHeight = Math.round((playful ? 80 : 52) * Math.min(fontScale, 1.5));
@@ -472,8 +485,8 @@ function ComparisonTimelineScreen({ events, customActivities, theme }: { events:
   const totalWidth = DATE_COLUMN_WIDTH + trackWidth;
   const now = useMemo(() => new Date(nowTime), [nowTime]);
   const estimates = useMemo(() => estimateMissingLogs(events, INITIAL_DAYS, now).estimates, [events, now]);
-  const earliestEventAt = events.reduce((earliest, event) => Math.min(earliest, event.at), nowTime);
-  const maxHistoryDays = events.length
+  const earliestEventAt = activity?summary?.earliestAt??nowTime:events.reduce((earliest, event) => Math.min(earliest, event.at), nowTime);
+  const maxHistoryDays = (activity?summary?.eventCount:events.length)
     ? Math.max(INITIAL_DAYS, calendarDayDistance(new Date(earliestEventAt), now) + 1)
     : INITIAL_DAYS;
   const days = useMemo(
@@ -591,7 +604,7 @@ function ComparisonTimelineScreen({ events, customActivities, theme }: { events:
   }), []);
 
   function loadEarlierDays() {
-    if (!hasEarlierDays || isLoadingEarlier) return;
+    if (!hasEarlierDays || isLoadingEarlier || window.loading || window.error) return;
     startLoadingEarlier(() => {
       setLoadedDayCount((current) => Math.min(maxHistoryDays, current + LOAD_DAYS));
     });
@@ -649,6 +662,7 @@ function ComparisonTimelineScreen({ events, customActivities, theme }: { events:
       testID="screen.timeline"
       style={[styles.screen, { backgroundColor: theme.background }]}
     >
+      <ActivityLoadState loading={window.loading} error={window.error||summaryError} onRetry={()=>{window.retry();setSummaryAttempt(value=>value+1);}} theme={theme}/>
       <View
         style={[
           styles.header,
@@ -866,7 +880,7 @@ function ComparisonTimelineScreen({ events, customActivities, theme }: { events:
                   accessibilityRole={hasEarlierDays ? 'button' : 'text'}
                   accessibilityLabel={t(hasEarlierDays ? 'timeline.loadEarlier' : 'timeline.historyStart')}
                   accessibilityState={{ busy: isLoadingEarlier, disabled: !hasEarlierDays }}
-                  disabled={!hasEarlierDays || isLoadingEarlier}
+                  disabled={!hasEarlierDays || isLoadingEarlier || window.loading || window.error}
                   onPress={loadEarlierDays}
                   style={[
                     styles.loadEarlier,

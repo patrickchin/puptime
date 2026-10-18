@@ -6,6 +6,8 @@ import { QuickActions } from '../components/QuickActions';
 import { ActivityIcon } from '../components/ActivityIcon';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { EventRow } from '../components/EventRow';
+import {ActivityLoadState} from '../components/ActivityLoadState';
+import {useActivityPages,type ActivityViewProps} from '../activity-view';
 import { NoteInput } from '../components/NoteInput';
 import {
   dateKey,
@@ -82,7 +84,9 @@ function sectionTitle(
 }
 
 export function LogScreen({
-  events,
+  events:projectedEvents,
+  activity,
+  refreshToken,
   customActivities,
   editRequest,
   onEditRequestHandled,
@@ -101,8 +105,12 @@ export function LogScreen({
   onDelete: (event: PuppyEvent) => Promise<void>;
   onOpenSettings: () => void;
   theme: Theme;
-}) {
+}&ActivityViewProps) {
   const { activityColors, activityLabel, eventPastLabel, locale, relativeTime, t } = useLocalization();
+  const page=useActivityPages(activity,projectedEvents,refreshToken);
+  const events=page.events;
+  const requestHandled=useRef(onEditRequestHandled);requestHandled.current=onEditRequestHandled;
+  const [requestAttempt,setRequestAttempt]=useState(0);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PuppyEvent | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -233,10 +241,20 @@ export function LogScreen({
   useEffect(() => () => clearSaveTimer(), []);
   useEffect(() => {
     if (!editRequest) return;
-    const event = events.find((candidate) => candidate.id === editRequest.eventId);
-    if (event) startEditing(event, Boolean(editRequest.focusNote));
-    onEditRequestHandled?.();
-  }, [editRequest, events, onEditRequestHandled, startEditing]);
+    let current=true;
+    if(activity){
+      void activity.getEvent(editRequest.eventId).then(event=>{
+        if(!current)return;
+        if(event)startEditing(event,Boolean(editRequest.focusNote));
+        else Alert.alert(t('editor.deletedTitle'),t('editor.deletedBody'));
+        requestHandled.current?.();
+      }).catch(()=>{if(current)Alert.alert(t('app.loadErrorTitle'),t('app.loadErrorBody'),[{text:t('activity.retry'),onPress:()=>setRequestAttempt(value=>value+1)},{text:t('app.cancel'),onPress:()=>requestHandled.current?.()}]);});
+    }else{
+      const event=events.find(candidate=>candidate.id===editRequest.eventId);
+      if(event)startEditing(event,Boolean(editRequest.focusNote));requestHandled.current?.();
+    }
+    return()=>{current=false;};
+  }, [activity,editRequest,activity?undefined:events,startEditing,requestAttempt,t]);
   const todayKey = dateKey(now);
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);
@@ -438,7 +456,7 @@ export function LogScreen({
                 <Image source={require('../../assets/puppy-journal.png')} accessible={false} style={styles.puppy} resizeMode="contain" />
               </View>
             ) : null}
-            <QuickActions events={events} onLog={onLog} now={now} theme={theme} />
+            <QuickActions events={activity?projectedEvents:events} onLog={onLog} now={now} theme={theme} />
             <View style={styles.activityHeading}>
               <Text style={[styles.sectionTitle, playful && headingStyle(theme), { color: theme.text }]}>{t('log.activity')}</Text>
             </View>
@@ -450,7 +468,7 @@ export function LogScreen({
               testID={`history.day.${section.key === todayKey ? 'today' : section.key === yesterdayKey ? 'yesterday' : section.key}`}
               accessibilityRole="button"
               accessibilityState={{ expanded: section.expanded }}
-              accessibilityLabel={t('log.toggleDayA11y', { day: section.title, count: section.count })}
+              accessibilityLabel={activity?t('activity.dayA11y',{day:section.title,count:section.count}):t('log.toggleDayA11y', { day: section.title, count: section.count })}
               onPress={() => setExpandedDays((current) => ({
                 ...current,
                 [section.key]: !(current[section.key] ?? (section.key === todayKey || section.key === yesterdayKey)),
@@ -468,7 +486,7 @@ export function LogScreen({
               ]}
             >
               <Text style={[styles.dayHeadingText, { color: section.key === todayKey || section.key === yesterdayKey ? theme.primary : theme.text }]}>{section.title}</Text>
-              <Text style={[styles.dayCount, { color: theme.textMuted }]}>{section.count}</Text>
+              <Text style={[styles.dayCount, { color: theme.textMuted }]}>{activity?t('activity.loaded',{count:section.count}):section.count}</Text>
               <MaterialCommunityIcons
                 accessibilityElementsHidden
                 importantForAccessibility="no"
@@ -489,23 +507,25 @@ export function LogScreen({
                 />
               </View>
             ))}
-            {section.expanded && section.count === 0 && (section.key === todayKey || section.key === yesterdayKey) ? (
+            {section.expanded && section.count === 0 && !page.loading && !page.error && (section.key === todayKey || section.key === yesterdayKey) ? (
               <Text testID={section.key === todayKey ? 'history.empty' : undefined} style={[styles.emptyDay, { color: theme.textMuted }]}>
                 {t(section.key === todayKey ? 'log.emptyTitle' : 'log.emptyDay')}
               </Text>
             ) : null}
           </View>
         )}
-        ListFooterComponent={hasMoreDays ? (
+        ListFooterComponent={<>
+          <ActivityLoadState loading={page.loading} error={page.error} onRetry={page.retry} theme={theme}/>
+          {!page.loading&&!page.error&&(hasMoreDays||!!activity&&page.next) ? (
           <Pressable
             testID="history.loadMore"
             accessibilityRole="button"
-            onPress={() => setLoadedOlderDays((count) => count + olderDaysPerPage)}
+            onPress={() => {if(activity&&!hasMoreDays)void page.loadMore();setLoadedOlderDays((count) => count + olderDaysPerPage);}}
             style={({ pressed }) => [styles.loadMore, { backgroundColor: pressed ? theme.primarySoft : 'transparent' }]}
           >
             <Text style={[styles.loadMoreText, { color: theme.primary }]}>{t('log.loadMore')}</Text>
           </Pressable>
-        ) : null}
+        ) : null}</>}
       />
 
       <Modal visible={draft !== null} transparent animationType="none" onRequestClose={handleSystemClose}>
