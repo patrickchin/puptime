@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo, Alert, Animated, Easing, Image, Keyboard,
-  KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View,
+  KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions,
 } from 'react-native';
 
 import { ActivityIcon } from '../components/ActivityIcon';
@@ -15,6 +15,7 @@ type PracticeActivity = (typeof practiceActions)[number];
 
 export function OnboardingScreen({theme, mode, notificationPermission, onAllowNotifications, onOpenSystemSettings, onFinish}:OnboardingScreenProps) {
   const {t,activityLabel,activityColors,locale}=useLocalization();
+  const largeText=useWindowDimensions().fontScale>=1.5;
   const [step,setStep]=useState(0);
   const [practice,setPractice]=useState<PracticeActivity|null>(null);
   const [practiceReminder,setPracticeReminder]=useState(false);
@@ -79,12 +80,25 @@ export function OnboardingScreen({theme, mode, notificationPermission, onAllowNo
   );
   const card={backgroundColor:theme.surfaceRaised,borderColor:theme.border,borderRadius:theme.presentation.cardRadius};
 
+  const footer=(
+      <View style={[styles.footer,largeText&&styles.scrollFooter,{backgroundColor:theme.background,borderColor:theme.border}]}>
+        <Pressable testID="onboarding.primary" accessibilityRole="button" disabled={busy} accessibilityState={{disabled:busy,busy}} onPress={()=>step<3?setStep(step+1):void finish()} style={({pressed})=>[styles.primary,{backgroundColor:pressed?theme.primaryPressed:theme.primary,borderRadius:theme.presentation.controlRadius,opacity:busy?0.6:1}]}>
+          <Text style={[styles.primaryText,{color:theme.onPrimary}]}>{t(step<3?'onboarding.continue':replay?'tour.replayDone':'onboarding.start')}</Text>
+          <MaterialCommunityIcons name="arrow-right" size={21} color={theme.onPrimary}/>
+        </Pressable>
+        {step>0?<View style={[step===3&&!replay?styles.footerChoices:undefined,largeText&&styles.largeChoices]}>
+          <Pressable testID="onboarding.back" accessibilityRole="button" disabled={busy} onPress={()=>{Keyboard.dismiss();setStep(step-1);}} style={styles.back}><Text style={[styles.backText,{color:theme.textMuted}]}>{t('onboarding.back')}</Text></Pressable>
+          {step===3&&!replay?<Pressable testID="onboarding.later" accessibilityRole="button" disabled={busy} onPress={()=>void finish(true)} style={styles.back}><Text style={[styles.backText,{color:theme.textMuted}]}>{t('onboarding.later')}</Text></Pressable>:null}
+        </View>:null}
+      </View>
+  );
+
   return (
     <KeyboardAvoidingView testID="screen.onboarding" behavior="padding" style={[styles.root,{backgroundColor:theme.background}]}>
       <View style={styles.topBar}>
         <View style={styles.brand}>
           <MaterialCommunityIcons name="paw" size={20} color={theme.primary}/>
-          <Text style={[styles.brandText,headingStyle(theme),{color:theme.text}]}>Puptime</Text>
+          <Text maxFontSizeMultiplier={1.3} style={[styles.brandText,headingStyle(theme),{color:theme.text}]}>Puptime</Text>
         </View>
         <Pressable testID="onboarding.skip" accessibilityRole="button" disabled={busy} accessibilityState={{disabled:busy}} onPress={()=>void finish(true)} style={styles.skip}>
           <Text style={[styles.skipText,{color:theme.textMuted}]}>{t('onboarding.skip')}</Text>
@@ -94,17 +108,17 @@ export function OnboardingScreen({theme, mode, notificationPermission, onAllowNo
         {[0,1,2,3].map(index=><View key={index} style={[styles.progressMark,{backgroundColor:index<=step?theme.primary:theme.border}]}/>)}
       </View>
       <ScrollView ref={scroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
-        <Text ref={title} testID={`onboarding.step.${step}`} accessibilityRole="header" style={[styles.title,headingStyle(theme),{color:theme.text}]}>{t(headings[step])}</Text>
+        <Text ref={title} testID={`onboarding.step.${step}`} accessibilityRole="header" style={[styles.title,headingStyle(theme),largeText&&styles.largeTitle,{color:theme.text}]}>{t(headings[step])}</Text>
         <Text style={[styles.body,{color:theme.textMuted}]}>{t(bodies[step])}</Text>
 
         {step===0?<>
           {puppy()}
           <View style={[styles.card,card]}>
             <Text style={[styles.eyebrow,{color:theme.primary}]}>{t('tour.practice')}</Text>
-            <View style={styles.actions}>
+            <View style={[styles.actions,largeText&&styles.largeActions]}>
               {practiceActions.map(type=>{
                 const activity={type},appearance=activityColors(theme,activity),selected=practice===type;
-                return <Pressable key={type} testID={`onboarding.demo.${type}`} accessibilityRole="button" accessibilityLabel={t('tour.practiceAction',{activity:activityLabel(activity)})} accessibilityState={{selected}} onPress={()=>tryActivity(type)} style={({pressed})=>[styles.action,{backgroundColor:selected?appearance.softColor:theme.surface,borderColor:selected?appearance.color:theme.border,borderRadius:theme.presentation.controlRadius,opacity:pressed?0.75:1}]}>
+                return <Pressable key={type} testID={`onboarding.demo.${type}`} accessibilityRole="button" accessibilityLabel={t('tour.practiceAction',{activity:activityLabel(activity)})} accessibilityState={{selected}} onPress={()=>tryActivity(type)} style={({pressed})=>[styles.action,largeText&&styles.largeAction,{backgroundColor:selected?appearance.softColor:theme.surface,borderColor:selected?appearance.color:theme.border,borderRadius:theme.presentation.controlRadius,opacity:pressed?0.75:1}]}>
                   <ActivityIcon activity={activity} theme={theme} color={appearance.color} size={32}/>
                   <Text style={[styles.actionLabel,{color:theme.text}]}>{activityLabel(activity)}</Text>
                 </Pressable>;
@@ -119,12 +133,12 @@ export function OnboardingScreen({theme, mode, notificationPermission, onAllowNo
 
         {step===1?<View style={[styles.card,styles.example,card]}>
           <Text style={[styles.eyebrow,{color:theme.primary}]}>{t('onboarding.preview')}</Text>
-          <View style={styles.clockHeader}><Text style={[styles.day,{color:theme.textMuted}]}/><View style={styles.track}>{['06','12','18'].map(hour=><Text key={hour} style={[styles.hour,{color:theme.textMuted}]}>{hour}</Text>)}</View></View>
+          <View style={styles.clockHeader}>{!largeText?<Text style={[styles.day,{color:theme.textMuted}]}/>:null}<View style={styles.track}>{['06','12','18'].map(hour=><Text key={hour} style={[styles.hour,{color:theme.textMuted}]}>{hour}</Text>)}</View></View>
           {(['onboarding.todayPreview','onboarding.timelineYesterday','onboarding.timelineEarlier'] as const).map((day,index)=>{
             const marks=[{type:'pee' as const,position:22+index*3},{type:'meal' as const,position:48},...(index===0&&practice?[{type:practice,position:77}]:[{type:'walk' as const,position:75-index*2}])];
-            return <View key={day} testID={index===0?'onboarding.demo.timeline.today':undefined} accessibilityLabel={t(day)} style={styles.dayRow}>
-              <Text style={[styles.day,{color:theme.text}]}>{t(day)}</Text>
-              <View style={[styles.track,styles.trackLine,{backgroundColor:theme.surface,borderColor:theme.border}]}>
+            return <View key={day} testID={index===0?'onboarding.demo.timeline.today':undefined} accessibilityLabel={t(day)} style={[styles.dayRow,largeText&&styles.largeDayRow]}>
+              <Text style={[styles.day,largeText&&styles.largeDayLabel,{color:theme.text}]}>{t(day)}</Text>
+              <View style={[styles.track,styles.trackLine,largeText&&styles.largeTrack,{backgroundColor:theme.surface,borderColor:theme.border}]}>
                 {[25,50,75].map(position=><View key={position} style={[styles.gridLine,{left:`${position}%`,backgroundColor:theme.border}]}/>)}
                 {marks.map(({type,position},mark)=><View key={mark} accessible accessibilityLabel={activityLabel({type})} style={[styles.mark,{left:`${position}%`,backgroundColor:activityColors(theme,{type}).color}]}/>)}
               </View>
@@ -155,29 +169,22 @@ export function OnboardingScreen({theme, mode, notificationPermission, onAllowNo
           {!replay?<>
             <Text style={[styles.fieldLabel,{color:theme.text}]}>{t('tour.nameLabel')}</Text>
             <TextInput testID="onboarding.name.input" accessibilityLabel={t('tour.nameLabel')} value={puppyName} onChangeText={setPuppyName} placeholder={t('tour.namePlaceholder')} placeholderTextColor={theme.textMuted} maxLength={256} autoCapitalize="words" autoCorrect={false} textContentType="none" returnKeyType="done" onSubmitEditing={Keyboard.dismiss} editable={!busy} style={[styles.nameInput,{color:theme.text,backgroundColor:theme.surfaceRaised,borderColor:theme.border,borderRadius:theme.presentation.controlRadius}]}/>
-            <View style={[styles.notificationCard,card]}>
+            <View style={[styles.notificationCard,card,largeText&&styles.largeNotification]}>
               <MaterialCommunityIcons name="bell-outline" color={theme.primary} size={25}/>
-              <View style={styles.flex}><Text style={[styles.fieldLabel,{color:theme.text}]}>{t('tour.notificationsTitle')}</Text><Text style={[styles.small,{color:theme.textMuted}]}>{t(notificationPermission==='granted'?'tour.notificationsOn':'tour.notificationsOptional')}</Text></View>
-              {notificationPermission!=='granted'?<Pressable testID="onboarding.notifications.allow" accessibilityRole="button" disabled={busy} onPress={()=>void allowNotifications()} style={styles.allow}><Text style={[styles.allowText,{color:theme.primary}]}>{t(notificationPermission==='blocked'?'schedule.openSettings':'tour.allow')}</Text></Pressable>:<MaterialCommunityIcons name="check-circle" color={theme.primary} size={25}/>}
+              <View style={[styles.flex,largeText&&styles.largeCopy]}><Text style={[styles.fieldLabel,{color:theme.text}]}>{t('tour.notificationsTitle')}</Text><Text style={[styles.small,{color:theme.textMuted}]}>{t(notificationPermission==='granted'?'tour.notificationsOn':'tour.notificationsOptional')}</Text></View>
+              {notificationPermission!=='granted'?<Pressable testID="onboarding.notifications.allow" accessibilityRole="button" disabled={busy} onPress={()=>void allowNotifications()} style={[styles.allow,largeText&&styles.largeAllow]}><Text style={[styles.allowText,{color:theme.primary}]}>{t(notificationPermission==='blocked'?'schedule.openSettings':'tour.allow')}</Text></Pressable>:<MaterialCommunityIcons name="check-circle" color={theme.primary} size={25}/>}
             </View>
           </>:null}
         </>:null}
+        {largeText?footer:null}
       </ScrollView>
-      <View style={[styles.footer,{backgroundColor:theme.background,borderColor:theme.border}]}>
-        <Pressable testID="onboarding.primary" accessibilityRole="button" disabled={busy} accessibilityState={{disabled:busy,busy}} onPress={()=>step<3?setStep(step+1):void finish()} style={({pressed})=>[styles.primary,{backgroundColor:pressed?theme.primaryPressed:theme.primary,borderRadius:theme.presentation.controlRadius,opacity:busy?0.6:1}]}>
-          <Text style={[styles.primaryText,{color:theme.onPrimary}]}>{t(step<3?'onboarding.continue':replay?'tour.replayDone':'onboarding.start')}</Text>
-          <MaterialCommunityIcons name="arrow-right" size={21} color={theme.onPrimary}/>
-        </Pressable>
-        {step>0?<View style={step===3&&!replay?styles.footerChoices:undefined}>
-          <Pressable testID="onboarding.back" accessibilityRole="button" disabled={busy} onPress={()=>{Keyboard.dismiss();setStep(step-1);}} style={styles.back}><Text style={[styles.backText,{color:theme.textMuted}]}>{t('onboarding.back')}</Text></Pressable>
-          {step===3&&!replay?<Pressable testID="onboarding.later" accessibilityRole="button" disabled={busy} onPress={()=>void finish(true)} style={styles.back}><Text style={[styles.backText,{color:theme.textMuted}]}>{t('onboarding.later')}</Text></Pressable>:null}
-        </View>:null}
-      </View>
+      {!largeText?footer:null}
     </KeyboardAvoidingView>
   );
 }
 
 const styles=StyleSheet.create({
+  largeTitle:{fontSize:25,lineHeight:31,letterSpacing:-0.3},largeActions:{flexDirection:'column'},largeAction:{flex:0,flexDirection:'row',justifyContent:'flex-start',gap:16,padding:16},largeDayRow:{flexDirection:'column',alignItems:'stretch',gap:10},largeDayLabel:{width:'100%'},largeTrack:{flex:0,width:'100%'},largeNotification:{flexDirection:'column',alignItems:'flex-start'},largeCopy:{flex:0},largeAllow:{maxWidth:'100%'},scrollFooter:{paddingHorizontal:0,marginTop:24},largeChoices:{flexDirection:'column'},
   root:{flex:1},flex:{flex:1},topBar:{minHeight:58,paddingHorizontal:spacing.lg,flexDirection:'row',alignItems:'center',justifyContent:'space-between'},brand:{flexDirection:'row',alignItems:'center',gap:8},brandText:{fontSize:17},skip:{minWidth:55,minHeight:44,justifyContent:'center',alignItems:'flex-end'},skipText:{fontSize:15,fontWeight:'700'},
   progress:{flexDirection:'row',gap:6,marginHorizontal:spacing.lg,marginBottom:20},progressMark:{flex:1,height:4,borderRadius:4},content:{paddingHorizontal:spacing.lg,paddingBottom:24},title:{fontSize:33,lineHeight:39,letterSpacing:-0.8},body:{fontSize:16,lineHeight:23,marginTop:9},puppy:{alignItems:'center',justifyContent:'center',marginTop:12,marginBottom:8},puppyImage:{width:210,height:'100%'},
   card:{padding:18,borderWidth:1},eyebrow:{fontSize:11,fontWeight:'800',letterSpacing:1.3},actions:{flexDirection:'row',gap:8,marginTop:14},action:{flex:1,minWidth:0,minHeight:95,borderWidth:1,alignItems:'center',justifyContent:'center',padding:8,gap:7},actionLabel:{fontSize:16,fontWeight:'700',textAlign:'center'},practiceRow:{marginTop:14,borderRadius:12,padding:12,flexDirection:'row',alignItems:'center',gap:10},practiceText:{fontSize:15,lineHeight:21,flex:1},practiceEmpty:{fontSize:14,lineHeight:21,textAlign:'center',marginTop:17,marginBottom:3},

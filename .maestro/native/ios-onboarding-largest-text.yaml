@@ -1,0 +1,102 @@
+appId: com.patrickchin.puptime
+name: Small iPhone onboarding with the largest accessibility text
+---
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: unset
+- extendedWaitUntil:
+    visible:
+      id: onboarding.step.0
+    timeout: 90000
+- assertVisible:
+    id: onboarding.skip
+- scrollUntilVisible:
+    element:
+      id: onboarding.demo.meal
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- tapOn:
+    id: onboarding.demo.meal
+- scrollUntilVisible:
+    element:
+      id: onboarding.demo.row
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- takeScreenshot: largest-text-log-practice
+- scrollUntilVisible:
+    element:
+      id: onboarding.primary
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- tapOn:
+    id: onboarding.primary
+- assertVisible:
+    id: onboarding.skip
+- scrollUntilVisible:
+    element:
+      id: onboarding.demo.timeline.today
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- takeScreenshot: largest-text-timeline
+- scrollUntilVisible:
+    element:
+      id: onboarding.primary
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- tapOn:
+    id: onboarding.primary
+- scrollUntilVisible:
+    element:
+      id: onboarding.demo.routine.reminder
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- tapOn:
+    id: onboarding.demo.routine.reminder
+- takeScreenshot: largest-text-routine
+- scrollUntilVisible:
+    element:
+      id: onboarding.primary
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- tapOn:
+    id: onboarding.primary
+- scrollUntilVisible:
+    element:
+      id: onboarding.name.input
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- tapOn:
+    id: onboarding.name.input
+- inputText: Biscuit
+- assertVisible:
+    id: onboarding.skip
+- scrollUntilVisible:
+    element:
+      id: onboarding.primary
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- takeScreenshot: largest-text-keyboard
+- tapOn:
+    id: onboarding.primary
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- launchApp:
+    clearState: true
+- tapOn:
+    id: onboarding.skip
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
