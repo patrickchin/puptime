@@ -1,0 +1,13 @@
+appId: com.patrickchin.puptime
+name: Open saved puppy settings on populated history
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- tapOn:
+    id: settings.open
+- assertVisible:
+    id: settings.puppy.name
+    text: .*Mochi.*

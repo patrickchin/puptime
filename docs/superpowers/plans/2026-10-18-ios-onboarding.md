@@ -61,10 +61,10 @@
 
 **Interfaces:** PuppyNameSetting({theme,cloud}) native component uses getLocalRuntime()/subscribeLocalWrites(), runtime.storage.loadPuppyName()/savePuppyName(); cloud:CloudHandle supplies the existing account snapshot for remote projection notifications. Non-iOS component returns null. Existing permission callbacks remain separate from finish.
 
-- [ ] Extend native qualifier with populated history/name/preferences/owner/outbox snapshot: replay all demos and finish/Skip, then compare exact durable snapshot and OS permission. Replay has no name or permission action. Observe expected RED before guards/UI finish.
-- [ ] Add iOS Settings row with actual saved name, native prompt and localized validation/error. Reload saved name on local commit, preserve an open prompt draft; commit only explicit Save and keep old saved label on error. No account/trial changes.
-- [ ] Record native rename/restart, cancel, non-BMP/long name, and injected SQL failure/retry. Independent production SQLite name write during open prompt must not change draft; after cancel saved label reflects newest commit. Preserve petId and populated events.
-- [ ] Record first-run notification Not now/Allow/denied; completion is independent, no automatic prompt from routine demo or replay. Update existing 00-onboarding/notification flows to assert the separate explicit action and retained first-log access. Run affected native/storage checks, full Node and types, expect PASS. Commit.
+- [x] Extend native qualifier with populated history/name/preferences/owner/outbox snapshot: replay all demos and finish/Skip, then compare exact durable snapshot and OS permission. Replay has no name or permission action. Observe expected RED before guards/UI finish.
+- [x] Add iOS Settings row with actual saved name, native prompt and localized validation/error. Reload saved name on local commit, preserve an open prompt draft; commit only explicit Save and keep old saved label on error. No account/trial changes.
+- [x] Record native rename/restart, cancel, non-BMP/long name, and injected SQL failure/retry. Independent production SQLite name write during open prompt must not change draft; after cancel saved label reflects newest commit. Preserve petId and populated events.
+- [x] Record first-run notification Not now/Allow/denied; completion is independent, no automatic prompt from routine demo or replay. Update existing 00-onboarding/notification flows to assert the separate explicit action and retained first-log access. Run affected native/storage checks, full Node and types, expect PASS. Commit.
 
 ### Task 4: Accessibility, Release qualification and integration
 

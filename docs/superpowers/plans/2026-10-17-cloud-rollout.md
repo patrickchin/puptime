@@ -23,7 +23,22 @@ Create a precise subsystem plan at each boundary using the actual interfaces and
 
 ## Current execution priority
 
-The user directed **iOS app first; Android only when explicitly resumed, and widgets later**. The in-progress widget branch is preserved at `codex/native-storage-cutover` (`bd99857`) and is not merged. PR88's iOS storage cutover has merged after green native CI. The engine is in PR93; the iOS account/cloud client has completed its single review fix pass and is being prepared for PR/CI integration. Android remains unverified and keeps its existing backend; no new widget transport is activated here. Continue iOS lifecycle/history, onboarding, billing/web and observability after this client slice. Deferred tracks must not block that sequence.
+The user directed **iOS app first; Android only when explicitly resumed, and widgets later**. The in-progress widget branch is preserved at `codex/native-storage-cutover` (`bd99857`) and is not merged. PR88's iOS storage cutover and PR93's sync engine have merged after green native CI. The iOS account/cloud client is in PR96 against main; verification checks pass while its current native build runs. Android remains unverified and keeps its existing backend; no new widget transport is activated here. The interactive iOS onboarding slice is underway with its own plan and native evidence. Deferred tracks must not block that sequence.
+
+### Storage and architecture follow-up from October 18
+
+The user questioned JSON event storage and the cost of adding accounts/sync to the original single-device structure. Inspection confirms local events have indexed identity/time columns plus JSON bodies; ordinary reads and edits still materialize the complete puppy history. The server stores generic JSON records in per-account SQLite. Those are current implementation facts, not the desired large-history access pattern.
+
+After completing the bounded onboarding slice, make the following an explicit reviewed subsystem plan before expanding lifecycle/history UI:
+
+- [ ] Move core event/routine fields into constrained SQL columns, preserving existing values and stable identity with a transactional, restart-safe migration. JSON API messages are a separate concern. Account for every existing sync projection, revision and enrollment consumer rather than changing only the table definition.
+- [ ] Replace ordinary single-event whole-history mutations with targeted transactional writes; provide indexed date/activity queries, bounded history pages and SQL summaries. Adapt the affected UI reads so pagination is real. Retain a deliberate complete-data path for export/import and other features that require it.
+- [ ] Verify large-history behavior with actual query plans, populated device tests and measured read/write work; cover at least 1,000, 10,000 and 100,000 synthetic events. Do not claim a speed improvement from schema changes alone.
+- [ ] Define how committed local/remote changes refresh affected screens without overwriting open drafts. Reuse supported database/library facilities where they meet the requirement; avoid a second global event bus or duplicate authoritative state.
+- [ ] Reassess the existing custom synchronization against maintained replication tools using concrete offline, free-tier, authorization and migration requirements. Preserve working behavior unless evidence supports a replacement; no infrastructure activation or service migration based on a generic preference.
+- [ ] Decide the ownership boundary for eventual shared care before implementing invitations: current per-account storage requires additional design for cross-account puppy access. Multiple-pet keys alone do not establish shared-care authorization. Keep personal preferences/billing distinct from shared puppy records; no shared-care release or UI is claimed now.
+
+The existing accounts/sync foundations and tests remain useful; this follow-up is required work, not a claim that an architectural audit or storage migration has already passed. Continue billing/web, observability and full release qualification afterward under the original scope.
 
 ## Implementation evidence
 
