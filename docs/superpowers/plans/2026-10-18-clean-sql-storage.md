@@ -60,9 +60,9 @@
 
 **Interfaces:** appendEvents/updateEvent/removeEvent/updateEventTime complete without returning complete history; importEvents returns {imported:number,skipped:number}. Runtime storage uses the existing changeSink/afterCommit. Explicit full reads remain loadEvents() for full-data workflows. Schedule writes target IDs; saveSchedule remains deliberate whole-routine replacement. Existing deferred-platform returned arrays may be ignored until unification.
 
-- [ ] Add instrumented real-SQL tests: edit one of10000records without SELECT-all/decoding other events; exactly one changed record/revision/outbox; unchanged edit/deletion no new revision; failed capture rolls back; independent edits serialize; deleted edit rejects. Observe RED.
-- [ ] Replace array-wide mutation/diff with requested-row reads/updates and explicit LocalChange capture in database.write. Materialize new custom labels atomically; ordinary settings/name writes use stored activity state without decoding full history. Preserve import duplicate/estimate/open-duration invariants and current blocked/acknowledgment recovery.
-- [ ] Adapt actual mutation callers/tests to completion/count results, retaining explicit full reads only where required. Verify post-commit listener failures cannot reject acknowledged saves. Run Node/Workers/types, expect PASS and commit.
+- [x] Add instrumented real-SQL tests: edit one of10000records without SELECT-all/decoding other events; exactly one changed record/revision/outbox; unchanged edit/deletion no new revision; failed capture rolls back; independent edits serialize; deleted edit rejects. Observe RED.
+- [x] Replace array-wide mutation/diff with requested-row reads/updates and explicit LocalChange capture in database.write. Materialize new custom labels atomically; ordinary settings/name writes use stored activity state without decoding full history. Preserve import duplicate/estimate/open-duration invariants and current blocked/acknowledgment recovery.
+- [x] Adapt actual mutation callers/tests to completion/count results, retaining explicit full reads only where required. Verify post-commit listener failures cannot reject acknowledged saves. Run Node/Workers/types, expect PASS and commit.
 
 ### Task 4: Indexed native read queries
 
