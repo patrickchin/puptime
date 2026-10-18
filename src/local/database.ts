@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE INDEX IF NOT EXISTS events_by_pet_time ON events(pet_id,at DESC,id DESC);
 CREATE INDEX IF NOT EXISTS events_by_pet_activity ON events(pet_id,type,custom_label,at DESC,id DESC);
+CREATE INDEX IF NOT EXISTS events_open_nap ON events(pet_id) WHERE type='nap' AND end_state=1;
 CREATE TABLE IF NOT EXISTS routines (
   pet_id TEXT NOT NULL REFERENCES puppies(id) ON DELETE CASCADE,
   id TEXT NOT NULL CHECK(length(id) BETWEEN 1 AND 256),

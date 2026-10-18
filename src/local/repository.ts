@@ -1,10 +1,10 @@
-import { isOpenNap, type PuppyEvent, type PuppyEventChanges, type ScheduleEntry } from '../domain.ts';
-import {parseEvents,parseSchedule,EventDeletedError,EventsImportError,EventsStorageError} from '../storage-validation.ts';
+import { type PuppyEvent, type PuppyEventChanges, type ScheduleEntry } from '../domain.ts';
+import { parseEvents, parseSchedule, EventDeletedError, EventsImportError, EventsStorageError } from '../storage-validation.ts';
 import type { LocalDatabase, SqlExecutor } from './database.ts';
 import { applyScheduleEntryEdit } from '../schedule-editor.ts';
-import { localChanges, notifyLocalCommit, readLocalSettingsRecords, type LocalChangeSink } from './sync-projection.ts';
-import {localIdSchema} from '../cloud/protocol.ts';
-import {eventDataFromSql,routineDataFromSql,eventSqlValues,routineSqlValues,upsertEventSql,upsertRoutineSql,type EventSqlRow,type RoutineSqlRow} from '../record-sql.ts';
+import { localChanges, notifyLocalCommit, retainCustomActivities, type LocalChange, type LocalChangeSink } from './sync-projection.ts';
+import { localIdSchema } from '../cloud/protocol.ts';
+import { eventDataFromSql, routineDataFromSql, eventSqlValues, routineSqlValues, upsertEventSql, upsertRoutineSql, type EventSqlRow, type RoutineSqlRow } from '../record-sql.ts';
 
 type EventRow = { id: string; at: number; body: string; event: PuppyEvent };
 export function createLocalRepository(database: LocalDatabase, petId: string, onChange?: LocalChangeSink, afterCommit?:()=>void) {
@@ -12,110 +12,130 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
   async function requirePet(sql: SqlExecutor) {
     if (!await sql.getFirstAsync('SELECT id FROM puppies WHERE id=?', petId)) throw new Error('The local puppy could not be found.');
   }
+  function eventFromRow(row: EventSqlRow & {id:string}):PuppyEvent {
+    try { return {id:localIdSchema.parse(row.id),...eventDataFromSql(row)}; }
+    catch { throw new EventsStorageError(); }
+  }
+  async function readEvent(sql:SqlExecutor,id:string) {
+    const row=await sql.getFirstAsync<EventSqlRow&{id:string}>('SELECT * FROM events WHERE pet_id=? AND id=?',petId,localIdSchema.parse(id));
+    return row?eventFromRow(row):null;
+  }
   async function readEvents(sql: SqlExecutor): Promise<EventRow[]> {
     await requirePet(sql);
     const rows=await sql.getAllAsync<EventSqlRow&{id:string}>('SELECT * FROM events WHERE pet_id=? ORDER BY at DESC,id DESC',petId);
-    try {
-      return rows.map(row=>{const event={id:localIdSchema.parse(row.id),...eventDataFromSql(row)};return {id:event.id,at:event.at,body:JSON.stringify(event),event};});
-    } catch { throw new EventsStorageError(); }
+    return rows.map(row=>{const event=eventFromRow(row);return {id:event.id,at:event.at,body:JSON.stringify(event),event};});
   }
   function materialize(rows: EventRow[]): PuppyEvent[] {
-    const present = new Set(rows.map((row) => row.id));
+    const present = new Set(rows.map(row=>row.id));
     for (const id of cache.keys()) if (!present.has(id)) cache.delete(id);
-    return rows.map((row) => {
-      const previous = cache.get(row.id);
-      if (previous?.body === row.body) return previous.event;
-      cache.set(row.id, { body: row.body, event: row.event });
-      return row.event;
+    return rows.map(row=>{
+      const previous=cache.get(row.id);
+      if (previous?.body===row.body) return previous.event;
+      cache.set(row.id,{body:row.body,event:row.event});return row.event;
     });
   }
-  async function mutateEvents<T>(action: (events: PuppyEvent[]) => { events: PuppyEvent[]; value: T }) {
+  async function commit<T>(action:(sql:SqlExecutor)=>Promise<{changes:LocalChange[];value:T}>):Promise<T> {
     let changed=false;
-    const committed = await database.write(async (sql) => {
-      const rows = await readEvents(sql);
-      const beforeSettings=(onChange||afterCommit)?await readLocalSettingsRecords(sql,petId):[];
-      const result = action(rows.map((row) => row.event));
-      result.events=parseEvents(result.events);
-      const previous = new Map(rows.map((row) => [row.id, row.body]));
-      const next = new Map(result.events.map((event) => [event.id, event]));
-      for (const row of rows) if (!next.has(row.id)) await sql.runAsync('DELETE FROM events WHERE pet_id=? AND id=?', petId, row.id);
-      const sorted = [...result.events].sort((a,b)=>b.at-a.at||(a.id<b.id?1:a.id>b.id?-1:0));
-      const saved: EventRow[] = [];
-      for (const event of sorted) {
-        const body = JSON.stringify(event);
-        if (previous.get(event.id) !== body) await sql.runAsync(upsertEventSql,petId,event.id,...eventSqlValues(event));
-        saved.push({ id: event.id, at: event.at, body, event });
-      }
-      if (onChange||afterCommit) {
-        const records = (events: PuppyEvent[]) => events.map(({id,...data})=>({kind:'event' as const,localId:id,data}));
-        const changes=localChanges([...records(rows.map(row=>row.event)),...beforeSettings],[...records(result.events),...await readLocalSettingsRecords(sql,petId)]);
-        if (changes.length) {await onChange?.(sql,changes);changed=true;}
-      }
-      return { rows: saved, value: result.value };
+    const result=await database.write(async sql=>{
+      await requirePet(sql);
+      const result=await action(sql);
+      if (result.changes.length) {await onChange?.(sql,result.changes);changed=true;}
+      return result.value;
     });
     if (changed) notifyLocalCommit(afterCommit);
-    return { events: materialize(committed.rows), value: committed.value };
+    return result;
+  }
+  const records=(kind:'event'|'routine',value:PuppyEvent|ScheduleEntry|null)=>{
+    if (!value) return [];
+    const {id,...data}=value;return [{kind,localId:id,data}];
+  };
+  async function writeEvent(sql:SqlExecutor,before:PuppyEvent|null,after:PuppyEvent|null):Promise<LocalChange[]> {
+    const changes=localChanges(records('event',before),records('event',after));
+    if (!changes.length) return [];
+    if (after) await sql.runAsync(upsertEventSql,petId,after.id,...eventSqlValues(after));
+    else await sql.runAsync('DELETE FROM events WHERE pet_id=? AND id=?',petId,before!.id);
+    return changes;
+  }
+  async function eventLabels(sql:SqlExecutor,changes:LocalChange[]) {
+    const labels=changes.flatMap(change=>change.after?.type==='custom'?[String(change.after.customLabel)]:[]);
+    return [...changes,...await retainCustomActivities(sql,petId,labels)];
+  }
+  async function updateEvent(id:string,changes:PuppyEventChanges):Promise<void> {
+    await commit(async sql=>{
+      const before=await readEvent(sql,id);
+      if (!before) throw new EventDeletedError();
+      const [after]=parseEvents([{...before,...changes,...(before.estimated?{estimated:true}:{})}]);
+      return {changes:await eventLabels(sql,await writeEvent(sql,before,after)),value:undefined};
+    });
+  }
+  function routineFromRow(row:RoutineSqlRow&{id:string}):ScheduleEntry {return {id:localIdSchema.parse(row.id),...routineDataFromSql(row)};}
+  async function readRoutine(sql:SqlExecutor,id:string) {
+    const row=await sql.getFirstAsync<RoutineSqlRow&{id:string}>('SELECT * FROM routines WHERE pet_id=? AND id=?',petId,localIdSchema.parse(id));
+    return row?routineFromRow(row):null;
   }
   async function readSchedule(sql: SqlExecutor): Promise<ScheduleEntry[]> {
     await requirePet(sql);
-    const rows=await sql.getAllAsync<RoutineSqlRow&{id:string}>('SELECT * FROM routines WHERE pet_id=? ORDER BY minutes,id',petId);
-    const entries=rows.map(row=>({id:localIdSchema.parse(row.id),...routineDataFromSql(row)}));
-    return entries;
+    return (await sql.getAllAsync<RoutineSqlRow&{id:string}>('SELECT * FROM routines WHERE pet_id=? ORDER BY minutes,id',petId)).map(routineFromRow);
   }
-  const updateEvent = async (id: string, changes: PuppyEventChanges): Promise<PuppyEvent[]> => (await mutateEvents((events) => {
-    if (!events.some(event => event.id === id)) throw new EventDeletedError();
-    return { events: events.map((event) => event.id === id ? { ...event, ...changes, ...(event.estimated ? { estimated: true } : {}) } : event), value: undefined };
-  })).events;
-  async function mutateSchedule(action:(current:ScheduleEntry[])=>ScheduleEntry[]):Promise<ScheduleEntry[]> {
-    let changed=false;
-    const saved=await database.write(async sql=>{
-      const before=await readSchedule(sql),entries=parseSchedule(action(before));
-      const previous=new Map(before.map(entry=>[entry.id,JSON.stringify(entry)]));
-      const ids=new Set(entries.map(entry=>entry.id));
-      for(const id of previous.keys())if(!ids.has(id))await sql.runAsync('DELETE FROM routines WHERE pet_id=? AND id=?',petId,id);
-      for(const entry of entries){
-        const body=JSON.stringify(entry);
-        if(previous.get(entry.id)!==body)await sql.runAsync(upsertRoutineSql,petId,entry.id,...routineSqlValues(entry));
-      }
-      if(onChange||afterCommit){
-        const records=(values:ScheduleEntry[])=>values.map(({id,...data})=>({kind:'routine' as const,localId:id,data}));
-        const changes=localChanges(records(before),records(entries));
-        if(changes.length){await onChange?.(sql,changes);changed=true;}
-      }
-      return entries;
-    });
-    if(changed)notifyLocalCommit(afterCommit);return saved;
+  async function writeRoutine(sql:SqlExecutor,before:ScheduleEntry|null,after:ScheduleEntry|null):Promise<LocalChange[]> {
+    const changes=localChanges(records('routine',before),records('routine',after));
+    if (!changes.length) return [];
+    if (after) await sql.runAsync(upsertRoutineSql,petId,after.id,...routineSqlValues(after));
+    else await sql.runAsync('DELETE FROM routines WHERE pet_id=? AND id=?',petId,before!.id);
+    return changes;
   }
   return {
-    async readEventsInTransaction(sql: SqlExecutor) { return (await readEvents(sql)).map((row) => row.event); },
     async loadEvents() { return materialize(await database.read(readEvents)); },
-    async appendEvents(incoming: PuppyEvent[]) {
+    async appendEvents(incoming:PuppyEvent[]):Promise<void> {
       incoming=parseEvents(incoming);
-      return (await mutateEvents((events) => {
-        const byId = new Map(events.map((event) => [event.id, event]));
-        for (const event of incoming) byId.set(event.id, { ...byId.get(event.id), ...event, ...(byId.get(event.id)?.estimated ? { estimated: true } : {}) });
-        return { events: [...byId.values()], value: undefined };
-      })).events;
-    },
-    async importEvents(incoming: PuppyEvent[]) {
-      incoming=parseEvents(incoming);
-      const result = await mutateEvents((events) => {
-        const ids = new Set(events.map((event) => event.id));
-        const additions = incoming.filter((event) => !ids.has(event.id));
-        const merged = [...events, ...additions];
-        if (merged.filter(isOpenNap).length > 1) throw new EventsImportError();
-        return { events: merged, value: { imported: additions.length, skipped: incoming.length - additions.length } };
+      await commit(async sql=>{
+        const changes:LocalChange[]=[];
+        for (const event of incoming) {
+          const before=await readEvent(sql,event.id);
+          const [after]=parseEvents([{...before,...event,...(before?.estimated?{estimated:true}:{})}]);
+          changes.push(...await writeEvent(sql,before,after));
+        }
+        return {changes:await eventLabels(sql,changes),value:undefined};
       });
-      return { events: result.events, ...result.value };
+    },
+    async importEvents(incoming:PuppyEvent[]):Promise<{imported:number;skipped:number}> {
+      incoming=parseEvents(incoming);
+      return commit(async sql=>{
+        const changes:LocalChange[]=[];let imported=0;
+        for (const event of incoming) {
+          if (await readEvent(sql,event.id)) continue;
+          changes.push(...await writeEvent(sql,null,event));imported++;
+        }
+        const open=await sql.getAllAsync("SELECT id FROM events WHERE pet_id=? AND type='nap' AND end_state=1 LIMIT 2",petId);
+        if (open.length>1) throw new EventsImportError();
+        return {changes:await eventLabels(sql,changes),value:{imported,skipped:incoming.length-imported}};
+      });
     },
     updateEvent,
-    updateEventTime: (id: string, at: number) => updateEvent(id, { at }),
-    async removeEvent(id: string) { return (await mutateEvents((events) => ({ events: events.filter((event) => event.id !== id), value: undefined }))).events; },
-    loadSchedule: () => database.read(readSchedule),
-    async saveSchedule(entries: ScheduleEntry[]) {
-      await mutateSchedule(()=>entries);
+    updateEventTime:(id:string,at:number)=>updateEvent(id,{at}),
+    async removeEvent(id:string):Promise<void> {
+      await commit(async sql=>({changes:await writeEvent(sql,await readEvent(sql,id),null),value:undefined}));
     },
-    saveScheduleEntry:(entry:ScheduleEntry,original?:ScheduleEntry)=>mutateSchedule(current=>applyScheduleEntryEdit(current,entry,original)),
-    removeScheduleEntry:(id:string)=>mutateSchedule(current=>current.filter(entry=>entry.id!==id)),
+    loadSchedule:()=>database.read(readSchedule),
+    async saveSchedule(entries:ScheduleEntry[]):Promise<void> {
+      entries=parseSchedule(entries);
+      await commit(async sql=>{
+        const previous=new Map((await readSchedule(sql)).map(entry=>[entry.id,entry]));
+        const next=new Map(entries.map(entry=>[entry.id,entry])),changes:LocalChange[]=[];
+        for (const [id,entry] of previous) if (!next.has(id)) changes.push(...await writeRoutine(sql,entry,null));
+        for (const entry of entries) changes.push(...await writeRoutine(sql,previous.get(entry.id)??null,entry));
+        return {changes,value:undefined};
+      });
+    },
+    async saveScheduleEntry(entry:ScheduleEntry,original?:ScheduleEntry):Promise<void> {
+      await commit(async sql=>{
+        const before=await readRoutine(sql,entry.id);
+        const [after]=parseSchedule(applyScheduleEntryEdit(before?[before]:[],entry,original));
+        return {changes:await writeRoutine(sql,before,after),value:undefined};
+      });
+    },
+    async removeScheduleEntry(id:string):Promise<void> {
+      await commit(async sql=>({changes:await writeRoutine(sql,await readRoutine(sql,id),null),value:undefined}));
+    },
   };
 }

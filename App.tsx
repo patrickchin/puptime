@@ -132,7 +132,8 @@ export default function App() {
 
   const refresh = useCallback(async () => {
     const pending = await readPendingWidgetEvents();
-    const nextEvents = pending.length ? await appendEvents(pending) : await loadEvents();
+    if (pending.length) await appendEvents(pending);
+    const nextEvents = await loadEvents();
     setEvents(nextEvents);
     const nextCustomActivities = await loadCustomActivities(nextEvents);
     setCustomActivities(nextCustomActivities);
@@ -168,11 +169,11 @@ export default function App() {
     return nextEvents;
   }, []);
 
-  const refreshFromCloud=useCallback(async()=>{
+  const refreshCommittedState=useCallback(async()=>{
     try{await refresh();}
     catch{Alert.alert(translate(languageRef.current,'app.loadErrorTitle'),translate(languageRef.current,'app.loadErrorBody'));}
   },[refresh]);
-  const cloud=useCloud(refreshFromCloud);
+  const cloud=useCloud(refreshCommittedState);
 
   useEffect(() => {
     let mounted = true;
@@ -276,9 +277,8 @@ export default function App() {
     if (!event) return;
 
     if (response.actionIdentifier === ADD_NOTE_ACTION && response.userText?.trim()) {
-      const updatedEvents = await updateEvent(event.id, { note: normalizeNote(response.userText) });
-      setEvents(updatedEvents);
-      updateHomeWidget(updatedEvents).catch(() => undefined);
+      await updateEvent(event.id, { note: normalizeNote(response.userText) });
+      await refreshCommittedState();
     }
     setAccountVisible(false);
     setSettingsVisible(false);
@@ -287,7 +287,7 @@ export default function App() {
       eventId: event.id,
       focusNote: response.actionIdentifier === ADD_NOTE_ACTION && !response.userText?.trim(),
     });
-  }, [initialOnboardingCheck, refresh]);
+  }, [initialOnboardingCheck, refresh, refreshCommittedState]);
 
   useEffect(() => {
     const initialResponse = Notifications.getLastNotificationResponse();
@@ -319,18 +319,16 @@ export default function App() {
       const openNap = (await loadEvents()).find(isOpenNap);
       if (openNap) {
         const event = { ...openNap, endedAt: Math.max(openNap.at, now) };
-        const nextEvents = await updateEvent(openNap.id, { endedAt: event.endedAt });
-        setEvents(nextEvents);
+        await updateEvent(openNap.id, { endedAt: event.endedAt });
         setUndoState({ event, restore: openNap, message: translate(language, 'app.napEnded') });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-        updateHomeWidget(nextEvents).catch(() => undefined);
+        await refreshCommittedState();
         return;
       }
     }
 
     const event = type === 'nap' ? createNapEvent('app', now) : createEvent(type, 'app', now, customLabel);
-    const nextEvents = await appendEvents([event]);
-    setEvents(nextEvents);
+    await appendEvents([event]);
     setUndoState({
       event,
       message: type === 'nap'
@@ -338,8 +336,7 @@ export default function App() {
         : translate(language, 'app.logged', { activity: displayPastLabel(event) }),
     });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-    syncPottyReminders(nextEvents, notificationPreferences, language).catch(() => undefined);
-    updateHomeWidget(nextEvents).catch(() => undefined);
+    await refreshCommittedState();
   };
 
   const logEvent = (type: EventType, customLabel?: string) => {
@@ -347,10 +344,8 @@ export default function App() {
   };
 
   const deleteEvent = async (event: PuppyEvent) => {
-    const nextEvents = await removeEvent(event.id);
-    setEvents(nextEvents);
-    syncPottyReminders(nextEvents, notificationPreferences, language).catch(() => undefined);
-    updateHomeWidget(nextEvents).catch(() => undefined);
+    await removeEvent(event.id);
+    await refreshCommittedState();
   };
 
   const importActivity = async () => {
@@ -358,11 +353,8 @@ export default function App() {
       const incoming = await pickEventsCsv();
       if (incoming === null) return;
       const result = await importEvents(incoming);
-      setEvents(result.events);
       setUndoState(null);
-      void loadCustomActivities(result.events).then(setCustomActivities).catch(() => undefined);
-      syncPottyReminders(result.events, notificationPreferences, language).catch(() => undefined);
-      updateHomeWidget(result.events).catch(() => undefined);
+      await refreshCommittedState();
       Alert.alert(translate(language, 'insights.importedTitle'), translate(language, 'insights.importedBody', {
         imported: result.imported,
         skipped: result.skipped,
@@ -386,23 +378,18 @@ export default function App() {
     if ((changes.type??event.type)==='custom'&&changes.customLabel&&activityKey({type:'custom',customLabel:changes.customLabel})!==activityKey(event)) {
       setCustomActivities(await saveCustomActivity(changes.customLabel));
     }
-    const nextEvents=await updateEvent(event.id,changes);
-    setEvents(nextEvents);
+    await updateEvent(event.id,changes);
     Haptics.selectionAsync().catch(() => undefined);
-    syncPottyReminders(nextEvents, notificationPreferences, language).catch(() => undefined);
-    updateHomeWidget(nextEvents).catch(() => undefined);
+    await refreshCommittedState();
   };
 
   const persistUndo = async () => {
     if (!undoState) return;
-    const nextEvents = undoState.restore
-      ? await appendEvents([undoState.restore])
-      : await removeEvent(undoState.event.id);
-    setEvents(nextEvents);
+    if (undoState.restore) await appendEvents([undoState.restore]);
+    else await removeEvent(undoState.event.id);
     setUndoState(null);
     Haptics.selectionAsync().catch(() => undefined);
-    syncPottyReminders(nextEvents, notificationPreferences, language).catch(() => undefined);
-    updateHomeWidget(nextEvents).catch(() => undefined);
+    await refreshCommittedState();
   };
 
   const undo = () => {
@@ -424,9 +411,13 @@ export default function App() {
       Alert.alert(translate(language, 'app.routineSaved'), translate(language, 'app.reminderError'));
     }
   };
-  const changeSchedule = async (nextSchedule:ScheduleEntry[]) => {await saveSchedule(nextSchedule);await applySavedSchedule(await loadSchedule());};
-  const changeScheduleEntry = async (entry:ScheduleEntry,original?:ScheduleEntry) => applySavedSchedule(await saveScheduleEntry(entry,original));
-  const deleteScheduleEntry = async (id:string) => applySavedSchedule(await removeScheduleEntry(id));
+  const refreshCommittedSchedule=async()=>{
+    try{await applySavedSchedule(await loadSchedule());}
+    catch{Alert.alert(translate(language,'app.loadErrorTitle'),translate(language,'app.loadErrorBody'));}
+  };
+  const changeSchedule = async (nextSchedule:ScheduleEntry[]) => {await saveSchedule(nextSchedule);await refreshCommittedSchedule();};
+  const changeScheduleEntry = async (entry:ScheduleEntry,original?:ScheduleEntry) => {await saveScheduleEntry(entry,original);await refreshCommittedSchedule();};
+  const deleteScheduleEntry = async (id:string) => {await removeScheduleEntry(id);await refreshCommittedSchedule();};
 
   const chooseTheme = (preference: ThemePreference) => {
     saveThemePreference(preference)

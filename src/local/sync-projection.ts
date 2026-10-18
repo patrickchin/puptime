@@ -50,9 +50,8 @@ async function settings(sql: SqlExecutor, petId: string) {
     if (typeof value!=='object'||Array.isArray(value)) throw new Error('Saved settings contain an invalid object.');
     return value;
   }
-  const historical=await sql.getAllAsync<{label:string}>("SELECT DISTINCT custom_label label FROM events WHERE pet_id=? AND type='custom'",petId);
   const deleted=strings(storageKeys.deletedCustomActivities);
-  const labels=normalizeCustomActivities([...strings(storageKeys.customActivities),...historical.map(row=>row.label)],deleted);
+  const labels=normalizeCustomActivities(strings(storageKeys.customActivities),deleted);
   return {pet,values,labels,deleted,customizations:normalizeActivityCustomizations(object(storageKeys.activityCustomizations)),notification:normalizeNotificationPreferences(object(storageKeys.notificationPreferences)),widgetActions:values.has(storageKeys.widgetActions)?normalizeWidgetActions(strings(storageKeys.widgetActions),labels):[...DEFAULT_WIDGET_ACTIONS]};
 }
 
@@ -86,6 +85,21 @@ export async function readLocalRecords(sql:SqlExecutor,petId:string):Promise<Loc
 async function set(sql:SqlExecutor,petId:string,key:StorageKey,value:string) {
   if (petSettingKeys.has(key)) await sql.runAsync('INSERT INTO pet_settings(pet_id,key,value) VALUES (?,?,?) ON CONFLICT(pet_id,key) DO UPDATE SET value=excluded.value',petId,key,value);
   else await sql.runAsync('INSERT INTO settings(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',key,value);
+}
+export async function retainCustomActivities(sql:SqlExecutor,petId:string,incoming:string[]):Promise<LocalChange[]> {
+  if (!incoming.length) return [];
+  async function strings(key:StorageKey):Promise<string[]> {
+    const row=await sql.getFirstAsync<{value:string}>('SELECT value FROM pet_settings WHERE pet_id=? AND key=?',petId,key);
+    if (!row) return [];
+    const value:unknown=JSON.parse(row.value);
+    if (!Array.isArray(value)||value.some(item=>typeof item!=='string')) throw new Error('Saved settings contain an invalid collection.');
+    return value;
+  }
+  const stored=await strings(storageKeys.customActivities),deleted=await strings(storageKeys.deletedCustomActivities);
+  const before=normalizeCustomActivities(stored,deleted),after=normalizeCustomActivities([...before,...incoming],deleted);
+  if (JSON.stringify(stored)!==JSON.stringify(after)) await set(sql,petId,storageKeys.customActivities,JSON.stringify(after));
+  const records=(labels:string[])=>labels.map(label=>({kind:'customActivity' as const,localId:customActivityKey(label),data:{label}}));
+  return localChanges(records(before),records(after));
 }
 export async function applyLocalRecords(sql:SqlExecutor,petId:string,records:LocalRecord[],deleted:Array<{kind:RecordKind;localId:string}>):Promise<void> {
   const state=await settings(sql,petId);
@@ -135,6 +149,9 @@ export async function applyLocalRecords(sql:SqlExecutor,petId:string,records:Loc
       await set(sql,petId,storageKeys.notificationPreferences,JSON.stringify(preferences));
     }
   }
+  const eventLabels=records.filter(record=>record.kind==='event'&&record.data.type==='custom').map(record=>String(record.data.customLabel));
+  const nextLabels=normalizeCustomActivities([...labels,...eventLabels],removed);
+  if (JSON.stringify(labels)!==JSON.stringify(nextLabels)) {labels=nextLabels;changedLabels=true;}
   if (changedLabels) {await set(sql,petId,storageKeys.customActivities,JSON.stringify(labels));await set(sql,petId,storageKeys.deletedCustomActivities,JSON.stringify(removed));}
   if (changedCustomizations) await set(sql,petId,storageKeys.activityCustomizations,JSON.stringify(customizations));
 }

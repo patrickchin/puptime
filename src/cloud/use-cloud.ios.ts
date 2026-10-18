@@ -5,7 +5,8 @@ import { watchAccountChanges } from './change-subscription';
 import { createNativeCloudClient } from './auth.ios';
 import { createAccountController,type AccountController } from './account-controller';
 import { getLocalRuntime,subscribeLocalWrites } from '../local/runtime.ios';
-import type { CloudHandle } from './use-cloud';
+import type { CloudHandle } from './handle';
+export type { CloudHandle } from './handle';
 
 const getLocalName=async()=>(await getLocalRuntime()).storage.loadPuppyName();
 export function useCloud(onRemoteChange:()=>unknown):CloudHandle {

@@ -85,6 +85,18 @@ test('projection round trip preserves exact IDs, history and independent puppy s
   assert.deepEqual(await storage.loadCustomActivities(),['Training']); assert.equal(changes.length,0);
 });
 
+test('remote event projection materializes custom labels without resurrecting a deleted activity',async t=>{
+ const {database,storage}=await setup(t);
+ const record={kind:'event' as const,localId:'remote-custom',data:{type:'custom',customLabel:'Training',at:100,source:'app'}};
+ await database.write(sql=>projection.applyLocalRecords(sql,'pet-1',[record],[]));
+ assert.equal((await database.read(sql=>sql.getFirstAsync<{value:string}>("SELECT value FROM pet_settings WHERE key='puptime.customActivities.v1'")))!.value,'["Training"]');
+ await storage.deleteCustomActivity('Training');
+ await database.write(sql=>projection.applyLocalRecords(sql,'pet-1',[{...record,data:{...record.data,note:'remote note'}}],[]));
+ assert.deepEqual(await storage.loadCustomActivities(),[]);assert.equal((await storage.loadEvents())[0].note,'remote note');
+ await database.write(sql=>projection.applyLocalRecords(sql,'pet-1',[{kind:'customActivity',localId:'custom:training',data:{label:'Training'}}],[]));
+ assert.deepEqual(await storage.loadCustomActivities(),['Training']);
+});
+
 test('snapshot and apply reject corrupt fields and invalid batches without partial projection', async t => {
   const {database,storage}=await setup(t);
   await storage.appendEvents([event]);

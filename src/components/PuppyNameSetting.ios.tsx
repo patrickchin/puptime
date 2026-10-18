@@ -5,7 +5,7 @@ import { useAccountSnapshot } from '../cloud/use-account-snapshot';
 import { getLocalRuntime, subscribeLocalWrites } from '../local/runtime.ios';
 import { useLocalization } from '../localization-context';
 import { spacing, surfaceTreatment } from '../theme';
-import type { PuppyNameSettingProps } from './PuppyNameSetting';
+import type { PuppyNameSettingProps } from './puppy-name-setting-props';
 import { SettingsRow } from './SettingsRow';
 
 export function PuppyNameSetting({theme,cloud}:PuppyNameSettingProps) {

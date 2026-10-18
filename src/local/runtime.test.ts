@@ -16,6 +16,29 @@ test('the local runtime shares the storage transaction and engine, retaining fre
  const another=await runtime.createLocalRuntime(db,'pet-1');assert.equal(another.deviceId,local.deviceId);
 });
 
+test('one changed record creates one revision and upload while no-ops and failed outbox commits create neither',async t=>{
+ const db=await database();t.after(()=>db.close());let signals=0;
+ const local=await runtime.createLocalRuntime(db,'pet-1',()=>{signals++;});
+ const owner={...await local.sync.prepareAssociation({accountId:'account-1',localPetId:'pet-1',deviceId:local.deviceId,enrollment:{operationId:'enrollment',deviceId:local.deviceId,localPetId:'pet-1',name:'My puppy'}}),accountId:'account-1'};
+ await local.sync.stageBaseline({...owner,page:{changes:[],cursor:0,hasMore:false}});await local.sync.completeAssociation({...owner,cloudPetId:'pet-1'});
+ const counts=()=>db.read(async sql=>({revisions:(await sql.getFirstAsync<{n:number}>('SELECT COUNT(*) n FROM local_revisions'))!.n,pending:(await sql.getFirstAsync<{n:number}>('SELECT COUNT(*) n FROM local_sync_outbox'))!.n}));
+ const before=await counts(),event={id:'one',type:'pee' as const,at:100,source:'app' as const};
+ await local.storage.appendEvents([event]);
+ const created={revisions:before.revisions+1,pending:before.pending+1};assert.deepEqual(await counts(),created);assert.equal(signals,1);
+ await local.storage.updateEvent('one',{at:100});await local.storage.appendEvents([event]);await local.storage.removeEvent('missing');
+ assert.deepEqual(await counts(),created);assert.equal(signals,1);
+ await db.write(sql=>sql.execAsync("CREATE TRIGGER fail_pending AFTER INSERT ON local_sync_outbox WHEN NEW.local_id='one' BEGIN SELECT RAISE(ABORT,'synthetic queue failure'); END;"));
+ await assert.rejects(local.storage.updateEvent('one',{note:'must roll back'}),/queue failure/);
+ assert.deepEqual(await local.storage.loadEvents(),[event]);assert.deepEqual(await counts(),created);assert.equal(signals,1);
+ await db.write(sql=>sql.execAsync('DROP TRIGGER fail_pending'));
+ await local.storage.updateEvent('one',{note:'saved'});
+ assert.deepEqual(await counts(),{revisions:created.revisions+1,pending:created.pending+1});assert.equal(signals,2);
+ assert.deepEqual((await local.sync.nextBatch(owner)).at(-1)!.patch,{note:'saved'});
+ await local.storage.removeEvent('one');const deleted=await counts();assert.equal(signals,3);
+ await local.storage.removeEvent('one');await assert.rejects(local.storage.updateEvent('one',{note:'stale draft'}),/deleted/i);
+ assert.deepEqual(await counts(),deleted);assert.equal(signals,3);
+});
+
 test('an invalid retained device identity fails without silently changing history or assigning a new identity',async t=>{
  const db=await database();t.after(()=>db.close());assert.equal(typeof runtime.createLocalRuntime,'function');
  await db.write(async sql=>{await sql.runAsync("INSERT INTO metadata(key,value) VALUES ('cloud_device_id','broken device id')");await sql.runAsync("INSERT INTO events(pet_id,id,type,at,source) VALUES ('pet-1','one','pee',100,'app')");});

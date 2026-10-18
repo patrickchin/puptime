@@ -50,13 +50,10 @@ export function createNativeStorage(database: LocalDatabase, petId: string, onCh
     if (typeof value !== 'object' || Array.isArray(value)) throw new Error('Saved settings contain an invalid object.');
     return value;
   }
-  async function activities(sql: SqlExecutor, events?: PuppyEvent[]) {
+  async function activities(sql: SqlExecutor) {
     const stored = await strings(sql, storageKeys.customActivities);
     const deleted = await strings(sql, storageKeys.deletedCustomActivities);
-    const history = (events ?? await repository.readEventsInTransaction(sql)).filter((event) => event.type === 'custom').map((event) => event.customLabel);
-    const next = normalizeCustomActivities([...stored, ...history], deleted);
-    if (JSON.stringify(next) !== JSON.stringify(stored)) await set(sql, storageKeys.customActivities, JSON.stringify(next));
-    return next;
+    return normalizeCustomActivities(stored, deleted);
   }
   async function customizations(sql: SqlExecutor) { return normalizeActivityCustomizations(await object(sql, storageKeys.activityCustomizations)); }
   return {
@@ -84,7 +81,7 @@ export function createNativeStorage(database: LocalDatabase, petId: string, onCh
     saveThemePreference: (value: ThemePreference) => settingsWrite((sql) => set(sql, storageKeys.theme, value)),
     loadLanguagePreference: () => database.read(async (sql) => { const value = await get(sql, storageKeys.language); return isLanguagePreference(value) ? value : 'system'; }),
     saveLanguagePreference: (value: LanguagePreference) => settingsWrite((sql) => set(sql, storageKeys.language, value)),
-    loadCustomActivities: (events?: PuppyEvent[]) => database.write((sql) => activities(sql, events)),
+    loadCustomActivities: (_events?: PuppyEvent[]) => database.read(activities),
     async saveCustomActivity(label: string) {
       return settingsWrite(async (sql) => {
         const key = customActivityKey(label);
@@ -109,7 +106,7 @@ export function createNativeStorage(database: LocalDatabase, petId: string, onCh
       const next = { ...await customizations(sql), [key]: value };
       await set(sql, storageKeys.activityCustomizations, JSON.stringify(next)); return next;
     }),
-    loadWidgetActions: (customActivities?: string[]) => database.write(async (sql) => {
+    loadWidgetActions: (customActivities?: string[]) => database.read(async (sql) => {
       const raw = await get(sql, storageKeys.widgetActions);
       if (raw === null) return [...DEFAULT_WIDGET_ACTIONS];
       return normalizeWidgetActions(await strings(sql, storageKeys.widgetActions), customActivities ?? await activities(sql));

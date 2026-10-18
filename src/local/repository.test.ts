@@ -3,8 +3,9 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import test, { type TestContext } from 'node:test';
-import { createLocalDatabase, initializeLocalDatabase } from './database.ts';
+import { createLocalDatabase, initializeLocalDatabase, type SqlValue } from './database.ts';
 import { createLocalRepository } from './repository.ts';
+import { createLocalRuntime } from './runtime-factory.ts';
 import { sqliteTestConnection } from './sqlite-test-adapter.ts';
 import { EventsImportError, EventsStorageError } from '../storage-validation.ts';
 import type { PuppyEvent } from '../domain.ts';
@@ -12,11 +13,60 @@ const event = (id = 'first', at = 100): PuppyEvent => ({ id, at, type: 'pee', so
 async function setup(t: TestContext) {
   const directory = await mkdtemp(join(tmpdir(), 'puptime-repository-'));
   const path = join(directory, 'data.db');
-  const database = await createLocalDatabase(sqliteTestConnection(path));
+  const connection=sqliteTestConnection(path),reads:Array<{sql:string;rows:number}>=[];
+  const database = await createLocalDatabase({...connection,
+    async getAllAsync<T>(sql:string,...values:SqlValue[]){const rows=await connection.getAllAsync<T>(sql,...values);reads.push({sql,rows:rows.length});return rows;},
+    async getFirstAsync<T>(sql:string,...values:SqlValue[]){const row=await connection.getFirstAsync<T>(sql,...values);reads.push({sql,rows:row===null?0:1});return row;},
+  });
   t.after(async () => { await database.close(); await rm(directory, { recursive: true, force: true }); });
   await initializeLocalDatabase(database,()=> 'pet-1');await database.write(sql=>sql.runAsync('DELETE FROM routines'));
-  return { database, path, repository: createLocalRepository(database, 'pet-1') };
+  return { database, path, reads, repository: createLocalRepository(database, 'pet-1') };
 }
+
+test('ordinary mutations read only requested records with 10000 saved events and preserve atomic revision capture',async t=>{
+  const {repository,database,reads}=await setup(t);
+  await repository.appendEvents(Array.from({length:10000},(_,index)=>event(`event-${index}`,index)));
+  const {storage}=await createLocalRuntime(database,'pet-1');
+  reads.length=0;
+  const result=await storage.updateEvent('event-5000',{note:'one saved edit'});
+  const eventReads=reads.filter(read=>/\bFROM events\b/i.test(read.sql));
+  assert.equal(eventReads.reduce((count,read)=>count+read.rows,0),1,'A one-row edit must not materialize event history.');
+  assert.equal(eventReads.length,1,'Ordinary edits must not scan history to derive settings.');
+  assert.equal(result,undefined);
+  assert.equal((await database.read(sql=>sql.getFirstAsync<{note:string}>("SELECT note FROM events WHERE id='event-5000'")))!.note,'one saved edit');
+  assert.equal((await database.read(sql=>sql.getFirstAsync<{n:number}>('SELECT COUNT(*) n FROM local_revisions')))!.n,1);
+  reads.length=0;
+  assert.equal(await storage.appendEvents([event('new',10001)]),undefined);
+  assert.deepEqual(reads.filter(read=>/\bFROM events\b/i.test(read.sql)).map(read=>read.rows),[0]);
+  reads.length=0;
+  assert.equal(await storage.removeEvent('event-100'),undefined);
+  assert.deepEqual(reads.filter(read=>/\bFROM events\b/i.test(read.sql)).map(read=>read.rows),[1]);
+  reads.length=0;
+  assert.deepEqual(await storage.importEvents([event('event-101'),event('imported')]),{imported:1,skipped:1});
+  assert.deepEqual(reads.filter(read=>/\bFROM events\b/i.test(read.sql)).map(read=>read.rows),[1,0,0]);
+  reads.length=0;
+  await storage.savePuppyName('Biscuit');await storage.saveThemePreference('soft-play');await storage.loadCustomActivities();
+  assert.equal(reads.filter(read=>/\bFROM events\b/i.test(read.sql)).length,0,'Settings must use stored activity state.');
+  await storage.saveSchedule([{id:'one',type:'meal',minutes:500},{id:'two',type:'walk',minutes:600}]);
+  reads.length=0;
+  assert.equal(await storage.saveScheduleEntry({id:'one',type:'meal',minutes:515},{id:'one',type:'meal',minutes:500}),undefined);
+  assert.deepEqual(reads.filter(read=>/\bFROM routines\b/i.test(read.sql)).map(read=>read.rows),[1]);
+});
+
+test('custom event labels commit with history and reads never materialize or resurrect deleted activities',async t=>{
+  const {database}=await setup(t);const {storage}=await createLocalRuntime(database,'pet-1');
+  await storage.importEvents([{...event('custom'),type:'custom',customLabel:'Training'}]);
+  const stored=await database.read(sql=>sql.getFirstAsync<{value:string}>("SELECT value FROM pet_settings WHERE key='puptime.customActivities.v1' AND pet_id='pet-1'"));
+  assert.equal(stored?.value,'["Training"]');
+  const revisions=await database.read(sql=>sql.getAllAsync<{kind:string}>('SELECT kind FROM local_revisions ORDER BY sequence'));
+  assert.deepEqual(revisions.map(row=>row.kind),['event','customActivity']);
+  await storage.deleteCustomActivity('Training');
+  await storage.importEvents([{...event('another-custom'),type:'custom',customLabel:'Training'}]);
+  const before=(await database.read(sql=>sql.getFirstAsync<{n:number}>('SELECT total_changes() n')))!.n;
+  assert.deepEqual(await storage.loadCustomActivities(),[]);
+  assert.equal((await database.read(sql=>sql.getFirstAsync<{n:number}>('SELECT total_changes() n')))!.n,before);
+  assert.equal((await storage.loadEvents()).length,2);
+});
 
 test('current event and routine fields are SQL columns with exact optional-value round trips',async t=>{
   const {repository,database}=await setup(t);
@@ -48,24 +98,27 @@ test('current event and routine fields are SQL columns with exact optional-value
   assert.deepEqual(await repository.loadEvents(),saved);
 });
 
-test('transactional CRUD returns committed history and retains estimate provenance and optional clears', async (t) => {
+test('transactional CRUD retains estimate provenance and optional clears in committed history', async (t) => {
   const { repository } = await setup(t);
   const first = { ...event(), estimated: true, note: 'keep' };
   await repository.appendEvents([first, event('second', 200)]);
-  const updated = await repository.appendEvents([{ ...event(), source: 'widget' }]);
+  assert.equal(await repository.appendEvents([{ ...event(), source: 'widget' }]),undefined);
+  const updated = await repository.loadEvents();
   assert.equal(updated.find((item) => item.id === first.id)!.note, 'keep');
   assert.equal(updated.find((item) => item.id === first.id)!.estimated, true);
-  const changed = await repository.updateEvent(first.id, { at: 300, note: undefined });
+  assert.equal(await repository.updateEvent(first.id, { at: 300, note: undefined }),undefined);
+  const changed = await repository.loadEvents();
   assert.deepEqual(changed.map((item) => item.id), ['first', 'second']);
   assert.equal(changed[0].estimated, true); assert.equal(changed[0].note, undefined);
-  assert.deepEqual(await repository.removeEvent('second'), [changed[0]]);
+  assert.equal(await repository.removeEvent('second'),undefined);
   assert.deepEqual(await repository.loadEvents(), [changed[0]]);
 });
 
 test('duplicate CSV import does not write and preserves existing conflicting-open-nap import behavior', async (t) => {
   const { repository, database } = await setup(t);
   await repository.appendEvents([{ ...event(), note: 'newer' }]);
-  assert.deepEqual(await repository.importEvents([event(), event('second')]), { events: [event('second'),{ ...event(), note: 'newer' }], imported: 1, skipped: 1 });
+  assert.deepEqual(await repository.importEvents([event(), event('second')]), { imported: 1, skipped: 1 });
+  assert.deepEqual(await repository.loadEvents(),[event('second'),{...event(),note:'newer'}]);
   const before = (await database.read((sql) => sql.getFirstAsync<{ count: number }>('SELECT total_changes() AS count')))!.count;
   assert.equal((await repository.importEvents([event(), event('second')])).imported, 0);
   assert.equal((await database.read((sql) => sql.getFirstAsync<{ count: number }>('SELECT total_changes() AS count')))!.count, before);
@@ -93,7 +146,8 @@ test('history reads and one-row edits preserve all unchanged event object refere
   await repository.appendEvents(Array.from({ length: 1000 }, (_, index) => event(`event-${index}`, index)));
   const before = await repository.loadEvents();
   assert.equal((await repository.loadEvents())[500], before[500]);
-  const after = await repository.updateEvent('event-500', { note: 'one edit' });
+  await repository.updateEvent('event-500', { note: 'one edit' });
+  const after = await repository.loadEvents();
   assert.equal(after.filter((item, index) => item === before[index]).length, 999);
   assert.equal(after.find((item) => item.id === 'event-500')!.note, 'one edit');
 });
@@ -166,7 +220,8 @@ test('routine field edits preserve independently committed fields and newly adde
  const added={id:'other-device',type:'walk' as const,minutes:700};
  await repository.saveSchedule([original]);await repository.saveSchedule([remote,added]);
  assert.equal(typeof repository.saveScheduleEntry,'function');
- assert.deepEqual(await repository.saveScheduleEntry({...original,minutes:615},original),[{...remote,minutes:615},added]);
+ assert.equal(await repository.saveScheduleEntry({...original,minutes:615},original),undefined);
+ assert.deepEqual(await repository.loadSchedule(),[{...remote,minutes:615},added]);
 });
 
 test('saving a deleted routine rejects without resurrection, preserving other current routines',async t=>{
@@ -188,5 +243,6 @@ test('routine edits validate and roll back atomically while deletion touches onl
  await database.write(sql=>sql.execAsync("CREATE TRIGGER fail_routine_patch BEFORE UPDATE ON routines BEGIN SELECT RAISE(ABORT,'synthetic write failure'); END;"));
  await assert.rejects(repository.saveScheduleEntry({...first,minutes:615},first),/write failure/);
  assert.deepEqual(await repository.loadSchedule(),[first,other]);
- assert.deepEqual(await repository.removeScheduleEntry('first'),[other]);
+ assert.equal(await repository.removeScheduleEntry('first'),undefined);
+ assert.deepEqual(await repository.loadSchedule(),[other]);
 });
