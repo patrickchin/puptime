@@ -3,6 +3,12 @@ import { cloudRecordId, fieldPatch, localRecordId } from '../cloud/record-identi
 import { ReconciliationError, reconcileMutation, retainValidEventTiming } from '../cloud/reconcile.ts';
 import type { LocalDatabase, SqlExecutor } from './database.ts';
 import { applyLocalRecords, localChangeSchema, localChanges, readLocalDeletedActivities, readLocalRecords, type LocalChange, type LocalChangeSink, type LocalRecord } from './sync-projection.ts';
+import { STARTER_SCHEDULE } from '../domain.ts';
+import { firstLaunchStepSchema } from '../first-launch.ts';
+
+export class RestoreNeedsConfirmationError extends Error {
+  constructor(){super('Restore requires confirmation because this setup is no longer pristine.');this.name='RestoreNeedsConfirmationError';}
+}
 
 type Owner={generation:string;account_id:string;device_id:string;cursor:number;pending_pet_id:string|null;staging_cursor:number;staging_complete:number;resyncing:number};
 type Binding={pet_id:string;cloud_pet_id:string|null;enrollment:string;status:'preparing'|'active'};
@@ -19,6 +25,26 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
   }
   async function required(sql:SqlExecutor,fence:Fence) {const value=await owner(sql,fence);if (!value) throw new Error('Cloud owner changed.');return value;}
   async function binding(sql:SqlExecutor,petId:string) {return sql.getFirstAsync<Binding>('SELECT * FROM local_sync_pets WHERE pet_id=?',petId);}
+  async function pristineSetup(sql:SqlExecutor,petId:string):Promise<boolean> {
+    const shown=await sql.getFirstAsync<{value:string}>("SELECT value FROM metadata WHERE key='show_onboarding'");
+    const step=await sql.getFirstAsync<{value:string}>("SELECT value FROM metadata WHERE key='first_launch_step'");
+    const active=await sql.getFirstAsync<{value:string}>("SELECT value FROM metadata WHERE key='active_pet_id'");
+    if(shown?.value!=='true'||active?.value!==petId||!firstLaunchStepSchema.safeParse(step?.value??'welcome').success)return false;
+    if(await sql.getFirstAsync('SELECT id FROM events WHERE pet_id=? LIMIT 1',petId)
+      ||await sql.getFirstAsync("SELECT sequence FROM local_revisions WHERE pet_id=? AND kind!='puppy' LIMIT 1",petId)
+      ||await sql.getFirstAsync("SELECT pet_id FROM local_sync_pets WHERE status='active' LIMIT 1")
+      ||await sql.getFirstAsync('SELECT operation_id FROM local_sync_outbox WHERE local_pet_id=? LIMIT 1',petId))return false;
+    const records=await readLocalRecords(sql,petId);
+    if(records.some(record=>record.kind==='customActivity'||record.kind==='customization')||(await readLocalDeletedActivities(sql,petId)).length)return false;
+    const starters:LocalRecord[]=STARTER_SCHEDULE.map(({id,...data})=>({kind:'routine',localId:id,data}));
+    return !localChanges(starters,records.filter(record=>record.kind==='routine')).length;
+  }
+  async function associationMode(sql:SqlExecutor,operationId:string):Promise<'combine'|'restore'> {
+    const intent=await sql.getFirstAsync<{value:string}>("SELECT value FROM metadata WHERE key='pending_restore_operation'");
+    if(intent&&intent.value!==operationId)throw new Error('Saved restoration intent is inconsistent.');
+    return intent?'restore':'combine';
+  }
+  async function clearRestoreIntent(sql:SqlExecutor) {await sql.runAsync("DELETE FROM metadata WHERE key='pending_restore_operation'");}
   async function mirrored(sql:SqlExecutor,generation:string,recordId:string) {
     const row=await sql.getFirstAsync<{body:string}>('SELECT body FROM local_sync_records WHERE generation=? AND record_id=?',generation,recordId);
     return row?cloudRecordSchema.parse(JSON.parse(row.body)):null;
@@ -153,9 +179,13 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
         }
       };
     },
-    async prepareAssociation(input:{accountId:string;localPetId:string;deviceId:string;enrollment:Enrollment}):Promise<{generation:string}> {
+    canRestoreSetup:(petId:string)=>database.read(sql=>pristineSetup(sql,identifierSchema.parse(petId))),
+    async prepareAssociation(input:{accountId:string;localPetId:string;deviceId:string;enrollment:Enrollment;mode?:'combine'|'restore'}):Promise<{generation:string}> {
       identifierSchema.parse(input.accountId);identifierSchema.parse(input.deviceId);identifierSchema.parse(input.localPetId);
       const request=enrollmentSchema.parse(input.enrollment);
+      const mode=input.mode??'combine';
+      if(!['combine','restore'].includes(mode))throw new TypeError('Invalid association mode.');
+      if(mode==='restore'&&!request.confirmedPetId)throw new RestoreNeedsConfirmationError();
       if (request.localPetId!==input.localPetId||request.deviceId!==input.deviceId) throw new Error('Enrollment identity mismatch.');
       return database.write(async sql=>{
         if (!await sql.getFirstAsync('SELECT id FROM puppies WHERE id=?',input.localPetId)) throw new Error('Local puppy does not exist.');
@@ -164,9 +194,11 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
         const previous=await binding(sql,input.localPetId);
         if (previous) {
           if (previous.enrollment!==JSON.stringify(request)) throw new Error('Enrollment attempt cannot change.');
+          if(previous.status==='preparing'&&await associationMode(sql,request.operationId)!==mode)throw new Error('Enrollment mode cannot change.');
           return {generation:current!.generation};
         }
         if (current?.pending_pet_id||current?.resyncing) throw new Error('Finish the pending enrollment or baseline first.');
+        if(mode==='restore'&&!await pristineSetup(sql,input.localPetId))throw new RestoreNeedsConfirmationError();
         if (!current) {
           const generation=await id(sql);
           await sql.runAsync('INSERT INTO local_sync_owner(singleton,generation,account_id,device_id,pending_pet_id) VALUES (1,?,?,?,?)',generation,input.accountId,input.deviceId,input.localPetId);
@@ -174,14 +206,17 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
         } else await sql.runAsync('UPDATE local_sync_owner SET pending_pet_id=?,staging_cursor=0,staging_complete=0 WHERE singleton=1',input.localPetId);
         await sql.runAsync('DELETE FROM local_sync_baseline WHERE generation=?',current.generation);
         await sql.runAsync("INSERT INTO local_sync_pets(pet_id,generation,enrollment,status) VALUES (?,?,?,'preparing')",input.localPetId,current.generation,JSON.stringify(request));
+        if(mode==='restore')await sql.runAsync("INSERT INTO metadata(key,value) VALUES ('pending_restore_operation',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",request.operationId);
+        else await clearRestoreIntent(sql);
         return {generation:current.generation};
       });
     },
-    async enrollmentState():Promise<(Fence&{request:Enrollment;stagingCursor:number;baselineComplete:boolean})|null> {
+    async enrollmentState():Promise<(Fence&{request:Enrollment;stagingCursor:number;baselineComplete:boolean;mode?:'restore'})|null> {
       return database.read(async sql=>{
         const current=await owner(sql);if (!current?.pending_pet_id) return null;
         const pet=await binding(sql,current.pending_pet_id);if (!pet||pet.status!=='preparing') throw new Error('Saved enrollment state is inconsistent.');
-        return {generation:current.generation,accountId:current.account_id,request:enrollmentSchema.parse(JSON.parse(pet.enrollment)),stagingCursor:current.staging_cursor,baselineComplete:current.staging_complete===1};
+        const request=enrollmentSchema.parse(JSON.parse(pet.enrollment)),mode=await associationMode(sql,request.operationId);
+        return {generation:current.generation,accountId:current.account_id,request,stagingCursor:current.staging_cursor,baselineComplete:current.staging_complete===1,...(mode==='restore'?{mode}:{})};
       });
     },
     async cancelEnrollment(input:Fence&{operationId:string}):Promise<void> {
@@ -193,6 +228,7 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
         await sql.runAsync('DELETE FROM local_sync_pets WHERE generation=? AND pet_id=?',current.generation,pet.pet_id);
         if(await sql.getFirstAsync('SELECT pet_id FROM local_sync_pets WHERE generation=? LIMIT 1',current.generation))await sql.runAsync('UPDATE local_sync_owner SET pending_pet_id=NULL,staging_cursor=0,staging_complete=0 WHERE generation=?',current.generation);
         else await sql.runAsync('DELETE FROM local_sync_owner WHERE generation=?',current.generation);
+        await clearRestoreIntent(sql);
       });
     },
     async stageBaseline(input:Fence&{page:PullPage}):Promise<void> {
@@ -226,11 +262,14 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
         if (!current.staging_complete) throw new Error('The full baseline is incomplete.');
         const pet=(await binding(sql,current.pending_pet_id))!,request=enrollmentSchema.parse(JSON.parse(pet.enrollment));
         if (input.cloudPetId!==(request.confirmedPetId??request.localPetId)) throw new Error('Puppy confirmation does not match enrollment.');
+        const restoring=await associationMode(sql,request.operationId)==='restore';
+        if(restoring&&!await pristineSetup(sql,pet.pet_id))throw new RestoreNeedsConfirmationError();
         const hadActive=!!await sql.getFirstAsync("SELECT pet_id FROM local_sync_pets WHERE generation=? AND status='active'",current.generation);
         const local=await readLocalRecords(sql,pet.pet_id);
         const locallyDeleted=new Set(await readLocalDeletedActivities(sql,pet.pet_id));
         const rows=await sql.getAllAsync<{body:string}>('SELECT body FROM local_sync_baseline WHERE generation=? ORDER BY json_extract(body,\'$.sequence\')',current.generation);
         const cloud=rows.map(row=>cloudRecordSchema.parse(JSON.parse(row.body)));
+        if(restoring&&cloud.some(record=>record.kind==='puppy'&&record.petId===input.cloudPetId&&record.deleted))throw new RestoreNeedsConfirmationError();
         for (const record of cloud) await sql.runAsync('INSERT INTO local_sync_records(generation,record_id,body) VALUES (?,?,?) ON CONFLICT(generation,record_id) DO UPDATE SET body=excluded.body',current.generation,record.id,JSON.stringify(record));
         const old=new Map<string,LocalRecord>(),desired=new Map<string,LocalRecord>(),deleted:Array<{kind:LocalRecord['kind'];localId:string}>=[];
         for (const record of cloud) {
@@ -240,6 +279,11 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
           if (record.deleted) deleted.push(value);else {old.set(key(value),value);if (!(['customActivity','customization'].includes(record.kind)&&locallyDeleted.has(value.localId))) desired.set(key(value),value);}
         }
         for (const record of local) {
+          if(restoring){
+            if(record.kind==='accountPreferences'&&!old.has(key(record)))desired.set(key(record),record);
+            if(record.kind==='puppy'&&!old.has(key(record)))desired.set(key(record),{...record,data:{name:request.name}});
+            continue;
+          }
           if (record.kind==='accountPreferences'&&(hadActive||old.has(key(record)))) continue;
           const remote=old.get(key(record));
           if (record.kind==='puppy'&&remote&&record.data.name==='My puppy') continue;
@@ -249,7 +293,7 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
         }
         const active={...pet,status:'active' as const,cloud_pet_id:input.cloudPetId};
         await sql.runAsync("UPDATE local_sync_pets SET cloud_pet_id=?,status='active' WHERE pet_id=?",input.cloudPetId,pet.pet_id);
-        for (const change of localChanges([...old.values()],[...desired.values()])) {
+        if(!restoring)for (const change of localChanges([...old.values()],[...desired.values()])) {
           const mutation=await enqueue(sql,current,active,change);
           const remote=mutation?await mirrored(sql,current.generation,mutation.recordId):null;
           if (mutation&&remote) {
@@ -266,10 +310,12 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
           const value={kind:record.kind,localId:record.kind==='puppy'?pet.pet_id:localRecordId(record)};
           desired.delete(key(value));
         }
+        if(restoring)for(const record of local)if(!desired.has(key(record)))deleted.push(record);
         await applyLocalRecords(sql,pet.pet_id,[...desired.values()],deleted.filter(record=>!desired.has(key(record))));
         await retainRevisions(sql,pet.pet_id,localChanges(local,await readLocalRecords(sql,pet.pet_id)),'enrollment');
         await sql.runAsync('UPDATE local_sync_owner SET cursor=?,pending_pet_id=NULL,staging_cursor=0,staging_complete=0 WHERE singleton=1',current.staging_cursor);
         await sql.runAsync('DELETE FROM local_sync_baseline WHERE generation=?',current.generation);
+        await clearRestoreIntent(sql);
       });
     },
     async applySync(input:Fence&{accepted:MutationResult[];rejected?:Array<{operationId:string;error:'conflict'|'invalid_mutation'|'retry_later'}>;page:PullPage}):Promise<void> {
@@ -367,7 +413,7 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
         await projectOwner(sql,current,[],'restore');
       });
     },
-    async detach(input:Fence):Promise<void> {await database.write(async sql=>{await required(sql,input);await sql.runAsync('DELETE FROM local_sync_owner WHERE generation=?',input.generation);});},
+    async detach(input:Fence):Promise<void> {await database.write(async sql=>{await required(sql,input);await sql.runAsync('DELETE FROM local_sync_owner WHERE generation=?',input.generation);await clearRestoreIntent(sql);});},
     async status(petId:string):Promise<{state:'local'|'preparing'|'active'|'resyncing';generation:string|null;accountId:string|null;pending:number;blocked:number;cursor:number}> {
       return database.read(async sql=>{
         const current=await owner(sql),pet=await binding(sql,petId);

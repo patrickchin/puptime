@@ -1,5 +1,5 @@
 import { throwIfAborted,CloudApiError,type CloudApi,type CloudErrorCategory } from './api.ts';
-import type { createLocalSync } from '../local/sync-engine.ts';
+import { RestoreNeedsConfirmationError,type createLocalSync } from '../local/sync-engine.ts';
 import type { pushResponseSchema } from './protocol.ts';
 import type { z } from 'zod';
 
@@ -91,7 +91,7 @@ export function createSyncRunner({sync,api,petId,deviceId,sessionAccountId,chang
       } catch(error) {
         throwIfAborted(signal);
         if (error instanceof OwnerChanged) return result('auth-required',null,'account-mismatch');
-        if (error instanceof EnrollmentRejected) return result('idle',null,'confirmation-required');
+        if (error instanceof EnrollmentRejected||error instanceof RestoreNeedsConfirmationError) return result('idle',null,'confirmation-required');
         if (error instanceof BudgetReached) return result('pending',0);
         if (!(error instanceof CloudApiError)) return result('error',null,'local-storage');
         if (error.category==='auth-required') return result('auth-required',null,error.category);

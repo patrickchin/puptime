@@ -11,14 +11,15 @@ import { reconcileMutation } from './reconcile.ts';
 import { cloudRecordId } from './record-identity.ts';
 import { createCloudApi,CloudApiError,type CloudApi,type CloudAccountSummary } from './api.ts';
 import type { CloudRecord,Mutation,MutationResult } from './protocol.ts';
+import { cloudRecordSchema } from './protocol.ts';
 import * as runner from './runner.ts';
 const event={id:'event-1',type:'pee' as const,at:100,source:'app' as const};
 const enrollment={operationId:'enroll-1',deviceId:'device-1',localPetId:'local-pet',name:'My puppy'};
 const account:CloudAccountSummary={user:{id:'account-1',email:'person@example.com',name:'Person'},cloud:{canSync:true,canExport:true,source:'trial',expiresAt:8640000000000000},pets:[]};
-async function fixture(t:TestContext) {
+async function fixture(t:TestContext,{pristine=false}={}) {
  const directory=await mkdtemp(join(tmpdir(),'puptime-runner-')),path=join(directory,'data.db');
  const database=await createLocalDatabase(sqliteTestConnection(path));t.after(async()=>{await database.close();await rm(directory,{force:true,recursive:true});});
- await initializeLocalDatabase(database,()=> 'local-pet');await database.write(sql=>sql.runAsync('DELETE FROM routines'));
+ await initializeLocalDatabase(database,()=> 'local-pet');if(!pristine)await database.write(sql=>sql.runAsync('DELETE FROM routines'));
  const sync=createLocalSync(database),storage=createNativeStorage(database,'local-pet',sync.changeSink('local-pet'));
  return {database,path,sync,storage};
 }
@@ -47,11 +48,54 @@ function server() {
  });
  return {api,calls,changes,records,commit,enrollments};
 }
-function make(sync:ReturnType<typeof createLocalSync>,api:CloudApi,sessionAccountId:()=>string|null=()=> 'account-1') {
+function make(sync:ReturnType<typeof createLocalSync>,api:Pick<CloudApi,'account'|'enroll'|'push'|'pull'>,sessionAccountId:()=>string|null=()=> 'account-1') {
  assert.equal(typeof runner.createSyncRunner,'function');
  return runner.createSyncRunner({sync,api,petId:'local-pet',deviceId:'device-1',sessionAccountId,changed:()=>{},random:()=>1});
 }
 const signal=()=>new AbortController().signal;
+
+test('first-launch restore survives a lost enrollment reply and never pushes starter defaults',async t=>{
+ const {sync,storage,path}=await fixture(t,{pristine:true});
+ const request={...enrollment,name:'Basil',confirmedPetId:'cloud-pet'};
+ await sync.prepareAssociation({accountId:'account-1',deviceId:'device-1',localPetId:'local-pet',enrollment:request,mode:'restore'});
+ const records=[cloudRecordSchema.parse({id:'cloud-pet',petId:'cloud-pet',kind:'puppy',data:{name:'Basil'},revision:1,sequence:1,deleted:false,updatedAt:1})];
+ const requests:unknown[]=[],operations=new Set<string>();let loseReply=true;
+ const api:Pick<CloudApi,'account'|'enroll'|'push'|'pull'>={
+  account:async()=>({...account,pets:[{id:'cloud-pet',name:'Basil',eventCount:0}]}),
+  enroll:async input=>{requests.push(structuredClone(input));operations.add(input.operationId);if(loseReply){loseReply=false;throw new CloudApiError('network');}return {petId:'cloud-pet'};},
+  pull:async after=>({changes:records.filter(record=>record.sequence>after),cursor:1,hasMore:false}),
+  push:async()=>{throw new Error('A pristine restore must not send local defaults.');},
+ };
+ const first=runner.createSyncRunner({sync,api,petId:'local-pet',deviceId:'device-1',sessionAccountId:()=> 'account-1',changed:()=>{}});
+ assert.equal((await first.run(signal())).state,'retry');
+ const reopened=await createLocalDatabase(sqliteTestConnection(path));t.after(()=>reopened.close());
+ const resumed=createLocalSync(reopened),second=runner.createSyncRunner({sync:resumed,api,petId:'local-pet',deviceId:'device-1',sessionAccountId:()=> 'account-1',changed:()=>{}});
+ assert.equal((await second.run(signal())).state,'synced');
+ assert.deepEqual(requests,[request,request]);assert.equal(operations.size,1);
+ assert.equal(await storage.loadPuppyName(),'Basil');assert.deepEqual(await storage.loadSchedule(),[]);
+ assert.deepEqual(await storage.loadEvents(),[]);assert.equal((await resumed.status('local-pet')).pending,0);
+});
+
+test('first-launch restore asks for confirmation when local work arrives during its baseline',async t=>{
+ const {sync,storage}=await fixture(t,{pristine:true});
+ await sync.prepareAssociation({accountId:'account-1',deviceId:'device-1',localPetId:'local-pet',enrollment:{...enrollment,name:'Basil',confirmedPetId:'cloud-pet'},mode:'restore'});
+ const api:Pick<CloudApi,'account'|'enroll'|'push'|'pull'>={account:async()=>account,enroll:async()=>({petId:'cloud-pet'}),pull:async()=>{await storage.appendEvents([event]);return {changes:[],cursor:0,hasMore:false};},push:async()=>{throw new Error('No push is authorized after a restore guard fails.');}};
+ const result=await runner.createSyncRunner({sync,api,petId:'local-pet',deviceId:'device-1',sessionAccountId:()=> 'account-1',changed:()=>{}}).run(signal());
+ assert.equal(result.problem,'confirmation-required');assert.equal(result.retryAfterMs,null);
+ assert.equal((await sync.status('local-pet')).state,'preparing');assert.deepEqual(await storage.loadEvents(),[event]);
+});
+
+test('first-launch expired access leaves a prepared restore untouched and never reports it restored',async t=>{
+ const {sync,storage}=await fixture(t,{pristine:true});
+ await storage.saveFirstLaunchProfile('Local draft');
+ await sync.prepareAssociation({accountId:'account-1',deviceId:'device-1',localPetId:'local-pet',enrollment:{...enrollment,name:'Basil',confirmedPetId:'cloud-pet'},mode:'restore'});
+ const before=await sync.enrollmentState(),calls:string[]=[];
+ const api:Pick<CloudApi,'account'|'enroll'|'push'|'pull'>={account:async()=>({...account,cloud:{canSync:false,canExport:true,source:'trial',expiresAt:1}}),enroll:async()=>{calls.push('enroll');throw new Error('Expired.');},pull:async()=>{calls.push('pull');throw new Error('Expired.');},push:async()=>{calls.push('push');throw new Error('Expired.');}};
+ const result=await make(sync,api).run(signal());
+ assert.equal(result.state,'expired');assert.equal(result.retryAfterMs,null);assert.deepEqual(calls,[]);
+ assert.deepEqual(await sync.enrollmentState(),before);assert.equal(await storage.loadPuppyName(),'Local draft');
+ assert.equal((await storage.loadSchedule()).length,12);assert.equal((await sync.status('local-pet')).state,'preparing');
+});
 
 test('free and signed-in unenrolled profiles never send cloud or trial requests',async t=>{
  const {sync}=await fixture(t),remote=server();
