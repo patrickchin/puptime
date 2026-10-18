@@ -6,6 +6,8 @@ tags:
 ---
 - launchApp:
     clearState: true
+    permissions:
+      notifications: unset
 - extendedWaitUntil:
     visible:
       id: onboarding.step.0
