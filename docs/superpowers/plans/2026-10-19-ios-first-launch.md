@@ -60,10 +60,10 @@ Use real provider labels, bounded form content and the existing theme. Public re
 
 **Interfaces:** `FirstLaunchStep = 'welcome'|'profile'|'account'|'cloud'|'walkthrough'|'reminders'`; `FirstLaunchProgress = {step:FirstLaunchStep;puppyName:string}`. Native storage produces `loadFirstLaunch():Promise<FirstLaunchProgress|null>`, `saveFirstLaunchStep(step):Promise<void>` and `saveFirstLaunchProfile(name):Promise<void>` (atomically saves name and next account checkpoint). Existing `completeOnboarding(options?)` atomically completes setup and its existing marker; replay never calls it. Use local scalar metadata, no new persistence layer.
 
-- [ ] Write real SQLite tests: fresh welcome; profile save/reopen keeps one pet/identity; blank/default; invalid name and injected checkpoint failure roll back name/revision/step; completion failure retains resumable state; existing completed marker without setup checkpoint returns null; invalid checkpoint rejects without overwriting it. Assert setup metadata is absent from sync records.
-- [ ] Run the named tests and observe missing APIs/atomic behavior fail.
-- [ ] Implement validated metadata checkpoints through the existing database/settings writer, expose iOS facade methods, and initialize new-device delivery intent false. Final completion must preserve an explicit delivery decision and leave an absent first-run decision off.
-- [ ] Run native-storage/initialization/projection tests and base+iOS types; expect PASS. Commit `feat: persist first-launch setup checkpoints`.
+- [x] Write real SQLite tests: fresh welcome; profile save/reopen keeps one pet/identity; blank/default; invalid name and injected checkpoint failure roll back name/revision/step; completion failure retains resumable state; existing completed marker without setup checkpoint returns null; invalid checkpoint rejects without overwriting it. Assert setup metadata is absent from sync records.
+- [x] Run the named tests and observe missing APIs/atomic behavior fail.
+- [x] Implement validated metadata checkpoints through the existing database/settings writer, expose iOS facade methods, and initialize new-device delivery intent false. Final completion must preserve an explicit delivery decision and leave an absent first-run decision off.
+- [x] Run native-storage/initialization/projection tests and base+iOS types; expect PASS. Commit `feat: persist first-launch setup checkpoints`.
 
 ### Task 2: Safe returning-puppy restore and local fallback
 

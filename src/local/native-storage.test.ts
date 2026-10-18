@@ -10,6 +10,7 @@ import { createLocalRuntime } from './runtime-factory.ts';
 import { DEFAULT_NOTIFICATION_PREFERENCES, type NotificationPreferences } from '../notification-config.ts';
 import type { PuppyEvent } from '../domain.ts';
 import { csvToEvents, eventsToCsv } from '../export.ts';
+import { readLocalRecords } from './sync-projection.ts';
 async function setup(t: TestContext) {
   const directory = await mkdtemp(join(tmpdir(),'puptime-native-settings-'));
   const path = join(directory,'data.db');
@@ -18,6 +19,79 @@ async function setup(t: TestContext) {
   await initializeLocalDatabase(database,()=> 'pet-1');
   return { database, path, storage:createNativeStorage(database,'pet-1') };
 }
+
+test('first-launch profile checkpoints reopen with the same puppy and stay out of cloud records',async t=>{
+ const {database,path}=await setup(t),{storage}=await createLocalRuntime(database,'pet-1');
+ assert.deepEqual(await storage.loadFirstLaunch(),{step:'welcome',puppyName:'My puppy'});
+ await storage.saveFirstLaunchStep('profile');await storage.saveFirstLaunchProfile('  Biscuit  ');
+ const reopened=await createLocalDatabase(sqliteTestConnection(path));
+ try{
+  assert.deepEqual(await initializeLocalDatabase(reopened),{petId:'pet-1'});
+  const second=await createLocalRuntime(reopened,'pet-1');
+  assert.deepEqual(await second.storage.loadFirstLaunch(),{step:'account',puppyName:'Biscuit'});
+  await second.storage.saveFirstLaunchStep('walkthrough');
+ }finally{await reopened.close();}
+ assert.deepEqual(await storage.loadFirstLaunch(),{step:'walkthrough',puppyName:'Biscuit'});
+ assert.equal((await database.read(sql=>sql.getFirstAsync<{n:number}>('SELECT COUNT(*) n FROM puppies')))!.n,1);
+ const records=await database.read(sql=>readLocalRecords(sql,'pet-1'));
+ assert.ok(!JSON.stringify(records).includes('first_launch'));
+ assert.ok(!JSON.stringify(records).includes('notify_on_device'));
+ assert.equal((await database.read(sql=>sql.getFirstAsync<{n:number}>('SELECT COUNT(*) n FROM local_sync_outbox')))!.n,0);
+});
+
+test('first-launch profile failure preserves the previous name checkpoint and revision before retry',async t=>{
+ const {database}=await setup(t),{storage}=await createLocalRuntime(database,'pet-1');
+ await storage.saveFirstLaunchStep('profile');
+ const snapshot=()=>database.read(async sql=>Object.fromEntries(await Promise.all(['metadata','puppies','local_revisions','local_sync_outbox'].map(async table=>[table,await sql.getAllAsync(`SELECT * FROM ${table} ORDER BY rowid`)]))));
+ const before=await snapshot();
+ await assert.rejects(storage.saveFirstLaunchProfile('x'.repeat(257)));
+ assert.deepEqual(await snapshot(),before);
+ await database.write(sql=>sql.execAsync("CREATE TRIGGER fail_profile_checkpoint BEFORE UPDATE OF value ON metadata WHEN OLD.key='first_launch_step' BEGIN SELECT RAISE(ABORT,'checkpoint failure'); END;"));
+ await assert.rejects(storage.saveFirstLaunchProfile('Biscuit'),/checkpoint failure/);
+ assert.deepEqual(await snapshot(),before);
+ await database.write(sql=>sql.execAsync('DROP TRIGGER fail_profile_checkpoint'));
+ await storage.saveFirstLaunchProfile('Biscuit');await storage.saveFirstLaunchProfile('Biscuit');
+ assert.deepEqual(await storage.loadFirstLaunch(),{step:'account',puppyName:'Biscuit'});
+ assert.equal((await database.read(sql=>sql.getFirstAsync<{n:number}>("SELECT COUNT(*) n FROM local_revisions WHERE kind='puppy'")))!.n,1);
+});
+
+test('first-launch completion rolls back on failure and cannot be reopened by stale callbacks',async t=>{
+ const {database}=await setup(t),{storage}=await createLocalRuntime(database,'pet-1');
+ await storage.saveFirstLaunchProfile('Biscuit');await storage.saveFirstLaunchStep('reminders');
+ await database.write(sql=>sql.runAsync("DELETE FROM metadata WHERE key='notify_on_device'"));
+ await database.write(sql=>sql.execAsync("CREATE TRIGGER fail_setup_completion BEFORE UPDATE OF value ON metadata WHEN OLD.key='show_onboarding' BEGIN SELECT RAISE(ABORT,'completion failure'); END;"));
+ await assert.rejects(storage.completeOnboarding(),/completion failure/);
+ assert.deepEqual(await storage.loadFirstLaunch(),{step:'reminders',puppyName:'Biscuit'});
+ await database.write(sql=>sql.execAsync('DROP TRIGGER fail_setup_completion'));
+ await storage.completeOnboarding();assert.equal(await storage.loadFirstLaunch(),null);
+ await assert.rejects(storage.saveFirstLaunchStep('profile'));
+ await assert.rejects(storage.saveFirstLaunchProfile('Stale draft'));
+ await storage.completeOnboarding({puppyName:'Stale finish'});
+ assert.equal(await storage.loadPuppyName(),'Biscuit');
+ assert.equal(await storage.shouldShowOnboarding(),false);
+ assert.equal((await database.read(sql=>sql.getFirstAsync<{value:string}>("SELECT value FROM metadata WHERE key='notify_on_device'")))!.value,'false');
+});
+
+test('first-launch default name and existing completed installation do not create another setup',async t=>{
+ const {database,storage}=await setup(t);
+ await storage.saveFirstLaunchProfile('   ');
+ assert.deepEqual(await storage.loadFirstLaunch(),{step:'account',puppyName:'My puppy'});
+ await database.write(async sql=>{await sql.runAsync("DELETE FROM metadata WHERE key='first_launch_step'");await sql.runAsync("UPDATE metadata SET value='false' WHERE key='show_onboarding'");});
+ assert.equal(await storage.loadFirstLaunch(),null);
+});
+
+test('first-launch corruption rejects without replacing the saved checkpoint',async t=>{
+ const {database,storage}=await setup(t);
+ await storage.saveFirstLaunchStep('profile');
+ await assert.rejects(storage.saveFirstLaunchStep('unknown' as never));
+ assert.deepEqual(await storage.loadFirstLaunch(),{step:'profile',puppyName:'My puppy'});
+ await database.write(sql=>sql.runAsync("UPDATE metadata SET value='unknown' WHERE key='first_launch_step'"));
+ await assert.rejects(storage.loadFirstLaunch());
+ await assert.rejects(storage.saveFirstLaunchStep('welcome'));
+ await assert.rejects(storage.completeOnboarding());
+ assert.equal((await database.read(sql=>sql.getFirstAsync<{value:string}>("SELECT value FROM metadata WHERE key='first_launch_step'")))!.value,'unknown');
+ assert.equal(await storage.shouldShowOnboarding(),true);
+});
 
 test('local writes enforce cloud field limits without committing invalid creation edit or import',async t=>{
   const {database}=await setup(t),{storage}=await createLocalRuntime(database,'pet-1');
