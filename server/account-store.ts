@@ -12,27 +12,27 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
   constructor(ctx: DurableObjectState, env: Cloudflare.Env) {
     super(ctx, env);
     ctx.storage.transactionSync(() => {
-      ctx.storage.sql.exec('CREATE TABLE IF NOT EXISTS schema_metadata (version INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS account_state (key TEXT PRIMARY KEY, value INTEGER NOT NULL)');
-      const version = ctx.storage.sql.exec<{ version: number }>('SELECT version FROM schema_metadata').toArray()[0]?.version ?? 0;
-      if (version > 2) throw new Error('Account schema requires a newer Worker.');
-      if (version === 0) {
-        ctx.storage.sql.exec(`
-          CREATE TABLE records (id TEXT PRIMARY KEY, body TEXT NOT NULL);
-          CREATE TABLE revisions (sequence INTEGER PRIMARY KEY, record_id TEXT NOT NULL, revision INTEGER NOT NULL, body TEXT NOT NULL, UNIQUE(record_id, revision));
-          CREATE INDEX revisions_by_record ON revisions(record_id, revision DESC);
-          CREATE TABLE operations (id TEXT PRIMARY KEY, payload TEXT NOT NULL, result TEXT NOT NULL);
-          INSERT INTO schema_metadata(version) VALUES (1);
-        `);
+      const tables=ctx.storage.sql.exec<{name:string}>("SELECT name FROM sqlite_master WHERE type='table'").toArray().map(row=>row.name);
+      if(tables.includes('schema_metadata')){
+        const versions=ctx.storage.sql.exec<{version:number}>('SELECT version FROM schema_metadata').toArray();
+        if(versions.length!==1||versions[0].version!==3)throw new Error('Unsupported development or newer account schema.');
+        if(['account_state','records','revisions','operations','pets','enrollments','enrolled_devices'].some(name=>!tables.includes(name)))throw new Error('The account database schema is incomplete.');
+        return;
       }
-      if (version < 2) {
-        ctx.storage.sql.exec(`
-          CREATE TABLE pets (id TEXT PRIMARY KEY, initial_name TEXT NOT NULL, created_at INTEGER NOT NULL);
-          CREATE TABLE enrollments (id TEXT PRIMARY KEY, payload TEXT NOT NULL, result TEXT NOT NULL);
-          CREATE TABLE enrolled_devices (id TEXT NOT NULL, pet_id TEXT NOT NULL REFERENCES pets(id), PRIMARY KEY(id, pet_id));
-          CREATE INDEX records_by_pet_kind ON records(json_extract(body, '$.petId'), json_extract(body, '$.kind'), json_extract(body, '$.deleted'));
-          UPDATE schema_metadata SET version = 2;
-        `);
-      }
+      if(tables.some(name=>!name.startsWith('sqlite_')&&!name.startsWith('__cf_')))throw new Error('The existing account database schema is incomplete.');
+      ctx.storage.sql.exec(`
+        CREATE TABLE schema_metadata (version INTEGER NOT NULL);
+        CREATE TABLE account_state (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
+        CREATE TABLE records (id TEXT PRIMARY KEY, body TEXT NOT NULL);
+        CREATE TABLE revisions (sequence INTEGER PRIMARY KEY, record_id TEXT NOT NULL, revision INTEGER NOT NULL, body TEXT NOT NULL, UNIQUE(record_id, revision));
+        CREATE INDEX revisions_by_record ON revisions(record_id, revision DESC);
+        CREATE TABLE operations (id TEXT PRIMARY KEY, payload TEXT NOT NULL, result TEXT NOT NULL);
+        CREATE TABLE pets (id TEXT PRIMARY KEY, initial_name TEXT NOT NULL, created_at INTEGER NOT NULL);
+        CREATE TABLE enrollments (id TEXT PRIMARY KEY, payload TEXT NOT NULL, result TEXT NOT NULL);
+        CREATE TABLE enrolled_devices (id TEXT NOT NULL, pet_id TEXT NOT NULL REFERENCES pets(id), PRIMARY KEY(id, pet_id));
+        CREATE INDEX records_by_pet_kind ON records(json_extract(body, '$.petId'), json_extract(body, '$.kind'), json_extract(body, '$.deleted'));
+        INSERT INTO schema_metadata(version) VALUES (3);
+      `);
     });
   }
 

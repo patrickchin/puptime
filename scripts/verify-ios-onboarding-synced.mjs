@@ -26,7 +26,7 @@ const directory=join(simctl('get_app_container',udid,app,'data'),'Documents/SQLi
 cpSync(directory,join(output,'previous-synthetic-sqlite'),{recursive:true});
 const path=join(directory,'puptime-v2.db'),inspection=new DatabaseSync(path,{readOnly:true});
 inspection.exec('PRAGMA busy_timeout=5000');
-const tables=['metadata','puppies','events','routines','settings','pet_settings','local_revisions','local_sync_owner','local_sync_pets','local_sync_outbox','local_sync_records','local_sync_acks','local_sync_baseline','legacy_snapshots'];
+const tables=['metadata','puppies','events','routines','settings','pet_settings','local_revisions','local_sync_owner','local_sync_pets','local_sync_outbox','local_sync_records','local_sync_acks','local_sync_baseline'];
 const snapshot=()=>Object.fromEntries(tables.map(table=>[table,inspection.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all().map(row=>({...row}))]));
 let database,remote,stoppedPid;
 try {

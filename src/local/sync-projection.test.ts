@@ -3,8 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test, { type TestContext } from 'node:test';
-import { createLocalDatabase, migrateLegacy } from './database.ts';
-import { legacyKeys, parseLegacySnapshot } from './legacy.ts';
+import { createLocalDatabase, initializeLocalDatabase } from './database.ts';
 import { sqliteTestConnection } from './sqlite-test-adapter.ts';
 import { createNativeStorage } from './native-storage.ts';
 import * as projection from './sync-projection.ts';
@@ -14,7 +13,7 @@ async function setup(t: TestContext) {
   const directory = await mkdtemp(join(tmpdir(), 'puptime-projection-'));
   const database = await createLocalDatabase(sqliteTestConnection(join(directory,'data.db')));
   t.after(async () => { await database.close(); await rm(directory,{recursive:true,force:true}); });
-  await migrateLegacy(database,parseLegacySnapshot(legacyKeys.map(key=>[key,key==='puptime.schedule.v1'?'[]':null])),()=> 'pet-1');
+  await initializeLocalDatabase(database,()=> 'pet-1');await database.write(sql=>sql.runAsync('DELETE FROM routines'));
   const changes: LocalChange[][] = [];
   const storage = createNativeStorage(database, 'pet-1', async (sql, batch) => {
     assert.equal((await sql.getFirstAsync<{n:number}>('SELECT COUNT(*) n FROM puppies'))!.n, 1);
@@ -110,9 +109,9 @@ test('partial preference projection merges reminder fields and preserves local-o
   assert.equal(changes.length,0);
 });
 
-test('locally valid legacy values remain lossless even when cloud limits are narrower', async t => {
+test('current boundary values remain lossless across change capture and projection', async t => {
   const {database,storage,changes}=await setup(t);
-  const local={...event,id:'legacy'.repeat(100),note:'训练'.repeat(17000)};
+  const local={...event,id:'历史 / '.repeat(40),note:'训练'.repeat(8192)};
   await storage.appendEvents([local]);
   assert.equal(changes[0][0].localId,local.id); assert.equal(changes[0][0].after!.note,local.note);
   const record=(await database.read(sql=>projection.readLocalRecords(sql,'pet-1'))).find(value=>value.kind==='event')!;

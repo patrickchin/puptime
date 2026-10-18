@@ -1,10 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createLocalDatabase,migrateLegacy } from './database.ts';
-import { legacyKeys,parseLegacySnapshot } from './legacy.ts';
+import { createLocalDatabase,initializeLocalDatabase } from './database.ts';
 import { sqliteTestConnection } from './sqlite-test-adapter.ts';
 import * as runtime from './runtime-factory.ts';
-async function database() {const db=await createLocalDatabase(sqliteTestConnection(':memory:'));await migrateLegacy(db,parseLegacySnapshot(legacyKeys.map(key=>[key,key==='puptime.schedule.v1'?'[]':null])),()=> 'pet-1');return db;}
+async function database() {const db=await createLocalDatabase(sqliteTestConnection(':memory:'));await initializeLocalDatabase(db,()=> 'pet-1');await db.write(sql=>sql.runAsync('DELETE FROM routines'));return db;}
 
 test('the local runtime shares the storage transaction and engine, retaining free revisions without upload work',async t=>{
  const db=await database();t.after(()=>db.close());let signals=0;

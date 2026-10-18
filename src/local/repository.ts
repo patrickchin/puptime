@@ -1,6 +1,5 @@
 import { isOpenNap, type PuppyEvent, type PuppyEventChanges, type ScheduleEntry } from '../domain.ts';
-import { assertValidEvents, EventDeletedError, EventsImportError, EventsStorageError } from '../storage-validation.ts';
-import { assertValidSchedule } from './legacy.ts';
+import {parseEvents,parseSchedule,EventDeletedError,EventsImportError,EventsStorageError} from '../storage-validation.ts';
 import type { LocalDatabase, SqlExecutor } from './database.ts';
 import { applyScheduleEntryEdit } from '../schedule-editor.ts';
 import { localChanges, notifyLocalCommit, readLocalSettingsRecords, type LocalChangeSink } from './sync-projection.ts';
@@ -15,8 +14,7 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
     await requirePet(sql);
     const rows = await sql.getAllAsync<{ id: string; at: number; body: string }>('SELECT id,at,body FROM events WHERE pet_id=? ORDER BY at DESC,rowid ASC', petId);
     try {
-      const events: unknown = rows.map((row) => JSON.parse(row.body));
-      assertValidEvents(events);
+      const events = parseEvents(rows.map((row) => JSON.parse(row.body)));
       if (events.some((event, index) => event.id !== rows[index].id || event.at !== rows[index].at)) throw new Error('Inconsistent activity index.');
       return rows.map((row, index) => ({ ...row, event: events[index] }));
     } catch { throw new EventsStorageError(); }
@@ -37,7 +35,7 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
       const rows = await readEvents(sql);
       const beforeSettings=(onChange||afterCommit)?await readLocalSettingsRecords(sql,petId):[];
       const result = action(rows.map((row) => row.event));
-      assertValidEvents(result.events);
+      result.events=parseEvents(result.events);
       const previous = new Map(rows.map((row) => [row.id, row.body]));
       const next = new Map(result.events.map((event) => [event.id, event]));
       for (const row of rows) if (!next.has(row.id)) await sql.runAsync('DELETE FROM events WHERE pet_id=? AND id=?', petId, row.id);
@@ -61,8 +59,7 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
   async function readSchedule(sql: SqlExecutor): Promise<ScheduleEntry[]> {
     await requirePet(sql);
     const rows = await sql.getAllAsync<{ id: string; minutes: number; body: string }>('SELECT id,minutes,body FROM routines WHERE pet_id=? ORDER BY minutes,rowid', petId);
-    const entries: unknown = rows.map((row) => JSON.parse(row.body));
-    assertValidSchedule(entries);
+    const entries=parseSchedule(rows.map((row) => JSON.parse(row.body)));
     if (entries.some((entry, index) => entry.id !== rows[index].id || entry.minutes !== rows[index].minutes)) throw new Error('The saved routine index is inconsistent.');
     return entries;
   }
@@ -73,7 +70,7 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
   async function mutateSchedule(action:(current:ScheduleEntry[])=>ScheduleEntry[]):Promise<ScheduleEntry[]> {
     let changed=false;
     const saved=await database.write(async sql=>{
-      const before=await readSchedule(sql),entries=action(before);assertValidSchedule(entries);
+      const before=await readSchedule(sql),entries=parseSchedule(action(before));
       const previous=new Map(before.map(entry=>[entry.id,JSON.stringify(entry)]));
       const ids=new Set(entries.map(entry=>entry.id));
       for(const id of previous.keys())if(!ids.has(id))await sql.runAsync('DELETE FROM routines WHERE pet_id=? AND id=?',petId,id);
@@ -94,7 +91,7 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
     async readEventsInTransaction(sql: SqlExecutor) { return (await readEvents(sql)).map((row) => row.event); },
     async loadEvents() { return materialize(await database.read(readEvents)); },
     async appendEvents(incoming: PuppyEvent[]) {
-      assertValidEvents(incoming);
+      incoming=parseEvents(incoming);
       return (await mutateEvents((events) => {
         const byId = new Map(events.map((event) => [event.id, event]));
         for (const event of incoming) byId.set(event.id, { ...byId.get(event.id), ...event, ...(byId.get(event.id)?.estimated ? { estimated: true } : {}) });
@@ -102,7 +99,7 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
       })).events;
     },
     async importEvents(incoming: PuppyEvent[]) {
-      assertValidEvents(incoming);
+      incoming=parseEvents(incoming);
       const result = await mutateEvents((events) => {
         const ids = new Set(events.map((event) => event.id));
         const additions = incoming.filter((event) => !ids.has(event.id));

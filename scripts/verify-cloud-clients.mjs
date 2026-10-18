@@ -6,8 +6,7 @@ import {mkdtempSync,readFileSync,writeFileSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {serializeSignedCookie} from 'better-call';
-import {createLocalDatabase,migrateLegacy} from '../src/local/database.ts';
-import {legacyKeys,parseLegacySnapshot} from '../src/local/legacy.ts';
+import {createLocalDatabase,initializeLocalDatabase} from '../src/local/database.ts';
 import {sqliteTestConnection} from '../src/local/sqlite-test-adapter.ts';
 import {createLocalRuntime} from '../src/local/runtime-factory.ts';
 import {createCloudApi,CloudApiError} from '../src/cloud/api.ts';
@@ -62,7 +61,7 @@ async function channel(owner){
 let primary,remote,sessionId,success=false;
 async function open(name){
  const path=join(directory,name+'.db'),database=await createLocalDatabase(sqliteTestConnection(path));
- await migrateLegacy(database,parseLegacySnapshot(legacyKeys.map(key=>[key,key==='puptime.schedule.v1'?'[]':null])),()=>name);
+ await initializeLocalDatabase(database,()=> name);await database.write(sql=>sql.runAsync('DELETE FROM routines'));
  const runtime=await createLocalRuntime(database,name);
  const runner=createSyncRunner({sync:runtime.sync,api:remote.api,petId:name,deviceId:runtime.deviceId,sessionAccountId:()=>sessionId,changed:()=>{},random:()=>1});
  const client={...runtime,name,runner,closed:false,async close(){if(!this.closed){this.closed=true;await database.close();}}};clients.push(client);return client;

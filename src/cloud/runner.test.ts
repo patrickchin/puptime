@@ -3,8 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test,{type TestContext} from 'node:test';
-import { createLocalDatabase, migrateLegacy } from '../local/database.ts';
-import { legacyKeys, parseLegacySnapshot } from '../local/legacy.ts';
+import { createLocalDatabase, initializeLocalDatabase } from '../local/database.ts';
 import { sqliteTestConnection } from '../local/sqlite-test-adapter.ts';
 import { createNativeStorage } from '../local/native-storage.ts';
 import { createLocalSync } from '../local/sync-engine.ts';
@@ -19,7 +18,7 @@ const account:CloudAccountSummary={user:{id:'account-1',email:'person@example.co
 async function fixture(t:TestContext) {
  const directory=await mkdtemp(join(tmpdir(),'puptime-runner-')),path=join(directory,'data.db');
  const database=await createLocalDatabase(sqliteTestConnection(path));t.after(async()=>{await database.close();await rm(directory,{force:true,recursive:true});});
- await migrateLegacy(database,parseLegacySnapshot(legacyKeys.map(key=>[key,key==='puptime.schedule.v1'?'[]':null])),()=> 'local-pet');
+ await initializeLocalDatabase(database,()=> 'local-pet');await database.write(sql=>sql.runAsync('DELETE FROM routines'));
  const sync=createLocalSync(database),storage=createNativeStorage(database,'local-pet',sync.changeSink('local-pet'));
  return {database,path,sync,storage};
 }

@@ -23,7 +23,7 @@ try{
     console.log('> Flow actual native Reduce Motion:',phase);
     flow('ios-onboarding-motion-prepare.yaml',phase,{MOTION_VALUE:value,OTHER_MOTION_VALUE:other});
     const database=new DatabaseSync(join(directory(),'puptime-v2.db'),{readOnly:true});
-    const tables=['metadata','puppies','events','routines','settings','pet_settings','local_revisions','local_sync_owner','local_sync_pets','local_sync_outbox','local_sync_records','local_sync_acks','local_sync_baseline','legacy_snapshots'];
+    const tables=['metadata','puppies','events','routines','settings','pet_settings','local_revisions','local_sync_owner','local_sync_pets','local_sync_outbox','local_sync_records','local_sync_acks','local_sync_baseline'];
     const snapshot=()=>Object.fromEntries(tables.map(table=>[table,database.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all().map(row=>({...row}))]));
     try{
       const before=snapshot();

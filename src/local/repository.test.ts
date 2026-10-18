@@ -3,8 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import test, { type TestContext } from 'node:test';
-import { createLocalDatabase, migrateLegacy } from './database.ts';
-import { legacyKeys, parseLegacySnapshot } from './legacy.ts';
+import { createLocalDatabase, initializeLocalDatabase } from './database.ts';
 import { createLocalRepository } from './repository.ts';
 import { sqliteTestConnection } from './sqlite-test-adapter.ts';
 import { EventsImportError, EventsStorageError } from '../storage-validation.ts';
@@ -15,7 +14,7 @@ async function setup(t: TestContext) {
   const path = join(directory, 'data.db');
   const database = await createLocalDatabase(sqliteTestConnection(path));
   t.after(async () => { await database.close(); await rm(directory, { recursive: true, force: true }); });
-  await migrateLegacy(database, parseLegacySnapshot(legacyKeys.map((key) => [key, key === 'puptime.schedule.v1' ? '[]' : null])), () => 'pet-1');
+  await initializeLocalDatabase(database,()=> 'pet-1');await database.write(sql=>sql.runAsync('DELETE FROM routines'));
   return { database, path, repository: createLocalRepository(database, 'pet-1') };
 }
 

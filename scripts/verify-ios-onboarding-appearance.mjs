@@ -43,7 +43,7 @@ try{
       await runtime.storage.saveThemePreference(theme);await runtime.storage.saveLanguagePreference(language);
     }finally{await database.close();}
     const inspection=new DatabaseSync(path,{readOnly:true});
-    const tables=['metadata','puppies','events','routines','settings','pet_settings','local_revisions','local_sync_owner','local_sync_pets','local_sync_outbox','local_sync_records','local_sync_acks','local_sync_baseline','legacy_snapshots'];
+    const tables=['metadata','puppies','events','routines','settings','pet_settings','local_revisions','local_sync_owner','local_sync_pets','local_sync_outbox','local_sync_records','local_sync_acks','local_sync_baseline'];
     const snapshot=()=>Object.fromEntries(tables.map(table=>[table,inspection.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all().map(row=>({...row}))]));
     try{
       const before=snapshot();assert.equal(before.events.length,0);

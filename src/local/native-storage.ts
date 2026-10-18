@@ -4,7 +4,7 @@ import { isLanguagePreference, type LanguagePreference } from '../localization.t
 import { DEFAULT_NOTIFICATION_PREFERENCES, normalizeNotificationPreferences, type NotificationPreferences } from '../notification-config.ts';
 import { isThemePreference, type ThemePreference } from '../theme.ts';
 import type { LocalDatabase, SqlExecutor } from './database.ts';
-import { petSettingKeys, storageKeys, type LegacyKey } from './legacy.ts';
+import { petSettingKeys, storageKeys, type StorageKey } from './settings.ts';
 import { createLocalRepository } from './repository.ts';
 import { localChanges, notifyLocalCommit, readLocalSettingsRecords, type LocalChangeSink } from './sync-projection.ts';
 import { recordDataSchema } from '../cloud/protocol.ts';
@@ -23,28 +23,28 @@ export function createNativeStorage(database: LocalDatabase, petId: string, onCh
     if (changed) notifyLocalCommit(afterCommit);
     return result;
   }
-  async function get(sql: SqlExecutor, key: LegacyKey) {
+  async function get(sql: SqlExecutor, key: StorageKey) {
     const row = petSettingKeys.has(key)
       ? await sql.getFirstAsync<{ value: string }>('SELECT value FROM pet_settings WHERE pet_id=? AND key=?', petId, key)
       : await sql.getFirstAsync<{ value: string }>('SELECT value FROM settings WHERE key=?', key);
     return row?.value ?? null;
   }
-  async function set(sql: SqlExecutor, key: LegacyKey, value: string) {
+  async function set(sql: SqlExecutor, key: StorageKey, value: string) {
     if (petSettingKeys.has(key)) await sql.runAsync('INSERT INTO pet_settings(pet_id,key,value) VALUES (?,?,?) ON CONFLICT(pet_id,key) DO UPDATE SET value=excluded.value', petId, key, value);
     else await sql.runAsync('INSERT INTO settings(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', key, value);
   }
-  async function json(sql: SqlExecutor, key: LegacyKey): Promise<unknown> {
+  async function json(sql: SqlExecutor, key: StorageKey): Promise<unknown> {
     const raw = await get(sql, key);
     if (raw === null) return null;
     try { const value: unknown = JSON.parse(raw); if (value === null) throw new Error('Invalid null setting.'); return value; } catch { throw new Error('Saved settings could not be read. The original value has been preserved.'); }
   }
-  async function strings(sql: SqlExecutor, key: LegacyKey): Promise<string[]> {
+  async function strings(sql: SqlExecutor, key: StorageKey): Promise<string[]> {
     const value = await json(sql, key);
     if (value === null) return [];
     if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) throw new Error('Saved settings contain an invalid collection.');
     return value;
   }
-  async function object(sql: SqlExecutor, key: LegacyKey): Promise<object | null> {
+  async function object(sql: SqlExecutor, key: StorageKey): Promise<object | null> {
     const value = await json(sql, key);
     if (value === null) return null;
     if (typeof value !== 'object' || Array.isArray(value)) throw new Error('Saved settings contain an invalid object.');

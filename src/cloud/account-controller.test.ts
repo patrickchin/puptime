@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import test,{type TestContext} from 'node:test';
-import { createLocalDatabase,migrateLegacy } from '../local/database.ts';
-import { legacyKeys,parseLegacySnapshot } from '../local/legacy.ts';
+import { createLocalDatabase,initializeLocalDatabase } from '../local/database.ts';
 import { sqliteTestConnection } from '../local/sqlite-test-adapter.ts';
 import { createLocalRuntime } from '../local/runtime-factory.ts';
 import { CloudApiError,type CloudApi,type CloudAccountSummary } from './api.ts';
@@ -9,7 +8,7 @@ import * as controllerModule from './account-controller.ts';
 const event={id:'one',type:'pee' as const,at:100,source:'app' as const};
 async function fixture(t:TestContext) {
  const database=await createLocalDatabase(sqliteTestConnection(':memory:'));t.after(()=>database.close());
- await migrateLegacy(database,parseLegacySnapshot(legacyKeys.map(key=>[key,key==='puptime.schedule.v1'?'[]':null])),()=> 'pet-1');
+ await initializeLocalDatabase(database,()=> 'pet-1');await database.write(sql=>sql.runAsync('DELETE FROM routines'));
  const writes=new Set<()=>void>(),runtime=await createLocalRuntime(database,'pet-1',()=>{for(const fn of writes)fn();});
  const summary:CloudAccountSummary={user:{id:'account-1',email:'person@example.com',name:'Person'},cloud:{canSync:false,canExport:true,source:'none',expiresAt:null},pets:[]};
  const state={credentials:false,summary,trialCalls:0,signOutCalls:0,signOutFails:false,storageFails:false,requested:[] as string[],verifications:0};

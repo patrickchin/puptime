@@ -3,6 +3,7 @@ import worker from './index';
 import { expect, test } from 'vitest';
 import { runInDurableObject } from 'cloudflare:test';
 import { mutationSchema, type Mutation } from '../src/cloud/protocol';
+import { AccountStore } from './account-store';
 
 async function store(petId = 'pet-1') {
   const account = env.ACCOUNTS.get(env.ACCOUNTS.newUniqueId());
@@ -15,6 +16,30 @@ function create(recordId = 'event-1', petId = 'pet-1'): Mutation {
 function edit(original: Mutation, revision: number, patch: object, intent = 'patch'): Mutation {
   return mutationSchema.parse({ ...original, operationId: crypto.randomUUID(), baseRevision: revision, intent, patch });
 }
+
+test('fresh account uses one complete first-release schema baseline',async()=>{
+  const account=await store();
+  await runInDurableObject(account,(_instance,state)=>{
+    expect(state.storage.sql.exec<{version:number}>('SELECT version FROM schema_metadata').one().version).toBe(3);
+    const names=state.storage.sql.exec<{name:string}>("SELECT name FROM sqlite_master WHERE type='table'").toArray().map(row=>row.name);
+    for(const name of ['records','revisions','operations','pets','enrollments','enrolled_devices','account_state'])expect(names).toContain(name);
+  });
+});
+
+test('unsupported account schema rejection preserves stored rows and table definitions',async()=>{
+  const account=await store();
+  await account.apply(create());
+  await runInDurableObject(account,(_instance,state)=>{
+    for(const version of [1,2,999]){
+      state.storage.sql.exec('UPDATE schema_metadata SET version=?',version);
+      const before=state.storage.sql.exec('SELECT name,sql FROM sqlite_master ORDER BY name').toArray();
+      const records=state.storage.sql.exec('SELECT * FROM records').toArray();
+      expect(()=>new AccountStore(state,env)).toThrow(/unsupported/i);
+      expect(state.storage.sql.exec('SELECT name,sql FROM sqlite_master ORDER BY name').toArray()).toEqual(before);
+      expect(state.storage.sql.exec('SELECT * FROM records').toArray()).toEqual(records);
+    }
+  });
+});
 
 test('accepted writes commit state, history, and an incrementing change cursor', async () => {
   const account = await store();

@@ -19,7 +19,7 @@ flow('ios-onboarding-practice-prepare.yaml');
 const path=join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite/puptime-v2.db');
 const database=new DatabaseSync(path,{readOnly:true});
 database.exec('PRAGMA busy_timeout=5000');
-const tables=['puppies','events','routines','settings','pet_settings','local_revisions','local_sync_owner','local_sync_pets','local_sync_outbox','legacy_snapshots'];
+const tables=['puppies','events','routines','settings','pet_settings','local_revisions','local_sync_owner','local_sync_pets','local_sync_outbox'];
 const snapshot=()=>Object.fromEntries(tables.map(table=>[table,database.prepare(`SELECT * FROM ${table}`).all().map(row=>({...row}))]));
 try{
   const before=snapshot();
@@ -27,7 +27,7 @@ try{
   assert.equal(database.prepare("SELECT value FROM metadata WHERE key='show_onboarding'").get().value,'true');
   flow('ios-onboarding-practice.yaml');
   const after=snapshot();
-  for(const table of ['events','routines','pet_settings','local_sync_owner','local_sync_pets','local_sync_outbox','legacy_snapshots'])assert.deepEqual(after[table],before[table],`${table}: practice must not change real puppy history or cloud ownership.`);
+  for(const table of ['events','routines','pet_settings','local_sync_owner','local_sync_pets','local_sync_outbox'])assert.deepEqual(after[table],before[table],`${table}: practice must not change real puppy history or cloud ownership.`);
   assert.deepEqual(after.puppies,[{...before.puppies[0],name:'Biscuit'}]);
   const settings=rows=>rows.filter(row=>row.key!=='puptime.onboarding.v1');
   assert.deepEqual(settings(after.settings),settings(before.settings));

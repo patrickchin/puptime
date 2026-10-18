@@ -28,7 +28,7 @@ try{
   await storage.appendEvents([{id:'retained-before-completion',type:'pee',at:1700000000000,source:'app'}]);
 }finally{await writer.close();}
 const database=new DatabaseSync(path);database.exec('PRAGMA busy_timeout=5000');
-const tables=['metadata','puppies','events','routines','settings','pet_settings','local_revisions','local_sync_owner','local_sync_pets','local_sync_outbox','local_sync_records','local_sync_acks','local_sync_baseline','legacy_snapshots'];
+const tables=['metadata','puppies','events','routines','settings','pet_settings','local_revisions','local_sync_owner','local_sync_pets','local_sync_outbox','local_sync_records','local_sync_acks','local_sync_baseline'];
 const snapshot=()=>Object.fromEntries(tables.map(table=>[table,database.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all().map(row=>({...row}))]));
 try{
   const before=snapshot();assert.equal(before.events.length,1);

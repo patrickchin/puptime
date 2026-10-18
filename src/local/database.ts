@@ -1,5 +1,5 @@
 import { STARTER_SCHEDULE } from '../domain.ts';
-import { legacyKeys, petSettingKeys, storageKeys, type LegacySnapshot } from './legacy.ts';
+import { identifierSchema } from '../cloud/protocol.ts';
 export type SqlValue = string | number | null | Uint8Array;
 export interface SqlExecutor {
   execAsync(sql: string): Promise<void>;
@@ -64,7 +64,6 @@ CREATE TABLE IF NOT EXISTS routines (
 );
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS pet_settings (pet_id TEXT NOT NULL REFERENCES puppies(id) ON DELETE CASCADE, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY(pet_id,key));
-CREATE TABLE IF NOT EXISTS legacy_snapshots (key TEXT PRIMARY KEY NOT NULL, raw_value TEXT);
 CREATE TABLE IF NOT EXISTS local_revisions (
   sequence INTEGER PRIMARY KEY AUTOINCREMENT, pet_id TEXT NOT NULL REFERENCES puppies(id) ON DELETE CASCADE,
   kind TEXT NOT NULL, local_id TEXT NOT NULL, before_data TEXT CHECK(before_data IS NULL OR json_valid(before_data)),
@@ -107,42 +106,29 @@ CREATE TABLE IF NOT EXISTS local_sync_baseline (
 );
 `;
 
-export async function migrateLegacy(database: LocalDatabase, source: LegacySnapshot | (() => Promise<LegacySnapshot>), newId?: () => string): Promise<{ petId: string; migrated: boolean }> {
+export async function initializeLocalDatabase(database: LocalDatabase, newId?: () => string): Promise<{ petId: string }> {
   return database.write(async (sql) => {
-    await sql.execAsync(localSchema);
-    const version = await sql.getFirstAsync<{ value: string }>("SELECT value FROM metadata WHERE key = 'schema_version'");
-    if (version && !['1','2','3'].includes(version.value)) throw new Error('Unsupported or newer local database schema.');
-    if (version) {
+    const metadata = await sql.getFirstAsync("SELECT name FROM sqlite_master WHERE type='table' AND name='metadata'");
+    if (metadata) {
+      const version = await sql.getFirstAsync<{ value: string }>("SELECT value FROM metadata WHERE key='schema_version'");
+      if (!version) throw new Error('The local database metadata is incomplete.');
+      if (version.value !== '4') throw new Error('Unsupported development or newer local database schema. The original data has been preserved.');
       const pet = await sql.getFirstAsync<{ value: string }>("SELECT value FROM metadata WHERE key = 'active_pet_id'");
-      const complete = await sql.getFirstAsync<{ value: string }>("SELECT value FROM metadata WHERE key = 'migration_complete'");
-      if (!pet || complete?.value !== '1' || !await sql.getFirstAsync('SELECT id FROM puppies WHERE id = ?', pet.value)) throw new Error('The local migration metadata is incomplete.');
-      if (version.value === '1') {
-        for (const key of petSettingKeys) {
-          await sql.runAsync('INSERT INTO pet_settings(pet_id,key,value) SELECT ?,key,value FROM settings WHERE key=?', pet.value, key);
-          await sql.runAsync('DELETE FROM settings WHERE key=?', key);
-        }
-        await sql.runAsync("UPDATE metadata SET value='2' WHERE key='schema_version'");
-      }
-      if (version.value !== '3') await sql.runAsync("UPDATE metadata SET value='3' WHERE key='schema_version'");
-      return { petId: pet.value, migrated: false };
+      const onboarding = await sql.getFirstAsync<{ value: string }>("SELECT value FROM metadata WHERE key='show_onboarding'");
+      const required=['metadata','puppies','events','routines','settings','pet_settings','local_revisions','local_sync_owner','local_sync_pets','local_sync_outbox','local_sync_records','local_sync_acks','local_sync_baseline'];
+      const tables=await sql.getAllAsync<{name:string}>("SELECT name FROM sqlite_master WHERE type='table'");
+      if(required.some(name=>!tables.some(table=>table.name===name))||!pet||!identifierSchema.safeParse(pet.value).success||!onboarding||!['true','false'].includes(onboarding.value)
+        ||!await sql.getFirstAsync('SELECT id FROM puppies WHERE id=?',pet.value)) throw new Error('The local database metadata or active puppy is incomplete.');
+      return { petId: pet.value };
     }
-    const snapshot = typeof source === 'function' ? await source() : source;
-    const petId = newId ? newId() : (await sql.getFirstAsync<{ id: string }>('SELECT lower(hex(randomblob(16))) AS id'))!.id;
-    if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(petId)) throw new Error('Invalid initial puppy identifier.');
+    if(await sql.getFirstAsync("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' LIMIT 1")) throw new Error('The existing local database is incomplete. The original data has been preserved.');
+    await sql.execAsync(localSchema);
+    const petId = identifierSchema.parse(newId ? newId() : (await sql.getFirstAsync<{ id: string }>('SELECT lower(hex(randomblob(16))) AS id'))!.id);
     await sql.runAsync('INSERT INTO puppies(id,name) VALUES (?,?)', petId, 'My puppy');
-    for (const event of snapshot.events) await sql.runAsync('INSERT INTO events(pet_id,id,at,body) VALUES (?,?,?,?)', petId, event.id, event.at, JSON.stringify(event));
-    for (const routine of snapshot.schedule ?? STARTER_SCHEDULE) await sql.runAsync('INSERT INTO routines(pet_id,id,minutes,body) VALUES (?,?,?,?)', petId, routine.id, routine.minutes, JSON.stringify(routine));
-    for (const key of legacyKeys) {
-      const raw = snapshot.raw[key];
-      await sql.runAsync('INSERT INTO legacy_snapshots(key,raw_value) VALUES (?,?)', key, raw);
-      if (raw !== null && key !== storageKeys.events && key !== storageKeys.schedule) {
-        if (petSettingKeys.has(key)) await sql.runAsync('INSERT INTO pet_settings(pet_id,key,value) VALUES (?,?,?)', petId, key, raw);
-        else await sql.runAsync('INSERT INTO settings(key,value) VALUES (?,?)', key, raw);
-      }
-    }
-    for (const [key, value] of Object.entries({ schema_version: '3', active_pet_id: petId, migration_complete: '1', show_onboarding: String(snapshot.showOnboarding) })) {
+    for (const routine of STARTER_SCHEDULE) await sql.runAsync('INSERT INTO routines(pet_id,id,minutes,body) VALUES (?,?,?,?)', petId, routine.id, routine.minutes, JSON.stringify(routine));
+    for (const [key, value] of Object.entries({ schema_version: '4', active_pet_id: petId, show_onboarding: 'true' })) {
       await sql.runAsync('INSERT INTO metadata(key,value) VALUES (?,?)', key, value);
     }
-    return { petId, migrated: true };
+    return { petId };
   });
 }

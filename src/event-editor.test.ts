@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import test,{type TestContext} from 'node:test';
-import { createLocalDatabase,migrateLegacy } from './local/database.ts';
-import { legacyKeys,parseLegacySnapshot } from './local/legacy.ts';
+import { createLocalDatabase,initializeLocalDatabase } from './local/database.ts';
 import { sqliteTestConnection } from './local/sqlite-test-adapter.ts';
 import { createNativeStorage } from './local/native-storage.ts';
 import { applyLocalRecords } from './local/sync-projection.ts';
@@ -10,7 +9,7 @@ import * as editing from './event-editor.ts';
 const original:PuppyEvent={id:'one',type:'pee',at:100,source:'app',note:'original',estimated:true};
 async function fixture(t:TestContext,event=original) {
  const database=await createLocalDatabase(sqliteTestConnection(':memory:'));t.after(()=>database.close());
- await migrateLegacy(database,parseLegacySnapshot(legacyKeys.map(key=>[key,key==='puptime.schedule.v1'?'[]':null])),()=> 'pet-1');
+ await initializeLocalDatabase(database,()=> 'pet-1');await database.write(sql=>sql.runAsync('DELETE FROM routines'));
  const storage=createNativeStorage(database,'pet-1');await storage.appendEvents([event]);
  assert.equal(typeof editing.createEventEditor,'function');
  const editor=editing.createEventEditor(event,async changes=>{await storage.updateEvent(event.id,changes);});
@@ -44,9 +43,9 @@ test('overlapping autosaves are serialized around local commit and keep independ
  const first=editor.save({...values,note:'first'}),second=editor.save({...values,note:'second'});release();await Promise.all([first,second]);
  assert.deepEqual((await storage.loadEvents())[0],{...original,at:200,note:'second'});
 });
-test('editing time preserves an untouched oversized legacy note and explicit note removal still clears it',async t=>{
- const long={...original,note:'x'.repeat(17000)};const {storage,editor,values}=await fixture(t,long);
- await editor.save({...values,at:150});assert.equal((await storage.loadEvents())[0].note!.length,17000);
+test('editing time preserves an untouched imported note at the cloud limit and explicit removal clears it',async t=>{
+ const long={...original,note:'x'.repeat(16384)};const {storage,editor,values}=await fixture(t,long);
+ await editor.save({...values,at:150});assert.equal((await storage.loadEvents())[0].note!.length,16384);
  await editor.save({...values,at:150,note:''});assert.equal((await storage.loadEvents())[0].note,undefined);
 });
 test('an untouched future timestamp is not clamped by a note-only autosave',async t=>{

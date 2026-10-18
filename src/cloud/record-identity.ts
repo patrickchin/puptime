@@ -1,7 +1,5 @@
-import { z } from 'zod';
-import { identifierSchema, type CloudRecord, type RecordKind } from './protocol.ts';
+import { identifierSchema, localIdSchema, type CloudRecord, type RecordKind } from './protocol.ts';
 
-const localIdSchema = z.string().min(1).max(256).refine((id) => !!id.trim() && !/[\u0000-\u001f\u007f]/.test(id));
 export function cloudRecordId(kind: RecordKind, cloudPetId: string | null, localId: string): string {
   localIdSchema.parse(localId);
   if (kind === 'accountPreferences') {
