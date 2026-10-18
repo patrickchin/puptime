@@ -605,6 +605,8 @@ function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken
 
   function loadEarlierDays() {
     if (!hasEarlierDays || isLoadingEarlier || window.loading || window.error) return;
+    // Consume the gesture once; more top-edge scroll events must not queue pages.
+    didUserScroll.current = false;
     startLoadingEarlier(() => {
       setLoadedDayCount((current) => Math.min(maxHistoryDays, current + LOAD_DAYS));
     });
@@ -813,7 +815,7 @@ function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken
           })}
         </ScrollView>
 
-        {!isCompactHeight && visibleMarkCount === 0 ? (
+        {!isCompactHeight && !window.loading && !window.error && !summaryError && visibleMarkCount === 0 ? (
           <View testID="timeline.empty" style={[styles.emptyNote, { backgroundColor: theme.surface, borderRadius: theme.presentation.controlRadius }]}>
             <MaterialCommunityIcons name="clock-outline" size={18} color={theme.textMuted} />
             <Text style={[styles.emptyText, { color: theme.textMuted }]}>
