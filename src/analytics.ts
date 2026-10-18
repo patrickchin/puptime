@@ -190,6 +190,14 @@ export function activityFrequencyStats(
   };
 }
 
+export function activityMonthDate(at:number):Date {
+  const source=new Date(at),month=new Date(0);
+  month.setFullYear(source.getFullYear(),source.getMonth(),1);
+  month.setHours(12,0,0,0);
+  // The first supported month begins partway through it; keep a valid date.
+  return Number.isFinite(month.getTime())?month:source;
+}
+
 export function monthlyActivityStats(
   events: PuppyEvent[],
   types?: readonly EventType[],
@@ -206,7 +214,7 @@ export function monthlyActivityStats(
     const date = new Date(event.at);
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     const month = months.get(key) ?? {
-      date: new Date(date.getFullYear(), date.getMonth(), 1, 12),
+      date: activityMonthDate(event.at),
       total: 0,
       estimatedTotal: 0,
       recordedDays: new Set<string>(),
@@ -220,7 +228,7 @@ export function monthlyActivityStats(
   });
 
   return [...months.entries()]
-    .sort(([left], [right]) => right.localeCompare(left))
+    .sort(([,left], [,right]) => right.date.getTime()-left.date.getTime())
     .map(([key, month]) => ({
       key,
       date: month.date,

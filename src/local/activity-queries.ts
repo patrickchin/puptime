@@ -1,5 +1,5 @@
 import {z} from 'zod';
-import type {MonthlyActivityStat} from '../analytics.ts';
+import {activityMonthDate,type MonthlyActivityStat} from '../analytics.ts';
 import {eventDataSchema,localIdSchema} from '../cloud/protocol.ts';
 import {activityKey,type PuppyEvent} from '../domain.ts';
 import {eventDataFromSql,type EventSqlRow} from '../record-sql.ts';
@@ -84,10 +84,10 @@ export function createActivityQueries(database:LocalDatabase,petId:string){
       FROM days JOIN events ON events.pet_id=? AND at>=days.start AND at<days.finish GROUP BY days.start
      ) SELECT COALESCE(SUM(total),0) total,COALESCE(SUM(estimatedTotal),0) estimatedTotal,COALESCE(SUM(total>0),0) recordedDays FROM counts`,...ranges.flat(),petId))!;
      const {total,estimatedTotal,recordedDays}=aggregate;
-     months.push({key:year+'-'+String(month+1).padStart(2,'0'),date:new Date(year,month,1,12),total,estimatedTotal,recordedDays,averagePerRecordedDay:recordedDays?total/recordedDays:0});
+     months.push({key:year+'-'+String(month+1).padStart(2,'0'),date:activityMonthDate(first.at),total,estimatedTotal,recordedDays,averagePerRecordedDay:recordedDays?total/recordedDays:0});
      first=await sql.getFirstAsync<{at:number}>('SELECT at FROM events WHERE pet_id=? AND at>=? ORDER BY at LIMIT 1',petId,until);
     }
-    return months.sort((a,b)=>b.key.localeCompare(a.key));
+    return months.sort((a,b)=>b.date.getTime()-a.date.getTime());
    });
   },
  };

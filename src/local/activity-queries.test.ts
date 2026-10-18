@@ -76,7 +76,17 @@ test('calendar aggregates retain valid timestamp extremes without iterating empt
  const {repository,activity}=await setup(t);
  const events=[event('first',-8640000000000000),event('year-fifty',new Date('0050-02-01T00:00:00Z').getTime()),event('epoch',0),event('last',8640000000000000)];
  await repository.appendEvents(events);
- assert.deepEqual(await activity.monthlyStats(),monthlyActivityStats(events));
+ const sqlMonths=await activity.monthlyStats(),arrayMonths=monthlyActivityStats(events);
+ const expectedKeys=[...events].sort((a,b)=>b.at-a.at).map(event=>{const date=new Date(event.at);return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;});
+ assert.deepEqual(sqlMonths.map(month=>month.key),expectedKeys);
+ assert.deepEqual(arrayMonths.map(month=>month.key),expectedKeys);
+ for(const month of [...sqlMonths,...arrayMonths]){
+  assert.ok(Number.isFinite(month.date.getTime()),'Every accepted timestamp needs a renderable month date.');
+  const separator=month.key.lastIndexOf('-');
+  assert.equal(month.date.getFullYear(),Number(month.key.slice(0,separator)));
+  assert.equal(month.date.getMonth()+1,Number(month.key.slice(separator+1)));
+ }
+ assert.deepEqual(sqlMonths,arrayMonths);
  assert.deepEqual((await activity.eventsBetween(8640000000000000,8640000000000001)).map(row=>row.id),['last']);
 });
 
