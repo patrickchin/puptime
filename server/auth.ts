@@ -4,7 +4,7 @@ import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { emailOTP } from 'better-auth/plugins';
 import { Resend } from 'resend';
 import { z } from 'zod';
-import { retireCloudAccount } from './account-lifecycle';
+import { retireCloudAccount, type AppleRevocation } from './account-lifecycle';
 
 function emailSenderAvailable(env: Cloudflare.Env): boolean {
   const sender = z.email().safeParse(env.EMAIL_FROM);
@@ -21,7 +21,7 @@ export function configuredProviders(env: Cloudflare.Env) {
   };
 }
 
-export function createAuth(env: Cloudflare.Env, options: { disableEmailSignUp?: boolean } = {}) {
+export function createAuth(env: Cloudflare.Env, options: { disableEmailSignUp?: boolean; onAccountRetired?: (appleRevocation: AppleRevocation) => void } = {}) {
   const baseURL = z.url().parse(env.AUTH_BASE_URL);
   const secret = z.string().min(32).parse(env.AUTH_SECRET);
   const base = new URL(baseURL);
@@ -35,7 +35,7 @@ export function createAuth(env: Cloudflare.Env, options: { disableEmailSignUp?: 
     trustedOrigins: [base.origin, ...(env.WEB_ORIGINS ?? '').split(',').filter(Boolean), 'puptime://*', ...(providers.apple ? ['https://appleid.apple.com'] : [])],
     emailAndPassword: { enabled: false },
     account: { accountLinking: { enabled: true, disableImplicitLinking: true } },
-    user: { deleteUser: { enabled: true, beforeDelete: (user) => retireCloudAccount(env, user) } },
+    user: { deleteUser: { enabled: true, beforeDelete: async (user) => { const outcome = await retireCloudAccount(env, user); options.onAccountRetired?.(outcome); } } },
     session: { expiresIn: 60 * 60 * 24 * 30, updateAge: 60 * 60 * 24, freshAge: 60 * 10, cookieCache: { enabled: false } },
     rateLimit: { enabled: true, storage: 'database', window: 60, max: 30 },
     logger: { disabled: true },

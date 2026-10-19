@@ -43,3 +43,15 @@ test('deletion persistence runs after fresh verification and before dispatch, an
  await assert.rejects(client.remove('owner-a',()=>{assert.equal(calls.some(call=>call.method==='DELETE'),false);throw new AccountError('storage');}),error=>error instanceof AccountError&&error.kind==='storage');assert.equal(calls.some(call=>call.method==='DELETE'),false);
  await client.remove('owner-a',()=>{assert.equal(calls.some(call=>call.method==='DELETE'),false);saved=true;});assert.equal(saved,true);assert.equal(calls.filter(call=>call.method==='DELETE').length,1);
 });
+
+test('confirmed deletion exposes only the Apple outcome and uses manual guidance for older or unknown replies',async()=>{
+ const {client,state}=fixture();
+ for(const outcome of ['not-linked','revoked','manual'] as const){
+  state.deleteBody={success:true,message:'User deleted',appleRevocation:outcome,accessToken:'synthetic-private-token'};
+  assert.deepEqual(await client.remove('owner-a'),{appleRevocation:outcome});
+ }
+ for(const extra of [{},{appleRevocation:'unrecognized'},{appleRevocation:null}]){
+  state.deleteBody={success:true,message:'User deleted',...extra};
+  assert.deepEqual(await client.remove('owner-a'),{appleRevocation:'manual'});
+ }
+});

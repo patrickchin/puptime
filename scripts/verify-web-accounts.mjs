@@ -5,16 +5,22 @@ import assert from 'node:assert/strict';
 import {spawn,execFileSync} from 'node:child_process';
 import {createServer,request as httpRequest} from 'node:http';
 import {createRequire} from 'node:module';
-import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,readdirSync,existsSync,rmSync,createReadStream} from 'node:fs';
+import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,readdirSync,existsSync,rmSync,createReadStream,realpathSync} from 'node:fs';
 import {join,resolve,extname,dirname} from 'node:path';
 import {tmpdir} from 'node:os';
+import {fileURLToPath} from 'node:url';
+import {createHash} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
 import {gunzipSync} from 'node:zlib';
 import {cloudRecordId} from '../src/cloud/record-identity.ts';
 const require=createRequire(import.meta.url),{chromium}=require(process.env.PUPTIME_PLAYWRIGHT_MODULE??'playwright');
-const root=process.cwd(),front='http://127.0.0.1:8898',back='http://127.0.0.1:8798',directory=mkdtempSync(join(tmpdir(),'puptime-web-account-local-'));
-assert.ok(root.endsWith('/ios-ci-routine/puptime'),'Run only in the web-accounts managed worktree.');
-const output=resolve('output/playwright/web-accounts');mkdirSync(output,{recursive:true});
+const root=realpathSync(process.cwd());
+assert.equal(root,realpathSync(fileURLToPath(new URL('..',import.meta.url))),'Run from this script’s Puptime checkout root.');
+assert.equal(JSON.parse(readFileSync('package.json','utf8')).name,'puptime');
+assert.ok(process.argv.slice(2).every(value=>value==='--apple-deletion'),'Only --apple-deletion is supported. No remote target is accepted.');
+const appleDeletionOnly=process.argv.includes('--apple-deletion');
+const front='http://127.0.0.1:8898',back='http://127.0.0.1:8798',directory=mkdtempSync(join(tmpdir(),'puptime-web-account-local-'));
+const output=resolve(appleDeletionOnly?join('output/playwright/apple-deletion',new Date().toISOString().replace(/[:.]/g,'-')):'output/playwright/web-accounts');mkdirSync(output,{recursive:true});
 const persist=join(directory,'persist'),configPath=join(directory,'wrangler.json');
 const config={...JSON.parse(readFileSync('wrangler.jsonc','utf8')),name:'puptime-web-accounts-local',main:resolve('server/index.ts'),env:undefined,vars:{ENVIRONMENT:'local',AUTH_BASE_URL:front,WEB_ORIGINS:front,AUTH_SECRET:crypto.randomUUID()+crypto.randomUUID(),GOOGLE_CLIENT_ID:'synthetic-google-client',GOOGLE_CLIENT_SECRET:'synthetic-google-secret',APPLE_CLIENT_ID:'synthetic-apple-client',APPLE_CLIENT_SECRET:'synthetic-apple-secret'}};
 config.d1_databases=config.d1_databases.map(db=>({...db,migrations_dir:resolve(db.migrations_dir)}));writeFileSync(configPath,JSON.stringify(config),{mode:0o600});
@@ -49,8 +55,92 @@ async function signIn(page,email,wrongCode=false){
  if(wrongCode){await page.getByLabel('Email code',{exact:true}).fill(privateCode==='000000'?'111111':'000000');await page.getByRole('button',{name:'Continue',exact:true}).click();await page.getByRole('alert').filter({hasText:'That code didn’t work'}).waitFor();assert.equal(await page.getByRole('button',{name:'Sign out',exact:true}).count(),0);pass('An invalid email code keeps the visitor signed out and allows correction.');}
  await page.getByLabel('Email code',{exact:true}).fill(privateCode);await page.getByRole('button',{name:'Continue',exact:true}).click();await page.getByRole('button',{name:'Sign out',exact:true}).waitFor();
 }
+
+async function qualifyAppleDeletion(){
+ const sourceFiles=['server/auth.ts','server/account-lifecycle.ts','server/account-routes.ts','server/migrations/0003-deleting-account-credentials.sql','src/web/account-client.ts','src/web/AccountPage.tsx','scripts/verify-web-accounts.mjs'];
+ const digest=value=>createHash('sha256').update(value).digest('hex');
+ const source={head:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),files:Object.fromEntries(sourceFiles.map(path=>[path,digest(readFileSync(path))])),bundles:Object.fromEntries(readdirSync('dist-web/_expo/static/js/web').filter(path=>path.endsWith('.js')).map(path=>[path,digest(readFileSync(join('dist-web/_expo/static/js/web',path)))]))};
+ const fixtureHeaders={'x-puptime-fixture':'true'};
+ async function owner(){
+  const auth=await context(),page=await auth.newPage(),email=`apple-delete-${crypto.randomUUID()}@example.invalid`;
+  await signIn(page,email);
+  const response=await auth.request.get(front+'/api/account');assert.equal(response.status(),200);
+  const uid=(await response.json()).user.id;assert.match(uid,/^[A-Za-z0-9._:-]+$/);
+  const pet='apple-review-'+crypto.randomUUID();
+  assert.equal((await auth.request.post(front+'/api/cloud/trial',{headers:fixtureHeaders,data:{}})).status(),200);
+  assert.equal((await auth.request.post(front+'/api/cloud/enroll',{headers:fixtureHeaders,data:{operationId:crypto.randomUUID(),deviceId:'apple-review-device',localPetId:pet,name:'Synthetic puppy'}})).status(),200);
+  const mutation={protocolVersion:1,operationId:crypto.randomUUID(),deviceId:'apple-review-device',recordId:cloudRecordId('event',pet,'synthetic-event'),petId:pet,kind:'event',baseRevision:0,intent:'create',patch:{type:'pee',at:1000000,source:'app',note:'Synthetic deletion acceptance 犬'}};
+  const pushed=await auth.request.post(front+'/api/sync/push',{headers:fixtureHeaders,data:{mutations:[mutation]}});assert.equal(pushed.status(),200);assert.deepEqual((await pushed.json()).rejected,[]);
+  return {auth,page,email,uid,pet};
+ }
+ const target=await owner(),other=await owner();
+ const credential=crypto.randomUUID();
+ sql(`INSERT INTO account(id,accountId,providerId,userId,refreshToken,accessToken,createdAt,updatedAt) VALUES ('${credential}','${credential}','apple','${target.uid}',NULL,NULL,${Date.now()},${Date.now()})`);
+ assert.equal(read("SELECT id FROM account WHERE id=? AND userId=? AND providerId='apple' AND refreshToken IS NULL AND accessToken IS NULL",credential,target.uid).length,1);
+ assert.ok(read("SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'account_reject_%_while_deleting'").length===2);
+ pass('Two disposable accounts use genuine local UI OTP, explicit fixture enrollment and real persisted cloud events; only the deletion owner receives a tokenless synthetic Apple credential.');
+ const authSnapshot=uid=>Object.fromEntries(['user','session','account','cloud_accounts'].map(table=>[table,read(`SELECT * FROM ${table} WHERE ${table==='user'?'id':table==='cloud_accounts'?'account_id':'userId'}=? ORDER BY ${table==='cloud_accounts'?'account_id':'id'}`,uid)]));
+ const objectFiles=readdirSync(join(persist,'v3/do'),{recursive:true}).filter(path=>String(path).endsWith('.sqlite')).map(path=>join(persist,'v3/do',path));
+ function objectFor(pet){
+  const matches=objectFiles.filter(path=>{const db=new DatabaseSync(path,{readOnly:true});try{return !!db.prepare("SELECT name FROM sqlite_master WHERE name='pets'").get()&&!!db.prepare('SELECT id FROM pets WHERE id=?').get(pet);}finally{db.close();}});
+  assert.equal(matches.length,1);return matches[0];
+ }
+ const targetObject=objectFor(target.pet),otherObject=objectFor(other.pet);
+ const contentTables=['records','record_events','record_routines','revisions','operations','pets','enrollments','enrolled_devices'];
+ function objectSnapshot(path){assert.ok(path.startsWith(persist+'/'));const db=new DatabaseSync(path,{readOnly:true});try{return Object.fromEntries([...contentTables,'account_state','schema_metadata'].map(table=>[table,db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()]));}finally{db.close();}}
+ const unrelatedAuth=authSnapshot(other.uid),unrelatedContent=objectSnapshot(otherObject);
+ assert.equal(objectSnapshot(targetObject).revisions.length,1);
+ await target.page.reload();await target.page.getByText('✓ Apple connected',{exact:true}).waitFor();
+ const recorded=await context({storageState:await target.auth.storageState(),recordVideo:{dir:join(output,'video'),size:{width:1440,height:1000}},viewport:{width:1440,height:1000}}),page=await recorded.newPage();
+ reviewPage=page;
+ await page.goto(front+'/account');await page.getByText('✓ Apple connected',{exact:true}).waitFor();
+ await page.waitForTimeout(1800);
+ await page.getByRole('button',{name:'Delete cloud account',exact:true}).click();await page.getByRole('dialog',{name:'Delete cloud account?'}).waitFor();
+ await page.screenshot({path:join(output,'327-apple-delete-confirmation-desktop.png'),fullPage:true});
+ await page.waitForTimeout(1800);
+ await page.getByRole('dialog').getByRole('button',{name:'Cancel',exact:true}).click();
+ assert.equal(authSnapshot(target.uid).user.length,1);assert.equal(objectSnapshot(targetObject).revisions.length,1);
+ pass('Cancel closes the real confirmation without deleting identity or cloud history.');
+ await page.getByRole('button',{name:'Delete cloud account',exact:true}).click();await page.getByRole('dialog').waitFor();
+ const deleted=page.waitForResponse(response=>response.request().method()==='DELETE'&&new URL(response.url()).pathname==='/api/account');
+ await page.getByRole('dialog').getByRole('button',{name:'Delete cloud account',exact:true}).click();
+ const response=await deleted;assert.equal(response.status(),200);assert.equal(response.headers()['cache-control'],'no-store');
+ assert.deepEqual(await response.json(),{success:true,message:'User deleted',appleRevocation:'manual'});
+ await page.getByRole('status').filter({hasText:'Cloud account deleted'}).waitFor();
+ const instruction=page.getByText('Apple access wasn’t confirmed as revoked.',{exact:false});await instruction.waitFor();
+ const appleLink=page.getByRole('link',{name:'your Apple Account',exact:true});assert.equal(await appleLink.getAttribute('href'),'https://account.apple.com/');
+ await page.getByLabel('Email address',{exact:true}).waitFor();
+ assert.equal(await page.getByRole('dialog').isVisible(),false);
+ assert.equal((await recorded.request.get(front+'/api/account')).status(),401);
+ assert.equal((await target.auth.request.get(front+'/api/account')).status(),401);
+ for(const rows of Object.values(authSnapshot(target.uid)))assert.equal(rows.length,0);
+ assert.equal(read('SELECT id FROM local_email_previews WHERE email=?',target.email).length,0);
+ const retired=objectSnapshot(targetObject);for(const table of contentTables)assert.equal(retired[table].length,0);
+ assert.deepEqual(retired.account_state.map(row=>({...row})),[{key:'retired',value:1}]);
+ assert.deepEqual(authSnapshot(other.uid),unrelatedAuth);assert.deepEqual(objectSnapshot(otherObject),unrelatedContent);
+ assert.equal((await other.auth.request.get(front+'/api/account')).status(),200);
+ pass('Confirmed DELETE returns manual Apple guidance, clears the real SDK browser session, removes target identity/credentials/live cloud data and retains a non-content retirement fence; the unrelated owner’s auth and complete object rows are unchanged.');
+ await page.screenshot({path:join(output,'327-apple-delete-manual-desktop.png'),fullPage:true});await page.waitForTimeout(2600);
+ await page.setViewportSize({width:390,height:844});
+ await instruction.waitFor();await appleLink.scrollIntoViewIfNeeded();assert.equal(await appleLink.isVisible(),true);
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
+ await page.screenshot({path:join(output,'327-apple-delete-manual-mobile.png'),fullPage:true});await page.waitForTimeout(2600);
+ const video=page.video();await recorded.close();assert.ok(video);
+ const videoPath=join(output,'327-apple-account-deletion.mp4');
+ execFileSync('ffmpeg',['-nostdin','-hide_banner','-loglevel','error','-i',await video.path(),'-an','-c:v','libx264','-pix_fmt','yuv420p','-crf','20','-movflags','+faststart',videoPath],{stdio:['ignore','pipe','pipe']});
+ pass('Fresh desktop/mobile product screenshots and a seekable H.264 MP4 show the actual post-authentication confirmation, cancellation, deletion and manual Apple link; no code entry is recorded.');
+ assert.deepEqual(source.files,Object.fromEntries(sourceFiles.map(path=>[path,digest(readFileSync(path))])),'Reviewed source changed during qualification.');
+ assert.deepEqual(apiCalls.filter(call=>!call.fixture&&/\/api\/(cloud\/(trial|enroll)|sync\/push)/.test(call.path)),[]);
+ await target.auth.close();await other.auth.close();
+ const evidence={passed:summary,source,scope:'Isolated local real Better Auth email OTP + D1/SQLite DO + browser confirmation. The Apple credential is a synthetic tokenless row, not a real Apple login. No upstream Apple call is made; real revocation HTTP200/400/network/timeout behavior is separately mocked in Workers tests.',privateAuthRecorded:false,liveServicesUsed:false,manualLink:'https://account.apple.com/',unrelatedOwnerPreserved:true,media:readdirSync(output).filter(path=>/\.(png|mp4)$/.test(path)).map(path=>({path,sha256:digest(readFileSync(join(output,path)))}))};
+ writeFileSync(join(output,'326-apple-deletion-local.json'),JSON.stringify(evidence,null,2));
+ writeFileSync(join(output,'326-apple-deletion-local.log'),summary.map(value=>'PASS '+value).join('\n')+'\n'+evidence.scope+'\n');
+ console.log('Apple deletion evidence:',output);
+}
 try{
  assert.ok(existsSync('dist-web/account.html'),'Build the static website first.');
+ // Refuse another local service before spawning or issuing any fixture request.
+ for(const port of [8798,8898])await new Promise((resolve,reject)=>{const probe=createServer();probe.once('error',reject);probe.listen(port,'127.0.0.1',()=>probe.close(resolve));});
  cli(['d1','migrations','apply','AUTH_DB','--local','--config',configPath,'--persist-to',persist]);
  worker=spawn('npx',['wrangler','dev','--local','--ip','127.0.0.1','--port','8798','--config',configPath,'--persist-to',persist],{env:childEnv,stdio:['ignore','pipe','pipe'],detached:true});
  worker.stdout.resume();worker.stderr.resume();await waitServer();
@@ -69,6 +159,7 @@ try{
   res.writeHead(200,{'content-type':types[extname(file)]??'application/octet-stream','cache-control':'no-store'});createReadStream(file).pipe(res);
  });await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(8898,'127.0.0.1',resolve);});
  browser=await chromium.launch({headless:true,executablePath:process.env.PUPTIME_CHROMIUM_EXECUTABLE??chromium.executablePath()});
+ if(appleDeletionOnly){await qualifyAppleDeletion();}else{
  const privateContext=await context(),page=await privateContext.newPage(),email=`web-review-${crypto.randomUUID().slice(0,8)}@example.invalid`;
  await page.goto(front+'/account');await page.getByLabel('Email address',{exact:true}).waitFor();assert.equal(await page.locator('meta[name=robots]').getAttribute('content'),'noindex, nofollow');
  await page.screenshot({path:join(output,'300-web-account-sign-in.png'),fullPage:true});
@@ -151,7 +242,8 @@ try{
  writeFileSync(join(output,'verification.json'),JSON.stringify({passed:summary,scope:'Local genuine OTP/D1/DO + simulated external provider cancellation; no live provider or telemetry ingestion claim; optional analytics uses an isolated local mock.',privateAuthRecorded:false},null,2));
  console.log('Review evidence:',output);
  }
-}catch(error){if(reviewPage&&!reviewPage.isClosed())await reviewPage.screenshot({path:join(output,'319-public-review-failure.png'),fullPage:true}).catch(()=>{});let message=error?.message??'unknown failure';for(const secret of privateCodes)message=message.replaceAll(secret,'[REDACTED]');console.error('FAIL isolated web acceptance:',message);process.exitCode=1;}
+ }
+}catch(error){if(reviewPage&&!reviewPage.isClosed())await reviewPage.screenshot({path:join(output,appleDeletionOnly?'327-public-review-failure.png':'319-public-review-failure.png'),fullPage:true}).catch(()=>{});let message=error?.message??'unknown failure';for(const secret of privateCodes)message=message.replaceAll(secret,'[REDACTED]');console.error('FAIL isolated web acceptance:',message);process.exitCode=1;}
 finally{
  rmSync(join(output,'private-export.ndjson'),{force:true});
  await browser?.close();if(server)await new Promise(resolve=>server.close(resolve));
