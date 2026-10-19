@@ -26,11 +26,10 @@ test('cloud revisions validate immutable before/after identity, scope, proposal 
 
 test('SDK history requests retain the fixed credential origin and encode a long Unicode record ID as one segment',async()=>{
  const longId='["event","pet-1","'+'a'.repeat(200)+' /💩"]';
- const encoded='%5B%22event%22%2C%22pet-1%22%2C%22'+'a'.repeat(200)+'%20%2F%F0%9F%92%A9%22%5D';
  const revision={...first,recordId:longId,after:{...one,id:longId}};let calls=0;
  const controller=new AbortController();
  const cloud=createCloudApi(createSdkRequest(async(url,options)=>{
-  calls++;assert.equal(url,'https://puptime.test/api/records/'+encoded+'/history?beforeRevision=5');
+  calls++;assert.equal(url,'https://puptime.test/api/records/:recordId/history?beforeRevision=5');assert.deepEqual(options.params,{recordId:longId});
   assert.equal(options.method,'GET');assert.equal(options.body,undefined);assert.equal(options.signal,controller.signal);assert.equal(options.credentials,'omit');assert.equal(options.redirect,'error');assert.equal(options.retry,0);
   return {data:{revisions:[revision]},error:null};
  },'https://puptime.test'));

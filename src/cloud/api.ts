@@ -31,25 +31,30 @@ export class CloudApiError extends Error {
 type RequestOptions={method:'GET'|'POST';body?:object;signal?:AbortSignal};
 type RequestResult={data:unknown;error:{status:number}|null;retryAfter?:string|null};
 export type CloudRequest=(path:string,options:RequestOptions)=>Promise<RequestResult>;
-type SdkOptions=RequestOptions&{redirect:'error';credentials:'omit';retry:0;timeout:number;onResponse:(context:{response:Response})=>void};
+type SdkOptions=RequestOptions&{params?:{recordId:string};redirect:'error';credentials:'omit';retry:0;timeout:number;onResponse:(context:{response:Response})=>void};
 const historyRecordId=recordIdSchema.refine(value=>value!=='.'&&value!=='..');
 const historyCursor=z.number().int().min(1).max(Number.MAX_SAFE_INTEGER);
-function historyRoute(path:string,options:RequestOptions):boolean {
+function historyRoute(path:string,options:RequestOptions):{recordId:string;beforeRevision?:string}|null {
   const match=/^\/api\/records\/([^/?#]+)\/history(?:\?beforeRevision=([1-9]\d*))?$/.exec(path);
-  if(!match||options.method!=='GET'||options.body!==undefined)return false;
+  if(!match||options.method!=='GET'||options.body!==undefined)return null;
   try {
     const id=decodeURIComponent(match[1]);
-    return historyRecordId.safeParse(id).success&&encodeURIComponent(id)===match[1]
-      && (match[2]===undefined||historyCursor.safeParse(Number(match[2])).success);
-  } catch {return false;}
+    if(!historyRecordId.safeParse(id).success||encodeURIComponent(id)!==match[1]
+      ||(match[2]!==undefined&&!historyCursor.safeParse(Number(match[2])).success))return null;
+    return {recordId:id,beforeRevision:match[2]};
+  } catch {return null;}
 }
 export function createSdkRequest(fetchClient:(url:string,options:SdkOptions)=>Promise<Omit<RequestResult,'retryAfter'>>,origin:string):CloudRequest {
   const base=cloudBaseUrl(origin,true);if (!base) throw new Error('Cloud origin is missing.');
   return async(path,options)=>{
-    if (!/^\/api\/(?:config|account|cloud\/(?:trial|enroll)|sync\/push|sync\/pull\?after=\d+)$/.test(path)&&!historyRoute(path,options)) throw new CloudApiError('invalid-request',400);
+    const history=historyRoute(path,options);
+    if (!/^\/api\/(?:config|account|cloud\/(?:trial|enroll)|sync\/push|sync\/pull\?after=\d+)$/.test(path)&&!history) throw new CloudApiError('invalid-request',400);
     throwIfAborted(options.signal);
     let retryAfter:string|null=null;
-    const result=await fetchClient(`${base}${path}`,{...options,redirect:'error',credentials:'omit',retry:0,timeout:15000,onResponse:({response})=>{retryAfter=response.headers.get('retry-after');}});
+    // Better Auth encodes path parameters itself; a pre-encoded literal ID would
+    // be encoded twice and silently query history for a different record.
+    const sdkPath=history?`/api/records/:recordId/history${history.beforeRevision===undefined?'':`?beforeRevision=${history.beforeRevision}`}`:path;
+    const result=await fetchClient(`${base}${sdkPath}`,{...options,...(history?{params:{recordId:history.recordId}}:{}),redirect:'error',credentials:'omit',retry:0,timeout:15000,onResponse:({response})=>{retryAfter=response.headers.get('retry-after');}});
     return {...result,retryAfter};
   };
 }

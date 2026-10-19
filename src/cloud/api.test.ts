@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {createAuthClient} from 'better-auth/react';
+import {Hono} from 'hono';
 import type { Mutation } from './protocol.ts';
 import * as api from './api.ts';
 const config={protocolVersion:1,trialDays:14,providers:{apple:false,google:true,email:false},pricingFinalized:false};
@@ -62,6 +64,39 @@ test('SDK request adapter fixes the credential origin, disables redirects and SD
  assert.deepEqual(await request('/api/account',{method:'GET',signal:controller.signal}),{data:account,error:null,retryAfter:'3'});
  for(const path of ['https://other.example/api/account','//other.example/api/account','/api/../private','/api/auth/get-session','/api/account?url=https://other.example']) await assert.rejects(request(path,{method:'GET'}));
  assert.equal(calls,1);
+});
+
+test('the installed auth SDK delivers canonical history identities and cursors to the server route without double encoding',async()=>{
+ const histories=new Map<string,import('./protocol.ts').Revision[]>();
+ for(const localId of ['one','a'.repeat(200)+' /%?#:💩']){
+  const id=JSON.stringify(['event','pet-1',localId]);
+  const before={id,petId:'pet-1',kind:'event' as const,revision:1,sequence:1,deleted:false,updatedAt:1000,data:{type:'pee' as const,at:100,source:'app' as const,note:'First'}};
+  const after={...before,revision:2,sequence:2,updatedAt:2000,data:{...before.data,note:'Second'}};
+  histories.set(id,[
+   {recordId:id,revision:2,sequence:2,operationId:'op-2',deviceId:'device-1',acceptedAt:2000,baseRevision:1,intent:'patch',proposal:{note:'Second'},before,after,reason:'updated'},
+   {recordId:id,revision:1,sequence:1,operationId:'op-1',deviceId:'device-1',acceptedAt:1000,baseRevision:0,intent:'create',proposal:before.data,before:null,after:before,reason:'created'},
+  ]);
+ }
+ const received:{id:string;before:number}[]=[];
+ const server=new Hono().get('/api/records/:id/history',context=>{
+  const id=context.req.param('id'),before=Number(context.req.query('beforeRevision')??Number.MAX_SAFE_INTEGER);
+  received.push({id,before});
+  return context.json({revisions:(histories.get(id)??[]).filter(revision=>revision.revision<before).slice(0,1)});
+ });
+ const urls:string[]=[];
+ const auth=createAuthClient({baseURL:'https://puptime.test',fetchOptions:{customFetchImpl:async(input,init)=>{
+  const request=new Request(input,init);urls.push(request.url);
+  assert.equal(new URL(request.url).origin,'https://puptime.test');
+  return server.fetch(request);
+ }}});
+ const cloud=client(api.createSdkRequest((url,options)=>auth.$fetch(url,options),'https://puptime.test'));
+ for(const [id,revisions] of histories){
+  assert.deepEqual(await cloud.history(id),{revisions:[revisions[0]]});
+  assert.deepEqual(await cloud.history(id,2),{revisions:[revisions[1]]});
+  assert.deepEqual(received.splice(0),[{id,before:Number.MAX_SAFE_INTEGER},{id,before:2}]);
+  assert.equal(urls.shift(),'https://puptime.test/api/records/'+encodeURIComponent(id)+'/history');
+  assert.equal(urls.shift(),'https://puptime.test/api/records/'+encodeURIComponent(id)+'/history?beforeRevision=2');
+ }
 });
 
 
