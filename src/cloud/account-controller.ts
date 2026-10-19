@@ -22,11 +22,20 @@ export function createIdentityAdapter(auth:SdkIdentityClient):IdentityAdapter {
 }
 export type AccountSnapshot={config:CloudConfig|null;account:CloudAccountSummary|null;local:{name:string;eventCount:number}|null;sync:SyncStatus|null;run:RunResult|null;problem:AccountProblem|null;codeSentTo:string|null;busy:boolean;running:boolean;active:boolean;online:boolean;lastSyncedAt:number|null};
 const defaultDefer=(fn:()=>void,delay:number)=>{const timer=setTimeout(fn,delay);return()=>clearTimeout(timer);};
+// Call only after pausing the owning controller, or when no client exists.
+export async function continueFirstLaunchLocally(runtime:Runtime,confirmPending=false):Promise<AccountActionResult> {
+  if(!await runtime.storage.loadFirstLaunch())return 'cancelled';
+  const status=await runtime.sync.status(runtime.petId);
+  if(status.pending&&!confirmPending)return 'pending-confirmation-required';
+  if(status.generation&&status.accountId)await runtime.sync.detach({generation:status.generation,accountId:status.accountId});
+  return 'ok';
+}
 export function createAccountController({runtime,api,identity,subscribeLocalWrites,defer=defaultDefer,changed}:{runtime:Runtime;api:CloudApi;identity:IdentityAdapter;subscribeLocalWrites:(fn:()=>void)=>()=>void;defer?:(fn:()=>void,delay:number)=>()=>void;changed:()=>void}) {
   let snapshot:AccountSnapshot={config:null,account:null,local:null,sync:null,run:null,problem:null,codeSentTo:null,busy:false,running:false,active:false,online:true,lastSyncedAt:null};
   const listeners=new Set<()=>void>();
-  let disposed=false,suspended=false,signOutUnfinished=false,rerun=false;
+  let disposed=false,suspended=false,signOutUnfinished=false,rerun=false,associationConfirmationNeeded=false;
   let actions:Promise<unknown>=Promise.resolve(),refreshing:Promise<AccountActionResult>|null=null,running:Promise<void>|null=null,aborter:AbortController|null=null,cancelScheduled:(()=>void)|null=null;
+  let identityPending:Promise<AccountActionResult>|null=null;
   const runner=createSyncRunner({sync:runtime.sync,api,petId:runtime.petId,deviceId:runtime.deviceId,sessionAccountId:()=>snapshot.account?.user.id??null,changed});
   function emit(patch:Partial<AccountSnapshot>) {
     if (disposed) return;snapshot={...snapshot,...patch};
@@ -38,7 +47,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
     emit({sync,local:{name,eventCount:count!.n}});
   }
   function cancelTimer() {cancelScheduled?.();cancelScheduled=null;}
-  function eligible() {return !disposed&&!suspended&&!snapshot.busy&&snapshot.active&&snapshot.online&&!!snapshot.account?.cloud.canSync&&snapshot.sync?.accountId===snapshot.account?.user.id&&snapshot.sync?.state!=='local';}
+  function eligible() {return !disposed&&!suspended&&!associationConfirmationNeeded&&!snapshot.busy&&snapshot.active&&snapshot.online&&!!snapshot.account?.cloud.canSync&&snapshot.sync?.accountId===snapshot.account?.user.id&&snapshot.sync?.state!=='local';}
   function kick(delay=0,force=false) {
     if (!eligible()) return;
     if (cancelScheduled&&!force) return;cancelTimer();
@@ -54,6 +63,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
         if(controller.signal.aborted||disposed)return;
         await localState();
         confirmEnrollment=result.problem==='confirmation-required';
+        if(confirmEnrollment){associationConfirmationNeeded=true;cancelTimer();}
         emit({run:result,problem:result.problem,...(result.state==='synced'?{lastSyncedAt:Date.now()}:{}),...(result.state==='auth-required'?{account:null}:{})});
         if(['auth-required','expired','error'].includes(result.state))suspended=true;
         nextDelay=result.retryAfterMs;
@@ -63,7 +73,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
         if(!controller.signal.aborted&&confirmEnrollment&&!disposed){
           // Refresh outside the runner promise: account-change handling may
           // await transport shutdown and must never await its own promise.
-          void refresh().then(()=>{if(!disposed&&snapshot.sync?.state==='local'&&snapshot.account?.pets.length)emit({problem:'confirmation-required'});});
+          void refresh();
         }else if(!controller.signal.aborted&&(nextDelay!==null||rerun))kick(nextDelay??0);
       }
     })();
@@ -77,6 +87,10 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
       finally{try{await localState();}catch{fail('local-storage');}emit({busy:false});kick();}
     });
     actions=result.catch(()=>undefined);return result;
+  }
+  function authenticate(action:()=>Promise<AccountActionResult>):Promise<AccountActionResult> {
+    if(identityPending)return Promise.resolve('cancelled');
+    identityPending=perform(action).finally(()=>{identityPending=null;});return identityPending;
   }
   async function loadAccount():Promise<boolean> {
     if(disposed)return false;
@@ -95,7 +109,13 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
   }
   function refresh():Promise<AccountActionResult> {
     if(refreshing)return refreshing;
-    refreshing=perform(async()=>{if(!snapshot.online)return fail('network');emit({config:await api.config()});await localState();await loadAccount();return 'ok';}).finally(()=>{refreshing=null;});
+    refreshing=perform(async()=>{
+      if(!snapshot.online)return fail('network');emit({config:await api.config()});await localState();
+      const loaded=await loadAccount();
+      if(loaded&&associationConfirmationNeeded&&snapshot.account?.pets.length&&snapshot.sync?.state!=='active'
+        &&(!snapshot.sync?.accountId||snapshot.sync.accountId===snapshot.account.user.id))emit({problem:'confirmation-required'});
+      return 'ok';
+    }).finally(()=>{refreshing=null;});
     return refreshing;
   }
   async function outcome(action:()=>Promise<IdentityOutcome>):Promise<IdentityOutcome> {try{return await action();}catch{return {error:{status:0,code:'NETWORK_ERROR'}};}}
@@ -119,38 +139,52 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
     subscribe(listener:()=>void){listeners.add(listener);return()=>{listeners.delete(listener);};},
     refresh,
     invalidate(){kick(0,true);},
-    requestEmail(email:string) {return perform(async()=>{
+    requestEmail(email:string) {return authenticate(async()=>{
       const parsed=z.email().max(320).safeParse(email.trim());if(!parsed.success)return fail('invalid-email');
       if(!await canSignIn('email'))return 'error';
       const result=await outcome(()=>identity.requestEmail(parsed.data));if(result.error)return fail(identityProblem(result.error));
       emit({codeSentTo:parsed.data});return 'ok';
     });},
-    verifyEmail(email:string,code:string) {return perform(async()=>{
+    verifyEmail(email:string,code:string) {return authenticate(async()=>{
       if(!/^\d{6}$/.test(code)||email!==snapshot.codeSentTo)return fail('invalid-code');
       if(!await canSignIn('email'))return 'error';
       const result=await outcome(()=>identity.verifyEmail(email,code));if(result.error)return fail(identityProblem(result.error,true));
       if(!await loadAccount())return 'error';emit({codeSentTo:null});return 'ok';
     });},
-    signInSocial(provider:'apple'|'google') {return perform(async()=>{
+    signInSocial(provider:'apple'|'google') {return authenticate(async()=>{
       if(!await canSignIn(provider))return 'error';
       const result=await outcome(()=>identity.signInSocial(provider));if(result.error)return fail(identityProblem(result.error));
       if(!await loadAccount()){emit({problem:null});return 'cancelled';}return 'ok';
     });},
-    enableCloud({confirmedPetId}:{confirmedPetId?:string}) {return perform(async()=>{
+    enableCloud({confirmedPetId,mode}:{confirmedPetId?:string;mode?:'combine'|'restore'}) {return perform(async()=>{
+      const associationMode=z.enum(['combine','restore']).parse(mode??'combine');
       await pauseTransport();if(!await loadAccount())return 'error';await localState();
       if(disposed)return 'error';
       const account=snapshot.account!,status=snapshot.sync!;
       if(status.accountId&&status.accountId!==account.user.id)return fail('account-mismatch');
-      if(status.state!=='local'){suspended=false;return 'ok';}
+      if(status.state!=='local'){
+        if(associationConfirmationNeeded){emit({problem:'confirmation-required'});return 'confirmation-required';}
+        suspended=false;return 'ok';
+      }
       const existing=account.pets[0];
       if((existing&&confirmedPetId!==existing.id)||(!existing&&confirmedPetId)) {emit({problem:'confirmation-required'});return 'confirmation-required';}
+      if(associationMode==='restore'&&(!existing||!await runtime.sync.canRestoreSetup(runtime.petId))){emit({problem:'confirmation-required'});return 'confirmation-required';}
       if(!account.cloud.canSync){const trial=await api.startTrial();emit({account:{...account,cloud:trial.cloud}});if(!trial.cloud.canSync)return fail('trial-unavailable');}
       if(disposed)return 'error';
       const operationId=await runtime.database.read(async sql=>(await sql.getFirstAsync<{id:string}>('SELECT lower(hex(randomblob(16))) id'))!.id);
-      await runtime.sync.prepareAssociation({accountId:account.user.id,localPetId:runtime.petId,deviceId:runtime.deviceId,enrollment:{operationId,deviceId:runtime.deviceId,localPetId:runtime.petId,name:snapshot.local!.name,...(confirmedPetId?{confirmedPetId}:{})}});
-      suspended=false;return 'ok';
+      await runtime.sync.prepareAssociation({accountId:account.user.id,localPetId:runtime.petId,deviceId:runtime.deviceId,mode:associationMode,enrollment:{operationId,deviceId:runtime.deviceId,localPetId:runtime.petId,name:associationMode==='restore'?existing!.name:snapshot.local!.name,...(confirmedPetId?{confirmedPetId}:{})}});
+      associationConfirmationNeeded=false;suspended=false;return 'ok';
     });},
-    retry() {return perform(async()=>{await pauseTransport();if(!await loadAccount())return 'error';suspended=signOutUnfinished;return 'ok';});},
+    continueLocally({confirmPending=false}:{confirmPending?:boolean}={}) {return perform(async()=>{
+      if(!await runtime.storage.loadFirstLaunch())return 'cancelled';
+      await pauseTransport();const result=await continueFirstLaunchLocally(runtime,confirmPending);
+      if(result!=='ok'){suspended=signOutUnfinished;if(result==='pending-confirmation-required')emit({problem:result});return result;}
+      associationConfirmationNeeded=false;suspended=signOutUnfinished;emit({run:null,problem:null});return 'ok';
+    });},
+    retry() {return perform(async()=>{
+      if(associationConfirmationNeeded){emit({problem:'confirmation-required'});return 'confirmation-required';}
+      await pauseTransport();if(!await loadAccount())return 'error';suspended=signOutUnfinished;return 'ok';
+    });},
     signOut({confirmPending=false}:{confirmPending?:boolean}) {return perform(async()=>{
       const status=await runtime.sync.status(runtime.petId);
       if(status.pending&&!confirmPending){emit({problem:'pending-confirmation-required'});return 'pending-confirmation-required';}
@@ -161,7 +195,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
       try{if(await identity.hasCredentials())return fail('sign-out-failed');}catch{return fail('sign-out-failed');}
       emit({account:null,run:null,codeSentTo:null});
       if(status.generation&&status.accountId)await runtime.sync.detach({generation:status.generation,accountId:status.accountId});
-      signOutUnfinished=false;emit({problem:result.error?'remote-sign-out-unconfirmed':null});return 'ok';
+      associationConfirmationNeeded=false;signOutUnfinished=false;emit({problem:result.error?'remote-sign-out-unconfirmed':null});return 'ok';
     });},
     setActive(active:boolean) {if(snapshot.active===active)return;emit({active});if(!active){cancelTimer();aborter?.abort();}else if(snapshot.online)void refresh();},
     setOnline(online:boolean) {if(snapshot.online===online)return;emit({online});if(!online){cancelTimer();aborter?.abort();}else if(snapshot.active)void refresh();},

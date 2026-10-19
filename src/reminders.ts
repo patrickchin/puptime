@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import {getNotificationDelivery,setNotificationDelivery} from './cloud/notification-delivery';
 
 import type { ActivityKey, PuppyEvent, ScheduleEntry } from './domain';
 import { translate, type AppLanguage } from './localization';
@@ -19,6 +20,13 @@ import {
 const ROUTINE_CHANNEL_ID = 'puptime-routine';
 const POTTY_CHANNEL_ID = 'puptime-potty';
 const WIDGET_CHANNEL_ID = 'puptime-widget-log';
+
+// Serialize replacement writes so disabling delivery also cancels requests
+// whose native scheduling call was already in flight.
+let reminderWrites:Promise<unknown>=Promise.resolve();
+function updateReminders(action:()=>Promise<boolean>):Promise<boolean> {
+  const result=reminderWrites.then(action);reminderWrites=result.catch(()=>undefined);return result;
+}
 
 export const WIDGET_LOG_CATEGORY = 'puptimeWidgetLog';
 export const ADD_NOTE_ACTION = 'puptimeAddNote';
@@ -114,6 +122,7 @@ export async function getNotificationPermissionState(): Promise<NotificationPerm
 }
 
 export async function requestReminderPermission(language: AppLanguage = 'en'): Promise<boolean> {
+  await setNotificationDelivery(true);
   await Promise.all([ensureReminderChannel(), ensurePottyChannel(), configureNotificationActions(language)]);
   let settings = await Notifications.getPermissionsAsync();
   if (permissionAllowsNotifications(settings)) return true;
@@ -131,6 +140,7 @@ export async function syncPottyReminders(
   language: AppLanguage = 'en',
   now = Date.now(),
 ): Promise<boolean> {
+  return updateReminders(async()=>{
   await ensurePottyChannel();
 
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
@@ -142,6 +152,7 @@ export async function syncPottyReminders(
 
   const plans = pottyReminderPlans(events, preferences, now);
   if (plans.length === 0) return true;
+  if(!await getNotificationDelivery())return false;
   const settings = await Notifications.getPermissionsAsync();
   if (!permissionAllowsNotifications(settings)) return false;
 
@@ -167,6 +178,7 @@ export async function syncPottyReminders(
   }));
 
   return true;
+  });
 }
 
 export async function syncScheduleReminders(
@@ -174,6 +186,7 @@ export async function syncScheduleReminders(
   leadMinutes: ReminderLeadMinutes = 0,
   language: AppLanguage = 'en',
 ): Promise<boolean> {
+  return updateReminders(async()=>{
   await ensureReminderChannel();
 
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
@@ -185,6 +198,7 @@ export async function syncScheduleReminders(
 
   const reminders = schedule.filter((entry) => entry.reminder);
   if (reminders.length === 0) return true;
+  if(!await getNotificationDelivery())return false;
   const settings = await Notifications.getPermissionsAsync();
   if (!permissionAllowsNotifications(settings)) return false;
 
@@ -207,6 +221,7 @@ export async function syncScheduleReminders(
   }));
 
   return true;
+  });
 }
 
 export async function showWidgetLogConfirmation(

@@ -1,0 +1,39 @@
+appId: com.patrickchin.puptime
+name: First-open profile and optional email account
+---
+- launchApp:
+    clearState: true
+    clearKeychain: true
+- extendedWaitUntil:
+    visible:
+      id: setup.step.welcome
+    timeout: 90000
+- tapOn:
+    id: setup.start
+- tapOn:
+    id: setup.profile.input
+- inputText: Maple
+- tapOn:
+    id: Done
+- tapOn:
+    id: setup.profile.next
+- extendedWaitUntil:
+    visible:
+      id: account.email.input
+    timeout: 30000
+- tapOn:
+    id: account.email.input
+- setClipboard: ${TEST_EMAIL}
+- pasteText
+- tapOn:
+    id: setup.step.account
+- scrollUntilVisible:
+    element:
+      id: account.sendCode
+    direction: DOWN
+- tapOn:
+    id: account.sendCode
+- extendedWaitUntil:
+    visible:
+      id: account.code.input
+    timeout: 30000

@@ -13,7 +13,7 @@ import { headingStyle, spacing } from '../theme';
 const practiceActions = ['pee', 'poop', 'meal'] as const;
 type PracticeActivity = (typeof practiceActions)[number];
 
-export function OnboardingScreen({theme, mode, notificationPermission, onAllowNotifications, onOpenSystemSettings, onFinish}:OnboardingScreenProps) {
+export function OnboardingScreen({theme, mode, notificationPermission, onAllowNotifications, onOpenSystemSettings, onFinish,onBack}:OnboardingScreenProps) {
   const {t,activityLabel,activityColors,locale}=useLocalization();
   const {fontScale,height:windowHeight}=useWindowDimensions();
   const largeText=fontScale>=1.5;
@@ -27,6 +27,7 @@ export function OnboardingScreen({theme, mode, notificationPermission, onAllowNo
   const title=useRef<Text>(null),scroll=useRef<ScrollView>(null);
   const bounce=useRef(new Animated.Value(0)).current;
   const replay=mode==='replay';
+  const embedded=mode==='embedded',lastStep=embedded?2:3;
   const colors=practice?activityColors(theme,{type:practice}):null;
   const headings=['tour.logTitle','tour.timelineTitle','tour.routineTitle',replay?'tour.replayTitle':'tour.readyTitle'] as const;
   const bodies=['tour.logBody','tour.timelineBody','tour.routineBody',replay?'tour.replayBody':'tour.readyBody'] as const;
@@ -61,7 +62,7 @@ export function OnboardingScreen({theme, mode, notificationPermission, onAllowNo
   async function finish(skip=false) {
     if(locked.current)return;
     locked.current=true;setBusy(true);Keyboard.dismiss();
-    try{await onFinish(skip||replay?undefined:{puppyName});}
+    try{await onFinish(skip||replay||embedded?undefined:{puppyName});}
     catch{Alert.alert(t('settings.saveErrorTitle'),t('settings.saveErrorBody'));}
     finally{locked.current=false;if(mounted.current)setBusy(false);}
   }
@@ -83,14 +84,14 @@ export function OnboardingScreen({theme, mode, notificationPermission, onAllowNo
 
   const footer=(
       <View style={[styles.footer,largeText&&styles.scrollFooter,{backgroundColor:theme.background,borderColor:theme.border}]}>
-        <Pressable testID="onboarding.primary" accessibilityRole="button" disabled={busy} accessibilityState={{disabled:busy,busy}} onPress={()=>step<3?setStep(step+1):void finish()} style={({pressed})=>[styles.primary,{backgroundColor:pressed?theme.primaryPressed:theme.primary,borderRadius:theme.presentation.controlRadius,opacity:busy?0.6:1}]}>
-          <Text style={[styles.primaryText,{color:theme.onPrimary}]}>{t(step<3?'onboarding.continue':replay?'tour.replayDone':'onboarding.start')}</Text>
+        <Pressable testID="onboarding.primary" accessibilityRole="button" disabled={busy} accessibilityState={{disabled:busy,busy}} onPress={()=>step<lastStep?setStep(step+1):void finish()} style={({pressed})=>[styles.primary,{backgroundColor:pressed?theme.primaryPressed:theme.primary,borderRadius:theme.presentation.controlRadius,opacity:busy?0.6:1}]}>
+          <Text style={[styles.primaryText,{color:theme.onPrimary}]}>{t(step<lastStep||embedded?'onboarding.continue':replay?'tour.replayDone':'onboarding.start')}</Text>
           <MaterialCommunityIcons name="arrow-right" size={21} color={theme.onPrimary}/>
         </Pressable>
         {step>0?<View style={[step===3&&!replay?styles.footerChoices:undefined,largeText&&styles.largeChoices]}>
           <Pressable testID="onboarding.back" accessibilityRole="button" disabled={busy} onPress={()=>{Keyboard.dismiss();setStep(step-1);}} style={styles.back}><Text style={[styles.backText,{color:theme.textMuted}]}>{t('onboarding.back')}</Text></Pressable>
           {step===3&&!replay?<Pressable testID="onboarding.later" accessibilityRole="button" disabled={busy} onPress={()=>void finish(true)} style={styles.back}><Text style={[styles.backText,{color:theme.textMuted}]}>{t('onboarding.later')}</Text></Pressable>:null}
-        </View>:!largeText?<View style={styles.backSlot}/>:null}
+        </View>:embedded?<Pressable testID="onboarding.back" accessibilityRole="button" disabled={busy} onPress={onBack} style={styles.back}><Text style={[styles.backText,{color:theme.textMuted}]}>{t('onboarding.back')}</Text></Pressable>:!largeText?<View style={styles.backSlot}/>:null}
       </View>
   );
 
@@ -105,8 +106,8 @@ export function OnboardingScreen({theme, mode, notificationPermission, onAllowNo
           <Text style={[styles.skipText,{color:theme.textMuted}]}>{t('onboarding.skip')}</Text>
         </Pressable>
       </View>
-      <View accessibilityRole="progressbar" accessibilityLabel={t('onboarding.progress',{step:step+1})} accessibilityValue={{min:1,max:4,now:step+1}} style={styles.progress}>
-        {[0,1,2,3].map(index=><View key={index} style={[styles.progressMark,{backgroundColor:index<=step?theme.primary:theme.border}]}/>)}
+      <View accessibilityRole="progressbar" accessibilityLabel={t(embedded?'setup.tourProgress':'onboarding.progress',{step:step+1})} accessibilityValue={{min:1,max:lastStep+1,now:step+1}} style={styles.progress}>
+        {Array.from({length:lastStep+1},(_,index)=><View key={index} style={[styles.progressMark,{backgroundColor:index<=step?theme.primary:theme.border}]}/>)}
       </View>
       <ScrollView ref={scroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
         <Text ref={title} testID={`onboarding.step.${step}`} accessibilityRole="header" style={[styles.title,headingStyle(theme),largeText&&styles.largeTitle,{color:theme.text}]}>{t(headings[step])}</Text>

@@ -9,6 +9,7 @@ import { createLocalRepository } from './repository.ts';
 import { localChanges, notifyLocalCommit, readLocalSettingsRecords, type LocalChangeSink } from './sync-projection.ts';
 import { recordDataSchema } from '../cloud/protocol.ts';
 import type { FinishOnboardingOptions } from '../onboarding.ts';
+import {firstLaunchStepSchema,type FirstLaunchStep,type FirstLaunchProgress} from '../first-launch.ts';
 
 export function createNativeStorage(database: LocalDatabase, petId: string, onChange?: LocalChangeSink, afterCommit?:()=>void) {
   const repository = createLocalRepository(database, petId, onChange,afterCommit);
@@ -56,6 +57,23 @@ export function createNativeStorage(database: LocalDatabase, petId: string, onCh
     return normalizeCustomActivities(stored, deleted);
   }
   async function customizations(sql: SqlExecutor) { return normalizeActivityCustomizations(await object(sql, storageKeys.activityCustomizations)); }
+  async function firstLaunch(sql:SqlExecutor):Promise<FirstLaunchProgress|null> {
+    const shown=await sql.getFirstAsync<{value:string}>("SELECT value FROM metadata WHERE key='show_onboarding'");
+    const checkpoint=await sql.getFirstAsync<{value:string}>("SELECT value FROM metadata WHERE key='first_launch_step'");
+    if(!shown||!['true','false'].includes(shown.value))throw new Error('Saved setup state is invalid.');
+    if(shown.value==='false'){
+      if(checkpoint&&checkpoint.value!=='done')throw new Error('Saved setup completion is inconsistent.');
+      return null;
+    }
+    const step=firstLaunchStepSchema.parse(checkpoint?.value??'welcome');
+    const pet=await sql.getFirstAsync<{name:string}>('SELECT name FROM puppies WHERE id=?',petId);
+    const puppy=recordDataSchema('puppy').parse({name:pet?.name});
+    if(!('name' in puppy))throw new Error('The local puppy could not be found.');
+    return {step,puppyName:puppy.name};
+  }
+  async function checkpoint(sql:SqlExecutor,step:FirstLaunchStep|'done') {
+    await sql.runAsync("INSERT INTO metadata(key,value) VALUES ('first_launch_step',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",step);
+  }
   return {
     loadEvents: repository.loadEvents, appendEvents: repository.appendEvents, importEvents: repository.importEvents,
     removeEvent: repository.removeEvent, updateEvent: repository.updateEvent, updateEventTime: repository.updateEventTime,
@@ -66,14 +84,43 @@ export function createNativeStorage(database: LocalDatabase, petId: string, onCh
     async shouldShowOnboarding() {
       return database.read(async (sql) => (await sql.getFirstAsync<{ value: string }>("SELECT value FROM metadata WHERE key='show_onboarding'"))?.value === 'true');
     },
+    loadFirstLaunch:()=>database.read(firstLaunch),
+    loadNotificationDelivery:()=>database.read(async sql=>{
+      const flag=await sql.getFirstAsync<{value:string}>("SELECT value FROM metadata WHERE key='notify_on_device'");
+      if(flag){if(!['true','false'].includes(flag.value))throw new Error('Saved device notification choice is invalid.');return flag.value==='true';}
+      return await firstLaunch(sql)===null;
+    }),
+    async saveNotificationDelivery(enabled:boolean) {
+      if(typeof enabled!=='boolean')throw new TypeError('Invalid device notification choice.');
+      await database.write(sql=>sql.runAsync("INSERT INTO metadata(key,value) VALUES ('notify_on_device',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",String(enabled)));
+    },
+    async saveFirstLaunchStep(step:FirstLaunchStep) {
+      firstLaunchStepSchema.parse(step);
+      await database.write(async sql=>{
+        if(!await firstLaunch(sql))throw new Error('Setup is already complete.');
+        await checkpoint(sql,step);
+      });
+    },
+    async saveFirstLaunchProfile(name:string) {
+      await settingsWrite(async sql=>{
+        if(!await firstLaunch(sql))throw new Error('Setup is already complete.');
+        const puppy=recordDataSchema('puppy').parse({name:name.trim()||'My puppy'});
+        if(!('name' in puppy))throw new Error('Invalid puppy name.');
+        await sql.runAsync('UPDATE puppies SET name=? WHERE id=?',puppy.name,petId);
+        await checkpoint(sql,'account');
+      });
+    },
     async completeOnboarding(options?:FinishOnboardingOptions) {
       await settingsWrite(async (sql) => {
+        if(!await firstLaunch(sql))return;
         if(options?.puppyName!==undefined){
           const value=recordDataSchema('puppy').parse({name:options.puppyName.trim()||'My puppy'});
           if(!('name' in value))throw new Error('Invalid puppy name.');
           await sql.runAsync('UPDATE puppies SET name=? WHERE id=?',value.name,petId);
         }
         await sql.runAsync("UPDATE metadata SET value='false' WHERE key='show_onboarding'");
+        await checkpoint(sql,'done');
+        await sql.runAsync("INSERT OR IGNORE INTO metadata(key,value) VALUES ('notify_on_device','false')");
         await set(sql, storageKeys.onboarding, 'done');
       });
     },

@@ -1,0 +1,21 @@
+appId: com.patrickchin.puptime
+name: Leaving a first-open email challenge keeps local use available
+---
+- scrollUntilVisible:
+    element:
+      id: setup.local
+    direction: DOWN
+- tapOn:
+    id: setup.local
+- assertVisible:
+    id: onboarding.step.0
+- scrollUntilVisible:
+    element:
+      id: onboarding.back
+    direction: DOWN
+- tapOn:
+    id: onboarding.back
+- extendedWaitUntil:
+    visible:
+      id: account.code.input
+    timeout: 15000

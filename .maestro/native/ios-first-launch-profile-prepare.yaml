@@ -1,0 +1,29 @@
+appId: com.patrickchin.puptime
+name: First-open welcome and puppy draft
+---
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: unset
+- extendedWaitUntil:
+    visible:
+      id: setup.step.welcome
+    timeout: 90000
+- takeScreenshot: first-open-welcome
+- scrollUntilVisible:
+    element:
+      id: setup.start
+    direction: DOWN
+- tapOn:
+    id: setup.start
+- assertVisible:
+    id: setup.step.profile
+- scrollUntilVisible:
+    element:
+      id: setup.profile.input
+    direction: DOWN
+- tapOn:
+    id: setup.profile.input
+- inputText: Biscuit
+- tapOn:
+    id: Done

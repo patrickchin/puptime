@@ -1,0 +1,66 @@
+appId: com.patrickchin.puptime
+name: Localized first-open welcome, puppy profile and account choice
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: setup.step.welcome
+      text: ${EXPECTED_WELCOME}
+    timeout: 90000
+- takeScreenshot: first-open-welcome
+- scrollUntilVisible:
+    element:
+      id: setup.start
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: setup.start
+- assertVisible:
+    id: setup.step.profile
+    text: ${EXPECTED_PROFILE}
+- scrollUntilVisible:
+    element:
+      id: setup.profile.input
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: setup.profile.input
+- inputText: Biscuit
+- takeScreenshot: first-open-profile-keyboard
+- tapOn:
+    id: Done
+- runFlow:
+    when:
+      true: ${LARGEST_TEXT == 'true'}
+    commands:
+      - setOrientation: LANDSCAPE_LEFT
+      - waitForAnimationToEnd
+      - scrollUntilVisible:
+          element:
+            id: setup.profile.input
+          direction: DOWN
+          centerElement: true
+      - assertVisible:
+          id: setup.profile.input
+          text: Biscuit
+      - takeScreenshot: first-open-profile-landscape
+- scrollUntilVisible:
+    element:
+      id: setup.profile.next
+    direction: DOWN
+    centerElement: true
+- waitForAnimationToEnd
+- tapOn:
+    id: setup.profile.next
+- extendedWaitUntil:
+    visible:
+      id: setup.step.account
+      text: ${EXPECTED_ACCOUNT}
+    timeout: 15000
+- takeScreenshot: first-open-account
+- runFlow:
+    when:
+      true: ${LARGEST_TEXT == 'true'}
+    commands:
+      - setOrientation: PORTRAIT
+      - waitForAnimationToEnd

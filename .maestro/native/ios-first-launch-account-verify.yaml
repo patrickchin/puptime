@@ -1,0 +1,30 @@
+appId: com.patrickchin.puptime
+name: First-open verified account still needs explicit cloud activation
+---
+- scrollUntilVisible:
+    element:
+      id: account.code.input
+    direction: DOWN
+- tapOn:
+    id: account.code.input
+- eraseText
+- inputText: ${MAESTRO_TEST_CODE}
+- assertVisible:
+    id: account.code.input
+    text: ^[0-9]{6}$
+- tapOn: Sign-in code
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      id: account.verify
+    direction: DOWN
+- tapOn:
+    id: account.verify
+- extendedWaitUntil:
+    visible:
+      id: setup.step.cloud
+    timeout: 30000
+- assertVisible:
+    id: setup.cloud.enable
+- assertNotVisible:
+    id: account.code.input

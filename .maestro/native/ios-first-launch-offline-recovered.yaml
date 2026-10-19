@@ -1,0 +1,26 @@
+appId: com.patrickchin.puptime
+name: Recovered service keeps explicit local choice and SDK credentials
+---
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- tapOn:
+    id: settings.open
+- tapOn:
+    id: settings.account.open
+- extendedWaitUntil:
+    visible:
+      id: account.local.summary
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: account.enable
+    direction: DOWN
+    centerElement: true
+- assertVisible:
+    id: account.enable
+- assertNotVisible:
+    id: account.email.input

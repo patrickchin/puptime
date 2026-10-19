@@ -2,7 +2,78 @@ appId: com.patrickchin.puptime
 ---
 - extendedWaitUntil:
     visible:
-      id: screen.onboarding
+      id: 'screen\.(firstLaunch|onboarding)'
     timeout: 90000
-- tapOn:
-    id: onboarding.skip
+- runFlow:
+    when:
+      visible:
+        id: setup.step.welcome
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: setup.start
+          direction: DOWN
+      - tapOn:
+          id: setup.start
+- runFlow:
+    when:
+      visible:
+        id: setup.step.profile
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: setup.profile.later
+          direction: DOWN
+      - tapOn:
+          id: setup.profile.later
+- runFlow:
+    when:
+      visible:
+        id: setup.step.account
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: setup.local
+          direction: DOWN
+      - tapOn:
+          id: setup.local
+- runFlow:
+    when:
+      visible:
+        id: setup.step.cloud
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: setup.cloud.local
+          direction: DOWN
+      - tapOn:
+          id: setup.cloud.local
+- runFlow:
+    when:
+      visible:
+        id: screen.onboarding
+    commands:
+      - tapOn:
+          id: onboarding.skip
+- runFlow:
+    when:
+      visible:
+        id: setup.step.reminders
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: setup.reminders.later
+          direction: DOWN
+      - tapOn:
+          id: setup.reminders.later
+- runFlow:
+    when:
+      visible:
+        id: setup.step.ready
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: setup.finish
+          direction: DOWN
+      - tapOn:
+          id: setup.finish

@@ -1,0 +1,36 @@
+appId: com.patrickchin.puptime
+name: Offline cloud setup can finish locally without signing out
+---
+- scrollUntilVisible:
+    element:
+      id: setup.cloud.local
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: setup.cloud.local
+- assertVisible:
+    id: onboarding.step.0
+- tapOn:
+    id: onboarding.skip
+- scrollUntilVisible:
+    element:
+      id: setup.reminders.later
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: setup.reminders.later
+- scrollUntilVisible:
+    element:
+      id: setup.finish
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: setup.finish
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 15000
+- tapOn:
+    id: quick.pee
+- assertVisible:
+    id: event.pee.edit

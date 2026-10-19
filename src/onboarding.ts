@@ -5,7 +5,7 @@ export type FinishOnboardingOptions = { puppyName?: string };
 
 export type OnboardingScreenProps = {
   theme: Theme;
-  mode: 'first-run' | 'replay';
+  mode: 'first-run' | 'replay' | 'embedded';
   notificationPermission: NotificationPermissionState;
   onAllowNotifications: () => Promise<boolean>;
   onOpenSystemSettings: () => void;

@@ -13,7 +13,7 @@ name: Set the real iOS Reduce Motion preference before practice
         text: ^${OTHER_MOTION_VALUE}$
     commands:
       - tapOn:
-          point: 84%,18%
+          point: ${MOTION_SWITCH_POINT}
 - assertVisible:
     id: REDUCE_MOTION
     text: ^${MOTION_VALUE}$
@@ -21,6 +21,31 @@ name: Set the real iOS Reduce Motion preference before practice
 - launchApp:
     appId: com.patrickchin.puptime
     clearState: true
+- extendedWaitUntil:
+    visible:
+      id: screen.firstLaunch
+    timeout: 90000
+- scrollUntilVisible:
+    element:
+      id: setup.start
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: setup.start
+- scrollUntilVisible:
+    element:
+      id: setup.profile.later
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: setup.profile.later
+- scrollUntilVisible:
+    element:
+      id: setup.local
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: setup.local
 - extendedWaitUntil:
     visible:
       id: onboarding.step.0

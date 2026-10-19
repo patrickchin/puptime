@@ -1,0 +1,27 @@
+appId: com.patrickchin.puptime
+name: Resumed first-open email challenge requires an explicit request
+---
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: account.email.input
+    timeout: 90000
+- assertNotVisible:
+    id: account.code.input
+- tapOn:
+    id: account.email.input
+- setClipboard: ${TEST_EMAIL}
+- pasteText
+- tapOn:
+    id: setup.step.account
+- scrollUntilVisible:
+    element:
+      id: account.sendCode
+    direction: DOWN
+- tapOn:
+    id: account.sendCode
+- extendedWaitUntil:
+    visible:
+      id: account.code.input
+    timeout: 30000

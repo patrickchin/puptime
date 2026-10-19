@@ -1,0 +1,28 @@
+appId: com.patrickchin.puptime
+---
+- extendedWaitUntil:
+    visible:
+      id: setup.step.welcome
+    timeout: 90000
+- scrollUntilVisible:
+    element:
+      id: setup.start
+    direction: DOWN
+- tapOn:
+    id: setup.start
+- scrollUntilVisible:
+    element:
+      id: setup.profile.later
+    direction: DOWN
+- tapOn:
+    id: setup.profile.later
+- scrollUntilVisible:
+    element:
+      id: setup.local
+    direction: DOWN
+- tapOn:
+    id: setup.local
+- tapOn:
+    id: onboarding.skip
+- assertVisible:
+    id: setup.step.reminders

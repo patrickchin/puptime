@@ -8,10 +8,8 @@ tags:
 - runFlow:
     when:
       visible:
-        id: onboarding.skip
-    commands:
-      - tapOn:
-          id: onboarding.skip
+        id: 'screen\.(firstLaunch|onboarding)'
+    file: helpers/skip-onboarding.yaml
 - tapOn:
     id: nav.learn
 - runFlow:

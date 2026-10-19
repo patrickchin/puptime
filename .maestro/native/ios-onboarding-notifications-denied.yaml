@@ -5,28 +5,31 @@ name: Denied notification permission never blocks first logging
     clearState: true
     permissions:
       notifications: unset
-- extendedWaitUntil:
-    visible:
-      id: onboarding.step.0
-    timeout: 90000
+- runFlow: ../helpers/first-launch-to-reminders.yaml
+- scrollUntilVisible:
+    element:
+      id: setup.reminders.allow
+    direction: DOWN
 - tapOn:
-    id: onboarding.primary
-- tapOn:
-    id: onboarding.primary
-- tapOn:
-    id: onboarding.demo.routine.reminder
-- tapOn:
-    id: onboarding.primary
-- assertVisible:
-    id: onboarding.step.3
-- tapOn:
-    id: onboarding.notifications.allow
+    id: setup.reminders.allow
 - tapOn: Don.t Allow
 - assertVisible:
-    id: onboarding.notifications.allow
+    id: setup.reminders.allow
     text: Open Settings
+- scrollUntilVisible:
+    element:
+      id: setup.reminders.later
+    direction: DOWN
 - tapOn:
-    id: onboarding.primary
+    id: setup.reminders.later
+- assertVisible:
+    id: setup.step.ready
+- scrollUntilVisible:
+    element:
+      id: setup.finish
+    direction: DOWN
+- tapOn:
+    id: setup.finish
 - extendedWaitUntil:
     visible:
       id: screen.today
@@ -37,7 +40,6 @@ name: Denied notification permission never blocks first logging
     element:
       id: settings.notifications.permission
     direction: DOWN
-    visibilityPercentage: 100
 - assertVisible:
     id: settings.notifications.permission
     text: .*Off in device settings.*

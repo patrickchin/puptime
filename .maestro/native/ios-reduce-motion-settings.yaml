@@ -2,17 +2,25 @@ appId: com.apple.Preferences
 name: Inspect Reduce Motion in the dedicated iOS simulator
 ---
 - launchApp
-- scrollUntilVisible:
-    element:
-      text: ^Accessibility$
-    direction: DOWN
-    visibilityPercentage: 100
-- tapOn: ^Accessibility$
-- scrollUntilVisible:
-    element:
-      text: ^Motion$
-    direction: DOWN
-    visibilityPercentage: 100
-- tapOn: ^Motion$
+- runFlow:
+    when:
+      notVisible:
+        id: REDUCE_MOTION
+    commands:
+      - scrollUntilVisible:
+          element:
+            text: ^Accessibility$
+          direction: DOWN
+          visibilityPercentage: 100
+      - tapOn: ^Accessibility$
+      - scrollUntilVisible:
+          element:
+            text: ^Motion$
+          direction: DOWN
+          visibilityPercentage: 100
+      - tapOn: ^Motion$
 - assertVisible: ^Reduce Motion$
+- assertVisible:
+    id: REDUCE_MOTION
+    text: ^0$
 - takeScreenshot: native-reduce-motion-settings

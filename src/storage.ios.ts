@@ -4,12 +4,16 @@ import type { LanguagePreference } from './localization';
 import type { NotificationPreferences } from './notification-config';
 import type { ThemePreference } from './theme';
 import type { FinishOnboardingOptions } from './onboarding';
+import type { FirstLaunchStep } from './first-launch';
 import { getLocalRuntime } from './local/runtime.ios';
 export { assertValidEvents, EventsImportError, EventsStorageError } from './storage-validation';
 
 const storage=async()=>(await getLocalRuntime()).storage;
 
 export const shouldShowOnboarding = async () => (await storage()).shouldShowOnboarding();
+export const loadFirstLaunch = async () => (await storage()).loadFirstLaunch();
+export const saveFirstLaunchStep = async (step:FirstLaunchStep) => (await storage()).saveFirstLaunchStep(step);
+export const saveFirstLaunchProfile = async (name:string) => (await storage()).saveFirstLaunchProfile(name);
 export const completeOnboarding = async (options?:FinishOnboardingOptions) => (await storage()).completeOnboarding(options);
 export const loadEvents = async () => (await storage()).loadEvents();
 export const appendEvents = async (events: PuppyEvent[],options?:EventWriteOptions) => (await storage()).appendEvents(events,options);
