@@ -19,7 +19,15 @@ app.use('/api/*', cors({
 }));
 app.get('/health', (context) => context.json({ service: 'puptime-api', status: 'ok', protocolVersion: 1 }));
 app.get('/api/config', (context) => context.json({ protocolVersion: 1, trialDays: trialDaysFromEnvironment(context.env.CLOUD_TRIAL_DAYS), providers: configuredProviders(context.env), pricingFinalized: false }));
-app.on(['GET', 'POST'], '/api/auth/*', (context) => createAuth(context.env).handler(context.req.raw));
+app.on(['GET', 'POST'], '/api/auth/*', async (context) => {
+  const auth=createAuth(context.env),expected=context.req.header('x-puptime-account');
+  if(context.req.method==='POST'&&context.req.path==='/api/auth/link-social'&&expected!==undefined){
+    const session=await auth.api.getSession({headers:context.req.raw.headers});
+    if(!session)return context.json({error:'unauthorized'},401);
+    if(session.user.id!==expected)return context.json({error:'account_mismatch'},409);
+  }
+  return auth.handler(context.req.raw);
+});
 app.route('/api', accountRoutes);
 app.notFound((context) => context.json({ error: 'not_found' }, 404));
 app.onError((error, context) => error instanceof HTTPException ? error.getResponse() : error instanceof z.ZodError ? context.json({ error: 'invalid_request' }, 400) : context.json({ error: 'service_unavailable' }, 503));

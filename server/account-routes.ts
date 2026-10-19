@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import { validator } from 'hono/validator';
 import { z } from 'zod';
@@ -29,12 +29,12 @@ const authenticated = createMiddleware<AccountEnv>(async (context, next) => {
     }
   }
   if (!context.req.header('cookie')) return context.json({ error: 'unauthorized' }, 401);
-  const result = await createAuth(context.env).api.getSession({ headers: context.req.raw.headers, returnHeaders: true });
+  const result = await createAuth(context.env).api.getSession({ headers: context.req.raw.headers, returnHeaders: true, query: { disableRefresh: context.req.method === 'POST' && context.req.path === '/api/account/reauth' } });
   for (const cookie of result.headers.getSetCookie()) context.header('set-cookie', cookie, { append: true });
   if (!result.response) return context.json({ error: 'unauthorized' }, 401);
   const { user, session } = result.response;
   const account = await getCloudAccount(context.env.AUTH_DB, user.id);
-  if (account?.state === 'deleting' && !(context.req.method === 'DELETE' && context.req.path === '/api/account')) return context.json({ error: 'account_deleting' }, 410);
+  if (account?.state === 'deleting' && !((context.req.method === 'DELETE' && context.req.path === '/api/account') || (context.req.method === 'POST' && context.req.path === '/api/account/reauth'))) return context.json({ error: 'account_deleting' }, 410);
   context.set('user', { id: user.id, email: user.email, name: user.name });
   context.set('sessionCreatedAt', new Date(session.createdAt).getTime());
   context.set('sessionId',session.id);
@@ -76,7 +76,7 @@ accountRoutes.get('/records/:id/history', authenticated, syncAccess, async (cont
   const before = afterSchema.parse(context.req.query('beforeRevision') ?? Number.MAX_SAFE_INTEGER);
   return context.json({ revisions: await context.get('store').history(id, before) });
 });
-accountRoutes.get('/account/export', authenticated, async (context) => {
+async function exportAccount(context: Context<AccountEnv>) {
   const store = context.get('store');
   const snapshot = await store.exportSnapshot();
   const encoder = new TextEncoder();
@@ -106,10 +106,22 @@ accountRoutes.get('/account/export', authenticated, async (context) => {
     'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store',
     'Content-Disposition': 'attachment; filename="puptime-cloud-export.ndjson"',
   } });
+}
+accountRoutes.get('/account/export', authenticated, exportAccount);
+accountRoutes.post('/account/export', authenticated, validator('form', value => z.strictObject({expectedAccount:z.string().min(1).max(256)}).parse(value)), context => {
+  if(context.req.valid('form').expectedAccount!==context.get('user').id)return context.html('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="robots" content="noindex"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Account changed | Puptime</title><style>body{margin:0;background:#f6f4ed;color:#17231e;font:17px/1.5 system-ui,sans-serif}main{max-width:540px;margin:72px auto;padding:24px}h1{font-size:36px;letter-spacing:-1px}a{display:inline-block;color:#176b52;padding:12px 0;text-underline-offset:4px}</style><main><h1>Account changed</h1><p>Return to your account before downloading cloud data.</p><a href="/account">Back to account</a></main></html>',409);
+  return exportAccount(context);
+});
+accountRoutes.post('/account/reauth', authenticated, validator('json', value => z.strictObject({otp:z.string().regex(/^\d{6}$/)}).parse(value)), context => {
+  const expected=context.req.header('x-puptime-account');
+  if(!expected)return context.json({error:'invalid_request'},400);
+  if(expected!==context.get('user').id)return context.json({error:'account_mismatch'},409);
+  return createAuth(context.env,{disableEmailSignUp:true}).api.signInEmailOTP({headers:context.req.raw.headers,body:{email:context.get('user').email,otp:context.req.valid('json').otp},asResponse:true});
 });
 
-
 accountRoutes.delete('/account', authenticated, validator('json', (value) => z.strictObject({ confirm: z.literal(true) }).parse(value)), async (context) => {
+  const expected=context.req.header('x-puptime-account');
+  if(expected!==undefined&&expected!==context.get('user').id)return context.json({error:'account_mismatch'},409);
   if (!Number.isFinite(context.get('sessionCreatedAt')) || Date.now() - context.get('sessionCreatedAt') >= 600000) return context.json({ error: 'reauthentication_required' }, 401);
   return createAuth(context.env).api.deleteUser({ headers: context.req.raw.headers, body: {}, asResponse: true });
 });

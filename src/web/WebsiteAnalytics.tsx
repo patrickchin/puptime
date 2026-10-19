@@ -46,7 +46,7 @@ export function WebsiteAnalytics({ path }: { path: string }) {
   if (!open) return null;
   return <section aria-label="Website analytics preferences" style={{ position: 'fixed', bottom: 16, left: 16, right: 16, margin: '0 auto', maxWidth: 640, padding: 22, border: '1px solid #D6DED8', borderRadius: 18, background: '#FFFEFA', color: '#17231E', boxShadow: '0 4px 32px #17231e22', zIndex: 1000, fontFamily: 'system-ui', fontSize: 15, lineHeight: 1.5 }}>
     <strong>Help improve Puptime?</strong>
-    <p style={{ margin: '8px 0 16px' }}>Optional PostHog analytics measure guide visits, download clicks, and error counts using an anonymous browser ID. No session recordings. Cloudflare separately measures traffic and page speed. <a href="https://github.com/patrickchin/puptime/blob/main/PRIVACY.md">Privacy policy</a></p>
+    <p style={{ margin: '8px 0 16px' }}>Optional PostHog analytics measure website visits, account actions, and error counts using an anonymous browser ID. No account details or session recordings. Cloudflare separately measures traffic and page speed. <a href="https://github.com/patrickchin/puptime/blob/main/PRIVACY.md">Privacy policy</a></p>
     {(blocked || !posthogConfigured) && <p>{blocked ? 'Your browser privacy signal keeps optional analytics off.' : 'Optional analytics are not configured.'}</p>}
     {choice && !blocked && <p>Optional analytics are {choice === 'yes' ? 'on' : 'off'}.</p>}
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
