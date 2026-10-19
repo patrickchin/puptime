@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import * as Notifications from 'expo-notifications';
-import { ActivityIndicator, Alert, AppState, KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 import { useLocalization } from '../localization-context';
 import {
@@ -341,8 +341,8 @@ export function NotificationsScreen({
       </View>
     </ScrollView>
     <Modal visible={draft !== null} presentationStyle="pageSheet" animationType="none" onRequestClose={() => { if (!saving) setDraft(null); }}>
-      <KeyboardAvoidingView testID="notifications.timed.editor" behavior="padding" style={[styles.editorRoot, { backgroundColor: theme.background }]}>
-        <ScrollView keyboardShouldPersistTaps="handled" contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.editorContent}>
+      <View testID="notifications.timed.editor" style={[styles.editorRoot, { backgroundColor: theme.background }]}>
+        <ScrollView automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.editorContent}>
           <View style={styles.editorHeading}>
             <Text style={[styles.editorTitle, { color: theme.text, fontFamily: theme.presentation.headingFont }]}>{t('notifications.timedPrompt')}</Text>
             <Pressable testID="notifications.timed.close" accessibilityRole="button" accessibilityLabel={t('app.cancel')}
@@ -367,7 +367,7 @@ export function NotificationsScreen({
             <Text style={[styles.actionLabel, { color: theme.onPrimary }]}>{t(saving ? 'common.saving' : 'notifications.timedSave')}</Text>
           </Pressable>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
     </>
   );

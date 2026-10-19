@@ -7,9 +7,14 @@ from pathlib import Path
 import re
 
 CURRENT_JOURNEYS = [
+    '195-clean-first-open-and-timed-reminder',
+    '188-drawer-and-native-timer-journeys',
     '194-terrier-full-first-open-and-recovery',
     '191-terrier-full-first-open-appearance',
-    '188-drawer-and-native-timer-journeys',
+    '206-notifications-native-keyboard-accessibility',
+    '198-drawer-populated-history-rendering',
+    '199-navigation-upgrade-preserves-owned-history',
+    '200-navigation-full-standalone-regression',
 ]
 
 STYLE = '''

@@ -17,6 +17,7 @@ name: First open and first reminder product review
     direction: DOWN
     visibilityPercentage: 100
     centerElement: false
+- waitForAnimationToEnd
 - tapOn:
     id: setup.start
 - assertVisible:
@@ -32,6 +33,7 @@ name: First open and first reminder product review
     direction: DOWN
     visibilityPercentage: 100
     centerElement: false
+- waitForAnimationToEnd
 - tapOn:
     id: setup.profile.next
 - assertVisible:
@@ -43,6 +45,7 @@ name: First open and first reminder product review
     direction: DOWN
     visibilityPercentage: 100
     centerElement: false
+- waitForAnimationToEnd
 - tapOn:
     id: setup.local
 - assertVisible:
@@ -53,6 +56,7 @@ name: First open and first reminder product review
     direction: DOWN
     visibilityPercentage: 100
     centerElement: false
+- waitForAnimationToEnd
 - tapOn:
     id: onboarding.demo.pee
 - assertVisible:
@@ -63,6 +67,7 @@ name: First open and first reminder product review
     direction: DOWN
     visibilityPercentage: 100
     centerElement: false
+- waitForAnimationToEnd
 - tapOn:
     id: onboarding.primary
 - assertVisible:
@@ -75,6 +80,7 @@ name: First open and first reminder product review
     direction: DOWN
     visibilityPercentage: 100
     centerElement: false
+- waitForAnimationToEnd
 - tapOn:
     id: onboarding.primary
 - assertVisible:
@@ -85,6 +91,7 @@ name: First open and first reminder product review
     direction: DOWN
     visibilityPercentage: 100
     centerElement: false
+- waitForAnimationToEnd
 - tapOn:
     id: onboarding.demo.routine.reminder
 - assertVisible:
@@ -96,6 +103,7 @@ name: First open and first reminder product review
     direction: DOWN
     visibilityPercentage: 100
     centerElement: false
+- waitForAnimationToEnd
 - tapOn:
     id: onboarding.primary
 - assertVisible:
@@ -106,6 +114,7 @@ name: First open and first reminder product review
     direction: DOWN
     visibilityPercentage: 100
     centerElement: false
+- waitForAnimationToEnd
 - tapOn:
     id: setup.reminders.later
 - assertVisible:
@@ -117,6 +126,7 @@ name: First open and first reminder product review
     direction: DOWN
     visibilityPercentage: 100
     centerElement: false
+- waitForAnimationToEnd
 - tapOn:
     id: setup.finish
 - extendedWaitUntil:
@@ -145,6 +155,7 @@ name: First open and first reminder product review
     direction: DOWN
     visibilityPercentage: 100
     centerElement: false
+- waitForAnimationToEnd
 - takeScreenshot: product-review-drawer
 - tapOn:
     id: nav.notifications

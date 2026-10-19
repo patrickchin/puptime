@@ -22,6 +22,7 @@ name: Notifications stay usable at maximum text size in English and Spanish
           direction: DOWN
           visibilityPercentage: 100
           centerElement: false
+      - waitForAnimationToEnd
       - assertVisible:
           id: nav.notifications
           text: "${output.language === 'en' ? 'Notifications' : 'Notificaciones'}"
@@ -32,6 +33,7 @@ name: Notifications stay usable at maximum text size in English and Spanish
           direction: UP
           visibilityPercentage: 100
           centerElement: false
+      - waitForAnimationToEnd
       - tapOn:
           id: nav.close
       - assertNotVisible:
@@ -44,10 +46,18 @@ name: Notifications stay usable at maximum text size in English and Spanish
           direction: DOWN
           visibilityPercentage: 100
           centerElement: false
+      - waitForAnimationToEnd
       - tapOn:
           id: nav.notifications
       - assertVisible:
           id: screen.notifications
+      - scrollUntilVisible:
+          element:
+            id: notifications.timed.add
+          direction: DOWN
+          visibilityPercentage: 100
+          centerElement: false
+      - waitForAnimationToEnd
       - extendedWaitUntil:
           visible:
             id: notifications.timed.add
@@ -65,6 +75,7 @@ name: Notifications stay usable at maximum text size in English and Spanish
           direction: DOWN
           visibilityPercentage: 100
           centerElement: false
+      - waitForAnimationToEnd
       - assertVisible:
           id: notifications.timed.save
           enabled: false
@@ -74,6 +85,7 @@ name: Notifications stay usable at maximum text size in English and Spanish
           direction: UP
           visibilityPercentage: 100
           centerElement: false
+      - waitForAnimationToEnd
       - tapOn:
           id: notifications.timed.label
       - setClipboard: "${output.language === 'en' ? 'Give Mochi the monthly flea treatment' : 'Darle a Mochi el antiparasitario mensual'}"
@@ -84,9 +96,14 @@ name: Notifications stay usable at maximum text size in English and Spanish
           direction: DOWN
           visibilityPercentage: 100
           centerElement: false
+      - waitForAnimationToEnd
       - assertVisible:
           id: notifications.timed.save
           enabled: true
+      - swipe:
+          start: 50%,45%
+          end: 50%,20%
+      - waitForAnimationToEnd
       - takeScreenshot: notifications-large-${output.language}-keyboard-save
       - scrollUntilVisible:
           element:
@@ -94,6 +111,7 @@ name: Notifications stay usable at maximum text size in English and Spanish
           direction: UP
           visibilityPercentage: 100
           centerElement: false
+      - waitForAnimationToEnd
       - assertVisible:
           id: notifications.timed.when
       - takeScreenshot: notifications-large-${output.language}-native-picker
@@ -103,6 +121,7 @@ name: Notifications stay usable at maximum text size in English and Spanish
           direction: UP
           visibilityPercentage: 100
           centerElement: false
+      - waitForAnimationToEnd
       - tapOn:
           id: notifications.timed.close
       - assertNotVisible:
@@ -117,6 +136,7 @@ name: Notifications stay usable at maximum text size in English and Spanish
           direction: DOWN
           visibilityPercentage: 100
           centerElement: false
+      - waitForAnimationToEnd
       - assertVisible:
           id: nav.notifications
           selected: true
@@ -126,6 +146,7 @@ name: Notifications stay usable at maximum text size in English and Spanish
           direction: DOWN
           visibilityPercentage: 100
           centerElement: false
+      - waitForAnimationToEnd
       - tapOn:
           id: nav.settings
       - assertVisible:
@@ -136,6 +157,7 @@ name: Notifications stay usable at maximum text size in English and Spanish
           direction: DOWN
           visibilityPercentage: 100
           centerElement: false
+      - waitForAnimationToEnd
       - tapOn:
           id: settings.language.open
       - evalScript: "${output.nextLanguage = output.language === 'en' ? 'es' : 'en'}"
@@ -145,6 +167,7 @@ name: Notifications stay usable at maximum text size in English and Spanish
           direction: DOWN
           visibilityPercentage: 100
           centerElement: false
+      - waitForAnimationToEnd
       - tapOn:
           id: appearance.language.${output.nextLanguage}
       - assertVisible:
@@ -155,6 +178,7 @@ name: Notifications stay usable at maximum text size in English and Spanish
           direction: UP
           visibilityPercentage: 100
           centerElement: false
+      - waitForAnimationToEnd
       - tapOn:
           id: settings.back
       - assertVisible:

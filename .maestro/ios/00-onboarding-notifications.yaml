@@ -15,7 +15,9 @@ tags:
     direction: DOWN
 - tapOn:
     id: setup.reminders.allow
-- tapOn: Allow
+- tapOn:
+    text: ^Allow$
+    optional: true
 - assertVisible:
     id: setup.step.ready
 - scrollUntilVisible:
