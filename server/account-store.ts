@@ -210,16 +210,39 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
     }
   }
 
-  exportSnapshot(): { cursor: number; pets: { id: string; name: string; eventCount: number }[] } {
-    const cursor = this.ctx.storage.sql.exec<{ value: number }>('SELECT COALESCE(MAX(sequence), 0) AS value FROM revisions').one().value;
-    return { cursor, ...this.summary() };
-  }
-
-  exportPage(after: number, through: number): Revision[] {
-    this.#assertActive();
-    cursorSchema.parse(after); cursorSchema.parse(through);
-    return this.ctx.storage.sql.exec<JsonRow>('SELECT body FROM revisions WHERE sequence > ? AND sequence <= ? ORDER BY sequence LIMIT 100', after, through)
-      .toArray().map((row) => JSON.parse(row.body) as Revision);
+  exportStream(): Response {
+    // Capture both synchronously before returning. Later writes cannot enter this
+    // history, and the HTTP Worker does not spend one RPC/JSON parse per page.
+    const snapshot = { cursor: this.#cursor(), ...this.summary() }, encoder = new TextEncoder();
+    let manifest = true, cursor = 0;
+    const stream = new ReadableStream({
+      type: 'bytes',
+      pull: controller => {
+        try {
+          this.#assertActive();
+          if (manifest) {
+            manifest = false;
+            controller.enqueue(encoder.encode(JSON.stringify({ type: 'manifest', format: 'puptime-cloud-export', version: 1, exportedAt: Date.now(), pets: snapshot.pets }) + '\n'));
+          } else if (cursor < snapshot.cursor) {
+            // One saved row bounds memory without retaining a SQL cursor across
+            // pulls; retirement and concurrent writes remain able to proceed.
+            const row = this.ctx.storage.sql.exec<{ sequence: number; body: string }>('SELECT sequence,body FROM revisions WHERE sequence>? AND sequence<=? ORDER BY sequence LIMIT 1', cursor, snapshot.cursor).toArray()[0];
+            if (!row || row.sequence !== cursor + 1 || !row.body.startsWith('{') || !row.body.endsWith('}')) throw new Error('Incomplete snapshot.');
+            cursor = row.sequence;
+            // Stored bodies are validated Revision objects serialized at commit.
+            // Preserve their JSON bytes instead of parsing/restringifying notes.
+            controller.enqueue(encoder.encode('{"type":"revision",' + row.body.slice(1) + '\n'));
+          } else {
+            controller.enqueue(encoder.encode(JSON.stringify({ type: 'complete', cursor }) + '\n'));
+            controller.close();
+          }
+        } catch { controller.error(new Error('Export interrupted. Please retry.')); }
+      },
+    });
+    return new Response(stream, { headers: {
+      'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store',
+      'Content-Disposition': 'attachment; filename="puptime-cloud-export.ndjson"',
+    } });
   }
 
   pull(after: number, limit = 100): PullPage {

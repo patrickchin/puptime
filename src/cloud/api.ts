@@ -63,7 +63,7 @@ function retryDelay(value:string|null|undefined):number|null {
   const milliseconds=/^\d+$/.test(value)?Number(value)*1000:Date.parse(value)-Date.now();
   return Number.isFinite(milliseconds)?Math.max(0,Math.min(60000,milliseconds)):null;
 }
-function category(status:number):CloudErrorCategory {
+export function cloudErrorCategory(status:number):CloudErrorCategory {
   const categories:Record<number,CloudErrorCategory>={401:'auth-required',402:'expired',403:'forbidden',409:'conflict',410:'account-deleted',429:'rate-limited'};
   return categories[status]??(status>=500?'server-error':'invalid-request');
 }
@@ -74,7 +74,7 @@ export function createCloudApi(request:CloudRequest) {
     try {result=await request(path,{method:body?'POST':'GET',...(body?{body}:{}),signal});}
     catch {throwIfAborted(signal);throw new CloudApiError('network');}
     throwIfAborted(signal);
-    if (result.error) throw new CloudApiError(category(result.error.status),result.error.status,retryDelay(result.retryAfter));
+    if (result.error) throw new CloudApiError(cloudErrorCategory(result.error.status),result.error.status,retryDelay(result.retryAfter));
     const parsed=schema.safeParse(result.data);
     if (!parsed.success) throw new CloudApiError('invalid-response');
     return parsed.data;

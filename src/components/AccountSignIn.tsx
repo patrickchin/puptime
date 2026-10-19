@@ -19,6 +19,7 @@ export function accountProblemKey(problem:AccountProblem|null):MessageKey|null {
   if(problem==='account-mismatch')return 'account.error.mismatch';
   if(problem==='sign-out-failed')return 'account.error.signOut';
   if(problem==='remote-sign-out-unconfirmed')return 'account.error.remoteSignOut';
+  if(problem==='export-failed')return 'account.error.export';
   if(problem==='local-storage')return 'account.error.storage';
   if(problem==='social-incomplete')return 'account.error.socialIncomplete';
   if(problem==='link-incomplete')return 'account.error.linkIncomplete';

@@ -19,6 +19,7 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
   const days=state?.config?.trialDays??14;
   useEffect(()=>{let mounted=true;cloud.getLocalName().then(name=>{if(mounted)setLocalName(name);}).catch(()=>{if(mounted)setReadFailed(true);});return()=>{mounted=false;};},[cloud.getLocalName]);
   useEffect(()=>{setSamePuppy(false);},[account?.user.id,existing?.id]);
+  useEffect(()=>()=>cloud.controller?.cancelExport(),[cloud.controller]);
   const titleStyle={color:theme.text,fontFamily:theme.presentation.headingFont,fontSize:theme.presentation.titleSize,lineHeight:theme.presentation.titleLineHeight,fontWeight:theme.presentation.titleWeight};
   const bodyStyle={color:theme.textMuted};
   const cardStyle=[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border,borderRadius:theme.presentation.cardRadius}];
@@ -34,7 +35,7 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
     <KeyboardAvoidingView behavior="padding" style={styles.root}>
       <ScrollView testID="screen.account" keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <Pressable testID="account.back" accessibilityRole="button" accessibilityLabel={t('account.back')} onPress={onBack} style={({pressed})=>[styles.back,{backgroundColor:pressed?theme.primarySoft:theme.surfaceRaised,borderRadius:theme.presentation.controlRadius}]}>
+          <Pressable testID="account.back" accessibilityRole="button" accessibilityLabel={t('account.back')} onPress={()=>{cloud.controller?.cancelExport();onBack();}} style={({pressed})=>[styles.back,{backgroundColor:pressed?theme.primarySoft:theme.surfaceRaised,borderRadius:theme.presentation.controlRadius}]}>
             <MaterialCommunityIcons name="arrow-left" size={24} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no" />
           </Pressable>
           <Text accessibilityRole="header" maxFontSizeMultiplier={2} style={[styles.title,titleStyle]}>{t('account.title')}</Text>
@@ -71,6 +72,10 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
               <Text style={[styles.body,styles.grow,{color:theme.text}]}>{t(provider==='apple'?'account.connectedApple':'account.connectedGoogle')}</Text>
             </View>:<AccountButton key={provider} theme={theme} testID={`account.${provider}.connect`} label={t(provider==='apple'?'account.connectApple':'account.connectGoogle')} icon={provider} disabled={busy||!state.online} loading={state.linkingProvider===provider} onPress={()=>{void cloud.controller!.connectProvider(provider);}}/>)}
           </View>:null}
+          <View style={cardStyle}>
+            <AccountButton theme={theme} testID="account.export" label={t(state?.exporting?'account.exporting':'account.export')} icon="download-outline" disabled={busy||!state!.online||!account.cloud.canExport} loading={state?.exporting} onPress={()=>{void cloud.controller!.exportData();}}/>
+            {state?.exporting?<AccountButton theme={theme} testID="account.export.cancel" label={t('account.cancel')} onPress={()=>cloud.controller!.cancelExport()}/>:state?.sync?.pending?<Text style={[styles.body,bodyStyle]}>{t('account.exportPending')}</Text>:null}
+          </View>
           <AccountButton theme={theme} testID="account.signOut" label={t('account.signOut')} disabled={busy} onPress={signOut}/>
         </View>)}
         {!account&&state?.sync?.accountId?<AccountButton theme={theme} testID="account.signOut" label={t('account.signOut')} disabled={busy} onPress={signOut}/>:null}
