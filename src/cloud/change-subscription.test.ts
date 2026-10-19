@@ -4,7 +4,7 @@ import type {AccountSnapshot} from './account-controller.ts';
 import * as subscription from './change-subscription.ts';
 const tick=()=>new Promise<void>(resolve=>setImmediate(resolve));
 function fixture(){
- let state:AccountSnapshot={active:true,online:true,busy:false,problem:null,account:{user:{id:'one',email:'one@example.invalid',name:'One'},cloud:{canSync:true,canExport:true,source:'trial',expiresAt:null},pets:[]},sync:{accountId:'one',generation:'first',state:'active',pending:0,blocked:0,cursor:0},config:null,local:null,run:null,codeSentTo:null,running:false,lastSyncedAt:null};
+ let state:AccountSnapshot={active:true,online:true,busy:false,problem:null,account:{user:{id:'one',email:'one@example.invalid',name:'One'},cloud:{canSync:true,canExport:true,source:'trial',expiresAt:null},pets:[]},sync:{accountId:'one',generation:'first',state:'active',pending:0,blocked:0,cursor:0},config:null,linkedProviders:null,linkingProvider:null,local:null,run:null,codeSentTo:null,running:false,lastSyncedAt:null};
  const listeners=new Set<()=>void>();let invalidations=0;
  const timers:Array<{fn:()=>void;delay:number;cancelled:boolean}>=[],calls:Array<{signal:AbortSignal;onCursor:(cursor:number)=>void;onClose:()=>void;closed:number;resolve?:(value:{close:()=>void})=>void}>=[];
  const controller={read:()=>state,subscribe:(fn:()=>void)=>{listeners.add(fn);return()=>{listeners.delete(fn);};},invalidate:()=>{invalidations++;}};
