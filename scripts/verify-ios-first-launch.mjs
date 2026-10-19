@@ -65,7 +65,7 @@ try{
  assert.equal(sql.prepare('SELECT COUNT(*) n FROM local_sync_owner').get().n,0);assert.equal(sql.prepare('SELECT COUNT(*) n FROM local_sync_outbox').get().n,0);
  console.log('PASS final completion failure/retry is atomic, then the first actual quick log creates exactly one real event, with no account or cloud work.');
  const beforeReplay=snapshot();
- flow('separate-replay',`- tapOn:\n    id: settings.open\n- scrollUntilVisible:\n    element:\n      id: settings.guide.open\n    direction: UP\n- tapOn:\n    id: settings.guide.open\n- assertVisible:\n    id: onboarding.step.0\n- tapOn:\n    id: onboarding.skip\n- assertVisible:\n    id: screen.settings\n`);
+ flow('separate-replay',`- assertVisible:\n    id: screen.today\n- tapOn:\n    id: nav.open\n- assertVisible:\n    id: nav.settings\n- tapOn:\n    id: nav.settings\n- assertVisible:\n    id: screen.settings\n- scrollUntilVisible:\n    element:\n      id: settings.guide.open\n    direction: DOWN\n- tapOn:\n    id: settings.guide.open\n- assertVisible:\n    id: onboarding.step.0\n- tapOn:\n    id: onboarding.skip\n- assertVisible:\n    id: screen.settings\n`);
  assert.deepEqual(snapshot(),beforeReplay,'Standalone walkthrough replay never repeats setup writes.');
  simctl('terminate',udid,app);sql.prepare("UPDATE metadata SET value='corrupt' WHERE key='first_launch_step'").run();
  const corrupt=snapshot();

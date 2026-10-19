@@ -7,7 +7,7 @@ from pathlib import Path
 import re
 
 CURRENT_JOURNEYS = [
-    '192-terrier-full-first-open-and-recovery',
+    '194-terrier-full-first-open-and-recovery',
     '191-terrier-full-first-open-appearance',
     '188-drawer-and-native-timer-journeys',
 ]

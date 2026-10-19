@@ -40,6 +40,7 @@ const repository=createLocalRepository(database,petId);
 for(let at=0;at<events.length;at+=1000)await repository.appendEvents(events.slice(at,at+1000));
 await database.write(async sql=>{
  await sql.runAsync("UPDATE metadata SET value='false' WHERE key='show_onboarding'");
+ await sql.runAsync("UPDATE metadata SET value='done' WHERE key='first_launch_step'");
  await sql.runAsync("INSERT INTO metadata(key,value) VALUES ('qualification_fixture','native-activity-v1')");
 });
 await database.close();
