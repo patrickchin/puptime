@@ -46,7 +46,7 @@ tags:
       id: settings.notifications.lead.15
     direction: DOWN
     visibilityPercentage: 100
-    centerElement: true
+    centerElement: false
 - waitForAnimationToEnd:
     timeout: 5000
 - swipe:
@@ -88,7 +88,7 @@ tags:
       id: settings.notifications.lead.15
     direction: DOWN
     visibilityPercentage: 100
-    centerElement: true
+    centerElement: false
 - waitForAnimationToEnd:
     timeout: 5000
 - swipe:
@@ -206,7 +206,7 @@ tags:
       id: settings.notifications.lead.15
     direction: DOWN
     visibilityPercentage: 100
-    centerElement: true
+    centerElement: false
 - waitForAnimationToEnd:
     timeout: 5000
 - swipe:
