@@ -1,6 +1,5 @@
 import type { PostHog } from 'posthog-js';
-import { consentKey, privacySignalActive, sanitizeWebsiteEvent, type WebsiteEvent } from './telemetry-policy';
-import { publicPaths } from './site';
+import { consentKey, privacySignalActive, sanitizeWebsiteEvent, telemetryPaths, type WebsiteEvent } from './telemetry-policy';
 
 export const posthogConfigured = Boolean(process.env.EXPO_PUBLIC_POSTHOG_KEY);
 let client: PostHog | undefined;
@@ -15,7 +14,7 @@ export function storedConsent() {
 export async function setAnalyticsEnabled(enabled: boolean, path: string) {
   const current = ++generation;
   allowed = enabled && !privacySignalActive(navigator);
-  page = path === '/puppy-care' ? '/puppy-care/' : publicPaths.includes(path) ? path : '/404';
+  page = path === '/puppy-care' ? '/puppy-care/' : telemetryPaths.includes(path) ? path : '/404';
   if (!allowed) {
     client?.opt_out_capturing();
     client?.reset();
@@ -51,6 +50,6 @@ export async function setAnalyticsEnabled(enabled: boolean, path: string) {
   }
 }
 
-export function captureWebsiteEvent(event: WebsiteEvent, properties: { destination?: 'android_download' | 'source'; error_kind?: 'script' | 'unhandled_rejection' | 'render' } = {}) {
+export function captureWebsiteEvent(event: WebsiteEvent, properties: { destination?: 'android_download' | 'source'; error_kind?: 'script' | 'unhandled_rejection' | 'render';action?:'sign_in'|'request_code'|'sign_out'|'link_provider'|'export'|'delete';result?:'started'|'success'|'error'|'cancelled' } = {}) {
   if (allowed && !privacySignalActive(navigator)) client?.capture(event, { page, ...properties });
 }

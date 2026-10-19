@@ -1,8 +1,12 @@
 # Puptime
 
-Puptime is a puppy activity log for Android and iOS. Data stays on the device. The public website has separate traffic analytics and optional product analytics; see [Privacy](PRIVACY.md).
+Puptime is a puppy activity log, with the account-enabled release focused on iPhone. Local logging stays free without an account; optional cloud backup and device sync are being qualified separately from existing offline releases. The website provides account management and consent-controlled analytics; see [Privacy](PRIVACY.md).
 
-## Screenshots
+## Existing offline release
+
+The screenshots, features, and Android installation instructions below describe the published offline release. Android, widgets, and nap-related changes are deferred during the account-enabled iPhone rollout.
+
+### Screenshots
 
 <table>
   <tr>
@@ -27,7 +31,7 @@ Puptime is a puppy activity log for Android and iOS. Data stays on the device. T
   </tr>
 </table>
 
-## Features
+### Features
 
 - Log pee, poop, and meals with one tap, haptic confirmation, and undo. Earlier logs of other activities remain in history.
 - Use a configured widget action to start and stop naps, then edit their start and end times.
@@ -46,7 +50,7 @@ Puptime is a puppy activity log for Android and iOS. Data stays on the device. T
 
 The starter routine is only an editable example, not veterinary guidance. Change it to fit your puppy and your veterinarian’s advice.
 
-## Install on Android
+### Install on Android
 
 Download the APK from the [latest GitHub release](https://github.com/patrickchin/puptime/releases/latest), open it on your phone, and allow installation from that source if Android asks.
 
@@ -75,7 +79,7 @@ Requires Node.js 22.18 or newer, the Android SDK for Android, and Xcode for iOS.
 ```sh
 npm ci
 npm run prebuild
-npm run android
+npm run ios
 ```
 
 The widgets use native extensions, so they require a development or release build rather than Expo Go. Interactive iOS widget buttons require iOS 17 or newer.
@@ -114,7 +118,7 @@ See [Puppy care research](PUPPY_CARE_RESEARCH.md) for the source selection, evid
 
 - Expo SDK 57 / React Native 0.86 / React 19
 - TypeScript
-- AsyncStorage for offline persistence
+- Expo SQLite for the account-enabled iOS store; AsyncStorage for legacy storage and migration
 - `react-native-android-widget` on Android
 - Expo Widgets and SwiftUI on iOS
 

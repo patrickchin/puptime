@@ -265,6 +265,17 @@ Configure the Pages production binding before qualifying the route; preview depl
 
 Local Workers runtime tests cover genuine SDK OTP/session, explicit activation/enrollment, typed SQL push/pull, history/paging/owner isolation, logout, untrusted origins and real WebSocket101/cursor invalidations through the binding. They do not prove a live Pages deployment or inbox delivery. Both remain explicit deployment/native acceptance gates.
 
+### Deployed identity checkpoint — October 20
+
+PRs102–103 passed their exact-head Checks, Pages and iOS Simulator workflows and merged through normal pull requests. The canonical staging auth origin is now `https://puptime.pages.dev`, and the Pages production binding forwards the real API. Preview deployments remain unbound. The previous paragraph's pending route/inbox work describes the earlier October19 checkpoint.
+
+Real Resend-delivered email sign-in and native deployed sync are now qualified on a dedicated retained installation: explicit cloud activation, outgoing and independently created incoming changes, restart and a final three-log Up to date state. Codes were entered privately without recording. The test sender still permits only the Resend owner inbox; public email delivery needs a verified Puptime sender domain.
+
+Live check278 verifies both Apple and Google configurations, exact callback URLs, PKCE, Apple's form-post response mode, invalid-state rejection and protected anonymous responses. Check293 verifies the actual Keychain-held Apple key and installed JWT's signature, claims and expiry locally. These are configuration and cryptographic checks, not a completed provider token exchange. See [provider setup and rotation](social-provider-setup.md).
+
+Standalone iOS recordings275–276 show the configured Google control, actual system authentication prompt and cancellation feedback. Check277 confirms all14 application tables are unchanged. Recording279 then updates the existing genuine email-account installation in place and opens Backup and sync with its three logs and both Connect controls. Full container/old-app backups precede installation; checks291–292 verify all14 tables and full rows before launch and after viewing. No owner, log, revision, queue or credential was reset. The OS relocated the data-container path during installation; failed check290 preserves that initial path guard, and the corrected guard resolves the authoritative container before comparing the complete data.
+
+Google's real sign-in page is ready for private human completion in the separate simulator browser. Genuine Apple/Google success, returning identity and explicit linking remain open gates. No public-provider, distributed-release or arbitrary-inbox delivery claim follows from this checkpoint.
 
 ## October19 iOS log-history qualification in progress
 
