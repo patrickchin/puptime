@@ -82,7 +82,7 @@
 - [x] Write RED API/schema tests for long encoded IDs, pages/concurrent writes, malformed versions, wrong record/pet, mismatched before/after identity, duplicates/order/cursor, abort/network/402/401 and invalid payload preservation.
 - [x] Write RED controller/engine tests for sign-out/account switch/disposal during a history request and old cloud selection after a new local/remote edit. Include actual server-authenticated history/merge/deletion/restore/pagination and cross-account isolation; retain local history when remote access fails.
 - [x] Implement the existing SDK request route and strict response validation. Reuse the current account/runtime state; do not add another auth implementation or persistent cache. Revalidate identity/owner after the response and before exposing it. Extend only the selection branch of Task2's guarded restore; do not bypass its no-pending/current-revision checks.
-- [ ] Run full Node/Workers suites and all types; expect PASS. Commit `feat: read and restore scoped cloud log versions` and task-done.
+- [x] Run full Node/Workers suites and all types; expect PASS. Commit `feat: read and restore scoped cloud log versions` and task-done.
 
 ### Task 4: Discreet iOS history surfaces
 
