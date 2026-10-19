@@ -14,7 +14,7 @@ const udid=process.argv[2],app='com.patrickchin.puptime';
 assert.equal(process.argv[3],'--replace-synthetic');
 const simctl=(...args)=>execFileSync('xcrun',['simctl',...args],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
 const device=Object.values(JSON.parse(simctl('list','devices','available','-j')).devices).flat().find(device=>device.udid===udid);
-assert.ok(device?.name.startsWith('Puptime Native Storage ae0c first-launch '),'Use this worktree’s dedicated first-launch device.');
+assert.ok(device?.name.startsWith('Puptime Native Storage ae0c '),'Use this worktree’s dedicated device.');
 const output=mkdtempSync(join(tmpdir(),'puptime-first-launch-appearance-'));
 const directory=()=>join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite');
 const stop=()=>{try{simctl('terminate',udid,app);}catch(error){if(!String(error.stderr??'').includes('found nothing to terminate'))throw error;}};
@@ -25,13 +25,19 @@ if(existsSync(directory())){
  cpSync(directory(),join(output,'previous-synthetic-sqlite'),{recursive:true});
 }
 const labels={
- en:{EXPECTED_WELCOME:'A little rhythm for puppy life.',EXPECTED_PROFILE:'Who’s joining you?',EXPECTED_ACCOUNT:'Make yourself at home.',EXPECTED_LOG:'Little moments. Easier days.',EXPECTED_SAMPLE:'.*practice log',EXPECTED_REMINDERS:'A nudge when you need one.',EXPECTED_READY:'Ready for the first little moment.'},
- es:{EXPECTED_WELCOME:'Un poco de ritmo para su nueva vida.',EXPECTED_PROFILE:'¿Quién te acompaña?',EXPECTED_ACCOUNT:'Ponte cómodo.',EXPECTED_LOG:'Pequeños momentos. Días más fáciles.',EXPECTED_SAMPLE:'.*registro de práctica',EXPECTED_REMINDERS:'Una ayuda cuando hace falta.',EXPECTED_READY:'Todo listo para el primer momento.'},
- 'zh-Hans':{EXPECTED_WELCOME:'陪小狗，一起找到生活节奏。',EXPECTED_PROFILE:'陪伴你的小狗叫什么？',EXPECTED_ACCOUNT:'安顿下来，慢慢开始。',EXPECTED_LOG:'记录小事，轻松过每一天。',EXPECTED_SAMPLE:'.*练习记录',EXPECTED_REMINDERS:'需要时，轻轻提醒。',EXPECTED_READY:'准备好记录第一个小瞬间。'},
+ en:{EXPECTED_WELCOME:'Puppy life, in one place.',EXPECTED_PROFILE:'Puppy’s name?',EXPECTED_ACCOUNT:'Save across devices?',EXPECTED_LOG:'Try a log',EXPECTED_SAMPLE:'.*practice log',EXPECTED_REMINDERS:'A little reminder?',EXPECTED_READY:'You’re all set.'},
+ es:{EXPECTED_WELCOME:'Su día a día, en un lugar.',EXPECTED_PROFILE:'¿Cómo se llama tu cachorro?',EXPECTED_ACCOUNT:'¿Usarlo en varios dispositivos?',EXPECTED_LOG:'Prueba un registro',EXPECTED_SAMPLE:'.*registro de práctica',EXPECTED_REMINDERS:'¿Un recordatorio?',EXPECTED_READY:'Todo listo.'},
+ 'zh-Hans':{EXPECTED_WELCOME:'小狗日常，都在这里。',EXPECTED_PROFILE:'小狗叫什么？',EXPECTED_ACCOUNT:'想在多台设备上使用？',EXPECTED_LOG:'试着记一笔',EXPECTED_SAMPLE:'.*练习记录',EXPECTED_REMINDERS:'需要提醒吗？',EXPECTED_READY:'准备好了。'},
 };
 const cases=[['system-light-en','system','light','en',false],['system-dark-es','system','dark','es',false],['journal-es','puppy-journal','light','es',false],['soft-play-zh','soft-play','light','zh-Hans',false],['day-trails-en','day-trails','light','en',false],['largest-text','puppy-journal','light','en',true]];
 const selected=process.argv[4];if(selected)assert.ok(cases.some(([name])=>name===selected),'Choose a named appearance case.');
-const run=(file,path,values={})=>execFileSync(process.env.MAESTRO_BIN??'maestro',['--device',udid,'test',...Object.entries(values).flatMap(([key,value])=>['-e',`${key}=${value}`]),file,'--test-output-dir',path],{stdio:'inherit',env:{...process.env,MAESTRO_CLI_NO_ANALYTICS:'1'}});
+let invocation=0;
+function run(file,path,values={}){
+ // Reactivate inside each new XCTest session without resetting the app draft.
+ const wrapper=join(output,`activate-${++invocation}.yaml`);
+ writeFileSync(wrapper,'appId: '+app+'\n---\n- launchApp:\n    stopApp: false\n    permissions: {}\n- waitForAnimationToEnd\n- runFlow: '+JSON.stringify(resolve(file))+'\n');
+ execFileSync(process.env.MAESTRO_BIN??'maestro',['--device',udid,'test',...Object.entries(values).flatMap(([key,value])=>['-e',`${key}=${value}`]),wrapper,'--test-output-dir',path],{stdio:'inherit',env:{...process.env,MAESTRO_CLI_NO_ANALYTICS:'1'}});
+}
 function flow(name,body,path){const file=join(output,name+'.yaml');writeFileSync(file,'appId: '+app+'\n---\n'+body);run(file,path);}
 const oldSize=simctl('ui',udid,'content_size'),oldAppearance=simctl('ui',udid,'appearance');
 try{

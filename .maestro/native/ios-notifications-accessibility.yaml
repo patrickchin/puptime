@@ -1,0 +1,192 @@
+appId: com.patrickchin.puptime
+name: Notifications stay usable at maximum text size in English and Spanish
+---
+# Completed English setup, task small iPhone, maximum Dynamic Type set by caller.
+# No clearState or Save taps. Use an unowned appearance fixture with no one-offs.
+# Only the language preference changes; the second pass restores English.
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- evalScript: ${output.language = 'en'}
+- repeat:
+    times: 2
+    commands:
+      - tapOn:
+          id: nav.open
+      - scrollUntilVisible:
+          element:
+            id: nav.notifications
+          direction: DOWN
+          visibilityPercentage: 100
+          centerElement: false
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: nav.notifications
+          text: "${output.language === 'en' ? 'Notifications' : 'Notificaciones'}"
+      - takeScreenshot: notifications-large-${output.language}-drawer
+      - scrollUntilVisible:
+          element:
+            id: nav.close
+          direction: UP
+          visibilityPercentage: 100
+          centerElement: false
+      - waitForAnimationToEnd
+      - tapOn:
+          id: nav.close
+      - assertNotVisible:
+          id: nav.close
+      - tapOn:
+          id: nav.open
+      - scrollUntilVisible:
+          element:
+            id: nav.notifications
+          direction: DOWN
+          visibilityPercentage: 100
+          centerElement: false
+      - waitForAnimationToEnd
+      - tapOn:
+          id: nav.notifications
+      - assertVisible:
+          id: screen.notifications
+      - scrollUntilVisible:
+          element:
+            id: notifications.timed.add
+          direction: DOWN
+          visibilityPercentage: 100
+          centerElement: false
+      - waitForAnimationToEnd
+      - extendedWaitUntil:
+          visible:
+            id: notifications.timed.add
+            enabled: true
+          timeout: 30000
+      - assertNotVisible:
+          id: notifications.timed.item..*
+      - tapOn:
+          id: notifications.timed.add
+      - assertVisible:
+          id: notifications.timed.editor
+      - scrollUntilVisible:
+          element:
+            id: notifications.timed.save
+          direction: DOWN
+          visibilityPercentage: 100
+          centerElement: false
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: notifications.timed.save
+          enabled: false
+      - scrollUntilVisible:
+          element:
+            id: notifications.timed.label
+          direction: UP
+          visibilityPercentage: 100
+          centerElement: false
+      - waitForAnimationToEnd
+      - tapOn:
+          id: notifications.timed.label
+      - setClipboard: "${output.language === 'en' ? 'Give Mochi the monthly flea treatment' : 'Darle a Mochi el antiparasitario mensual'}"
+      - pasteText
+      - scrollUntilVisible:
+          element:
+            id: notifications.timed.save
+          direction: DOWN
+          visibilityPercentage: 100
+          centerElement: false
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: notifications.timed.save
+          enabled: true
+      - swipe:
+          start: 50%,45%
+          end: 50%,20%
+      - waitForAnimationToEnd
+      - takeScreenshot: notifications-large-${output.language}-keyboard-save
+      - scrollUntilVisible:
+          element:
+            id: notifications.timed.when
+          direction: UP
+          visibilityPercentage: 100
+          centerElement: false
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: notifications.timed.when
+      - takeScreenshot: notifications-large-${output.language}-native-picker
+      - scrollUntilVisible:
+          element:
+            id: notifications.timed.close
+          direction: UP
+          visibilityPercentage: 100
+          centerElement: false
+      - waitForAnimationToEnd
+      - tapOn:
+          id: notifications.timed.close
+      - assertNotVisible:
+          id: notifications.timed.editor
+      - assertNotVisible:
+          id: notifications.timed.item..*
+      - tapOn:
+          id: nav.open
+      - scrollUntilVisible:
+          element:
+            id: nav.notifications
+          direction: DOWN
+          visibilityPercentage: 100
+          centerElement: false
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: nav.notifications
+          selected: true
+      - scrollUntilVisible:
+          element:
+            id: nav.settings
+          direction: DOWN
+          visibilityPercentage: 100
+          centerElement: false
+      - waitForAnimationToEnd
+      - tapOn:
+          id: nav.settings
+      - assertVisible:
+          id: screen.settings
+      - scrollUntilVisible:
+          element:
+            id: settings.language.open
+          direction: DOWN
+          visibilityPercentage: 100
+          centerElement: false
+      - waitForAnimationToEnd
+      - tapOn:
+          id: settings.language.open
+      - evalScript: "${output.nextLanguage = output.language === 'en' ? 'es' : 'en'}"
+      - scrollUntilVisible:
+          element:
+            id: appearance.language.${output.nextLanguage}
+          direction: DOWN
+          visibilityPercentage: 100
+          centerElement: false
+      - waitForAnimationToEnd
+      - tapOn:
+          id: appearance.language.${output.nextLanguage}
+      - assertVisible:
+          id: screen.settings
+      - scrollUntilVisible:
+          element:
+            id: settings.back
+          direction: UP
+          visibilityPercentage: 100
+          centerElement: false
+      - waitForAnimationToEnd
+      - tapOn:
+          id: settings.back
+      - assertVisible:
+          id: screen.notifications
+      - evalScript: ${output.language = output.nextLanguage}
+- assertNotVisible:
+    id: nav.close
+- assertNotVisible:
+    id: notifications.timed.editor
+- assertNotVisible:
+    id: notifications.timed.item..*

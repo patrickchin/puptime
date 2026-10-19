@@ -4,6 +4,7 @@ import { createLocalDatabase,initializeLocalDatabase } from '../local/database.t
 import { sqliteTestConnection } from '../local/sqlite-test-adapter.ts';
 import { createLocalRuntime } from '../local/runtime-factory.ts';
 import { CloudApiError,type CloudApi,type CloudAccountSummary } from './api.ts';
+import type {Revision} from './protocol.ts';
 import * as controllerModule from './account-controller.ts';
 const event={id:'one',type:'pee' as const,at:100,source:'app' as const};
 async function fixture(t:TestContext,{pristine=false}={}) {
@@ -13,7 +14,7 @@ async function fixture(t:TestContext,{pristine=false}={}) {
  const summary:CloudAccountSummary={user:{id:'account-1',email:'person@example.com',name:'Person'},cloud:{canSync:false,canExport:true,source:'none',expiresAt:null},pets:[]};
  const state={credentials:false,summary,trialCalls:0,signOutCalls:0,signOutFails:false,storageFails:false,requested:[] as string[],verifications:0};
  const config={protocolVersion:1 as const,trialDays:14,providers:{apple:false,google:true,email:true},pricingFinalized:false};
- const api:CloudApi={config:async()=>config,account:async()=>{if(!state.credentials)throw new CloudApiError('auth-required',401);return structuredClone(state.summary);},startTrial:async()=>{state.trialCalls++;state.summary.cloud={canSync:true,canExport:true,source:'trial',expiresAt:8640000000000000};return {cloud:state.summary.cloud};},enroll:async request=>({petId:request.confirmedPetId??request.localPetId}),push:async mutations=>({accepted:[],rejected:mutations.map(mutation=>({operationId:mutation.operationId,error:'retry_later' as const}))}),pull:async after=>({changes:[],cursor:after,hasMore:false})};
+ const api:CloudApi={config:async()=>config,account:async()=>{if(!state.credentials)throw new CloudApiError('auth-required',401);return structuredClone(state.summary);},startTrial:async()=>{state.trialCalls++;state.summary.cloud={canSync:true,canExport:true,source:'trial',expiresAt:8640000000000000};return {cloud:state.summary.cloud};},enroll:async request=>({petId:request.confirmedPetId??request.localPetId}),push:async mutations=>({accepted:[],rejected:mutations.map(mutation=>({operationId:mutation.operationId,error:'retry_later' as const}))}),pull:async after=>({changes:[],cursor:after,hasMore:false}),history:async()=>({revisions:[]})};
  const identity={requestEmail:async(email:string)=>{state.requested.push(email);return {error:null};},verifyEmail:async(_email:string,code:string)=>{state.verifications++;if(code!=='123456')return {error:{status:400,code:'INVALID_OTP'}};state.credentials=true;return {error:null};},signInSocial:async()=>{state.credentials=true;return {error:null};},signOut:async()=>{state.signOutCalls++;if(!state.storageFails)state.credentials=false;return {error:state.signOutFails?{status:503,code:'NETWORK_ERROR'}:null};},hasCredentials:async()=>{if(state.storageFails)throw new Error('secure storage failed');return state.credentials;}};
  const timers:Array<{fn:()=>void;delay:number;cancelled:boolean}>=[];
  assert.equal(typeof controllerModule.createAccountController,'function');
@@ -238,4 +239,49 @@ test('another device winning first enrollment returns to explicit puppy confirma
  assert.equal(await controller.enableCloud({confirmedPetId:'other-device-pet'}),'ok');
  const saved=await runtime.sync.enrollmentState();assert.equal(saved!.request.confirmedPetId,'other-device-pet');
  assert.notEqual(saved!.request.operationId,requests[0].operationId);assert.equal(state.trialCalls,1);
+});
+
+const historical:Revision={recordId:'["event","cloud-1","one"]',revision:1,sequence:2,operationId:'server-first',deviceId:'other-device',acceptedAt:1000,baseRevision:0,intent:'create',proposal:{type:'pee',at:100,source:'app',note:'First'},before:null,after:{id:'["event","cloud-1","one"]',petId:'cloud-1',kind:'event',revision:1,sequence:2,deleted:false,updatedAt:1000,data:{type:'pee',at:100,source:'app',note:'First'}},reason:'created'};
+async function historyFixture(t:TestContext){
+ const f=await fixture(t);assert.equal(typeof f.controller.eventHistory,'function');
+ f.state.credentials=true;f.state.summary.cloud={canSync:true,canExport:true,source:'trial',expiresAt:8640000000000000};f.state.summary.pets=[{id:'cloud-1',name:'My puppy',eventCount:1}];
+ const owner={...await f.runtime.sync.prepareAssociation({accountId:'account-1',localPetId:'pet-1',deviceId:f.runtime.deviceId,enrollment:{operationId:'history-enroll',deviceId:f.runtime.deviceId,localPetId:'pet-1',name:'My puppy',confirmedPetId:'cloud-1'}}),accountId:'account-1'};
+ await f.runtime.sync.stageBaseline({...owner,page:{changes:[{id:'cloud-1',petId:'cloud-1',kind:'puppy',revision:1,sequence:1,deleted:false,updatedAt:1000,data:{name:'My puppy'}},{...historical.after,revision:2,sequence:3,updatedAt:2000,data:{type:'pee',at:100,source:'app',note:'Second'}}],cursor:3,hasMore:false}});
+ await f.runtime.sync.completeAssociation({...owner,cloudPetId:'cloud-1'});await f.controller.refresh();return {...f,owner};
+}
+
+test('cloud history resolves only the enrolled record and leaves local versions trial and account status alone',async t=>{
+ const {controller,runtime,state,api}=await historyFixture(t),signal=new AbortController().signal;let requests=0;
+ api.history=async(recordId,beforeRevision,received)=>{requests++;assert.equal(recordId,'["event","cloud-1","one"]');assert.equal(beforeRevision,2);assert.equal(received,signal);return {revisions:[historical]};};
+ const local=await runtime.history.eventPage('one');assert.deepEqual(await controller.eventHistory('one',2,signal),{revisions:[historical]});
+ assert.equal(requests,1);assert.equal(state.trialCalls,0);assert.equal(controller.read().problem,null);assert.deepEqual(await runtime.history.eventPage('one'),local);
+});
+
+test('cloud history refuses unauthenticated unenrolled or offline requests while local history stays available',async t=>{
+ const {controller,runtime,state,api}=await fixture(t);assert.equal(typeof controller.eventHistory,'function');let requests=0;api.history=async()=>{requests++;return {revisions:[]};};
+ await runtime.storage.appendEvents([event]);await controller.refresh();
+ await assert.rejects(controller.eventHistory('one'),error=>error instanceof CloudApiError&&error.category==='auth-required');
+ state.credentials=true;state.summary.cloud={canSync:true,canExport:true,source:'trial',expiresAt:8640000000000000};await controller.refresh();
+ await assert.rejects(controller.eventHistory('one'),error=>error instanceof CloudApiError&&error.category==='forbidden');
+ controller.setOnline(false);await assert.rejects(controller.eventHistory('one'),error=>error instanceof CloudApiError&&error.category==='network');
+ assert.equal(requests,0);assert.equal((await runtime.history.eventPage('one')).entries.length,1);assert.deepEqual(await runtime.storage.loadEvents(),[event]);
+});
+
+test('a remote history access failure never replaces local history or the account problem state',async t=>{
+ const {controller,runtime,api}=await historyFixture(t),before=await runtime.history.eventPage('one');
+ api.history=async()=>{throw new CloudApiError('expired',402);};
+ await assert.rejects(controller.eventHistory('one'),error=>error instanceof CloudApiError&&error.category==='expired');
+ assert.deepEqual(await runtime.history.eventPage('one'),before);assert.equal(controller.read().problem,null);
+});
+
+for(const action of ['sign-out','account-switch','generation-change','dispose'] as const)test(`a cloud history response after ${action} cannot expose the old request result`,{timeout:5000},async t=>{
+ const {controller,runtime,state,api,owner}=await historyFixture(t);let release!:(value:{revisions:Revision[]})=>void,started!:()=>void;
+ const entered=new Promise<void>(resolve=>{started=resolve;});api.history=()=>{started();return new Promise(resolve=>{release=resolve;});};
+ const request=controller.eventHistory('one');await Promise.race([entered,request.then(()=>assert.fail('The request must await its response.'))]);
+ if(action==='sign-out')await controller.signOut({confirmPending:true});
+ if(action==='account-switch'){state.summary={...state.summary,user:{...state.summary.user,id:'account-2'}};await controller.refresh();}
+ if(action==='generation-change'){await runtime.sync.detach(owner);await runtime.sync.prepareAssociation({accountId:'account-1',localPetId:'pet-1',deviceId:runtime.deviceId,enrollment:{operationId:'new-generation',deviceId:runtime.deviceId,localPetId:'pet-1',name:'My puppy',confirmedPetId:'cloud-1'}});}
+ if(action==='dispose')controller.stop();
+ release({revisions:[historical]});await assert.rejects(request,error=>error instanceof CloudApiError&&error.category==='conflict');
+ assert.equal((await runtime.storage.loadEvents())[0].note,'Second');assert.equal(state.trialCalls,0);
 });

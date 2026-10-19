@@ -49,6 +49,7 @@ export async function createLocalDatabase(connection: SqlConnection): Promise<Lo
   };
 }
 
+const revisionChangesIndex='CREATE INDEX IF NOT EXISTS local_revision_changes ON local_revisions(pet_id,kind,sequence DESC);';
 export const localSchema = `
 CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS puppies (id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL);
@@ -76,6 +77,7 @@ CREATE TABLE IF NOT EXISTS local_revisions (
   source TEXT NOT NULL CHECK(source IN ('local','enrollment','cloud','restore'))
 );
 CREATE INDEX IF NOT EXISTS local_revision_history ON local_revisions(pet_id,kind,local_id,sequence DESC);
+${revisionChangesIndex}
 CREATE TABLE IF NOT EXISTS local_sync_owner (
   singleton INTEGER PRIMARY KEY CHECK(singleton=1), generation TEXT NOT NULL UNIQUE,
   account_id TEXT NOT NULL, device_id TEXT NOT NULL, cursor INTEGER NOT NULL DEFAULT 0 CHECK(cursor>=0),
@@ -124,6 +126,7 @@ export async function initializeLocalDatabase(database: LocalDatabase, newId?: (
       const tables=await sql.getAllAsync<{name:string}>("SELECT name FROM sqlite_master WHERE type='table'");
       if(required.some(name=>!tables.some(table=>table.name===name))||!pet||!identifierSchema.safeParse(pet.value).success||!onboarding||!['true','false'].includes(onboarding.value)
         ||!await sql.getFirstAsync('SELECT id FROM puppies WHERE id=?',pet.value)) throw new Error('The local database metadata or active puppy is incomplete.');
+      await sql.execAsync(revisionChangesIndex);
       return { petId: pet.value };
     }
     if(await sql.getFirstAsync("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' LIMIT 1")) throw new Error('The existing local database is incomplete. The original data has been preserved.');

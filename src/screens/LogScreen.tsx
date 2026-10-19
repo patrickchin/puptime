@@ -94,6 +94,7 @@ export function LogScreen({
   onSave,
   onDelete,
   onOpenSettings,
+  showHeader=true,
   theme,
 }: {
   events: PuppyEvent[];
@@ -104,6 +105,7 @@ export function LogScreen({
   onSave: (event: PuppyEvent, changes: PuppyEventChanges) => Promise<void>;
   onDelete: (event: PuppyEvent) => Promise<void>;
   onOpenSettings: () => void;
+  showHeader?:boolean;
   theme: Theme;
 }&ActivityViewProps) {
   const { activityColors, activityLabel, eventPastLabel, locale, relativeTime, t } = useLocalization();
@@ -391,7 +393,7 @@ export function LogScreen({
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <>
-            <View style={styles.titleBlock}>
+            {showHeader?<View style={styles.titleBlock}>
               <View
                 style={[
                   styles.mark,
@@ -449,11 +451,11 @@ export function LogScreen({
                   />
                 </Pressable>
               </View>
-            </View>
+            </View>:null}
             {playful ? (
               <View style={styles.greetingRow}>
                 <Text maxFontSizeMultiplier={1.5} style={[styles.greeting, headingStyle(theme), { color: theme.text }]}>{t(`theme.${theme.presentation.iconProfile as 'puppy-journal' | 'soft-play' | 'day-trails'}.greeting`)}</Text>
-                <Image source={require('../../assets/puppy-journal.png')} accessible={false} style={styles.puppy} resizeMode="contain" />
+                <Image source={require('../../assets/mascots/scruffy-terrier.png')} accessible={false} style={styles.puppy} resizeMode="contain" />
               </View>
             ) : null}
             <QuickActions events={activity?projectedEvents:events} onLog={onLog} now={now} theme={theme} />

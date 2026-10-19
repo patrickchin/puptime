@@ -1,0 +1,7 @@
+appId: com.patrickchin.puptime
+name: iOS custom timed reminder create remove and restart
+tags:
+  - ios
+  - notifications
+---
+- runFlow: ../native/ios-custom-timed-reminders.yaml

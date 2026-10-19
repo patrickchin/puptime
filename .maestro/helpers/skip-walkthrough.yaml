@@ -1,0 +1,21 @@
+appId: com.patrickchin.puptime
+---
+# A hierarchy/focus change can satisfy the driver's tap settlement before the
+# target receives it. Only retry this idempotent transition while Skip exists.
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: onboarding.skip
+          commands:
+            - waitForAnimationToEnd
+            - tapOn:
+                id: onboarding.skip
+                retryTapIfNoChange: true
+            - waitForAnimationToEnd
+- extendedWaitUntil:
+    notVisible:
+      id: screen.onboarding
+    timeout: 15000

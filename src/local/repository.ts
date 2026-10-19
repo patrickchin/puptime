@@ -7,6 +7,17 @@ import { localIdSchema } from '../cloud/protocol.ts';
 import { eventDataFromSql, routineDataFromSql, eventSqlValues, routineSqlValues, upsertEventSql, upsertRoutineSql, type EventSqlRow, type RoutineSqlRow } from '../record-sql.ts';
 
 type EventRow = { id: string; at: number; body: string; event: PuppyEvent };
+const records=(kind:'event'|'routine',value:PuppyEvent|ScheduleEntry|null)=>{
+  if (!value) return [];
+  const {id,...data}=value;return [{kind,localId:id,data}];
+};
+export async function writeEventRecord(sql:SqlExecutor,petId:string,before:PuppyEvent|null,after:PuppyEvent|null):Promise<LocalChange[]> {
+  const changes=localChanges(records('event',before),records('event',after));
+  if (!changes.length) return [];
+  if (after) await sql.runAsync(upsertEventSql,petId,after.id,...eventSqlValues(after));
+  else await sql.runAsync('DELETE FROM events WHERE pet_id=? AND id=?',petId,before!.id);
+  return changes;
+}
 export function createLocalRepository(database: LocalDatabase, petId: string, onChange?: LocalChangeSink, afterCommit?:()=>void) {
   const cache = new Map<string, { body: string; event: PuppyEvent }>();
   async function requirePet(sql: SqlExecutor) {
@@ -45,16 +56,8 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
     if (changed) notifyLocalCommit(afterCommit);
     return result;
   }
-  const records=(kind:'event'|'routine',value:PuppyEvent|ScheduleEntry|null)=>{
-    if (!value) return [];
-    const {id,...data}=value;return [{kind,localId:id,data}];
-  };
   async function writeEvent(sql:SqlExecutor,before:PuppyEvent|null,after:PuppyEvent|null):Promise<LocalChange[]> {
-    const changes=localChanges(records('event',before),records('event',after));
-    if (!changes.length) return [];
-    if (after) await sql.runAsync(upsertEventSql,petId,after.id,...eventSqlValues(after));
-    else await sql.runAsync('DELETE FROM events WHERE pet_id=? AND id=?',petId,before!.id);
-    return changes;
+    return writeEventRecord(sql,petId,before,after);
   }
   async function eventLabels(sql:SqlExecutor,changes:LocalChange[],options:EventWriteOptions={}) {
     const labels=changes.flatMap(change=>change.after?.type==='custom'?[String(change.after.customLabel)]:[]);

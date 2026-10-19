@@ -40,6 +40,7 @@ const repository=createLocalRepository(database,petId);
 for(let at=0;at<events.length;at+=1000)await repository.appendEvents(events.slice(at,at+1000));
 await database.write(async sql=>{
  await sql.runAsync("UPDATE metadata SET value='false' WHERE key='show_onboarding'");
+ await sql.runAsync("UPDATE metadata SET value='done' WHERE key='first_launch_step'");
  await sql.runAsync("INSERT INTO metadata(key,value) VALUES ('qualification_fixture','native-activity-v1')");
 });
 await database.close();
@@ -55,8 +56,10 @@ function expectedWindow(previousDays){
 const trace=()=>JSON.parse(readFileSync(join(documents,'sql-query-probe.json'),'utf8'));
 const renders=()=>JSON.parse(readFileSync(join(documents,'row-render-probe.json'),'utf8')).renders;
 const windows=()=>trace().reads.filter(read=>read.sql.includes('UNION ALL'));
-function flow(name,body){
- const file=join(output,name+'.yaml');writeFileSync(file,'appId: '+app+'\nname: '+name+'\n---\n'+body);
+function flow(name,body,resume=true){
+ // New XCTest sessions may steal foreground; resume preserves loaded rows and drafts.
+ const activation=resume?'- launchApp:\n    stopApp: false\n    permissions: {}\n- waitForAnimationToEnd\n':'';
+ const file=join(output,name+'.yaml');writeFileSync(file,'appId: '+app+'\nname: '+name+'\n---\n'+activation+body);
  execFileSync(process.env.MAESTRO_BIN??'maestro',['--device',udid,'test',file,'--test-output-dir',join(output,name)],{stdio:'inherit',env:{...process.env,MAESTRO_CLI_NO_ANALYTICS:'1'}});
 }
 function screenshot(name){simctl('io',udid,'screenshot',join(output,name+'.png'));}
@@ -72,12 +75,25 @@ try{
     notVisible:
       id: activity.loading
     timeout: 30000
-`);
+`,false);
  assert.ok(trace().reads.some(read=>read.sql.includes('ORDER BY at DESC,id DESC LIMIT')&&read.rows===201));
  assert.ok(trace().reads.every(read=>read.rows<=201));
  const before=renders(),target=events.at(-1).id;
  assert.equal(Object.keys(before).length,200,'The actual EventRow body observer must be active.');
  console.log('PASS '+count+': actual initial history reads201 SQL rows and renders200 records. Rows/ms:',trace().reads.map(read=>[read.rows,read.ms]));
+ flow('drawer-preserves-loaded-rows',`
+- tapOn:
+    id: nav.open
+- assertVisible:
+    id: nav.log
+    selected: true
+- tapOn:
+    id: nav.close
+- assertVisible:
+    id: screen.today
+`);
+ assert.deepEqual(renders(),before,'Opening and closing navigation must not rerender unchanged activity rows.');
+ console.log('PASS '+count+': side drawer leaves every loaded activity row render unchanged.');
  flow('edit-loaded-record',`
 - tapOn:
     id: event.pee.edit
@@ -125,6 +141,8 @@ try{
  const timelineStart=windows().length;
  flow('comparison-window',`
 - tapOn:
+    id: nav.open
+- tapOn:
     id: nav.timeline
     retryTapIfNoChange: true
 - extendedWaitUntil:
@@ -142,6 +160,8 @@ try{
  const scheduleStart=windows().length;
  flow('routine-window',`
 - tapOn:
+    id: nav.open
+- tapOn:
     id: nav.schedule
     retryTapIfNoChange: true
 - extendedWaitUntil:
@@ -158,6 +178,8 @@ try{
  assert.deepEqual(windows().slice(scheduleStart).map(read=>read.rows),[expectedWindow(14)]);
  const insightsStart=windows().length;
  flow('insights-window',`
+- tapOn:
+    id: nav.open
 - tapOn:
     id: nav.insights
     retryTapIfNoChange: true

@@ -1,0 +1,213 @@
+appId: com.patrickchin.puptime
+name: First open and first reminder product review
+---
+# Root guards and backs up the dedicated unowned fixture before this fresh run.
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: unset
+- extendedWaitUntil:
+    visible:
+      id: setup.step.welcome
+    timeout: 90000
+- takeScreenshot: product-review-welcome
+- scrollUntilVisible:
+    element:
+      id: setup.start
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: setup.start
+- assertVisible:
+    id: setup.step.profile
+- tapOn:
+    id: setup.profile.input
+- inputText: Mochi
+- tapOn: ^Done$
+- takeScreenshot: product-review-profile
+- scrollUntilVisible:
+    element:
+      id: setup.profile.next
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: setup.profile.next
+- assertVisible:
+    id: setup.step.account
+- takeScreenshot: product-review-account
+- scrollUntilVisible:
+    element:
+      id: setup.local
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: setup.local
+- assertVisible:
+    id: onboarding.step.0
+- scrollUntilVisible:
+    element:
+      id: onboarding.demo.pee
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: onboarding.demo.pee
+- assertVisible:
+    id: onboarding.demo.row
+- scrollUntilVisible:
+    element:
+      id: onboarding.primary
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: onboarding.primary
+- assertVisible:
+    id: onboarding.step.1
+- assertVisible:
+    id: onboarding.demo.timeline.today
+- scrollUntilVisible:
+    element:
+      id: onboarding.primary
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: onboarding.primary
+- assertVisible:
+    id: onboarding.step.2
+- scrollUntilVisible:
+    element:
+      id: onboarding.demo.routine.reminder
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: onboarding.demo.routine.reminder
+- assertVisible:
+    id: onboarding.demo.routine.reminder
+    checked: true
+- scrollUntilVisible:
+    element:
+      id: onboarding.primary
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: onboarding.primary
+- assertVisible:
+    id: setup.step.reminders
+- scrollUntilVisible:
+    element:
+      id: setup.reminders.later
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: setup.reminders.later
+- assertVisible:
+    id: setup.step.ready
+- assertVisible: Mochi
+- scrollUntilVisible:
+    element:
+      id: setup.finish
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: setup.finish
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- assertNotVisible:
+    id: event.pee
+- tapOn:
+    id: quick.pee
+- extendedWaitUntil:
+    visible:
+      id: event.pee
+    timeout: 30000
+- tapOn:
+    id: nav.open
+    retryTapIfNoChange: true
+- assertVisible:
+    id: nav.drawer
+- assertVisible:
+    id: nav.log
+    selected: true
+- scrollUntilVisible:
+    element:
+      id: nav.notifications
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- takeScreenshot: product-review-drawer
+- tapOn:
+    id: nav.notifications
+- assertVisible:
+    id: screen.notifications
+- extendedWaitUntil:
+    visible:
+      id: notifications.timed.add
+      enabled: true
+    timeout: 30000
+- assertVisible:
+    id: settings.notifications.deviceDelivery
+    checked: false
+- assertNotVisible:
+    id: notifications.timed.item..*
+- takeScreenshot: product-review-notifications
+- tapOn:
+    id: notifications.timed.add
+- assertVisible:
+    id: notifications.timed.editor
+- assertVisible:
+    id: notifications.timed.when
+- tapOn:
+    id: notifications.timed.label
+- inputText: Call the vet
+- tapOn:
+    text: ^Done$
+    optional: true
+- assertVisible:
+    id: notifications.timed.save
+    enabled: true
+- takeScreenshot: product-review-timed-editor
+- tapOn:
+    id: notifications.timed.save
+# Some Maestro versions accept the system prompt automatically.
+- tapOn:
+    text: ^Allow$
+    optional: true
+- extendedWaitUntil:
+    notVisible:
+      id: notifications.timed.editor
+    timeout: 30000
+- assertVisible: Call the vet
+- assertVisible:
+    id: notifications.timed.item..*
+    index: 0
+- assertNotVisible:
+    id: notifications.timed.item..*
+    index: 1
+- assertVisible:
+    id: settings.notifications.deviceDelivery
+    checked: true
+- assertNotVisible:
+    id: settings.notifications.permission
+- takeScreenshot: product-review-first-timed-reminder

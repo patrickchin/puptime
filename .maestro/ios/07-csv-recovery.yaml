@@ -5,6 +5,7 @@ tags:
   - recovery
 ---
 - launchApp:
+    permissions: {}
     clearState: true
 - runFlow: ../helpers/skip-onboarding.yaml
 - extendedWaitUntil:
@@ -14,6 +15,8 @@ tags:
 - tapOn:
     id: quick.pee
     retryTapIfNoChange: true
+- tapOn:
+    id: nav.open
 - tapOn:
     id: nav.insights
     retryTapIfNoChange: true
@@ -70,11 +73,14 @@ tags:
     id: insights.frequency.pee
     text: .*1\.0.*
 - stopApp
-- launchApp
+- launchApp:
+    permissions: {}
 - extendedWaitUntil:
     visible:
-      id: nav.insights
+      id: nav.open
     timeout: 90000
+- tapOn:
+    id: nav.open
 - tapOn:
     id: nav.insights
     retryTapIfNoChange: true

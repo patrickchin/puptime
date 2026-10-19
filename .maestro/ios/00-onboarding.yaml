@@ -14,7 +14,8 @@ tags:
 - assertVisible:
     id: setup.step.account
 - stopApp
-- launchApp
+- launchApp:
+    permissions: {}
 - extendedWaitUntil:
     visible:
       id: setup.step.account
@@ -31,14 +32,26 @@ tags:
       id: screen.today
     timeout: 90000
 - tapOn:
-    id: settings.open
-- scrollUntilVisible:
-    element:
-      id: settings.notifications.permission
-    direction: DOWN
+    id: nav.open
+    retryTapIfNoChange: true
+- assertVisible:
+    id: nav.drawer
+- tapOn:
+    id: nav.notifications
+- assertVisible:
+    id: screen.notifications
 - assertVisible:
     id: settings.notifications.permission
-    text: .*Needed for reminders and confirmations.*
+    text: Allow notifications
+- tapOn:
+    id: nav.open
+    retryTapIfNoChange: true
+- assertVisible:
+    id: nav.drawer
+- tapOn:
+    id: nav.settings
+- assertVisible:
+    id: screen.settings
 - scrollUntilVisible:
     element:
       id: settings.guide.open

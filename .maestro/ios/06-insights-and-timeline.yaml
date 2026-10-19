@@ -5,6 +5,7 @@ tags:
   - analytics
 ---
 - launchApp:
+    permissions: {}
     clearState: true
 - runFlow: ../helpers/skip-onboarding.yaml
 - extendedWaitUntil:
@@ -58,6 +59,8 @@ tags:
 - waitForAnimationToEnd:
     timeout: 5000
 - tapOn:
+    id: nav.open
+- tapOn:
     id: nav.insights
     retryTapIfNoChange: true
 - extendedWaitUntil:
@@ -83,6 +86,8 @@ tags:
 - assertVisible:
     id: insights.export
     enabled: true
+- tapOn:
+    id: nav.open
 - tapOn:
     id: nav.timeline
     retryTapIfNoChange: true

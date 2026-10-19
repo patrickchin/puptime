@@ -1,0 +1,156 @@
+appId: com.patrickchin.puptime
+name: iOS custom timed reminder create remove and restart
+---
+# Fresh synthetic installation only. Never run against the preserved owned fixture.
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: unset
+- runFlow: ../helpers/skip-onboarding.yaml
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.notifications
+- extendedWaitUntil:
+    visible:
+      id: notifications.timed.add
+      enabled: true
+    timeout: 30000
+- assertNotVisible:
+    id: notifications.timed.item..*
+- tapOn:
+    id: notifications.timed.add
+- assertVisible:
+    id: notifications.timed.editor
+- assertVisible:
+    id: notifications.timed.when
+- assertVisible:
+    id: notifications.timed.save
+    enabled: false
+- tapOn:
+    id: notifications.timed.label
+- inputText: Flea treatment
+- tapOn:
+    text: ^Done$
+    optional: true
+- assertVisible:
+    id: notifications.timed.save
+    enabled: true
+- doubleTapOn:
+    id: notifications.timed.save
+# The driver may already accept a configured system prompt; verify permission below.
+- tapOn:
+    text: ^Allow$
+    optional: true
+- extendedWaitUntil:
+    notVisible:
+      id: notifications.timed.editor
+    timeout: 30000
+- assertVisible: Flea treatment
+- assertVisible:
+    id: notifications.timed.item..*
+    index: 0
+- assertNotVisible:
+    id: notifications.timed.item..*
+    index: 1
+- takeScreenshot: timed-reminder-one-future-request
+- stopApp
+- launchApp:
+    permissions: {}
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.notifications
+- extendedWaitUntil:
+    visible:
+      id: notifications.timed.item..*
+    timeout: 30000
+- assertVisible: Flea treatment
+- assertNotVisible:
+    id: notifications.timed.item..*
+    index: 1
+- tapOn:
+    id: notifications.timed.remove..*
+- extendedWaitUntil:
+    notVisible:
+      id: notifications.timed.item..*
+    timeout: 30000
+- tapOn:
+    id: notifications.timed.add
+- tapOn:
+    id: notifications.timed.label
+- inputText: Call the vet
+- tapOn:
+    text: ^Done$
+    optional: true
+- tapOn:
+    id: notifications.timed.save
+- extendedWaitUntil:
+    notVisible:
+      id: notifications.timed.editor
+    timeout: 30000
+- assertVisible: Call the vet
+- scrollUntilVisible:
+    element:
+      id: settings.notifications.deviceDelivery
+    direction: UP
+    visibilityPercentage: 100
+    centerElement: false
+- tapOn:
+    id: settings.notifications.deviceDelivery
+- assertVisible: Turn off notifications?
+- tapOn: ^Cancel$
+- assertVisible:
+    id: settings.notifications.deviceDelivery
+    checked: true
+- assertVisible: Call the vet
+- tapOn:
+    id: settings.notifications.deviceDelivery
+- assertVisible: Turn off notifications?
+- tapOn: ^Turn off$
+- extendedWaitUntil:
+    visible:
+      id: settings.notifications.deviceDelivery
+      checked: false
+    timeout: 30000
+- assertNotVisible:
+    id: notifications.timed.item..*
+- scrollUntilVisible:
+    element:
+      id: settings.notifications.pottyAfterPee.enabled
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- assertVisible:
+    id: settings.notifications.pottyAfterPee.enabled
+    checked: true
+- takeScreenshot: device-off-removes-only-timed-requests
+- stopApp
+- launchApp:
+    permissions: {}
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.notifications
+- extendedWaitUntil:
+    visible:
+      id: notifications.timed.add
+      enabled: true
+    timeout: 30000
+- assertNotVisible:
+    id: notifications.timed.item..*
+- assertVisible:
+    id: settings.notifications.deviceDelivery
+    checked: false

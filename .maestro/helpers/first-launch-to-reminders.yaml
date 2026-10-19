@@ -22,7 +22,6 @@ appId: com.patrickchin.puptime
     direction: DOWN
 - tapOn:
     id: setup.local
-- tapOn:
-    id: onboarding.skip
+- runFlow: skip-walkthrough.yaml
 - assertVisible:
     id: setup.step.reminders

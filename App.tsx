@@ -6,7 +6,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator,Alert, Appearance, AppState, BackHandler, Linking, Modal, Platform, Pressable,StyleSheet,Text,useColorScheme, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
-import { BottomNav, type Tab } from './src/components/BottomNav';
+import { BottomNav } from './src/components/BottomNav';
+import {SideNavigation,type AppTab} from './src/components/SideNavigation';
+import {MaterialCommunityIcons} from '@expo/vector-icons';
 import { ThemePicker } from './src/components/ThemePicker';
 import { Toast } from './src/components/Toast';
 import type { ActivityCustomizations } from './src/activity-customization';
@@ -43,10 +45,11 @@ import type {FirstLaunchProgress} from './src/first-launch';
 import type { FinishOnboardingOptions } from './src/onboarding';
 import { ScheduleScreen } from './src/screens/ScheduleScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
+import {NotificationsScreen} from './src/screens/NotificationsScreen';
 import { AccountScreen } from './src/screens/AccountScreen';
 import { useCloud } from './src/cloud/use-cloud';
 import {getNotificationDelivery,setNotificationDelivery} from './src/cloud/notification-delivery';
-import {getActivityData,type ActivityQueries} from './src/activity-data';
+import {getActivityData,getActivityPetId,type ActivityQueries} from './src/activity-data';
 import { TimelineScreen } from './src/screens/TimelineScreen';
 import {
   ADD_NOTE_ACTION,
@@ -54,6 +57,8 @@ import {
   configureReminderHandling,
   getNotificationPermissionState,
   POTTY_REMINDER_NOTIFICATION_KIND,
+  CUSTOM_TIMED_REMINDER_NOTIFICATION_KIND,
+  cancelCustomTimedRemindersIfDeliveryOff,
   requestReminderPermission,
   syncPottyReminders,
   syncScheduleReminders,
@@ -107,6 +112,7 @@ export default function App() {
   const [preferencePicker, setPreferencePicker] = useState<'theme' | 'language' | null>(null);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [accountVisible,setAccountVisible]=useState(false);
+  const [drawerOpen,setDrawerOpen]=useState(false);
   const [onboardingVisible, setOnboardingVisible] = useState<boolean | null>(null);
   const [guideOpenedFromSettings, setGuideOpenedFromSettings] = useState(false);
   const [scheduleOpenedFromSettings, setScheduleOpenedFromSettings] = useState(false);
@@ -118,9 +124,10 @@ export default function App() {
   const language = resolveLanguage(languagePreference);
   const languageRef = useRef(language);
   languageRef.current = language;
-  const [tab, setTab] = useState<Tab>('log');
+  const [tab, setTab] = useState<AppTab>('log');
   const [events, setEvents] = useState<PuppyEvent[]>([]);
   const [activity,setActivity]=useState<ActivityQueries>();
+  const [petId,setPetId]=useState<string>();
   const activityRef=useRef<ActivityQueries|undefined>(undefined);
   const [refreshToken,setRefreshToken]=useState(0);
   const [eventCount,setEventCount]=useState(0);
@@ -145,7 +152,7 @@ export default function App() {
 
   const refresh = useCallback(async () => {
     const generation=++refreshGeneration.current;
-    const data=await getActivityData();
+    const [data,nextPetId]=await Promise.all([getActivityData(),getActivityPetId()]);
     activityRef.current=data;
     const pending = await readPendingWidgetEvents();
     if (pending.length) await appendEvents(pending);
@@ -154,6 +161,7 @@ export default function App() {
     else{nextEvents=await loadEvents();count=nextEvents.length;}
     if(generation!==refreshGeneration.current)return nextEvents;
     setActivity(data);
+    setPetId(nextPetId);
     setEvents(nextEvents);
     setEventCount(count);
     setRefreshToken(value=>value+1);
@@ -190,6 +198,7 @@ export default function App() {
         resolveLanguage(nextLanguagePreference),
       ).catch(() => undefined),
       updateHomeWidget(nextEvents).catch(() => undefined),
+      ...(Platform.OS==='ios'?[cancelCustomTimedRemindersIfDeliveryOff().catch(()=>undefined)]:[]),
     ]);
     return nextEvents;
   }, []);
@@ -241,7 +250,9 @@ export default function App() {
     Appearance.setColorScheme(themePreference === 'system' ? 'unspecified' : theme.isDark ? 'dark' : 'light');
   }, [theme.isDark, themePreference]);
 
-  const navigateToTab = (nextTab: Tab) => {
+  const navigateToTab = (nextTab: AppTab) => {
+    setDrawerOpen(false);
+    setSettingsVisible(false);
     setScheduleOpenedFromSettings(false);
     setTab(nextTab);
   };
@@ -249,6 +260,7 @@ export default function App() {
   useEffect(() => {
     if (onboardingVisible !== false) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if(drawerOpen){setDrawerOpen(false);return true;}
       if(accountVisible){setAccountVisible(false);return true;}
       if (preferencePicker !== null) {
         setPreferencePicker(null);
@@ -271,7 +283,7 @@ export default function App() {
       return false;
     });
     return () => subscription.remove();
-  }, [accountVisible,onboardingVisible, preferencePicker, scheduleOpenedFromSettings, settingsVisible, tab]);
+  }, [accountVisible,drawerOpen,onboardingVisible, preferencePicker, scheduleOpenedFromSettings, settingsVisible, tab]);
 
   useEffect(() => {
     configureNotificationActions(language).catch(() => undefined);
@@ -279,6 +291,9 @@ export default function App() {
 
   const handleNotificationResponse = useCallback(async (response: Notifications.NotificationResponse) => {
     const data = response.notification.request.content.data;
+    if(Platform.OS==='ios'&&data?.kind===CUSTOM_TIMED_REMINDER_NOTIFICATION_KIND){
+      setDrawerOpen(false);setAccountVisible(false);setSettingsVisible(false);setTab('notifications');return;
+    }
     if (data?.kind === POTTY_REMINDER_NOTIFICATION_KIND) {
       setAccountVisible(false);
       setSettingsVisible(false);
@@ -541,6 +556,7 @@ export default function App() {
     if(enabled){await requestNotifications();return;}
     await setNotificationDelivery(false);setDelivery(false);
     await Promise.all([
+      ...(Platform.OS==='ios'?[cancelCustomTimedRemindersIfDeliveryOff()]:[]),
       syncScheduleReminders(schedule,notificationPreferences.reminderLeadMinutes,language),
       syncPottyReminders(events,notificationPreferences,language),
     ]);
@@ -569,6 +585,9 @@ export default function App() {
     if (settingsVisible) {
       return (
         <SettingsScreen
+          {...{showHeader:Platform.OS!=='ios',notificationDelivery:Platform.OS==='ios'?notificationDelivery:undefined,
+            onNotificationDeliveryChange:changeNotificationDelivery,routineReminderCount:schedule.filter(entry=>entry.reminder).length,
+            onOpenSchedule:()=>{setSettingsVisible(false);setScheduleOpenedFromSettings(true);setTab('schedule');}}}
           theme={theme}
           themePreference={themePreference}
           languagePreference={languagePreference}
@@ -576,9 +595,6 @@ export default function App() {
           customActivities={customActivities}
           notificationPreferences={notificationPreferences}
           notificationPermission={notificationPermission}
-          notificationDelivery={Platform.OS==='ios'?notificationDelivery:undefined}
-          onNotificationDeliveryChange={changeNotificationDelivery}
-          routineReminderCount={schedule.filter((entry) => entry.reminder).length}
           onBack={() => setSettingsVisible(false)}
           cloudHandle={cloud}
           onOpenAccount={()=>setAccountVisible(true)}
@@ -589,11 +605,6 @@ export default function App() {
           onOpenSystemSettings={() => {
             Linking.openSettings().catch(() => undefined);
           }}
-          onOpenSchedule={() => {
-            setSettingsVisible(false);
-            setScheduleOpenedFromSettings(true);
-            setTab('schedule');
-          }}
           onOpenGuide={() => {
             setSettingsVisible(false);
             setGuideOpenedFromSettings(true);
@@ -602,6 +613,12 @@ export default function App() {
         />
       );
     }
+    if(tab==='notifications')return <NotificationsScreen theme={theme} petId={petId} notificationPreferences={notificationPreferences}
+      notificationPermission={notificationPermission} notificationDelivery={notificationDelivery}
+      routineReminderCount={schedule.filter(entry=>entry.reminder).length}
+      onNotificationPreferencesChange={changeNotificationPreferences} onRequestNotificationPermission={requestNotifications}
+      onNotificationDeliveryChange={changeNotificationDelivery} onOpenSystemSettings={()=>{void Linking.openSettings().catch(()=>undefined);}}
+      onOpenSchedule={()=>navigateToTab('schedule')}/>;
     if (tab === 'learn') return <LearnScreen theme={theme} />;
     if (tab === 'timeline') return <TimelineScreen events={events} activity={activity} refreshToken={refreshToken} customActivities={customActivities} theme={theme} />;
     if (tab === 'insights') return <InsightsScreen events={events} activity={activity} refreshToken={refreshToken} customActivities={customActivities} onImport={importActivity} theme={theme} />;
@@ -623,6 +640,7 @@ export default function App() {
     }
     return (
       <LogScreen
+        showHeader={Platform.OS!=='ios'}
         events={events}
         activity={activity}
         refreshToken={refreshToken}
@@ -644,6 +662,7 @@ export default function App() {
     editRequest,
     events,
     activity,
+    petId,
     refreshToken,
     language,
     languagePreference,
@@ -663,9 +682,24 @@ export default function App() {
       <LocalizationProvider language={language} customizations={activityCustomizations}>
         <SafeAreaView
           style={[styles.container, { backgroundColor: theme.background }]}
-          edges={settingsVisible || onboardingVisible ? ['top', 'bottom', 'left', 'right'] : ['top', 'left', 'right']}
+          edges={Platform.OS==='ios'||settingsVisible||onboardingVisible ? ['top', 'bottom', 'left', 'right'] : ['top', 'left', 'right']}
         >
           <StatusBar style={theme.isDark ? 'light' : 'dark'} />
+          <SideNavigation open={drawerOpen} enabled={onboardingVisible===false} tab={tab} settingsVisible={settingsVisible} theme={theme}
+            onOpen={()=>setDrawerOpen(true)} onClose={()=>setDrawerOpen(false)} onChange={navigateToTab} onSettings={()=>setSettingsVisible(true)}>
+          {Platform.OS==='ios'&&onboardingVisible===false?<View style={styles.navigationHeader}>
+            <Pressable testID="nav.open" accessibilityRole="button" accessibilityLabel={translate(language,'nav.open')} onPress={()=>setDrawerOpen(true)}
+              style={({pressed})=>[styles.menuButton,{backgroundColor:pressed?theme.primarySoft:theme.surface,borderRadius:theme.presentation.controlRadius}]}>
+              <MaterialCommunityIcons accessible={false} name="menu" size={25} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
+            </Pressable>
+            <Text accessibilityRole={settingsVisible||tab==='notifications'?'header':undefined} style={[styles.navigationTitle,{color:theme.text}]}>{settingsVisible?translate(language,'settings.title'):tab==='notifications'?translate(language,'notifications.title'):'Puptime'}</Text>
+            {settingsVisible?<Pressable testID="settings.back" accessibilityRole="button" accessibilityLabel={translate(language,'settings.back')} onPress={()=>setSettingsVisible(false)} style={styles.menuButton}>
+              <MaterialCommunityIcons accessible={false} name="close" size={24} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
+            </Pressable>:null}
+            {!settingsVisible&&tab==='log'?<Pressable testID="settings.open" accessibilityRole="button" accessibilityLabel={translate(language,'log.openSettingsA11y')} onPress={()=>setSettingsVisible(true)} style={styles.menuButton}>
+              <MaterialCommunityIcons accessible={false} name="cog-outline" size={24} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
+            </Pressable>:null}
+          </View>:null}
           <View style={styles.screen}>
             {onboardingVisible === null || (!fontsLoaded && !fontError) ? Platform.OS==='ios'?<View testID="setup.loading" style={styles.startup}>
               {startupFailed?<>
@@ -703,11 +737,12 @@ export default function App() {
               />
             ) : null}
           </View>
-          {onboardingVisible === false && !settingsVisible ? (
+          {Platform.OS!=='ios'&&onboardingVisible === false && !settingsVisible ? (
             <SafeAreaView edges={['bottom']} style={{ backgroundColor: theme.nav }}>
-              <BottomNav tab={tab} onChange={navigateToTab} theme={theme} />
+              <BottomNav tab={tab==='notifications'?'log':tab} onChange={navigateToTab} theme={theme} />
             </SafeAreaView>
           ) : null}
+          </SideNavigation>
           <ThemePicker
             visible={preferencePicker !== null}
             mode={preferencePicker ?? 'theme'}
@@ -731,6 +766,9 @@ export default function App() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   screen: { flex: 1 },
+  navigationHeader:{minHeight:60,paddingHorizontal:20,paddingVertical:6,flexDirection:'row',alignItems:'center',gap:14},
+  menuButton:{minHeight:48,minWidth:48,alignItems:'center',justifyContent:'center'},
+  navigationTitle:{fontSize:20,lineHeight:28,fontWeight:'700',flex:1},
   startup:{flex:1,alignItems:'center',justifyContent:'center',padding:24,gap:16},
   startupText:{fontSize:16,lineHeight:24,textAlign:'center'},
   startupRetry:{minHeight:48,paddingHorizontal:24,paddingVertical:12,borderRadius:12},

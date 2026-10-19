@@ -80,7 +80,7 @@ export function DayTimeline({events:projectedEvents,activity,refreshToken,theme}
           </View>
           <View style={styles.dayHeading}>
             <Text style={[styles.dayTitle, headingStyle(theme), { color: theme.text }]}>{t(trail ? 'theme.day-trails.greeting' : 'theme.puppy-journal.greeting')}</Text>
-            <Image source={require('../../assets/puppy-journal.png')} accessible={false} style={styles.puppy} resizeMode="contain" />
+            <Image source={require('../../assets/mascots/scruffy-terrier.png')} accessible={false} style={styles.puppy} resizeMode="contain" />
           </View>
         </>
       }

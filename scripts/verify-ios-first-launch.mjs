@@ -10,7 +10,7 @@ const udid=process.argv[2],app='com.patrickchin.puptime';
 assert.equal(process.argv[3],'--replace-synthetic');
 const simctl=(...args)=>execFileSync('xcrun',['simctl',...args],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
 const devices=Object.values(JSON.parse(simctl('list','devices','available','-j')).devices).flat();
-assert.ok(devices.find(device=>device.udid===udid)?.name.startsWith('Puptime Native Storage '));
+assert.ok(devices.find(device=>device.udid===udid)?.name.startsWith('Puptime Native Storage ae0c '),'Use this worktree’s dedicated device.');
 try{simctl('terminate',udid,app);}catch{}
 const output=mkdtempSync(join(tmpdir(),'puptime-first-launch-native-'));
 const directory=()=>join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite');
@@ -19,7 +19,13 @@ if(existsSync(directory())){
  try{assert.equal(previous.prepare('SELECT COUNT(*) n FROM local_sync_owner').get().n,0,'Preserve owned history.');}finally{previous.close();}
  cpSync(directory(),join(output,'previous-synthetic-sqlite'),{recursive:true});
 }
-function run(name,file){execFileSync('maestro',['--device',udid,'test',file,'--test-output-dir',join(output,name)],{stdio:'inherit',env:{...process.env,MAESTRO_CLI_NO_ANALYTICS:'1'}});}
+function run(name,file){
+ // A fresh XCTest session can background the app. Activate after its startup,
+ // without restarting the app or losing an uncommitted profile/ready state.
+ const wrapper=join(output,name+'-active.yaml');
+ writeFileSync(wrapper,'appId: '+app+'\n---\n- launchApp:\n    stopApp: false\n    permissions: {}\n- waitForAnimationToEnd\n- runFlow: '+JSON.stringify(resolve(file))+'\n');
+ execFileSync(process.env.MAESTRO_BIN??'maestro',['--device',udid,'test',wrapper,'--test-output-dir',join(output,name)],{stdio:'inherit',env:{...process.env,MAESTRO_CLI_NO_ANALYTICS:'1'}});
+}
 function flow(name,body){const file=join(output,name+'.yaml');writeFileSync(file,'appId: '+app+'\n---\n'+body);run(name,file);}
 run('profile-prepare',resolve('.maestro/native/ios-first-launch-profile-prepare.yaml'));
 const sql=new DatabaseSync(join(directory(),'puptime-v2.db'));sql.exec('PRAGMA busy_timeout=5000');
@@ -51,7 +57,7 @@ try{
  flow('completion-failure',`- scrollUntilVisible:\n    element:\n      id: setup.finish\n    direction: DOWN\n- tapOn:\n    id: setup.finish\n- tapOn: OK\n- assertVisible:\n    id: setup.step.ready\n`);
  assert.deepEqual(snapshot(),beforeCompletion,'Failed final completion preserves every saved table.');
  sql.exec('DROP TRIGGER fail_first_completion');
- flow('completion-retry',`- tapOn:\n    id: setup.finish\n- extendedWaitUntil:\n    visible:\n      id: screen.today\n    timeout: 15000\n`);
+ flow('completion-retry',`- assertVisible:\n    id: setup.step.ready\n- scrollUntilVisible:\n    element:\n      id: setup.finish\n    direction: DOWN\n    visibilityPercentage: 100\n- waitForAnimationToEnd\n- tapOn:\n    id: setup.finish\n- extendedWaitUntil:\n    visible:\n      id: screen.today\n    timeout: 15000\n`);
  assert.equal(flag('first_launch_step'),'done');assert.equal(flag('show_onboarding'),'false');assert.equal(flag('notify_on_device'),'false');
  assert.equal(sql.prepare('SELECT COUNT(*) n FROM events').get().n,0);
  flow('first-real-log',`- tapOn:\n    id: quick.pee\n- assertVisible:\n    id: event.pee.edit\n`);
@@ -59,7 +65,7 @@ try{
  assert.equal(sql.prepare('SELECT COUNT(*) n FROM local_sync_owner').get().n,0);assert.equal(sql.prepare('SELECT COUNT(*) n FROM local_sync_outbox').get().n,0);
  console.log('PASS final completion failure/retry is atomic, then the first actual quick log creates exactly one real event, with no account or cloud work.');
  const beforeReplay=snapshot();
- flow('separate-replay',`- tapOn:\n    id: settings.open\n- scrollUntilVisible:\n    element:\n      id: settings.guide.open\n    direction: UP\n- tapOn:\n    id: settings.guide.open\n- assertVisible:\n    id: onboarding.step.0\n- tapOn:\n    id: onboarding.skip\n- assertVisible:\n    id: screen.settings\n`);
+ flow('separate-replay',`- assertVisible:\n    id: screen.today\n- tapOn:\n    id: nav.open\n- assertVisible:\n    id: nav.settings\n- tapOn:\n    id: nav.settings\n- assertVisible:\n    id: screen.settings\n- scrollUntilVisible:\n    element:\n      id: settings.guide.open\n    direction: DOWN\n- tapOn:\n    id: settings.guide.open\n- assertVisible:\n    id: onboarding.step.0\n- tapOn:\n    id: onboarding.skip\n- assertVisible:\n    id: screen.settings\n`);
  assert.deepEqual(snapshot(),beforeReplay,'Standalone walkthrough replay never repeats setup writes.');
  simctl('terminate',udid,app);sql.prepare("UPDATE metadata SET value='corrupt' WHERE key='first_launch_step'").run();
  const corrupt=snapshot();
