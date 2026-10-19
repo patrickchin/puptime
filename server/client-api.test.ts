@@ -26,7 +26,7 @@ test('installed auth SDK and cloud API carry explicit OTP, trial, enrollment and
   return response;
  }}});
  expect(typeof controllers.createIdentityAdapter).toBe('function');
- const identity=controllers.createIdentityAdapter({emailOtp:auth.emailOtp,signIn:auth.signIn,signOut:auth.signOut,getCookie:async()=>cookie});
+ const identity=controllers.createIdentityAdapter({emailOtp:auth.emailOtp,signIn:auth.signIn,linkSocial:auth.linkSocial,listAccounts:auth.listAccounts,signOut:auth.signOut,getCookie:async()=>cookie});
  const api=createCloudApi(createSdkRequest((url,options)=>auth.$fetch<unknown>(url,options),'https://puptime.test'));
  expect((await api.config()).providers.email).toBe(true);expect((await api.config()).trialDays).toBe(21);
  const email=`sdk-${crypto.randomUUID()}@example.com`;
