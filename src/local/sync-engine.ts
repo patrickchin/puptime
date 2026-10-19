@@ -1,5 +1,5 @@
 import {z} from 'zod';
-import { enrollmentSchema, identifierSchema, localIdSchema, eventDataSchema, mutationSchema, pullPageSchema, recordDataSchema, cloudRecordSchema, mutationResultSchema, pushResponseSchema, type MutationResult, type CloudRecord, type Enrollment, type Mutation, type PullPage } from '../cloud/protocol.ts';
+import { enrollmentSchema, identifierSchema, localIdSchema, eventDataSchema, mutationSchema, pullPageSchema, recordDataSchema, cloudRecordSchema, mutationResultSchema, pushResponseSchema, revisionSchema, type MutationResult, type CloudRecord, type Enrollment, type Mutation, type PullPage } from '../cloud/protocol.ts';
 import { cloudRecordId, fieldPatch, localRecordId } from '../cloud/record-identity.ts';
 import { ReconciliationError, reconcileMutation, retainValidEventTiming } from '../cloud/reconcile.ts';
 import type { LocalDatabase, SqlExecutor } from './database.ts';
@@ -20,7 +20,10 @@ type Fence={generation:string;accountId:string};
 type Outbox={sequence:number;operation_id:string;local_pet_id:string;local_kind:LocalChange['kind'];local_id:string;change_json:string;mutation_json:string|null;blocked_reason:string|null};
 const key=(record:{kind:string;localId:string})=>JSON.stringify([record.kind,record.localId]);
 const requestFits=(mutations:Mutation[])=>new TextEncoder().encode(JSON.stringify({mutations})).byteLength<65536;
-const historySelection=z.strictObject({source:z.literal('local'),sequence:z.number().int().min(1).max(Number.MAX_SAFE_INTEGER)});
+const historySelection=z.discriminatedUnion('source',[
+  z.strictObject({source:z.literal('local'),sequence:z.number().int().min(1).max(Number.MAX_SAFE_INTEGER)}),
+  z.strictObject({source:z.literal('cloud'),revision:revisionSchema}),
+]);
 export function createLocalSync(database:LocalDatabase,options:{newId?:()=>string;now?:()=>number;afterCommit?:()=>void}={}) {
   const now=options.now??Date.now;
   async function id(sql:SqlExecutor) {return identifierSchema.parse(options.newId?.()??(await sql.getFirstAsync<{id:string}>('SELECT lower(hex(randomblob(16))) id'))!.id);}
@@ -427,12 +430,21 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
         const current=await owner(sql),pet=await binding(sql,petId);
         if(pet&&(pet.status!=='active'||current?.pending_pet_id||current?.resyncing))throw new EventHistoryError('pending');
         if(pet&&await sql.getFirstAsync('SELECT operation_id FROM local_sync_outbox WHERE generation=? AND local_pet_id=? AND local_kind=? AND local_id=? LIMIT 1',current!.generation,petId,'event',eventId))throw new EventHistoryError('pending');
-        const selected=await readEventHistoryEntry(sql,petId,eventId,selection.sequence);
-        if(!selected?.after)throw new EventHistoryError('unavailable');
+        let selected:PuppyEvent;
+        if(selection.source==='local'){
+          const entry=await readEventHistoryEntry(sql,petId,eventId,selection.sequence);
+          if(!entry?.after)throw new EventHistoryError('unavailable');
+          selected=entry.after;
+        }else{
+          const revision=selection.revision,record=revision.after,mirror=head.cloudRecord;
+          if(!pet||!head.owner||!mirror||record.kind!=='event'||record.deleted
+            ||revision.recordId!==mirror.id||record.petId!==mirror.petId||record.revision>mirror.revision||record.sequence>mirror.sequence)throw new EventHistoryError('unavailable');
+          selected={id:eventId,...eventDataSchema.parse(record.data)};
+        }
         const latest=head.sequence===null?null:await readEventHistoryEntry(sql,petId,eventId,head.sequence);
         const previous=head.event??latest?.after??latest?.before,cloudData=head.cloudRecord?.kind==='event'?eventDataSchema.parse(head.cloudRecord.data):null;
-        if(selected.after.type==='nap'||previous?.type==='nap'||cloudData?.type==='nap')throw new EventHistoryError('unsupported');
-        const {id:_,...snapshot}=selected.after;
+        if(selected.type==='nap'||previous?.type==='nap'||cloudData?.type==='nap')throw new EventHistoryError('unsupported');
+        const {id:_,...snapshot}=selected;
         const desired={id:eventId,...eventDataSchema.parse({...snapshot,...(previous?.estimated||cloudData?.estimated?{estimated:true}:{})})};
         if(head.event&&!Object.keys(fieldPatch(head.event,desired)).length)return {event:head.event,changed:false};
         if(pet){

@@ -114,6 +114,25 @@ export type Revision = {
   acceptedAt: number; baseRevision: number; intent: Mutation['intent']; proposal: Mutation['patch'];
   before: CloudRecord | null; after: CloudRecord; reason: RevisionReason;
 };
+export const revisionSchema = z.strictObject({
+  recordId: recordIdSchema, revision: recordMetadata.revision, sequence: recordMetadata.sequence,
+  operationId: identifierSchema, deviceId: identifierSchema, acceptedAt: timestamp,
+  baseRevision: common.baseRevision, intent: common.intent, proposal: z.record(z.string(), z.unknown()),
+  before: cloudRecordSchema.nullable(), after: cloudRecordSchema, reason: z.enum(revisionReasons),
+}).refine(({recordId,revision,sequence,baseRevision,intent,before,after}) =>
+  recordId === after.id && revision === after.revision && sequence === after.sequence
+  && (before
+    ? before.id === recordId && before.petId === after.petId && before.kind === after.kind
+      && before.revision + 1 === revision && before.sequence < sequence && baseRevision <= before.revision
+      && (intent !== 'restore' || baseRevision === before.revision)
+    : revision === 1 && baseRevision === 0 && intent === 'create'),
+'Invalid revision identity or committed order.').transform((value, context) => {
+  const proposal = mutationSchema.safeParse({protocolVersion:1,operationId:value.operationId,deviceId:value.deviceId,
+    recordId:value.recordId,petId:value.after.petId,kind:value.after.kind,baseRevision:value.baseRevision,
+    intent:value.intent,patch:value.proposal});
+  if (!proposal.success) {context.addIssue({code:'custom',message:'Invalid revision proposal.'});return z.NEVER;}
+  return {...value,proposal:proposal.data.patch};
+});
 export type MutationResult = Omit<z.infer<typeof mutationResultSchema>, 'record'> & { record: CloudRecord };
 export type PullPage = Omit<z.infer<typeof pullPageSchema>, 'changes'> & { changes: CloudRecord[] };
 

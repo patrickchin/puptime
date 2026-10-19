@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CloudApiError,type CloudApi,type CloudAccountSummary,type CloudConfig,type CloudErrorCategory } from './api.ts';
+import { CloudApiError,throwIfAborted,type CloudApi,type CloudAccountSummary,type CloudConfig,type CloudErrorCategory } from './api.ts';
 import { createSyncRunner,type RunResult } from './runner.ts';
 import type { createLocalRuntime } from '../local/runtime-factory.ts';
 
@@ -138,6 +138,27 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
     read:()=>snapshot,
     subscribe(listener:()=>void){listeners.add(listener);return()=>{listeners.delete(listener);};},
     refresh,
+    async eventHistory(eventId:string,beforeRevision?:number,signal?:AbortSignal) {
+      throwIfAborted(signal);
+      if(disposed||snapshot.busy||identityPending)throw new CloudApiError('conflict');
+      const accountId=snapshot.account?.user.id,actionFence=actions;
+      if(!accountId)throw new CloudApiError('auth-required',401);
+      function currentSession() {
+        throwIfAborted(signal);
+        if(disposed||snapshot.busy||identityPending||actions!==actionFence||snapshot.account?.user.id!==accountId)throw new CloudApiError('conflict');
+        if(!snapshot.online)throw new CloudApiError('network');
+      }
+      currentSession();
+      const {head}=await runtime.history.eventPage(eventId,{limit:1});currentSession();
+      if(head.owner?.accountId!==accountId||!head.cloudRecord)throw new CloudApiError('forbidden',403);
+      if(!snapshot.account!.cloud.canSync)throw new CloudApiError('expired',402);
+      const result=await api.history(head.cloudRecord.id,beforeRevision,signal);currentSession();
+      const {head:latest}=await runtime.history.eventPage(eventId,{limit:1});currentSession();
+      if(latest.owner?.generation!==head.owner.generation||latest.owner?.accountId!==accountId
+        ||latest.cloudRecord?.id!==head.cloudRecord.id||latest.cloudRecord?.petId!==head.cloudRecord.petId)throw new CloudApiError('conflict');
+      if(!snapshot.account!.cloud.canSync)throw new CloudApiError('expired',402);
+      return result;
+    },
     invalidate(){kick(0,true);},
     requestEmail(email:string) {return authenticate(async()=>{
       const parsed=z.email().max(320).safeParse(email.trim());if(!parsed.success)return fail('invalid-email');

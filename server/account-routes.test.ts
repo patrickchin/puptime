@@ -260,3 +260,30 @@ test('an abnormal peer close is acknowledged with a valid WebSocket close code',
  });
  socket.close();
 });
+
+test('authenticated cloud history validates for the client across merge delete restore paging and owner isolation',async()=>{
+ const user=await owner();await enroll(user);const recordId='["event","pet-1","history / 💩"]';
+ expect((await call(user,'cloud/enroll',{operationId:crypto.randomUUID(),deviceId:'other-device',localPetId:'other-local',name:'Pip',confirmedPetId:'pet-1'})).status).toBe(200);
+ const created=event(recordId);if(created.kind!=='event')throw new Error('Expected an event fixture.');
+ const operations:Mutation[]=[created,
+  {...created,operationId:crypto.randomUUID(),baseRevision:1,intent:'patch',patch:{note:'Updated note'}},
+  {...created,operationId:crypto.randomUUID(),deviceId:'other-device',baseRevision:1,intent:'patch',patch:{at:200}},
+  {...created,operationId:crypto.randomUUID(),baseRevision:3,intent:'delete',patch:{}},
+  {...created,operationId:crypto.randomUUID(),baseRevision:4,intent:'restore',patch:{type:'pee',at:100,source:'app',note:'Updated note'}},
+ ];
+ for(const mutation of operations){const response=await call(user,'sync/push',{mutations:[mutation]});expect(response.status).toBe(200);expect((await response.json<{rejected:unknown[]}>()).rejected).toEqual([]);}
+ const history=await (await call(user,`records/${encodeURIComponent(recordId)}/history`)).json<{revisions:unknown[]}>();
+ const protocol=await import('../src/cloud/protocol');expect(typeof protocol.revisionSchema?.parse).toBe('function');
+ const revisions=history.revisions.map(value=>protocol.revisionSchema.parse(value));
+ expect(revisions.map(value=>value.reason)).toEqual(['restored','deleted','merged','updated','created']);
+ expect(revisions.map(value=>value.revision)).toEqual([5,4,3,2,1]);
+ expect(revisions[2].after.data).toEqual({type:'pee',at:200,source:'app',note:'Updated note'});
+ const oldPath=`records/${encodeURIComponent(recordId)}/history?beforeRevision=4`;
+ const old=await (await call(user,oldPath)).json<{revisions:{revision:number}[]}>();expect(old.revisions.map(value=>value.revision)).toEqual([3,2,1]);
+ await call(user,'sync/push',{mutations:[{...created,operationId:crypto.randomUUID(),baseRevision:5,intent:'patch',patch:{note:'Later'}}]});
+ expect(await (await call(user,oldPath)).json()).toEqual(old);
+ const other=await owner();await enroll(other,'other-pet');expect(await (await call(other,`records/${encodeURIComponent(recordId)}/history`)).json()).toEqual({revisions:[]});
+ expect((await call(null,`records/${encodeURIComponent(recordId)}/history`)).status).toBe(401);
+ await env.AUTH_DB.prepare('UPDATE cloud_accounts SET trial_started_at=0,trial_ends_at=1 WHERE account_id=?').bind(user.id).run();
+ expect((await call(user,`records/${encodeURIComponent(recordId)}/history`)).status).toBe(402);
+});

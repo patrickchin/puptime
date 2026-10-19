@@ -137,3 +137,29 @@ test('a free restored version survives reopening with the same identity and no p
  await database.close();database=await createLocalDatabase(sqliteTestConnection(path));await initializeLocalDatabase(database,()=>assert.fail('Do not create another puppy.'));const reopened=await createLocalRuntime(database,'pet-1');
  assert.deepEqual(await reopened.storage.loadEvents(),[first]);assert.equal((await reopened.history.eventPage('one')).entries[0].source,'restore');assert.equal((await reopened.sync.status('pet-1')).pending,0);
 });
+
+const cloudFirst={recordId:'["event","cloud-1","one"]',revision:1,sequence:2,operationId:'server-first',deviceId:'other-device',acceptedAt:1000,baseRevision:0,intent:'create' as const,proposal:{type:'pee' as const,at:100,source:'app' as const,note:'First'},before:null,after:{id:'["event","cloud-1","one"]',petId:'cloud-1',kind:'event' as const,revision:1,sequence:2,deleted:false,updatedAt:1000,data:{type:'pee' as const,at:100,source:'app' as const,note:'First'}},reason:'created' as const};
+test('a cloud-only older version restores against the current mirror without inventing a local version ID',async t=>{
+ const {database,local}=await setup(t),{owner}=await owned(local);const before=await local.history.eventPage('one');
+ // A freshly restored device can have the current baseline without earlier local snapshots.
+ await database.write(sql=>sql.runAsync('DELETE FROM local_revisions WHERE pet_id=? AND kind=? AND local_id=? AND sequence=?','pet-1','event','one',before.entries.at(-1)!.sequence));
+ const page=await local.history.eventPage('one');assert.equal(page.entries.length,1);
+ assert.deepEqual(await local.history.restore({eventId:'one',selection:{source:'cloud',revision:cloudFirst},expected:page.head}),first);
+ const batch=await local.sync.nextBatch(owner);assert.equal(batch.length,1);assert.equal(batch[0].intent,'restore');assert.equal(batch[0].baseRevision,2);assert.equal(batch[0].recordId,'["event","cloud-1","one"]');assert.equal(batch[0].kind,'event');if(batch[0].kind==='event')assert.equal(batch[0].patch.note,'First');
+ const after=await local.history.eventPage('one');assert.equal(after.entries[0].source,'restore');assert.ok(after.entries[0].createdAt>2000);
+});
+
+test('cloud version scope deletion and stale local or remote views cannot bypass the history restore guard',async t=>{
+ const {database,local}=await setup(t),{owner,current}=await owned(local),page=await local.history.eventPage('one');
+ for(const revision of [
+  {...cloudFirst,recordId:'["event","cloud-1","other"]',after:{...cloudFirst.after,id:'["event","cloud-1","other"]'}},
+  {...cloudFirst,after:{...cloudFirst.after,petId:'cloud-2'}},
+ ]){const before=await snapshot(database);await assert.rejects(local.history.restore({eventId:'one',selection:{source:'cloud',revision},expected:page.head}));assert.deepEqual(await snapshot(database),before);}
+ const deleted={recordId:current.id,revision:3,sequence:5,operationId:'server-delete',deviceId:'other-device',acceptedAt:3000,baseRevision:2,intent:'delete' as const,proposal:{},before:current,after:{...current,revision:3,sequence:5,deleted:true,updatedAt:3000},reason:'deleted' as const};
+ let before=await snapshot(database);await assert.rejects(local.history.restore({eventId:'one',selection:{source:'cloud',revision:deleted},expected:page.head}),category('unavailable'));assert.deepEqual(await snapshot(database),before);
+ const newer={...current,revision:3,sequence:5,updatedAt:3000,data:{...current.data,note:'New remote'}};
+ await local.sync.applySync({...owner,accepted:[],rejected:[],page:{changes:[newer],cursor:5,hasMore:false}});before=await snapshot(database);
+ await assert.rejects(local.history.restore({eventId:'one',selection:{source:'cloud',revision:cloudFirst},expected:page.head}),category('stale'));assert.deepEqual(await snapshot(database),before);
+ const fresh=await local.history.eventPage('one');await local.storage.updateEvent('one',{note:'New local'});before=await snapshot(database);
+ await assert.rejects(local.history.restore({eventId:'one',selection:{source:'cloud',revision:cloudFirst},expected:fresh.head}),category('stale'));assert.deepEqual(await snapshot(database),before);
+});

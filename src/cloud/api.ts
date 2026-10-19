@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { enrollmentSchema, identifierSchema, mutationSchema, pullPageSchema, pushResponseSchema, type Enrollment, type Mutation } from './protocol.ts';
+import { enrollmentSchema, identifierSchema, mutationSchema, pullPageSchema, pushResponseSchema, recordIdSchema, revisionSchema, type Enrollment, type Mutation, type Revision } from './protocol.ts';
+import {localRecordId} from './record-identity.ts';
 
 // React Native's maintained AbortController polyfill exposes aborted, but not
 // the newer throwIfAborted()/reason API. Preserve native and browser cancellation.
@@ -31,10 +32,21 @@ type RequestOptions={method:'GET'|'POST';body?:object;signal?:AbortSignal};
 type RequestResult={data:unknown;error:{status:number}|null;retryAfter?:string|null};
 export type CloudRequest=(path:string,options:RequestOptions)=>Promise<RequestResult>;
 type SdkOptions=RequestOptions&{redirect:'error';credentials:'omit';retry:0;timeout:number;onResponse:(context:{response:Response})=>void};
+const historyRecordId=recordIdSchema.refine(value=>value!=='.'&&value!=='..');
+const historyCursor=z.number().int().min(1).max(Number.MAX_SAFE_INTEGER);
+function historyRoute(path:string,options:RequestOptions):boolean {
+  const match=/^\/api\/records\/([^/?#]+)\/history(?:\?beforeRevision=([1-9]\d*))?$/.exec(path);
+  if(!match||options.method!=='GET'||options.body!==undefined)return false;
+  try {
+    const id=decodeURIComponent(match[1]);
+    return historyRecordId.safeParse(id).success&&encodeURIComponent(id)===match[1]
+      && (match[2]===undefined||historyCursor.safeParse(Number(match[2])).success);
+  } catch {return false;}
+}
 export function createSdkRequest(fetchClient:(url:string,options:SdkOptions)=>Promise<Omit<RequestResult,'retryAfter'>>,origin:string):CloudRequest {
   const base=cloudBaseUrl(origin,true);if (!base) throw new Error('Cloud origin is missing.');
   return async(path,options)=>{
-    if (!/^\/api\/(?:config|account|cloud\/(?:trial|enroll)|sync\/push|sync\/pull\?after=\d+)$/.test(path)) throw new CloudApiError('invalid-request',400);
+    if (!/^\/api\/(?:config|account|cloud\/(?:trial|enroll)|sync\/push|sync\/pull\?after=\d+)$/.test(path)&&!historyRoute(path,options)) throw new CloudApiError('invalid-request',400);
     throwIfAborted(options.signal);
     let retryAfter:string|null=null;
     const result=await fetchClient(`${base}${path}`,{...options,redirect:'error',credentials:'omit',retry:0,timeout:15000,onResponse:({response})=>{retryAfter=response.headers.get('retry-after');}});
@@ -77,6 +89,17 @@ export function createCloudApi(request:CloudRequest) {
       return call('/api/sync/push',pushResponseSchema.refine(response=>response.accepted.length+response.rejected.length===ids.size&&[...response.accepted,...response.rejected].every(result=>ids.has(result.operationId))),{mutations},signal);
     },
     async pull(after:number,signal?:AbortSignal) {z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).parse(after);return call(`/api/sync/pull?after=${after}`,pullPageSchema,undefined,signal);},
+    async history(recordId:string,beforeRevision?:number,signal?:AbortSignal):Promise<{revisions:Revision[]}> {
+      historyRecordId.parse(recordId);if(beforeRevision!==undefined)historyCursor.parse(beforeRevision);
+      const page=z.strictObject({revisions:z.array(revisionSchema).max(50)}).refine(({revisions})=>{
+        try{return revisions.every((revision,index)=>{
+          localRecordId(revision.after);
+          return revision.recordId===recordId&&(beforeRevision===undefined||revision.revision<beforeRevision)
+            && (index===0||(revision.revision<revisions[index-1].revision&&revision.sequence<revisions[index-1].sequence));
+        });}catch{return false;}
+      },'Invalid history scope or page order.');
+      return call(`/api/records/${encodeURIComponent(recordId)}/history${beforeRevision===undefined?'':`?beforeRevision=${beforeRevision}`}`,page,undefined,signal);
+    },
   };
 }
 export type CloudApi=ReturnType<typeof createCloudApi>;

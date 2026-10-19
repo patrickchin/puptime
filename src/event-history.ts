@@ -1,4 +1,4 @@
-import type {CloudRecord} from './cloud/protocol.ts';
+import type {CloudRecord,Revision} from './cloud/protocol.ts';
 import type {PuppyEvent} from './domain.ts';
 
 export type EventHistoryEntry={
@@ -10,7 +10,7 @@ export type EventHistoryHead={
  event:PuppyEvent|null;cloudRecord:CloudRecord|null;
 };
 export type EventHistoryPage={entries:EventHistoryEntry[];next:number|null;head:EventHistoryHead};
-export type EventHistorySelection={source:'local';sequence:number};
+export type EventHistorySelection={source:'local';sequence:number}|{source:'cloud';revision:Revision};
 export type EventHistoryRestore={eventId:string;selection:EventHistorySelection;expected:EventHistoryHead};
 export type EventHistoryProblem='read'|'stale'|'pending'|'unavailable'|'unsupported';
 export class EventHistoryError extends Error {
