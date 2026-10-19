@@ -25,6 +25,12 @@ Create a precise subsystem plan at each boundary using the actual interfaces and
 
 ## Current execution priority
 
+### October 19: cloud sign-in takes precedence
+
+The user clarified that usable cloud sign-in and online database synchronization are the primary outcome; payments are secondary. Pause peripheral appearance qualification and billing until the actual cloud path is reviewable. Preserve the in-progress history work and its failure evidence. The default cloud-disabled standalone recordings demonstrate local setup only, not account availability.
+
+Prioritize the existing local Better Auth/SQL backend and official iOS SDK journey, then the same database/sync scenarios on deployed staging, one real delivered provider, and a standalone iOS build configured with the staging HTTPS origin. The deployed database is already provisioned; live provider configuration and the app origin are the immediate gaps. A verified Puptime domain remains deferred, harpapro.com remains forbidden, and a Resend owner-address test sender is only an interim qualification route requiring a dedicated sending key. Do not describe it as public email availability.
+
 The user directed **iOS app first; Android only when explicitly resumed, and widgets later**. The in-progress widget branch is preserved at `codex/native-storage-cutover` (`bd99857`) and is not merged. PR88's iOS storage cutover, PR93's sync engine and PR96's account client have merged after green native CI. PR97 delivered feature education; PR98 delivered the typed SQL/bounded-read follow-up. Complete first-open onboarding now has a separate implementation/qualification plan and must pass its whole-branch review and exact-head PR CI. Then continue the remaining iOS history/lifecycle UI, billing/web and observability work. Android keeps its existing backend; no new widget transport is activated. Deferred tracks must not block this sequence.
 
 ### Storage and architecture follow-up from October 18
