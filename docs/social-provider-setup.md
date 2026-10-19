@@ -1,6 +1,6 @@
 # Apple and Google sign-in setup
 
-This prepares the existing Better Auth 1.7.10 browser OAuth flow, including its Expo browser return. It does not configure or enable either provider. Both require their complete server credential pair; no new mobile SDK is needed for this flow. See the [Better Auth Expo integration](https://better-auth.com/docs/integrations/expo).
+Puptime uses the existing Better Auth 1.7.10 browser OAuth flow, including its Expo browser return. Both providers require their complete server credential pair; no new mobile SDK is needed for this flow. See the [Better Auth Expo integration](https://better-auth.com/docs/integrations/expo).
 
 ## Coordinate the public auth origin first
 
@@ -24,7 +24,17 @@ Merely accessing auth through Pages does not change URLs generated from `AUTH_BA
 - **Apple:** associate a Services ID with the existing primary App ID for `com.patrickchin.puptime`, with Sign in with Apple enabled. Register the website and return URL above. Apple currently requires no domain verification file. Confirm console access and the App ID before making changes; capability changes can affect signing profiles. [Apple web setup](https://developer.apple.com/help/account/capabilities/configure-sign-in-with-apple-for-the-web/).
 - Store the Services ID as `APPLE_CLIENT_ID` and a client-secret JWT as `APPLE_CLIENT_SECRET`. Creating that JWT requires the Apple team ID, key ID, and Sign in with Apple private key. Keep the private key out of the client and repository; record and rotate the JWT before its maximum six-month expiry. The server now uses the Services ID as its ID-token audience and trusts `https://appleid.apple.com` only when Apple is configured. A future native Apple ID-token flow would need a deliberately configured bundle audience and separate qualification. [Better Auth Apple instructions](https://better-auth.com/docs/authentication/apple).
 
-Use the existing authorized accounts and least privilege. Human account access, MFA, provider consent, key creation, capability changes, secret installation, and deployment still need coordinated execution; none is performed by this change. Signing in to a Codex browser does not sign in the simulator's authentication browser.
+Use the existing authorized accounts and least privilege. Human account access, MFA, provider consent, key creation, capability changes, secret installation, and deployment need coordinated execution. Signing in to a Codex browser does not sign in the simulator's authentication browser.
+
+## Staging checkpoint — October 20, 2026
+
+Both complete credential pairs are installed on the staging Worker. The Google Web client belongs to the dedicated `puptime-512111` project and remains in external Testing. Apple's Services ID is `com.patrickchin.puptime.web`, associated with the existing Puptime primary App ID. Both use the exact callbacks above. The main App Store provisioning profile was regenerated with Sign in with Apple; refreshing a cached EAS profile and verifying a distributed build remain separate work.
+
+The replacement Apple sign-in key is held in macOS Keychain service `com.puptime.apple-staging-sign-in`, account `puptime`. Its JSON stores the private PEM as `privateKeyPemBase64`; the original download was removed only after an exact Keychain round trip. The interactive `security` parser transforms backslash escapes, so do not replace this field with an escaped raw PEM. The private key stays in Keychain. Only the Services ID and generated ES256 client-secret JWT are installed on the Worker. The existing APNs key is unchanged.
+
+The installed Apple client-secret expires **April 17, 2027 at 15:38:41 UTC**. Before expiry, generate a replacement JWT from that Keychain key, verify its signature and issuer/audience/subject/expiry, then replace `APPLE_CLIENT_SECRET` through private standard input. Never print the private key or JWT, pass either in command arguments, or commit them. Repeat the genuine Apple callback/session check after rotation.
+
+Actual deployed HTTPS checks confirm both providers are advertised, authorization starts use PKCE S256 and the exact callbacks, Apple uses `form_post`, invalid state cannot create a session, and anonymous protected account requests return401 with `no-store`. A signed standalone iOS build reaches Google's actual sign-in page and handles cancellation without changing any local SQL rows. Updating the retained genuine email-account installation preserves every application table and shows both explicit Connect controls. These checks do **not** prove a completed real Apple or Google token exchange. Private provider login, return to the app, confirmed session, restart and account-link qualification remain required before public release.
 
 ## Preserve existing accounts
 
