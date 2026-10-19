@@ -32,7 +32,7 @@ export function createAuth(env: Cloudflare.Env) {
   const providers = configuredProviders(env);
   return betterAuth({
     appName: 'Puptime', baseURL, secret, database: env.AUTH_DB,
-    trustedOrigins: [base.origin, ...(env.WEB_ORIGINS ?? '').split(',').filter(Boolean), 'puptime://*'],
+    trustedOrigins: [base.origin, ...(env.WEB_ORIGINS ?? '').split(',').filter(Boolean), 'puptime://*', ...(providers.apple ? ['https://appleid.apple.com'] : [])],
     emailAndPassword: { enabled: false },
     account: { accountLinking: { enabled: true, disableImplicitLinking: true } },
     user: { deleteUser: { enabled: true, beforeDelete: (user) => retireCloudAccount(env, user) } },
@@ -47,7 +47,7 @@ export function createAuth(env: Cloudflare.Env) {
     }) },
     socialProviders: {
       ...(providers.google ? { google: { clientId: env.GOOGLE_CLIENT_ID!, clientSecret: env.GOOGLE_CLIENT_SECRET! } } : {}),
-      ...(providers.apple ? { apple: { clientId: env.APPLE_CLIENT_ID!, clientSecret: env.APPLE_CLIENT_SECRET!, appBundleIdentifier: 'com.patrickchin.puptime' } } : {}),
+      ...(providers.apple ? { apple: { clientId: env.APPLE_CLIENT_ID!, clientSecret: env.APPLE_CLIENT_SECRET! } } : {}),
     },
     disabledPaths: ['/email-otp/request-password-reset', '/forget-password/email-otp', '/email-otp/reset-password', '/delete-user', '/delete-user/callback'],
     plugins: [expo(), emailOTP({
