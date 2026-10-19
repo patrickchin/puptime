@@ -55,8 +55,10 @@ function expectedWindow(previousDays){
 const trace=()=>JSON.parse(readFileSync(join(documents,'sql-query-probe.json'),'utf8'));
 const renders=()=>JSON.parse(readFileSync(join(documents,'row-render-probe.json'),'utf8')).renders;
 const windows=()=>trace().reads.filter(read=>read.sql.includes('UNION ALL'));
-function flow(name,body){
- const file=join(output,name+'.yaml');writeFileSync(file,'appId: '+app+'\nname: '+name+'\n---\n'+body);
+function flow(name,body,resume=true){
+ // New XCTest sessions may steal foreground; resume preserves loaded rows and drafts.
+ const activation=resume?'- launchApp:\n    stopApp: false\n    permissions: {}\n- waitForAnimationToEnd\n':'';
+ const file=join(output,name+'.yaml');writeFileSync(file,'appId: '+app+'\nname: '+name+'\n---\n'+activation+body);
  execFileSync(process.env.MAESTRO_BIN??'maestro',['--device',udid,'test',file,'--test-output-dir',join(output,name)],{stdio:'inherit',env:{...process.env,MAESTRO_CLI_NO_ANALYTICS:'1'}});
 }
 function screenshot(name){simctl('io',udid,'screenshot',join(output,name+'.png'));}
@@ -72,7 +74,7 @@ try{
     notVisible:
       id: activity.loading
     timeout: 30000
-`);
+`,false);
  assert.ok(trace().reads.some(read=>read.sql.includes('ORDER BY at DESC,id DESC LIMIT')&&read.rows===201));
  assert.ok(trace().reads.every(read=>read.rows<=201));
  const before=renders(),target=events.at(-1).id;

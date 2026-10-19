@@ -7,17 +7,9 @@ from pathlib import Path
 import re
 
 CURRENT_JOURNEYS = [
-    '160-standalone-full-setup-and-permissions',
-    '136-first-open-account-request',
-    '137-first-open-cloud-activation',
-    '145-final-source-cloud-restore',
-    '155-first-launch-reconnect-keeps-local',
-    '159-full-first-open-largest-text',
-    '163-first-open-native-motion-on',
-    '164-first-open-preserves-completed-sync',
-    '116-current-sql-native-sync-offline',
-    '121-reviewed-release-event-label-atomicity',
-    '176-settings-target-visibility',
+    '192-terrier-full-first-open-and-recovery',
+    '191-terrier-full-first-open-appearance',
+    '188-drawer-and-native-timer-journeys',
 ]
 
 STYLE = '''
