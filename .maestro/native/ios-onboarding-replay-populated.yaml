@@ -3,13 +3,33 @@ name: Replay practice and both exits preserve populated puppy data
 ---
 - scrollUntilVisible:
     element:
-      id: settings.notifications.permission
-    direction: DOWN
+      id: settings.back
+    direction: UP
     visibilityPercentage: 100
-    centerElement: true
-- copyTextFrom:
-    id: settings.notifications.permission
-- evalScript: ${output.permissionBefore = maestro.copiedText}
+    centerElement: false
+- tapOn:
+    id: settings.back
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.notifications
+- assertVisible:
+    id: screen.notifications
+- evalScript: ${output.permissionBefore = ''}
+- runFlow:
+    when:
+      visible:
+        id: settings.notifications.permission
+    commands:
+      - copyTextFrom:
+          id: settings.notifications.permission
+      - evalScript: ${output.permissionBefore = maestro.copiedText}
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.settings
+- assertVisible:
+    id: screen.settings
 - scrollUntilVisible:
     element:
       id: settings.guide.open
@@ -51,11 +71,35 @@ name: Replay practice and both exits preserve populated puppy data
 - takeScreenshot: populated-replay-returns-settings
 - scrollUntilVisible:
     element:
-      id: settings.notifications.permission
-    direction: DOWN
+      id: settings.back
+    direction: UP
     visibilityPercentage: 100
-    centerElement: true
+    centerElement: false
+- tapOn:
+    id: settings.back
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.notifications
 - assertVisible:
-    id: settings.notifications.permission
-    text: ${output.permissionBefore}
+    id: screen.notifications
+- runFlow:
+    when:
+      true: ${output.permissionBefore !== ''}
+    commands:
+      - assertVisible:
+          id: settings.notifications.permission
+          text: ${output.permissionBefore}
+- runFlow:
+    when:
+      true: ${output.permissionBefore === ''}
+    commands:
+      - assertNotVisible:
+          id: settings.notifications.permission
 - takeScreenshot: replay-preserves-os-permission
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.settings
+- assertVisible:
+    id: screen.settings

@@ -15,6 +15,8 @@ tags:
     id: quick.pee
     retryTapIfNoChange: true
 - tapOn:
+    id: nav.open
+- tapOn:
     id: nav.insights
     retryTapIfNoChange: true
 - extendedWaitUntil:
@@ -73,8 +75,10 @@ tags:
 - launchApp
 - extendedWaitUntil:
     visible:
-      id: nav.insights
+      id: nav.open
     timeout: 90000
+- tapOn:
+    id: nav.open
 - tapOn:
     id: nav.insights
     retryTapIfNoChange: true

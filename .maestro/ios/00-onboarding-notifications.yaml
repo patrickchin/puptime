@@ -29,11 +29,13 @@ tags:
       id: screen.today
     timeout: 90000
 - tapOn:
-    id: settings.open
-- scrollUntilVisible:
-    element:
-      id: settings.notifications.permission
-    direction: DOWN
+    id: nav.open
+- tapOn:
+    id: nav.notifications
 - assertVisible:
+    id: screen.notifications
+- assertVisible:
+    id: settings.notifications.deviceDelivery
+    checked: true
+- assertNotVisible:
     id: settings.notifications.permission
-    text: .*Allowed.*

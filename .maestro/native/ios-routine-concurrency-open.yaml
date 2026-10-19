@@ -16,6 +16,8 @@ name: iOS routine keeps an activity draft while another writer changes fields
               id: screen.schedule
           commands:
             - tapOn:
+                id: nav.open
+            - tapOn:
                 id: nav.schedule
                 retryTapIfNoChange: true
             - waitForAnimationToEnd

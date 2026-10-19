@@ -11,8 +11,10 @@ tags:
 - runFlow: ../helpers/skip-onboarding.yaml
 - extendedWaitUntil:
     visible:
-      id: nav.schedule
+      id: nav.open
     timeout: 90000
+- tapOn:
+    id: nav.open
 - tapOn:
     id: nav.schedule
     retryTapIfNoChange: true
@@ -91,8 +93,7 @@ tags:
 - waitForAnimationToEnd:
     timeout: 5000
 - tapOn:
-    id: nav.log
-    retryTapIfNoChange: true
+    id: nav.open
 - tapOn:
     id: nav.log
     retryTapIfNoChange: true
@@ -100,6 +101,8 @@ tags:
     id: screen.today
 - assertNotVisible:
     id: routine.card
+- tapOn:
+    id: nav.open
 - tapOn:
     id: nav.schedule
     retryTapIfNoChange: true

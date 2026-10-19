@@ -12,9 +12,6 @@ tags:
       id: screen.today
     timeout: 90000
 - assertVisible:
-    id: nav.log
-    selected: true
-- assertVisible:
     id: quick.pee
 - assertVisible:
     id: quick.poop
@@ -27,13 +24,14 @@ tags:
 - assertNotVisible:
     id: quick.nap
 - tapOn:
+    id: nav.open
+- assertVisible:
+    id: nav.log
+    selected: true
+- tapOn:
     id: nav.timeline
-    retryTapIfNoChange: true
 - assertVisible:
     id: screen.timeline
-- assertVisible:
-    id: nav.timeline
-    selected: true
 - assertVisible:
     id: timeline.zoom.out
     enabled: false
@@ -41,13 +39,14 @@ tags:
     id: timeline.zoom.in
     enabled: true
 - tapOn:
+    id: nav.open
+- assertVisible:
+    id: nav.timeline
+    selected: true
+- tapOn:
     id: nav.insights
-    retryTapIfNoChange: true
 - assertVisible:
     id: screen.insights
-- assertVisible:
-    id: nav.insights
-    selected: true
 - scrollUntilVisible:
     element:
       id: insights.export
@@ -57,13 +56,14 @@ tags:
     id: insights.export
     enabled: false
 - tapOn:
+    id: nav.open
+- assertVisible:
+    id: nav.insights
+    selected: true
+- tapOn:
     id: nav.schedule
-    retryTapIfNoChange: true
 - assertVisible:
     id: screen.schedule
-- assertVisible:
-    id: nav.schedule
-    selected: true
 - scrollUntilVisible:
     element:
       id: schedule.empty
@@ -72,10 +72,20 @@ tags:
 - assertVisible:
     id: schedule.empty
 - tapOn:
+    id: nav.open
+- assertVisible:
+    id: nav.schedule
+    selected: true
+- tapOn:
     id: nav.log
-    retryTapIfNoChange: true
 - assertVisible:
     id: screen.today
+- tapOn:
+    id: nav.open
 - assertVisible:
     id: nav.log
     selected: true
+- tapOn:
+    id: nav.close
+- assertNotVisible:
+    id: nav.log

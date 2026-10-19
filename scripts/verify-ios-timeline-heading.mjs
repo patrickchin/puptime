@@ -11,7 +11,7 @@ const device=Object.values(JSON.parse(simctl('list','devices','available','-j'))
 assert.ok(device?.name.startsWith('Puptime Native Storage '));
 assert.equal(device.deviceTypeIdentifier,'com.apple.CoreSimulator.SimDeviceType.iPhone-17');
 const output=mkdtempSync(join(tmpdir(),'puptime-timeline-heading-')),flow=join(output,'heading.yaml');
-writeFileSync(flow,'appId: '+app+'\n---\n- launchApp\n- extendedWaitUntil:\n    visible:\n      id: event.pee.edit\n    timeout: 30000\n- tapOn:\n    id: nav.timeline\n    retryTapIfNoChange: true\n- extendedWaitUntil:\n    visible:\n      id: timeline.range\n    timeout: 30000\n- extendedWaitUntil:\n    notVisible:\n      id: activity.loading\n    timeout: 30000\n');
+writeFileSync(flow,'appId: '+app+'\n---\n- launchApp\n- extendedWaitUntil:\n    visible:\n      id: event.pee.edit\n    timeout: 30000\n- tapOn:\n    id: nav.open\n- tapOn:\n    id: nav.timeline\n    retryTapIfNoChange: true\n- extendedWaitUntil:\n    visible:\n      id: timeline.range\n    timeout: 30000\n- extendedWaitUntil:\n    notVisible:\n      id: activity.loading\n    timeout: 30000\n');
 simctl('ui',udid,'appearance','light');simctl('ui',udid,'content_size',size);
 execFileSync('maestro',['--device',udid,'test',flow,'--test-output-dir',join(output,'ui')],{stdio:'inherit',env:{...process.env,MAESTRO_CLI_NO_ANALYTICS:'1'}});
 const screenshot=join(output,'timeline-heading.png');simctl('io',udid,'screenshot',screenshot);

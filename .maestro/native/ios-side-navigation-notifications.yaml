@@ -1,0 +1,304 @@
+appId: com.patrickchin.puptime
+name: iOS side navigation and notification preferences
+---
+# Fresh synthetic installation only; the populated qualification never runs this flow.
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: allow
+- runFlow: ../helpers/skip-onboarding.yaml
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- assertNotVisible:
+    id: nav.notifications
+- assertNotVisible:
+    id: nav.close
+- tapOn:
+    id: nav.open
+- assertVisible:
+    id: nav.log
+    selected: true
+- scrollUntilVisible:
+    element:
+      id: nav.notifications
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- assertVisible:
+    id: nav.notifications
+- scrollUntilVisible:
+    element:
+      id: nav.close
+    direction: UP
+    visibilityPercentage: 100
+    centerElement: false
+- tapOn:
+    id: nav.close
+- assertNotVisible:
+    id: nav.notifications
+- assertVisible:
+    id: screen.today
+- tapOn:
+    id: nav.open
+- assertVisible:
+    id: nav.close
+- tapOn:
+    point: 95%,50%
+- assertNotVisible:
+    id: nav.close
+- assertVisible:
+    id: screen.today
+- tapOn:
+    id: nav.open
+- scrollUntilVisible:
+    element:
+      id: nav.notifications
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- tapOn:
+    id: nav.notifications
+- assertVisible:
+    id: screen.notifications
+- assertNotVisible:
+    id: nav.close
+- assertVisible:
+    id: settings.notifications.deviceDelivery
+    checked: false
+- tapOn:
+    id: settings.notifications.deviceDelivery
+- runFlow:
+    when:
+      visible: ^Allow$
+    commands:
+      - tapOn: ^Allow$
+- assertVisible:
+    id: settings.notifications.deviceDelivery
+    checked: true
+- assertNotVisible:
+    id: settings.notifications.permission
+- assertVisible:
+    id: settings.notifications.pottyAfterPee.enabled
+    checked: true
+- assertNotVisible:
+    id: settings.notifications.pottyAfterPee.delay.60
+- tapOn:
+    id: settings.notifications.pottyAfterPee.changeDelay
+- scrollUntilVisible:
+    element:
+      id: settings.notifications.pottyAfterPee.delay.120
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- assertVisible:
+    id: settings.notifications.pottyAfterPee.delay.120
+    text: radio button, checked
+- scrollUntilVisible:
+    element:
+      id: settings.notifications.pottyAfterPee.delay.60
+    direction: UP
+    visibilityPercentage: 100
+    centerElement: false
+- tapOn:
+    id: settings.notifications.pottyAfterPee.delay.60
+- assertVisible:
+    id: settings.notifications.pottyAfterPee.delay.60
+    text: radio button, checked
+- scrollUntilVisible:
+    element:
+      id: settings.notifications.pottyAfterPee.changeDelay
+    direction: UP
+    visibilityPercentage: 100
+    centerElement: false
+- tapOn:
+    id: settings.notifications.pottyAfterPee.changeDelay
+- assertNotVisible:
+    id: settings.notifications.pottyAfterPee.delay.60
+- scrollUntilVisible:
+    element:
+      id: settings.notifications.lead.15
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- assertVisible:
+    id: settings.notifications.lead.10
+    text: radio button, checked
+- tapOn:
+    id: settings.notifications.lead.15
+- assertVisible:
+    id: settings.notifications.lead.15
+    text: radio button, checked
+- scrollUntilVisible:
+    element:
+      id: settings.notifications.routines
+    direction: UP
+    visibilityPercentage: 100
+    centerElement: false
+- tapOn:
+    id: settings.notifications.routines
+- assertVisible:
+    id: screen.schedule
+- tapOn:
+    id: nav.open
+- scrollUntilVisible:
+    element:
+      id: nav.schedule
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- assertVisible:
+    id: nav.schedule
+    selected: true
+- scrollUntilVisible:
+    element:
+      id: nav.notifications
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- tapOn:
+    id: nav.notifications
+- assertVisible:
+    id: screen.notifications
+- tapOn:
+    id: nav.open
+- scrollUntilVisible:
+    element:
+      id: nav.notifications
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- assertVisible:
+    id: nav.notifications
+    selected: true
+- scrollUntilVisible:
+    element:
+      id: nav.close
+    direction: UP
+    visibilityPercentage: 100
+    centerElement: false
+- tapOn:
+    id: nav.close
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- tapOn:
+    id: nav.open
+- scrollUntilVisible:
+    element:
+      id: nav.notifications
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- tapOn:
+    id: nav.notifications
+- assertVisible:
+    id: settings.notifications.deviceDelivery
+    checked: true
+- tapOn:
+    id: settings.notifications.pottyAfterPee.changeDelay
+- scrollUntilVisible:
+    element:
+      id: settings.notifications.pottyAfterPee.delay.60
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- assertVisible:
+    id: settings.notifications.pottyAfterPee.delay.60
+    text: radio button, checked
+- scrollUntilVisible:
+    element:
+      id: settings.notifications.pottyAfterPee.changeDelay
+    direction: UP
+    visibilityPercentage: 100
+    centerElement: false
+- tapOn:
+    id: settings.notifications.pottyAfterPee.changeDelay
+- scrollUntilVisible:
+    element:
+      id: settings.notifications.lead.15
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- assertVisible:
+    id: settings.notifications.lead.15
+    text: radio button, checked
+- takeScreenshot: notifications-restored-after-restart
+- tapOn:
+    id: nav.open
+- scrollUntilVisible:
+    element:
+      id: nav.settings
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- tapOn:
+    id: nav.settings
+- tapOn:
+    id: settings.language.open
+- tapOn:
+    id: appearance.language.es
+- assertVisible:
+    id: screen.settings
+- tapOn:
+    id: settings.back
+- tapOn:
+    id: nav.open
+- scrollUntilVisible:
+    element:
+      id: nav.notifications
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- assertVisible:
+    id: nav.notifications
+    text: Notificaciones
+- tapOn:
+    id: nav.notifications
+- assertVisible:
+    id: screen.notifications
+- assertVisible:
+    id: settings.notifications.pottyAfterPee.enabled
+    checked: true
+- scrollUntilVisible:
+    element:
+      id: settings.notifications.lead.15
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- assertVisible:
+    id: settings.notifications.lead.15
+    text: radio button, checked
+- takeScreenshot: notifications-spanish-preferences
+- tapOn:
+    id: nav.open
+- scrollUntilVisible:
+    element:
+      id: nav.settings
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- tapOn:
+    id: nav.settings
+- tapOn:
+    id: settings.language.open
+- tapOn:
+    id: appearance.language.en
+- tapOn:
+    id: settings.back
+- tapOn:
+    id: nav.open
+- scrollUntilVisible:
+    element:
+      id: nav.notifications
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- tapOn:
+    id: nav.notifications
+- assertVisible:
+    id: screen.notifications

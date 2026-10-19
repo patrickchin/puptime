@@ -9,7 +9,11 @@ name: Device notification delivery setting
       id: screen.today
     timeout: 90000
 - tapOn:
-    id: settings.open
+    id: nav.open
+- tapOn:
+    id: nav.notifications
+- assertVisible:
+    id: screen.notifications
 - scrollUntilVisible:
     element:
       id: settings.notifications.deviceDelivery

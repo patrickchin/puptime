@@ -41,28 +41,6 @@ tags:
 - assertVisible:
     id: settings.widget.action.walk
     text: checkbox, checked
-- scrollUntilVisible:
-    element:
-      id: settings.notifications.lead.15
-    direction: DOWN
-    visibilityPercentage: 100
-    centerElement: false
-- waitForAnimationToEnd:
-    timeout: 5000
-- swipe:
-    start: 50%,70%
-    end: 50%,35%
-    duration: 400
-- waitForAnimationToEnd:
-    timeout: 5000
-- assertVisible:
-    id: settings.notifications.lead.10
-    text: radio button, checked
-- tapOn:
-    id: settings.notifications.lead.15
-- assertVisible:
-    id: settings.notifications.lead.15
-    text: radio button, checked
 - stopApp
 - launchApp
 - extendedWaitUntil:
@@ -83,23 +61,6 @@ tags:
 - assertVisible:
     id: settings.widget.action.walk
     text: checkbox, checked
-- scrollUntilVisible:
-    element:
-      id: settings.notifications.lead.15
-    direction: DOWN
-    visibilityPercentage: 100
-    centerElement: false
-- waitForAnimationToEnd:
-    timeout: 5000
-- swipe:
-    start: 50%,70%
-    end: 50%,35%
-    duration: 400
-- waitForAnimationToEnd:
-    timeout: 5000
-- assertVisible:
-    id: settings.notifications.lead.15
-    text: radio button, checked
 - scrollUntilVisible:
     element:
       id: settings.theme.open
@@ -158,14 +119,32 @@ tags:
 - tapOn:
     id: settings.back
     retryTapIfNoChange: true
-- assertVisible: Registro
+- assertVisible:
+    id: screen.today
+- tapOn:
+    id: nav.open
+- assertVisible:
+    id: nav.log
+    text: Registro
+    selected: true
+- tapOn:
+    id: nav.close
 - stopApp
 - launchApp
 - extendedWaitUntil:
     visible:
       id: screen.today
     timeout: 90000
-- assertVisible: Registro
+- assertVisible:
+    id: screen.today
+- tapOn:
+    id: nav.open
+- assertVisible:
+    id: nav.log
+    text: Registro
+    selected: true
+- tapOn:
+    id: nav.close
 - tapOn:
     id: settings.open
     retryTapIfNoChange: true
@@ -201,20 +180,3 @@ tags:
 - assertVisible:
     id: settings.widget.action.walk
     text: checkbox, checked
-- scrollUntilVisible:
-    element:
-      id: settings.notifications.lead.15
-    direction: DOWN
-    visibilityPercentage: 100
-    centerElement: false
-- waitForAnimationToEnd:
-    timeout: 5000
-- swipe:
-    start: 50%,70%
-    end: 50%,35%
-    duration: 400
-- waitForAnimationToEnd:
-    timeout: 5000
-- assertVisible:
-    id: settings.notifications.lead.15
-    text: radio button, checked

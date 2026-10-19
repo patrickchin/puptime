@@ -10,6 +10,12 @@ tags:
       visible:
         id: 'screen\.(firstLaunch|onboarding)'
     file: helpers/skip-onboarding.yaml
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: nav.open
 - tapOn:
     id: nav.learn
 - runFlow:
@@ -51,6 +57,12 @@ tags:
     id: learn.audio.play
 - assertVisible:
     id: learn.audio.seek
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: nav.open
 - tapOn:
     id: nav.timeline
 - assertNotVisible:

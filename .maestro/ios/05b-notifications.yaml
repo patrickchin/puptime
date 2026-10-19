@@ -1,0 +1,7 @@
+appId: com.patrickchin.puptime
+name: iOS side navigation and notification preferences
+tags:
+  - ios
+  - settings
+---
+- runFlow: ../native/ios-side-navigation-notifications.yaml

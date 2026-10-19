@@ -31,6 +31,8 @@ tags:
     id: settings.back
 - assertVisible: A little day, together.
 - tapOn:
+    id: nav.open
+- tapOn:
     id: nav.timeline
 - assertVisible:
     id: timeline.day
@@ -66,6 +68,8 @@ tags:
     id: timeline.zoom.value
     text: .*1\.5×.*
 - tapOn:
+    id: nav.open
+- tapOn:
     id: nav.log
 - tapOn:
     id: settings.open
@@ -77,6 +81,8 @@ tags:
     id: settings.back
 - assertVisible: How’s your pup?
 - tapOn:
+    id: nav.open
+- tapOn:
     id: nav.timeline
 - assertVisible:
     id: timeline.zoom.in
@@ -84,6 +90,8 @@ tags:
     id: timeline.mode.day
 - assertVisible:
     id: timeline.day
+- tapOn:
+    id: nav.open
 - tapOn:
     id: nav.log
 - tapOn:
@@ -96,6 +104,8 @@ tags:
     id: settings.back
 - assertVisible: One happy little day
 - tapOn:
+    id: nav.open
+- tapOn:
     id: nav.timeline
 - assertVisible:
     id: timeline.day
@@ -103,6 +113,8 @@ tags:
     id: timeline.mode.compare
 - assertVisible:
     id: timeline.zoom.in
+- tapOn:
+    id: nav.open
 - tapOn:
     id: nav.log
 - tapOn:
@@ -115,6 +127,8 @@ tags:
     id: settings.back
 - assertVisible:
     id: event.pee
+- tapOn:
+    id: nav.open
 - tapOn:
     id: nav.timeline
 - assertNotVisible:

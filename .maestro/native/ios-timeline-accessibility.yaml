@@ -10,6 +10,8 @@ name: Timeline remains usable at maximum text size
       id: toast
     timeout: 10000
 - tapOn:
+    id: nav.open
+- tapOn:
     id: nav.timeline
     retryTapIfNoChange: true
 - extendedWaitUntil:

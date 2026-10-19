@@ -125,6 +125,8 @@ try{
  const timelineStart=windows().length;
  flow('comparison-window',`
 - tapOn:
+    id: nav.open
+- tapOn:
     id: nav.timeline
     retryTapIfNoChange: true
 - extendedWaitUntil:
@@ -142,6 +144,8 @@ try{
  const scheduleStart=windows().length;
  flow('routine-window',`
 - tapOn:
+    id: nav.open
+- tapOn:
     id: nav.schedule
     retryTapIfNoChange: true
 - extendedWaitUntil:
@@ -158,6 +162,8 @@ try{
  assert.deepEqual(windows().slice(scheduleStart).map(read=>read.rows),[expectedWindow(14)]);
  const insightsStart=windows().length;
  flow('insights-window',`
+- tapOn:
+    id: nav.open
 - tapOn:
     id: nav.insights
     retryTapIfNoChange: true

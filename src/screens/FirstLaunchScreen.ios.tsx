@@ -20,6 +20,7 @@ export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPerm
  const {t,locale}=useLocalization(),state=useAccountSnapshot(cloud.controller),{fontScale,height}=useWindowDimensions();
  const insets=useSafeAreaInsets();
  const [progress,setProgress]=useState(initial),[name,setName]=useState(initial.puppyName==='My puppy'?'':initial.puppyName);
+ const [keyboardVisible,setKeyboardVisible]=useState(Keyboard.isVisible());
  const [busy,setBusy]=useState(false),[error,setError]=useState<string|null>(null),[ready,setReady]=useState(false),[pristine,setPristine]=useState<boolean|null>(null);
  const locked=useRef(false),mounted=useRef(true),scroll=useRef<ScrollView>(null),title=useRef<Text>(null);
  const step=progress.step,account=state?.account,existing=account?.pets[0],working=busy||!!state?.busy;
@@ -28,6 +29,10 @@ export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPerm
  const shownName=progress.puppyName==='My puppy'?t('account.defaultName'):progress.puppyName;
  const cloudError=accountProblemKey(state?.problem??null),days=state?.config?.trialDays??14;
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
+ useEffect(()=>{
+  const show=Keyboard.addListener('keyboardWillShow',()=>setKeyboardVisible(true)),hide=Keyboard.addListener('keyboardWillHide',()=>setKeyboardVisible(false));
+  return()=>{show.remove();hide.remove();};
+ },[]);
  useEffect(()=>{
   scroll.current?.scrollTo({y:0,animated:false});
   const frame=requestAnimationFrame(()=>{if(title.current)AccessibilityInfo.sendAccessibilityEvent(title.current,'focus');});
@@ -89,7 +94,6 @@ export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPerm
  const bodyStyle=[styles.body,{color:theme.textMuted}];
  const cardStyle=[styles.card,{backgroundColor:theme.surfaceRaised,borderColor:theme.border,borderRadius:theme.presentation.cardRadius}];
  const button=(testID:string,label:string,onPress:()=>void,primary=false,disabled=working,loading=false)=><AccountButton key={testID} testID={testID} theme={theme} label={label} onPress={onPress} primary={primary} disabled={disabled} loading={loading}/>;
- const puppy=(small=false)=><Image source={require('../../assets/puppy-journal.png')} accessible={false} resizeMode="contain" style={[styles.puppy,{height:small||fontScale>=1.5?100:Math.min(220,height*0.27)}]}/>;
  if(step==='walkthrough')return <View style={styles.root}>
   {error?<Text testID="setup.error" accessibilityRole="alert" style={[styles.body,{color:theme.danger,padding:16}]}>{error}</Text>:null}
   <OnboardingScreen theme={theme} mode="embedded" notificationPermission={notificationPermission} onAllowNotifications={onAllowNotifications} onOpenSystemSettings={onOpenSystemSettings} onFinish={()=>checkpoint('reminders')} onBack={()=>{void act(()=>checkpoint(account?'cloud':'account'));return true;}}/>
@@ -101,12 +105,11 @@ export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPerm
    <View style={styles.brand}><MaterialCommunityIcons name="paw" color={theme.primary} size={20}/><Text maxFontSizeMultiplier={1.3} style={[styles.brandText,headingStyle(theme),{color:theme.text}]}>Puptime</Text></View>
   </View>
   {step!=='welcome'?<View accessibilityRole="progressbar" accessibilityLabel={t('setup.progress',{step:stage})} accessibilityValue={{min:1,max:6,now:stage}} style={styles.progress}>{firstLaunchStepSchema.options.map((value,index)=><View key={value} style={[styles.mark,{backgroundColor:index<stage?theme.primary:theme.border}]}/>)}</View>:null}
-  <ScrollView ref={scroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
-   {step==='welcome'?puppy():null}
+  <ScrollView ref={scroll} keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content,step==='profile'&&styles.profileContent]}>
+   {!keyboardVisible&&(step==='welcome'||step==='profile'&&fontScale<1.5)?<Image source={require('../../assets/mascots/scruffy-terrier.png')} accessible={false} resizeMode="contain" style={[styles.mascot,{height:fontScale>=1.5?80:Math.min(step==='welcome'?210:132,height*(step==='welcome'?0.25:0.18))}]}/>:null}
    <Text ref={title} testID={`setup.step.${ready?'ready':step}`} accessibilityRole="header" style={[styles.title,headingStyle(theme),fontScale>=1.5&&styles.largeTitle,{color:theme.text}]}>{t(ready?'setup.readyTitle':titles[step])}</Text>
    {error?<Text testID="setup.error" accessibilityRole="alert" style={[styles.body,{color:theme.danger}]}>{error}</Text>:null}
    {step==='welcome'?<>
-    <Text style={bodyStyle}>{t('setup.welcomeBody')}</Text>
     <View style={styles.space}/>
     <View style={styles.actions}>
      {button('setup.start',t('setup.start'),()=>{void act(()=>checkpoint('profile'));},true)}
@@ -115,10 +118,7 @@ export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPerm
     </View>
    </>:null}
    {step==='profile'?<>
-    <Text style={bodyStyle}>{t('setup.profileBody')}</Text>
-    {puppy(true)}
-    <Text style={[styles.label,{color:theme.text}]}>{t('tour.nameLabel')}</Text>
-    <TextInput testID="setup.profile.input" accessibilityLabel={t('tour.nameLabel')} value={name} onChangeText={setName} placeholder={t('tour.namePlaceholder')} placeholderTextColor={theme.textMuted} maxLength={256} autoCapitalize="words" autoCorrect={false} returnKeyType="done" onSubmitEditing={Keyboard.dismiss} editable={!working} style={[styles.input,{color:theme.text,backgroundColor:theme.surfaceRaised,borderColor:theme.border,borderRadius:theme.presentation.controlRadius}]}/>
+    <TextInput testID="setup.profile.input" accessibilityLabel={t('tour.nameLabel')} value={name} onChangeText={setName} placeholder={t('tour.namePlaceholder')} placeholderTextColor={theme.textMuted} maxLength={256} autoCapitalize="words" autoCorrect={false} returnKeyType="done" onSubmitEditing={Keyboard.dismiss} editable={!working} style={[styles.input,headingStyle(theme),{color:theme.text,borderColor:theme.primary}]}/>
     <View style={styles.space}/>
     {button('setup.profile.next',t('onboarding.continue'),()=>{void act(()=>profile(name));},true)}
     {button('setup.profile.later',t('onboarding.later'),()=>{void act(()=>profile(progress.puppyName));})}
@@ -131,7 +131,6 @@ export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPerm
     <Pressable accessibilityRole="link" onPress={()=>{void Linking.openURL('https://github.com/patrickchin/puptime/blob/main/PRIVACY.md').catch(()=>setError(t('learn.linkErrorBody')));}} style={styles.privacy}><Text style={[styles.caption,{color:theme.primary,textDecorationLine:'underline'}]}>{t('account.privacy')}</Text></Pressable>
    </>:null}
    {step==='cloud'?<>
-    <Text style={bodyStyle}>{t('setup.cloudBody')}</Text>
     {cloudError?<Text testID="setup.cloud.error" accessibilityRole="alert" style={[styles.body,{color:theme.danger}]}>{t(cloudError)}</Text>:null}
     {!account?<AccountSignIn cloud={cloud} theme={theme} showIntro={false} showError={false}/>:<>
      <Text style={[styles.caption,{color:theme.textMuted}]}>{account.user.email}</Text>
@@ -157,23 +156,25 @@ export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPerm
    </>:null}
    {step==='reminders'&&!ready?<>
     <Text style={bodyStyle}>{t('setup.remindersBody')}</Text>
-    <View style={cardStyle}>
-     <MaterialCommunityIcons name="bell-outline" color={theme.primary} size={30}/>
-     <Text style={[styles.label,{color:theme.text}]}>{t('onboarding.notificationExampleTitle')}</Text>
-     <Text style={bodyStyle}>{t('onboarding.notificationExampleBody')}</Text>
+    <View style={[cardStyle,styles.notificationPreview]}>
+     <View style={[styles.notificationIcon,{backgroundColor:theme.primarySoft}]}><MaterialCommunityIcons name="bell-outline" color={theme.primary} size={27}/></View>
+     <View style={styles.notificationCopy}><Text style={[styles.label,{color:theme.text}]}>{t('onboarding.notificationExampleTitle')}</Text><Text style={bodyStyle}>{t('onboarding.notificationExampleBody')}</Text></View>
     </View>
     <View style={styles.space}/>
     {button('setup.reminders.allow',t(notificationPermission==='blocked'?'schedule.openSettings':notificationPermission==='granted'?'setup.useReminders':'setup.allowReminders'),()=>{void act(async()=>{const granted=await onAllowNotifications();if(granted)setReady(true);else if(notificationPermission==='blocked')onOpenSystemSettings();else setError(t('schedule.notificationsBody'));});},true,working,busy)}
     {button('setup.reminders.later',t('onboarding.later'),()=>{void act(async()=>{await onDisableNotifications();setReady(true);});})}
    </>:null}
    {ready?<>
-    {puppy()}
-    <Text style={[styles.puppyName,headingStyle(theme),{color:theme.primary}]}>{shownName}</Text>
-    <Text style={bodyStyle}>{t('setup.readyBody')}</Text>
+    <View style={[styles.readyCard,{backgroundColor:theme.primarySoft,borderRadius:theme.presentation.cardRadius}]}><MaterialCommunityIcons name="check-circle-outline" size={40} color={theme.primary}/><Text style={[styles.puppyName,headingStyle(theme),{color:theme.text}]}>{shownName}</Text></View>
     <View style={styles.space}/>
     {button('setup.finish',t('onboarding.start'),()=>{void act(()=>onFinish());},true,working,busy)}
    </>:null}
   </ScrollView>
  </KeyboardAvoidingView>;
 }
-const styles=StyleSheet.create({root:{flex:1},header:{minHeight:56,paddingHorizontal:spacing.lg,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12},back:{minHeight:44,flexDirection:'row',alignItems:'center',gap:5},backText:{fontSize:15,fontWeight:'600'},brand:{flexDirection:'row',alignItems:'center',gap:8,marginLeft:'auto'},brandText:{fontSize:17},progress:{flexDirection:'row',gap:6,marginHorizontal:spacing.lg,marginBottom:8},mark:{height:4,borderRadius:4,flex:1},content:{flexGrow:1,width:'100%',maxWidth:600,alignSelf:'center',paddingHorizontal:spacing.lg,paddingTop:20,paddingBottom:spacing.md,gap:16},title:{fontSize:33,lineHeight:40,letterSpacing:-0.8},largeTitle:{fontSize:25,lineHeight:32},body:{fontSize:16,lineHeight:24},caption:{fontSize:14,lineHeight:21},label:{fontSize:16,lineHeight:23,fontWeight:'700'},puppy:{width:'100%',marginVertical:8},puppyName:{fontSize:26,lineHeight:34},input:{minHeight:54,borderWidth:1,paddingHorizontal:16,paddingVertical:13,fontSize:18},space:{flexGrow:1,minHeight:8},actions:{gap:12},card:{padding:20,borderWidth:1,gap:10},privacy:{minHeight:44,justifyContent:'center'},loading:{flexDirection:'row',alignItems:'center',gap:12}});
+const styles=StyleSheet.create({
+ root:{flex:1},header:{minHeight:56,paddingHorizontal:spacing.lg,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12},back:{minHeight:44,flexDirection:'row',alignItems:'center',gap:5},backText:{fontSize:15,fontWeight:'600'},brand:{flexDirection:'row',alignItems:'center',gap:8,marginLeft:'auto'},brandText:{fontSize:17},progress:{flexDirection:'row',gap:6,marginHorizontal:spacing.lg,marginBottom:8},mark:{height:4,borderRadius:4,flex:1},
+ content:{flexGrow:1,width:'100%',maxWidth:600,alignSelf:'center',paddingHorizontal:spacing.lg,paddingTop:28,paddingBottom:spacing.md,gap:20},profileContent:{paddingTop:32},title:{fontSize:36,lineHeight:43,letterSpacing:-0.9},largeTitle:{fontSize:25,lineHeight:32},body:{fontSize:16,lineHeight:24},caption:{fontSize:14,lineHeight:21},label:{fontSize:16,lineHeight:23,fontWeight:'700'},
+ mascot:{width:'100%',alignSelf:'center'},puppyName:{fontSize:28,lineHeight:36,flexShrink:1},input:{minHeight:76,borderBottomWidth:2,paddingHorizontal:0,paddingTop:8,paddingBottom:14,fontSize:31,lineHeight:40},
+ space:{flexGrow:1,minHeight:8},actions:{gap:12},card:{padding:20,borderWidth:1,gap:10},privacy:{minHeight:44,justifyContent:'center'},loading:{flexDirection:'row',alignItems:'center',gap:12},notificationPreview:{flexDirection:'row',alignItems:'center',gap:14,marginTop:12},notificationIcon:{width:50,height:50,borderRadius:16,alignItems:'center',justifyContent:'center'},notificationCopy:{flex:1,gap:4},readyCard:{padding:26,marginTop:16,gap:20},
+});
