@@ -42,11 +42,10 @@ name: iOS custom timed reminder create remove and restart
     enabled: true
 - doubleTapOn:
     id: notifications.timed.save
-- runFlow:
-    when:
-      visible: ^Allow$
-    commands:
-      - tapOn: ^Allow$
+# The driver may already accept a configured system prompt; verify permission below.
+- tapOn:
+    text: ^Allow$
+    optional: true
 - extendedWaitUntil:
     notVisible:
       id: notifications.timed.editor

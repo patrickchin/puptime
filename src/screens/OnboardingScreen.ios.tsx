@@ -85,7 +85,7 @@ export function OnboardingScreen({theme, mode, notificationPermission, onAllowNo
       <View style={[styles.footer,largeText&&styles.scrollFooter,{backgroundColor:theme.background,borderColor:theme.border}]}>
         <Pressable testID="onboarding.primary" accessibilityRole="button" disabled={busy} accessibilityState={{disabled:busy,busy}} onPress={()=>step<lastStep?setStep(step+1):void finish()} style={({pressed})=>[styles.primary,{backgroundColor:pressed?theme.primaryPressed:theme.primary,borderRadius:theme.presentation.controlRadius,opacity:busy?0.6:1}]}>
           <Text style={[styles.primaryText,{color:theme.onPrimary}]}>{t(step<lastStep||embedded?'onboarding.continue':replay?'tour.replayDone':'onboarding.start')}</Text>
-          <MaterialCommunityIcons name="arrow-right" size={21} color={theme.onPrimary}/>
+          <MaterialCommunityIcons accessible={false} name="arrow-right" size={21} color={theme.onPrimary}/>
         </Pressable>
         {step>0?<View style={[step===3&&!replay?styles.footerChoices:undefined,largeText&&styles.largeChoices]}>
           <Pressable testID="onboarding.back" accessibilityRole="button" disabled={busy} onPress={()=>{Keyboard.dismiss();setStep(step-1);}} style={styles.back}><Text style={[styles.backText,{color:theme.textMuted}]}>{t('onboarding.back')}</Text></Pressable>
@@ -98,7 +98,7 @@ export function OnboardingScreen({theme, mode, notificationPermission, onAllowNo
     <KeyboardAvoidingView testID="screen.onboarding" behavior="padding" style={[styles.root,{backgroundColor:theme.background}]}>
       <View style={styles.topBar}>
         <View style={styles.brand}>
-          <MaterialCommunityIcons name="paw" size={20} color={theme.primary}/>
+          <MaterialCommunityIcons accessible={false} name="paw" size={20} color={theme.primary}/>
           <Text maxFontSizeMultiplier={1.3} style={[styles.brandText,headingStyle(theme),{color:theme.text}]}>Puptime</Text>
         </View>
         <Pressable testID="onboarding.skip" accessibilityRole="button" disabled={busy} accessibilityState={{disabled:busy}} onPress={()=>void finish(true)} style={styles.skip}>
@@ -125,7 +125,7 @@ export function OnboardingScreen({theme, mode, notificationPermission, onAllowNo
               })}
             </View>
             {practice&&colors?<View testID="onboarding.demo.row" accessible accessibilityLabel={t('tour.practiceAdded',{activity:activityLabel({type:practice})})} style={[styles.practiceRow,{backgroundColor:colors.softColor}]}>
-              <MaterialCommunityIcons name="check-circle-outline" size={23} color={colors.color}/>
+              <MaterialCommunityIcons accessible={false} name="check-circle-outline" size={23} color={colors.color}/>
               <Text style={[styles.practiceText,{color:theme.text}]}>{t('tour.practiceAdded',{activity:activityLabel({type:practice})})}</Text>
             </View>:null}
           </Animated.View>
@@ -156,7 +156,7 @@ export function OnboardingScreen({theme, mode, notificationPermission, onAllowNo
             <Switch testID="onboarding.demo.routine.reminder" accessibilityLabel={t('tour.practiceReminder')} value={practiceReminder} onValueChange={setPracticeReminder} trackColor={{true:theme.primary,false:theme.border}}/>
           </View>
           <View style={[styles.reminderPreview,{backgroundColor:theme.primarySoft}]}>
-            <MaterialCommunityIcons name={practiceReminder?'bell-ring-outline':'bell-off-outline'} size={23} color={theme.primary}/>
+            <MaterialCommunityIcons accessible={false} name={practiceReminder?'bell-ring-outline':'bell-off-outline'} size={23} color={theme.primary}/>
             <Text style={[styles.flex,styles.body,{color:theme.text}]}>{t(practiceReminder?'tour.practiceReminderOn':'tour.practiceReminderOff')}</Text>
           </View>
         </View>:null}
@@ -165,9 +165,9 @@ export function OnboardingScreen({theme, mode, notificationPermission, onAllowNo
           {!replay?<>
             <TextInput testID="onboarding.name.input" accessibilityLabel={t('tour.nameLabel')} value={puppyName} onChangeText={setPuppyName} placeholder={t('tour.namePlaceholder')} placeholderTextColor={theme.textMuted} maxLength={256} autoCapitalize="words" autoCorrect={false} textContentType="none" returnKeyType="done" onSubmitEditing={Keyboard.dismiss} editable={!busy} style={[styles.nameInput,{color:theme.text,backgroundColor:theme.surfaceRaised,borderColor:theme.border,borderRadius:theme.presentation.controlRadius}]}/>
             <View style={[styles.notificationCard,card,largeText&&styles.largeNotification]}>
-              <MaterialCommunityIcons name="bell-outline" color={theme.primary} size={25}/>
+              <MaterialCommunityIcons accessible={false} name="bell-outline" color={theme.primary} size={25}/>
               <View style={[styles.flex,largeText&&styles.largeCopy]}><Text style={[styles.fieldLabel,{color:theme.text}]}>{t('tour.notificationsTitle')}</Text><Text style={[styles.small,{color:theme.textMuted}]}>{t(notificationPermission==='granted'?'tour.notificationsOn':'tour.notificationsOptional')}</Text></View>
-              {notificationPermission!=='granted'?<Pressable testID="onboarding.notifications.allow" accessibilityRole="button" disabled={busy} onPress={()=>void allowNotifications()} style={[styles.allow,largeText&&styles.largeAllow]}><Text style={[styles.allowText,{color:theme.primary}]}>{t(notificationPermission==='blocked'?'schedule.openSettings':'tour.allow')}</Text></Pressable>:<MaterialCommunityIcons name="check-circle" color={theme.primary} size={25}/>}
+              {notificationPermission!=='granted'?<Pressable testID="onboarding.notifications.allow" accessibilityRole="button" disabled={busy} onPress={()=>void allowNotifications()} style={[styles.allow,largeText&&styles.largeAllow]}><Text style={[styles.allowText,{color:theme.primary}]}>{t(notificationPermission==='blocked'?'schedule.openSettings':'tour.allow')}</Text></Pressable>:<MaterialCommunityIcons accessible={false} name="check-circle" color={theme.primary} size={25}/>}
             </View>
           </>:null}
         </>:null}

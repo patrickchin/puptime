@@ -69,11 +69,10 @@ name: iOS side navigation and notification preferences
     checked: false
 - tapOn:
     id: settings.notifications.deviceDelivery
-- runFlow:
-    when:
-      visible: ^Allow$
-    commands:
-      - tapOn: ^Allow$
+# The driver may already accept a configured system prompt; verify permission below.
+- tapOn:
+    text: ^Allow$
+    optional: true
 - assertVisible:
     id: settings.notifications.deviceDelivery
     checked: true

@@ -690,14 +690,14 @@ export default function App() {
           {Platform.OS==='ios'&&onboardingVisible===false?<View style={styles.navigationHeader}>
             <Pressable testID="nav.open" accessibilityRole="button" accessibilityLabel={translate(language,'nav.open')} onPress={()=>setDrawerOpen(true)}
               style={({pressed})=>[styles.menuButton,{backgroundColor:pressed?theme.primarySoft:theme.surface,borderRadius:theme.presentation.controlRadius}]}>
-              <MaterialCommunityIcons name="menu" size={25} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
+              <MaterialCommunityIcons accessible={false} name="menu" size={25} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
             </Pressable>
             <Text accessibilityRole={settingsVisible||tab==='notifications'?'header':undefined} style={[styles.navigationTitle,{color:theme.text}]}>{settingsVisible?translate(language,'settings.title'):tab==='notifications'?translate(language,'notifications.title'):'Puptime'}</Text>
             {settingsVisible?<Pressable testID="settings.back" accessibilityRole="button" accessibilityLabel={translate(language,'settings.back')} onPress={()=>setSettingsVisible(false)} style={styles.menuButton}>
-              <MaterialCommunityIcons name="close" size={24} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
+              <MaterialCommunityIcons accessible={false} name="close" size={24} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
             </Pressable>:null}
             {!settingsVisible&&tab==='log'?<Pressable testID="settings.open" accessibilityRole="button" accessibilityLabel={translate(language,'log.openSettingsA11y')} onPress={()=>setSettingsVisible(true)} style={styles.menuButton}>
-              <MaterialCommunityIcons name="cog-outline" size={24} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
+              <MaterialCommunityIcons accessible={false} name="cog-outline" size={24} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
             </Pressable>:null}
           </View>:null}
           <View style={styles.screen}>

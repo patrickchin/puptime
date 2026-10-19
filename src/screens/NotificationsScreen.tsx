@@ -187,7 +187,7 @@ export function NotificationsScreen({
       <View style={cardStyle}>
         {notificationDelivery !== undefined && onNotificationDeliveryChange ? (
           <View style={styles.row}>
-            <MaterialCommunityIcons name="bell-outline" size={24} color={theme.primary}
+            <MaterialCommunityIcons accessible={false} name="bell-outline" size={24} color={theme.primary}
               accessibilityElementsHidden importantForAccessibility="no" />
             <View style={styles.copy}>
               <Text style={[styles.label, { color: theme.text }]}>{t('settings.deviceDelivery')}</Text>
@@ -227,7 +227,7 @@ export function NotificationsScreen({
             <Text style={[styles.actionLabel, { color: theme.primary }]}>
               {t(notificationPermission === 'requestable' ? 'settings.allowNotifications' : 'schedule.openSettings')}
             </Text>
-            <MaterialCommunityIcons name="chevron-right" size={21} color={theme.primary}
+            <MaterialCommunityIcons accessible={false} name="chevron-right" size={21} color={theme.primary}
               accessibilityElementsHidden importantForAccessibility="no" />
           </Pressable>
         ) : null}
@@ -237,7 +237,7 @@ export function NotificationsScreen({
         <Pressable testID="notifications.timed.add" accessibilityRole="button" accessibilityState={{ disabled: saving || !petId }}
           disabled={saving || !petId} onPress={addTimed}
           style={({ pressed }) => [styles.row, { backgroundColor: pressed ? theme.primarySoft : undefined, borderRadius: theme.presentation.controlRadius, opacity: saving || !petId ? 0.55 : 1 }]}>
-          <MaterialCommunityIcons name="plus" size={24} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no" />
+          <MaterialCommunityIcons accessible={false} name="plus" size={24} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no" />
           <Text style={[styles.actionLabel, { color: theme.primary }]}>{t('notifications.addTimed')}</Text>
         </Pressable>
         {timedLoading ? <View style={styles.loadingRow}><ActivityIndicator color={theme.primary} /><Text style={[styles.detail, { color: theme.textMuted }]}>{t('notifications.timedLoading')}</Text></View> : null}
@@ -255,7 +255,7 @@ export function NotificationsScreen({
           <Pressable testID={`notifications.timed.remove.${reminder.id}`} accessibilityRole="button" accessibilityLabel={t('notifications.timedRemove', { label: reminder.label })}
             disabled={saving} accessibilityState={{ disabled: saving }} onPress={() => removeTimed(reminder)}
             style={({ pressed }) => [styles.removeButton, { backgroundColor: pressed ? theme.dangerSoft : undefined, opacity: saving ? 0.55 : 1, borderRadius: theme.presentation.controlRadius }]}>
-            <MaterialCommunityIcons name="close" size={22} color={theme.textMuted} accessibilityElementsHidden importantForAccessibility="no" />
+            <MaterialCommunityIcons accessible={false} name="close" size={22} color={theme.textMuted} accessibilityElementsHidden importantForAccessibility="no" />
           </Pressable>
         </View>)}
       </View>
@@ -293,7 +293,7 @@ export function NotificationsScreen({
             borderRadius: theme.presentation.controlRadius,
           }]}
         >
-          <MaterialCommunityIcons name="calendar-clock-outline" size={24} color={theme.primary}
+          <MaterialCommunityIcons accessible={false} name="calendar-clock-outline" size={24} color={theme.primary}
             accessibilityElementsHidden importantForAccessibility="no" />
           <View style={styles.copy}>
             <Text style={[styles.label, { color: theme.text }]}>{t('settings.routineReminders')}</Text>
@@ -301,7 +301,7 @@ export function NotificationsScreen({
               {t('settings.routineRemindersDetail', { count: routineReminderCount })}
             </Text>
           </View>
-          <MaterialCommunityIcons name="chevron-right" size={23} color={theme.textMuted}
+          <MaterialCommunityIcons accessible={false} name="chevron-right" size={23} color={theme.textMuted}
             accessibilityElementsHidden importantForAccessibility="no" />
         </Pressable>
         <View style={[styles.divider, { backgroundColor: theme.border }]} />
@@ -330,7 +330,7 @@ export function NotificationsScreen({
                     opacity: saving ? 0.55 : 1,
                   }]}
                 >
-                  {selected ? <MaterialCommunityIcons name="check" size={16} color={theme.primary}
+                  {selected ? <MaterialCommunityIcons accessible={false} name="check" size={16} color={theme.primary}
                     accessibilityElementsHidden importantForAccessibility="no" /> : null}
                   <Text style={[styles.choiceLabel, { color: selected ? theme.primary : theme.text }]}>{label}</Text>
                 </Pressable>
@@ -347,7 +347,7 @@ export function NotificationsScreen({
             <Text style={[styles.editorTitle, { color: theme.text, fontFamily: theme.presentation.headingFont }]}>{t('notifications.timedPrompt')}</Text>
             <Pressable testID="notifications.timed.close" accessibilityRole="button" accessibilityLabel={t('app.cancel')}
               disabled={saving} onPress={() => setDraft(null)} style={styles.removeButton}>
-              <MaterialCommunityIcons name="close" size={24} color={theme.text} accessibilityElementsHidden importantForAccessibility="no" />
+              <MaterialCommunityIcons accessible={false} name="close" size={24} color={theme.text} accessibilityElementsHidden importantForAccessibility="no" />
             </Pressable>
           </View>
           <TextInput testID="notifications.timed.label" accessibilityLabel={t('notifications.timedPrompt')} maxLength={80}
@@ -415,7 +415,7 @@ function PottyReminderRule({
               }]}
             >
               <Text style={[styles.actionLabel, { color: theme.primary }]}>{delayLabel(rule.delayMinutes)}</Text>
-              <MaterialCommunityIcons name={expanded ? 'chevron-up' : 'chevron-down'} size={19} color={theme.primary}
+              <MaterialCommunityIcons accessible={false} name={expanded ? 'chevron-up' : 'chevron-down'} size={19} color={theme.primary}
                 accessibilityElementsHidden importantForAccessibility="no" />
             </Pressable>
           ) : null}
@@ -452,7 +452,7 @@ function PottyReminderRule({
                   opacity: disabled ? 0.55 : 1,
                 }]}
               >
-                {selected ? <MaterialCommunityIcons name="check" size={16} color={theme.primary}
+                {selected ? <MaterialCommunityIcons accessible={false} name="check" size={16} color={theme.primary}
                   accessibilityElementsHidden importantForAccessibility="no" /> : null}
                 <Text style={[styles.choiceLabel, { color: selected ? theme.primary : theme.text }]}>{delayLabel(delay)}</Text>
               </Pressable>

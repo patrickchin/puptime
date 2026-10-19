@@ -78,6 +78,19 @@ try{
  const before=renders(),target=events.at(-1).id;
  assert.equal(Object.keys(before).length,200,'The actual EventRow body observer must be active.');
  console.log('PASS '+count+': actual initial history reads201 SQL rows and renders200 records. Rows/ms:',trace().reads.map(read=>[read.rows,read.ms]));
+ flow('drawer-preserves-loaded-rows',`
+- tapOn:
+    id: nav.open
+- assertVisible:
+    id: nav.log
+    selected: true
+- tapOn:
+    id: nav.close
+- assertVisible:
+    id: screen.today
+`);
+ assert.deepEqual(renders(),before,'Opening and closing navigation must not rerender unchanged activity rows.');
+ console.log('PASS '+count+': side drawer leaves every loaded activity row render unchanged.');
  flow('edit-loaded-record',`
 - tapOn:
     id: event.pee.edit

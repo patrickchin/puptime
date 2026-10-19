@@ -101,8 +101,8 @@ export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPerm
  const stage=firstLaunchStepSchema.options.indexOf(step)+1;
  return <KeyboardAvoidingView testID="screen.firstLaunch" behavior="padding" keyboardVerticalOffset={insets.top} style={[styles.root,{backgroundColor:theme.background}]}>
   <View style={styles.header}>
-   {step!=='welcome'&&!(enrolled&&step==='cloud')?<Pressable testID="setup.back" accessibilityRole="button" accessibilityLabel={t('onboarding.back')} disabled={working} accessibilityState={{disabled:working}} onPress={back} style={[styles.back,working&&{opacity:0.5}]}><MaterialCommunityIcons name="arrow-left" size={22} color={theme.primary}/><Text style={[styles.backText,{color:theme.primary}]}>{t('onboarding.back')}</Text></Pressable>:null}
-   <View style={styles.brand}><MaterialCommunityIcons name="paw" color={theme.primary} size={20}/><Text maxFontSizeMultiplier={1.3} style={[styles.brandText,headingStyle(theme),{color:theme.text}]}>Puptime</Text></View>
+   {step!=='welcome'&&!(enrolled&&step==='cloud')?<Pressable testID="setup.back" accessibilityRole="button" accessibilityLabel={t('onboarding.back')} disabled={working} accessibilityState={{disabled:working}} onPress={back} style={[styles.back,working&&{opacity:0.5}]}><MaterialCommunityIcons accessible={false} name="arrow-left" size={22} color={theme.primary}/><Text style={[styles.backText,{color:theme.primary}]}>{t('onboarding.back')}</Text></Pressable>:null}
+   <View style={styles.brand}><MaterialCommunityIcons accessible={false} name="paw" color={theme.primary} size={20}/><Text maxFontSizeMultiplier={1.3} style={[styles.brandText,headingStyle(theme),{color:theme.text}]}>Puptime</Text></View>
   </View>
   {step!=='welcome'?<View accessibilityRole="progressbar" accessibilityLabel={t('setup.progress',{step:stage})} accessibilityValue={{min:1,max:6,now:stage}} style={styles.progress}>{firstLaunchStepSchema.options.map((value,index)=><View key={value} style={[styles.mark,{backgroundColor:index<stage?theme.primary:theme.border}]}/>)}</View>:null}
   <ScrollView ref={scroll} keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content,step==='profile'&&styles.profileContent]}>
@@ -157,7 +157,7 @@ export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPerm
    {step==='reminders'&&!ready?<>
     <Text style={bodyStyle}>{t('setup.remindersBody')}</Text>
     <View style={[cardStyle,styles.notificationPreview]}>
-     <View style={[styles.notificationIcon,{backgroundColor:theme.primarySoft}]}><MaterialCommunityIcons name="bell-outline" color={theme.primary} size={27}/></View>
+     <View style={[styles.notificationIcon,{backgroundColor:theme.primarySoft}]}><MaterialCommunityIcons accessible={false} name="bell-outline" color={theme.primary} size={27}/></View>
      <View style={styles.notificationCopy}><Text style={[styles.label,{color:theme.text}]}>{t('onboarding.notificationExampleTitle')}</Text><Text style={bodyStyle}>{t('onboarding.notificationExampleBody')}</Text></View>
     </View>
     <View style={styles.space}/>
@@ -165,7 +165,7 @@ export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPerm
     {button('setup.reminders.later',t('onboarding.later'),()=>{void act(async()=>{await onDisableNotifications();setReady(true);});})}
    </>:null}
    {ready?<>
-    <View style={[styles.readyCard,{backgroundColor:theme.primarySoft,borderRadius:theme.presentation.cardRadius}]}><MaterialCommunityIcons name="check-circle-outline" size={40} color={theme.primary}/><Text style={[styles.puppyName,headingStyle(theme),{color:theme.text}]}>{shownName}</Text></View>
+    <View style={[styles.readyCard,{backgroundColor:theme.primarySoft,borderRadius:theme.presentation.cardRadius}]}><MaterialCommunityIcons accessible={false} name="check-circle-outline" size={40} color={theme.primary}/><Text style={[styles.puppyName,headingStyle(theme),{color:theme.text}]}>{shownName}</Text></View>
     <View style={styles.space}/>
     {button('setup.finish',t('onboarding.start'),()=>{void act(()=>onFinish());},true,working,busy)}
    </>:null}
