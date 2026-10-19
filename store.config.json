@@ -4,11 +4,11 @@
     "version": "1.11.30",
     "copyright": "2026 Patrick Chin",
     "release": {
-      "automaticRelease": true
+      "automaticRelease": false
     },
     "info": {
       "en-US": {
-        "description": "Tap Pee, Poop, or Eat to record it; edit the time, type or dictate a note, or change the details later. Today and yesterday stay visible in the log, with earlier dates available on demand.\n\nSet a schedule if you need one, with or without reminders. Compare timing patterns in Timeline, where possible gaps appear as faded marks without being added to history. Saved or imported estimated entries keep their Estimated label and are counted separately from recorded activity. Choose 2–4 Home Screen widget actions, including walks, naps, or custom activities. Start and stop naps from the widget to track their duration.\n\nExport an activity CSV to keep a backup, then import it to recover missing entries while keeping your current edits. Backups include activity times, notes, custom activity names, nap state, and estimate labels. Routines and settings are not included.\n\nPuptime tracks one pet without an account, ads, a subscription, analytics, or tracking. Activity data stays on your device unless you choose to export it. Voice dictation uses your device's speech-recognition service and may require a network connection.\n\nThe starter routine is an editable example, not veterinary advice. Adjust it with your veterinarian's guidance.",
+        "description": "Keep track of potty breaks and meals while you learn your puppy's routine. Tap Pee, Poop, or Eat, then adjust the time or add a note when you need to.\n\nBuild an editable routine and choose reminders that suit your day. Timeline helps you spot patterns. Estimated entries stay labelled and count separately from recorded activity.\n\nLocal logging is free and works offline without an account. Optional cloud backup and device sync let you keep the same puppy history across your devices. Sign in and choose to enable cloud access before any puppy data is uploaded. Cloud access is a separate service; the available plan and any trial are shown before you choose it.\n\nExport an activity CSV from Insights, or import a backup to recover missing entries while keeping your current edits. CSV backups include activity times, notes, custom activity names, and estimate labels. Routines and settings are not included in the activity CSV.\n\nVoice dictation uses your device's speech-recognition service and may need an internet connection. The starter routine is an editable example. Adjust it with your veterinarian's guidance.",
         "keywords": [
           "dog",
           "routine",
@@ -20,16 +20,15 @@
           "reminder",
           "history",
           "offline",
-          "widget",
           "log"
         ],
-        "marketingUrl": "https://github.com/patrickchin/puptime",
-        "promoText": "Tap Pee, Poop, or Eat in Log, or use configurable Home Screen widget actions for walks, naps, and other puppy activities.",
+        "marketingUrl": "https://puptime.pages.dev",
+        "promoText": "Log potty breaks and meals, spot timing patterns, and choose reminders for your puppy. Start with free offline logging; add cloud backup when you need it.",
         "supportUrl": "https://github.com/patrickchin/puptime/issues",
         "title": "Puptime: Puppy Tracker",
-        "subtitle": "Potty, meals, walks & naps",
+        "subtitle": "Potty, meals & puppy routines",
         "privacyPolicyUrl": "https://github.com/patrickchin/puptime/blob/main/PRIVACY.md",
-        "releaseNotes": "• Listen while reading with a compact audio bar above the navigation tabs.\n• Tap or drag to seek, skip 15 seconds, adjust playback speed, and mute.\n• Landscape and tablet layouts use a single horizontal player."
+        "releaseNotes": "• Set up your puppy profile and choose local logging or optional cloud backup.\n• Sign in for cloud access and keep your puppy history across devices.\n• Restore missing activity from a CSV backup while keeping your current edits."
       }
     },
     "categories": [

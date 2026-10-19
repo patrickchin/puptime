@@ -1,9 +1,9 @@
-Tap Pee, Poop, or Eat to record it; edit the time, type or dictate a note, or change the details later. Today and yesterday stay visible in the log, with earlier dates available on demand.
+Keep track of potty breaks and meals while you learn your puppy's routine. Tap Pee, Poop, or Eat, then adjust the time or add a note when you need to.
 
-Set a schedule if you need one, with or without reminders. Compare timing patterns in Timeline, where possible gaps appear as faded marks without being added to history. Saved or imported estimated entries keep their Estimated label and are counted separately from recorded activity. Choose 2–4 Home Screen widget actions, including walks, naps, or custom activities. Start and stop naps from the widget to track their duration.
+Build an editable routine and choose reminders that suit your day. Timeline helps you spot patterns. Estimated entries stay labelled and count separately from recorded activity.
 
-Export an activity CSV to keep a backup, then import it to recover missing entries while keeping your current edits. Backups include activity times, notes, custom activity names, nap state, and estimate labels. Routines and settings are not included.
+Local logging is free and works offline without an account. Optional cloud backup and device sync let you keep the same puppy history across your devices. Sign in and choose to enable cloud access before any puppy data is uploaded. Cloud access is a separate service; the available plan and any trial are shown before you choose it.
 
-Puptime tracks one pet without an account, ads, a subscription, analytics, or tracking. Activity data stays on your device unless you choose to export it. Voice dictation uses your device's speech-recognition service and may require a network connection.
+Export an activity CSV from Insights, or import a backup to recover missing entries while keeping your current edits. CSV backups include activity times, notes, custom activity names, and estimate labels. Routines and settings are not included in the activity CSV.
 
-The starter routine is an editable example, not veterinary advice. Adjust it with your veterinarian's guidance.
+Voice dictation uses your device's speech-recognition service and may need an internet connection. The starter routine is an editable example. Adjust it with your veterinarian's guidance.
