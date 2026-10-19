@@ -121,11 +121,18 @@ name: iOS side navigation and notification preferences
     direction: DOWN
     visibilityPercentage: 100
     centerElement: false
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: settings.notifications.lead.15
+      enabled: true
+    timeout: 10000
 - assertVisible:
     id: settings.notifications.lead.10
     text: radio button, checked
 - tapOn:
     id: settings.notifications.lead.15
+    retryTapIfNoChange: true
 - assertVisible:
     id: settings.notifications.lead.15
     text: radio button, checked

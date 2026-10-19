@@ -15,7 +15,7 @@ import { WebsiteMetadata } from './src/web/WebsiteMetadata';
 import { openAnalyticsSettings, WebsiteAnalytics } from './src/web/WebsiteAnalytics';
 import { captureWebsiteEvent } from './src/web/telemetry';
 
-const releaseUrl = 'https://github.com/patrickchin/puptime/releases/latest';
+const accountUrl = '/account';
 const sourceUrl = 'https://github.com/patrickchin/puptime';
 const privacyUrl = 'https://github.com/patrickchin/puptime/blob/main/PRIVACY.md';
 
@@ -37,12 +37,12 @@ const colors = {
 const day = [
   ['06:55', 'Potty trip'],
   ['08:10', 'Breakfast'],
-  ['13:00', 'Nap'],
+  ['13:00', 'Potty trip'],
   ['17:40', 'Walk'],
 ];
 
 const details = [
-  ['Activity', 'Pee, poop, meals, potty trips, walks, naps, and custom logs.'],
+  ['Activity', 'Pee, poop, meals, potty trips, walks, and custom logs.'],
   ['History', 'Edit logs, compare timing, or export CSV.'],
   ['Schedule', 'Set routine times and optional reminders.'],
 ];
@@ -67,8 +67,8 @@ function LinkButton({
       accessibilityRole="link"
       href={href}
       onPress={() => {
-        if (href === releaseUrl || href === sourceUrl) {
-          captureWebsiteEvent('website_cta', { destination: href === releaseUrl ? 'android_download' : 'source' });
+        if (href === sourceUrl) {
+          captureWebsiteEvent('website_cta', { destination: 'source' });
         }
       }}
       style={({ pressed }) => [
@@ -111,7 +111,7 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
         </Anchor>
         <View style={styles.headerLinks}>
           <Pressable accessibilityRole="button" onPress={openAnalyticsSettings} style={styles.navLink}><Text style={styles.textLink}>Analytics settings</Text></Pressable>
-          <LinkButton href={releaseUrl}>Download</LinkButton>
+          <LinkButton href={accountUrl}>Account</LinkButton>
         </View>
       </View>
       <LearnScreen theme={lightTheme} articleId={articleId} onArticleChange={(id) => { window.location.assign(id ? `/puppy-care/${id}` : '/puppy-care/'); }} />
@@ -136,7 +136,7 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
               <Text style={styles.textLink}>Privacy</Text>
             </Anchor>
           )}
-          <LinkButton href={releaseUrl}>Download</LinkButton>
+          <LinkButton href={accountUrl}>Account</LinkButton>
         </View>
       </View>
 
@@ -150,14 +150,13 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
             Puppy log
           </Text>
           <Text style={[styles.intro, compact && styles.introCompact]}>
-            Record potty breaks, meals, walks, naps, and other activities. Data stays on your
-            device.
+            Potty breaks, meals, walks, and the little moments between. Log freely on your iPhone, with optional cloud backup and device sync.
           </Text>
           <View style={[styles.actions, compact && styles.actionsCompact]}>
-            <LinkButton href={releaseUrl}>Download for Android</LinkButton>
+            <LinkButton href={accountUrl}>Manage your account</LinkButton>
             <LinkButton href={sourceUrl} quiet>View the source</LinkButton>
           </View>
-          <Text style={styles.note}>Open source · iPhone and Android</Text>
+          <Text style={styles.note}>iPhone first · Free local logging · Open source</Text>
         </View>
 
         <View style={[styles.dayCard, narrow && styles.dayCardStacked, compact && styles.dayCardCompact]}>
@@ -205,21 +204,13 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
 
         <View style={[styles.widgetFeature, narrow && styles.widgetFeatureNarrow]}>
           <View style={styles.widgetCopy}>
-            <Text style={styles.detailLabel}>IPHONE HOME SCREEN</Text>
-            <Text accessibilityRole="header" aria-level={2} style={styles.widgetTitle}>The little things, one tap away.</Text>
+            <Text style={styles.detailLabel}>OPTIONAL CLOUD BACKUP</Text>
+            <Text accessibilityRole="header" aria-level={2} style={styles.widgetTitle}>A little peace of mind.</Text>
             <Text style={styles.widgetDescription}>
-              Log a pee, poop, or meal straight from the Puptime widget. Your most recent time stays
-              in view between visits.
+              Local logging is free without an account. Sign in when you want to manage your cloud backup and sign-in methods. Your saved cloud data stays yours when sync is paused.
             </Text>
           </View>
-          <View style={styles.widgetScreenshotFrame}>
-            <Image
-              accessibilityLabel="Puptime quick log widget on an iPhone Home Screen"
-              resizeMode="cover"
-              source={require('./assets/screenshots/widget.jpg')}
-              style={styles.previewImage}
-            />
-          </View>
+          <LinkButton href={accountUrl}>Your account</LinkButton>
         </View>
 
         <View style={[styles.previewGrid, compact && styles.previewGridCompact]}>
@@ -249,6 +240,7 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
       <View style={[styles.footer, compact && styles.footerCompact]}>
         <Text style={styles.footerLine}>Puptime</Text>
         <View style={[styles.footerLinks, compact && styles.footerLinksCompact]}>
+          <Anchor accessibilityRole="link" href={accountUrl}><Text style={styles.textLink}>Account</Text></Anchor>
           <Pressable accessibilityRole="button" onPress={openAnalyticsSettings} style={styles.navLink}><Text style={styles.textLink}>Analytics settings</Text></Pressable>
           <Anchor accessibilityRole="link" href="/puppy-care/"><Text style={styles.textLink}>Puppy care</Text></Anchor>
           <Anchor accessibilityRole="link" href={sourceUrl}>
@@ -626,16 +618,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 28,
     marginTop: 20,
-  },
-  widgetScreenshotFrame: {
-    width: 284,
-    maxWidth: '100%',
-    aspectRatio: 1320 / 2868,
-    overflow: 'hidden',
-    borderColor: colors.ink,
-    borderWidth: 6,
-    borderRadius: 34,
-    backgroundColor: colors.white,
   },
   previewGrid: {
     width: '100%',

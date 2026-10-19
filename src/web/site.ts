@@ -10,7 +10,7 @@ export function pageMetadata(path: string) {
     title: article ? `${article.title} | Puptime` : library ? 'Puppy care guides: feeding, sleep & toilet training | Puptime' : 'Puptime — Puppy activity log & potty training tracker',
     description: article?.summary ?? (library
       ? 'Practical puppy care guides on toilet training, feeding, sleep, socialisation, and daily routines, with sources from animal welfare and veterinary organisations.'
-      : 'Track puppy potty breaks, meals, walks, and naps with Puptime. Build a daily routine, spot timing patterns, and log from your Home Screen. Free and open source.'),
+      : 'Track puppy potty breaks, meals, and walks with Puptime for iPhone. Local logging is free without an account, with optional cloud backup and device sync.'),
     url: `${siteUrl}${library ? '/puppy-care/' : path}`,
     article,
   };

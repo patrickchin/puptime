@@ -8,7 +8,9 @@ copyFileSync('assets/puptime-icon.png', 'dist-web/social-preview.png');
 copyFileSync('dist-web/+not-found.html', 'dist-web/404.html');
 for (const path of ['+not-found.html', '_sitemap.html', 'puppy-care/[id].html']) rmSync(`dist-web/${path}`, { force: true });
 // Cloudflare also protects preview deployments; keep that policy explicit in source.
-writeFileSync('dist-web/_headers', `/*\n  Referrer-Policy: strict-origin-when-cross-origin\n  X-Content-Type-Options: nosniff\nhttps://:preview.puptime.pages.dev/*\n  X-Robots-Tag: noindex\n`);
+writeFileSync('dist-web/_headers', `/*\n  Referrer-Policy: strict-origin-when-cross-origin\n  X-Content-Type-Options: nosniff\nhttps://:preview.puptime.pages.dev/*\n  X-Robots-Tag: noindex\n/account\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n/account.html\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n`);
+const accountHtml=readFileSync('dist-web/account.html','utf8');
+if(!accountHtml.includes('noindex')||!accountHtml.includes('Your account | Puptime')||publicPaths.includes('/account'))throw new Error('Account must be static, private and excluded from the sitemap.');
 for (const path of publicPaths) {
   const filename = path === '/' ? 'index' : path === '/puppy-care/' ? 'puppy-care/index' : path.slice(1);
   const html = readFileSync(`dist-web/${filename}.html`, 'utf8');

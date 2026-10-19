@@ -21,7 +21,7 @@ export function configuredProviders(env: Cloudflare.Env) {
   };
 }
 
-export function createAuth(env: Cloudflare.Env) {
+export function createAuth(env: Cloudflare.Env, options: { disableEmailSignUp?: boolean } = {}) {
   const baseURL = z.url().parse(env.AUTH_BASE_URL);
   const secret = z.string().min(32).parse(env.AUTH_SECRET);
   const base = new URL(baseURL);
@@ -51,7 +51,7 @@ export function createAuth(env: Cloudflare.Env) {
     },
     disabledPaths: ['/email-otp/request-password-reset', '/forget-password/email-otp', '/email-otp/reset-password', '/delete-user', '/delete-user/callback'],
     plugins: [expo(), emailOTP({
-      expiresIn: 300, allowedAttempts: 3, storeOTP: 'hashed',
+      expiresIn: 300, allowedAttempts: 3, disableSignUp: options.disableEmailSignUp ?? false, storeOTP: 'hashed',
       async sendVerificationOTP({ email, otp }) {
         if (env.ENVIRONMENT === 'local') {
           await env.AUTH_DB.prepare('INSERT INTO local_email_previews(id, email, code, expires_at) VALUES (?, ?, ?, ?)')
