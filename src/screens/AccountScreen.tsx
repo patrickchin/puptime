@@ -65,6 +65,12 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
             {account.cloud.expiresAt?<Text style={[styles.body,bodyStyle]}>{t('account.expires',{date:new Intl.DateTimeFormat(locale,{dateStyle:'medium'}).format(account.cloud.expiresAt)})}</Text>:null}
             <AccountButton theme={theme} testID="account.retry" label={t(status==='expired'?'account.refresh':'account.retry')} disabled={busy||state!.running||!state!.online} onPress={()=>{void cloud.controller!.retry();}}/>
           </View>)}
+          {state?.config&&(state.config.providers.apple||state.config.providers.google)?<View style={cardStyle}>
+            {state.linkedProviders===null?<AccountButton theme={theme} testID="account.methods.refresh" label={t(busy?'account.methodsLoading':'account.refreshMethods')} disabled={busy||!state.online} loading={busy} onPress={()=>{void cloud.controller!.refresh();}}/>:(['apple','google'] as const).filter(provider=>state.config!.providers[provider]).map(provider=>state.linkedProviders!.includes(provider)?<View key={provider} testID={`account.${provider}.connected`} style={styles.summaryHeader}>
+              <MaterialCommunityIcons name="check-circle-outline" size={22} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
+              <Text style={[styles.body,styles.grow,{color:theme.text}]}>{t(provider==='apple'?'account.connectedApple':'account.connectedGoogle')}</Text>
+            </View>:<AccountButton key={provider} theme={theme} testID={`account.${provider}.connect`} label={t(provider==='apple'?'account.connectApple':'account.connectGoogle')} icon={provider} disabled={busy||!state.online} loading={state.linkingProvider===provider} onPress={()=>{void cloud.controller!.connectProvider(provider);}}/>)}
+          </View>:null}
           <AccountButton theme={theme} testID="account.signOut" label={t('account.signOut')} disabled={busy} onPress={signOut}/>
         </View>)}
         {!account&&state?.sync?.accountId?<AccountButton theme={theme} testID="account.signOut" label={t('account.signOut')} disabled={busy} onPress={signOut}/>:null}

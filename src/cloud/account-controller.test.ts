@@ -12,16 +12,136 @@ async function fixture(t:TestContext,{pristine=false}={}) {
  await initializeLocalDatabase(database,()=> 'pet-1');if(!pristine)await database.write(sql=>sql.runAsync('DELETE FROM routines'));
  const writes=new Set<()=>void>(),runtime=await createLocalRuntime(database,'pet-1',()=>{for(const fn of writes)fn();});
  const summary:CloudAccountSummary={user:{id:'account-1',email:'person@example.com',name:'Person'},cloud:{canSync:false,canExport:true,source:'none',expiresAt:null},pets:[]};
- const state={credentials:false,summary,trialCalls:0,signOutCalls:0,signOutFails:false,storageFails:false,requested:[] as string[],verifications:0};
+ const state={credentials:false,summary,trialCalls:0,signOutCalls:0,signOutFails:false,storageFails:false,requested:[] as string[],verifications:0,linkCalls:0,listCalls:0,linkedAccounts:[] as {userId:string;providerId:string}[]};
  const config={protocolVersion:1 as const,trialDays:14,providers:{apple:false,google:true,email:true},pricingFinalized:false};
  const api:CloudApi={config:async()=>config,account:async()=>{if(!state.credentials)throw new CloudApiError('auth-required',401);return structuredClone(state.summary);},startTrial:async()=>{state.trialCalls++;state.summary.cloud={canSync:true,canExport:true,source:'trial',expiresAt:8640000000000000};return {cloud:state.summary.cloud};},enroll:async request=>({petId:request.confirmedPetId??request.localPetId}),push:async mutations=>({accepted:[],rejected:mutations.map(mutation=>({operationId:mutation.operationId,error:'retry_later' as const}))}),pull:async after=>({changes:[],cursor:after,hasMore:false}),history:async()=>({revisions:[]})};
- const identity={requestEmail:async(email:string)=>{state.requested.push(email);return {error:null};},verifyEmail:async(_email:string,code:string)=>{state.verifications++;if(code!=='123456')return {error:{status:400,code:'INVALID_OTP'}};state.credentials=true;return {error:null};},signInSocial:async()=>{state.credentials=true;return {error:null};},signOut:async()=>{state.signOutCalls++;if(!state.storageFails)state.credentials=false;return {error:state.signOutFails?{status:503,code:'NETWORK_ERROR'}:null};},hasCredentials:async()=>{if(state.storageFails)throw new Error('secure storage failed');return state.credentials;}};
+ const identity:controllerModule.IdentityAdapter={requestEmail:async(email:string)=>{state.requested.push(email);return {error:null};},verifyEmail:async(_email:string,code:string)=>{state.verifications++;if(code!=='123456')return {error:{status:400,code:'INVALID_OTP'}};state.credentials=true;return {error:null};},signInSocial:async()=>{state.credentials=true;return {error:null};},linkSocial:async provider=>{state.linkCalls++;state.linkedAccounts.push({userId:state.summary.user.id,providerId:provider});return {error:null};},listAccounts:async()=>{state.listCalls++;return {data:structuredClone(state.linkedAccounts),error:null};},signOut:async()=>{state.signOutCalls++;if(!state.storageFails)state.credentials=false;return {error:state.signOutFails?{status:503,code:'NETWORK_ERROR'}:null};},hasCredentials:async()=>{if(state.storageFails)throw new Error('secure storage failed');return state.credentials;}};
  const timers:Array<{fn:()=>void;delay:number;cancelled:boolean}>=[];
  assert.equal(typeof controllerModule.createAccountController,'function');
  const controller=controllerModule.createAccountController({runtime,api,identity,subscribeLocalWrites:(fn:()=>void)=>{writes.add(fn);return()=>{writes.delete(fn);};},defer:(fn:()=>void,delay:number)=>{const task={fn,delay,cancelled:false};timers.push(task);return()=>{task.cancelled=true;};},changed:()=>{}});
  t.after(()=>controller.stop());
- return {controller,runtime,state,api,config,timers};
+ return {controller,runtime,state,api,identity,config,timers};
 }
+
+async function localTables(runtime:Awaited<ReturnType<typeof createLocalRuntime>>) {
+ return runtime.database.read(async sql=>{
+  const tables=await sql.getAllAsync<{name:string}>("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name");
+  return Promise.all(tables.map(async({name})=>[name,await sql.getAllAsync(`SELECT * FROM "${name.replaceAll('"','""')}" ORDER BY rowid`)]));
+ });
+}
+
+test('identity adapter uses official explicit linking and normalizes only safe account fields',async()=>{
+ const calls:unknown[]=[],sdk={emailOtp:{sendVerificationOtp:async()=>({error:null})},signIn:{emailOtp:async()=>({error:null}),social:async(input:unknown)=>{calls.push(input);return {error:null};}},signOut:async()=>({error:null}),getCookie:async()=> 'managed-cookie',linkSocial:async(input:unknown)=>{calls.push(input);return {error:null};},listAccounts:async()=>({data:[{userId:'owner',providerId:'google',accountId:'private-subject',accessToken:'private-token'}] as unknown,error:null})};
+ const identity=controllerModule.createIdentityAdapter(sdk);
+ await identity.signInSocial('google');await identity.linkSocial('apple');
+ assert.deepEqual(calls,[{provider:'google',callbackURL:'puptime://account',errorCallbackURL:'puptime://account'},{provider:'apple',callbackURL:'puptime://account',errorCallbackURL:'puptime://account'}]);
+ assert.deepEqual(await identity.listAccounts(),{data:[{userId:'owner',providerId:'google'}],error:null});
+ sdk.listAccounts=async()=>({data:[{providerId:'google'}],error:null});
+ assert.deepEqual(await identity.listAccounts(),{data:null,error:{status:502,code:'INVALID_RESPONSE'}});
+});
+
+test('refresh and retry load connected providers only for configured signed-in identities',async t=>{
+ const {controller,state,config}=await fixture(t);config.providers.google=false;state.credentials=true;
+ assert.equal(await controller.refresh(),'ok');assert.equal(state.listCalls,0);assert.deepEqual(controller.read().linkedProviders,[]);
+ config.providers.apple=true;state.linkedAccounts=[{userId:'account-1',providerId:'apple'},{userId:'account-1',providerId:'other'}];
+ assert.equal(await controller.refresh(),'ok');assert.deepEqual(controller.read().linkedProviders,['apple']);
+ state.linkedAccounts.push({userId:'account-1',providerId:'google'});
+ assert.equal(await controller.retry(),'ok');assert.deepEqual(controller.read().linkedProviders,['apple','google']);
+ state.credentials=false;await controller.refresh();assert.equal(controller.read().linkedProviders,null);
+});
+
+test('connecting a provider retains every local table and pending operation without activating cloud',async t=>{
+ const {controller,runtime,state}=await fixture(t);state.credentials=true;await enrollLocal(runtime);await runtime.storage.appendEvents([event]);await controller.refresh();
+ const before=await localTables(runtime),status=await runtime.sync.status(runtime.petId);assert.ok(status.pending>0);
+ assert.equal(await controller.connectProvider('google'),'ok');assert.deepEqual(controller.read().linkedProviders,['google']);assert.equal(controller.read().linkingProvider,null);
+ assert.deepEqual(await localTables(runtime),before);assert.deepEqual(await runtime.sync.status(runtime.petId),status);
+ assert.equal(state.trialCalls,0);assert.equal(state.signOutCalls,0);assert.equal(state.credentials,true);assert.equal(state.linkCalls,1);
+ assert.equal(await controller.connectProvider('google'),'ok');assert.equal(state.linkCalls,1);
+});
+
+test('a signed-in local-only owner can connect a provider without enrollment or a trial',async t=>{
+ const {controller,runtime,state}=await fixture(t);state.credentials=true;await runtime.storage.appendEvents([event]);await controller.refresh();const before=await localTables(runtime);
+ assert.equal(await controller.connectProvider('google'),'ok');assert.deepEqual(await localTables(runtime),before);assert.equal(state.trialCalls,0);assert.equal((await runtime.sync.status(runtime.petId)).state,'local');
+});
+
+test('an OAuth initiation response without a newly linked account is honestly incomplete',async t=>{
+ const {controller,runtime,state,identity}=await fixture(t);state.credentials=true;await enrollLocal(runtime);await runtime.storage.appendEvents([event]);await controller.refresh();const before=await localTables(runtime);
+ identity.linkSocial=async()=>({error:null});
+ assert.equal(await controller.connectProvider('google'),'error');assert.equal(controller.read().problem,'link-incomplete');assert.deepEqual(controller.read().linkedProviders,[]);
+ assert.deepEqual(await localTables(runtime),before);assert.equal(state.credentials,true);assert.equal(state.signOutCalls,0);
+});
+
+test('returning from the provider browser does not erase the incomplete result with a queued foreground refresh',async t=>{
+ const {controller,state,identity}=await fixture(t);state.credentials=true;controller.setActive(true);await controller.refresh();
+ let release!:()=>void,started!:()=>void;const entered=new Promise<void>(resolve=>{started=resolve;});
+ identity.linkSocial=async()=>{started();await new Promise<void>(resolve=>{release=resolve;});return {error:null};};
+ const request=controller.connectProvider('google');await entered;controller.setActive(false);controller.setActive(true);release();
+ assert.equal(await request,'error');await tick();assert.equal(controller.read().problem,'link-incomplete');
+});
+
+test('a lost linking reply stays unconfirmed until retry reconciles the same owner without replaying OAuth',async t=>{
+ const {controller,runtime,state,identity}=await fixture(t);state.credentials=true;await enrollLocal(runtime);await runtime.storage.appendEvents([event]);await controller.refresh();const before=await localTables(runtime);
+ identity.linkSocial=async()=>{state.linkCalls++;state.linkedAccounts=[{userId:'account-1',providerId:'google'}];throw new Error('response lost');};
+ assert.equal(await controller.connectProvider('google'),'error');assert.equal(controller.read().problem,'network');assert.deepEqual(controller.read().linkedProviders,[]);
+ assert.equal(await controller.retry(),'ok');assert.deepEqual(controller.read().linkedProviders,['google']);assert.equal(state.linkCalls,1);assert.deepEqual(await localTables(runtime),before);
+});
+
+test('a delayed post-link provider list is fenced against a replacement local generation',async t=>{
+ const {controller,runtime,state,identity}=await fixture(t);state.credentials=true;const owner=await enrollLocal(runtime);await runtime.storage.appendEvents([event]);await controller.refresh();
+ let release!:(value:{data:{userId:string;providerId:string}[];error:null})=>void,started!:()=>void,count=0;const entered=new Promise<void>(resolve=>{started=resolve;});
+ identity.listAccounts=async()=>{if(++count===1)return {data:[],error:null};started();return new Promise(resolve=>{release=resolve;});};
+ const request=controller.connectProvider('google');await entered;await runtime.sync.detach(owner);await runtime.sync.prepareAssociation({accountId:'account-1',localPetId:runtime.petId,deviceId:runtime.deviceId,enrollment:{operationId:'new-list-generation',deviceId:runtime.deviceId,localPetId:runtime.petId,name:'My puppy'}});const before=await localTables(runtime);
+ release({data:[{userId:'account-1',providerId:'google'}],error:null});assert.equal(await request,'error');assert.equal(controller.read().problem,'account-mismatch');assert.equal(controller.read().linkedProviders,null);assert.deepEqual(await localTables(runtime),before);
+});
+
+test('duplicate linking taps dispatch once and preserve legitimate writes made while OAuth is open',async t=>{
+ const {controller,runtime,state,identity}=await fixture(t);state.credentials=true;await enrollLocal(runtime);await runtime.storage.appendEvents([event]);await controller.refresh();
+ let release!:()=>void,started!:()=>void;const entered=new Promise<void>(resolve=>{started=resolve;});
+ identity.linkSocial=async()=>{state.linkCalls++;started();await new Promise<void>(resolve=>{release=resolve;});state.linkedAccounts=[{userId:'account-1',providerId:'google'}];return {error:null};};
+ const request=controller.connectProvider('google');await entered;assert.equal(controller.read().linkingProvider,'google');
+ assert.equal(await controller.connectProvider('google'),'cancelled');assert.equal(await controller.signInSocial('google'),'cancelled');
+ await runtime.storage.appendEvents([{...event,id:'written-during-oauth',at:200}]);const before=await localTables(runtime);release();assert.equal(await request,'ok');
+ assert.equal(state.linkCalls,1);assert.deepEqual(await localTables(runtime),before);assert.equal((await runtime.storage.loadEvents()).length,2);
+});
+
+for(const change of ['session','owner','dispose','network','auth-expired'] as const)test(`a linking completion after ${change} cannot publish a stale connected state`,async t=>{
+ const {controller,runtime,state,api,identity}=await fixture(t);state.credentials=true;const owner=await enrollLocal(runtime);await runtime.storage.appendEvents([event]);await controller.refresh();
+ let release!:()=>void,started!:()=>void;const entered=new Promise<void>(resolve=>{started=resolve;});
+ identity.linkSocial=async()=>{started();await new Promise<void>(resolve=>{release=resolve;});state.linkedAccounts=[{userId:'account-1',providerId:'google'}];return {error:null};};
+ const request=controller.connectProvider('google');await entered;
+ if(change==='session')state.summary={...state.summary,user:{...state.summary.user,id:'account-2'}};
+ if(change==='owner'){await runtime.sync.detach(owner);await runtime.sync.prepareAssociation({accountId:'account-1',localPetId:runtime.petId,deviceId:runtime.deviceId,enrollment:{operationId:'replacement-owner',deviceId:runtime.deviceId,localPetId:runtime.petId,name:'My puppy'}});}
+ if(change==='network')controller.setOnline(false);
+ if(change==='auth-expired')state.credentials=false;
+ let laterAccountCalls=0;const original=api.account;api.account=async()=>{laterAccountCalls++;return original();};
+ const listCalls=state.listCalls,before=await localTables(runtime);if(change==='dispose')controller.stop();const frozen=controller.read();
+ release();assert.equal(await request,'error');assert.notDeepEqual(controller.read().linkedProviders,['google']);assert.deepEqual(await localTables(runtime),before);
+ assert.equal(state.signOutCalls,0);assert.equal(state.trialCalls,0);
+ if(change==='dispose'){assert.equal(controller.read(),frozen);assert.equal(laterAccountCalls,0);assert.equal(state.listCalls,listCalls);}
+ if(change==='session'||change==='owner')assert.equal(controller.read().problem,'account-mismatch');
+ if(change==='auth-expired'){assert.equal(controller.read().account,null);assert.equal(controller.read().problem,'auth-required');}
+});
+
+test('a provider list from another user or a failed verification never claims a new connection',async t=>{
+ const {controller,state,identity}=await fixture(t);state.credentials=true;await controller.refresh();
+ identity.linkSocial=async()=>({error:null});identity.listAccounts=async()=>({data:[{userId:'other-owner',providerId:'google'}],error:null});
+ assert.equal(await controller.connectProvider('google'),'error');assert.equal(controller.read().problem,'account-mismatch');assert.equal(controller.read().linkedProviders,null);
+ identity.listAccounts=async()=>({data:null,error:{status:503}});assert.equal(await controller.refresh(),'error');assert.equal(controller.read().linkedProviders,null);
+ identity.listAccounts=async()=>{throw new Error('network');};assert.equal(await controller.refresh(),'error');assert.equal(controller.read().problem,'network');
+});
+
+test('provider linking rejects offline unavailable unauthenticated and mismatched owners before OAuth',async t=>{
+ const {controller,runtime,state}=await fixture(t);await controller.refresh();assert.equal(await controller.connectProvider('google'),'error');
+ state.credentials=true;await controller.refresh();assert.equal(await controller.connectProvider('apple'),'error');
+ controller.setOnline(false);assert.equal(await controller.connectProvider('google'),'error');controller.setOnline(true);
+ await runtime.sync.prepareAssociation({accountId:'different-owner',localPetId:runtime.petId,deviceId:runtime.deviceId,enrollment:{operationId:'wrong-owner',deviceId:runtime.deviceId,localPetId:runtime.petId,name:'My puppy'}});
+ assert.equal(await controller.connectProvider('google'),'error');assert.equal(controller.read().problem,'account-mismatch');assert.equal(state.linkCalls,0);
+});
+
+test('an unconfirmed social browser sign-in keeps its input and explains the original-method path',async t=>{
+ const {controller,runtime,identity}=await fixture(t);await controller.refresh();await controller.requestEmail('person@example.com');identity.signInSocial=async()=>({error:null});const before=await localTables(runtime);
+ assert.equal(await controller.signInSocial('google'),'error');assert.equal(controller.read().problem,'social-incomplete');assert.equal(controller.read().codeSentTo,'person@example.com');assert.deepEqual(await localTables(runtime),before);
+});
 
 test('first-launch restore validates local work before activating any trial',async t=>{
  const {controller,runtime,state}=await fixture(t,{pristine:true});

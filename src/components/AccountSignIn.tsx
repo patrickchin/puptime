@@ -20,6 +20,8 @@ export function accountProblemKey(problem:AccountProblem|null):MessageKey|null {
   if(problem==='sign-out-failed')return 'account.error.signOut';
   if(problem==='remote-sign-out-unconfirmed')return 'account.error.remoteSignOut';
   if(problem==='local-storage')return 'account.error.storage';
+  if(problem==='social-incomplete')return 'account.error.socialIncomplete';
+  if(problem==='link-incomplete')return 'account.error.linkIncomplete';
   if(problem==='provider-unavailable'||problem==='server-error'||problem==='invalid-response'||problem==='account-deleted')return 'account.error.service';
   return 'account.error.signIn';
 }

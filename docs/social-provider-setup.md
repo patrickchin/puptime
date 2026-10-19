@@ -4,9 +4,9 @@ This prepares the existing Better Auth 1.7.10 browser OAuth flow, including its 
 
 ## Coordinate the public auth origin first
 
-The Pages `/api/*` function forwards to `puptime-api-staging`; credentials and `AUTH_BASE_URL` belong to that Worker, not the static website. The checked-in staging `AUTH_BASE_URL` still names the Worker. Decide the canonical origin before registering callbacks, then coordinate the Worker configuration, native `EXPO_PUBLIC_CLOUD_API_URL`, website client, and provider consoles in one release. This change does not alter that configuration.
+The Pages `/api/*` function forwards to `puptime-api-staging`; credentials and `AUTH_BASE_URL` belong to that Worker, not the static website. The checked-in staging `AUTH_BASE_URL` is `https://puptime.pages.dev`. Deploy that configuration and coordinate the native `EXPO_PUBLIC_CLOUD_API_URL`, website client, and provider consoles before installing the provider credentials.
 
-For a Pages canonical origin, use these exact values:
+Use these exact values:
 
 | Setting | Value |
 | --- | --- |
@@ -16,7 +16,7 @@ For a Pages canonical origin, use these exact values:
 | Apple website domain | `puptime.pages.dev` |
 | Expo completion URL | `puptime://account` |
 
-If retaining the Worker as canonical, the provider callback host must instead be `puptime-api-staging.p-ch.workers.dev`. Merely accessing auth through Pages does not change URLs generated from `AUTH_BASE_URL`. Neither a purchased domain nor `harpapro.com` is needed for this staging work. Provider console acceptance and a genuine round trip remain to be verified.
+Merely accessing auth through Pages does not change URLs generated from `AUTH_BASE_URL`; the Worker configuration must also be deployed. Neither a purchased domain nor `harpapro.com` is needed for this staging work. A genuine provider round trip remains a separate qualification gate.
 
 ## Configure credentials in the provider consoles
 
@@ -28,12 +28,16 @@ Use the existing authorized accounts and least privilege. Human account access, 
 
 ## Preserve existing accounts
 
-`disableImplicitLinking: true` remains enabled. A Google or Apple identity with an existing email must not silently attach itself to that account. The installed SDK supports authenticated `linkSocial`, but Puptime's current account controller/UI does not expose it. Add that explicit, owner-fenced UI and a useful account-not-linked error before enabling providers for existing users. Different Apple Hide My Email addresses can represent a separate account; do not use the retained live qualification owner to test linking or deletion. [Account linking](https://better-auth.com/docs/concepts/users-accounts).
+`disableImplicitLinking: true` remains enabled. A Google or Apple identity with an existing email must not silently attach itself to that account. Existing users sign in with their original method, then use **Connect Apple** or **Connect Google** in Backup and sync. The controller uses the SDK's authenticated `linkSocial`, checks the same session user and local ownership generation before and after the browser, and shows Connected only after the server confirms the provider. Connecting never enrolls a puppy or changes pending local work. Different-email linking remains disabled; an Apple Hide My Email address can represent a separate account. Do not use the retained live qualification owner to test linking or deletion. [Account linking](https://better-auth.com/docs/concepts/users-accounts).
+
+The installed Expo SDK resolves its initial OAuth response even after browser cancellation and does not expose callback errors to Puptime. Both completion URLs return to the app. If the expected session or provider cannot be confirmed, show the contextual incomplete-flow message and a retry; do not claim a particular provider error or report Connected from the initial response alone.
 
 Apple OAuth itself does not require an email-code delivery. Email recovery to Hide My Email addresses requires an approved sender and Apple relay registration. The current `onboarding@resend.dev` test sender cannot deliver to arbitrary users, so it cannot establish that recovery path. A verified sender domain remains separate deferred work. [Apple relay configuration](https://developer.apple.com/help/account/capabilities/configure-private-email-relay-service/), [Resend test-domain restriction](https://resend.com/docs/knowledge-base/403-error-resend-dev-domain).
 
 ## Evidence and next qualification
 
 `server/auth.test.ts` exercises real Better Auth routes and isolated D1: disabled/half-configured providers, OAuth URL generation for both origins, signed Apple token validation, Apple's form-post callback, and refusal to implicitly link either provider to a genuine local OTP account. Provider network replies and signing keys are synthetic; these tests do not prove real console credentials, consent, or delivery.
+
+`server/social-linking.test.ts` uses the installed client SDK and isolated D1 to qualify authenticated linking, subsequent provider sign-in returning the original user, unchanged profile/identity ownership, different-email and existing-owner rejection, and missing, mismatched or expired authentication state. Only the external token-exchange replies are synthetic. Controller tests separately preserve complete SQL state and pending work through cancellation, concurrent local writes, lost replies, lifecycle changes and delayed responses.
 
 After configuration, qualify each provider with a fresh dedicated fixture: success, cancel, invalid/expired state, app return, restart with the same identity, and the existing-email refusal/explicit-link path. Verify the resulting server session and database ownership. Keep private authentication phases unrecorded and preserve the retained live owner and outbox.
