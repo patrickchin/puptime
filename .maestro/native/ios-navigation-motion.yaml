@@ -1,0 +1,99 @@
+appId: com.patrickchin.puptime
+name: Drawer respects the actual iOS Reduce Motion preference
+---
+# Existing completed synthetic journal only; never clear or seed app data here.
+- launchApp:
+    stopApp: false
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- assertNotVisible:
+    id: nav.close
+- tapOn:
+    id: nav.open
+- assertVisible:
+    id: nav.drawer
+- runFlow:
+    when:
+      true: ${MOTION_VALUE === '1'}
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: nav.reducedMotion
+          timeout: 10000
+- runFlow:
+    when:
+      true: ${MOTION_VALUE === '0'}
+    commands:
+      - assertNotVisible:
+          id: nav.reducedMotion
+- takeScreenshot: navigation-motion-open-${MOTION_VALUE}
+- scrollUntilVisible:
+    element:
+      id: nav.close
+    direction: UP
+    visibilityPercentage: 100
+    centerElement: false
+- tapOn:
+    id: nav.close
+- assertNotVisible:
+    id: nav.close
+- assertNotVisible:
+    id: nav.reducedMotion
+- assertVisible:
+    id: screen.today
+- tapOn:
+    id: nav.open
+- assertVisible:
+    id: nav.close
+- tapOn:
+    point: 95%,50%
+- assertNotVisible:
+    id: nav.close
+- assertNotVisible:
+    id: nav.reducedMotion
+- assertVisible:
+    id: screen.today
+- tapOn:
+    id: nav.open
+- scrollUntilVisible:
+    element:
+      id: nav.notifications
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- tapOn:
+    id: nav.notifications
+- assertVisible:
+    id: screen.notifications
+- assertNotVisible:
+    id: nav.close
+- assertNotVisible:
+    id: nav.reducedMotion
+- tapOn:
+    id: nav.open
+- scrollUntilVisible:
+    element:
+      id: nav.notifications
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- assertVisible:
+    id: nav.notifications
+    selected: true
+- takeScreenshot: navigation-motion-selected-${MOTION_VALUE}
+- scrollUntilVisible:
+    element:
+      id: nav.log
+    direction: UP
+    visibilityPercentage: 100
+    centerElement: false
+- tapOn:
+    id: nav.log
+- assertVisible:
+    id: screen.today
+- assertNotVisible:
+    id: nav.close
+- assertNotVisible:
+    id: nav.reducedMotion

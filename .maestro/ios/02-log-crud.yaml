@@ -5,6 +5,7 @@ tags:
   - critical
 ---
 - launchApp:
+    permissions: {}
     clearState: true
 - runFlow: ../helpers/skip-onboarding.yaml
 - extendedWaitUntil:
@@ -73,7 +74,8 @@ tags:
 - assertVisible:
     id: event.poop
 - stopApp
-- launchApp
+- launchApp:
+    permissions: {}
 - extendedWaitUntil:
     visible:
       id: screen.today

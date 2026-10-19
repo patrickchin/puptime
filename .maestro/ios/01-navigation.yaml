@@ -5,6 +5,7 @@ tags:
   - smoke
 ---
 - launchApp:
+    permissions: {}
     clearState: true
 - runFlow: ../helpers/skip-onboarding.yaml
 - extendedWaitUntil:

@@ -5,6 +5,7 @@ tags:
   - settings
 ---
 - launchApp:
+    permissions: {}
     clearState: true
 - runFlow: ../helpers/skip-onboarding.yaml
 - extendedWaitUntil:
@@ -42,7 +43,8 @@ tags:
     id: settings.widget.action.walk
     text: checkbox, checked
 - stopApp
-- launchApp
+- launchApp:
+    permissions: {}
 - extendedWaitUntil:
     visible:
       id: settings.open
@@ -130,7 +132,8 @@ tags:
 - tapOn:
     id: nav.close
 - stopApp
-- launchApp
+- launchApp:
+    permissions: {}
 - extendedWaitUntil:
     visible:
       id: screen.today

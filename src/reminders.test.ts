@@ -168,3 +168,78 @@ test('device-off queued behind in-flight custom creation cancels only validated 
  assert.deepEqual(await reminders.listCustomTimedReminders(timedInput.petId),[]);
  assert.equal(state.requests,0);
 });
+
+async function sixtyTimedReminders(){
+ for(let index=0;index<60;index++)await reminders.createCustomTimedReminder({...timedInput,petId:index%2?'other-puppy':timedInput.petId,label:`One-off ${index}`});
+ assert.equal(state.scheduled.length,60);
+}
+const fiveRoutines=Array.from({length:5},(_,index)=>({...routine,id:`routine-${index}`,minutes:420+index}));
+function freshPottyEvents(now:number){return [{id:'pee',type:'pee' as const,at:now-1,source:'app' as const},{id:'meal',type:'meal' as const,at:now,source:'app' as const}];}
+
+test('routine replacement rejects total iOS overflow before cancelling or scheduling any retained request',async()=>{
+ reset();state.delivery=true;await sixtyTimedReminders();
+ // Replacing this older routine must not free room by discarding it first.
+ state.scheduled.push({identifier:'puptime-routine-old'});
+ const before=structuredClone(state.scheduled);
+ await assert.rejects(reminders.syncScheduleReminders(fiveRoutines),reminders.CustomTimedReminderLimitError);
+ assert.deepEqual(state.scheduled,before);assert.deepEqual(state.cancelled,[]);
+ assert.equal((await reminders.listCustomTimedReminders(timedInput.petId)).length,30);
+ assert.equal((await reminders.listCustomTimedReminders('other-puppy')).length,30);
+});
+
+test('potty replacement counts retained one-offs and routines before changing any native requests',async()=>{
+ reset();state.delivery=true;await sixtyTimedReminders();
+ state.scheduled.push(...fiveRoutines.slice(0,3).map(entry=>({identifier:'puptime-routine-'+entry.id})),{identifier:'puptime-activity-old'});
+ const before=structuredClone(state.scheduled),now=Date.now();assert.equal(before.length,64);
+ await assert.rejects(reminders.syncPottyReminders(freshPottyEvents(now),DEFAULT_NOTIFICATION_PREFERENCES,'en',now),reminders.CustomTimedReminderLimitError);
+ assert.deepEqual(state.scheduled,before);assert.deepEqual(state.cancelled,[]);
+});
+
+test('normal routine and potty replacement can fill exactly64 slots while preserving one-offs and unrelated native markers',async()=>{
+ for(const kind of ['routine','potty']){
+  reset();state.delivery=true;await sixtyTimedReminders();
+  const other=kind==='routine'?'puptime-activity-afterPee':'puptime-routine-keep';
+  state.scheduled.push({identifier:other},{identifier:'foreign-version',content:{data:{app:'com.patrickchin.puptime',kind:'customTimedReminder',version:2}}});
+  const retained=structuredClone(state.scheduled),old=kind==='routine'?'puptime-routine-old':'puptime-activity-old';
+  state.scheduled.push({identifier:old});
+  const now=Date.now();
+  const result=kind==='routine'
+   ?await reminders.syncScheduleReminders(fiveRoutines.slice(0,2))
+   :await reminders.syncPottyReminders(freshPottyEvents(now),DEFAULT_NOTIFICATION_PREFERENCES,'en',now);
+  assert.equal(result,true);assert.equal(state.scheduled.length,64);
+  assert.deepEqual(state.scheduled.slice(0,62),retained);assert.deepEqual(state.cancelled,[old]);
+  const replacementIds=kind==='routine'?['puptime-routine-routine-0','puptime-routine-routine-1']:['puptime-activity-afterPee','puptime-activity-afterMeal'];
+  assert.deepEqual(state.scheduled.slice(62).map(item=>item.identifier),replacementIds);
+ }
+});
+
+test('full native queues still cancel owned replacements when device delivery or OS access is off or plans are empty',async()=>{
+ for(const unavailable of ['device-off','permission-off','no-plans']){
+  reset();state.delivery=true;await sixtyTimedReminders();
+  state.scheduled.push({identifier:'puptime-routine-old'},{identifier:'puptime-activity-old'},{identifier:'foreign-keep'},{identifier:'puptime-widget-keep'});
+  const retained=structuredClone(state.scheduled.filter(item=>!['puptime-routine-old','puptime-activity-old'].includes(item.identifier)));
+  if(unavailable==='device-off')state.delivery=false;
+  if(unavailable==='permission-off')state.granted=false;
+  const now=Date.now(),expected=unavailable==='no-plans';
+  assert.equal(await reminders.syncScheduleReminders(expected?[]:fiveRoutines),expected);
+  assert.equal(await reminders.syncPottyReminders(expected?[]:freshPottyEvents(now),DEFAULT_NOTIFICATION_PREFERENCES,'en',now),expected);
+  assert.deepEqual(state.scheduled,retained);assert.deepEqual(state.cancelled,['puptime-routine-old','puptime-activity-old']);
+ }
+});
+
+test('queued routine and potty writes reserve against the latest native total rather than the same earlier snapshot',async()=>{
+ reset();state.delivery=true;await sixtyTimedReminders();
+ let release!:()=>void,entered!:()=>void;
+ const ready=new Promise<void>(resolve=>{entered=resolve;}),gate=new Promise<void>(resolve=>{release=resolve;});
+ state.scheduleHold=()=>{entered();return gate;};
+ const routines=reminders.syncScheduleReminders(fiveRoutines.slice(0,3));await ready;
+ const now=Date.now(),potty=reminders.syncPottyReminders(freshPottyEvents(now),DEFAULT_NOTIFICATION_PREFERENCES,'en',now);
+ const outcomes=Promise.allSettled([routines,potty]);
+ await new Promise(resolve=>setImmediate(resolve));release();
+ const results=await outcomes;
+ assert.deepEqual(results[0],{status:'fulfilled',value:true});assert.equal(results[1].status,'rejected');
+ if(results[1].status==='rejected')assert.ok(results[1].reason instanceof reminders.CustomTimedReminderLimitError);
+ assert.equal(state.scheduled.length,63);assert.deepEqual(state.cancelled,[]);
+ assert.equal(state.scheduled.filter(item=>item.identifier.startsWith('puptime-activity-')).length,0);
+ assert.equal((await reminders.countCustomTimedReminders()),60);
+});

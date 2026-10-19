@@ -4,7 +4,8 @@ tags:
   - android
   - ios
 ---
-- launchApp
+- launchApp:
+    permissions: {}
 - runFlow:
     when:
       visible:

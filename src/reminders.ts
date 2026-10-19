@@ -22,6 +22,7 @@ import {
 const ROUTINE_CHANNEL_ID = 'puptime-routine';
 const POTTY_CHANNEL_ID = 'puptime-potty';
 const WIDGET_CHANNEL_ID = 'puptime-widget-log';
+const IOS_SCHEDULED_NOTIFICATION_LIMIT = 64;
 
 // Serialize replacement writes so disabling delivery also cancels requests
 // whose native scheduling call was already in flight.
@@ -220,17 +221,16 @@ export async function syncPottyReminders(
   await ensurePottyChannel();
 
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-  await Promise.all(
-    scheduled
-      .filter((notification) => notification.identifier.startsWith(POTTY_REMINDER_IDENTIFIER_PREFIX))
-      .map((notification) => Notifications.cancelScheduledNotificationAsync(notification.identifier)),
-  );
-
+  const replacing = scheduled.filter((notification) => notification.identifier.startsWith(POTTY_REMINDER_IDENTIFIER_PREFIX));
   const plans = pottyReminderPlans(events, preferences, now);
+  const canDeliver = plans.length > 0 && await getNotificationDelivery()
+    && permissionAllowsNotifications(await Notifications.getPermissionsAsync());
+  if (canDeliver && Platform.OS === 'ios' && scheduled.length - replacing.length + plans.length > IOS_SCHEDULED_NOTIFICATION_LIMIT) {
+    throw new CustomTimedReminderLimitError();
+  }
+  await Promise.all(replacing.map((notification) => Notifications.cancelScheduledNotificationAsync(notification.identifier)));
   if (plans.length === 0) return true;
-  if(!await getNotificationDelivery())return false;
-  const settings = await Notifications.getPermissionsAsync();
-  if (!permissionAllowsNotifications(settings)) return false;
+  if (!canDeliver) return false;
 
   await Promise.all(plans.map(async (plan) => {
     const content = pottyReminderCopy(plan.kind, plan.delayMinutes, language);
@@ -266,17 +266,16 @@ export async function syncScheduleReminders(
   await ensureReminderChannel();
 
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-  await Promise.all(
-    scheduled
-      .filter((notification) => notification.identifier.startsWith(REMINDER_IDENTIFIER_PREFIX))
-      .map((notification) => Notifications.cancelScheduledNotificationAsync(notification.identifier)),
-  );
-
+  const replacing = scheduled.filter((notification) => notification.identifier.startsWith(REMINDER_IDENTIFIER_PREFIX));
   const reminders = schedule.filter((entry) => entry.reminder);
+  const canDeliver = reminders.length > 0 && await getNotificationDelivery()
+    && permissionAllowsNotifications(await Notifications.getPermissionsAsync());
+  if (canDeliver && Platform.OS === 'ios' && scheduled.length - replacing.length + reminders.length > IOS_SCHEDULED_NOTIFICATION_LIMIT) {
+    throw new CustomTimedReminderLimitError();
+  }
+  await Promise.all(replacing.map((notification) => Notifications.cancelScheduledNotificationAsync(notification.identifier)));
   if (reminders.length === 0) return true;
-  if(!await getNotificationDelivery())return false;
-  const settings = await Notifications.getPermissionsAsync();
-  if (!permissionAllowsNotifications(settings)) return false;
+  if (!canDeliver) return false;
 
   await Promise.all(reminders.map(async (entry) => {
     const content = reminderCopy(entry, language, leadMinutes);

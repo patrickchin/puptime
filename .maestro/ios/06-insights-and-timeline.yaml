@@ -5,6 +5,7 @@ tags:
   - analytics
 ---
 - launchApp:
+    permissions: {}
     clearState: true
 - runFlow: ../helpers/skip-onboarding.yaml
 - extendedWaitUntil:

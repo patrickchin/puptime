@@ -180,7 +180,8 @@ name: iOS side navigation and notification preferences
 - tapOn:
     id: nav.close
 - stopApp
-- launchApp
+- launchApp:
+    permissions: {}
 - extendedWaitUntil:
     visible:
       id: screen.today

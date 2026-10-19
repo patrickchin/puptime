@@ -14,7 +14,8 @@ tags:
 - assertVisible:
     id: setup.step.account
 - stopApp
-- launchApp
+- launchApp:
+    permissions: {}
 - extendedWaitUntil:
     visible:
       id: setup.step.account

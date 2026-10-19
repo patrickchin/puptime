@@ -139,6 +139,24 @@ test('a free restored version survives reopening with the same identity and no p
 });
 
 const cloudFirst={recordId:'["event","cloud-1","one"]',revision:1,sequence:2,operationId:'server-first',deviceId:'other-device',acceptedAt:1000,baseRevision:0,intent:'create' as const,proposal:{type:'pee' as const,at:100,source:'app' as const,note:'First'},before:null,after:{id:'["event","cloud-1","one"]',petId:'cloud-1',kind:'event' as const,revision:1,sequence:2,deleted:false,updatedAt:1000,data:{type:'pee' as const,at:100,source:'app' as const,note:'First'}},reason:'created' as const};
+test('cloud history cannot contradict the immutable current mirror or its revision and sequence ordering',async t=>{
+ const {database,local,signals}=await setup(t),{current}=await owned(local),page=await local.history.eventPage('one');
+ const exact={...cloudFirst,revision:2,sequence:4,baseRevision:1,intent:'patch' as const,proposal:{note:'Second'},before:cloudFirst.after,after:current,acceptedAt:2000,reason:'updated' as const};
+ const before=await snapshot(database),count=signals();
+ for(const revision of [
+  {...exact,proposal:{note:'Contradiction'},after:{...current,data:{...current.data,note:'Contradiction'}}},
+  {...exact,sequence:3,after:{...current,sequence:3}},
+  {...cloudFirst,sequence:4,after:{...cloudFirst.after,sequence:4}},
+  {...exact,acceptedAt:2001,after:{...current,updatedAt:2001}},
+ ]){
+  await assert.rejects(local.history.restore({eventId:'one',selection:{source:'cloud',revision},expected:page.head}),category('unavailable'));
+  assert.deepEqual(await snapshot(database),before,'Invalid immutable history cannot write a record, revision or upload operation.');
+  assert.equal(signals(),count);
+ }
+ assert.deepEqual(await local.history.restore({eventId:'one',selection:{source:'cloud',revision:exact},expected:page.head}),page.head.event);
+ assert.deepEqual(await snapshot(database),before,'The exact current immutable snapshot is a no-op.');
+ assert.equal(signals(),count);
+});
 test('a cloud-only older version restores against the current mirror without inventing a local version ID',async t=>{
  const {database,local}=await setup(t),{owner}=await owned(local);const before=await local.history.eventPage('one');
  // A freshly restored device can have the current baseline without earlier local snapshots.

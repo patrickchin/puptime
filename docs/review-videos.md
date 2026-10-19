@@ -1,6 +1,6 @@
 # Review videos
 
-Current review: [local gallery](http://127.0.0.1:8877/) opens on recording195, the uninterrupted first-open Mochi setup through the first real log and timed reminder. Recordings191/194 cover full setup appearance and recovery;188/206 cover drawer, permissions and reminder/accessibility states;198/199 cover populated rendering and owned-data preservation. Current evidence and remaining integration gates are recorded in `docs/cloud-verification.md`.
+Current review: [local gallery](http://127.0.0.1:8877/) opens on recording195, the uninterrupted first-open Mochi setup through the first real log and timed reminder. Recordings191/194 cover full setup appearance and recovery;188/206 cover drawer, permissions and reminder/accessibility states;198/199 cover populated rendering and owned-data preservation;222 covers the actual OS Reduce Motion drawer variants. Recording209 is the final full regression, and215 is searchable full code-check output. Current evidence and remaining integration gates are recorded in `docs/cloud-verification.md`.
 
 Record actual iOS journeys as acceptance evidence, with the test logs alongside
 them. Keep terminal-only checks as searchable text; do not render terminal output

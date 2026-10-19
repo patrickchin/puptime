@@ -14,7 +14,8 @@ CURRENT_JOURNEYS = [
     '206-notifications-native-keyboard-accessibility',
     '198-drawer-populated-history-rendering',
     '199-navigation-upgrade-preserves-owned-history',
-    '200-navigation-full-standalone-regression',
+    '222-ios-navigation-reduce-motion',
+    '209-navigation-full-standalone-regression',
 ]
 
 STYLE = '''

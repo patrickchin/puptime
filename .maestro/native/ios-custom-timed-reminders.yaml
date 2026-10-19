@@ -59,7 +59,8 @@ name: iOS custom timed reminder create remove and restart
     index: 1
 - takeScreenshot: timed-reminder-one-future-request
 - stopApp
-- launchApp
+- launchApp:
+    permissions: {}
 - extendedWaitUntil:
     visible:
       id: screen.today
@@ -133,7 +134,8 @@ name: iOS custom timed reminder create remove and restart
     checked: true
 - takeScreenshot: device-off-removes-only-timed-requests
 - stopApp
-- launchApp
+- launchApp:
+    permissions: {}
 - extendedWaitUntil:
     visible:
       id: screen.today

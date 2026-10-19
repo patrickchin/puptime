@@ -15,6 +15,11 @@ appId: com.patrickchin.puptime
           direction: DOWN
       - tapOn:
           id: setup.start
+          retryTapIfNoChange: true
+      - extendedWaitUntil:
+          visible:
+            id: setup.step.profile
+          timeout: 15000
 - runFlow:
     when:
       visible:
@@ -26,6 +31,11 @@ appId: com.patrickchin.puptime
           direction: DOWN
       - tapOn:
           id: setup.profile.later
+          retryTapIfNoChange: true
+      - extendedWaitUntil:
+          visible:
+            id: setup.step.(account|cloud)
+          timeout: 15000
 - runFlow:
     when:
       visible:
@@ -37,6 +47,11 @@ appId: com.patrickchin.puptime
           direction: DOWN
       - tapOn:
           id: setup.local
+          retryTapIfNoChange: true
+      - extendedWaitUntil:
+          visible:
+            id: screen.onboarding
+          timeout: 15000
 - runFlow:
     when:
       visible:
@@ -48,13 +63,16 @@ appId: com.patrickchin.puptime
           direction: DOWN
       - tapOn:
           id: setup.cloud.local
+          retryTapIfNoChange: true
+      - extendedWaitUntil:
+          visible:
+            id: screen.onboarding
+          timeout: 15000
 - runFlow:
     when:
       visible:
         id: screen.onboarding
-    commands:
-      - tapOn:
-          id: onboarding.skip
+    file: skip-walkthrough.yaml
 - runFlow:
     when:
       visible:
@@ -66,6 +84,11 @@ appId: com.patrickchin.puptime
           direction: DOWN
       - tapOn:
           id: setup.reminders.later
+          retryTapIfNoChange: true
+      - extendedWaitUntil:
+          visible:
+            id: setup.step.ready
+          timeout: 15000
 - runFlow:
     when:
       visible:
@@ -77,3 +100,8 @@ appId: com.patrickchin.puptime
           direction: DOWN
       - tapOn:
           id: setup.finish
+          retryTapIfNoChange: true
+      - extendedWaitUntil:
+          visible:
+            id: screen.today
+          timeout: 90000

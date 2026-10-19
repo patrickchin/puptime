@@ -439,6 +439,9 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
           const revision=selection.revision,record=revision.after,mirror=head.cloudRecord;
           if(!pet||!head.owner||!mirror||record.kind!=='event'||record.deleted
             ||revision.recordId!==mirror.id||record.petId!==mirror.petId||record.revision>mirror.revision||record.sequence>mirror.sequence)throw new EventHistoryError('unavailable');
+          if(record.revision===mirror.revision||record.sequence===mirror.sequence){
+            if(JSON.stringify(record)!==JSON.stringify(mirror))throw new EventHistoryError('unavailable');
+          }
           selected={id:eventId,...eventDataSchema.parse(record.data)};
         }
         const latest=head.sequence===null?null:await readEventHistoryEntry(sql,petId,eventId,head.sequence);

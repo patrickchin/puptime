@@ -5,6 +5,7 @@ tags:
   - recovery
 ---
 - launchApp:
+    permissions: {}
     clearState: true
 - runFlow: ../helpers/skip-onboarding.yaml
 - extendedWaitUntil:
@@ -72,7 +73,8 @@ tags:
     id: insights.frequency.pee
     text: .*1\.0.*
 - stopApp
-- launchApp
+- launchApp:
+    permissions: {}
 - extendedWaitUntil:
     visible:
       id: nav.open
