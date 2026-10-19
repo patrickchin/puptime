@@ -69,7 +69,10 @@ with TemporaryDirectory(prefix='puptime-gallery-check-') as folder:
     assert metadata['exit_code'] == 7 and metadata['log'] == '999-result.log' and 'video' not in metadata
     legacy = {**metadata, 'title': 'Old terminal replay', 'rendered_actual_output': True, 'video': 'old-terminal.mp4'}
     (root / '998-legacy.json').write_text(json.dumps(legacy))
-    native = {**metadata, 'title': 'Actual app', 'video': 'clip.mp4'}
+    (root / 'review.png').write_bytes(b'fixture image')
+    native = {**metadata, 'title': 'Actual app', 'video': 'clip.mp4',
+        'capture_kind': 'Actual local browser recording',
+        'screenshots': [{'file': 'review.png', 'title': 'Synthetic account <fixture>'}]}
     (root / '997-app.json').write_text(json.dumps(native))
     builder.build(root)
     page = (root / 'index.html').read_text()
@@ -77,6 +80,8 @@ with TemporaryDirectory(prefix='puptime-gallery-check-') as folder:
     assert 'src="old-terminal.mp4"' not in page
     assert page.count('<video ') == 1
     assert 'id="search-results"' in page
+    assert 'Actual local browser recording' in page and 'Actual iOS recording' not in page
+    assert 'alt="Synthetic account &lt;fixture&gt;"' in page and 'href="review.png"' in page
     (root / 'clip.mp4').unlink()
     builder.build(root)
     page = (root / 'index.html').read_text()

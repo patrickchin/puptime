@@ -1,0 +1,133 @@
+appId: com.patrickchin.puptime
+name: Explicit deployed puppy restore real log and authenticated cold reopen
+---
+# Cloud/account screens contain the owner inbox. Root records only safe segments.
+- launchApp:
+    stopApp: false
+    permissions: {}
+- assertVisible:
+    id: setup.cloud.puppy
+- scrollUntilVisible:
+    element:
+      id: setup.cloud.enable
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- tapOn:
+    id: setup.cloud.enable
+- extendedWaitUntil:
+    visible:
+      id: setup.cloud.active
+    timeout: 60000
+- tapOn:
+    id: setup.cloud.next
+- runFlow: ../helpers/skip-walkthrough.yaml
+- scrollUntilVisible:
+    element:
+      id: setup.reminders.later
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- tapOn:
+    id: setup.reminders.later
+- assertVisible:
+    id: setup.step.ready
+- scrollUntilVisible:
+    element:
+      id: setup.finish
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- tapOn:
+    id: setup.finish
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 30000
+- assertVisible:
+    id: event.pee.edit
+- tapOn:
+    id: quick.pee
+- tapOn:
+    id: nav.open
+    retryTapIfNoChange: true
+- assertVisible:
+    id: nav.drawer
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      id: nav.settings
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- tapOn:
+    id: nav.settings
+- extendedWaitUntil:
+    visible:
+      id: screen.settings
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: settings.account.open
+    direction: DOWN
+    speed: 40
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: settings.account.open
+- extendedWaitUntil:
+    visible:
+      id: account.status
+      text: Up to date
+    timeout: 60000
+- assertVisible:
+    id: account.local.count
+    text: 2 activity logs
+- stopApp
+- launchApp:
+    permissions: {}
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- assertNotVisible:
+    id: screen.firstLaunch
+- tapOn:
+    id: nav.open
+    retryTapIfNoChange: true
+- assertVisible:
+    id: nav.drawer
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      id: nav.settings
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- tapOn:
+    id: nav.settings
+- extendedWaitUntil:
+    visible:
+      id: screen.settings
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: settings.account.open
+    direction: DOWN
+    speed: 40
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: settings.account.open
+- extendedWaitUntil:
+    visible:
+      id: account.status
+      text: Up to date
+    timeout: 60000
+- assertVisible:
+    id: account.local.count
+    text: 2 activity logs
+- assertVisible:
+    id: account.signOut

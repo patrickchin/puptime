@@ -1,0 +1,160 @@
+appId: com.patrickchin.puptime
+name: Inspect owned retained log history without restoring or changing data
+---
+# The upgrade verifier leaves Settings open and derives both sequences from the
+# preserved SDK-owned database. Never clearState, edit, load cloud or restore.
+- assertVisible:
+    id: screen.settings
+- scrollUntilVisible:
+    element:
+      id: settings.history.open
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+    speed: 40
+    waitToSettleTimeoutMs: 1000
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: settings.history.open
+      enabled: true
+    timeout: 15000
+- tapOn:
+    id: settings.history.open
+    retryTapIfNoChange: true
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      visible:
+        id: settings.history.open
+        enabled: true
+    commands:
+      - tapOn:
+          id: settings.history.open
+          retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: history.recent.list
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: history.recent.${RECENT_SEQUENCE}
+    direction: DOWN
+    timeout: 30000
+    visibilityPercentage: 100
+    centerElement: false
+    speed: 40
+    waitToSettleTimeoutMs: 1000
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      true: ${typeof HISTORY_A11Y !== 'undefined' && HISTORY_A11Y === '1'}
+    commands:
+      - assertVisible:
+          id: history.recent.${RECENT_SEQUENCE}
+          text: ${EXPECTED_ACCESSIBILITY}
+- tapOn:
+    id: history.recent.${RECENT_SEQUENCE}
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: history.local.list
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: history.local.${SELECTED_SEQUENCE}
+    direction: DOWN
+    timeout: 30000
+    visibilityPercentage: 100
+    centerElement: false
+    speed: 40
+    waitToSettleTimeoutMs: 1000
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      true: ${typeof HISTORY_A11Y !== 'undefined' && HISTORY_A11Y === '1'}
+    commands:
+      - assertVisible:
+          id: history.local.${SELECTED_SEQUENCE}
+          text: ${EXPECTED_ACCESSIBILITY}
+- tapOn:
+    id: history.local.${SELECTED_SEQUENCE}
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: history.detail
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: history.after.at
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- assertVisible:
+    id: history.after.at
+- runFlow:
+    when:
+      true: ${HISTORY_HAS_NOTE === '1'}
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: history.after.note
+          direction: DOWN
+          visibilityPercentage: 100
+          centerElement: false
+      - assertVisible:
+          id: history.after.note
+          text: ${EXPECTED_NOTE}
+- takeScreenshot: owned-history-selected-version
+- runFlow:
+    when:
+      true: ${HISTORY_CONFIRM === '1'}
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: history.restore
+          direction: DOWN
+          visibilityPercentage: 100
+          centerElement: false
+      - tapOn:
+          id: history.restore
+      - assertVisible:
+          id: history.confirm
+      - scrollUntilVisible:
+          element:
+            id: history.confirm.cancel
+          direction: DOWN
+          visibilityPercentage: 100
+          centerElement: false
+      - takeScreenshot: owned-history-cancel-before-any-write
+      - tapOn:
+          id: history.confirm.cancel
+      - assertNotVisible:
+          id: history.confirm
+      - assertVisible:
+          id: history.detail
+- runFlow:
+    when:
+      true: ${HISTORY_CONFIRM === '0'}
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: history.identical
+          direction: DOWN
+          visibilityPercentage: 100
+          centerElement: false
+      - assertVisible:
+          id: history.identical
+- tapOn:
+    id: history.back
+- assertVisible:
+    id: history.local.list
+- tapOn:
+    id: history.back
+- assertVisible:
+    id: history.recent.list
+- tapOn:
+    id: history.recent.back
+- assertVisible:
+    id: screen.settings
+- takeScreenshot: owned-history-returns-without-data-changes

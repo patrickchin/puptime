@@ -1,0 +1,22 @@
+appId: com.patrickchin.puptime
+name: Explicit activation combines the1001 existing local logs
+---
+- scrollUntilVisible:
+    element:
+      id: account.enable
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: account.enable
+- extendedWaitUntil:
+    visible:
+      id: account.status
+      text: ^Up to date$
+    timeout: 180000
+- assertVisible:
+    id: account.local.count
+    text: ^1,001 activity logs$

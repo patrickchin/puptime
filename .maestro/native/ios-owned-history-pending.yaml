@@ -1,0 +1,75 @@
+appId: com.patrickchin.puptime
+name: Pending restore prevents a second historical restore without losing any state
+---
+- tapOn:
+    id: history.back
+- assertVisible:
+    id: editor
+- scrollUntilVisible:
+    element:
+      id: editor.history
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: editor.history
+- extendedWaitUntil:
+    visible:
+      id: history.local.list
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: history.local.${PENDING_SEQUENCE}
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: history.local.${PENDING_SEQUENCE}
+- scrollUntilVisible:
+    element:
+      id: history.restore
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: history.restore
+      enabled: true
+    timeout: 45000
+- tapOn:
+    id: history.restore
+- assertVisible:
+    id: history.confirm
+- scrollUntilVisible:
+    element:
+      id: history.confirm.restore
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: history.confirm.restore
+      enabled: true
+    timeout: 45000
+- tapOn:
+    id: history.confirm.restore
+- extendedWaitUntil:
+    visible:
+      id: history.restore.error
+      text: ^This log is still syncing\. Try again after it finishes\.$
+    timeout: 15000
+- assertNotVisible:
+    id: history.restored
+- takeScreenshot: owned-pending-restore-keeps-current-version

@@ -29,9 +29,26 @@ appId: com.patrickchin.puptime
           element:
             id: setup.profile.later
           direction: DOWN
+          waitToSettleTimeoutMs: 1000
+      - waitForAnimationToEnd
+      - extendedWaitUntil:
+          visible:
+            id: setup.profile.later
+            enabled: true
+          timeout: 15000
       - tapOn:
           id: setup.profile.later
           retryTapIfNoChange: true
+      - waitForAnimationToEnd
+      - runFlow:
+          when:
+            visible:
+              id: setup.profile.later
+              enabled: true
+          commands:
+            - tapOn:
+                id: setup.profile.later
+                retryTapIfNoChange: true
       - extendedWaitUntil:
           visible:
             id: setup.step.(account|cloud)

@@ -88,13 +88,28 @@ name: Local history appearance and read-only navigation
     direction: DOWN
     timeout: 120000
     speed: 80
+    waitToSettleTimeoutMs: 1000
     visibilityPercentage: 60
     centerElement: true
 - waitForAnimationToEnd
 - tapOn:
     id: history.local.${SELECTED_SEQUENCE}
-- assertVisible:
-    id: history.detail
+    retryTapIfNoChange: true
+- repeat:
+    times: 2
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: history.local.list
+          commands:
+            - tapOn:
+                id: history.local.${SELECTED_SEQUENCE}
+                retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: history.detail
+    timeout: 15000
 - takeScreenshot: history-selected-top
 - scrollUntilVisible:
     element:
@@ -126,6 +141,7 @@ name: Local history appearance and read-only navigation
 - assertVisible:
     id: history.confirm
 - assertVisible: ${EXPECTED_CONFIRM}
+- assertVisible: ${EXPECTED_CONFIRM_BODY}
 - assertVisible:
     id: history.back
 - takeScreenshot: history-confirmation-top
@@ -222,6 +238,28 @@ name: Local history appearance and read-only navigation
 - waitForAnimationToEnd
 - tapOn:
     id: settings.history.open
+    retryTapIfNoChange: true
+- repeat:
+    times: 2
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: screen.settings
+          commands:
+            - scrollUntilVisible:
+                element:
+                  id: settings.history.open
+                direction: DOWN
+                timeout: 120000
+                speed: 40
+                waitToSettleTimeoutMs: 1000
+                visibilityPercentage: 60
+                centerElement: true
+            - waitForAnimationToEnd
+            - tapOn:
+                id: settings.history.open
+                retryTapIfNoChange: true
 - extendedWaitUntil:
     visible:
       id: history.recent.list

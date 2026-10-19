@@ -15,20 +15,19 @@ name: Local onboarding practice and reminder choice
     direction: DOWN
 - tapOn:
     id: onboarding.demo.pee
-- scrollUntilVisible:
-    element:
-      id: onboarding.primary
-    direction: DOWN
-- tapOn:
-    id: onboarding.primary
+- assertVisible:
+    id: onboarding.demo.pee
+    selected: true
+- runFlow:
+    file: ../helpers/walkthrough-next.yaml
+    env:
+      FROM_STEP: '0'
 - assertVisible:
     id: onboarding.step.1
-- scrollUntilVisible:
-    element:
-      id: onboarding.primary
-    direction: DOWN
-- tapOn:
-    id: onboarding.primary
+- runFlow:
+    file: ../helpers/walkthrough-next.yaml
+    env:
+      FROM_STEP: '1'
 - assertVisible:
     id: onboarding.step.2
 - scrollUntilVisible:
@@ -37,12 +36,10 @@ name: Local onboarding practice and reminder choice
     direction: DOWN
 - tapOn:
     id: onboarding.demo.routine.reminder
-- scrollUntilVisible:
-    element:
-      id: onboarding.primary
-    direction: DOWN
-- tapOn:
-    id: onboarding.primary
+- runFlow:
+    file: ../helpers/walkthrough-next.yaml
+    env:
+      FROM_STEP: '2'
 - assertVisible:
     id: setup.step.reminders
 - takeScreenshot: first-open-reminders

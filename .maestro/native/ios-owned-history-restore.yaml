@@ -1,0 +1,42 @@
+appId: com.patrickchin.puptime
+name: Offline owned history restoration commits one durable restore intent
+---
+- scrollUntilVisible:
+    element:
+      id: history.restore
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: history.restore
+      enabled: true
+    timeout: 45000
+- tapOn:
+    id: history.restore
+- assertVisible:
+    id: history.confirm
+- scrollUntilVisible:
+    element:
+      id: history.confirm.restore
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: history.confirm.restore
+      enabled: true
+    timeout: 45000
+- tapOn:
+    id: history.confirm.restore
+- extendedWaitUntil:
+    visible:
+      id: history.restored
+    timeout: 15000
+- takeScreenshot: owned-offline-local-version-restored

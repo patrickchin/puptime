@@ -1,0 +1,50 @@
+appId: com.patrickchin.puptime
+name: Actual account change channel invalidates an older restore confirmation
+---
+- extendedWaitUntil:
+    visible:
+      id: history.stale
+    timeout: 45000
+- assertNotVisible:
+    id: history.restored
+- takeScreenshot: owned-confirmation-stale-after-http-edit
+- scrollUntilVisible:
+    element:
+      id: history.reload
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: history.reload
+- extendedWaitUntil:
+    visible:
+      id: history.local.list
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: history.local.${LOCAL_SEQUENCE}
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: history.local.${LOCAL_SEQUENCE}
+- assertVisible:
+    id: history.detail
+- scrollUntilVisible:
+    element:
+      id: history.after.note
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- assertVisible:
+    id: history.after.note
+    text: ${EXPECTED_LOCAL_NOTE}

@@ -1,0 +1,60 @@
+appId: com.patrickchin.puptime
+name: Private fresh SDK sign-in adopts the existing local fixture
+---
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- tapOn:
+    id: nav.open
+    retryTapIfNoChange: true
+- assertVisible:
+    id: nav.drawer
+- waitForAnimationToEnd
+- tapOn:
+    id: nav.settings
+- scrollUntilVisible:
+    element:
+      id: settings.account.open
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: settings.account.open
+- extendedWaitUntil:
+    visible:
+      id: account.email.input
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: account.email.input
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: account.email.input
+- setClipboard: ${TEST_EMAIL}
+- pasteText
+- tapOn: ^Email address$
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      id: account.sendCode
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: account.sendCode
+- extendedWaitUntil:
+    visible:
+      id: account.code.input
+    timeout: 30000

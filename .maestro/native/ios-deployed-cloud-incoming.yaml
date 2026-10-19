@@ -1,0 +1,15 @@
+appId: com.patrickchin.puptime
+name: Idle deployed incoming event after SQLite convergence
+---
+# Assertions only: SQL convergence was proved before starting this flow.
+# The app remains on Account; never launch, foreground, navigate or refresh.
+- extendedWaitUntil:
+    visible:
+      id: account.status
+      text: Up to date
+    timeout: 15000
+- assertVisible:
+    id: account.local.count
+    text: 3 activity logs
+- assertVisible:
+    id: account.signOut

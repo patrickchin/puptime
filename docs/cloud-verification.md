@@ -248,7 +248,7 @@ Actual native evidence:
 
 Independent whole-branch review found two material boundaries, now corrected with actual RED→GREEN checks: a selected current cloud revision must exactly match its immutable mirror (older revision and sequence order must agree), and iOS routine/potty replacement batches must fit64 total native requests before cancelling anything. Overflow preserves existing requests and uses existing error feedback. Android scheduling remains unchanged. The review’s motion finding is addressed by native static drawer presentation when Reduce Motion is enabled, with the preference refreshed on foreground return. Recording222 passes actual OS Off/On, close/backdrop/selection, every unchanged SQLite table and restoration of the original OS value. Recording217 retains the initial foreground-refresh finding. No second reviewer is substituted for qualification.
 
-Recording200 completed12/13 flows on the preceding standalone build: a test Skip tap did not advance, while its conditional helper silently skipped subsequent setup steps. The shared helper now verifies transitions and retries only the still-visible idempotent Skip action. Recording209 is the full13-flow final standalone rerun; its terminal result and exact-final-head CI remain integration gates at this evidence snapshot. The first PR100 native run39199525741 built and passed11 flows, then exposed a slow-runner menu-tap miss and the expanded suite's35-minute limit. The qualifier now checks actual drawer opening with a bounded idempotent retry, and CI allows45 minutes. This is a harness correction, not evidence of a deterministic app drawer failure. Original failure logs/metadata remain retained. The next run39205443835 completed12/13 flows within the45-minute budget; its sole navigation failure screenshot shows native Siri Settings in the foreground, rather than a Puptime drawer. Selected CRC-validated artifacts required265274 bytes. Default Maestro launches [grant every permission](https://docs.maestro.dev/maestro-flows/flow-control-and-logic/permissions), including Siri; that default is an inferred cause of the unexpected OS activity, not a proven app navigation bug. Nonpermission acceptance launches now explicitly use an empty permission map; explicit Allow/Deny/unset notification scenarios remain intact. The replacement head must qualify independently.
+Recording200 completed12/13 flows on the preceding standalone build: a test Skip tap did not advance, while its conditional helper silently skipped subsequent setup steps. The shared helper now verifies transitions and retries only the still-visible idempotent Skip action. Recording209 completes13/13 flows in11m3s on the parent standalone Release identified above. This is parent app regression evidence; the child history implementation and exact-final-head CI require their own qualification. The first PR100 native run39199525741 built and passed11 flows, then exposed a slow-runner menu-tap miss and the expanded suite's35-minute limit. The qualifier now checks actual drawer opening with a bounded idempotent retry, and CI allows45 minutes. This is a harness correction, not evidence of a deterministic app drawer failure. Original failure logs/metadata remain retained. The next run39205443835 completed12/13 flows within the45-minute budget; its sole navigation failure screenshot shows native Siri Settings in the foreground, rather than a Puptime drawer. Selected CRC-validated artifacts required265274 bytes. Default Maestro launches [grant every permission](https://docs.maestro.dev/maestro-flows/flow-control-and-logic/permissions), including Siri; that default is an inferred cause of the unexpected OS activity, not a proven app navigation bug. Nonpermission acceptance launches now explicitly use an empty permission map; explicit Allow/Deny/unset notification scenarios remain intact. The replacement head must qualify independently.
 
 The gallery supports HTTP206/single/suffix/HEAD/invalid ranges and actual browser scrubbing in both directions with decoded frames and no media errors. Current app journeys appear first; terminal checks are searchable text. Cleanup removed112 redundant/superseded MP4s (about157MB) only after exact hash, retained-log and successor checks; diagnostic screenshots and distinct service/SDK/permission evidence remain. The inactive task worktree was submitted for recoverable archival, but completion is not yet confirmed. Other chats’ worktrees and owned data are untouched.
 
@@ -264,3 +264,224 @@ The host currently resolves `puptime.pages.dev` but not the Worker hostname thro
 Configure the Pages production binding before qualifying the route; preview deployments remain unbound. Keep the existing Worker `wrangler.jsonc` separate from Pages configuration. A cloud-enabled iOS build must use the qualified HTTPS origin through `EXPO_PUBLIC_CLOUD_API_URL` and `EXPO_PUBLIC_CLOUD_ALLOW_LOCAL=0`. Email/session calls work with the already trusted Pages origin; social providers must wait for coordinated canonical `AUTH_BASE_URL` and registered return-URL configuration. Never rewrite OAuth redirects or cookies to conceal a mismatched origin.
 
 Local Workers runtime tests cover genuine SDK OTP/session, explicit activation/enrollment, typed SQL push/pull, history/paging/owner isolation, logout, untrusted origins and real WebSocket101/cursor invalidations through the binding. They do not prove a live Pages deployment or inbox delivery. Both remain explicit deployment/native acceptance gates.
+
+
+## October19 iOS log-history qualification in progress
+
+This checkpoint predates the restacked continuation recorded below.
+
+The child history worktree extends the reviewed history foundation with native
+local-version and Recent changes surfaces. Parent209 passes all13 configured
+standalone flows; parent222 separately passes actual OS Reduce Motion Off/On,
+static fallback/normal drawer selection and dismissal, every unchanged SQLite
+table and restoration of the original preference. These parent checks do not
+qualify the child history Release.
+
+Inspected recording224 passes the installed child **Debug** local matrix against
+actual SQLite: opening history first commits the exact editor draft,1000 unrelated
+rows and account/settings data remain unchanged, local versions page in bounded
+loads, Cancel preserves the selection, a newer edit invalidates confirmation,
+an injected actual SQLite failure rolls back and remains retryable, repeated
+Restore taps create one retained restoration, and Recent changes restores a
+deleted custom log's identity/provenance without reactivating its quick action.
+The unchanged-row and full restoration assertions are scoped to that synthetic
+Debug fixture; this is not final standalone or authenticated SDK history UI proof.
+
+Records225(local) and226(deployed staging) pass the full authenticated HTTP
+history matrix on the reviewed3304 foundation: strict encoded-ID/50-row/exclusive
+cursor history, merge/deletion/restore reasons, owner isolation, cancellation,
+current-server-snapshot no-op, contradictory immutable data/order no-write
+guards, cloud-only restoration against the current mirror, pending/local-stale/
+remote-stale refusal, lost-ack disk reopen/convergence, deleted custom identity/
+estimated provenance, expiry with retained local restoration, and authenticated
+oldest/latest history export. Both normally retire their administrative synthetic
+accounts, revoke both sessions and confirm zero authoritative fixture rows.226
+uses the existing process-local DNS-over-HTTPS resolver with ordinary TLS
+validation; ordinary host DNS and real email/Apple/Google delivery remain gated.
+The server deployment remains `bff50626-a5ab-42be-adbe-23f86bd85325`.
+
+The extended `verify-ios-first-launch-upgrade.mjs` is prepared but **unexecuted**.
+It retains the exact dedicated D931 SDK-owned pre-checkpoint installation guard,
+SQLite backup, full table/owner/outbox/cursor comparisons and actual remote event
+count. Its new drawer-based path adds Recent changes, a SQL-derived retained
+local version and read-only Back/Cancel where a differing version is available;
+it never resets, seeds, loads cloud versions or restores. Root must run it on
+the final default standalone, qualify child appearance229 and the full native
+regression, and inspect fresh screenshots before claiming this bounded phase
+complete. Expected REDs and failed qualification logs remain retained. Exact-head
+CI/PR integration, provider-authenticated distribution, physical notification
+delivery and the broader lifecycle/billing/web/telemetry/Sentry gates remain open.
+
+
+## Cloud-first qualification priority — October 19
+
+Initial cloud-first checkpoint, before the live runs documented below: the user prioritized working sign-in and online database sync over payment and peripheral UI qualification. The default standalone used in review195 has no `EXPO_PUBLIC_CLOUD_API_URL`; its unavailable sign-in message reflects that build configuration. It is not proof that the backend is absent. Staging health/configuration are reachable through the documented process-local resolver, but all three public providers remain disabled; the only configured staging secret is `AUTH_SECRET`. No real inbox or social-provider success is claimed.
+
+Fresh local check243 uses the actual Better Auth Expo SDK against the running Worker/D1/SQL backend, explicitly activates cloud, and uploads all1001 pre-existing marked synthetic logs. Sign-in alone changes no puppy/account/outbox rows or trial state; activation retains every original event field. Private authentication artifacts are discarded and the separate owned-history context is preserved. A cloud-enabled standalone/deployed-provider journey remains the next release gate; payment is not a prerequisite.
+
+
+## Restacked iOS history continuation — October 19–20
+
+The child was restacked onto `329764f` after PR101/102 merged. A new private,
+hash-verified backup retains every pending source file, the original patches,
+index and stash; the history implementation patch is byte-identical after the
+restack. No retained simulator or account was reset. The duplicate SDK path fix
+was already included upstream.
+
+Record 287 passes 331 Node tests, 62 Workers tests and all three TypeScript
+configurations. Record 286 builds the default standalone Release; strict deep
+signature validation passes. Its 5,510,308-byte bundle has SHA256
+`4176ddb64ccac8ce17d7876ee81aab5ca40b29dae500c4b07980d153d5ee8141`
+and excludes the qualification observers, injected fault marker and local8793
+URL. This default build does not claim deployed-provider configuration.
+
+The preserved C712 account has 1,001 logs. Record 280 passes actual SDK cloud
+paging beyond 50 versions, selection and Cancel with every SQLite table
+unchanged. Record 283 uses an independent genuine local OTP session and real
+HTTP/WSS edit to invalidate a native confirmation; Reload and local selection
+preserve the projected data and all 1,000 unrelated logs. The actual offline
+restore in 284 queues one immutable operation, rejects another pending restore,
+survives restart and is accepted once after reconnect. Its final count assertion
+mistook historical changes for current records. The separate read-only
+`284-owned-history-saved-restore-verified` passes the exact saved operation,
+selected full event data, all 1,001 current cloud/local records and all-table
+preservation while showing Up to date. It never replays the restoration.
+
+Record 289-local-history-service-restacked passes the local HTTP/SQL matrix,
+including current-snapshot no-op, immutable contradiction guards, lost reply,
+restart, deletion, expiry and normal retirement with authoritative zero fixture
+rows. The earlier deployed history matrix 225/226 remains separately scoped.
+Small standalone appearance now passes all six cases across the three 285
+captures. The first two normal-size cases passed before a driver bootstrap
+failure; Chinese passed in the next capture; all three maximum-text cases pass
+in the final capture after settling the version-card tap. Every read-only case
+preserves all tables. Actual language-picker changes retain their audit history
+and restore the original preferences/OS settings. Record 288-owned-update-history-verified
+passes the preserved 1,002-log completed-installation update, full replay and
+read-only local history/Back, with all 14 tables and actual remote count unchanged.
+Its selected version is identical; this fixture does not claim confirmation
+Cancel. Fresh standalone local-history and configured regression acceptance
+remain pending at this checkpoint. The failed socket, selector, tap, count and
+driver-bootstrap attempts remain retained; none is relabelled as a full pass.
+
+The cloud-first work has separate live evidence: actual delivered-email native
+setup 260, confirmed returning-puppy restore/log/reopen 263, independent genuine
+server comparison 265, and enrolled-peer incoming change 267 all pass. Record
+258 passes the deployed Pages 1,000-event HTTP/WSS/SQL matrix with normal DNS/TLS.
+Google configuration/start guards 273 and native start/cancel 275/276 pass;
+277 preserves all 14 SQLite tables. Completed Google sign-in, Apple sign-in,
+distribution and physical-device delivery remain separate gates. The broader
+lifecycle, billing, web account-management and observability rollout remains open.
+
+
+### Confirmation context correction and final candidate
+
+Fresh maximum-text screenshot review exposed a real pane-transition defect:
+confirmation reused the detail scroll offset and hid its explanation. Record
+285-confirmation-scroll-context-red reproduces the new translated explanation
+assertion on the preceding signed build, before any restoration. A single local
+ScrollView key now resets detail/confirmation content without remounting the
+underlying activity list. The same assertion and complete maximum-text journeys
+pass in English, Spanish and Chinese in 285-confirmation-scroll-context-green.
+All read-only tables and original preferences remain preserved.
+
+The fresh final default bundle is 5,510,320 bytes, SHA256
+`a6725519453e777d113784335a452189a7c5611655869aa03315f71354156625`.
+Record 286-history-confirm-scroll-release-build succeeds; strict deep signing
+and exclusion of qualification hooks/local8793 pass. Record
+287-history-confirm-scroll-code-checks passes 331 Node/62 Workers tests and all
+three TypeScript configurations. The final standalone is cloud-unconfigured;
+live sign-in evidence uses the separate explicitly configured build.
+
+The actual installed Debug observer in 285-confirmation-owned-render-proof
+qualifies the same pane change on preserved C712 owned history: 1,001 logs,
+unchanged owner/outbox and all 14 tables, 200 loaded rows and exactly unchanged
+render counts for all 199 other rows through keyboard focus, selection, detail,
+confirmation and Cancel. It never resets or seeds data or writes SQL. The observer
+is excluded from the final standalone. Its private evidence retains the executed
+verifier, before snapshot and actual row counters.
+
+PR103 merged normally as `5d306fdfd402e54672119ddc525a64677f021b55`
+after exact-head CI and live provider controls/configuration checks. The child
+remains on its preserved pre-PR103 base during native qualification; another
+hash-verified source backup and guarded restack are still required after freeze.
+No completed SSO is inferred from an OAuth start or Connect-card view. Final
+candidate local-history/configured-suite acceptance and final-candidate completed
+installation verification remain pending at this checkpoint.
+
+Provider follow-up records 278/279 and 291/292 pass both deployed provider
+starts/callback guards and native Connect-card viewing on the preserved live
+account. All 14 tables and three logs match the private pre-install backup,
+before launch and after viewing. Check 290 retains the failed assumption that
+iOS would keep the same data-container path; the passing checks resolve the
+current selected-device container. Record 293 independently validates the
+Keychain signing key and client-secret claims/signature. That secret expires
+`2027-04-17T15:38:41Z`; completed provider sign-in and token exchange are still
+unverified at this checkpoint.
+
+
+## Integrated history acceptance and reviewed correction — October 20
+
+This checkpoint supersedes the pending native-history items above. The child was
+safely restacked onto merged PR103 (`5d306f`), producing `5f493b9`; all 36 pending
+files and the committed history patch were hash-preserved, with the original
+stash and backups retained. Integrated code check287 passes348 Node/77 Workers
+and all three TypeScript configurations. Signed default bundle
+`c0c9c656d3cdb6cf23f314a83a80b8d1d1853da75b269b88f70e7d9d3d79a296`
+passes strict deep signature and exclusion of qualification hooks/local8793.
+
+Record289-history-default-standalone-local executes the actual new CI entry
+script on a fresh task-owned simulator: exact draft/save, populated paging and
+Cancel, stale edit, actual SQLite write rollback/retry, one restore despite
+repeated taps and deleted estimated/custom-log recovery all pass. Every unrelated
+row remains intact. The configured regression then passes13/13 in13m8s on this
+same immutable c0c9 bundle, including complete first-open setup/practice/replay,
+Notifications/timers and all themes. Failed11/13 and12/13 runs remain failures;
+bounded settled/enabled profile and from-step walkthrough test guards address
+their missed taps without weakening the original assertions. The separately
+reviewed exact PR104 lead15 settle/retry patch passes its target and this suite.
+The workflow now also runs continuous standalone local-history acceptance on its
+own newly created simulator and always uploads its logs/screenshots.
+
+The human intentionally deleted the older test simulators. The original D931
+in-place upgrade cannot be rerun on the final candidate; its earlier bundle4176
+proof remains historical. Root authorized an independent NEW backup-restored
+synthetic fixture, without recreating an old UUID. Record288-backup-restored-owned-
+history-verified passes1,002 events/all14 full tables/owner/outbox/mirrors/cursor
+unchanged through read-only local history. The raw DB/WAL/SHM originals stay
+unopened and hash-identical before/after. No SDK session or cloud authentication
+is restored. The first missed Settings tap remains diagnostic; the same fixture
+passes a bounded retry without recopying or reseeding.
+
+Whole-slice product review found one P2: HistoryVersionRow explicitly labelled
+only date/change details, hiding the visible event/custom name and note from
+VoiceOver. Actual old-c0c9 hierarchy reproduces the precise RED. One shared label
+now reuses the existing visible activity string. Replacement default signed bundle
+`f0a8356ccb7902e62d1e30b11f3534dcd3220aa19fa67480545f9a16366a9d93`
+(5,530,514bytes) passes base/iOS types and actual Recent changes/local-version
+native label assertions, selected detail/Back and all14-table/raw-backup checks.
+The same clone survives the signed update with a full10-file container backup
+and all rows unchanged before launch. Record288-history-accessibility-label-
+green-verified and the searchable observed-label proof retain this correction.
+Its first stale CoreSimulator bundle-path preflight fails before launch and
+remains diagnostic. The prior full13 result stays scoped to c0c9; the correction
+changes no layout, navigation, persistence or restoration logic. No unconditional
+full rerun is claimed for the replacement.
+
+Separate genuine deployed identity proof is now complete: real Google298 and
+Apple320 return through the installed SDK and survive cold restart with enabled
+cloud choices.294/295/299 and321/322/323 preserve local tables and verify separate
+real deployed identities/sessions, including approved Apple Hide My Email. These
+sign-ins alone start no trial, enroll no puppy, upload nothing and do not link the
+accounts. Live email/native restore/incoming proofs260/263/265/267 remain distinct.
+Local browser326/327 uses genuine local OTP plus a synthetic tokenless Apple row;
+it does not claim real Apple deletion. Text325/328/329 retain separately scoped
+export/deletion code checks, not completed native export or deployed timing.
+
+This is the bounded iOS history milestone, not release completion. The final
+original-device in-place upgrade is an acknowledged unavailable historical gate;
+backup-restored compatibility is independently qualified. A new history PR and
+exact-head CI/integration follow review; PR100 is already merged and is not this
+history PR. Distribution/physical-device notification delivery, billing, the wider
+lifecycle/export/web rollout and full observability/Sentry gates remain separate.
+Android, widgets and nap work remain deferred by the human.

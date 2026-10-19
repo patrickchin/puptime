@@ -1,0 +1,179 @@
+appId: com.patrickchin.puptime
+name: Actual native cloud history paging and confirmation Cancel
+---
+- runFlow:
+    when:
+      visible:
+        id: screen.today
+    commands:
+      - tapOn:
+          id: nav.open
+          retryTapIfNoChange: true
+      - assertVisible:
+          id: nav.drawer
+      - waitForAnimationToEnd
+      - tapOn:
+          id: nav.settings
+      - scrollUntilVisible:
+          element:
+            id: settings.account.open
+          direction: DOWN
+          timeout: 120000
+          speed: 40
+          visibilityPercentage: 100
+          centerElement: false
+      - waitForAnimationToEnd
+      - tapOn:
+          id: settings.account.open
+- extendedWaitUntil:
+    visible:
+      id: account.status
+      text: ^Up to date$
+    timeout: 45000
+- scrollUntilVisible:
+    element:
+      id: account.back
+    direction: UP
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: account.back
+- scrollUntilVisible:
+    element:
+      id: settings.back
+    direction: UP
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: settings.back
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: quick.pee
+    direction: UP
+    timeout: 120000
+    speed: 40
+    waitToSettleTimeoutMs: 1000
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      id: event.custom.edit
+    direction: DOWN
+    timeout: 120000
+    speed: 40
+    waitToSettleTimeoutMs: 1000
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: event.custom.edit
+- assertVisible:
+    id: editor
+- scrollUntilVisible:
+    element:
+      id: editor.history
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: editor.history
+- extendedWaitUntil:
+    visible:
+      id: history.cloud.load
+    timeout: 15000
+- tapOn:
+    id: history.cloud.load
+- extendedWaitUntil:
+    visible:
+      id: history.cloud.${LATEST_REVISION}
+    timeout: 30000
+- takeScreenshot: owned-cloud-latest-versions
+# The paging button sits between cloud and local rows. Large scroll steps can
+# skip it entirely; bounded short swipes keep each intervening position visible.
+- repeat:
+    times: 60
+    commands:
+      - runFlow:
+          when:
+            notVisible:
+              id: history.cloud.more
+          commands:
+            - swipe:
+                start: 80%,78%
+                end: 80%,55%
+                duration: 450
+            - waitForAnimationToEnd
+- assertVisible:
+    id: history.cloud.more
+- waitForAnimationToEnd
+- tapOn:
+    id: history.cloud.more
+    retryTapIfNoChange: true
+- scrollUntilVisible:
+    element:
+      id: history.cloud.${SELECTED_REVISION}
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: history.cloud.${SELECTED_REVISION}
+- assertVisible:
+    id: history.detail
+- scrollUntilVisible:
+    element:
+      id: history.after.note
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- assertVisible:
+    id: history.after.note
+    text: ${EXPECTED_CLOUD_NOTE}
+- scrollUntilVisible:
+    element:
+      id: history.restore
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: history.restore
+- assertVisible:
+    id: history.confirm
+- scrollUntilVisible:
+    element:
+      id: history.confirm.cancel
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: history.confirm.cancel
+- assertVisible:
+    id: history.detail
+- assertNotVisible:
+    id: history.confirm
+- takeScreenshot: owned-cloud-confirmation-cancelled

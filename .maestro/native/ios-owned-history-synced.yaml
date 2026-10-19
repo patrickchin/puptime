@@ -1,0 +1,56 @@
+appId: com.patrickchin.puptime
+name: Restored owned history reaches acknowledged cloud sync after reconnect
+---
+- tapOn:
+    id: nav.open
+    retryTapIfNoChange: true
+- runFlow:
+    when:
+      notVisible:
+        id: nav.drawer
+    commands:
+      - tapOn:
+          id: nav.open
+          retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: nav.drawer
+    timeout: 10000
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      id: nav.settings
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+    speed: 40
+    waitToSettleTimeoutMs: 1000
+- waitForAnimationToEnd
+- tapOn:
+    id: nav.settings
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: screen.settings
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: settings.account.open
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: settings.account.open
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: account.status
+      text: ^Up to date$
+    timeout: 120000
+- assertVisible:
+    id: account.local.count
+    text: ^1,001 activity logs$
+- takeScreenshot: owned-history-restoration-acknowledged

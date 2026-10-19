@@ -1,0 +1,17 @@
+appId: com.patrickchin.puptime
+name: Private retry obtains a fresh SDK email code
+---
+- scrollUntilVisible:
+    element:
+      id: account.resend
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: account.resend
+- waitForAnimationToEnd
+- assertVisible:
+    id: account.code.input

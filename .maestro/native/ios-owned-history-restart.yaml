@@ -1,0 +1,12 @@
+appId: com.patrickchin.puptime
+name: Cold restart retains the SDK owner and queued historical restore
+---
+- launchApp:
+    permissions: {}
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- assertNotVisible:
+    id: screen.firstLaunch
+- takeScreenshot: owned-offline-restore-after-cold-restart

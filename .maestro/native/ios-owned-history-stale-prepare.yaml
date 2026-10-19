@@ -1,0 +1,33 @@
+appId: com.patrickchin.puptime
+name: Prepare owned cloud version confirmation before an independent HTTP edit
+---
+- runFlow:
+    when:
+      notVisible:
+        id: history.confirm
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: history.restore
+          direction: DOWN
+          timeout: 120000
+          speed: 80
+          visibilityPercentage: 100
+          centerElement: false
+      - waitForAnimationToEnd
+      - tapOn:
+          id: history.restore
+- assertVisible:
+    id: history.confirm
+- scrollUntilVisible:
+    element:
+      id: history.confirm.after.note
+    direction: UP
+    timeout: 120000
+    speed: 40
+    visibilityPercentage: 100
+    centerElement: false
+- assertVisible:
+    id: history.confirm.after.note
+    text: ${EXPECTED_CLOUD_NOTE}
+- takeScreenshot: owned-cloud-confirmation-before-remote-edit

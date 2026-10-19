@@ -143,7 +143,7 @@ export function EventHistoryPanel({data,eventId,cloud,theme,onBack,onRestored,re
    <Pressable testID="history.back" accessibilityRole="button" accessibilityLabel={t('onboarding.back')} accessibilityState={{disabled:saving}} disabled={saving} onPress={back} style={({pressed})=>[styles.back,{backgroundColor:pressed?theme.primarySoft:theme.surfaceRaised,borderRadius:theme.presentation.controlRadius}]}><MaterialCommunityIcons name="arrow-left" size={24} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/></Pressable>
    <Text accessibilityRole="header" maxFontSizeMultiplier={1.5} style={[styles.title,text,{fontFamily:theme.presentation.headingFont}]}>{t(confirm?'history.confirmTitle':'history.title')}</Text>
   </View>
-  {selected?<ScrollView testID={confirm?'history.confirm':'history.detail'} contentContainerStyle={styles.content}>
+  {selected?<ScrollView key={confirm?'confirm':'detail'} testID={confirm?'history.confirm':'history.detail'} contentContainerStyle={styles.content}>
    {restored?notice('history.restored','history.restored'):null}
    {!restored&&page&&!page.head.event&&page.head.sequence!==null?notice('history.deleted','history.deleted'):null}
    <Text style={[styles.body,muted]}>{date(selected.createdAt)} · {t(selected.label)}</Text>
@@ -166,13 +166,14 @@ export function EventHistoryPanel({data,eventId,cloud,theme,onBack,onRestored,re
 
 export function HistoryVersionRow({theme,event,testID,title,detail,deleted,onPress}:{theme:Theme;event:PuppyEvent|null;testID:string;title:string;detail:string;deleted?:boolean;onPress:()=>void}) {
  const {t,eventLabel}=useLocalization();
- return <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={`${title}. ${detail}${deleted?`. ${t('history.deleted')}`:''}`} onPress={onPress} style={({pressed})=>[styles.row,{borderColor:theme.border,backgroundColor:pressed?theme.primarySoft:theme.surfaceRaised,borderRadius:theme.presentation.controlRadius}]}>
+ const activity=event?`${event.type==='custom'?event.customLabel:eventLabel(event.type)}${event.note?` · ${event.note}`:''}`:null;
+ return <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={`${title}. ${detail}${deleted?`. ${t('history.deleted')}`:''}${activity?`. ${activity}`:''}`} onPress={onPress} style={({pressed})=>[styles.row,{borderColor:theme.border,backgroundColor:pressed?theme.primarySoft:theme.surfaceRaised,borderRadius:theme.presentation.controlRadius}]}>
   {event?<View style={[styles.icon,{backgroundColor:theme.primarySoft,borderRadius:theme.presentation.iconRadius}]}><ActivityIcon activity={event} theme={theme} color={theme.primary} size={22}/></View>:null}
   <View style={styles.copy}>
    <Text style={[styles.rowTitle,{color:theme.text}]}>{title}</Text>
    <Text style={[styles.small,{color:theme.textMuted}]}>{detail}</Text>
    {deleted?<Text style={[styles.small,{color:theme.danger}]}>{t('history.deleted')}</Text>:null}
-   {event?<Text numberOfLines={2} style={[styles.small,{color:theme.text}]}>{event.type==='custom'?event.customLabel:eventLabel(event.type)}{event.note?` · ${event.note}`:''}</Text>:null}
+   {event?<Text numberOfLines={2} style={[styles.small,{color:theme.text}]}>{activity}</Text>:null}
   </View><MaterialCommunityIcons name="chevron-right" size={22} color={theme.textMuted} accessibilityElementsHidden importantForAccessibility="no"/>
  </Pressable>;
 }

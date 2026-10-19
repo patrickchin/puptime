@@ -1,0 +1,36 @@
+appId: com.patrickchin.puptime
+name: Private genuine deployed native SDK OTP verification
+---
+- launchApp:
+    stopApp: false
+    permissions: {}
+- scrollUntilVisible:
+    element:
+      id: account.code.input
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- tapOn:
+    id: account.code.input
+- eraseText
+- inputText: ${MAESTRO_TEST_CODE}
+- tapOn: Sign-in code
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      id: account.verify
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- tapOn:
+    id: account.verify
+- extendedWaitUntil:
+    visible:
+      id: setup.step.cloud
+    timeout: 30000
+- assertVisible:
+    id: setup.cloud.puppy
+- assertVisible:
+    id: setup.cloud.enable
+- assertNotVisible:
+    id: account.code.input

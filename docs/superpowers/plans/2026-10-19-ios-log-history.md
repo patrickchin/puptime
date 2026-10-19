@@ -90,23 +90,49 @@
 
 **Interfaces:** extend existing platform data files with `getEventHistoryData():Promise<EventHistoryData|undefined>`; iOS returns the cached runtime history, base returns undefined. LogScreen receives optional history data and current cloud handle for the secondary panel. Settings receives an optional Recent changes callback. `EventHistoryPanel` consumes the same runtime data/current controller for a selected eventId, reports committed restore results and Back; `EventHistoryScreen` supplies the recent-list navigation. No new primary tab.
 
-- [ ] Write native flows/SQL assertions for opening editor history with a committed draft, local older/deleted snapshots, Recent changes discovery, paging, confirmation/cancel/restore, repeated taps and a stale/write-failed confirmation. Initial RED is the absent editor history action. Preserve an owned populated fixture before use; never clear another profile/device.
-- [ ] Implement the design contract using existing cards, buttons, loading/error primitives, sheet and typography. Flush valid editor changes before entry; failed/invalid/deleted draft recovery remains reachable. Render history within the existing presented editor sheet and retain the underlying list. Refresh the acknowledged editor baseline after restore; old autosave callbacks must not undo it.
-- [ ] Add current/empty/pending/stale/offline/cloud-error states, actual before/after fields/reason and separate local/server labels. Nap versions remain readable with restoration deferred. Confirm a concrete selected version and preserve private values in-app only. Add all strings in English/Spanish/Simplified Chinese.
-- [ ] Run full Node/Workers/types and affected actual native flows; inspect fresh screenshots at small/standard phone, light/dark and maximum text/keyboard. Prove unchanged underlying rows do not redraw while history selection/detail state changes. Fix observable clipping/overlap/inert controls. Commit `feat: add discreet iOS log history and restore` and task-done.
+- [x] Write native flows/SQL assertions for opening editor history with a committed draft, local older/deleted snapshots, Recent changes discovery, paging, confirmation/cancel/restore, repeated taps and a stale/write-failed confirmation. Initial RED is the absent editor history action. Preserve an owned populated fixture before use; never clear another profile/device.
+- [x] Implement the design contract using existing cards, buttons, loading/error primitives, sheet and typography. Flush valid editor changes before entry; failed/invalid/deleted draft recovery remains reachable. Render history within the existing presented editor sheet and retain the underlying list. Refresh the acknowledged editor baseline after restore; old autosave callbacks must not undo it.
+- [x] Add current/empty/pending/stale/offline/cloud-error states, actual before/after fields/reason and separate local/server labels. Nap versions remain readable with restoration deferred. Confirm a concrete selected version and preserve private values in-app only. Add all strings in English/Spanish/Simplified Chinese.
+- [x] Run full Node/Workers/types and affected actual native flows; inspect fresh screenshots at small/standard phone, light/dark and maximum text/keyboard. Prove unchanged underlying rows do not redraw while history selection/detail state changes. Fix observable clipping/overlap/inert controls. Commit `feat: add discreet iOS log history and restore` and task-done.
 
 ### Task 5: Native and deployed history qualification
 
 **Files:** reusable `scripts/verify-ios-history.mjs`, `.maestro/native` history flows, existing HTTP matrix, cloud/video verification docs and rollout milestone.
 
-- [ ] Qualify free and owned populated histories with actual SQLite counts/IDs/revisions and untouched rows: restore/offline/reconnect/restart/deletion/estimate/custom label, stale local/remote confirmation, pending operation, failure/retry and full bounded paging. Use dedicated task-named devices and explicit scoped backups. Preserve current1002-event owned fixture.
-- [ ] Run actual local and deployed-staging authenticated history/merge/restore/isolation/paging edge paths with synthetic accounts and authoritative cleanup; do not substitute fake sessions for public provider proof. Record actual native SDK interactions where relevant without private code entry.
-- [ ] Build a fresh default standalone Release and prove no test hooks/local auth URL. Run affected history flows plus the configured regression suite on that immutable bundle. Verify current completed installations keep setup/history/owner state. Retain explicit provider/distribution/physical gates.
-- [ ] Record actual app journeys and grouped full test/type output, inspect fresh screenshots and update the external gallery/docs with precise scope and failed harness attempts. Run full Node/Workers/all types, native/service qualifiers and task-done; commit qualification.
-- [ ] Record this bounded phase4 milestone without closing the full rollout or the later lifecycle/billing/web/Sentry/release gates. Then run one fresh whole-branch review, re-grade by user effect, make one material RED→GREEN fix pass, defer minors and do not re-review. PR integration follows only after exact-head checks and PR99 have passed/merged.
+- [x] Qualify free and owned populated histories with actual SQLite counts/IDs/revisions and untouched rows: restore/offline/reconnect/restart/deletion/estimate/custom label, stale local/remote confirmation, pending operation, failure/retry and full bounded paging. Use dedicated task-named devices and explicit scoped backups. Preserve current1002-event owned fixture.
+- [x] Run actual local and deployed-staging authenticated history/merge/restore/isolation/paging edge paths with synthetic accounts and authoritative cleanup; do not substitute fake sessions for public provider proof. Record actual native SDK interactions where relevant without private code entry.
+- [x] Build a fresh default standalone Release and prove no test hooks/local auth URL. Run affected history flows plus the configured regression suite on that immutable bundle. Verify completed setup/history/owner compatibility using the authorized backup-restored new fixture; retain original-device in-place evidence as historical after the human deleted that device. Retain explicit provider/distribution/physical gates.
+- [x] Record actual app journeys and grouped full test/type output, inspect fresh screenshots and update the external gallery/docs with precise scope and failed harness attempts. Run full Node/Workers/all types, native/service qualifiers and task-done; commit qualification.
+- [x] Record this bounded phase4 milestone without closing the full rollout or the later lifecycle/billing/web/Sentry/release gates. Then run one fresh whole-branch review, re-grade by user effect, make one material RED→GREEN fix pass, defer minors and do not re-review. PR integration follows only after exact-head checks and PR99 have passed/merged.
 
 ## Self-review and execution boundary
 
 Task1's page/head/SQL helper types feed Task2 guards and Task4 rendering; Task2's local selection is explicitly widened in Task3 before Task4 consumes cloud versions. Task3 consumes existing authenticated history rather than creating new service permissions. Task4 preserves autosave and row identities rather than replacing activity loading. Task5 pins all five Review Focus classes with actual local/native/deployed evidence. Current schema4 gains an idempotent additive index, not development-format conversion. Full lifecycle/billing/web/telemetry work remains required later.
 
 The human already authorized autonomous implementation and technical decisions. This plan makes that existing scope reviewable; proceed inline without another routine approval handoff. Work may begin on the isolated child branch while PR99's frozen remote head runs CI; any parent CI correction is qualified on its own head and incorporated before child integration. No current native qualification or reviewer is reading mutable child source.
+
+
+## October 20 implementation and review milestone
+
+Tasks4/5 now have actual native/service evidence; commit/PR integration remains subject to exact-head CI. The preserved child restacked onto merged
+PR1035d306 with every pending file/committed history patch hash-verified.348Node,
+77Workers and all types pass; signed c0c9 passes actual CI-local history and all13
+configured flows. Maximum text has an actual confirmation-scroll RED→GREEN, and
+owned200-loaded-row instrumentation preserves all199 other row counters.
+
+The human intentionally deleted the older test devices. Update Task5's original
+D931 requirement accordingly: keep its bundle4176 in-place proof historical and
+do not recreate an old UUID or relax its verifier guard. Independently qualify a
+new fixture from a COPY of the unopened raw backup, with original hashes exact.
+That final-candidate read-only1,002-event/all14-table compatibility proof passes;
+it does not restore authentication or replace the unavailable original-device
+in-place evidence.
+
+The one fresh whole-slice product review found one P2 spoken-row-label omission.
+One correction reuses visible localized event/custom name and note. Actual c0c9
+native hierarchy is RED; signed replacement f0a8 passes Recent changes/local
+version labels and all-table preservation. Base/iOS types pass; no broader
+layout/storage/navigation change requires another unconditional13-flow run.
+Earlier failures, raw backups, source stashes and immutable c0c9 app remain
+preserved. Gallery/proof/docs retain build and fixture scope. A NEW history PR
+follows; original PR100 is already merged. The broader rollout stays active.

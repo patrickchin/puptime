@@ -1,0 +1,11 @@
+appId: com.patrickchin.puptime
+name: Foreground reconnect resumes the persisted owned restore
+---
+- pressKey: Home
+- launchApp:
+    stopApp: false
+    permissions: {}
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000

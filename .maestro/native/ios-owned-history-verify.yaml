@@ -1,0 +1,37 @@
+appId: com.patrickchin.puptime
+name: Private official SDK email-code verification without cloud activation
+---
+- scrollUntilVisible:
+    element:
+      id: account.code.input
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: account.code.input
+- inputText: ${MAESTRO_TEST_CODE}
+- assertVisible:
+    id: account.code.input
+    text: ^[0-9]{6}$
+- tapOn: ^Sign-in code$
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      id: account.verify
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: account.verify
+- extendedWaitUntil:
+    visible:
+      id: account.enable
+    timeout: 30000
+- assertNotVisible:
+    id: account.email.input
