@@ -1,0 +1,258 @@
+appId: com.patrickchin.puptime
+name: Local history appearance and read-only navigation
+---
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- scrollUntilVisible:
+    element:
+      id: quick.pee
+    direction: UP
+    timeout: 120000
+    speed: 40
+    waitToSettleTimeoutMs: 1000
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      id: event.custom.edit
+    direction: DOWN
+    timeout: 120000
+    speed: 40
+    waitToSettleTimeoutMs: 1000
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: event.custom.edit
+- assertVisible:
+    id: editor
+- scrollUntilVisible:
+    element:
+      id: editor.note.input
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: editor.note.input
+- waitForAnimationToEnd
+- assertVisible:
+    id: delete
+- assertVisible:
+    id: editor.note.input
+- takeScreenshot: editor-note-keyboard
+# Maestro hideKeyboard sends short swipes through time controls. Dismiss by
+# tapping the actual localized, noninteractive label without changing the log.
+- scrollUntilVisible:
+    element:
+      text: ${EXPECTED_ADJUST_TIME}
+    direction: UP
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn: ${EXPECTED_ADJUST_TIME}
+- waitForAnimationToEnd
+- assertNotVisible:
+    id: delete
+- scrollUntilVisible:
+    element:
+      id: editor.history
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: editor.history
+- extendedWaitUntil:
+    visible:
+      id: history.local.list
+    timeout: 15000
+- assertVisible: ${EXPECTED_HISTORY}
+- assertVisible:
+    id: history.back
+- takeScreenshot: history-list
+# At maximum text size a version card can span most of the viewport. Bring
+# its visible body to the center, then verify the exact snapshot after opening.
+- scrollUntilVisible:
+    element:
+      id: history.local.${SELECTED_SEQUENCE}
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 60
+    centerElement: true
+- waitForAnimationToEnd
+- tapOn:
+    id: history.local.${SELECTED_SEQUENCE}
+- assertVisible:
+    id: history.detail
+- takeScreenshot: history-selected-top
+- scrollUntilVisible:
+    element:
+      id: history.after.note
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- assertVisible:
+    id: history.after.note
+    text: ${EXPECTED_NOTE}
+- scrollUntilVisible:
+    element:
+      id: history.restore
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- assertVisible:
+    id: history.restore
+    enabled: true
+- takeScreenshot: history-selected-restore-action
+- tapOn:
+    id: history.restore
+- assertVisible:
+    id: history.confirm
+- assertVisible: ${EXPECTED_CONFIRM}
+- assertVisible:
+    id: history.back
+- takeScreenshot: history-confirmation-top
+- scrollUntilVisible:
+    element:
+      id: history.confirm.after.note
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- assertVisible:
+    id: history.confirm.after.note
+    text: ${EXPECTED_NOTE}
+- scrollUntilVisible:
+    element:
+      id: history.confirm.restore
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- assertVisible:
+    id: history.confirm.restore
+    enabled: true
+- takeScreenshot: history-confirmation-restore-action
+- scrollUntilVisible:
+    element:
+      id: history.confirm.cancel
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- takeScreenshot: history-confirmation-cancel-action
+- tapOn:
+    id: history.confirm.cancel
+- assertNotVisible:
+    id: history.confirm
+- assertVisible:
+    id: history.detail
+- tapOn:
+    id: history.back
+- extendedWaitUntil:
+    visible:
+      id: history.local.list
+    timeout: 15000
+- tapOn:
+    id: history.back
+- assertVisible:
+    id: editor
+- scrollUntilVisible:
+    element:
+      id: editor.close
+    direction: UP
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: editor.close
+- assertVisible:
+    id: screen.today
+- tapOn:
+    id: nav.open
+    retryTapIfNoChange: true
+- waitForAnimationToEnd
+- assertVisible:
+    id: nav.drawer
+- scrollUntilVisible:
+    element:
+      id: nav.settings
+    direction: DOWN
+    timeout: 120000
+    speed: 40
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: nav.settings
+- scrollUntilVisible:
+    element:
+      id: settings.history.open
+    direction: DOWN
+    timeout: 120000
+    speed: 40
+    waitToSettleTimeoutMs: 1000
+    visibilityPercentage: 60
+    centerElement: true
+- waitForAnimationToEnd
+- tapOn:
+    id: settings.history.open
+- extendedWaitUntil:
+    visible:
+      id: history.recent.list
+    timeout: 15000
+- assertVisible: ${EXPECTED_RECENT}
+- assertVisible:
+    id: history.recent.back
+- takeScreenshot: history-recent-changes
+- tapOn:
+    id: history.recent.back
+- assertNotVisible:
+    id: screen.eventHistory
+- waitForAnimationToEnd
+- tapOn:
+    id: nav.open
+    retryTapIfNoChange: true
+- waitForAnimationToEnd
+- assertVisible:
+    id: nav.drawer
+- scrollUntilVisible:
+    element:
+      id: nav.log
+    direction: UP
+    timeout: 120000
+    speed: 40
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: nav.log
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 15000

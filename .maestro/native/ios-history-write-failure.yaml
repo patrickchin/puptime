@@ -1,0 +1,19 @@
+appId: com.patrickchin.puptime
+name: A failed historical write keeps the selected confirmation retryable
+---
+- scrollUntilVisible:
+    element:
+      id: history.confirm.restore
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: history.confirm.restore
+- assertVisible:
+    id: history.restore.error
+- assertVisible:
+    id: history.confirm
+- assertNotVisible:
+    id: history.restored
+- takeScreenshot: failed-history-write-preserves-confirmation

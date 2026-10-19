@@ -1,0 +1,17 @@
+appId: com.patrickchin.puptime
+name: A changed log invalidates an older restoration confirmation
+---
+- runFlow:
+    when:
+      visible:
+        id: history.confirm.restore
+    commands:
+      - tapOn:
+          id: history.confirm.restore
+- assertVisible:
+    id: history.stale
+- assertVisible:
+    id: history.reload
+- assertNotVisible:
+    id: history.restored
+- takeScreenshot: stale-history-confirmation-keeps-newer-log

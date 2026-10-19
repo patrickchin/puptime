@@ -43,6 +43,7 @@ export function SettingsScreen({
   onOpenGuide,
   cloudHandle,
   onOpenAccount,
+  onOpenHistory,
   showHeader=true,
 }: {
   theme: Theme;
@@ -61,6 +62,7 @@ export function SettingsScreen({
   onOpenGuide: () => void;
   cloudHandle?: CloudHandle;
   onOpenAccount?: () => void;
+  onOpenHistory?: () => void;
   showHeader?:boolean;
 }) {
   const { activityColors, activityLabel, t } = useLocalization();
@@ -179,6 +181,7 @@ export function SettingsScreen({
 
       {cloudHandle?.available&&onOpenAccount?<AccountSettingsRow cloud={cloudHandle} theme={theme} onOpen={onOpenAccount}/>:null}
       <PuppyNameSetting theme={theme} cloud={cloudHandle}/>
+      {onOpenHistory?<View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}><SettingsRow testID="settings.history.open" icon="history" label={t('history.recentTitle')} detail={t('history.recentDetail')} onPress={onOpenHistory} theme={theme} wrap/></View>:null}
       <View style={[styles.card, surfaceTreatment(theme), { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
         <SettingsRow
           testID="settings.theme.open"
