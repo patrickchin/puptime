@@ -438,8 +438,8 @@ for(const change of ['account','generation','dispose','offline'] as const)test(`
  assert.equal(f.state.trialCalls,0);assert.equal(f.state.signOutCalls,0);
 });
 
-test('export file failure keeps the account and pending work and resumes eligible sync',async t=>{
- const f=await fixture(t,{exportCloud:async()=>{throw new Error('Private file path must not escape');}});f.state.credentials=true;f.state.summary.cloud={canSync:true,canExport:true,source:'trial',expiresAt:8640000000000000};await enrollLocal(f.runtime);await f.runtime.storage.appendEvents([event]);f.controller.setActive(true);await f.controller.refresh();
+for(const fault of [new Error('Private file path must not escape'),new CloudApiError('network'),new CloudApiError('server-error',503),new CloudApiError('rate-limited',429)])test(`export ${fault.message} failure stays scoped to the export and preserves pending work`,async t=>{
+ const f=await fixture(t,{exportCloud:async()=>{throw fault;}});f.state.credentials=true;f.state.summary.cloud={canSync:true,canExport:true,source:'trial',expiresAt:8640000000000000};await enrollLocal(f.runtime);await f.runtime.storage.appendEvents([event]);f.controller.setActive(true);await f.controller.refresh();
  const before=await localTables(f.runtime);assert.equal(await f.controller.exportData(),'error');assert.equal(f.controller.read().problem,'export-failed');assert.equal(f.controller.read().account!.user.id,'account-1');assert.equal(f.controller.read().exporting,false);assert.deepEqual(await localTables(f.runtime),before);assert.equal(f.timers.filter(task=>!task.cancelled).length,1);
 });
 

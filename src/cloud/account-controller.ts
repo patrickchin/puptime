@@ -250,7 +250,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
           if(controller.signal.aborted)return snapshot.online?'cancelled':fail('network');
           if(error instanceof CloudApiError){
             if(error.category==='auth-required')emit({account:null,linkedProviders:null});
-            if(!['invalid-response','invalid-request'].includes(error.category))return fail(error.category);
+            if(['auth-required','account-deleted','forbidden','conflict'].includes(error.category))return fail(error.category);
           }
           return fail('export-failed');
         }finally{

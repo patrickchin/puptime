@@ -63,6 +63,11 @@ cursor, preserves Unicode, excludes concurrent writes, and interrupts retirement
 without a success footer. This establishes the local RPC boundary; deployed
 Free-plan CPU timing still needs qualification.
 
+The local native fault matrix now passes; see
+`docs/cloud-export-verification.md` for commands, recording scope and remaining
+deployed/native qualification gates. Visual review also moved download errors
+beside Export and kept authentication failures at the account level.
+
 ## 2. Deletion and original-owner verification
 
 - [x] Correct Apple upstream token revocation at the shared server deletion

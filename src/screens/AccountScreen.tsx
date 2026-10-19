@@ -46,7 +46,7 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
           <Text testID="account.local.count" style={[styles.body,bodyStyle]}>{readFailed?t('account.error.storage'):countLabel(count)}</Text>
           <Text testID="account.status" accessibilityLiveRegion="polite" style={[styles.status,{color:theme.primary}]}>{t(`account.status.${status}`)}</Text>
         </View>
-        {errorKey?<Text testID="account.error" accessibilityRole="alert" style={[styles.notice,{color:theme.danger,backgroundColor:theme.dangerSoft,borderRadius:theme.presentation.controlRadius}]}>{t(errorKey)}</Text>:null}
+        {errorKey&&errorKey!=='account.error.export'?<Text testID="account.error" accessibilityRole="alert" style={[styles.notice,{color:theme.danger,backgroundColor:theme.dangerSoft,borderRadius:theme.presentation.controlRadius}]}>{t(errorKey)}</Text>:null}
         {!account?<AccountSignIn cloud={cloud} theme={theme} showError={false}/>:(<View style={styles.stack}>
           <Text selectable style={[styles.body,{color:theme.text}]}>{account.user.email}</Text>
           {!enrolled?(<View style={cardStyle}>
@@ -73,6 +73,7 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
             </View>:<AccountButton key={provider} theme={theme} testID={`account.${provider}.connect`} label={t(provider==='apple'?'account.connectApple':'account.connectGoogle')} icon={provider} disabled={busy||!state.online} loading={state.linkingProvider===provider} onPress={()=>{void cloud.controller!.connectProvider(provider);}}/>)}
           </View>:null}
           <View style={cardStyle}>
+            {errorKey==='account.error.export'?<Text testID="account.error" accessibilityRole="alert" style={[styles.notice,{color:theme.danger,backgroundColor:theme.dangerSoft,borderRadius:theme.presentation.controlRadius}]}>{t(errorKey)}</Text>:null}
             <AccountButton theme={theme} testID="account.export" label={t(state?.exporting?'account.exporting':'account.export')} icon="download-outline" disabled={busy||!state!.online||!account.cloud.canExport} loading={state?.exporting} onPress={()=>{void cloud.controller!.exportData();}}/>
             {state?.exporting?<AccountButton theme={theme} testID="account.export.cancel" label={t('account.cancel')} onPress={()=>cloud.controller!.cancelExport()}/>:state?.sync?.pending?<Text style={[styles.body,bodyStyle]}>{t('account.exportPending')}</Text>:null}
           </View>
