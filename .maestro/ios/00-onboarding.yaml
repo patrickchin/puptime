@@ -32,6 +32,9 @@ tags:
     timeout: 90000
 - tapOn:
     id: nav.open
+    retryTapIfNoChange: true
+- assertVisible:
+    id: nav.drawer
 - tapOn:
     id: nav.notifications
 - assertVisible:
@@ -41,6 +44,9 @@ tags:
     text: Allow notifications
 - tapOn:
     id: nav.open
+    retryTapIfNoChange: true
+- assertVisible:
+    id: nav.drawer
 - tapOn:
     id: nav.settings
 - assertVisible:
