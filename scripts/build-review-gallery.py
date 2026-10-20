@@ -7,6 +7,8 @@ from pathlib import Path
 import re
 
 CURRENT_JOURNEYS = [
+    '330-ios-cloud-export-local',
+    '331-ios-cloud-export-inline-feedback',
     '195-clean-first-open-and-timed-reminder',
     '188-drawer-and-native-timer-journeys',
     '194-terrier-full-first-open-and-recovery',

@@ -5,9 +5,10 @@ import type { createLocalRuntime } from '../local/runtime-factory.ts';
 
 type Runtime=Awaited<ReturnType<typeof createLocalRuntime>>;
 type SyncStatus=Awaited<ReturnType<Runtime['sync']['status']>>;
-export type AccountProblem=CloudErrorCategory|'local-storage'|'confirmation-required'|'pending-confirmation-required'|'account-mismatch'|'trial-unavailable'|'provider-unavailable'|'invalid-email'|'invalid-code'|'code-expired'|'too-many-attempts'|'sign-in-failed'|'social-incomplete'|'link-incomplete'|'sign-out-failed'|'remote-sign-out-unconfirmed';
+export type AccountProblem=CloudErrorCategory|'local-storage'|'confirmation-required'|'pending-confirmation-required'|'account-mismatch'|'trial-unavailable'|'provider-unavailable'|'invalid-email'|'invalid-code'|'code-expired'|'too-many-attempts'|'sign-in-failed'|'social-incomplete'|'link-incomplete'|'sign-out-failed'|'remote-sign-out-unconfirmed'|'export-failed';
 export type AccountActionResult='ok'|'error'|'cancelled'|'confirmation-required'|'pending-confirmation-required';
 export type SocialProvider='apple'|'google';
+export type CloudExportAction=(expectedAccount:string,ready:()=>Promise<boolean>,signal?:AbortSignal)=>Promise<'shared'|'cancelled'>;
 type IdentityOutcome={error:{status:number;code?:string}|null};
 type LinkedIdentity={userId:string;providerId:string};
 type IdentityListOutcome=IdentityOutcome&{data:LinkedIdentity[]|null};
@@ -30,7 +31,7 @@ export function createIdentityAdapter(auth:SdkIdentityClient):IdentityAdapter {
     hasCredentials:async()=>!!(await auth.getCookie()),
   };
 }
-export type AccountSnapshot={config:CloudConfig|null;account:CloudAccountSummary|null;linkedProviders:SocialProvider[]|null;linkingProvider:SocialProvider|null;local:{name:string;eventCount:number}|null;sync:SyncStatus|null;run:RunResult|null;problem:AccountProblem|null;codeSentTo:string|null;busy:boolean;running:boolean;active:boolean;online:boolean;lastSyncedAt:number|null};
+export type AccountSnapshot={config:CloudConfig|null;account:CloudAccountSummary|null;linkedProviders:SocialProvider[]|null;linkingProvider:SocialProvider|null;local:{name:string;eventCount:number}|null;sync:SyncStatus|null;run:RunResult|null;problem:AccountProblem|null;codeSentTo:string|null;busy:boolean;exporting:boolean;running:boolean;active:boolean;online:boolean;lastSyncedAt:number|null};
 const defaultDefer=(fn:()=>void,delay:number)=>{const timer=setTimeout(fn,delay);return()=>clearTimeout(timer);};
 // Call only after pausing the owning controller, or when no client exists.
 export async function continueFirstLaunchLocally(runtime:Runtime,confirmPending=false):Promise<AccountActionResult> {
@@ -40,12 +41,13 @@ export async function continueFirstLaunchLocally(runtime:Runtime,confirmPending=
   if(status.generation&&status.accountId)await runtime.sync.detach({generation:status.generation,accountId:status.accountId});
   return 'ok';
 }
-export function createAccountController({runtime,api,identity,subscribeLocalWrites,defer=defaultDefer,changed}:{runtime:Runtime;api:CloudApi;identity:IdentityAdapter;subscribeLocalWrites:(fn:()=>void)=>()=>void;defer?:(fn:()=>void,delay:number)=>()=>void;changed:()=>void}) {
-  let snapshot:AccountSnapshot={config:null,account:null,linkedProviders:null,linkingProvider:null,local:null,sync:null,run:null,problem:null,codeSentTo:null,busy:false,running:false,active:false,online:true,lastSyncedAt:null};
+export function createAccountController({runtime,api,identity,subscribeLocalWrites,defer=defaultDefer,changed,exportCloud}:{runtime:Runtime;exportCloud?:CloudExportAction;api:CloudApi;identity:IdentityAdapter;subscribeLocalWrites:(fn:()=>void)=>()=>void;defer?:(fn:()=>void,delay:number)=>()=>void;changed:()=>void}) {
+  let snapshot:AccountSnapshot={config:null,account:null,linkedProviders:null,linkingProvider:null,local:null,sync:null,run:null,problem:null,codeSentTo:null,busy:false,exporting:false,running:false,active:false,online:true,lastSyncedAt:null};
   const listeners=new Set<()=>void>();
   let disposed=false,suspended=false,signOutUnfinished=false,rerun=false,associationConfirmationNeeded=false;
   let actions:Promise<unknown>=Promise.resolve(),refreshing:Promise<AccountActionResult>|null=null,running:Promise<void>|null=null,aborter:AbortController|null=null,cancelScheduled:(()=>void)|null=null;
-  let identityPending:Promise<AccountActionResult>|null=null;
+  let identityPending:Promise<AccountActionResult>|null=null,exportPending:Promise<AccountActionResult>|null=null;
+  let exportAborter:AbortController|null=null;
   const runner=createSyncRunner({sync:runtime.sync,api,petId:runtime.petId,deviceId:runtime.deviceId,sessionAccountId:()=>snapshot.account?.user.id??null,changed});
   function emit(patch:Partial<AccountSnapshot>) {
     if (disposed) return;snapshot={...snapshot,...patch};
@@ -220,6 +222,48 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
       if(!snapshot.account!.cloud.canSync)throw new CloudApiError('expired',402);
       return result;
     },
+    cancelExport(){exportAborter?.abort();},
+    exportData():Promise<AccountActionResult> {
+      if(exportPending||identityPending)return Promise.resolve('cancelled');
+      const controller=new AbortController();exportAborter=controller;
+      exportPending=perform(async()=>{
+        if(controller.signal.aborted)return 'cancelled';
+        if(!snapshot.online)return fail('network');
+        if(!exportCloud)return fail('export-failed');
+        const wasSuspended=suspended;await pauseTransport();
+        const fence=await captureIdentityFence();if(!fence)return 'error';
+        emit({exporting:true});
+        try {
+          if(controller.signal.aborted)return 'cancelled';
+          if(!await confirmIdentity(fence))return 'error';
+          if(controller.signal.aborted)return 'cancelled';
+          if(!snapshot.account!.cloud.canExport)return fail('forbidden');
+          const result=await exportCloud(fence.userId,async()=>{
+            if(disposed||controller.signal.aborted)return false;
+            if(!await confirmIdentity(fence))return false;
+            if(!snapshot.account!.cloud.canExport){fail('forbidden');return false;}
+            return true;
+          },controller.signal);
+          return result==='shared'?'ok':'cancelled';
+        }catch(error){
+          if(disposed)return 'cancelled';
+          if(controller.signal.aborted)return snapshot.online?'cancelled':fail('network');
+          if(error instanceof CloudApiError){
+            if(error.category==='auth-required')emit({account:null,linkedProviders:null});
+            if(['auth-required','account-deleted','forbidden','conflict'].includes(error.category))return fail(error.category);
+          }
+          return fail('export-failed');
+        }finally{
+          if(!disposed){
+            try {
+              const owner=await runtime.sync.status(runtime.petId);
+              if(snapshot.account?.user.id===fence.userId&&owner.accountId===fence.accountId&&owner.generation===fence.generation)suspended=wasSuspended||signOutUnfinished;
+            }finally{emit({exporting:false});}
+          }
+        }
+      }).finally(()=>{exportAborter=null;exportPending=null;});
+      return exportPending;
+    },
     invalidate(){kick(0,true);},
     requestEmail(email:string) {return authenticate(async()=>{
       const parsed=z.email().max(320).safeParse(email.trim());if(!parsed.success)return fail('invalid-email');
@@ -308,8 +352,8 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
     // The identity action verifies its own browser return; a queued lifecycle
     // refresh would otherwise immediately erase its completion/error state.
     setActive(active:boolean) {if(snapshot.active===active)return;emit({active});if(!active){cancelTimer();aborter?.abort();}else if(snapshot.online&&!identityPending)void refresh();},
-    setOnline(online:boolean) {if(snapshot.online===online)return;emit({online});if(!online){cancelTimer();aborter?.abort();}else if(snapshot.active&&!identityPending)void refresh();},
-    stop(){if(disposed)return;disposed=true;cancelTimer();aborter?.abort();unsubscribe();listeners.clear();},
+    setOnline(online:boolean) {if(snapshot.online===online)return;emit({online});if(!online){cancelTimer();aborter?.abort();exportAborter?.abort();}else if(snapshot.active&&!identityPending)void refresh();},
+    stop(){if(disposed)return;disposed=true;cancelTimer();aborter?.abort();exportAborter?.abort();unsubscribe();listeners.clear();},
   };
 }
 export type AccountController=ReturnType<typeof createAccountController>;

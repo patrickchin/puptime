@@ -2,7 +2,7 @@ import { Hono, type Context } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import { validator } from 'hono/validator';
 import { z } from 'zod';
-import { enrollmentSchema, mutationSchema, recordIdSchema, type Revision } from '../src/cloud/protocol';
+import { enrollmentSchema, mutationSchema, recordIdSchema } from '../src/cloud/protocol';
 import { getAccountStore, type AccountStore } from './account-store';
 import { createAuth } from './auth';
 import type { AppleRevocation } from './account-lifecycle';
@@ -78,35 +78,7 @@ accountRoutes.get('/records/:id/history', authenticated, syncAccess, async (cont
   return context.json({ revisions: await context.get('store').history(id, before) });
 });
 async function exportAccount(context: Context<AccountEnv>) {
-  const store = context.get('store');
-  const snapshot = await store.exportSnapshot();
-  const encoder = new TextEncoder();
-  let manifest = true; let cursor = 0; let pending: Revision[] = [];
-  const stream = new ReadableStream<Uint8Array>({
-    async pull(controller) {
-      try {
-        if (manifest) {
-          manifest = false;
-          controller.enqueue(encoder.encode(JSON.stringify({ type: 'manifest', format: 'puptime-cloud-export', version: 1, exportedAt: Date.now(), pets: snapshot.pets }) + '\n'));
-          return;
-        }
-        if (!pending.length && cursor < snapshot.cursor) pending = await store.exportPage(cursor, snapshot.cursor);
-        const revision = pending.shift();
-        if (revision) {
-          cursor = revision.sequence;
-          controller.enqueue(encoder.encode(JSON.stringify({ type: 'revision', ...revision }) + '\n'));
-        } else {
-          if (cursor !== snapshot.cursor) throw new Error('Incomplete snapshot.');
-          controller.enqueue(encoder.encode(JSON.stringify({ type: 'complete', cursor }) + '\n'));
-          controller.close();
-        }
-      } catch { controller.error(new Error('Export interrupted. Please retry.')); }
-    },
-  });
-  return new Response(stream, { headers: {
-    'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store',
-    'Content-Disposition': 'attachment; filename="puptime-cloud-export.ndjson"',
-  } });
+  return context.get('store').exportStream();
 }
 accountRoutes.get('/account/export', authenticated, exportAccount);
 accountRoutes.post('/account/export', authenticated, validator('form', value => z.strictObject({expectedAccount:z.string().min(1).max(256)}).parse(value)), context => {
