@@ -79,3 +79,11 @@ disk reopen, duplicate receipts, concurrent edits, owner isolation, ISO session
 expiry, retained pending work and convergence to 1,002 logs. Its sessions are
 administrative fixtures; this is not native SDK or social-provider acceptance.
 The new baseline has not yet been reset/deployed on staging.
+
+The combined shared-native/explicit-SQL branch passes 374 app checks and 97
+Workers checks, with default, iOS, Android-static and server types. The focused
+browser command `node scripts/verify-web-accounts.mjs --core-accounts` passes
+seven reported checks using real local UI email-code authentication and a
+populated cloud store. It verifies reload, sign-out, ISO session expiry and
+same-owner recovery without automatic puppy upload. It captures screenshots
+and no videos. Native qualification and deployed acceptance remain separate.
