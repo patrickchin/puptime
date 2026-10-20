@@ -42,6 +42,14 @@ CURRENT_JOURNEYS = [
     '288-history-accessibility-label-green-verified',
     '289-history-default-standalone-local',
     '289-history-default-standalone-regression-final',
+    '330-ios-cloud-export-local',
+    '331-ios-cloud-export-inline-feedback',
+    '334-ios-cloud-export-live',
+    '340-ios-delete-confirmation',
+    '344-ios-delete-standalone-https',
+    '345-ios-delete-lost-reply',
+    '346-ios-delete-layout-matrix',
+    '347-ios-modal-diagnostic',
 ]
 
 REVIEW_NOTES = {

@@ -7,7 +7,7 @@ import { CloudApiError,type CloudApi,type CloudAccountSummary } from './api.ts';
 import type {Revision} from './protocol.ts';
 import * as controllerModule from './account-controller.ts';
 const event={id:'one',type:'pee' as const,at:100,source:'app' as const};
-async function fixture(t:TestContext,{pristine=false}={}) {
+async function fixture(t:TestContext,{pristine=false,exportCloud}:{pristine?:boolean;exportCloud?:controllerModule.CloudExportAction}={}) {
  const database=await createLocalDatabase(sqliteTestConnection(':memory:'));t.after(()=>database.close());
  await initializeLocalDatabase(database,()=> 'pet-1');if(!pristine)await database.write(sql=>sql.runAsync('DELETE FROM routines'));
  const writes=new Set<()=>void>(),runtime=await createLocalRuntime(database,'pet-1',()=>{for(const fn of writes)fn();});
@@ -18,7 +18,7 @@ async function fixture(t:TestContext,{pristine=false}={}) {
  const identity:controllerModule.IdentityAdapter={requestEmail:async(email:string)=>{state.requested.push(email);return {error:null};},verifyEmail:async(_email:string,code:string)=>{state.verifications++;if(code!=='123456')return {error:{status:400,code:'INVALID_OTP'}};state.credentials=true;return {error:null};},signInSocial:async()=>{state.credentials=true;return {error:null};},linkSocial:async provider=>{state.linkCalls++;state.linkedAccounts.push({userId:state.summary.user.id,providerId:provider});return {error:null};},listAccounts:async()=>{state.listCalls++;return {data:structuredClone(state.linkedAccounts),error:null};},signOut:async()=>{state.signOutCalls++;if(!state.storageFails)state.credentials=false;return {error:state.signOutFails?{status:503,code:'NETWORK_ERROR'}:null};},hasCredentials:async()=>{if(state.storageFails)throw new Error('secure storage failed');return state.credentials;}};
  const timers:Array<{fn:()=>void;delay:number;cancelled:boolean}>=[];
  assert.equal(typeof controllerModule.createAccountController,'function');
- const controller=controllerModule.createAccountController({runtime,api,identity,subscribeLocalWrites:(fn:()=>void)=>{writes.add(fn);return()=>{writes.delete(fn);};},defer:(fn:()=>void,delay:number)=>{const task={fn,delay,cancelled:false};timers.push(task);return()=>{task.cancelled=true;};},changed:()=>{}});
+ const controller=controllerModule.createAccountController({runtime,api,identity,exportCloud,subscribeLocalWrites:(fn:()=>void)=>{writes.add(fn);return()=>{writes.delete(fn);};},defer:(fn:()=>void,delay:number)=>{const task={fn,delay,cancelled:false};timers.push(task);return()=>{task.cancelled=true;};},changed:()=>{}});
  t.after(()=>controller.stop());
  return {controller,runtime,state,api,identity,config,timers};
 }
@@ -404,4 +404,54 @@ for(const action of ['sign-out','account-switch','generation-change','dispose'] 
  if(action==='dispose')controller.stop();
  release({revisions:[historical]});await assert.rejects(request,error=>error instanceof CloudApiError&&error.category==='conflict');
  assert.equal((await runtime.storage.loadEvents())[0].note,'Second');assert.equal(state.trialCalls,0);
+});
+
+
+test('cloud export works after paid access expires and preserves every local row and pending operation',async t=>{
+ let calls=0;
+ const f=await fixture(t,{exportCloud:async(expected,ready,signal)=>{calls++;assert.equal(expected,'account-1');assert.equal(signal?.aborted,false);assert.equal(await ready(),true);return 'shared';}});
+ f.state.credentials=true;await enrollLocal(f.runtime);await f.runtime.storage.appendEvents([event]);await f.controller.refresh();
+ const before=await localTables(f.runtime);assert.equal(f.controller.read().account!.cloud.canSync,false);assert.ok(f.controller.read().sync!.pending>0);
+ assert.equal(await f.controller.exportData(),'ok');assert.equal(calls,1);assert.deepEqual(await localTables(f.runtime),before);assert.equal(f.state.trialCalls,0);assert.equal(f.controller.read().exporting,false);assert.equal(f.controller.read().problem,null);
+});
+
+test('cloud export pauses an in-flight sync runner and ignores duplicate taps',async t=>{
+ let entered!:()=>void,release!:()=>void,aborted=false,calls=0;const started=new Promise<void>(resolve=>{entered=resolve;}),waiting=new Promise<void>(resolve=>{release=resolve;});
+ const f=await fixture(t,{exportCloud:async(_expected,ready)=>{calls++;assert.equal(aborted,true);entered();await waiting;assert.equal(await ready(),true);return 'shared';}});
+ f.state.credentials=true;f.state.summary.cloud={canSync:true,canExport:true,source:'trial',expiresAt:8640000000000000};await enrollLocal(f.runtime);
+ f.api.pull=async(_after,signal)=>new Promise((_,reject)=>signal!.addEventListener('abort',()=>{aborted=true;reject(new Error('cancelled'));},{once:true}));
+ f.controller.setActive(true);await f.controller.refresh();const timer=f.timers.find(task=>!task.cancelled)!;timer.cancelled=true;timer.fn();await tick();
+ const download=f.controller.exportData();await started;assert.equal(f.controller.read().exporting,true);assert.equal(f.controller.read().running,false);
+ assert.equal(await f.controller.exportData(),'cancelled');assert.equal(calls,1);release();assert.equal(await download,'ok');assert.equal(f.controller.read().exporting,false);
+});
+
+for(const change of ['account','generation','dispose','offline'] as const)test(`a cloud export after ${change} cannot share another ownership context`,async t=>{
+ let entered!:()=>void,release!:()=>void,shares=0,signal:AbortSignal|undefined;const started=new Promise<void>(resolve=>{entered=resolve;}),waiting=new Promise<void>(resolve=>{release=resolve;});
+ const f=await fixture(t,{exportCloud:async(_expected,ready,received)=>{signal=received;entered();await waiting;if(!await ready())return 'cancelled';shares++;return 'shared';}});
+ f.state.credentials=true;await enrollLocal(f.runtime);await f.runtime.storage.appendEvents([event]);await f.controller.refresh();
+ const pending=f.controller.exportData();await started;
+ if(change==='account')f.state.summary={...f.state.summary,user:{...f.state.summary.user,id:'account-2'}};
+ if(change==='generation'){const owner=await f.runtime.sync.status('pet-1');await f.runtime.sync.detach({generation:owner.generation!,accountId:owner.accountId!});}
+ if(change==='dispose')f.controller.stop();if(change==='offline')f.controller.setOnline(false);
+ const before=await localTables(f.runtime);release();assert.equal(await pending,'cancelled');assert.equal(shares,0);assert.deepEqual(await localTables(f.runtime),before);
+ if(change==='dispose'||change==='offline')assert.equal(signal?.aborted,true);
+ assert.equal(f.state.trialCalls,0);assert.equal(f.state.signOutCalls,0);
+});
+
+for(const fault of [new Error('Private file path must not escape'),new CloudApiError('network'),new CloudApiError('server-error',503),new CloudApiError('rate-limited',429)])test(`export ${fault.message} failure stays scoped to the export and preserves pending work`,async t=>{
+ const f=await fixture(t,{exportCloud:async()=>{throw fault;}});f.state.credentials=true;f.state.summary.cloud={canSync:true,canExport:true,source:'trial',expiresAt:8640000000000000};await enrollLocal(f.runtime);await f.runtime.storage.appendEvents([event]);f.controller.setActive(true);await f.controller.refresh();
+ const before=await localTables(f.runtime);assert.equal(await f.controller.exportData(),'error');assert.equal(f.controller.read().problem,'export-failed');assert.equal(f.controller.read().account!.user.id,'account-1');assert.equal(f.controller.read().exporting,false);assert.deepEqual(await localTables(f.runtime),before);assert.equal(f.timers.filter(task=>!task.cancelled).length,1);
+});
+
+test('anonymous and offline accounts cannot dispatch a cloud export',async t=>{
+ let calls=0;const f=await fixture(t,{exportCloud:async()=>{calls++;return 'shared';}});await f.runtime.storage.appendEvents([event]);await f.controller.refresh();const before=await localTables(f.runtime);
+ assert.equal(await f.controller.exportData(),'error');assert.equal(f.controller.read().problem,'auth-required');f.state.credentials=true;await f.controller.refresh();f.controller.setOnline(false);assert.equal(await f.controller.exportData(),'error');assert.equal(f.controller.read().problem,'network');assert.equal(calls,0);assert.deepEqual(await localTables(f.runtime),before);
+});
+
+test('leaving the account screen cancels an export still queued behind refresh',async t=>{
+ let calls=0,entered!:()=>void,release!:()=>void;const started=new Promise<void>(resolve=>{entered=resolve;}),waiting=new Promise<void>(resolve=>{release=resolve;});
+ const f=await fixture(t,{exportCloud:async()=>{calls++;return 'shared';}});f.state.credentials=true;await f.controller.refresh();const before=await localTables(f.runtime),account=f.api.account;
+ f.api.account=async()=>{entered();await waiting;return account();};
+ const refresh=f.controller.refresh();await started;const download=f.controller.exportData();f.controller.cancelExport();release();await refresh;
+ assert.equal(await download,'cancelled');assert.equal(calls,0);assert.equal(f.controller.read().exporting,false);assert.deepEqual(await localTables(f.runtime),before);
 });
