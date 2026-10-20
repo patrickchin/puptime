@@ -52,6 +52,7 @@ function AccountContent({client}:{client:Client}){
  const [config,setConfig]=useState<CloudConfig|null>(null),[summary,setSummary]=useState<CloudAccountSummary|null>(null),[linked,setLinked]=useState<Provider[]|null>(null);
  const [email,setEmail]=useState(''),[sent,setSent]=useState<string|null>(null),[code,setCode]=useState('');
  const [notice,setNotice]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState<string|null>(null),[loading,setLoading]=useState(true),[revision,setRevision]=useState(0);
+ const [appleManual,setAppleManual]=useState(false);
  const [reauth,setReauth]=useState<string|null>(null),[confirmation,setConfirmation]=useState<string|null>(null),[uncertain,setUncertain]=useState<string|null>(null);
  const mounted=useRef(true),locked=useRef(false),epoch=useRef(0),pending=useRef<ReturnIntent|null>(null),callbackFailed=useRef(false),dialog=useRef<HTMLDialogElement>(null),userId=useRef(user?.id);userId.current=user?.id;
  useEffect(()=>{
@@ -132,9 +133,11 @@ function AccountContent({client}:{client:Client}){
  }
  async function remove(){
   const expected=confirmation;if(!expected)return;
-  try{await client.remove(expected,()=>{saveDeletion(expected);setUncertain(expected);});}
+  let outcome;
+  try{outcome=await client.remove(expected,()=>{saveDeletion(expected);setUncertain(expected);});}
   catch(reason){if(readDeletion(expected)===expected)setUncertain(expected);throw reason;}
   if(!mounted.current)return;setConfirmation(null);setUncertain(null);clearDeletion(expected);setSummary(null);setLinked(null);setNotice('Cloud account deleted. Your iPhone’s local logs are kept.');
+  setAppleManual(outcome.appleRevocation==='manual');
   captureWebsiteEvent('website_account',{action:'delete',result:'success'});await session.refetch();
  }
  const disabled=!!busy||session.isRefetching;
@@ -152,6 +155,7 @@ function AccountContent({client}:{client:Client}){
  return <>
   {error?<div role="alert" className="account-error">{error}</div>:null}
   {notice?<p role="status" className="account-notice">{notice}</p>:null}
+  {appleManual?<p>Apple access wasn’t confirmed as revoked. In <a href="https://account.apple.com/">your Apple Account</a>, open Sign-In and Security → Sign in with Apple, then stop using Puptime.</p>:null}
   {uncertain?<div><p>We won’t create another account or restart sync automatically.</p>{reauth?signInForm:<button type="button" disabled={disabled} onClick={()=>{void run('delete-check',openDeletion);}}>Retry deletion</button>}<p><a href="https://github.com/patrickchin/puptime/issues">Get help</a></p></div>:loading||session.isPending?<p role="status">Loading account…</p>:!user?signInForm:<>
    <p className="account-email">{user.email}</p>
    {reauth?signInForm:<>

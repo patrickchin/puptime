@@ -1,5 +1,3 @@
-• Add customizable potty reminders after pee and meal logs.
-• Home Screen widget buttons now fill the available height on iPhone and iPad and match the selected theme.
-• Import an activity CSV backup to recover missing entries without replacing your current edits.
-• Saved and imported estimated entries stay marked as Estimated in Log, Timeline, and CSV backups, with separate counts in Insights.
-• Save failures are reported, and a failed save no longer blocks later saves.
+• Set up your puppy profile and choose local logging or optional cloud backup.
+• Sign in for cloud access and keep your puppy history across devices.
+• Restore missing activity from a CSV backup while keeping your current edits.

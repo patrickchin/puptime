@@ -48,7 +48,11 @@ When you choose **Import CSV**, the system file picker lets you select a Puptime
 
 Your data remains on your device until you delete individual records or remove the app. Deleting the app removes its locally stored data, subject to your device backup settings.
 
-Cloud data is retained when sync is paused or access expires. Deleting a log can leave earlier versions in cloud history. **Delete cloud account** requires recent sign-in and explicit confirmation, and removes the account, its sign-in methods, sessions, and stored cloud records/history. It does not erase logs remaining on your devices or files you previously downloaded. If a deletion response is interrupted, the website reports that it cannot confirm completion rather than claiming success or creating a replacement account. With a still-valid original session, you can verify that account again by email and review a new deletion confirmation; verification never resumes deletion automatically.
+Cloud data is retained when sync is paused or access expires. Deleting a log can leave earlier versions in cloud history. **Delete cloud account** requires recent sign-in and explicit confirmation, and removes the account, its sign-in methods, sessions, and stored cloud records/history from the live service. It does not erase logs remaining on your devices or files you previously downloaded. For an Apple-linked account, Puptime also attempts to revoke its Apple authorization. If tokens are unavailable or Apple does not confirm revocation, app-data deletion still proceeds and the website directs you to remove Puptime in your Apple Account's Sign in with Apple settings.
+
+Cloudflare's recovery backups expire separately from live deletion. D1 account/authentication history can remain recoverable for up to seven days on Workers Free or thirty days on Workers Paid; SQLite Durable Object puppy data can remain recoverable for up to thirty days. Deletion does not immediately erase those provider-managed recovery copies. The retired account object keeps non-content metadata to reject old clients.
+
+If a deletion response is interrupted, the website reports that it cannot confirm completion rather than claiming success or creating a replacement account. With a still-valid original session, you can verify that account again by email and review a new deletion confirmation; verification never resumes deletion automatically.
 
 ## Changes
 

@@ -276,3 +276,46 @@ Live check278 verifies both Apple and Google configurations, exact callback URLs
 Standalone iOS recordings275–276 show the configured Google control, actual system authentication prompt and cancellation feedback. Check277 confirms all14 application tables are unchanged. Recording279 then updates the existing genuine email-account installation in place and opens Backup and sync with its three logs and both Connect controls. Full container/old-app backups precede installation; checks291–292 verify all14 tables and full rows before launch and after viewing. No owner, log, revision, queue or credential was reset. The OS relocated the data-container path during installation; failed check290 preserves that initial path guard, and the corrected guard resolves the authoritative container before comparing the complete data.
 
 Google's real sign-in page is ready for private human completion in the separate simulator browser. Genuine Apple/Google success, returning identity and explicit linking remain open gates. No public-provider, distributed-release or arbitrary-inbox delivery claim follows from this checkpoint.
+
+## Genuine provider sessions: October 20
+
+The configured standalone iOS app has now completed real Google and Apple
+provider sign-in against staging. Password and verification-code entry were
+private and unrecorded. Google recording 298 and Apple recording 320 show the
+returned cloud-choice screen with both actions enabled, then a cold restart
+returning to that ready signed-in state. Neither test enabled a trial, enrolled
+its puppy or uploaded local records.
+
+Checks 294/321 compare all local tables around the respective sign-ins: the
+thirteen data tables are unchanged, and setup metadata changes only from the
+account step to the cloud step. Checks 299/322 compare all fourteen full tables
+after the ready cold restart; integrity and foreign-key checks pass, with no
+owner association, event or outbox created. Read-only deployed checks 295/323
+confirm separate Google and Apple users/sessions, one Apple private-relay
+identity, and no cloud-account activation. The user explicitly chose Hide My
+Email for this separate Apple fixture; no existing email identity was linked.
+
+Slow Google attempts expired before callback. Reading and executing the
+installed SDK's state generator/parser established a ten-minute database state
+with a five-minute browser-binding cookie. A fresh flow completed within that
+window. No state/CSRF checks were weakened. Earlier failed attempts remain
+labelled in the evidence; they are not successful token-exchange proof.
+
+The user subsequently removed older test simulators. Their saved backups remain
+preserved. New qualification uses new task devices; a restored backup fixture
+must be labelled as such and cannot establish an in-place upgrade on a deleted
+original device. The genuine Google and Apple task sessions remain retained.
+
+Open provider/release gates include real explicit-provider linking and recovery,
+public email and Apple relay delivery through the deferred verified sender,
+physical devices, distributed release signing/provisioning, and store access.
+The genuine successes above supersede the pending-human-login status of the
+prior configuration checkpoint; they do not complete those other gates.
+
+Web account PR104's reviewed backend is deployed with protected route checks
+passing. Its website merge remains held after a native CI run passed twelve of
+thirteen flows and failed the notification lead-time selection assertion. The
+failure evidence and narrow test correction are separate from provider login
+qualification. The Apple account-deletion correction and migration described in
+[the lifecycle notes](apple-account-deletion.md) remain unmerged and undeployed
+until their own acceptance and reviewed PR workflow complete.
