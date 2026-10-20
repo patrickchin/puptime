@@ -703,7 +703,7 @@ export default function App() {
         >
           <StatusBar style={theme.isDark ? 'light' : 'dark'} />
           <SideNavigation open={drawerOpen} enabled={onboardingVisible===false} tab={tab} settingsVisible={settingsVisible} theme={theme}
-            onOpen={()=>setDrawerOpen(true)} onClose={()=>setDrawerOpen(false)} onChange={navigateToTab} onSettings={()=>setSettingsVisible(true)}>
+            onOpen={()=>setDrawerOpen(true)} onClose={()=>setDrawerOpen(false)} onChange={navigateToTab} onSettings={()=>{setHistoryVisible(false);setSettingsVisible(true);}}>
           {nativeApp&&onboardingVisible===false&&!historyVisible?<View style={styles.navigationHeader}>
             <Pressable testID="nav.open" accessibilityRole="button" accessibilityLabel={translate(language,'nav.open')} onPress={()=>setDrawerOpen(true)}
               style={({pressed})=>[styles.menuButton,{backgroundColor:pressed?theme.primarySoft:theme.surface,borderRadius:theme.presentation.controlRadius}]}>

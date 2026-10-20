@@ -36,8 +36,11 @@ export function NoteInput({
   const [listening, setListening] = useState(false);
   const baseNote = useRef('');
   const listeningRef = useRef(false);
+  const activeRef = useRef(active),permissionRequest = useRef(0);
+  activeRef.current = active;
 
   useSpeechRecognitionEvent('start', () => {
+    if(!activeRef.current){ExpoSpeechRecognitionModule.abort();return;}
     listeningRef.current = true;
     setListening(true);
     AccessibilityInfo.announceForAccessibility(t('note.listeningAnnouncement'));
@@ -47,7 +50,7 @@ export function NoteInput({
     setListening(false);
   });
   useSpeechRecognitionEvent('result', (event) => {
-    if(!active)return;
+    if(!activeRef.current)return;
     const transcript = event.results[0]?.transcript.trim();
     if (!transcript) return;
     onChangeText([baseNote.current, transcript].filter(Boolean).join(' ').slice(0, 300));
@@ -55,7 +58,7 @@ export function NoteInput({
   useSpeechRecognitionEvent('error', (event) => {
     listeningRef.current = false;
     setListening(false);
-    if (event.error === 'aborted') return;
+    if (event.error === 'aborted'||!activeRef.current) return;
     Alert.alert(
       t('note.transcribeErrorTitle'),
       event.error === 'not-allowed'
@@ -64,15 +67,20 @@ export function NoteInput({
     );
   });
 
-  useEffect(()=>{if(!active&&listeningRef.current)ExpoSpeechRecognitionModule.abort();},[active]);
+  useEffect(()=>{
+    if(!active){permissionRequest.current++;listeningRef.current=false;setListening(false);ExpoSpeechRecognitionModule.abort();}
+  },[active]);
 
-  useEffect(() => () => {
-    if (listeningRef.current) ExpoSpeechRecognitionModule.abort();
+  useEffect(() => {
+    activeRef.current=active;
+    return()=>{activeRef.current=false;permissionRequest.current++;ExpoSpeechRecognitionModule.abort();};
   }, []);
 
   const toggleListening = async () => {
+    if(!activeRef.current)return;
+    const request=++permissionRequest.current;
     try {
-      if (listening) {
+      if (listeningRef.current) {
         ExpoSpeechRecognitionModule.stop();
         return;
       }
@@ -81,6 +89,7 @@ export function NoteInput({
         return;
       }
       const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      if(!activeRef.current||request!==permissionRequest.current)return;
       if (!permission.granted) {
         Alert.alert(t('note.permissionTitle'), t('note.permissionBody'));
         return;
@@ -94,6 +103,7 @@ export function NoteInput({
         contextualStrings: ['pee', 'poop', 'potty', 'walk', 'meal', 'nap', 'play session', 'training', 'crate'],
       });
     } catch {
+      if(!activeRef.current||request!==permissionRequest.current)return;
       Alert.alert(t('note.unavailableTitle'), t('note.startError'));
     }
   };
