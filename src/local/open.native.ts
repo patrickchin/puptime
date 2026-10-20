@@ -1,7 +1,7 @@
 import { openDatabaseAsync } from 'expo-sqlite';
 import { createLocalDatabase, initializeLocalDatabase } from './database';
 
-// The iOS facade uses this private connection; Android activation is deferred.
+// Both native platforms use this private connection and the same typed schema.
 export async function openLocalDatabase() {
   const connection = await openDatabaseAsync('puptime-v2.db', { useNewConnection: true, enableChangeListener: true });
   try {

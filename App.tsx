@@ -100,6 +100,8 @@ import { readPendingWidgetEvents, updateHomeWidget } from './src/widgets/sync';
 
 configureReminderHandling();
 
+const nativeApp = Platform.OS !== 'web';
+
 export default function App() {
   const [fontsLoaded, fontError] = useFonts({
     Delius: require('./assets/fonts/Delius-Regular.ttf'),
@@ -198,7 +200,7 @@ export default function App() {
         resolveLanguage(nextLanguagePreference),
       ).catch(() => undefined),
       updateHomeWidget(nextEvents).catch(() => undefined),
-      ...(Platform.OS==='ios'?[cancelCustomTimedRemindersIfDeliveryOff().catch(()=>undefined)]:[]),
+      ...(nativeApp?[cancelCustomTimedRemindersIfDeliveryOff().catch(()=>undefined)]:[]),
     ]);
     return nextEvents;
   }, []);
@@ -214,7 +216,7 @@ export default function App() {
     startupLoading.current=true;setStartupFailed(false);
     try{
       let setup:FirstLaunchProgress|null;
-      if(Platform.OS==='ios'){setup=await loadInitialSetup();await refresh();}
+      if(nativeApp){setup=await loadInitialSetup();await refresh();}
       else{
         const shown=await initialOnboardingCheck;
         try{await refresh();}catch{Alert.alert(translate(languageRef.current,'app.loadErrorTitle'),translate(languageRef.current,'app.loadErrorBody'));}
@@ -291,7 +293,7 @@ export default function App() {
 
   const handleNotificationResponse = useCallback(async (response: Notifications.NotificationResponse) => {
     const data = response.notification.request.content.data;
-    if(Platform.OS==='ios'&&data?.kind===CUSTOM_TIMED_REMINDER_NOTIFICATION_KIND){
+    if(nativeApp&&data?.kind===CUSTOM_TIMED_REMINDER_NOTIFICATION_KIND){
       setDrawerOpen(false);setAccountVisible(false);setSettingsVisible(false);setTab('notifications');return;
     }
     if (data?.kind === POTTY_REMINDER_NOTIFICATION_KIND) {
@@ -369,7 +371,7 @@ export default function App() {
   const displayPastLabel = (event: PuppyEvent) => activityCustomizations[activityKey(event)]?.name ?? localizedEventPastLabel(language, event);
 
   const persistLogEvent = async (type: EventType, customLabel?: string) => {
-    if (Platform.OS !== 'ios' && type === 'custom' && customLabel) setCustomActivities(await saveCustomActivity(customLabel));
+    if (!nativeApp && type === 'custom' && customLabel) setCustomActivities(await saveCustomActivity(customLabel));
     const now = Date.now();
     if (type === 'nap') {
       const openNap = (activityRef.current?await activityRef.current.latestEvents():await loadEvents()).find(isOpenNap);
@@ -432,7 +434,7 @@ export default function App() {
     changes: PuppyEventChanges,
   ) => {
     const restoreCustomActivities=!!((changes.type??event.type)==='custom'&&changes.customLabel&&activityKey({type:'custom',customLabel:changes.customLabel})!==activityKey(event));
-    if (Platform.OS !== 'ios' && restoreCustomActivities && changes.customLabel) {
+    if (!nativeApp && restoreCustomActivities && changes.customLabel) {
       setCustomActivities(await saveCustomActivity(changes.customLabel));
     }
     await updateEvent(event.id,changes,{restoreCustomActivities});
@@ -556,22 +558,22 @@ export default function App() {
     if(enabled){await requestNotifications();return;}
     await setNotificationDelivery(false);setDelivery(false);
     await Promise.all([
-      ...(Platform.OS==='ios'?[cancelCustomTimedRemindersIfDeliveryOff()]:[]),
+      ...(nativeApp?[cancelCustomTimedRemindersIfDeliveryOff()]:[]),
       syncScheduleReminders(schedule,notificationPreferences.reminderLeadMinutes,language),
       syncPottyReminders(events,notificationPreferences,language),
     ]);
   };
 
   const finishOnboarding = async (options?:FinishOnboardingOptions) => {
-    if(Platform.OS==='ios'&&guideOpenedFromSettings){
+    if(nativeApp&&guideOpenedFromSettings){
       setOnboardingVisible(false);
       setGuideOpenedFromSettings(false);
       setSettingsVisible(true);
       return;
     }
     try {
-      await completeOnboarding(Platform.OS==='ios'?options:undefined);
-      if(Platform.OS==='ios')await refresh();
+      await completeOnboarding(nativeApp?options:undefined);
+      if(nativeApp)await refresh();
       setFirstLaunch(null);
       setOnboardingVisible(false);
       setGuideOpenedFromSettings(false);
@@ -585,7 +587,7 @@ export default function App() {
     if (settingsVisible) {
       return (
         <SettingsScreen
-          {...{showHeader:Platform.OS!=='ios',notificationDelivery:Platform.OS==='ios'?notificationDelivery:undefined,
+          {...{showHeader:!nativeApp,notificationDelivery:nativeApp?notificationDelivery:undefined,
             onNotificationDeliveryChange:changeNotificationDelivery,routineReminderCount:schedule.filter(entry=>entry.reminder).length,
             onOpenSchedule:()=>{setSettingsVisible(false);setScheduleOpenedFromSettings(true);setTab('schedule');}}}
           theme={theme}
@@ -640,7 +642,7 @@ export default function App() {
     }
     return (
       <LogScreen
-        showHeader={Platform.OS!=='ios'}
+        showHeader={!nativeApp}
         events={events}
         activity={activity}
         refreshToken={refreshToken}
@@ -682,12 +684,12 @@ export default function App() {
       <LocalizationProvider language={language} customizations={activityCustomizations}>
         <SafeAreaView
           style={[styles.container, { backgroundColor: theme.background }]}
-          edges={Platform.OS==='ios'||settingsVisible||onboardingVisible ? ['top', 'bottom', 'left', 'right'] : ['top', 'left', 'right']}
+          edges={nativeApp||settingsVisible||onboardingVisible ? ['top', 'bottom', 'left', 'right'] : ['top', 'left', 'right']}
         >
           <StatusBar style={theme.isDark ? 'light' : 'dark'} />
           <SideNavigation open={drawerOpen} enabled={onboardingVisible===false} tab={tab} settingsVisible={settingsVisible} theme={theme}
             onOpen={()=>setDrawerOpen(true)} onClose={()=>setDrawerOpen(false)} onChange={navigateToTab} onSettings={()=>setSettingsVisible(true)}>
-          {Platform.OS==='ios'&&onboardingVisible===false?<View style={styles.navigationHeader}>
+          {nativeApp&&onboardingVisible===false?<View style={styles.navigationHeader}>
             <Pressable testID="nav.open" accessibilityRole="button" accessibilityLabel={translate(language,'nav.open')} onPress={()=>setDrawerOpen(true)}
               style={({pressed})=>[styles.menuButton,{backgroundColor:pressed?theme.primarySoft:theme.surface,borderRadius:theme.presentation.controlRadius}]}>
               <MaterialCommunityIcons accessible={false} name="menu" size={25} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
@@ -701,7 +703,7 @@ export default function App() {
             </Pressable>:null}
           </View>:null}
           <View style={styles.screen}>
-            {onboardingVisible === null || (!fontsLoaded && !fontError) ? Platform.OS==='ios'?<View testID="setup.loading" style={styles.startup}>
+            {onboardingVisible === null || (!fontsLoaded && !fontError) ? nativeApp?<View testID="setup.loading" style={styles.startup}>
               {startupFailed?<>
                 <Text testID="setup.loadError" accessibilityRole="alert" style={[styles.startupText,{color:theme.text}]}>{translate(language,'setup.loadError')}</Text>
                 <Pressable testID="setup.retry" accessibilityRole="button" onPress={()=>{cloud.retry?.();void openJournal();}} style={[styles.startupRetry,{backgroundColor:theme.primary}]}><Text style={[styles.startupText,{color:theme.onPrimary}]}>{translate(language,'setup.retry')}</Text></Pressable>
@@ -737,7 +739,7 @@ export default function App() {
               />
             ) : null}
           </View>
-          {Platform.OS!=='ios'&&onboardingVisible === false && !settingsVisible ? (
+          {!nativeApp&&onboardingVisible === false && !settingsVisible ? (
             <SafeAreaView edges={['bottom']} style={{ backgroundColor: theme.nav }}>
               <BottomNav tab={tab==='notifications'?'log':tab} onChange={navigateToTab} theme={theme} />
             </SafeAreaView>

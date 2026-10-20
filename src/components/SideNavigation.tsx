@@ -24,7 +24,7 @@ export function SideNavigation({open,enabled,tab,settingsVisible,theme,onOpen,on
   const foreground=AppState.addEventListener('change',state=>{if(state==='active')refresh();});
   return()=>{active=false;subscription.remove();foreground.remove();};
  },[]);
- if(Platform.OS!=='ios')return children;
+ if(Platform.OS==='web')return children;
  const item=(key:AppTab|'settings')=>{
   const selected=key==='settings'?settingsVisible:!settingsVisible&&tab===key;
   const label=key==='settings'?t('settings.title'):key==='notifications'?t('notifications.title'):t(`nav.${key}`);

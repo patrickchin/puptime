@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import * as Notifications from 'expo-notifications';
-import { ActivityIndicator, Alert, AppState, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 import { useLocalization } from '../localization-context';
 import {
@@ -355,9 +355,11 @@ export function NotificationsScreen({
             returnKeyType="done" style={[styles.labelInput, { color: theme.text, backgroundColor: theme.surfaceRaised, borderColor: theme.border, borderRadius: theme.presentation.controlRadius }]} />
           {draft ? <View style={[styles.pickerCard, { backgroundColor: theme.surfaceRaised, borderRadius: theme.presentation.cardRadius }]}>
             <Text style={[styles.label, { color: theme.text }]}>{t('notifications.timedWhen')}</Text>
-            <DateTimePicker testID="notifications.timed.when" value={draft.at} mode="datetime" display="compact" minimumDate={new Date()}
+            {(Platform.OS==='android'?['date','time'] as const:['datetime'] as const).map(mode=><DateTimePicker key={mode}
+              testID={mode==='datetime'?'notifications.timed.when':`notifications.timed.${mode}`} value={draft.at} mode={mode}
+              display={Platform.OS==='android'?'default':'compact'} presentation="inline" minimumDate={mode==='time'?undefined:new Date()}
               locale={language} themeVariant={theme.isDark ? 'dark' : 'light'} accentColor={theme.primary} disabled={saving}
-              onValueChange={(_event, at) => setDraft((current) => current ? { ...current, at } : null)} style={styles.nativePicker} />
+              onValueChange={(_event, at) => {if(!saving)setDraft(current => current&&current.at.getTime()!==at.getTime()?{...current,at}:current);}} style={styles.nativePicker} />)}
           </View> : null}
           <Text style={[styles.detail, { color: theme.textMuted }]}>{t('notifications.timedDeviceOnly')}</Text>
           {draftError ? <Text testID="notifications.timed.error" accessibilityRole="alert" style={[styles.detail, { color: theme.danger }]}>{draftError}</Text> : null}

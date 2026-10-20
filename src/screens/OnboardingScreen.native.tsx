@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo, Alert, Animated, Easing, Image, Keyboard,
-  KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions,
+  KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions,
 } from 'react-native';
 
 import { ActivityIcon } from '../components/ActivityIcon';
@@ -40,7 +40,7 @@ export function OnboardingScreen({theme, mode, notificationPermission, onAllowNo
     return()=>{mounted.current=false;current=false;subscription.remove();bounce.stopAnimation();};
   },[bounce]);
   useEffect(()=>{
-    const show=Keyboard.addListener('keyboardWillShow',()=>setKeyboardVisible(true)),hide=Keyboard.addListener('keyboardWillHide',()=>setKeyboardVisible(false));
+    const show=Keyboard.addListener(Platform.OS==='ios'?'keyboardWillShow':'keyboardDidShow',()=>setKeyboardVisible(true)),hide=Keyboard.addListener(Platform.OS==='ios'?'keyboardWillHide':'keyboardDidHide',()=>setKeyboardVisible(false));
     return()=>{show.remove();hide.remove();};
   },[]);
   useEffect(()=>{
@@ -95,7 +95,7 @@ export function OnboardingScreen({theme, mode, notificationPermission, onAllowNo
   );
 
   return (
-    <KeyboardAvoidingView testID="screen.onboarding" behavior="padding" style={[styles.root,{backgroundColor:theme.background}]}>
+    <KeyboardAvoidingView testID="screen.onboarding" behavior={Platform.OS==='ios'?'padding':'height'} style={[styles.root,{backgroundColor:theme.background}]}>
       <View style={styles.topBar}>
         <View style={styles.brand}>
           <MaterialCommunityIcons accessible={false} name="paw" size={20} color={theme.primary}/>

@@ -59,6 +59,7 @@
     "build:web": "expo export --clear --platform web --output-dir dist-web && node scripts/build-web-seo.ts",
     "typecheck": "tsc --noEmit",
     "typecheck:ios": "tsc --noEmit --moduleSuffixes .ios,.native,",
+    "typecheck:android": "tsc --noEmit --moduleSuffixes .android,.native,",
     "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/*.test.ts src/cloud/*.test.ts src/local/*.test.ts",
     "test:e2e:ios": "maestro test --platform ios --config .maestro/config.yaml .maestro",
     "prebuild": "expo prebuild",

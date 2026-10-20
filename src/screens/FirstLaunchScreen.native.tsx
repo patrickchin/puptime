@@ -1,19 +1,19 @@
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import {useEffect,useRef,useState} from 'react';
-import {AccessibilityInfo,ActivityIndicator,Alert,Image,Keyboard,KeyboardAvoidingView,Linking,Pressable,ScrollView,StyleSheet,Text,TextInput,View,useWindowDimensions} from 'react-native';
+import {AccessibilityInfo,ActivityIndicator,Alert,Image,Keyboard,KeyboardAvoidingView,Linking,Platform,Pressable,ScrollView,StyleSheet,Text,TextInput,View,useWindowDimensions} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {AccountButton,AccountSignIn,accountProblemKey} from '../components/AccountSignIn';
 import {useAccountSnapshot} from '../cloud/use-account-snapshot';
 import {continueFirstLaunchLocally} from '../cloud/account-controller';
-import {getLocalRuntime} from '../local/runtime.ios';
-import {loadFirstLaunch,saveFirstLaunchProfile,saveFirstLaunchStep} from '../storage.ios';
+import {getLocalRuntime} from '../local/runtime.native';
+import {loadFirstLaunch,saveFirstLaunchProfile,saveFirstLaunchStep} from '../storage.native';
 import {useLocalization} from '../localization-context';
 import type {MessageKey} from '../localization';
 import {firstLaunchStepSchema,type FirstLaunchScreenProps,type FirstLaunchStep} from '../first-launch';
 import {headingStyle,spacing} from '../theme';
 import {OnboardingScreen} from './OnboardingScreen';
 
-export {loadFirstLaunch as loadInitialSetup} from '../storage.ios';
+export {loadFirstLaunch as loadInitialSetup} from '../storage.native';
 const titles:Record<FirstLaunchStep,MessageKey>={welcome:'setup.welcomeTitle',profile:'setup.profileTitle',account:'setup.accountTitle',cloud:'setup.cloudTitle',walkthrough:'tour.logTitle',reminders:'setup.remindersTitle'};
 
 export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPermission,onAllowNotifications,onDisableNotifications,onOpenSystemSettings,onFinish}:FirstLaunchScreenProps) {
@@ -30,7 +30,7 @@ export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPerm
  const cloudError=accountProblemKey(state?.problem??null);
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
  useEffect(()=>{
-  const show=Keyboard.addListener('keyboardWillShow',()=>setKeyboardVisible(true)),hide=Keyboard.addListener('keyboardWillHide',()=>setKeyboardVisible(false));
+  const show=Keyboard.addListener(Platform.OS==='ios'?'keyboardWillShow':'keyboardDidShow',()=>setKeyboardVisible(true)),hide=Keyboard.addListener(Platform.OS==='ios'?'keyboardWillHide':'keyboardDidHide',()=>setKeyboardVisible(false));
   return()=>{show.remove();hide.remove();};
  },[]);
  useEffect(()=>{
@@ -99,7 +99,7 @@ export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPerm
   <OnboardingScreen theme={theme} mode="embedded" notificationPermission={notificationPermission} onAllowNotifications={onAllowNotifications} onOpenSystemSettings={onOpenSystemSettings} onFinish={()=>checkpoint('reminders')} onBack={()=>{void act(()=>checkpoint(account?'cloud':'account'));return true;}}/>
  </View>;
  const stage=firstLaunchStepSchema.options.indexOf(step)+1;
- return <KeyboardAvoidingView testID="screen.firstLaunch" behavior="padding" keyboardVerticalOffset={insets.top} style={[styles.root,{backgroundColor:theme.background}]}>
+ return <KeyboardAvoidingView testID="screen.firstLaunch" behavior={Platform.OS==='ios'?'padding':'height'} keyboardVerticalOffset={insets.top} style={[styles.root,{backgroundColor:theme.background}]}>
   <View style={styles.header}>
    {step!=='welcome'&&!(enrolled&&step==='cloud')?<Pressable testID="setup.back" accessibilityRole="button" accessibilityLabel={t('onboarding.back')} disabled={working} accessibilityState={{disabled:working}} onPress={back} style={[styles.back,working&&{opacity:0.5}]}><MaterialCommunityIcons accessible={false} name="arrow-left" size={22} color={theme.primary}/><Text style={[styles.backText,{color:theme.primary}]}>{t('onboarding.back')}</Text></Pressable>:null}
    <View style={styles.brand}><MaterialCommunityIcons accessible={false} name="paw" color={theme.primary} size={20}/><Text maxFontSizeMultiplier={1.3} style={[styles.brandText,headingStyle(theme),{color:theme.text}]}>Puptime</Text></View>

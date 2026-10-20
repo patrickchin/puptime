@@ -5,7 +5,7 @@ import type {FirstLaunchProgress,FirstLaunchScreenProps} from '../first-launch';
 export async function loadInitialSetup():Promise<FirstLaunchProgress|null> {
   return await shouldShowOnboarding()?{step:'welcome',puppyName:'My puppy'}:null;
 }
-// Deferred platforms keep their current first-run behavior.
+// Browser activity fallback; phones resolve the shared native setup wizard.
 export function FirstLaunchScreen(props:FirstLaunchScreenProps) {
   return <OnboardingScreen {...props} mode="first-run" onBack={()=>false}/>;
 }

@@ -7,7 +7,7 @@ import { cloudBaseUrl, createCloudApi, createSdkRequest } from './api';
 import { createChangeOpener } from './change-subscription';
 import { createIdentityAdapter } from './account-controller';
 import { createCloudExportRequest } from './export-request';
-import { clearCloudExportCache, createNativeCloudExport } from './export.ios';
+import { clearCloudExportCache, createNativeCloudExport } from './export.native';
 
 // One SDK/storage adapter instance coordinates native secure credential access.
 // The caller initializes lazily; missing cloud configuration leaves local use intact.
