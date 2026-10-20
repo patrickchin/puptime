@@ -58,7 +58,13 @@ selected signing profile includes the capability. Retain the associated web
 Services ID and existing server secrets for browser fallback. Prebuild checks
 are not signing, device or provider-login evidence: after review/build, qualify
 the native sheet, cancellation, genuine session, cold restart and explicit
-linking on a dedicated iOS fixture. Native runtime verification is pending.
+linking on a dedicated iOS fixture. Native simulator qualification has now
+verified the system sheet, quiet cancellation, genuine sign-in, explicit
+restore/upload and cold restart against Pages. The session also survived an
+upgrade to integrated Release `a1bb417`. See the
+[current development checkpoint](cloud-development.md#current-verified-checkpoint--october-20-2026)
+for the exact source/build boundaries. Physical-device signing and distribution
+remain separate deferred work.
 
 ## Native iOS Google setup
 
@@ -86,10 +92,14 @@ it does not call `revokeAccess`.
 [Google sign-out guidance](https://developers.google.com/identity/sign-in/ios/sign-in#4_add_a_sign-out_button).
 
 A fresh binary is required for the native Google module and registered return
-scheme. Genuine provider sign-in, cancellation, existing-email refusal,
-explicit linking, account selection after sign-out and authenticated restart
-still require iOS runtime qualification. The console remains in external
-Testing; adding this public client does not publish the app or enable billing.
+scheme. Fresh local Release `a1bb417` has verified genuine SDK sign-in, quiet
+cancellation, no automatic upload, confirmed same-puppy enrollment,
+authenticated restart and native credential cleanup during sign-out against
+Pages. These checks preserve the original event IDs and cloud records.
+Existing-email refusal and explicit linking have separate real Better Auth
+route/SDK tests with synthetic external token replies; they are not claimed as
+genuine provider-consent journeys. The console remains in external Testing;
+adding this public client does not publish the app or enable billing.
 Android runtime and platform-specific sign-in changes remain deferred.
 
 ## Earlier browser staging checkpoint — October 20, 2026
@@ -100,7 +110,7 @@ The replacement Apple sign-in key is held in macOS Keychain service `com.puptime
 
 The installed Apple client-secret expires **April 17, 2027 at 15:38:41 UTC**. Before expiry, generate a replacement JWT from that Keychain key, verify its signature and issuer/audience/subject/expiry, then replace `APPLE_CLIENT_SECRET` through private standard input. Never print the private key or JWT, pass either in command arguments, or commit them. Repeat the genuine Apple callback/session check after rotation.
 
-Actual deployed HTTPS checks confirm both providers are advertised, authorization starts use PKCE S256 and the exact callbacks, Apple uses `form_post`, invalid state cannot create a session, and anonymous protected account requests return401 with `no-store`. A signed standalone iOS build reaches Google's actual sign-in page and handles cancellation without changing any local SQL rows. Updating the retained genuine email-account installation preserves every application table and shows both explicit Connect controls. These checks do **not** prove a completed real Apple or Google token exchange. Private provider login, return to the app, confirmed session, restart and account-link qualification remain required before public release.
+Actual deployed HTTPS checks confirm both providers are advertised, authorization starts use PKCE S256 and the exact callbacks, Apple uses `form_post`, invalid state cannot create a session, and anonymous protected account requests return401 with `no-store`. A signed standalone iOS build reaches Google's actual sign-in page and handles cancellation without changing any local SQL rows. Updating the retained genuine email-account installation preserves every application table and shows both explicit Connect controls. This earlier checkpoint did **not** prove a completed real Apple or Google token exchange; the subsequent native simulator qualification is recorded above and in the development checkpoint. Physical-device distribution and additional genuine account-link qualification remain deferred.
 
 ## Preserve existing accounts
 
@@ -116,4 +126,9 @@ Apple OAuth itself does not require an email-code delivery. Email recovery to Hi
 
 `server/social-linking.test.ts` uses the installed client SDK and isolated D1 to qualify authenticated linking, subsequent provider sign-in returning the original user, unchanged profile/identity ownership, different-email and existing-owner rejection, and missing, mismatched or expired authentication state. Only the external token-exchange replies are synthetic. Controller tests separately preserve complete SQL state and pending work through cancellation, concurrent local writes, lost replies, lifecycle changes and delayed responses.
 
-After configuration, qualify each provider with a fresh dedicated fixture: success, cancel, invalid/expired state, app return, restart with the same identity, and the existing-email refusal/explicit-link path. Verify the resulting server session and database ownership. Keep private authentication phases unrecorded and preserve the retained live owner and outbox.
+Use dedicated fixtures for future provider changes and keep private authentication
+phases unrecorded. The current development checkpoint records completed genuine
+sign-in, cancellation, app-return, restart and SQL ownership checks. The isolated
+Better Auth tests above cover invalid/expired state and existing-email
+refusal/linking; additional genuine linking and distributed-device checks are
+outside this milestone. Preserve the retained live owner and outbox.
