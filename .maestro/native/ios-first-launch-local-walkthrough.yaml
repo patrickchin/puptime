@@ -22,12 +22,14 @@ name: Local onboarding practice and reminder choice
     file: ../helpers/walkthrough-next.yaml
     env:
       FROM_STEP: '0'
+      TO_ID: 'onboarding\.step\.1'
 - assertVisible:
     id: onboarding.step.1
 - runFlow:
     file: ../helpers/walkthrough-next.yaml
     env:
       FROM_STEP: '1'
+      TO_ID: 'onboarding\.step\.2'
 - assertVisible:
     id: onboarding.step.2
 - scrollUntilVisible:
@@ -40,6 +42,7 @@ name: Local onboarding practice and reminder choice
     file: ../helpers/walkthrough-next.yaml
     env:
       FROM_STEP: '2'
+      TO_ID: 'setup\.step\.reminders'
 - assertVisible:
     id: setup.step.reminders
 - takeScreenshot: first-open-reminders

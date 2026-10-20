@@ -1,31 +1,28 @@
 appId: com.patrickchin.puptime
 ---
-# Focus or animation can satisfy tap settlement before Next receives the tap.
-# Guard retries by the old step so they cannot skip the following card.
-- repeat:
-    times: 2
-    commands:
-      - runFlow:
-          when:
-            visible:
-              id: onboarding.step.${FROM_STEP}
-          commands:
-            - scrollUntilVisible:
-                element:
-                  id: onboarding.primary
-                direction: DOWN
-                waitToSettleTimeoutMs: 1000
-            - waitForAnimationToEnd
-            - extendedWaitUntil:
-                visible:
-                  id: onboarding.primary
-                  enabled: true
-                timeout: 15000
-            - tapOn:
-                id: onboarding.primary
-                retryTapIfNoChange: true
-            - waitForAnimationToEnd
+# One tap per transition; require its exact destination before another action.
 - extendedWaitUntil:
-    notVisible:
-      id: onboarding.step.${FROM_STEP}
+    visible:
+      id: ^onboarding\.step\.${FROM_STEP}$
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: onboarding.primary
+    direction: DOWN
+    visibilityPercentage: 100
+    waitToSettleTimeoutMs: 1000
+    centerElement: false
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: onboarding.primary
+      enabled: true
+    timeout: 15000
+- tapOn:
+    id: onboarding.primary
+    retryTapIfNoChange: false
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: ^${TO_ID}$
     timeout: 15000
