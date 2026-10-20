@@ -4,7 +4,6 @@ name: A failed historical write keeps the selected confirmation retryable
 - scrollUntilVisible:
     element:
       id: history.confirm.restore
-    retryTapIfNoChange: false
     direction: DOWN
     visibilityPercentage: 100
     centerElement: false
