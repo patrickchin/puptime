@@ -22,8 +22,43 @@ test('fresh account uses one complete first-release schema baseline',async()=>{
   await runInDurableObject(account,(_instance,state)=>{
     expect(state.storage.sql.exec<{version:number}>('SELECT version FROM schema_metadata').one().version).toBe(3);
     const names=state.storage.sql.exec<{name:string}>("SELECT name FROM sqlite_master WHERE type='table'").toArray().map(row=>row.name);
-    for(const name of ['records','revisions','operations','pets','enrollments','enrolled_devices','account_state'])expect(names).toContain(name);
+    for(const name of ['records','record_events','record_routines','revisions','operations','pets','enrollments','enrolled_devices','account_state'])expect(names).toContain(name);
+    expect(state.storage.sql.exec<{name:string}>('PRAGMA index_info(records_by_pet_kind)').toArray().map(row=>row.name)).toEqual(['pet_id','kind','deleted']);
+    expect(state.storage.sql.exec<{name:string}>('PRAGMA index_info(revisions_by_record)').toArray().map(row=>row.name)).toEqual(['record_id','revision']);
   });
+});
+
+test('reopening the account SQL baseline preserves data, history and duplicate acknowledgments',async()=>{
+  const account=await store(),input=create();
+  const saved=await account.apply(input);
+  await runInDurableObject(account,(_instance,state)=>{
+    const tables=['schema_metadata','account_state','pets','records','record_events','record_routines','revisions','operations','enrollments','enrolled_devices'];
+    const snapshot=()=>tables.map(table=>state.storage.sql.exec(`SELECT * FROM ${table} ORDER BY rowid`).toArray());
+    const before=snapshot();
+    const reopened=new AccountStore(state,env);
+    expect(reopened.apply(input)).toEqual(saved);
+    expect(reopened.pull(0).changes).toEqual([saved.record]);
+    expect(snapshot()).toEqual(before);
+  });
+});
+
+test('the loaded account SQL rejects invalid typed values without changing saved logs',async()=>{
+  const account=await store(),input=create();
+  await account.apply(input);
+  await account.apply(mutationSchema.parse({...create('routine-1'),kind:'routine',patch:{type:'meal',minutes:60}}));
+  await runInDurableObject(account,(_instance,state)=>{
+    const event=state.storage.sql.exec('SELECT * FROM record_events WHERE record_id=?',input.recordId).one();
+    const routine=state.storage.sql.exec('SELECT * FROM record_routines WHERE record_id=?','routine-1').one();
+    for(const [column,value] of [['type','unknown'],['type','custom'],['at',1.5],['at',8640000000000001],['source','remote'],['estimated',2],['note','x'.repeat(16385)],['custom_label',' '.repeat(2)]] as const){
+      expect(()=>state.storage.sql.exec(`UPDATE record_events SET ${column}=? WHERE record_id=?`,value,input.recordId)).toThrow(/constraint/i);
+      expect(state.storage.sql.exec('SELECT * FROM record_events WHERE record_id=?',input.recordId).one()).toEqual(event);
+    }
+    for(const [column,value] of [['minutes',-1],['minutes',1440],['minutes',1.5],['reminder',2],['tolerance_minutes',1441],['type','custom']] as const){
+      expect(()=>state.storage.sql.exec(`UPDATE record_routines SET ${column}=? WHERE record_id=?`,value,'routine-1')).toThrow(/constraint/i);
+      expect(state.storage.sql.exec('SELECT * FROM record_routines WHERE record_id=?','routine-1').one()).toEqual(routine);
+    }
+  });
+  expect((await account.pull(0)).changes).toHaveLength(2);
 });
 
 test('unsupported account schema rejection preserves stored rows and table definitions',async()=>{
