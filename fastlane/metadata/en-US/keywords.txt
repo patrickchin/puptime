@@ -1,1 +1,1 @@
-dog,routine,training,housebreaking,toilet,feeding,schedule,reminder,history,offline,widget,log
+dog,routine,training,housebreaking,toilet,feeding,schedule,reminder,history,offline,log

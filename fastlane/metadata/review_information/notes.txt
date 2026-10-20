@@ -1,11 +1,11 @@
-Puptime tracks one pet and requires no account or sign-in. All activity data is stored locally on the device. Core logging, editing, history, and reminders work offline.
+Puptime tracks one puppy. Free local logging, editing, history, routines, and reminders work offline without an account. First-open setup lets you name your puppy and continue locally. The feature walkthrough can be skipped or replayed from Settings.
 
-To test voice dictation, allow Microphone and Speech Recognition when prompted. To test reminders, enable a routine reminder and allow notifications.
+Cloud accounts are optional. Use Backup and sync in Settings to sign in with the methods offered by the release, then explicitly enable cloud access. Signing in alone does not upload puppy records. Local data stays available when the network is unavailable or cloud access expires. Test the cloud path only against the release environment and review account supplied with the submitted build.
 
-In Insights, Activity backup offers Export CSV through the system share sheet and Import CSV through the system file picker. Export a few logs, then import the same file: existing entries are skipped and current edits are kept. To test recovery, delete one exported entry and import the file again. Activity backups include notes, custom activity names, nap state, and Estimated labels; they do not include routines or settings.
+Account management is available at https://puptime.pages.dev/account. After signing in, you can download cloud data, manage connected sign-in methods, sign out, or request cloud-account deletion. Deletion requires fresh verification and a separate confirmation. Cloud-account deletion leaves device-local records and previously downloaded files intact.
 
-The Log screen offers Pee, Poop, and Eat quick actions, with today and yesterday visible and earlier dates available on demand. Other actions, including walks, custom activities, and nap start/stop, are available through the configurable Home Screen widget.
+For reminders, enable a reminder and allow notifications when prompted. Dictation requests Microphone and Speech Recognition only when used.
 
-Possible missing activity appears automatically as faded Timeline marks; these marks are not stored or exported. Saved or imported estimated entries retain an Estimated label in Log, Timeline, Insights, and CSV backups and count separately from recorded activity.
+In Insights, Export CSV opens the system share sheet and Import CSV opens the file picker. Importing the same file skips existing entries and keeps current edits. Deleting one exported entry and importing the file again restores the missing entry. Activity CSV files do not include routines or settings.
 
-The Puptime Quick Log widget can be added from the Home Screen widget gallery. Its interactive logging buttons require iOS 17 or later.
+Estimated entries remain labelled in Log, Timeline, Insights, and activity CSV files. Faded suggestions in Timeline are not saved or exported until added.

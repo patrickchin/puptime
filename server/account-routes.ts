@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { enrollmentSchema, mutationSchema, recordIdSchema, type Revision } from '../src/cloud/protocol';
 import { getAccountStore, type AccountStore } from './account-store';
 import { createAuth } from './auth';
+import type { AppleRevocation } from './account-lifecycle';
 import { activateTrial, cloudAccess, getCloudAccount, trialDaysFromEnvironment, type CloudAccess, type CloudAccount } from './entitlements';
 
 type AccountEnv = { Bindings: Cloudflare.Env; Variables: {
@@ -123,5 +124,9 @@ accountRoutes.delete('/account', authenticated, validator('json', (value) => z.s
   const expected=context.req.header('x-puptime-account');
   if(expected!==undefined&&expected!==context.get('user').id)return context.json({error:'account_mismatch'},409);
   if (!Number.isFinite(context.get('sessionCreatedAt')) || Date.now() - context.get('sessionCreatedAt') >= 600000) return context.json({ error: 'reauthentication_required' }, 401);
-  return createAuth(context.env).api.deleteUser({ headers: context.req.raw.headers, body: {}, asResponse: true });
+  let appleRevocation: AppleRevocation = 'manual';
+  const response = await createAuth(context.env, { onAccountRetired: outcome => { appleRevocation = outcome; } }).api.deleteUser({ headers: context.req.raw.headers, body: {}, asResponse: true });
+  if (!response.ok) return response;
+  const result = await response.json();
+  return Response.json({ ...result, appleRevocation }, { status: response.status, headers: response.headers });
 });
