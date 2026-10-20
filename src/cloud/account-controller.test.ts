@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import test,{type TestContext} from 'node:test';
+import {createAuthClient} from 'better-auth/react';
 import { createLocalDatabase,initializeLocalDatabase } from '../local/database.ts';
 import { sqliteTestConnection } from '../local/sqlite-test-adapter.ts';
 import { createLocalRuntime } from '../local/runtime-factory.ts';
-import { CloudApiError,type CloudApi,type CloudAccountSummary } from './api.ts';
+import { CloudApiError,createCloudApi,createSdkRequest,type CloudApi,type CloudAccountSummary } from './api.ts';
 import {pushResponseSchema,type Revision} from './protocol.ts';
 import { reconcileMutation } from './reconcile.ts';
 import * as controllerModule from './account-controller.ts';
@@ -351,6 +352,25 @@ for(const [fault,delays] of [
  assert.deepEqual(await localTables(runtime),before);assert.equal(state.enrollCalls,0);assert.equal(state.pushCalls,0);
  api.config=async()=>{throw new CloudApiError('network');};await controller.refresh();
  assert.equal(timers.filter(task=>!task.cancelled)[0]?.delay,1000);
+});
+
+for(const endpoint of ['config','account'] as const)test(`the installed SDK ${endpoint} Retry-After header reaches the automatic recovery timer unchanged`,async t=>{
+ const {controller,runtime,state,config,api,timers}=await fixture(t);state.credentials=true;await runtime.storage.appendEvents([event]);
+ const before=await localTables(runtime),requests:string[]=[];let unavailable=true;
+ const auth=createAuthClient({baseURL:'https://puptime.test',fetchOptions:{customFetchImpl:async(input,init)=>{
+  const request=new Request(input,init),path=new URL(request.url).pathname;requests.push(path);assert.equal(new URL(request.url).origin,'https://puptime.test');
+  if(path===`/api/${endpoint}`&&unavailable)return new Response(JSON.stringify({code:'RATE_LIMITED',message:'Private server detail'}),{status:429,headers:{'content-type':'application/json','retry-after':'120'}});
+  return Response.json(path==='/api/config'?config:state.summary);
+ }}});
+ const cloud=createCloudApi(createSdkRequest((url,options)=>auth.$fetch(url,options),'https://puptime.test'));
+ api.config=cloud.config;api.account=cloud.account;
+ controller.setActive(true);assert.equal(await controller.refresh(),'error');assert.equal(controller.read().problem,'rate-limited');
+ assert.equal(timers.filter(task=>!task.cancelled)[0]?.delay,120000);
+ assert.deepEqual(requests,endpoint==='config'?['/api/config']:['/api/config','/api/account']);
+ assert.deepEqual(await localTables(runtime),before);
+ unavailable=false;await fireTimer(timers);assert.equal(controller.read().account?.user.id,'account-1');
+ assert.equal(timers.filter(task=>!task.cancelled).length,0);assert.equal(state.enrollCalls,0);assert.equal(state.pushCalls,0);
+ assert.deepEqual(await localTables(runtime),before);
 });
 
 for(const fault of [new CloudApiError('auth-required',401),new CloudApiError('forbidden',403),new CloudApiError('invalid-response'),new Error('local failure')])test(`refresh does not retry terminal ${fault.message} failure`,async t=>{

@@ -60,7 +60,8 @@ export function createSdkRequest(fetchClient:(url:string,options:SdkOptions)=>Pr
 function retryDelay(value:string|null|undefined):number|null {
   if (!value) return null;
   const milliseconds=/^\d+$/.test(value)?Number(value)*1000:Date.parse(value)-Date.now();
-  return Number.isFinite(milliseconds)?Math.max(0,Math.min(60000,milliseconds)):null;
+  // Keep server-requested delays within the signed 32-bit timer range.
+  return Number.isFinite(milliseconds)?Math.max(0,Math.min(2147483647,milliseconds)):null;
 }
 export function cloudErrorCategory(status:number):CloudErrorCategory {
   const categories:Record<number,CloudErrorCategory>={401:'auth-required',403:'forbidden',409:'conflict',410:'account-deleted',429:'rate-limited'};

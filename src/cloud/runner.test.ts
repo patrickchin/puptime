@@ -155,6 +155,14 @@ test('authentication and access errors pause uploads while transient errors back
  }
 });
 
+test('sync retries preserve a parsed Retry-After longer than exponential backoff without changing pending work',async t=>{
+ const {sync,storage}=await fixture(t);await active(sync);await storage.appendEvents([event]);
+ const before=await sync.status('local-pet'),calls:string[]=[];
+ const api=createCloudApi(async path=>{calls.push(path);return {data:null,error:{status:503},retryAfter:'120'};});
+ const result=await make(sync,api).run(signal());assert.equal(result.state,'retry');assert.equal(result.retryAfterMs,120000);
+ assert.deepEqual(calls,['/api/account']);assert.deepEqual(await sync.status('local-pet'),before);assert.deepEqual(await storage.loadEvents(),[event]);
+});
+
 test('account change or cancellation during a request cannot dispatch queued data or apply late responses',async t=>{
  const {sync}=await fixture(t);await active(sync);const remote=server();let identity:string|null='account-1';
  const api={...remote.api,account:async()=>{identity='account-2';return account;}};
