@@ -2,6 +2,12 @@
 
 October 20, 2026. This document supersedes conflicting scope in the October 17 account/sync design and October 18 SQL design. It records the user's revised priorities; it does not claim the proposed simplification is implemented.
 
+The implementation and its current verification are now documented in the
+[development checkpoint](../../cloud-development.md) and
+[SQL schema map](../../cloud-schema.md). The inventory below records the
+planning baseline; the obsolete migration files it lists have since been
+replaced by the documented fresh baseline.
+
 ## Objective
 
 Develop reliable optional accounts and offline-first puppy logging with cloud backup and device synchronization. Use a clear, constrained SQL model for puppies, logs, routines, preferences and necessary synchronization state. Keep account-free local use and optional Apple, Google and email-code sign-in. Design ownership for multiple puppies while initially presenting one puppy. Use established tools and free service tiers. Make shared React Native changes for both iOS and Android, verify the app on iOS, and defer Android runtime testing and platform-specific fixes. Prove the core journeys locally and against the development backend. Submit changes through reviewed GitHub PRs. Present a small curated set of main happy paths and important failure paths.

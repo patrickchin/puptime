@@ -77,7 +77,7 @@ development service; they do not establish a fresh build or Android runtime.
 The ID source later passed fresh iOS Release CI and actual native email-code
 sign-in, explicit upload and cold restart against the deployed development API.
 See the [current development checkpoint](cloud-development.md#current-verified-checkpoint--october-20-2026)
-for that evidence and the pending native Apple/Google checks. The ID convention
+for that evidence and the accepted native Apple/Google checks. The ID convention
 required no schema reset.
 
 ## Account tables and queries

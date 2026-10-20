@@ -98,6 +98,16 @@ parsed JUnit counts. The subsequent
 [native Apple run](https://github.com/patrickchin/puptime/actions/runs/39443848026)
 passed its Release build and Maestro step and completed successfully. These
 automated suites do not establish genuine provider authentication.
+The [native Google run](https://github.com/patrickchin/puptime/actions/runs/39446219615)
+also completed its fresh Release build and Maestro suite successfully.
+
+Final integrated source `a1bb417` passed 435 Node tests, 103 Workers tests,
+default/iOS type checks and a fresh local iOS Release build. An independent
+review also passed 22 focused integration tests. Its
+[combined native CI run](https://github.com/patrickchin/puptime/actions/runs/39453737708)
+completed successfully, including its Release build, standard Maestro suite,
+screenshots and artifact uploads. PR #130 merged as `fd3460b`; that main tree is
+exactly equal to the qualified `a1bb417` tree.
 
 The public API Worker version is `4fe8d9e9-5ef1-4f54-bd2f-9ee745353bc5`, with
 server tree `c054dad3590f80bab84d92693b5473dcefa95f0a` from reviewed source
@@ -106,8 +116,22 @@ bundle audience through Better Auth's built-in verifier and requires a nonce
 for Apple ID-token sign-in/linking. Deployment preserved the existing D1 and
 Durable Object bindings, data and secrets. The actual Pages API origin returned
 its configured providers and rejected anonymous account/export requests.
-The local service on port 8793 retains the earlier `ad54af8` source and its
-existing persistence; local email/sync demonstrations use a task-owned proxy.
+The local service on port 8793 now runs the same server tree from the current
+checkout, with its existing bindings, variables and persistence unchanged.
+The integrated source passed the full local persistent-client HTTP matrix:
+1,000-log upload/restore, lost replies and disk restart, concurrent edits,
+interrupted resync, detachment/reassociation, account mismatch, session expiry
+and renewal, private export and channel retirement. Those sessions were
+administrative fixtures; the native SDK evidence below is separate. Earlier
+local recordings retain their documented source and task-proxy environments.
+The developer checkout's dependencies, iOS project and pods were refreshed,
+including both native provider integrations and the registered Google scheme.
+The current deployed Worker also passed the same nine-group persistent-client
+matrix through the actual Pages HTTPS/WSS origin, including 1,000-log restore,
+automatic field merge, retained offline work and session expiry/renewal.
+Both test owners were retired normally and both change channels closed.
+The live deployment was independently confirmed as the Worker version above.
+These administrative-session tests do not stand in for native SDK authentication.
 
 | Actual SDK journey | Verified scope |
 | --- | --- |
@@ -115,9 +139,10 @@ existing persistence; local email/sync demonstrations use a task-owned proxy.
 | Public browser Google | Sign-in completed through the existing Google provider session, account navigation retained it and sign-out worked. No new scope grant or puppy upload occurred. |
 | Public browser Apple | The SDK reached Apple's authorization page; authentication has not completed. |
 | iOS Release email | The fresh `814db2dd` CI app used a real delivered code and the official native SDK against the public Pages API, without Metro, a local API override or session injection. Sign-in preserved every local SQL table without association or upload. Explicit enable then uploaded the original event once; all 15 initial operations were acknowledged with zero pending. Authenticated cold restart preserved every SQL table and did not duplicate that event. |
-| iOS Google, earlier browser flow | Release `814db2dd` completed the official SDK's browser provider flow against Pages. Sign-in preserved SQL without uploading; explicit enable uploaded both original events once, and authenticated cold restart preserved SQL. This does not qualify the replacement native Google SDK. |
+| iOS Google, earlier browser flow | Release `814db2dd` completed Better Auth's browser provider flow against Pages. Sign-in preserved SQL without uploading; explicit enable uploaded both original events once, and authenticated cold restart preserved SQL. This does not qualify the replacement native Google SDK. |
 | iOS native Apple | Fresh local Release `151c6f2` used the official Expo Apple system sheet and private password confirmation against Pages. Quiet cancellation preserved all 14 SQL tables. Genuine sign-in preserved domain data without association or upload; only the expected setup-step marker advanced. Explicit restore hydrated the existing puppy and 14 cloud records without outbound mutations. One new native log then uploaded once with revision 1 and an exact remote echo. Authenticated and recorded cold restarts preserved all 14 SQL tables, with zero pending. |
 | iOS native Google | Fresh integrated local Release `a1bb417` completed genuine sign-in through the official Google iOS SDK and its secure system browser against Pages. Quiet cancellation and sign-in preserved all 14 SQL tables without association or upload. Explicit same-puppy confirmation and enable kept both original event IDs at revision 1 and all 16 cloud bodies unchanged, without extra mutations. Authenticated and recorded cold restarts preserved all 14 tables. |
+| iOS native provider cleanup | Apple's authenticated session also survived an upgrade to integrated `a1bb417` with all 14 tables unchanged. Normal sign-out from a genuine newly cached Google SDK session cleared native credentials and the official Better Auth session before detaching the owner; both logs and all 11 unrelated/domain tables stayed exact, with no account or cloud-data deletion. |
 | Local iOS email and restore | Current `ad54af8` in a qualified Debug shell completed SDK email-code sign-in using a synthetic local address, explicit upload, restart, second-device restore and passive incoming-edit convergence. This local code preview is separate from real Resend delivery. |
 | Local iOS history | A separate account-free fixture with 1,001 events and 61 target revisions preserved every SQL table on Cancel. Confirmed restore added one target revision while 1,000 unrelated events and other domain/sync tables stayed exact. |
 | Local iOS automatic recovery | An actual `ad54af8` cold-start outage left an operation pending after the service returned. Fixed source `0472307` retained that exact event/operation across another closed-proxy cold restart, then uploaded it automatically once with revision 1 and an exact remote echo. No Retry, foreground action or lifecycle change occurred between restoring the proxy and the SQL proof; the outbox drained and unrelated data stayed unchanged. This used the compatible Debug shell and local service. |
@@ -126,11 +151,13 @@ Configuration flags and authorization-page handoffs are not completed sign-in
 evidence. Current first-open, local email/upload/restart, restore/incoming-edit
 and populated-history clips have been recorded; see [review videos](review-videos.md)
 for their source and environment limits. Short native Apple and Google restart
-clips and the offline-recovery clip are also recorded; the final gallery cohort
-and obsolete-media cleanup are being assembled. Private provider authentication
-is omitted from footage. Earlier footage stays labelled historical until it is
-retired. Android runtime, product web work, payments and publication remain
-deferred.
+clips and the offline-recovery clip are also recorded. The gallery now presents
+six journeys across seven videos and two text records. Its seven players,
+chapter buttons, seeking and range responses passed browser verification.
+The exact-file cleanup removed 1,436 obsolete gallery artifacts while retaining
+current recordings and external raw proofs. Private provider authentication is
+omitted from footage. Android runtime, product web work, payments and publication
+remain deferred.
 
 ## Earlier qualification and deployment checkpoints
 
