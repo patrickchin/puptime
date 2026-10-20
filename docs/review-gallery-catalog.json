@@ -1,0 +1,189 @@
+{
+  "journeys": [
+    {
+      "title": "First open: profile, optional account and first log",
+      "description": "Welcome, puppy profile, optional account choice, contextual reminders and the first real log. Earlier cloud-disabled Release build; the companion shows a deployed email request with private code entry omitted.",
+      "primary": "195-clean-first-open-and-timed-reminder",
+      "companion": "260-live-account-setup"
+    },
+    {
+      "title": "Everyday use: drawer and timed reminders",
+      "description": "Feature walkthrough after setup: navigate the drawer, create a reminder, reopen it and cancel. Earlier standalone Release capture.",
+      "primary": "188-drawer-and-native-timer-journeys"
+    },
+    {
+      "title": "Google: signed in after restart",
+      "description": "Genuine deployed Google session after cold restart. Private provider interaction is omitted.",
+      "primary": "298-google-session-ready-cold-restart"
+    },
+    {
+      "title": "Apple: signed in after restart",
+      "description": "Genuine deployed Apple session after cold restart. Private provider interaction is omitted.",
+      "primary": "320-apple-session-ready-cold-restart"
+    },
+    {
+      "title": "Cloud: restore, log and receive an update",
+      "description": "Explicitly restore a puppy, add a log and reopen. The companion shows incoming sync from a genuine peer without refresh.",
+      "primary": "263-live-puppy-restore-log-and-reopen",
+      "companion": "267-live-incoming-sync-without-refresh"
+    },
+    {
+      "title": "Recovery: log offline and reconnect",
+      "description": "One representative unhappy path: logging stays durable during a service outage, then the backlog syncs. Earlier Debug build against a local HTTP service.",
+      "primary": "07-offline-logging-and-recovery"
+    }
+  ],
+  "review_notes": {
+    "248-cloud-enabled-signed-in-ios": "Previous local-backend qualification. This recording proves the local SDK journey; the selected live recordings use the deployed Pages API.",
+    "259-live-account-setup": "Diagnostic failure: the initial welcome tap did not open the profile step. No email request occurred; local data remained unchanged. The successful retry is recording260.",
+    "262-live-puppy-restore-log-and-reopen": "Diagnostic failure: Maestro rejected the unsupported settleTimeoutMs property before any actions. Before/after SQLite snapshots were identical: verified sign-in, zero events, owner and outbox. Recording263 passed after removing that test property.",
+    "274-google-first-open-configured": "Diagnostic failure: the UI assertions passed, then an unsupported absolute screenshot path failed. Recording 275 resumed with a relative screenshot path and no data reset.",
+    "275-google-native-start": "Earlier signed iOS first-open Google handoff and system confirmation. This clip has no credential entry. The later completed real-provider session is qualified separately in 298.",
+    "276-google-native-cancel": "Cancelling the system Google handoff returns to the same account step with a useful retry message. Proof 277 compares every SQLite table; this does not claim completed Google sign-in.",
+    "281-owned-cloud-history-stale": "Diagnostic failure: the independent local HTTP peer hit a stale Node socket after the UI preparation. No remote mutation was sent. Recording 283 passed after the qualifier stopped reusing that socket.",
+    "282-owned-history-stale-confirmation": "Diagnostic failure: the qualifier used a detail-note ID in the confirmation. Interrupted before the remote mutation; the corrected confirmation ID passed in 283.",
+    "284-owned-history-offline-reconnect": "Diagnostic failure after the saved restore had been acknowledged once: the qualifier counted historical changes as current logs. The distinct-current-record count and exact saved-operation readback pass in284-owned-history-saved-restore-verified; the restore was not replayed.",
+    "284-owned-history-offline-readback": "Diagnostic failure: independent server/local data checks passed, then the unconfirmed menu tap missed. The completed read-only retry uses bounded drawer/Settings waits; no second restore was submitted.",
+    "284-owned-history-saved-restore-verified": "Read-only completion of the actual offline restoration in 284-owned-history-offline-reconnect. The unique saved operation was accepted once; all 1,001 current cloud logs match local data. No restoration replay or reseeding.",
+    "285-history-small-preserved-appearance": "Diagnostic run: complete standard English/light and Spanish/dark cases passed with all tables unchanged. The next Chinese-language driver failed to start before UI actions; original preferences were restored. Chinese passes in the next capture, and all maximum-text cases are recorded separately.",
+    "285-history-small-remaining-appearance": "Diagnostic run: the complete standard Chinese case passed. Maximum-text English then remained on the correct version card after a tap; all data and preferences were preserved. Settling the scroll before the bounded tap passed in the subsequent maximum-text capture.",
+    "285-history-small-maximum-text": "Three maximum-text journeys on the signed default standalone, using the real language picker and retained system theme. Standard English/light and Spanish/dark passed in the first 285 capture; standard Chinese passed in the second. Earlier test-driver/tap failures remain diagnostic records.",
+    "288-owned-completed-installation-history": "Diagnostic run: the signed update and full walkthrough replay passed with all 14 tables and server count unchanged. The final Recent changes row tap missed. The settled read-only selection passed in the recorded rerun; no fixture reset or restoration.",
+    "288-owned-update-history-verified": "The exact preserved 1,002-log account survives the signed update, walkthrough replay and read-only Recent changes/local-version navigation. The selected version is identical to current data, so this fixture verifies Back rather than a restore confirmation; Cancel is covered by the other history journeys.",
+    "279-existing-account-provider-controls": "Both Connect cards appear on the retained live account with three logs and Up to date. No provider credential, Connect, enrollment or logout action was taken. Text proofs 291/292 compare all 14 tables before launch and after viewing.",
+    "290-retained-account-before-launch": "Diagnostic failure: the qualifier assumed installation would keep the same data-container path. iOS relocated the container. Proof 291 resolves the selected device’s current container and compares every table and full row to the preserved pre-install backup; proof 292 repeats that comparison after viewing the provider controls.",
+    "296-google-session-cold-restart": "Earlier restart capture checks control presence; its last frame still shows loading. The stronger 298 recording waits for both cloud choices to be enabled after cold restart. Both preserve the signed-in account without activating cloud.",
+    "298-google-session-ready-cold-restart": "Actual completed Google OAuth used the installed SDK and deployed service; private provider interaction is omitted. This post-auth recording cold-restarts the standalone and waits for both cloud choices to be enabled. Proofs 294/295/299 verify the genuine deployed identity/session and preserved local data. No trial, puppy enrollment, upload or provider linking was performed.",
+    "320-apple-session-ready-cold-restart": "Actual completed Sign in with Apple used the approved Hide My Email choice and installed SDK. Private provider interaction is omitted. Both cloud choices are enabled after standalone cold restart; proofs 321/322 preserve local data, and 323 verifies separate real Apple/Google identities and sessions. No trial, enrollment, upload or account linking occurred.",
+    "289-history-default-standalone-local": "The actual CI entry script passes on a fresh task-owned simulator using integrated signed bundle c0c9 after merged provider changes. Populated draft/save, paging, Cancel, stale-edit rejection, actual SQLite rollback/retry, one restore despite repeated taps and deleted estimated-log recovery all pass with unrelated records preserved. No account, backend, or retained fixture is used.",
+    "289-history-default-standalone-regression": "Diagnostic full run: 11 of 13 flows passed. Navigation and simple-log both stopped in the shared profile Not now helper before their feature assertions; the profile remained visible after the unsettled tap. This failed run is retained. Settled/enabled helper qualification and a fresh complete suite are separate recordings.",
+    "289-history-default-standalone-regression-verified": "Diagnostic second run: 12 of 13 flows passed, including the corrected profile helper. A separate walkthrough Next tap stayed on practice step 0. The capture and strict step-1 failure remain retained; the from-step-guarded transition and final complete suite are separate qualifications.",
+    "289-history-default-standalone-regression-final": "All 13 configured flows pass on the integrated signed c0c9 build: full first-open setup and practice/replay, preferences, logging, routines, Notifications, timed reminders, populated views, CSV cancellation, guide audio and themes. Thirteen chapters use actual command timestamps. The later f0a8 build changes only the shared spoken history-row label and has separate targeted accessibility qualification.",
+    "288-backup-restored-owned-history": "Diagnostic failure: the new fixture passed schema and 1,002-log preflight, then the Recent changes tap remained on Settings. All 14 tables and original raw backup hashes were unchanged. The same fixture passed the bounded settled retry without copying or seeding again.",
+    "288-backup-restored-owned-history-verified": "The signed c0c9 build passes read-only Recent changes, local version selection and Back on a NEW synthetic fixture copied from the preserved 1,002-log backup. Every table, owner, outbox, mirror and cursor is unchanged; the three unopened original backup hashes remain exact. This is neither the deleted original device’s in-place upgrade nor restored authentication/cloud-sync proof.",
+    "288-history-accessibility-label-red": "Expected RED on c0c9: the actual native row label contains only date/source/change details and omits the event name and note. The row exists; the precise combined-label assertion fails. Every table and original backup hash remains unchanged.",
+    "288-history-accessibility-label-green": "Diagnostic preflight failure before app launch: CoreSimulator returned a stale bundle-container path immediately after the signed update. The actual installed bundle had the expected f0a8 hash. The next bounded read-only lookup/qualification is recorded separately; no data reset or repair occurred.",
+    "288-history-accessibility-label-green-verified": "The signed f0a8 correction reuses the visible event/custom label and note in the spoken row label. Actual native hierarchy assertions pass for both Recent changes and local-version rows, followed by detail and Back. The SAME backup-restored 1,002-log fixture preserves all 14 tables, owner/outbox and original raw hashes. The earlier c0c9 full13 result remains scoped to that build; no layout, storage or navigation behavior changed.",
+    "285-confirmation-scroll-context-red": "Expected RED on the previous signed build: the maximum-text confirmation retained the detail scroll offset and hid its explanation. The translated explanation-visible assertion failed before any restoration; the database and original preferences were preserved.",
+    "285-confirmation-scroll-context-green": "The final signed build resets only the local history pane when opening confirmation. The explanation-visible regression, full maximum-text journeys and all-table read-only checks run in English, Spanish and Chinese.",
+    "195-clean-first-open-and-timed-reminder": "This earlier reminder journey uses a cloud-disabled build. The companion email-request recording and cloud restore recordings use the deployed Pages API."
+  },
+  "evidence_links": [
+    [
+      "265-live-native-independent-database-proof",
+      "Genuine email session: native and live database agree"
+    ],
+    [
+      "258-pages-live-database-sync",
+      "Live service matrix: 1000 events, reconnect, restore and conflicts"
+    ],
+    [
+      "273-google-staging-configuration",
+      "Deployed Google configuration and callback guards"
+    ],
+    [
+      "277-google-cancel-sql-preservation",
+      "Google cancellation preserves every local table"
+    ],
+    [
+      "278-apple-google-staging-configuration",
+      "Both deployed provider starts and callback guards"
+    ],
+    [
+      "291-retained-account-before-launch",
+      "Signed update preserves the live account before launch"
+    ],
+    [
+      "292-retained-account-after-provider-view",
+      "Viewing Connect cards preserves all live account data"
+    ],
+    [
+      "293-apple-keychain-signing-verification",
+      "Private Apple signing key and client-secret validation"
+    ],
+    [
+      "294-google-real-sign-in-local-preservation",
+      "Real Google sign-in preserves local data"
+    ],
+    [
+      "295-google-live-identity-readback",
+      "Deployed Google identity and session readback"
+    ],
+    [
+      "299-google-ready-restart-data-preservation",
+      "Ready Google restart preserves every local table"
+    ],
+    [
+      "321-apple-real-sign-in-local-preservation",
+      "Real Apple sign-in preserves local data"
+    ],
+    [
+      "322-apple-ready-restart-data-preservation",
+      "Ready Apple restart preserves every local table"
+    ],
+    [
+      "323-apple-google-live-identity-isolation",
+      "Deployed Apple and Google identities remain separate"
+    ],
+    [
+      "318-web-local-browser-matrix",
+      "Web: sixteen-case local browser matrix"
+    ],
+    [
+      "316-web-stale-deletion-marker-guard",
+      "Web final fix: stale-tab deletion guard"
+    ],
+    [
+      "319-web-mature-cookie-reauthentication",
+      "Web final fix: mature-cookie renewal"
+    ],
+    [
+      "317-web-source-media-preservation",
+      "Frozen web source and review screenshots"
+    ],
+    [
+      "324-staging-rollout-review",
+      "Web backend staging rollout and anonymous route guards"
+    ],
+    [
+      "325-cloud-export-stream-contract",
+      "Native export stream contract: focused tests only"
+    ],
+    [
+      "326-apple-deletion-local-review",
+      "Apple-linked local deletion and owner-isolation proof"
+    ],
+    [
+      "328-cloud-account-deletion-regression",
+      "Account-deletion code regression checks"
+    ],
+    [
+      "329-cloud-export-code-and-scale-checks",
+      "Cloud export code and100,000-revision local runtime proof"
+    ],
+    [
+      "287-history-restacked-code-checks",
+      "Restacked history code checks"
+    ],
+    [
+      "287-history-confirm-scroll-code-checks",
+      "Final scroll correction code checks"
+    ],
+    [
+      "287-history-pr103-integrated-code-checks",
+      "History integrated with merged provider changes"
+    ],
+    [
+      "288-owned-update-sql-preservation",
+      "Completed account matches its original pre-boot database"
+    ],
+    [
+      "288-history-accessibility-observed",
+      "Actual native history labels and all-table preservation"
+    ],
+    [
+      "289-local-history-service-restacked",
+      "Local history HTTP and SQL acceptance"
+    ]
+  ]
+}

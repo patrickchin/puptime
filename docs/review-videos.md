@@ -1,6 +1,21 @@
 # Review videos
 
-Current review: [local gallery](http://127.0.0.1:8877/) opens on recording195, the uninterrupted first-open Mochi setup through the first real log and timed reminder. Recordings191/194 cover full setup appearance and recovery;188/206 cover drawer, permissions and reminder/accessibility states;198/199 cover populated rendering and owned-data preservation;222 covers the actual OS Reduce Motion drawer variants. Recording209 is the final full regression, and215 is searchable full code-check output. Current evidence and remaining integration gates are recorded in `docs/cloud-verification.md`.
+[Open the curated local gallery](http://127.0.0.1:8877/). Six entries cover the main happy paths and one offline/recovery path. Only the first entry opens by default:
+
+| Review entry | Existing evidence | Scope |
+| --- | --- | --- |
+| First open | 195; optional companion 260 | Profile, optional account, contextual reminders, first real log. 195 is an earlier cloud-disabled Release build; 260 shows the deployed email request, with private code entry omitted. |
+| Everyday use | 188 | Drawer and timed reminder walkthrough after setup; earlier Release build. |
+| Google restart | 298 | Genuine deployed session and ready controls after cold restart; private OAuth omitted. |
+| Apple restart | 320 | Genuine deployed relay session and ready controls after cold restart; private sign-in omitted. |
+| Cloud restore and incoming sync | 263; optional companion 267 | Explicit puppy restore, log and reopen; genuine peer update without refresh. |
+| Offline recovery | 07 | Earlier Debug build, isolated local HTTP outage, durable log and reconnect. |
+
+The six primary clips total about 5½ minutes; the two optional companions add about a minute. They are selected development evidence, not new recordings or qualification of the latest build. First-open setup remains separate from the feature walkthrough. Capture dates, recorded-rerun labels, original build/service scopes, diagnostic notes and results stay visible.
+
+The collapsed archive retains all other app captures (including deletion variants) and searchable technical logs. Deep links open their enclosing disclosures automatically. At curation, the 46-current / 126-previous / 191-text publication becomes six primary clips, two companions, 164 archived app captures and 191 text checks. No media, sidecar, log, screenshot or chapter data was deleted or rewritten.
+
+`scripts/build-review-gallery.py` reads the checked-in `docs/review-gallery-catalog.json`: selection order, descriptions, original review notes and service-evidence links. This replaces the frozen e9 builder plus ordered runtime overrides previously used to publish the gallery. The source builder and catalog reproduce the displayed page from the existing evidence directory; editing the artifact directory's legacy `build-index.py` is unnecessary. New unselected captures go into the archive. Current evidence and remaining integration gates are recorded in `docs/cloud-verification.md`.
 
 Record actual iOS journeys as acceptance evidence, with the test logs alongside
 them. Keep terminal-only checks as searchable text; do not render terminal output
@@ -41,7 +56,7 @@ The gallery distinguishes complete first-open onboarding (welcome, puppy profile
 
 CI-result replays must identify the original run and distinguish reading its retained results from executing tests again. The original PR99 result report178 shows10/11 flows passing; Settings recordings174/175 pass the original flow locally and176 passes its bottom-target centering correction with all visibility/persistence assertions retained. Recording167 is an interrupted status observation, not a test-run conclusion. Qualifying a replacement commit still requires its own complete CI result.
 
-History recordings168–183 currently show data-layer test output, not a native history UI. Expected REDs168/171/179/180 remain labelled as such. Focused181 and full final183 pass;182 stops on type errors after its Node/Workers tests pass. Task183 qualifies317 Node/54 Workers/all types. Native history journeys and deployed qualification follow in the history plan's remaining tasks.
+Historical recordings168–183 show data-layer test output, not a native history UI. Expected REDs168/171/179/180 remain labelled as such. Focused181 and full final183 pass;182 stops on type errors after its Node/Workers tests pass. Task183 qualifies317 Node/54 Workers/all types. These historical results retain their original scope; later native history journeys are available in the archive.
 
 Build and serve the local gallery with the standard-library helpers:
 
@@ -52,9 +67,9 @@ python3 scripts/serve-review-gallery.py /absolute/path/puptime-review-videos --p
 
 Use the range-aware server above rather than `python -m http.server`: partial
 responses (`206`, `Content-Range`, `Accept-Ranges: bytes`) let browser video
-controls seek before the entire recording downloads. Current app journeys appear
-first. Earlier captures remain collapsed, and old terminal-replay metadata is
+controls seek before the entire recording downloads. Selected app journeys appear
+first. Other captures and technical logs remain in the collapsed archive, and old terminal-replay metadata is
 presented as readable, searchable logs. Existing deep links are preserved.
 
 Run `python3 scripts/check-review-gallery.py` to verify byte ranges, HEAD, error
-bounds, text-only recorder status, and escaped log rendering.
+bounds, text-only recorder status, escaped log rendering, selection/companion placement, collapsed archive structure, provenance and deterministic output.

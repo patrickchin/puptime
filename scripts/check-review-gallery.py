@@ -77,8 +77,27 @@ with TemporaryDirectory(prefix='puptime-gallery-check-') as folder:
     assert 'src="old-terminal.mp4"' not in page
     assert page.count('<video ') == 1
     assert 'id="search-results"' in page
+    # Selected clips appear once; companion clips and all other evidence stay collapsed.
+    catalog = {'journeys': [{'title': 'Setup', 'description': 'Original scope',
+        'primary': '997-app', 'companion': '996-companion'}]}
+    (root / '996-companion.json').write_text(json.dumps({**native, 'started_at': 1792388891,
+        'recorded_rerun': True, 'capture_kind': 'Actual browser recording',
+        'chapters': [{'seconds': 7.2, 'title': '> Flow original chapter'}]}))
+    (root / '995-archived.json').write_text(json.dumps(native))
+    builder.build(root, catalog)
+    page = (root / 'index.html').read_text()
+    archive = page.index('<details id="archive">')
+    assert page.count('class="journey"') == 1 and page.count('<video ') == 3
+    assert page.index('id="997-app"') < page.index('class="companion"') < archive
+    assert page.index('id="996-companion"') < archive < page.index('id="995-archived"')
+    assert 'Recorded 2026-10-19 UTC · Recorded rerun' in page
+    assert 'Actual browser recording' in page and 'data-seek="7.2"' in page
+    assert '<details class="companion">' in page and '<details id="test-results">' in page
+    first_build = page
+    builder.build(root, catalog)
+    assert (root / 'index.html').read_text() == first_build
     (root / 'clip.mp4').unlink()
     builder.build(root)
     page = (root / 'index.html').read_text()
-    assert '<video ' not in page and page.count('class="result"') == 3
-print('PASS: full/single/suffix/unsatisfiable/HEAD ranges; text recorder exit status; no terminal video; searchable escaped logs.')
+    assert '<video ' not in page and page.count('class="result"') == 5
+print('PASS: full/single/suffix/unsatisfiable/HEAD ranges; text recorder exit status; no terminal video; searchable escaped logs; compact selection, collapsed archive, provenance and reproducible output.')
