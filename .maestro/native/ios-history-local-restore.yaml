@@ -1,0 +1,49 @@
+appId: com.patrickchin.puptime
+name: Page local versions and cancel restoration without writing
+---
+- scrollUntilVisible:
+    element:
+      id: history.local.more
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: history.local.more
+- scrollUntilVisible:
+    element:
+      id: history.local.${ORIGINAL_SEQUENCE}
+    direction: DOWN
+    timeout: 120000
+    speed: 80
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: history.local.${ORIGINAL_SEQUENCE}
+- assertVisible:
+    id: history.after.note
+    text: First note
+- scrollUntilVisible:
+    element:
+      id: history.restore
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: history.restore
+- assertVisible:
+    id: history.confirm
+- assertVisible:
+    id: history.confirm.after.note
+    text: First note
+- tapOn:
+    id: history.confirm.cancel
+- assertVisible:
+    id: history.panel
+- assertNotVisible:
+    id: history.confirm
+- takeScreenshot: local-history-cancel-preserves-selection

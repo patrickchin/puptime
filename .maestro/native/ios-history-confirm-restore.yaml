@@ -1,0 +1,28 @@
+appId: com.patrickchin.puptime
+name: Confirm one historical version and show the committed result
+---
+- scrollUntilVisible:
+    element:
+      id: history.restore
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: history.restore
+    retryTapIfNoChange: false
+- assertVisible:
+    id: history.confirm
+- assertVisible:
+    id: history.confirm.after.note
+    text: ${HISTORY_NOTE}
+- tapOn:
+    id: history.confirm.restore
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible:
+      id: history.restored
+    timeout: 15000
+- assertVisible:
+    id: history.after.note
+    text: ${HISTORY_NOTE}

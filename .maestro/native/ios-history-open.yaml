@@ -1,0 +1,60 @@
+appId: com.patrickchin.puptime
+name: Open free local history without losing an editor draft
+---
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- scrollUntilVisible:
+    element:
+      id: quick.pee
+    direction: UP
+    timeout: 120000
+    speed: 40
+    waitToSettleTimeoutMs: 1000
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      id: event.custom.edit
+    direction: DOWN
+    timeout: 120000
+    speed: 40
+    waitToSettleTimeoutMs: 1000
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: event.custom.edit
+- assertVisible:
+    id: editor
+- scrollUntilVisible:
+    element:
+      id: editor.note.input
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: editor.note.input
+- eraseText
+- inputText: Draft before history
+- tapOn: ^ADJUST TIME$
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      id: editor.history
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
+- tapOn:
+    id: editor.history
+- extendedWaitUntil:
+    visible:
+      id: history.panel
+    timeout: 15000
+- assertVisible:
+    id: history.local.list
+- takeScreenshot: local-history-preserves-draft
