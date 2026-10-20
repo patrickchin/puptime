@@ -70,7 +70,9 @@ function boundary(env:Cloudflare.Env):Integration {
         const event=safeEvent(payload as ErrorEvent,env);
         if(event)items.push([{type:'event'},event]);
       }
-      envelope[0]={sdk:{name:'sentry.javascript.cloudflare',version:Sentry.SDK_VERSION},sent_at:new Date().toISOString()};
+      // Relay identifies the event from this header, not the payload's ID.
+      // Derive it only from the already sanitized event, never the input header.
+      envelope[0]={...(items[0]?{event_id:items[0][1].event_id}:{}),sdk:{name:'sentry.javascript.cloudflare',version:Sentry.SDK_VERSION},sent_at:new Date().toISOString()};
       envelope[1]=items;
     });
   }};

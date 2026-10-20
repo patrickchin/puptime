@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { randomUUID } from 'node:crypto';
 
 // Only synthetic envelopes from the isolated observability test project.
 export default async function setup(project) {
@@ -16,8 +17,10 @@ export default async function setup(project) {
     }
     let body='';
     for await(const chunk of request){body+=chunk.toString();if(Buffer.byteLength(body)>262144){response.writeHead(413);response.end();return;}}
-    records.push({path:request.url,body});
-    response.writeHead(status,{'content-type':'application/json'});response.end('{}');
+    // Relay uses the envelope ID; without one it assigns a new ID.
+    const responseEventId=JSON.parse(body.split('\n')[0]).event_id??randomUUID().replaceAll('-','');
+    records.push({path:request.url,body,responseEventId});
+    response.writeHead(status,{'content-type':'application/json'});response.end(JSON.stringify({id:responseEventId}));
   });
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const port=server.address().port;

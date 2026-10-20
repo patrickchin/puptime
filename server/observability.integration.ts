@@ -12,7 +12,7 @@ import { apiSentryOptions,unexpectedError } from './observability';
 import worker from './index';
 
 const sink=()=>inject('sentryTestOrigin');
-const records=async()=>await(await fetch(sink()+'/records')).json() as {path:string;body:string}[];
+const records=async()=>await(await fetch(sink()+'/records')).json() as {path:string;body:string;responseEventId:string}[];
 const poison='synthetic-private-note-code-receipt-user-7bfc';
 beforeAll(()=>applyD1Migrations(env.AUTH_DB,inject('migrations')));
 beforeEach(async()=>{await fetch(sink()+'/records',{method:'DELETE'});});
@@ -35,6 +35,13 @@ test('unexpected HTTP503 sends one real SDK envelope to the isolated HTTP sink',
  const envelope=decoded(received[0].body);expect(envelope[1].map(([h])=>h.type)).toEqual(['event']);
  const event=envelope[1][0][1];expect(event).toMatchObject({level:'error',tags:{surface:'api'},exception:{values:[{type:'Error',value:'Unexpected Puptime API error'}]}});
  expect(event).not.toHaveProperty('request');expect(event).not.toHaveProperty('user');expect(event).not.toHaveProperty('contexts');
+});
+
+test('the real serialized SDK envelope and Relay-style acknowledgement preserve the sanitized event ID',async()=>{
+ const response=await request(worker,new Request('https://puptime.test/api/config'),failEnv());expect(response.status).toBe(503);
+ const received=await records();expect(received).toHaveLength(1);
+ const envelope=decoded(received[0].body),event=envelope[1][0][1] as {event_id:string};
+ expect(envelope[0].event_id).toBe(event.event_id);expect(received[0].responseEventId).toBe(event.event_id);
 });
 
 test.each([undefined,'not-a-dsn','http://public@outside.example/42','https://public@outside.example/42'])('missing or invalid DSN is disabled with no egress: %s',async dsn=>{
@@ -75,14 +82,14 @@ test.each(['http','validation','reconciliation'] as const)('the SDK filters expe
 test('final SDK envelope allowlist removes poison from fields, headers, attachments and every non-error item',async()=>{
  const app=scenario(async()=>{
   const payload={debug_meta:{images:[{type:'sourcemap',debug_id:'11111111-2222-3333-4444-555555555555',code_file:'/private/'+poison+'/index.ts'},{type:'sourcemap',debug_id:poison,code_file:poison}]},event_id:crypto.randomUUID().replaceAll('-',''),type:'error',message:poison,user:{id:poison,email:poison+'@example.invalid'},request:{url:'https://puptime.test/'+poison,headers:{cookie:poison},data:poison},tags:{owner:poison},extra:{sql:'SELECT '+poison},contexts:{private:{note:poison}},breadcrumbs:[{message:poison}],exception:{values:[{type:poison,value:poison,stacktrace:{frames:[{filename:'/private/'+poison+'/index.ts',lineno:12,colno:3,function:poison,vars:{note:poison},pre_context:[poison],context_line:poison},{filename:poison+'.js',lineno:13}]}}]}};
-  await Sentry.getClient()!.sendEnvelope([{trace:{transaction:poison},privateHeader:poison},[
+  await Sentry.getClient()!.sendEnvelope([{event_id:poison,trace:{transaction:poison},privateHeader:poison},[
    [{type:'event',privateHeader:poison},payload],
    ...['attachment','session','transaction','profile','replay_recording','check_in','log','trace_metric','span','raw_security'].map(type=>[{type,filename:poison},{private:poison}]),
   ]] as unknown as Envelope);
  });
  expect((await request(app,new Request('https://puptime.test/scenario?query='+poison))).status).toBe(204);
  const received=await records();expect(received).toHaveLength(1);expect(received[0].body).not.toContain(poison);
- const envelope=decoded(received[0].body);expect(Object.keys(envelope[0]).sort()).toEqual(['sdk','sent_at']);expect(envelope[1].map(([h])=>h.type)).toEqual(['event']);
+ const envelope=decoded(received[0].body);expect(Object.keys(envelope[0]).sort()).toEqual(['event_id','sdk','sent_at']);expect(envelope[0].event_id).toBe((envelope[1][0][1] as {event_id:string}).event_id);expect(envelope[1].map(([h])=>h.type)).toEqual(['event']);
  expect(envelope[1][0][1]).toMatchObject({debug_meta:{images:[{type:'sourcemap',debug_id:'11111111-2222-3333-4444-555555555555',code_file:'index.ts'}]},exception:{values:[{type:'Error',stacktrace:{frames:[{filename:'index.ts',lineno:12,colno:3,in_app:true}]}}]}});
 });
 
