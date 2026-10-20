@@ -70,8 +70,10 @@ def build(root, catalog=None):
     historical = [journey for journey in catalog.get('historical_journeys', []) if journey['primary'] in native]
     selected = {journey[key] for journey in journeys + historical for key in ('primary', 'companion') if key in journey and journey[key] in native}
     previous = [item for stem, item in native.items() if stem not in selected]
+    history_nav = '<a href="#historical-journeys">Historical review</a>' if historical else ''
+    archive_nav = '<a href="#archive">Archive</a>' if previous or historical else ''
     parts = ['<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Puptime review</title>',
-        f'<style>{STYLE}</style></head><body><aside><strong>Puptime review</strong><nav aria-label="Review sections"><a href="#journeys">Current journeys</a><a href="#historical-journeys">Historical review</a><a href="#archive">Archive</a><a href="#test-results">Technical checks</a></nav></aside><main>',
+        f'<style>{STYLE}</style></head><body><aside><strong>Puptime review</strong><nav aria-label="Review sections"><a href="#journeys">Current journeys</a>{history_nav}{archive_nav}<a href="#test-results">Technical checks</a></nav></aside><main>',
         '<h1>Puptime review</h1><div id="journeys">']
     if journeys:
         parts.append('<p class="muted">Selected development journeys. Capture dates, build scopes and original results apply.</p><ol class="review-list">')
@@ -80,7 +82,7 @@ def build(root, catalog=None):
         if pending:
             parts.append(f'<details id="pending-journeys"><summary>{e(catalog.get("pending_label", "Pending journeys"))} ({len(pending)})</summary><ul>' + ''.join(f'<li>{e(title)}</li>' for title in pending) + '</ul></details>')
     else:
-        parts.append('<h2>Current footage pending</h2><p class="muted">Updated cloud-development recordings are being qualified. Earlier footage, including cloud-unavailable and trial-era screens, is kept in historical review.</p><p><a href="#historical-journeys">Browse historical review</a></p>')
+        parts.append('<h2>Current footage pending</h2><p class="muted">Qualified recordings will appear here when available.</p><p><a href="#archive">Browse evidence</a></p>')
 
     def status(data):
         return 'EXPECTED RED' if data.get('expected_failure') else 'PASS' if data['exit_code'] == 0 else 'FAILED'
@@ -95,11 +97,10 @@ def build(root, catalog=None):
 
     def recording(path, data, featured=False):
         preload = "metadata" if featured else "none"
-        poster = ' poster="first-launch-final-welcome.png"' if path.stem == '160-standalone-full-setup-and-permissions' and (root / 'first-launch-final-welcome.png').is_file() else ''
         captured = datetime.fromtimestamp(data['started_at'], timezone.utc).strftime('%Y-%m-%d UTC') if data.get('started_at') else 'date in original details'
         provenance = f'Recorded {captured}' + (' · Recorded rerun' if data.get('recorded_rerun') else '')
         out = [f'<article id="{e(path.stem)}"><h2>{e(data["title"])}</h2><p class="muted">{e(data["scope"])}</p>',
-            f'<video id="v-{e(path.stem)}" aria-label="{e(data["title"])}" controls playsinline preload="{preload}"{poster} src="{e(data["video"])}"></video>',
+            f'<video id="v-{e(path.stem)}" aria-label="{e(data["title"])}" controls playsinline preload="{preload}" src="{e(data["video"])}"></video>',
             f'<small><span class="status">{status(data)}</span> · {e(data.get("capture_kind", "Actual iOS recording"))} · {e(provenance)} · <a href="{e(data["log"])}">Test log</a> · <a href="{e(path.name)}">Details</a></small>']
         out.append(screenshots(data))
         if path.stem in notes:
@@ -131,12 +132,23 @@ def build(root, catalog=None):
 
     render_journeys(journeys)
     archived_count = len(native) - sum(1 + int(journey.get('companion') in native) for journey in journeys)
-    parts.append('</div><section><details id="archive"><summary>Archive · ' + str(archived_count) + ' historical recordings · ' + str(len(terminal)) + ' technical checks</summary><p class="muted">Earlier builds, diagnostics and focused acceptance. These captures predate the current milestone and retain their original results.</p><p><a href="#historical-journeys">Historical review</a> · <a href="#previous-captures">Browse app recordings</a> · <a href="#test-results">Search technical checks</a></p>')
-    parts.append('<section><details id="historical-journeys"><summary>Historical review (' + str(len(historical)) + ' earlier journeys)</summary><p class="muted">The former review selection includes cloud-unavailable, trial-era and older platform-specific copy. It does not demonstrate the current cloud-development contract.</p>')
-    render_journeys(historical, historical=True)
-    parts.append('</details></section><section><details id="previous-captures"><summary>More app recordings (' + str(len(previous)) + ')</summary>')
-    parts.extend(recording(*item) for item in reversed(previous))
-    parts.append('</details></section><section><details id="test-results"><summary>Technical checks (' + str(len(terminal)) + ')</summary><label for="search-results">Search checks and full output</label><input id="search-results" type="search" placeholder="Search results…"><p id="result-count" class="muted" aria-live="polite">' + str(len(terminal)) + ' checks</p>')
+    archive_title = f'Archive · {archived_count} recordings · {len(terminal)} technical checks' if archived_count else f'Technical evidence · {len(terminal)} checks'
+    archive_links = []
+    if historical:
+        archive_links.append('<a href="#historical-journeys">Historical review</a>')
+    if previous:
+        archive_links.append('<a href="#previous-captures">Browse app recordings</a>')
+    archive_links.append('<a href="#test-results">Search technical checks</a>')
+    parts.append('</div><section><details id="archive"><summary>' + archive_title + '</summary><p class="muted">Original scopes and results apply. Generated summaries identify their source and remaining checks.</p><p>' + ' · '.join(archive_links) + '</p>')
+    if historical:
+        parts.append('<section><details id="historical-journeys"><summary>Historical review (' + str(len(historical)) + ' earlier journeys)</summary><p class="muted">The former selection does not demonstrate the current cloud-development contract.</p>')
+        render_journeys(historical, historical=True)
+        parts.append('</details></section>')
+    if previous:
+        parts.append('<section><details id="previous-captures"><summary>More app recordings (' + str(len(previous)) + ')</summary>')
+        parts.extend(recording(*item) for item in reversed(previous))
+        parts.append('</details></section>')
+    parts.append('<section><details id="test-results"><summary>Technical checks (' + str(len(terminal)) + ')</summary><label for="search-results">Search checks and full output</label><input id="search-results" type="search" placeholder="Search results…"><p id="result-count" class="muted" aria-live="polite">' + str(len(terminal)) + ' checks</p>')
     available_text = {path.stem for path, _ in terminal}
     links = [f'<a href="#{e(stem)}">{e(label)}</a>' for stem, label in catalog.get('evidence_links', []) if stem in available_text]
     if links:
@@ -144,7 +156,8 @@ def build(root, catalog=None):
     for path, data in reversed(terminal):
         log_path = root / data['log']
         output = log_path.read_text(errors='replace') if log_path.is_file() else 'Original log is unavailable.'
-        parts.extend([f'<details class="result" id="{e(path.stem)}"><summary><span class="status">{status(data)}</span>{e(data["title"])}</summary><p class="muted">{e(data["scope"])}</p>',
+        kind = ' · Generated summary' if data.get('generated_summary') else ''
+        parts.extend([f'<details class="result" id="{e(path.stem)}"><summary><span class="status">{status(data)}</span>{e(data["title"])}{kind}</summary><p class="muted">{e(data["scope"])}</p>',
             f'<small><a href="{e(data["log"])}">Open log</a> · <a href="{e(path.name)}">Details</a></small>'])
         if path.stem in notes:
             parts.append(f'<p class="muted">{e(notes[path.stem])}</p>')

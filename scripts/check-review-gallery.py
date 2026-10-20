@@ -105,8 +105,13 @@ with TemporaryDirectory(prefix='puptime-gallery-check-') as folder:
     assert archive < page.index('id="historical-journeys"') < page.index('id="journey-997-app"')
     assert 'Historical · 01 · Setup' in page and 'id="journey-997-app" open' not in page
     assert page.count('<video ') == 3 and 'data-seek="7.2"' in page
+    (root / '994-summary.json').write_text(json.dumps({**metadata,
+        'title': 'Current checks', 'generated_summary': True}))
     (root / 'clip.mp4').unlink()
     builder.build(root)
     page = (root / 'index.html').read_text()
-    assert '<video ' not in page and page.count('class="result"') == 5
+    assert '<video ' not in page and page.count('class="result"') == 6
+    assert 'Current checks · Generated summary' in page
+    assert 'id="historical-journeys"' not in page and 'id="previous-captures"' not in page
+    assert 'Technical evidence · 6 checks' in page
 print('PASS: full/single/suffix/unsatisfiable/HEAD ranges; text recorder exit status; no terminal video; searchable escaped logs; compact selection, collapsed archive, provenance and reproducible output.')
