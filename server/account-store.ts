@@ -5,6 +5,7 @@ import {cloudAccess,getCloudAccount} from './entitlements';
 import {eventSqlDefinition,routineSqlDefinition,eventSqlColumns,routineSqlColumns,eventSqlValues,routineSqlValues,eventDataFromSql,routineDataFromSql,type EventSqlRow,type RoutineSqlRow} from '../src/record-sql';
 import { reconcileMutation, ReconciliationError } from '../src/cloud/reconcile';
 import { authTimestampSql } from './auth-timestamps';
+import { reportExportFailure } from './observability';
 
 const cursorSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const pageSizeSchema = z.number().int().min(1).max(100);
@@ -237,7 +238,7 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
             controller.enqueue(encoder.encode(JSON.stringify({ type: 'complete', cursor }) + '\n'));
             controller.close();
           }
-        } catch { controller.error(new Error('Export interrupted. Please retry.')); }
+        } catch(error) { reportExportFailure(error,this.env,this.ctx); controller.error(new Error('Export interrupted. Please retry.')); }
       },
     });
     return new Response(stream, { headers: {

@@ -7,6 +7,8 @@
     "@expo/ui": "57.0.25",
     "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@sentry/cloudflare": "11.8.0",
+    "@sentry/core": "11.8.0",
     "better-auth": "^1.7.10",
     "expo": "~57.0.24",
     "expo-asset": "~57.0.18",
@@ -66,7 +68,8 @@
     "test:server": "vitest run --config server/vitest.config.mts",
     "typecheck:server": "tsc --noEmit -p server/tsconfig.json",
     "dev:server": "wrangler dev",
-    "test:web": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/web/*.test.ts"
+    "test:web": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/web/*.test.ts",
+    "test:observability": "vitest run --config server/observability.vitest.config.mts"
   },
   "private": true
 }

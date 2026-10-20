@@ -5,6 +5,8 @@ declare global {
       ACCOUNTS: DurableObjectNamespace<AccountStore>;
       AUTH_DB: D1Database;
       ENVIRONMENT?: 'local' | 'staging' | 'production';
+      SENTRY_DSN?: string;
+      SENTRY_RELEASE?: string;
       AUTH_BASE_URL?: string;
       WEB_ORIGINS?: string;
       AUTH_SECRET?: string;
@@ -21,5 +23,5 @@ declare global {
 }
 
 declare module 'vitest' {
-  interface ProvidedContext { migrations: import('@cloudflare/vitest-plugin').D1Migration[]; }
+  interface ProvidedContext { migrations: import('@cloudflare/vitest-plugin').D1Migration[]; sentryTestOrigin: string; }
 }
