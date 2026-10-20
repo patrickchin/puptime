@@ -45,6 +45,13 @@ test('direct initialization is atomic and reopens without reseeding',async t=>{
   }finally{await reopened.close();}
 });
 
+test('fresh SQL initialization mints one prefixed puppy identity and retains it on reopen',async t=>{
+ const {database,path}=await setup(t),first=await initialize(database);
+ assert.match(first.petId,/^pet_[a-f0-9]{32}$/);
+ const reopened=await createLocalDatabase(sqliteTestConnection(path));
+ try {assert.deepEqual(await initialize(reopened),first);}finally{await reopened.close();}
+});
+
 test('initialization failure rolls back and retries',async t=>{
   let inject=true;
   const {database}=await setup(t,connection=>({...connection,async execAsync(sql){

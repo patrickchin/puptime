@@ -9,7 +9,7 @@ test('the local runtime shares the storage transaction and engine, retaining fre
  const db=await database();t.after(()=>db.close());let signals=0;
  assert.equal(typeof runtime.createLocalRuntime,'function');
  const local=await runtime.createLocalRuntime(db,'pet-1',()=>{signals++;});
- assert.equal(local.database,db);assert.equal(local.petId,'pet-1');assert.match(local.deviceId,/^[a-f0-9]{32}$/);
+ assert.equal(local.database,db);assert.equal(local.petId,'pet-1');assert.match(local.deviceId,/^dev_[a-f0-9]{32}$/);
  await local.storage.appendEvents([{id:'one',type:'pee',at:100,source:'app'}]);assert.equal(signals,1);
  assert.equal((await local.sync.status('pet-1')).state,'local');assert.equal((await local.sync.status('pet-1')).pending,0);
  assert.equal((await db.read(sql=>sql.getFirstAsync<{n:number}>('SELECT COUNT(*) n FROM local_revisions')))!.n,1);

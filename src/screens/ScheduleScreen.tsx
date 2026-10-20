@@ -25,8 +25,9 @@ import type { PuppyEvent } from '../domain';
 import { useLocalization } from '../localization-context';
 import { spacing, surfaceTreatment, type Theme } from '../theme';
 import { ScheduleEntryDeletedError } from '../schedule-editor';
+import { entityId } from '../entity-id';
 
-type Draft = { id?: string; type: EventType; customLabel?: string; minutes: number; reminder: boolean; toleranceMinutes?: number };
+type Draft = { id: string; type: EventType; customLabel?: string; minutes: number; reminder: boolean; toleranceMinutes?: number };
 
 export function ScheduleScreen({
   events:projectedEvents,
@@ -52,6 +53,7 @@ export function ScheduleScreen({
   const { activityColors, activityLabel, locale, t } = useLocalization();
   const [draft, setDraft] = useState<Draft | null>(null);
   const originalDraft=useRef<ScheduleEntry|undefined>(undefined);
+  const acceptedSuggestion=useRef<{entries:ScheduleEntry[];preview:ReturnType<typeof suggestScheduleFromEvents>}|null>(null);
   const [showTimeSelector, setShowTimeSelector] = useState(false);
   const [pendingRemove, setPendingRemove] = useState<ScheduleEntry | null>(null);
   const [removing, setRemoving] = useState(false);
@@ -72,6 +74,7 @@ export function ScheduleScreen({
 
   const statuses = scheduleStatusesForDay(events, schedule, new Date(now), 30, now);
   const suggestion = suggestScheduleFromEvents(events, 14, new Date(now));
+  const previewSuggestion = acceptedSuggestion.current?.preview ?? suggestion;
   const canSuggest = suggestion.entries.length > 0&&!window.loading&&!window.error;
   const completed = statuses.filter((item) => item.status === 'done').length;
   const due = statuses.filter((item) => item.status === 'due').length;
@@ -93,14 +96,14 @@ export function ScheduleScreen({
   const openNew = () => {
     const now = new Date();
     const rounded = Math.round((now.getHours() * 60 + now.getMinutes()) / 15) * 15;
-    originalDraft.current=undefined;setDraft({ type: 'pee', minutes: rounded % (24 * 60), reminder: false });
+    originalDraft.current=undefined;setDraft({ id: entityId('rtn'), type: 'pee', minutes: rounded % (24 * 60), reminder: false });
     setShowTimeSelector(false);
   };
 
   const save = async () => {
     if (!draft || saving) return;
     const entry: ScheduleEntry = {
-      id: draft.id ?? `${Date.now()}-${draft.type}`,
+      id: draft.id,
       type: draft.type,
       ...(draft.type === 'custom' ? { customLabel: draft.customLabel } : {}),
       minutes: draft.minutes,
@@ -168,10 +171,11 @@ export function ScheduleScreen({
   };
 
   const applySuggestion = async () => {
-    if (!canSuggest || applyingSuggestion) return;
+    if (!previewSuggestion.entries.length || applyingSuggestion || (!acceptedSuggestion.current && !canSuggest)) return;
     setApplyingSuggestion(true);
     try {
-      await onChange(suggestion.entries);
+      acceptedSuggestion.current ??= {preview:previewSuggestion,entries:previewSuggestion.entries.map(entry=>({...entry,id:entityId('rtn')}))};
+      await onChange(acceptedSuggestion.current.entries);
       setReviewingSuggestion(false);
     } catch {
       Alert.alert(t('schedule.suggestionErrorTitle'), t('schedule.suggestionErrorBody'));
@@ -243,7 +247,7 @@ export function ScheduleScreen({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t('schedule.previewA11y', { count: suggestion.entries.length })}
-              onPress={() => setReviewingSuggestion(true)}
+              onPress={() => { acceptedSuggestion.current=null;setReviewingSuggestion(true); }}
               style={({ pressed }) => [
                 styles.learnButton,
                 {
@@ -461,8 +465,8 @@ export function ScheduleScreen({
                 <Text style={[styles.sheetTitle, { color: theme.text }]}>{t('schedule.suggestionTitle')}</Text>
                 <Text style={[styles.previewSubtitle, { color: theme.textMuted }]}>
                   {t('schedule.suggestionSubtitle', {
-                    days: suggestion.daysAnalyzed,
-                    period: suggestion.periodDays,
+                    days: previewSuggestion.daysAnalyzed,
+                    period: previewSuggestion.periodDays,
                   })}
                 </Text>
               </View>
@@ -477,14 +481,14 @@ export function ScheduleScreen({
             </View>
 
             <View style={[styles.previewList, { borderColor: theme.border }]}>
-              {suggestion.entries.map((entry, index) => {
+              {previewSuggestion.entries.map((entry, index) => {
                 const { color, softColor: background } = activityColors(theme, entry);
                 const label = activityLabel(entry);
                 return (
                   <View
                     key={entry.id}
                     accessible
-                    accessibilityLabel={`${label}. ${t('schedule.usualWindow', { range: formatScheduleWindow(entry, locale) })}. ${t('schedule.patternDays', { count: suggestion.observedDaysByEntry[entry.id], days: suggestion.daysAnalyzed })}`}
+                    accessibilityLabel={`${label}. ${t('schedule.usualWindow', { range: formatScheduleWindow(entry, locale) })}. ${t('schedule.patternDays', { count: previewSuggestion.observedDaysByEntry[entry.id], days: previewSuggestion.daysAnalyzed })}`}
                     style={[
                       styles.previewRow,
                       index > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
@@ -499,7 +503,7 @@ export function ScheduleScreen({
                         {t('schedule.usualWindow', { range: formatScheduleWindow(entry, locale) })}
                       </Text>
                       <Text style={[styles.windowDetail, { color: theme.textMuted }]}>
-                        {t('schedule.patternDays', { count: suggestion.observedDaysByEntry[entry.id], days: suggestion.daysAnalyzed })}
+                        {t('schedule.patternDays', { count: previewSuggestion.observedDaysByEntry[entry.id], days: previewSuggestion.daysAnalyzed })}
                       </Text>
                     </View>
                   </View>

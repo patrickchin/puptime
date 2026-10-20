@@ -5,6 +5,9 @@ import { emailOTP } from 'better-auth/plugins';
 import { Resend } from 'resend';
 import { z } from 'zod';
 import { retireCloudAccount, type AppleRevocation } from './account-lifecycle';
+import { entityId, type EntityPrefix } from '../src/entity-id';
+
+const authIdPrefixes = new Map<string, EntityPrefix>([['user','usr'],['session','ses'],['account','acc'],['verification','ver'],['rateLimit','rlm']]);
 
 function emailSenderAvailable(env: Cloudflare.Env): boolean {
   const sender = z.email().safeParse(env.EMAIL_FROM);
@@ -39,7 +42,11 @@ export function createAuth(env: Cloudflare.Env, options: { disableEmailSignUp?: 
     session: { expiresIn: 60 * 60 * 24 * 30, updateAge: 60 * 60 * 24, freshAge: 60 * 10, cookieCache: { enabled: false } },
     rateLimit: { enabled: true, storage: 'database', window: 60, max: 30 },
     logger: { disabled: true },
-    advanced: { ipAddress: { ipAddressHeaders: ['cf-connecting-ip'] } },
+    advanced: { ipAddress: { ipAddressHeaders: ['cf-connecting-ip'] }, database: { generateId: ({ model }) => {
+      const prefix = authIdPrefixes.get(model);
+      if (!prefix) throw new Error(`Unknown authentication model: ${model}`);
+      return entityId(prefix);
+    } } },
     hooks: { before: createAuthMiddleware(async (context) => {
       if (!providers.email && (context.path.startsWith('/email-otp/') || context.path === '/sign-in/email-otp')) {
         throw new APIError('SERVICE_UNAVAILABLE', { message: 'Email sign-in is not configured yet.' });
@@ -55,7 +62,7 @@ export function createAuth(env: Cloudflare.Env, options: { disableEmailSignUp?: 
       async sendVerificationOTP({ email, otp }) {
         if (env.ENVIRONMENT === 'local') {
           await env.AUTH_DB.prepare('INSERT INTO local_email_previews(id, email, code, expires_at) VALUES (?, ?, ?, ?)')
-            .bind(crypto.randomUUID(), email, otp, Date.now() + 300000).run();
+            .bind(entityId('prv'), email, otp, Date.now() + 300000).run();
           return;
         }
         if (!emailSenderAvailable(env)) throw new APIError('SERVICE_UNAVAILABLE', { message: 'Email sign-in is not configured yet.' });

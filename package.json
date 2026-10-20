@@ -2,6 +2,12 @@
   "name": "puptime",
   "version": "1.11.30",
   "main": "index",
+  "imports": {
+    "#entity-id-entropy": {
+      "react-native": "./src/entity-id-entropy.native.ts",
+      "default": "./src/entity-id-entropy.ts"
+    }
+  },
   "dependencies": {
     "@better-auth/expo": "^1.7.10",
     "@expo/ui": "57.0.25",

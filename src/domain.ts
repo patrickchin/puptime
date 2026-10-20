@@ -1,3 +1,5 @@
+import { entityId } from './entity-id.ts';
+
 export const eventTypes = ['pee', 'poop', 'meal', 'pottyTrip', 'walk', 'nap', 'custom'] as const;
 
 export const quickEventTypes = ['pee', 'poop', 'meal', 'pottyTrip', 'walk', 'nap'] as const;
@@ -188,7 +190,7 @@ export function createEvent(
 ): PuppyEvent {
   const label = type === 'custom' ? normalizeCustomLabel(customLabel) : undefined;
   return {
-    id: `${at}-${Math.random().toString(36).slice(2, 9)}`,
+    id: entityId('evt'),
     type,
     at,
     ...(label ? { customLabel: label } : {}),

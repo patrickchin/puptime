@@ -169,6 +169,31 @@ test('real OTP flow creates an authenticated session and consumes the code once'
   expect(await auth.api.getSession({ headers: new Headers({ cookie }) })).toBeNull();
 });
 
+test('the real Better Auth adapter persists prefixed IDs for all five models without changing credentials',async()=>{
+ const auth=createAuth(settings),email='prefixed-ids@example.invalid';
+ expect((await auth.handler(request('email-otp/send-verification-otp',{email,type:'sign-in'}))).status).toBe(200);
+ const preview=await env.AUTH_DB.prepare('SELECT id,code FROM local_email_previews WHERE email=?').bind(email).first<{id:string;code:string}>();
+ expect(preview!.id).toMatch(/^prv_[a-f0-9]{32}$/);
+ const verification=await env.AUTH_DB.prepare('SELECT id FROM verification WHERE identifier LIKE ?').bind(`%${email}%`).first<{id:string}>();
+ expect(verification!.id).toMatch(/^ver_[a-f0-9]{32}$/);
+ const response=await auth.handler(request('sign-in/email-otp',{email,otp:preview!.code}));
+ expect(response.status).toBe(200);
+ const session=(await auth.api.getSession({headers:new Headers({cookie:cookieHeader(response)})}))!;
+ expect(session.user.id).toMatch(/^usr_[a-f0-9]{32}$/);
+ expect(session.session.id).toMatch(/^ses_[a-f0-9]{32}$/);
+ const context=await auth.$context;
+ for(const model of ['toString','constructor','unknown'])expect(()=>context.generateId({model})).toThrow('Unknown authentication model');
+ const account=await context.adapter.create({model:'account',data:{userId:session.user.id,providerId:'google',accountId:'provider-subject-preserved',createdAt:new Date(),updatedAt:new Date()}});
+ expect(account.id).toMatch(/^acc_[a-f0-9]{32}$/);
+ expect(account.accountId).toBe('provider-subject-preserved');
+ const rate=await context.adapter.create({model:'rateLimit',data:{key:'prefixed-id-test',count:1,lastRequest:Date.now()}});
+ expect(rate.id).toMatch(/^rlm_[a-f0-9]{32}$/);
+ expect(rate.key).toBe('prefixed-id-test');
+ const stored=await env.AUTH_DB.prepare('SELECT token FROM session WHERE id=?').bind(session.session.id).first<{token:string}>();
+ expect(stored!.token).toBe(session.session.token);
+ expect(stored!.token).not.toMatch(/^ses_/);
+});
+
 test('incorrect codes fail without creating a session or leaking a valid code', async () => {
   const auth = createAuth(settings);
   const email = 'otp-wrong@example.com';
