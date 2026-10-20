@@ -11,6 +11,15 @@ name: A changed log invalidates an older restoration confirmation
           retryTapIfNoChange: false
 - assertVisible:
     id: history.stale
+- assertNotVisible:
+    id: history.restore.error
+- scrollUntilVisible:
+    element:
+      id: history.reload
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
 - assertVisible:
     id: history.reload
 - assertNotVisible:

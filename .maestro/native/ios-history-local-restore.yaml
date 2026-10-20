@@ -40,8 +40,16 @@ name: Page local versions and cancel restoration without writing
 - assertVisible:
     id: history.confirm.after.note
     text: First note
+- scrollUntilVisible:
+    element:
+      id: history.confirm.cancel
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
 - tapOn:
     id: history.confirm.cancel
+    retryTapIfNoChange: false
 - assertVisible:
     id: history.panel
 - assertNotVisible:

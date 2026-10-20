@@ -105,7 +105,7 @@ export function EventHistoryPanel({data,eventId,cloud,theme,onBack,onRestored,re
   savingRef.current=true;setSaving(true);onBusyChange?.(true);setRestoreError(null);
   let committed:PuppyEvent|undefined;
   try {committed=await data.restore({eventId,selection:selected.selection,expected:selected.head});setRestored(committed);restoredRef.current=committed;setConfirm(false);}
-  catch(error){const problem=error instanceof EventHistoryError?error.category:null;setRestoreError(problem==='stale'?'history.stale':problem==='pending'?'history.pending':problem==='unsupported'?'history.unsupported':problem==='unavailable'?'history.unavailable':'history.saveError');if(problem==='stale')setChanged(true);}
+  catch(error){const problem=error instanceof EventHistoryError?error.category:null;setRestoreError(problem==='stale'?null:problem==='pending'?'history.pending':problem==='unsupported'?'history.unsupported':problem==='unavailable'?'history.unavailable':'history.saveError');if(problem==='stale')setChanged(true);}
   finally {savingRef.current=false;setSaving(false);onBusyChange?.(false);}
   if(committed)onRestored(committed);
  };
