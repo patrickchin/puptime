@@ -7,6 +7,7 @@ import { accountRoutes } from './account-routes';
 import { configuredProviders, createAuth } from './auth';
 import { trialDaysFromEnvironment } from './entitlements';
 import { callbackReauthIntent, expectedAccountSchema, lifecycleError, newReauthIntent, reauthInputSchema, reauthMode, saveReauthResponse, trustedAccountOrigin } from './account-reauth';
+import { callbackRecoveryIntent, newRecoveryIntent, recoveryIPLimit, recoveryMode, recoverySocialInput, recoveryStartLimit, recoveryUnavailable, saveRecoveryResponse } from './account-recovery';
 export { AccountStore } from './account-store';
 
 const app = new Hono<{ Bindings: Cloudflare.Env }>();
@@ -23,6 +24,25 @@ app.get('/api/config', (context) => context.json({ protocolVersion: 1, trialDays
 app.on(['GET', 'POST'], '/api/auth/*', async (context) => {
   const auth=createAuth(context.env),expected=context.req.header('x-puptime-account');
   const mode = context.req.header('x-puptime-reauth');
+  if (mode === recoveryMode) {
+    context.header('Cache-Control', 'no-store');
+    await recoveryIPLimit(context.env.AUTH_DB, context.req.raw.headers);
+    if (context.req.method !== 'POST' || context.req.path !== '/api/auth/sign-in/social' || new URL(context.req.url).searchParams.has('receipt') || !trustedAccountOrigin(context.req.raw.headers, context.env)) recoveryUnavailable();
+    const parsed = recoverySocialInput.safeParse(await context.req.raw.clone().json().catch(() => null)), owner = expectedAccountSchema.safeParse(expected);
+    if (!parsed.success || !owner.success) recoveryUnavailable();
+    const { receipt, ...input } = parsed.data;
+    const allowed = ['puptime://account', new URL(context.env.AUTH_BASE_URL!).origin + '/account'];
+    if (!allowed.includes(input.callbackURL) || input.errorCallbackURL && !allowed.includes(input.errorCallbackURL) || !configuredProviders(context.env)[input.provider]) recoveryUnavailable();
+    const session = await auth.api.getSession({ headers: context.req.raw.headers, query: { disableRefresh: true } });
+    if (session && session.user.id !== owner.data) recoveryUnavailable();
+    const intent = await newRecoveryIntent(context.env.AUTH_DB, receipt, owner.data, input.provider);
+    await recoveryStartLimit(context.env.AUTH_DB, intent, context.req.raw.headers);
+    // The raw receipt is POST-only. It never reaches SDK state/additionalData.
+    const headers = new Headers(context.req.raw.headers); headers.delete('content-length');
+    const request = new Request(context.req.raw, { headers, body: JSON.stringify(input) });
+    const response = await createAuth(context.env, { startRecovery: intent }).handler(request);
+    return saveRecoveryResponse(context.env.AUTH_DB, intent, response);
+  }
   if (mode !== undefined) {
     context.header('Cache-Control', 'no-store');
     if (mode !== reauthMode || context.req.method !== 'POST' || context.req.path !== '/api/auth/sign-in/social') lifecycleError(400, 'invalid_request');
@@ -50,7 +70,12 @@ app.on(['GET', 'POST'], '/api/auth/*', async (context) => {
       state = typeof value === 'string' ? value : null;
     }
     const intent = await callbackReauthIntent(context.env.AUTH_DB, state);
-    return createAuth(context.env, { callbackReauth: intent }).handler(context.req.raw);
+    const recovery = await callbackRecoveryIntent(context.env.AUTH_DB, state);
+    if (recovery) {
+      const session = await auth.api.getSession({ headers: context.req.raw.headers, query: { disableRefresh: true } });
+      if (session && session.user.id !== recovery.accountId) recoveryUnavailable();
+    }
+    return createAuth(context.env, { callbackReauth: intent, recovery }).handler(context.req.raw);
   }
   if(context.req.method==='POST'&&context.req.path==='/api/auth/link-social'&&expected!==undefined){
     const session=await auth.api.getSession({headers:context.req.raw.headers});
