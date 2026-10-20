@@ -48,6 +48,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
   let actions:Promise<unknown>=Promise.resolve(),refreshing:Promise<AccountActionResult>|null=null,running:Promise<void>|null=null,aborter:AbortController|null=null,cancelScheduled:(()=>void)|null=null;
   let identityPending:Promise<AccountActionResult>|null=null,exportPending:Promise<AccountActionResult>|null=null;
   let exportAborter:AbortController|null=null;
+  let refreshGeneration=0,refreshFailures=0,cancelRefreshScheduled:(()=>void)|null=null;
   const runner=createSyncRunner({sync:runtime.sync,api,petId:runtime.petId,deviceId:runtime.deviceId,sessionAccountId:()=>snapshot.account?.user.id??null,changed});
   function emit(patch:Partial<AccountSnapshot>) {
     if (disposed) return;snapshot={...snapshot,...patch};
@@ -59,6 +60,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
     emit({sync,local:{name,eventCount:count!.n}});
   }
   function cancelTimer() {cancelScheduled?.();cancelScheduled=null;}
+  function cancelRefreshRecovery(reset=true) {cancelRefreshScheduled?.();cancelRefreshScheduled=null;refreshGeneration++;refreshing=null;if(reset)refreshFailures=0;}
   function eligible() {return !disposed&&!suspended&&!associationConfirmationNeeded&&!snapshot.busy&&snapshot.active&&snapshot.online&&!!snapshot.account?.cloud.canSync&&snapshot.sync?.accountId===snapshot.account?.user.id&&snapshot.sync?.state!=='local';}
   function kick(delay=0,force=false) {
     if (!eligible()) return;
@@ -91,9 +93,12 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
     })();
   }
   async function pauseTransport() {suspended=true;rerun=false;cancelTimer();aborter?.abort();if(running)await running;}
-  function perform(action:()=>Promise<AccountActionResult>):Promise<AccountActionResult> {
+  function perform(action:()=>Promise<AccountActionResult>,refreshFence?:number):Promise<AccountActionResult> {
+    if(refreshFence===undefined)cancelRefreshRecovery();
     const result=actions.then(async()=>{
-      if(disposed)return 'error' as const;emit({busy:true,problem:null});
+      if(disposed)return 'error' as const;
+      if(refreshFence!==undefined&&refreshFence!==refreshGeneration)return 'cancelled' as const;
+      emit({busy:true,problem:null});
       try{return await action();}
       catch(error){return fail(error instanceof CloudApiError?error.category:'local-storage');}
       finally{try{await localState();}catch{fail('local-storage');}emit({busy:false});kick();}
@@ -171,15 +176,34 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
   }
   function refresh():Promise<AccountActionResult> {
     if(refreshing)return refreshing;
-    refreshing=perform(async()=>{
-      if(!snapshot.online)return fail('network');emit({config:await api.config()});await localState();
-      const loaded=await loadAccount();
-      if(loaded&&!await refreshLinkedProviders())return 'error';
-      if(loaded&&associationConfirmationNeeded&&snapshot.account?.pets.length&&snapshot.sync?.state!=='active'
-        &&(!snapshot.sync?.accountId||snapshot.sync.accountId===snapshot.account.user.id))emit({problem:'confirmation-required'});
-      return 'ok';
-    }).finally(()=>{refreshing=null;});
-    return refreshing;
+    cancelRefreshRecovery(false);const generation=refreshGeneration;
+    let failure:CloudApiError|null=null;
+    const current=()=>!disposed&&generation===refreshGeneration;
+    const request=perform(async()=>{
+      try {
+        if(!snapshot.online)return fail('network');
+        const config=await api.config();if(!current())return 'cancelled';emit({config});await localState();
+        if(!current())return 'cancelled';const loaded=await loadAccount();if(!current())return 'cancelled';
+        if(loaded&&!await refreshLinkedProviders())return 'error';
+        if(loaded&&associationConfirmationNeeded&&snapshot.account?.pets.length&&snapshot.sync?.state!=='active'
+          &&(!snapshot.sync?.accountId||snapshot.sync.accountId===snapshot.account.user.id))emit({problem:'confirmation-required'});
+        return 'ok';
+      }catch(error){
+        if(error instanceof CloudApiError&&['network','rate-limited','server-error'].includes(error.category))failure=error;
+        throw error;
+      }
+    },generation).finally(()=>{
+      if(refreshing===request)refreshing=null;
+      // Only refresh's own transient failure can recover automatically. An
+      // explicit account action invalidates this fence before it is queued.
+      if(!current())return;
+      if(!failure){refreshFailures=0;return;}
+      const retry=failure,ready=()=>current()&&snapshot.active&&snapshot.online&&snapshot.problem===retry.category;
+      if(!ready())return;
+      const delay=Math.max(retry.retryAfterMs??0,1000*2**Math.min(refreshFailures++,6));
+      cancelRefreshScheduled=defer(()=>{if(!current())return;cancelRefreshScheduled=null;if(ready())void refresh();},Math.min(60000,delay));
+    });
+    refreshing=request;return request;
   }
   async function outcome(action:()=>Promise<IdentityOutcome>):Promise<IdentityOutcome> {try{return await action();}catch{return {error:{status:0,code:'NETWORK_ERROR'}};}}
   function identityProblem(error:NonNullable<IdentityOutcome['error']>,verifying=false):AccountProblem {
@@ -351,9 +375,9 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
     });},
     // The identity action verifies its own browser return; a queued lifecycle
     // refresh would otherwise immediately erase its completion/error state.
-    setActive(active:boolean) {if(snapshot.active===active)return;emit({active});if(!active){cancelTimer();aborter?.abort();}else if(snapshot.online&&!identityPending)void refresh();},
-    setOnline(online:boolean) {if(snapshot.online===online)return;emit({online});if(!online){cancelTimer();aborter?.abort();exportAborter?.abort();}else if(snapshot.active&&!identityPending)void refresh();},
-    stop(){if(disposed)return;disposed=true;cancelTimer();aborter?.abort();exportAborter?.abort();unsubscribe();listeners.clear();},
+    setActive(active:boolean) {if(snapshot.active===active)return;emit({active});if(!active){cancelRefreshRecovery();cancelTimer();aborter?.abort();}else if(snapshot.online&&!identityPending)void refresh();},
+    setOnline(online:boolean) {if(snapshot.online===online)return;emit({online});if(!online){cancelRefreshRecovery();cancelTimer();aborter?.abort();exportAborter?.abort();}else if(snapshot.active&&!identityPending)void refresh();},
+    stop(){if(disposed)return;disposed=true;cancelRefreshRecovery();cancelTimer();aborter?.abort();exportAborter?.abort();unsubscribe();listeners.clear();},
   };
 }
 export type AccountController=ReturnType<typeof createAccountController>;
