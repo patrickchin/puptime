@@ -1,17 +1,18 @@
 # Review videos
 
-[Open the local iOS video gallery](http://127.0.0.1:8877/). Four root-reviewed current core journeys are available:
+[Open the local iOS video gallery](http://127.0.0.1:8877/). Five root-reviewed current core journeys are available:
 
 | Clip | Demonstrated journey | Scope |
 | --- | --- | --- |
 | 360 | Full setup, optional local choice, practice, first real log and timed reminder | Public Pages API configured; no owner or queued upload |
 | 361 | Actual SDK email-code sign-in with a synthetic address against the local API, retained local log, explicit upload and cold restart | Local HTTP proxy/API; SQL equality excludes OS-timer state |
 | 364 | Explicit fresh-device restore and incoming peer edit | Local HTTP proxy/API; private code entry omitted |
+| 365 | Original queued log survives offline cold restart and reconnects automatically | Fixed0472307 JS, reused157-file Debug shell, local HTTP proxy8794→8793; no Retry or foreground before SQL proof |
 | 366 | Populated history, Cancel and exactly one confirmed restore | Account-free prepared fixture with 1,001 local logs; Node-minted fixture IDs do not establish Hermes generation |
 
-All four use exact frozen `ad54af8` shared core source in a reused qualified Debug shell. They are not fresh Release builds. Capture 360 omits only `clearState` after fresh-data proof to retain its separate Metro binding. Original sidecars carry the precise provenance. A later separate UI/Expo timer readback must not be folded into clip 361’s SQL equality claim.
+Clips360/361/364/366 use exact frozen `ad54af8` shared core source in a reused qualified Debug shell. Clip365 uses the fixed `0472307` JavaScript in that qualified shell against the local HTTP proxy/API. These are not fresh Release builds. Capture 360 omits only `clearState` after fresh-data proof to retain its separate Metro binding. Original sidecars carry the precise provenance. A later separate UI/Expo timer readback must not be folded into clip 361’s SQL equality claim.
 
-Two entries remain pending: native Apple/Google SDK post-auth restarts, and offline save/process restart/reconnect after its bug fix. The older browser-SDK Google capture 363 remains historical. Neither pending native-provider qualification nor the failed offline attempt is presented as a current passing journey.
+One entry remains pending: actual native Apple/Google SDK post-auth sign-in and restart qualification. The older browser-SDK Google capture363 remains historical. Clip365 retains the original failedad54 operation through the fixed run; the original failure is retained separately. Its automatic-upload SQL proof precedes all UI inspection and includes one accepted original operation, revision1, exact echo, empty outbox and15 unchanged unrelated records.
 
 The former six-entry selection and its two companions remain under **Archive → Historical review**, collapsed by default:
 
@@ -26,7 +27,7 @@ The former six-entry selection and its two companions remain under **Archive →
 
 These are historical development captures. They include cloud-unavailable setup, a 14-day trial offer in the Apple/Google restart clips, and older platform-specific copy. They do not establish the current optional-account, explicit-upload, trial-free development contract. Dates, recorded-rerun labels, original build/service scopes, diagnostic notes and results stay visible.
 
-The catalog's `journeys` list contains only supplied, qualified clips. `pending_journeys` lists the two remaining slots without recording references. `historical_journeys` retains the six earlier entries and two companions; other unselected captures and searchable technical checks remain archived. Deep links open their enclosing disclosures automatically. No original media, sidecar, log, screenshot or chapter data was deleted or rewritten.
+The catalog's `journeys` list contains only supplied, qualified clips. `pending_journeys` lists the remaining native-provider slot without recording references. `historical_journeys` retains the six earlier entries and two companions; other unselected captures and searchable technical checks remain archived. Deep links open their enclosing disclosures automatically. No original media, sidecar, log, screenshot or chapter data was deleted or rewritten.
 
 `scripts/build-review-gallery.py` reads the checked-in `docs/review-gallery-catalog.json`: current/historical selection, descriptions, original review notes and service-evidence links. This replaces the frozen e9 builder plus ordered runtime overrides previously used to publish the gallery. The source builder and catalog reproduce the displayed page from the existing evidence directory; editing the artifact directory's legacy `build-index.py` is unnecessary. New unselected captures go into the archive. Current evidence and remaining development checks are recorded in `docs/cloud-development.md`. `docs/cloud-verification.md` is the historical ledger.
 

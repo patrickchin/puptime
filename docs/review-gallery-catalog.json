@@ -16,6 +16,11 @@
       "primary": "364-ios-current-restore-incoming"
     },
     {
+      "title": "Offline: retained log and automatic reconnect",
+      "description": "The original queued log survives an offline cold restart, then uploads automatically when only the local HTTP proxy resumes. Fixed 0472307 JavaScript in the reused qualified 157-file Debug shell; local proxy 8794 to API8793, not deployed Pages or a fresh Release build.",
+      "primary": "365-ios-current-offline-reconnect"
+    },
+    {
       "title": "History: preview, Cancel and one restore",
       "description": "A prepared synthetic fixture with 1,001 local logs: save the editor draft, preview an older version, Cancel and confirm exactly one restore. Exact ad54 shared core source in a reused qualified Debug shell; account-free local history.",
       "primary": "366-ios-current-history-restore"
@@ -59,7 +64,8 @@
     "361-ios-current-email-upload-restart": "The first explicit enable uses the retained 360 Mochi fixture after private SDK email-code verification using a local preview code and an @example.invalid address. This recording does not establish delivered email. The SQL retained-data comparison excludes OS scheduled-notification request state. A later separate UI/Expo timer readback is not part of this clip’s SQL equality claim. Corrected Details preserve that boundary.",
     "364-ios-current-restore-incoming": "Recorded on a fresh empty synthetic device. The confirmed puppy restore and incoming edit use fully paged peer revision state and complete cloud-mirror checks. This is local HTTP/proxy qualification, not a deployed-service or fresh native-build claim.",
     "366-ios-current-history-restore": "The 1,001-log prepared fixture contains 1,000 unrelated events. Cancel preserves every SQL table; one confirmed restore preserves identity, provenance and unrelated tables. Fixture IDs were minted by the Node product runtime; this capture does not establish Hermes ID generation.",
-    "363-ios-current-google-restart": "Historical browser-SDK Google restart capture. It remains archived while iOS provider integration moves to native Apple/Google SDKs; it does not qualify the pending native-provider journey."
+    "363-ios-current-google-restart": "Historical browser-SDK Google restart capture. It remains archived while iOS provider integration moves to native Apple/Google SDKs; it does not qualify the pending native-provider journey.",
+    "365-ios-current-offline-reconnect": "The same original event and operation survive the failed ad54 run and fixed 0472307 offline cold restart; every SQL table is exact before reconnect. No UI, foreground/lifecycle action or manual Retry occurs before automatic-upload SQL proof. The original operation is accepted once with revision1 and exact echo, an empty outbox and a fully paged server cursor17; 15 other records are unchanged. UI inspection follows that proof. The original failure is retained separately."
   },
   "evidence_links": [
     [
@@ -214,7 +220,6 @@
     }
   ],
   "pending_journeys": [
-    "Native Apple and Google SDK post-auth restarts — fresh-build qualification pending",
-    "Offline save, process restart and reconnect — bug fix and qualification pending"
+    "Native Apple and Google SDK post-auth restarts — actual sign-in qualification pending"
   ]
 }
