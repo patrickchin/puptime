@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CloudApiError,throwIfAborted,type CloudApi,type CloudAccountSummary,type CloudConfig,type CloudErrorCategory } from './api.ts';
+import { CloudApiError,cloudErrorCategory,retryDelay,throwIfAborted,type CloudApi,type CloudAccountSummary,type CloudConfig,type CloudErrorCategory } from './api.ts';
 import { createSyncRunner,type RunResult } from './runner.ts';
 import type { createLocalRuntime } from '../local/runtime-factory.ts';
 
@@ -11,10 +11,10 @@ export type SocialProvider='apple'|'google';
 export type CloudExportAction=(expectedAccount:string,ready:()=>Promise<boolean>,signal?:AbortSignal)=>Promise<'shared'|'cancelled'>;
 type IdentityOutcome={error:{status:number;code?:string}|null};
 type LinkedIdentity={userId:string;providerId:string};
-type IdentityListOutcome=IdentityOutcome&{data:LinkedIdentity[]|null};
+type IdentityListOutcome=IdentityOutcome&{data:LinkedIdentity[]|null;retryAfterMs?:number|null};
 export type IdentityAdapter={requestEmail:(email:string)=>Promise<IdentityOutcome>;verifyEmail:(email:string,code:string)=>Promise<IdentityOutcome>;signInSocial:(provider:SocialProvider)=>Promise<IdentityOutcome>;linkSocial:(provider:SocialProvider)=>Promise<IdentityOutcome>;listAccounts:()=>Promise<IdentityListOutcome>;signOut:()=>Promise<IdentityOutcome>;hasCredentials:()=>Promise<boolean>};
 type SocialInput={provider:SocialProvider;callbackURL:string;errorCallbackURL:string};
-type SdkIdentityClient={emailOtp:{sendVerificationOtp:(input:{email:string;type:'sign-in'})=>Promise<IdentityOutcome>};signIn:{emailOtp:(input:{email:string;otp:string})=>Promise<IdentityOutcome>;social:(input:SocialInput)=>Promise<IdentityOutcome>};linkSocial:(input:SocialInput)=>Promise<IdentityOutcome>;listAccounts:()=>Promise<IdentityOutcome&{data?:unknown}>;signOut:()=>Promise<IdentityOutcome>;getCookie:()=>Promise<string>};
+type SdkIdentityClient={emailOtp:{sendVerificationOtp:(input:{email:string;type:'sign-in'})=>Promise<IdentityOutcome>};signIn:{emailOtp:(input:{email:string;otp:string})=>Promise<IdentityOutcome>;social:(input:SocialInput)=>Promise<IdentityOutcome>};linkSocial:(input:SocialInput)=>Promise<IdentityOutcome>;listAccounts:(options?:{fetchOptions:{onResponse:(context:{response:Response})=>void}})=>Promise<IdentityOutcome&{data?:unknown}>;signOut:()=>Promise<IdentityOutcome>;getCookie:()=>Promise<string>};
 export function createIdentityAdapter(auth:SdkIdentityClient):IdentityAdapter {
   const result=(value:IdentityOutcome):IdentityOutcome=>({error:value.error?{status:value.error.status,code:value.error.code}:null});
   return {
@@ -23,7 +23,9 @@ export function createIdentityAdapter(auth:SdkIdentityClient):IdentityAdapter {
     signInSocial:provider=>auth.signIn.social({provider,callbackURL:'puptime://account',errorCallbackURL:'puptime://account'}).then(result),
     linkSocial:provider=>auth.linkSocial({provider,callbackURL:'puptime://account',errorCallbackURL:'puptime://account'}).then(result),
     listAccounts:async()=>{
-      const response=await auth.listAccounts();if(response.error)return {...result(response),data:null};
+      let retryAfterMs:number|null=null;
+      const response=await auth.listAccounts({fetchOptions:{onResponse:({response})=>{retryAfterMs=retryDelay(response.headers.get('retry-after'));}}});
+      if(response.error)return {...result(response),data:null,retryAfterMs};
       const parsed=z.array(z.object({userId:z.string().min(1),providerId:z.string().min(1)})).safeParse(response.data);
       return parsed.success?{data:parsed.data,error:null}:{data:null,error:{status:502,code:'INVALID_RESPONSE'}};
     },
@@ -163,6 +165,8 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
     try{result=await identity.listAccounts();}catch{if(!refreshCurrent(refreshFence))return false;throw new CloudApiError('network');}
     if(!await currentIdentity(fence,refreshFence)||!refreshCurrent(refreshFence))return false;
     if(result.error){
+      const {status,code}=result.error;
+      if(refreshFence!==undefined&&code!=='INVALID_RESPONSE'&&(!status||status===429||status>=500))throw new CloudApiError(status?cloudErrorCategory(status):'network',status,result.retryAfterMs??null);
       if(result.error.status===401){await pauseTransport();if(refreshCurrent(refreshFence)){emit({account:null});fail('auth-required');}}
       else fail(result.error.code==='INVALID_RESPONSE'?'invalid-response':identityProblem(result.error));
       return false;
@@ -203,7 +207,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
       // explicit account action invalidates this fence before it is queued.
       if(!current())return;
       if(!failure){refreshFailures=0;return;}
-      const retry=failure,ready=()=>current()&&snapshot.active&&snapshot.online&&snapshot.problem===retry.category;
+      const retry=failure,ready=()=>current()&&snapshot.active&&snapshot.online&&(snapshot.problem===null||['network','rate-limited','server-error'].includes(snapshot.problem));
       if(!ready())return;
       const delay=Math.max(retry.retryAfterMs??0,Math.min(60000,1000*2**Math.min(refreshFailures++,6)));
       cancelRefreshScheduled=defer(()=>{if(!current())return;cancelRefreshScheduled=null;if(ready())void refresh();},delay);

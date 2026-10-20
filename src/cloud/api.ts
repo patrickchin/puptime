@@ -57,7 +57,7 @@ export function createSdkRequest(fetchClient:(url:string,options:SdkOptions)=>Pr
     return {...result,retryAfter};
   };
 }
-function retryDelay(value:string|null|undefined):number|null {
+export function retryDelay(value:string|null|undefined):number|null {
   if (!value) return null;
   const milliseconds=/^\d+$/.test(value)?Number(value)*1000:Date.parse(value)-Date.now();
   // Keep server-requested delays within the signed 32-bit timer range.

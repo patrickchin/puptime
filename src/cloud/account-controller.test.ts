@@ -373,6 +373,53 @@ for(const endpoint of ['config','account'] as const)test(`the installed SDK ${en
  assert.deepEqual(await localTables(runtime),before);
 });
 
+for(const status of [0,503] as const)test(`refresh recovers a returned provider-list ${status} error without replaying identity actions`,async t=>{
+ const {controller,runtime,state,identity,timers}=await fixture(t);state.credentials=true;await runtime.storage.appendEvents([event]);const before=await localTables(runtime);
+ let unavailable=true,calls=0;identity.listAccounts=async()=>{calls++;return unavailable?{data:null,error:{status}}:{data:[{userId:'account-1',providerId:'google'}],error:null};};
+ controller.setActive(true);assert.equal(await controller.refresh(),'error');assert.equal(controller.read().problem,status?'server-error':'network');
+ assert.equal(timers.filter(task=>!task.cancelled)[0]?.delay,1000);unavailable=false;await fireTimer(timers);
+ assert.deepEqual(controller.read().linkedProviders,['google']);assert.equal(calls,2);assert.equal(timers.filter(task=>!task.cancelled).length,0);
+ assert.deepEqual(await localTables(runtime),before);assert.equal(state.enrollCalls,0);assert.equal(state.linkCalls,0);assert.equal(state.verifications,0);
+});
+
+test('a successful sync cannot discard the captured provider-list refresh recovery',async t=>{
+ const {controller,runtime,state,api,identity,timers}=await fixture(t);state.credentials=true;await enrollLocal(runtime);
+ let unavailable=true,calls=0,sequence=0;
+ identity.listAccounts=async()=>{calls++;return unavailable?{data:null,error:{status:503}}:{data:[{userId:'account-1',providerId:'google'}],error:null};};
+ api.push=async mutations=>pushResponseSchema.parse({accepted:mutations.map(mutation=>{
+  const result=reconcileMutation(null,mutation,1000);return {operationId:mutation.operationId,record:{...result.record,revision:1,sequence:++sequence},sequence,reason:result.reason};
+ }),rejected:[]});
+ controller.setActive(true);assert.equal(await controller.refresh(),'error');
+ const sync=timers.find(task=>!task.cancelled&&task.delay===0)!;assert.ok(sync);sync.cancelled=true;sync.fn();await tick();
+ assert.equal(controller.read().run?.state,'synced');assert.equal(controller.read().problem,null);assert.equal(controller.read().linkedProviders,null);
+ unavailable=false;await fireTimer(timers);assert.deepEqual(controller.read().linkedProviders,['google']);assert.equal(calls,2);
+ assert.equal((await runtime.sync.status(runtime.petId)).pending,0);assert.equal(state.enrollCalls,0);
+});
+
+for(const response of [429,503,401,'invalid'] as const)test(`the installed SDK provider-list ${response} response preserves refresh retry scope and header timing`,async t=>{
+ const {controller,runtime,state,identity,timers}=await fixture(t);state.credentials=true;await runtime.storage.appendEvents([event]);const before=await localTables(runtime);
+ let unavailable=true,calls=0;
+ const auth=createAuthClient({baseURL:'https://puptime.test',fetchOptions:{retry:0,customFetchImpl:async(input,init)=>{
+  const request=new Request(input,init);assert.equal(request.url,'https://puptime.test/api/auth/list-accounts');assert.equal(request.method,'GET');calls++;
+  if(unavailable&&response!=='invalid')return Response.json({code:'TEST_ERROR',message:'Private server detail'},{status:response,headers:{'retry-after':'120'}});
+  return Response.json(unavailable?[{providerId:'google'}]:[]);
+ }}});
+ const unused=async()=>({error:null});
+ identity.listAccounts=controllerModule.createIdentityAdapter({emailOtp:{sendVerificationOtp:unused},signIn:{emailOtp:unused,social:unused},linkSocial:unused,listAccounts:auth.listAccounts,signOut:unused,getCookie:async()=>''}).listAccounts;
+ controller.setActive(true);assert.equal(await controller.refresh(),'error');
+ if(response===401||response==='invalid'){
+  assert.equal(controller.read().problem,response===401?'auth-required':'invalid-response');assert.equal(timers.filter(task=>!task.cancelled).length,0);assert.equal(calls,1);
+ }else{
+  assert.equal(controller.read().problem,response===429?'rate-limited':'server-error');assert.equal(timers.filter(task=>!task.cancelled)[0]?.delay,120000);
+  unavailable=false;await fireTimer(timers);assert.deepEqual(controller.read().linkedProviders,[]);assert.equal(calls,2);
+  let links=0;identity.linkSocial=async()=>{links++;unavailable=true;return {error:null};};
+  assert.equal(await controller.connectProvider('google'),'error');const problem=response===429?'too-many-attempts':'server-error';
+  assert.equal(controller.read().problem,problem);assert.equal(links,1);assert.equal(timers.filter(task=>!task.cancelled).length,0);
+  const after=calls;await tick();assert.equal(calls,after);assert.equal(links,1);assert.equal(controller.read().problem,problem);
+ }
+ assert.deepEqual(await localTables(runtime),before);assert.equal(state.enrollCalls,0);assert.equal(state.pushCalls,0);
+});
+
 for(const fault of [new CloudApiError('auth-required',401),new CloudApiError('forbidden',403),new CloudApiError('invalid-response'),new Error('local failure')])test(`refresh does not retry terminal ${fault.message} failure`,async t=>{
  const {controller,runtime,state,api,timers}=await fixture(t);state.credentials=true;await enrollLocal(runtime);await runtime.storage.appendEvents([event]);const before=await localTables(runtime);
  api.account=async()=>{throw fault;};controller.setActive(true);await controller.refresh();
