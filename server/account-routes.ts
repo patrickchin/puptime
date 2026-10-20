@@ -4,10 +4,12 @@ import { validator } from 'hono/validator';
 import { z } from 'zod';
 import { enrollmentSchema, mutationSchema, recordIdSchema } from '../src/cloud/protocol';
 import { getAccountStore, type AccountStore } from './account-store';
-import { createAuth } from './auth';
+import { configuredProviders, createAuth } from './auth';
 import { deleteCloudAccount, deletionReceiptSchema, deletionReceiptStatus, prepareDeletionReceipt, recentAuthentication } from './account-lifecycle';
 import { expectedAccountSchema, lifecycleError, trustedAccountOrigin } from './account-reauth';
 import { activateTrial, cloudAccess, getCloudAccount, trialDaysFromEnvironment, type CloudAccess, type CloudAccount } from './entitlements';
+import { emailRecoveryIntent, newRecoveryIntent, recoveryCancelInput, recoveryIPLimit, recoveryLimit, recoveryReceiptInput, recoveryStartLimit, recoveryUnavailable, recoveryVerifyInput, saveRecoveryIntent } from './account-recovery';
+import { hashCapability } from './account-reauth';
 
 type AccountEnv = { Bindings: Cloudflare.Env; Variables: {
   user: { id: string; email: string; name: string }; sessionCreatedAt: number; sessionId: string;
@@ -21,6 +23,50 @@ const pushSchema = z.strictObject({ mutations: z.array(mutationSchema).min(1).ma
 const afterSchema = z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 
 export const accountRoutes = new Hono<AccountEnv>();
+accountRoutes.use('/account/recovery/*', async (context, next) => {
+  context.header('Cache-Control', 'no-store');
+  if (new URL(context.req.url).searchParams.has('receipt') || !trustedAccountOrigin(context.req.raw.headers, context.env)) recoveryUnavailable();
+  await recoveryIPLimit(context.env.AUTH_DB, context.req.raw.headers);
+  await next();
+});
+async function recoveryExpected(context: Context<AccountEnv>) {
+  const expected = expectedAccountSchema.safeParse(context.req.header('x-puptime-account'));
+  if (!expected.success) recoveryUnavailable();
+  const session = await createAuth(context.env).api.getSession({ headers: context.req.raw.headers, query: { disableRefresh: true } });
+  if (session && session.user.id !== expected.data) recoveryUnavailable();
+  return expected.data;
+}
+accountRoutes.post('/account/recovery/email/start', async context => {
+  const input = recoveryReceiptInput.safeParse(await context.req.json().catch(() => null));
+  if (!input.success || !configuredProviders(context.env).email) recoveryUnavailable();
+  const expected = await recoveryExpected(context), intent = await newRecoveryIntent(context.env.AUTH_DB, input.data.receipt, expected, 'email');
+  await recoveryStartLimit(context.env.AUTH_DB, intent, context.req.raw.headers);
+  await saveRecoveryIntent(context.env.AUTH_DB, intent);
+  const response = await createAuth(context.env, { recovery: intent }).api.sendVerificationOTP({ headers: context.req.raw.headers, body: { email: intent.identity, type: 'sign-in' }, asResponse: true });
+  if (!response.ok) { await context.env.AUTH_DB.prepare('DELETE FROM account_recovery_intents WHERE id=?').bind(intent.id).run(); recoveryUnavailable(); }
+  return context.json({ success: true, recoveryIntentId: intent.id });
+});
+accountRoutes.post('/account/recovery/email/verify', async context => {
+  const input = recoveryVerifyInput.safeParse(await context.req.json().catch(() => null));
+  if (!input.success || !configuredProviders(context.env).email) recoveryUnavailable();
+  const expected = await recoveryExpected(context), intent = await emailRecoveryIntent(context.env.AUTH_DB, input.data.intentId, input.data.receipt, expected);
+  await recoveryLimit(context.env.AUTH_DB, [
+    { key: 'verify-owner:' + await hashCapability(expected), limit: 10, window: 300000 },
+    { key: 'verify-receipt:' + intent.receiptHash, limit: 10, window: 300000 },
+  ]);
+  const response = await createAuth(context.env, { recovery: intent }).api.signInEmailOTP({ headers: context.req.raw.headers, body: { email: intent.identity, otp: input.data.otp }, asResponse: true });
+  if (!response.ok) recoveryUnavailable();
+  const headers = new Headers(response.headers); headers.set('cache-control', 'no-store');
+  return new Response(response.body, { status: response.status, headers });
+});
+accountRoutes.post('/account/recovery/cancel', async context => {
+  const input = recoveryCancelInput.safeParse(await context.req.json().catch(() => null));
+  if (!input.success) recoveryUnavailable();
+  const expected = await recoveryExpected(context);
+  await context.env.AUTH_DB.prepare('DELETE FROM account_recovery_intents WHERE id=? AND receipt_hash=? AND account_id=?')
+    .bind(input.data.intentId, await hashCapability(input.data.receipt), expected).run();
+  return context.json({ success: true });
+});
 const authenticated = createMiddleware<AccountEnv>(async (context, next) => {
   context.header('Cache-Control', 'no-store');
   if (!['GET', 'HEAD', 'OPTIONS'].includes(context.req.method)) {

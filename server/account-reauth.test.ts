@@ -282,7 +282,7 @@ test('expired receipt and intent never strand a deleting original owner or auto-
   await env.AUTH_DB.prepare('UPDATE account_deletion_receipts SET created_at=0,expires_at=1 WHERE receipt_hash=?').bind(await hashCapability(oldReceipt.receipt)).run();
   await env.AUTH_DB.prepare('UPDATE session SET createdAt=? WHERE id=?').bind(new Date(Date.now() - 86400000).toISOString(), a.session.id).run();
   const expiredFlow = await begin(a); await env.AUTH_DB.prepare('UPDATE account_reauth_intents SET created_at=0,expires_at=1 WHERE id=?').bind(expiredFlow.id).run(); await reply(a);
-  expect((await callback(expiredFlow, a.provider)).location?.searchParams.get('error')).toBeTruthy(); expect(await (await status(oldReceipt.receipt)).json()).toEqual({ status: 'unknown' });
+  expect((await callback(expiredFlow, a.provider)).location?.searchParams.get('error')).toBeTruthy(); expect(await (await status(oldReceipt.receipt)).json()).toEqual({ status: 'pending' });
   expect((await call('account/deletion/prepare', {}, { cookie: a.cookie, headers: { 'x-puptime-account': a.user.id } })).status).toBe(401);
   const newFlow = await begin(a), refreshed = await callback(newFlow, a.provider); expect(refreshed.location?.href).toBe(base + '/account'); const recovered = { ...a, cookie: cookies(refreshed.response) };
   expect((await call('account/export', undefined, { cookie: recovered.cookie })).status).toBe(410); expect((await call('cloud/trial', {}, { cookie: recovered.cookie })).status).toBe(410);

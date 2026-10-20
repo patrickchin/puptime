@@ -62,17 +62,21 @@ requires recent authentication, so cancellation cannot turn a stale session fres
    DELETE, create an account or enroll a puppy automatically.
 
 Receipts contain 32 random bytes, appear only in request/response bodies, and are
-stored as hashes server-side. They expire after thirty days, with at most five
-unexpired receipts retained per owner. A fresh authenticated preparation can
+stored as hashes server-side. Unused preparations expire after thirty days;
+started proofs retain their owner binding while that user exists, and completed
+status remains for thirty days from completion. At most five usable receipts are
+retained per owner. A fresh authenticated preparation can
 replace the oldest unstarted, lease-free preparation when full, so lost responses
 cannot consume every slot. Replacement and insertion share one atomic transaction.
 A replaced unstarted receipt reports `unknown` and cannot confirm deletion; save
 the newly prepared receipt before a new explicit confirmation. Started proofs and
 their leases are never displaced to free capacity. If all five have started, use
 an existing saved receipt with fresh authentication for the confirmed retry;
-preparation remains bounded. Recovery after the original source session expires
-or is revoked remains a separate release gate; this provider flow still requires
-a live source session. Status receipts can confirm a completed deletion without one.
+preparation remains bounded. This provider mode still requires a live source
+session. The separate [receipt-bound recovery server contract](account-recovery-server-verification.md)
+supports original-owner proof without one; its native integration and real
+provider/email acceptance remain separate gates. Status receipts can confirm a
+completed deletion without authentication.
 The bounded non-content receipt row deliberately has
 no user foreign key so a successful user deletion cannot erase its status proof.
 It retains no email, provider subject, credential, raw receipt or OAuth state.
