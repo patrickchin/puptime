@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import test,{type TestContext} from 'node:test';
+import {createAuthClient} from 'better-auth/react';
 import { createLocalDatabase,initializeLocalDatabase } from '../local/database.ts';
 import { sqliteTestConnection } from '../local/sqlite-test-adapter.ts';
 import { createLocalRuntime } from '../local/runtime-factory.ts';
-import { CloudApiError,type CloudApi,type CloudAccountSummary } from './api.ts';
-import type {Revision} from './protocol.ts';
+import { CloudApiError,createCloudApi,createSdkRequest,type CloudApi,type CloudAccountSummary } from './api.ts';
+import {pushResponseSchema,type Revision} from './protocol.ts';
+import { reconcileMutation } from './reconcile.ts';
 import * as controllerModule from './account-controller.ts';
 const event={id:'one',type:'pee' as const,at:100,source:'app' as const};
 async function fixture(t:TestContext,{pristine=false,exportCloud}:{pristine?:boolean;exportCloud?:controllerModule.CloudExportAction}={}) {
@@ -349,6 +351,219 @@ test('a different signed-in account never reassigns or uploads the old queue',as
 });
 
 const tick=()=>new Promise<void>(resolve=>setImmediate(resolve));
+async function fireTimer(timers:Array<{fn:()=>void;delay:number;cancelled:boolean}>) {
+ const pending=timers.filter(task=>!task.cancelled);assert.equal(pending.length,1);
+ pending[0].cancelled=true;pending[0].fn();await tick();return pending[0];
+}
+for(const endpoint of ['config','account'] as const)test(`cold-start ${endpoint} outage recovers automatically and drains the original pending operations once`,async t=>{
+ const {controller,runtime,state,api,timers}=await fixture(t);state.credentials=true;
+ const owner=await enrollLocal(runtime);await runtime.storage.appendEvents([event]);
+ const pending=await runtime.sync.nextBatch(owner);assert.ok(pending.length>0);
+ const before=await localTables(runtime);let unavailable=true;
+ if(endpoint==='config'){const original=api.config;api.config=async()=>{if(unavailable)throw new CloudApiError('network');return original();};}
+ else {const original=api.account;api.account=async()=>{if(unavailable)throw new CloudApiError('network');return original();};}
+ const sent:string[]=[];let sequence=0;
+ api.push=async mutations=>{state.pushCalls++;return pushResponseSchema.parse({accepted:mutations.map(mutation=>{
+  sent.push(mutation.operationId);const result=reconcileMutation(null,mutation,1000);
+  return {operationId:mutation.operationId,record:{...result.record,revision:1,sequence:++sequence},sequence,reason:result.reason};
+ }),rejected:[]});};
+ controller.setActive(true);assert.equal(await controller.refresh(),'error');
+ assert.equal(controller.read().account,null);assert.deepEqual(await localTables(runtime),before);
+ const recovery=timers.filter(task=>!task.cancelled);assert.equal(recovery.length,1);
+ unavailable=false;recovery[0].cancelled=true;recovery[0].fn();await tick();
+ for(let i=0;i<50&&controller.read().busy;i++)await tick();
+ assert.equal(controller.read().account?.user.id,'account-1');
+ const sync=timers.filter(task=>!task.cancelled);assert.equal(sync.length,1);
+ sync[0].cancelled=true;sync[0].fn();for(let i=0;i<50&&controller.read().running;i++)await tick();
+ assert.deepEqual(sent,pending.map(mutation=>mutation.operationId));assert.equal(new Set(sent).size,sent.length);
+ assert.equal((await runtime.sync.status(runtime.petId)).pending,0);assert.deepEqual(await runtime.storage.loadEvents(),[event]);
+ assert.equal(state.enrollCalls,0);assert.equal(state.signOutCalls,0);assert.equal(state.credentials,true);
+ assert.equal(timers.filter(task=>!task.cancelled).length,0);
+});
+
+for(const [fault,delays] of [
+ [new CloudApiError('network'),[1000,2000,4000,8000,16000,32000,60000,60000]],
+ [new CloudApiError('server-error',503),[1000,2000]],
+ [new CloudApiError('rate-limited',429,45000),[45000,45000]],
+ [new CloudApiError('rate-limited',429,120000),[120000,120000]],
+] as const)test(`refresh recovery backs off ${fault.category}/${fault.retryAfterMs} and respects the retry cap`,async t=>{
+ const {controller,runtime,state,api,timers}=await fixture(t);state.credentials=true;const original=api.config;
+ await runtime.storage.appendEvents([event]);const before=await localTables(runtime);
+ api.config=async()=>{throw fault;};controller.setActive(true);await controller.refresh();
+ for(const delay of delays){assert.equal(timers.filter(task=>!task.cancelled)[0]?.delay,delay);await fireTimer(timers);}
+ api.config=original;await fireTimer(timers);assert.equal(controller.read().account?.user.id,'account-1');
+ assert.equal(timers.filter(task=>!task.cancelled).length,0);
+ assert.deepEqual(await localTables(runtime),before);assert.equal(state.enrollCalls,0);assert.equal(state.pushCalls,0);
+ api.config=async()=>{throw new CloudApiError('network');};await controller.refresh();
+ assert.equal(timers.filter(task=>!task.cancelled)[0]?.delay,1000);
+});
+
+for(const endpoint of ['config','account'] as const)test(`the installed SDK ${endpoint} Retry-After header reaches the automatic recovery timer unchanged`,async t=>{
+ const {controller,runtime,state,config,api,timers}=await fixture(t);state.credentials=true;await runtime.storage.appendEvents([event]);
+ const before=await localTables(runtime),requests:string[]=[];let unavailable=true;
+ const auth=createAuthClient({baseURL:'https://puptime.test',fetchOptions:{customFetchImpl:async(input,init)=>{
+  const request=new Request(input,init),path=new URL(request.url).pathname;requests.push(path);assert.equal(new URL(request.url).origin,'https://puptime.test');
+  if(path===`/api/${endpoint}`&&unavailable)return new Response(JSON.stringify({code:'RATE_LIMITED',message:'Private server detail'}),{status:429,headers:{'content-type':'application/json','retry-after':'120'}});
+  return Response.json(path==='/api/config'?config:state.summary);
+ }}});
+ const cloud=createCloudApi(createSdkRequest((url,options)=>auth.$fetch(url,options),'https://puptime.test'));
+ api.config=cloud.config;api.account=cloud.account;
+ controller.setActive(true);assert.equal(await controller.refresh(),'error');assert.equal(controller.read().problem,'rate-limited');
+ assert.equal(timers.filter(task=>!task.cancelled)[0]?.delay,120000);
+ assert.deepEqual(requests,endpoint==='config'?['/api/config']:['/api/config','/api/account']);
+ assert.deepEqual(await localTables(runtime),before);
+ unavailable=false;await fireTimer(timers);assert.equal(controller.read().account?.user.id,'account-1');
+ assert.equal(timers.filter(task=>!task.cancelled).length,0);assert.equal(state.enrollCalls,0);assert.equal(state.pushCalls,0);
+ assert.deepEqual(await localTables(runtime),before);
+});
+
+for(const status of [0,503] as const)test(`refresh recovers a returned provider-list ${status} error without replaying identity actions`,async t=>{
+ const {controller,runtime,state,identity,timers}=await fixture(t);state.credentials=true;await runtime.storage.appendEvents([event]);const before=await localTables(runtime);
+ let unavailable=true,calls=0;identity.listAccounts=async()=>{calls++;return unavailable?{data:null,error:{status}}:{data:[{userId:'account-1',providerId:'google'}],error:null};};
+ controller.setActive(true);assert.equal(await controller.refresh(),'error');assert.equal(controller.read().problem,status?'server-error':'network');
+ assert.equal(timers.filter(task=>!task.cancelled)[0]?.delay,1000);unavailable=false;await fireTimer(timers);
+ assert.deepEqual(controller.read().linkedProviders,['google']);assert.equal(calls,2);assert.equal(timers.filter(task=>!task.cancelled).length,0);
+ assert.deepEqual(await localTables(runtime),before);assert.equal(state.enrollCalls,0);assert.equal(state.linkCalls,0);assert.equal(state.verifications,0);
+});
+
+test('a successful sync cannot discard the captured provider-list refresh recovery',async t=>{
+ const {controller,runtime,state,api,identity,timers}=await fixture(t);state.credentials=true;await enrollLocal(runtime);
+ let unavailable=true,calls=0,sequence=0;
+ identity.listAccounts=async()=>{calls++;return unavailable?{data:null,error:{status:503}}:{data:[{userId:'account-1',providerId:'google'}],error:null};};
+ api.push=async mutations=>pushResponseSchema.parse({accepted:mutations.map(mutation=>{
+  const result=reconcileMutation(null,mutation,1000);return {operationId:mutation.operationId,record:{...result.record,revision:1,sequence:++sequence},sequence,reason:result.reason};
+ }),rejected:[]});
+ controller.setActive(true);assert.equal(await controller.refresh(),'error');
+ const sync=timers.find(task=>!task.cancelled&&task.delay===0)!;assert.ok(sync);sync.cancelled=true;sync.fn();await tick();
+ assert.equal(controller.read().run?.state,'synced');assert.equal(controller.read().problem,null);assert.equal(controller.read().linkedProviders,null);
+ unavailable=false;await fireTimer(timers);assert.deepEqual(controller.read().linkedProviders,['google']);assert.equal(calls,2);
+ assert.equal((await runtime.sync.status(runtime.petId)).pending,0);assert.equal(state.enrollCalls,0);
+});
+
+for(const response of [429,503,401,'invalid'] as const)test(`the installed SDK provider-list ${response} response preserves refresh retry scope and header timing`,async t=>{
+ const {controller,runtime,state,identity,timers}=await fixture(t);state.credentials=true;await runtime.storage.appendEvents([event]);const before=await localTables(runtime);
+ let unavailable=true,calls=0;
+ const auth=createAuthClient({baseURL:'https://puptime.test',fetchOptions:{retry:0,customFetchImpl:async(input,init)=>{
+  const request=new Request(input,init);assert.equal(request.url,'https://puptime.test/api/auth/list-accounts');assert.equal(request.method,'GET');calls++;
+  if(unavailable&&response!=='invalid')return Response.json({code:'TEST_ERROR',message:'Private server detail'},{status:response,headers:{'retry-after':'120'}});
+  return Response.json(unavailable?[{providerId:'google'}]:[]);
+ }}});
+ const unused=async()=>({error:null});
+ identity.listAccounts=controllerModule.createIdentityAdapter({emailOtp:{sendVerificationOtp:unused},signIn:{emailOtp:unused,social:unused},linkSocial:unused,listAccounts:auth.listAccounts,signOut:unused,getCookie:async()=>''}).listAccounts;
+ controller.setActive(true);assert.equal(await controller.refresh(),'error');
+ if(response===401||response==='invalid'){
+  assert.equal(controller.read().problem,response===401?'auth-required':'invalid-response');assert.equal(timers.filter(task=>!task.cancelled).length,0);assert.equal(calls,1);
+ }else{
+  assert.equal(controller.read().problem,response===429?'rate-limited':'server-error');assert.equal(timers.filter(task=>!task.cancelled)[0]?.delay,120000);
+  unavailable=false;await fireTimer(timers);assert.deepEqual(controller.read().linkedProviders,[]);assert.equal(calls,2);
+  let links=0;identity.linkSocial=async()=>{links++;unavailable=true;return {error:null};};
+  assert.equal(await controller.connectProvider('google'),'error');const problem=response===429?'too-many-attempts':'server-error';
+  assert.equal(controller.read().problem,problem);assert.equal(links,1);assert.equal(timers.filter(task=>!task.cancelled).length,0);
+  const after=calls;await tick();assert.equal(calls,after);assert.equal(links,1);assert.equal(controller.read().problem,problem);
+ }
+ assert.deepEqual(await localTables(runtime),before);assert.equal(state.enrollCalls,0);assert.equal(state.pushCalls,0);
+});
+
+for(const fault of [new CloudApiError('auth-required',401),new CloudApiError('forbidden',403),new CloudApiError('invalid-response'),new Error('local failure')])test(`refresh does not retry terminal ${fault.message} failure`,async t=>{
+ const {controller,runtime,state,api,timers}=await fixture(t);state.credentials=true;await enrollLocal(runtime);await runtime.storage.appendEvents([event]);const before=await localTables(runtime);
+ api.account=async()=>{throw fault;};controller.setActive(true);await controller.refresh();
+ assert.equal(timers.filter(task=>!task.cancelled).length,0);assert.deepEqual(await localTables(runtime),before);
+ assert.equal(controller.read().problem,fault instanceof CloudApiError?fault.category:'local-storage');
+ assert.equal(state.credentials,true);assert.equal(state.enrollCalls,0);assert.equal(state.pushCalls,0);
+});
+
+test('a refresh retry coalesces concurrent refreshes and ignores its already-fired callback',async t=>{
+ const {controller,state,api,timers}=await fixture(t);state.credentials=true;const config=await api.config();
+ api.config=async()=>{throw new CloudApiError('network');};controller.setActive(true);await controller.refresh();
+ let release!:(value:typeof config)=>void,entered!:()=>void,calls=0;const started=new Promise<void>(resolve=>{entered=resolve;});
+ api.config=()=>{calls++;entered();return new Promise(resolve=>{release=resolve;});};
+ const pending=timers.find(task=>!task.cancelled)!;pending.cancelled=true;pending.fn();await started;pending.fn();
+ const first=controller.refresh();assert.equal(controller.refresh(),first);release(config);assert.equal(await first,'ok');
+ assert.equal(calls,1);assert.equal(timers.filter(task=>!task.cancelled).length,0);
+});
+
+for(const change of ['background','offline','dispose'] as const)test(`refresh recovery cancels and fences stale callbacks on ${change}`,async t=>{
+ const {controller,state,api,timers}=await fixture(t);state.credentials=true;const original=api.config;let calls=0;
+ api.config=async()=>{calls++;throw new CloudApiError('network');};controller.setActive(true);await controller.refresh();
+ const pending=timers.find(task=>!task.cancelled)!;assert.ok(pending);
+ if(change==='background')controller.setActive(false);if(change==='offline')controller.setOnline(false);if(change==='dispose')controller.stop();
+ assert.equal(pending.cancelled,true);pending.fn();await tick();assert.equal(calls,1);
+ assert.equal(timers.filter(task=>!task.cancelled).length,0);
+ if(change!=='dispose'){
+  api.config=original;if(change==='background')controller.setActive(true);else controller.setOnline(true);
+  await tick();assert.equal(controller.read().account?.user.id,'account-1');assert.equal(timers.filter(task=>!task.cancelled).length,0);
+ }
+});
+
+for(const action of ['email','link','enable','sign-out','export'] as const)test(`an explicit ${action} action cancels refresh recovery without replaying or hiding its result`,async t=>{
+ let exports=0;
+ const {controller,runtime,state,api,identity,timers}=await fixture(t,{exportCloud:async()=>{exports++;throw new Error('export failure');}});
+ state.credentials=action!=='email';controller.setActive(true);await controller.refresh();const before=await localTables(runtime);
+ api.config=async()=>{throw new CloudApiError('network');};await controller.refresh();const pending=timers.find(task=>!task.cancelled)!;assert.ok(pending);
+ let calls=0,expected:string;
+ if(action==='email'){identity.requestEmail=async()=>{calls++;throw new Error('lost reply');};expected='network';await controller.requestEmail('person@example.com');}
+ else if(action==='link'){identity.linkSocial=async()=>{calls++;throw new Error('lost reply');};expected='network';await controller.connectProvider('google');}
+ else if(action==='enable'){api.account=async()=>{calls++;throw new CloudApiError('forbidden',403);};expected='forbidden';await controller.enableCloud({});}
+ else if(action==='sign-out'){state.signOutFails=true;state.storageFails=true;expected='sign-out-failed';await controller.signOut({confirmPending:true});calls=state.signOutCalls;}
+ else {expected='export-failed';await controller.exportData();calls=exports;}
+ assert.equal(calls,1);assert.equal(pending.cancelled,true);assert.equal(controller.read().problem,expected);
+ pending.fn();await tick();assert.equal(controller.read().problem,expected);assert.equal(timers.filter(task=>!task.cancelled).length,0);
+ assert.equal(calls,1);if(action==='sign-out')assert.equal(state.signOutCalls,1);if(action==='export')assert.equal(exports,1);
+ assert.deepEqual(await localTables(runtime),before);assert.equal(state.enrollCalls,0);assert.equal(state.pushCalls,0);
+});
+
+test('a sync access denial supersedes a pending refresh retry without losing pending work',async t=>{
+ const {controller,runtime,state,api,timers}=await fixture(t);state.credentials=true;await enrollLocal(runtime);await runtime.storage.appendEvents([event]);
+ controller.setActive(true);await controller.refresh();let configCalls=0;
+ api.config=async()=>{configCalls++;throw new CloudApiError('network');};await controller.refresh();
+ const recovery=timers.find(task=>!task.cancelled&&task.delay>0)!;assert.ok(recovery);
+ state.summary.cloud.canSync=false;const sync=timers.find(task=>!task.cancelled&&task.delay===0)!;sync.cancelled=true;sync.fn();await tick();
+ assert.equal(controller.read().problem,'forbidden');assert.ok((await runtime.sync.status(runtime.petId)).pending>0);
+ recovery.cancelled=true;recovery.fn();await tick();assert.equal(configCalls,1);assert.equal(controller.read().problem,'forbidden');
+ assert.equal(timers.filter(task=>!task.cancelled).length,0);
+});
+
+test('a queued recovery invalidated by an account action makes no request and preserves the action error',async t=>{
+ const {controller,api,timers}=await fixture(t);let calls=0;
+ api.config=async()=>{calls++;throw new CloudApiError('network');};controller.setActive(true);await controller.refresh();
+ const pending=timers.find(task=>!task.cancelled)!;pending.cancelled=true;pending.fn();
+ assert.equal(await controller.requestEmail('invalid'),'error');await tick();
+ assert.equal(calls,1);assert.equal(controller.read().problem,'invalid-email');assert.equal(timers.filter(task=>!task.cancelled).length,0);
+});
+
+test('an in-flight recovery invalidated by an account action cannot load the account or schedule another retry',async t=>{
+ const {controller,api,timers}=await fixture(t);const config=await api.config();
+ api.config=async()=>{throw new CloudApiError('network');};controller.setActive(true);await controller.refresh();
+ let release!:(value:typeof config)=>void,entered!:()=>void;const started=new Promise<void>(resolve=>{entered=resolve;});let accountCalls=0;
+ api.config=()=>{entered();return new Promise(resolve=>{release=resolve;});};api.account=async()=>{accountCalls++;throw new Error('stale account read');};
+ const pending=timers.find(task=>!task.cancelled)!;pending.cancelled=true;pending.fn();await started;
+ const action=controller.requestEmail('invalid');release(config);assert.equal(await action,'error');await tick();
+ assert.equal(accountCalls,0);assert.equal(controller.read().problem,'invalid-email');assert.equal(timers.filter(task=>!task.cancelled).length,0);
+});
+
+for(const response of ['success','auth-required'] as const)test(`an invalidated refresh ignores a deferred account ${response} response before publishing identity`,async t=>{
+ const {controller,state,api,timers}=await fixture(t);state.credentials=true;controller.setActive(true);await controller.refresh();
+ const account=structuredClone(controller.read().account),config=await api.config();
+ api.config=async()=>{throw new CloudApiError('network');};await controller.refresh();api.config=async()=>config;
+ let release!:()=>void,entered!:()=>void;const started=new Promise<void>(resolve=>{entered=resolve;});
+ api.account=()=>{entered();return new Promise((resolve,reject)=>{release=()=>response==='success'?resolve({...state.summary,user:{...state.summary.user,id:'replacement-user'}}):reject(new CloudApiError('auth-required',401));});};
+ const pending=timers.find(task=>!task.cancelled)!;pending.cancelled=true;pending.fn();await started;const listCalls=state.listCalls;
+ const action=controller.requestEmail('invalid');release();assert.equal(await action,'error');await tick();
+ assert.deepEqual(controller.read().account,account);assert.equal(state.listCalls,listCalls);
+ assert.equal(controller.read().problem,'invalid-email');assert.equal(timers.filter(task=>!task.cancelled).length,0);
+});
+
+for(const response of ['success','auth-required'] as const)test(`an invalidated refresh ignores a deferred provider ${response} response before publishing identity`,async t=>{
+ const {controller,state,api,identity,timers}=await fixture(t);state.credentials=true;controller.setActive(true);await controller.refresh();
+ const account=structuredClone(controller.read().account),config=await api.config();
+ api.config=async()=>{throw new CloudApiError('network');};await controller.refresh();api.config=async()=>config;
+ let release!:()=>void,entered!:()=>void;const started=new Promise<void>(resolve=>{entered=resolve;});
+ identity.listAccounts=()=>{entered();return new Promise(resolve=>{release=()=>resolve(response==='success'?{data:[{userId:'account-1',providerId:'google'}],error:null}:{data:null,error:{status:401}});});};
+ const pending=timers.find(task=>!task.cancelled)!;pending.cancelled=true;pending.fn();await started;
+ assert.equal(controller.read().linkedProviders,null);const action=controller.requestEmail('invalid');release();assert.equal(await action,'error');await tick();
+ assert.deepEqual(controller.read().account,account);assert.equal(controller.read().linkedProviders,null);
+ assert.equal(controller.read().problem,'invalid-email');assert.equal(timers.filter(task=>!task.cancelled).length,0);
+});
 test('foreground work coalesces local commits and stops timers on background, disconnection and disposal',async t=>{
  const {controller,runtime,state,timers}=await fixture(t);state.credentials=true;state.summary.cloud={canSync:true,canExport:true};await enrollLocal(runtime);await controller.refresh();
  controller.setActive(true);await controller.refresh();assert.equal(timers.filter(task=>!task.cancelled).length,1);
