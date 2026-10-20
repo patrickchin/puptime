@@ -14,8 +14,9 @@ import {createSyncRunner} from '../src/cloud/runner.ts';
 import {cloudRecordId} from '../src/cloud/record-identity.ts';
 const mode=process.argv[2]??'local';assert.ok(['local','staging'].includes(mode));
 const local=mode==='local'?JSON.parse(readFileSync(process.env.PUPTIME_CLOUD_STATE_FILE??'/tmp/puptime-native-cloud-state.json','utf8')):null;
-const base=local?.url??'https://puptime-api-staging.p-ch.workers.dev';
-assert.equal(base,mode==='local'?'http://127.0.0.1:8793':'https://puptime-api-staging.p-ch.workers.dev');
+const base=mode==='local'?local?.url:process.env.PUPTIME_STAGING_ORIGIN??'https://puptime.pages.dev';
+if(mode==='local')assert.equal(base,'http://127.0.0.1:8793');
+else assert.ok(['https://puptime.pages.dev','https://puptime-api-staging.p-ch.workers.dev'].includes(base),'PUPTIME_STAGING_ORIGIN must be an approved Puptime staging origin.');
 const origin=mode==='local'?base:'https://puptime.pages.dev';
 const secret=mode==='local'?readFileSync(join(local.directory,'.dev.vars'),'utf8').match(/^AUTH_SECRET=(.+)$/m)?.[1]:process.env.PUPTIME_STAGING_AUTH_SECRET;
 assert.ok(secret?.length>=32,'Supply the private staging auth secret through the environment.');
@@ -36,11 +37,23 @@ async function fixture(){
  sql(`INSERT INTO user(id,name,email,emailVerified,createdAt,updatedAt) VALUES ('${id}','HTTP qualification','${id}@example.invalid',1,'${now}','${now}');`);
  await issueSession(owner);return owner;
 }
+function reportTransportFailure(phase,path,started,error,status=null){
+ const route=path.startsWith('/api/records/')?'/api/records/:id/history':path.split('?')[0];
+ const routes=['/api/config','/api/account','/api/account/export','/api/cloud/enroll','/api/sync/push','/api/sync/pull','/api/records/:id/history'];
+ const names=['Error','TypeError','SyntaxError','AbortError','TimeoutError','AggregateError'];
+ const codes=['ENOTFOUND','EAI_AGAIN','ECONNREFUSED','ECONNRESET','ETIMEDOUT','EHOSTUNREACH','ENETUNREACH','EPIPE','UND_ERR_CONNECT_TIMEOUT','UND_ERR_HEADERS_TIMEOUT','UND_ERR_BODY_TIMEOUT','UND_ERR_SOCKET','UND_ERR_ABORTED','ABORT_ERR','ERR_TLS_CERT_ALTNAME_INVALID','CERT_HAS_EXPIRED','UNABLE_TO_VERIFY_LEAF_SIGNATURE','DEPTH_ZERO_SELF_SIGNED_CERT'];
+ const code=error?.cause?.code??error?.code;
+ console.error('Cloud qualification transport failure:',JSON.stringify({phase,route:routes.includes(route)?route:'other',elapsedMs:Math.max(0,Date.now()-started),status,errorName:names.includes(error?.name)?error.name:'OtherError',causeCode:codes.includes(code)?code:null}));
+}
 async function response(owner,path,{method='GET',body,signal}={}){
- return fetch(base+path,{method,headers:{origin,cookie:owner.cookie,...(body?{'content-type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{}),redirect:'error',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(15000)]):AbortSignal.timeout(15000)});
+ const started=Date.now();
+ try{return await fetch(base+path,{method,headers:{origin,cookie:owner.cookie,...(body?{'content-type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{}),redirect:'error',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(15000)]):AbortSignal.timeout(15000)});}
+ catch(error){reportTransportFailure('fetch',path,started,error);throw error;}
 }
 function transport(owner){let count=0;const api=createCloudApi(async(path,options)=>{
- count++;const result=await response(owner,path,options);return {data:await result.json(),error:result.ok?null:{status:result.status},retryAfter:result.headers.get('retry-after')};
+ count++;const started=Date.now(),result=await response(owner,path,options);let data;
+ try{data=await result.json();}catch(error){reportTransportFailure('json',path,started,error,result.status);throw error;}
+ return {data,error:result.ok?null:{status:result.status},retryAfter:result.headers.get('retry-after')};
  });return {api,get calls(){return count;}};}
 async function until(check,message){for(let i=0;i<150;i++){if(check())return;await new Promise(resolve=>setTimeout(resolve,100));}assert.fail(message);}
 async function channel(owner){
