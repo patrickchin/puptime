@@ -46,9 +46,19 @@ test('push enforces count and escaped UTF8 byte limits before dispatch and valid
 test('API errors preserve actionable status and bounded retry timing without retaining server contents',async()=>{
  for (const [status,category] of [[401,'auth-required'],[402,'invalid-request'],[403,'forbidden'],[409,'conflict'],[410,'account-deleted'],[429,'rate-limited'],[503,'server-error']] as const) {
   try {await client(async()=>({data:null,error:{status,message:'PRIVATE note token'},retryAfter:'120'})).account();assert.fail('must reject');}
-  catch(error) {assert.ok(error instanceof api.CloudApiError);assert.equal(error.status,status);assert.equal(error.category,category);assert.equal(error.retryAfterMs,60000);assert.ok(!JSON.stringify(error).includes('PRIVATE'));assert.ok(!String(error).includes('PRIVATE'));}
+  catch(error) {assert.ok(error instanceof api.CloudApiError);assert.equal(error.status,status);assert.equal(error.category,category);assert.equal(error.retryAfterMs,120000);assert.ok(!JSON.stringify(error).includes('PRIVATE'));assert.ok(!String(error).includes('PRIVATE'));}
  }
  await assert.rejects(client(async()=>{throw new Error('SECRET transport message');}).account(),error=>error instanceof api.CloudApiError&&error.category==='network'&&!String(error).includes('SECRET'));
+});
+
+test('Retry-After preserves seconds and HTTP dates up to the platform-safe timer bound',async t=>{
+ const now=Date.UTC(2026,9,20,12);t.mock.method(Date,'now',()=>now);
+ for(const [header,expected] of [
+  ['120',120000],[new Date(now+120000).toUTCString(),120000],
+  ['0',0],[new Date(now-120000).toUTCString(),0],
+  ['2147483648',2147483647],[new Date(now+2147484000).toUTCString(),2147483647],
+  ['not-a-date',null],['9'.repeat(400),null],
+ ] as const)await assert.rejects(client(async()=>({data:null,error:{status:429},retryAfter:header})).config(),error=>error instanceof api.CloudApiError&&error.retryAfterMs===expected);
 });
 
 test('aborted calls never dispatch and late responses cannot become usable account results',async()=>{
