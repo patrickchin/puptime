@@ -54,6 +54,7 @@ addEventListener('hashchange', revealHash); revealHash();
 def build(root, catalog=None):
     catalog = json.loads(CATALOG.read_text()) if catalog is None else catalog
     notes = catalog.get("review_notes", {})
+    pending = catalog.get("pending_journeys", [])
     e = html.escape
     items = []
     for path in root.glob('*.json'):
@@ -76,6 +77,8 @@ def build(root, catalog=None):
         parts.append('<p class="muted">Selected development journeys. Capture dates, build scopes and original results apply.</p><ol class="review-list">')
         parts.extend(f'<li><a href="#journey-{e(journey["primary"])}">{e(journey["title"])}</a></li>' for journey in journeys)
         parts.append('</ol>')
+        if pending:
+            parts.append(f'<details id="pending-journeys"><summary>Pending journeys ({len(pending)})</summary><ul>' + ''.join(f'<li>{e(title)}</li>' for title in pending) + '</ul></details>')
     else:
         parts.append('<h2>Current footage pending</h2><p class="muted">Updated cloud-development recordings are being qualified. Earlier footage, including cloud-unavailable and trial-era screens, is kept in historical review.</p><p><a href="#historical-journeys">Browse historical review</a></p>')
 
