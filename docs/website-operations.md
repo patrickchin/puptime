@@ -16,6 +16,10 @@ Run `npm run build:web`, `npm run test:web`, `npm run typecheck`, and `npm run t
 
 The `.node-version` file pins the shared Pages/CI runtime. The SEO build script uses Node's native TypeScript support; older Pages defaults such as Node 22.16 cannot execute it.
 
+## Marketing page checks
+
+After `npm run build:web`, run `PUPTIME_PLAYWRIGHT_MODULE=/absolute/path/to/playwright PUPTIME_CHROMIUM_EXECUTABLE=/absolute/path/to/chromium node scripts/verify-web-marketing.mjs`. This serves the static export on a temporary localhost port and blocks external requests. It verifies real wheel and PageDown scrolling, footer reachability, back-to-top and product anchors, title wrapping, preview controls, and care-library scrolling at desktop and phone widths. Screenshots and results go to `output/playwright/web-marketing/`. Full-page screenshots and clicks that automatically scroll elements into view do not prove that ordinary page scrolling works.
+
 ## Search
 
 The build renders the homepage, care library, and all 13 guides to HTML, including article text, headings, source links, titles, descriptions, canonical URLs, Open Graph/Twitter metadata, and JSON-LD. It generates `/sitemap.xml` and `/robots.txt`. Previously shared `/#puppy-care/...` links redirect in the browser to the corresponding clean URL. A top-level `404.html` prevents nonexistent pages from falling back to a successful homepage response. Preview hosts have `X-Robots-Tag: noindex`.
