@@ -4,14 +4,13 @@ History is a secondary editor action. Settings → Recent changes also finds
 deleted logs. Both native clients use the same UI and guarded local/cloud APIs;
 Android runtime verification is deferred.
 
-The product UI is adapted from PR106's final `5b65ccfd` source. Its old observer
-workflow, service harnesses, gallery changes and CI changes are excluded. In
-particular, its earlier native Reload failure is not claimed resolved by this
-port. The maintained flow requires a single Reload tap to reach the actual list.
+The shared UI uses the existing guarded history API. The maintained flow
+requires a single Reload tap to reach the actual list; a failed selector or a
+visible button alone does not establish that transition.
 
-## Pending iOS qualification
+## Repeatable iOS qualification
 
-Use a dedicated history simulator after the account/sync driver is released.
+Use a dedicated history simulator with exclusive native-driver ownership.
 Seed a clearly marked disposable fixture through the existing local runtime:
 1,000 unrelated events, an edited custom event with over 50 revisions, and one
 deleted custom event. Retain a database backup and capture all tables before
@@ -39,6 +38,40 @@ Their variables describe synthetic rows and contain no credentials.
 The candidate passed 379 Node tests, including guarded SQL restoration, bounded
 100,000-revision reads and three real-component dictation callback regressions.
 Default, iOS and Android TypeScript resolution checks passed. These are source
-and SQL checks; native history UI, restoration and populated-row render proof are
-still pending. The microphone tests use native event/permission stubs and do not
-claim actual microphone or OS permission verification.
+and SQL checks. The microphone tests use native event/permission stubs and do
+not claim actual microphone or OS permission verification.
+
+## Native checkpoint — October 20, 2026
+
+Frozen source `5612af66` passed local pagination/cancellation, draft persistence,
+stale rejection and one-tap Reload, deleted restoration, and target-only SQL
+failure/rollback followed by one successful retry. Each read-only or rejected
+action preserved every SQL table. The fixture contained 1,000 unrelated logs.
+An opt-in render probe on a separate fixture confirmed all 199 unrelated mounted
+rows kept identical counters while opening, paging, selecting, cancelling and
+rejecting a stale restoration. The functional journeys also ran without that
+probe.
+
+Actual local SDK email sign-in and explicit enrollment preceded cloud history
+checks. The UI paged 56 cloud versions and cancelled without writes. An online
+restore created one operation/revision and converged on an independent SQLite
+client. During an actual proxy outage, a cached restore and new log retained the
+same two pending payloads through process death; reconnect accepted each once,
+converging on 1,003 logs. These checks used the local service, not a new external
+provider sign-in or a native connection to the deployed backend.
+
+Source `c726c8a` reduced stale rejection to one announced warning and made the
+manual flows scroll to offscreen recovery controls. A small-screen test then
+reproduced a blank confirmation when system text size changed live; opening at
+the largest size worked. Source `d92d912` refreshes only the native history
+viewport on font-scale changes. The same failing sequence now retains the
+selected version and one warning, displays the body/header correctly, and
+reaches the list after one Reload tap, with every SQL table unchanged. iOS and
+Android static types passed again. Failed earlier runs and visibility-helper
+false negatives remain recorded separately.
+
+These native checks reused a compatible Debug shell with exact frozen Metro
+sources; they do not establish a fresh build for each source. Fresh iOS Release
+CI and its standard app flows are separate checks. Android runtime, external
+provider authentication, delayed microphone permission and review videos are
+not established by this history checkpoint.
