@@ -116,22 +116,59 @@ test('Apple default verification accepts only the configured Service ID/native b
   }
 });
 
-test('native Apple ID-token linking uses the authenticated owner without implicit linking or cloud enrollment',async()=>{
- const auth=createAuth(socialSettings),email='native-apple-link@example.invalid';
+test('Google native ID tokens use the configured server audience and default signature/issuer/expiry verification',async()=>{
+ const auth=createAuth(socialSettings),{privateKey,publicKey}=await generateKeyPair('RS256',{extractable:true});
+ const jwk={...await exportJWK(publicKey),alg:'RS256',kid:'native-google-key',use:'sig'};
+ vi.spyOn(globalThis,'fetch').mockImplementation(async input=>{expect(String(input)).toBe('https://www.googleapis.com/oauth2/v3/certs');return Response.json({keys:[jwk]});});
+ const sign=(changes:Record<string,unknown>={},key=privateKey)=>new SignJWT({sub:'native-google-subject',email:'native-google-token@example.invalid',email_verified:true,name:'Synthetic Google user',iss:'https://accounts.google.com',aud:socialSettings.GOOGLE_CLIENT_ID,iat:Math.floor(Date.now()/1000),exp:Math.floor(Date.now()/1000)+300,...changes}).setProtectedHeader({alg:'RS256',kid:jwk.kid}).sign(key);
+ const valid=await auth.handler(request('sign-in/social',{provider:'google',idToken:{token:await sign()}},undefined,socialClientIP()));expect(valid.status).toBe(200);
+ const owner=await auth.api.getSession({headers:new Headers({cookie:cookieHeader(valid)})});expect(owner?.user.email).toBe('native-google-token@example.invalid');expect((await env.AUTH_DB.prepare('SELECT * FROM cloud_accounts WHERE account_id=?').bind(owner!.user.id).all()).results).toEqual([]);
+ for(const changes of [{aud:'untrusted-ios.apps.googleusercontent.com'},{iss:'https://untrusted.example'},{exp:Math.floor(Date.now()/1000)-120},{iat:Math.floor(Date.now()/1000)-7200}]){
+  const rejected=await auth.handler(request('sign-in/social',{provider:'google',idToken:{token:await sign(changes)}},undefined,socialClientIP()));expect(rejected.status).toBe(401);expect(rejected.headers.get('set-cookie')).toBeNull();
+ }
+ for(const token of ['not-a-jwt',await sign({},(await generateKeyPair('RS256')).privateKey)]){
+  const rejected=await auth.handler(request('sign-in/social',{provider:'google',idToken:{token}},undefined,socialClientIP()));expect(rejected.status).toBe(401);expect(rejected.headers.get('set-cookie')).toBeNull();
+ }
+});
+
+test.each(['apple','google'] as const)('native %s ID-token linking uses the authenticated owner without implicit linking or cloud enrollment',async provider=>{
+ const auth=createAuth(socialSettings),email=`native-${provider}-link@example.invalid`;
  await auth.handler(request('email-otp/send-verification-otp',{email,type:'sign-in'}));
  const preview=await env.AUTH_DB.prepare('SELECT code FROM local_email_previews WHERE email=?').bind(email).first<{code:string}>();
  const login=await auth.handler(request('sign-in/email-otp',{email,otp:preview!.code})),cookie=cookieHeader(login),owner=await auth.api.getSession({headers:new Headers({cookie})});
- const {privateKey,publicKey}=await generateKeyPair('RS256',{extractable:true}),jwk={...await exportJWK(publicKey),alg:'RS256',kid:'native-link-key',use:'sig'};
- vi.spyOn(globalThis,'fetch').mockImplementation(async input=>{expect(String(input)).toBe('https://appleid.apple.com/auth/keys');return Response.json({keys:[jwk]});});
- const token=await new SignJWT({email,email_verified:true,nonce:'link-nonce'}).setSubject('native-link-subject').setIssuer('https://appleid.apple.com').setAudience('com.patrickchin.puptime').setIssuedAt().setExpirationTime('5m').setProtectedHeader({alg:'RS256',kid:jwk.kid}).sign(privateKey);
- const linked=await auth.handler(request('link-social',{provider:'apple',idToken:{token,nonce:'link-nonce'},callbackURL:'puptime://account'},cookie,socialClientIP()));
+ const subject=`native-${provider}-link-subject`,{privateKey,publicKey}=await generateKeyPair('RS256',{extractable:true}),jwk={...await exportJWK(publicKey),alg:'RS256',kid:`native-${provider}-link-key`,use:'sig'};
+ vi.spyOn(globalThis,'fetch').mockImplementation(async input=>{expect(String(input)).toBe(provider==='apple'?'https://appleid.apple.com/auth/keys':'https://www.googleapis.com/oauth2/v3/certs');return Response.json({keys:[jwk]});});
+ const token=await new SignJWT({email,email_verified:true,nonce:'link-nonce'}).setSubject(subject).setIssuer(provider==='apple'?'https://appleid.apple.com':'https://accounts.google.com').setAudience(provider==='apple'?'com.patrickchin.puptime':socialSettings.GOOGLE_CLIENT_ID).setIssuedAt().setExpirationTime('5m').setProtectedHeader({alg:'RS256',kid:jwk.kid}).sign(privateKey);
+ const linked=await auth.handler(request('link-social',{provider,idToken:{token,nonce:'link-nonce'},callbackURL:'puptime://account'},cookie,socialClientIP()));
  expect(linked.status).toBe(200);
- const row=await env.AUTH_DB.prepare("SELECT userId,accountId FROM account WHERE providerId='apple' AND accountId=?").bind('native-link-subject').first();
- expect(row).toEqual({userId:owner!.user.id,accountId:'native-link-subject'});
+ const row=await env.AUTH_DB.prepare('SELECT userId,accountId FROM account WHERE providerId=? AND accountId=?').bind(provider,subject).first();
+ expect(row).toEqual({userId:owner!.user.id,accountId:subject});
  expect((await auth.api.getSession({headers:new Headers({cookie})}))?.user.id).toBe(owner!.user.id);
  expect((await env.AUTH_DB.prepare('SELECT * FROM cloud_accounts WHERE account_id=?').bind(owner!.user.id).all()).results).toEqual([]);
- const anonymous=await auth.handler(request('link-social',{provider:'apple',idToken:{token,nonce:'link-nonce'}},undefined,socialClientIP()));
+ const anonymous=await auth.handler(request('link-social',{provider,idToken:{token,nonce:'link-nonce'}},undefined,socialClientIP()));
  expect(anonymous.status).toBe(401);
+});
+
+test.each(['apple','google'] as const)('native %s cannot implicitly claim an existing email or move a linked identity to another owner',async provider=>{
+ const auth=createAuth(socialSettings),email=`native-${provider}-protected@example.invalid`;
+ async function emailSession(value:string){
+  await auth.handler(request('email-otp/send-verification-otp',{email:value,type:'sign-in'}));
+  const preview=await env.AUTH_DB.prepare('SELECT code FROM local_email_previews WHERE email=?').bind(value).first<{code:string}>();
+  const response=await auth.handler(request('sign-in/email-otp',{email:value,otp:preview!.code}));expect(response.status).toBe(200);
+  const cookie=cookieHeader(response),session=await auth.api.getSession({headers:new Headers({cookie})});return {cookie,id:session!.user.id};
+ }
+ const first=await emailSession(email),other=await emailSession(`native-${provider}-other@example.invalid`);
+ const subject=`native-${provider}-protected-subject`,{privateKey,publicKey}=await generateKeyPair('RS256',{extractable:true}),jwk={...await exportJWK(publicKey),alg:'RS256',kid:`${provider}-protected-key`,use:'sig'};
+ vi.spyOn(globalThis,'fetch').mockImplementation(async input=>{expect(String(input)).toBe(provider==='apple'?'https://appleid.apple.com/auth/keys':'https://www.googleapis.com/oauth2/v3/certs');return Response.json({keys:[jwk]});});
+ const token=await new SignJWT({email,email_verified:true,nonce:'protected-nonce'}).setSubject(subject).setIssuer(provider==='apple'?'https://appleid.apple.com':'https://accounts.google.com').setAudience(provider==='apple'?'com.patrickchin.puptime':socialSettings.GOOGLE_CLIENT_ID).setIssuedAt().setExpirationTime('5m').setProtectedHeader({alg:'RS256',kid:jwk.kid}).sign(privateKey);
+ const body={provider,idToken:{token,nonce:'protected-nonce'}};
+ const implicit=await auth.handler(request('sign-in/social',body,undefined,socialClientIP()));expect(implicit.status).toBe(401);expect(implicit.headers.get('set-cookie')).toBeNull();
+ expect(await env.AUTH_DB.prepare('SELECT * FROM account WHERE providerId=? AND accountId=?').bind(provider,subject).first()).toBeNull();
+ const explicit=await auth.handler(request('link-social',body,first.cookie,socialClientIP()));expect(explicit.status).toBe(200);
+ const moved=await auth.handler(request('link-social',body,other.cookie,socialClientIP()));expect(moved.status).toBe(409);expect(await moved.json()).toMatchObject({code:'SOCIAL_ACCOUNT_ALREADY_LINKED'});
+ expect(await env.AUTH_DB.prepare('SELECT userId FROM account WHERE providerId=? AND accountId=?').bind(provider,subject).first()).toEqual({userId:first.id});
+ expect((await auth.api.getSession({headers:new Headers({cookie:other.cookie})}))?.user.id).toBe(other.id);
+ for(const owner of [first.id,other.id])expect((await env.AUTH_DB.prepare('SELECT * FROM cloud_accounts WHERE account_id=?').bind(owner).all()).results).toEqual([]);
 });
 
 test.each(['apple', 'google'] as const)('%s browser callback cannot implicitly link an existing email account', async (provider) => {

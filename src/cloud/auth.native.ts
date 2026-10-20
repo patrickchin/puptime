@@ -7,6 +7,8 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
 import { Platform } from 'react-native';
 import { requestAppleIdToken } from './apple-native';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { createGoogleIdTokenRequest } from './google-native';
 import { cloudBaseUrl, createCloudApi, createSdkRequest } from './api';
 import { createChangeOpener } from './change-subscription';
 import { createIdentityAdapter } from './account-controller';
@@ -29,5 +31,7 @@ export function createNativeCloudClient() {
     sha256:nonce=>Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256,nonce),
     signIn:nonce=>AppleAuthentication.signInAsync({nonce,requestedScopes:[AppleAuthentication.AppleAuthenticationScope.FULL_NAME,AppleAuthentication.AppleAuthenticationScope.EMAIL]}),
   }):undefined;
-  return {identity:createIdentityAdapter(auth,{appleIdToken}),api,origin,exportCloud:createNativeCloudExport(createCloudExportRequest((url,options)=>auth.$fetch<unknown>(url,options),origin)),openChanges:createChangeOpener({origin,getCookie:async()=>auth.getCookie(),createSocket:(url,options)=>new NativeSocket(url,[],options)})};
+  const googleIdToken=Platform.OS==='ios'?createGoogleIdTokenRequest(GoogleSignin):undefined;
+  const nativeSignOut=Platform.OS==='ios'?async()=>{await GoogleSignin.signOut();if(GoogleSignin.hasPreviousSignIn())throw new Error('Google sign-out did not complete.');}:undefined;
+  return {identity:createIdentityAdapter(auth,{appleIdToken,googleIdToken,nativeSignOut}),api,origin,exportCloud:createNativeCloudExport(createCloudExportRequest((url,options)=>auth.$fetch<unknown>(url,options),origin)),openChanges:createChangeOpener({origin,getCookie:async()=>auth.getCookie(),createSocket:(url,options)=>new NativeSocket(url,[],options)})};
 }
