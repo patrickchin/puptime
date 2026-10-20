@@ -243,12 +243,41 @@ name: iOS side navigation and notification preferences
     direction: DOWN
     visibilityPercentage: 100
     centerElement: false
+- waitForAnimationToEnd
 - tapOn:
     id: nav.settings
+- extendedWaitUntil:
+    notVisible:
+      id: nav.close
+    timeout: 10000
+- assertVisible:
+    id: screen.settings
+- scrollUntilVisible:
+    element:
+      id: settings.language.open
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
 - tapOn:
     id: settings.language.open
+- extendedWaitUntil:
+    visible:
+      id: appearance.close
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: appearance.language.es
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
 - tapOn:
     id: appearance.language.es
+- extendedWaitUntil:
+    notVisible:
+      id: appearance.close
+    timeout: 10000
 - assertVisible:
     id: screen.settings
 - tapOn:
@@ -289,12 +318,43 @@ name: iOS side navigation and notification preferences
     direction: DOWN
     visibilityPercentage: 100
     centerElement: false
+- waitForAnimationToEnd
 - tapOn:
     id: nav.settings
+- extendedWaitUntil:
+    notVisible:
+      id: nav.close
+    timeout: 10000
+- assertVisible:
+    id: screen.settings
+- scrollUntilVisible:
+    element:
+      id: settings.language.open
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
 - tapOn:
     id: settings.language.open
+- extendedWaitUntil:
+    visible:
+      id: appearance.close
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: appearance.language.en
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+- waitForAnimationToEnd
 - tapOn:
     id: appearance.language.en
+- extendedWaitUntil:
+    notVisible:
+      id: appearance.close
+    timeout: 10000
+- assertVisible:
+    id: screen.settings
 - tapOn:
     id: settings.back
 - tapOn:
@@ -305,7 +365,14 @@ name: iOS side navigation and notification preferences
     direction: DOWN
     visibilityPercentage: 100
     centerElement: false
+- assertVisible:
+    id: nav.notifications
+    text: Notifications
 - tapOn:
     id: nav.notifications
+- extendedWaitUntil:
+    notVisible:
+      id: nav.close
+    timeout: 10000
 - assertVisible:
     id: screen.notifications
