@@ -64,7 +64,7 @@ test('cloud history preserves cancellation and actionable failures without retai
  const cloud=createCloudApi(async()=>{calls++;return {data:{revisions:[]},error:null};});assert.equal(typeof cloud.history,'function');
  await assert.rejects(cloud.history(id,undefined,aborted.signal),/abort/i);assert.equal(calls,0);
  const late=new AbortController();const delayed=createCloudApi(async()=>{late.abort();return {data:{revisions:[first]},error:null};});await assert.rejects(delayed.history(id,undefined,late.signal),/abort/i);
- for(const [status,category] of [[401,'auth-required'],[402,'expired'],[403,'forbidden'],[429,'rate-limited']] as const){
+ for(const [status,category] of [[401,'auth-required'],[402,'invalid-request'],[403,'forbidden'],[429,'rate-limited']] as const){
   const failed=createCloudApi(async()=>({data:{private:'PRIVATE NOTE'},error:{status},retryAfter:'2'}));
   await assert.rejects(failed.history(id),error=>error instanceof CloudApiError&&error.category===category&&error.retryAfterMs===2000&&!String(error).includes('PRIVATE'));
  }

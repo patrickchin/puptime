@@ -12,8 +12,8 @@ import {sqliteTestConnection} from '../src/local/sqlite-test-adapter.ts';
 import {createLocalRuntime} from '../src/local/runtime-factory.ts';
 import {cloudRecordId} from '../src/cloud/record-identity.ts';
 const [phase,udid]=process.argv.slice(2),app='com.patrickchin.puptime';
-assert.ok(['first-launch-local-recovered','first-launch-local-fallback','first-launch-restore-request','first-launch-restore-verify','first-launch-restore','first-launch-request','first-launch-verify','first-launch-enable','request','verify','auth-faults','rate-limited','enable','resume','outage','preview','combine','signout','access-recovery','auto-expiry','enrollment-race'].includes(phase),'Use a supported native cloud qualification phase.');
-const state=JSON.parse(readFileSync('/tmp/puptime-native-cloud-state.json','utf8'));
+assert.ok(['first-launch-local-recovered','first-launch-local-fallback','first-launch-restore-request','first-launch-restore-verify','first-launch-restore','first-launch-request','first-launch-verify','first-launch-enable','request','verify','auth-faults','rate-limited','enable','resume','outage','preview','combine','signout','access-recovery','enrollment-race'].includes(phase),'Use a supported native cloud qualification phase.');
+const state=JSON.parse(readFileSync(process.env.PUPTIME_CLOUD_STATE_FILE??'/tmp/puptime-native-cloud-state.json','utf8'));
 assert.ok(basename(state.directory).startsWith('puptime-native-cloud-'));assert.equal(state.url,'http://127.0.0.1:8793');
 const simctl=(...args)=>execFileSync('xcrun',['simctl',...args],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
 const devices=Object.values(JSON.parse(simctl('list','devices','available','-j')).devices).flat();
@@ -65,6 +65,7 @@ async function fixtureCookie(){
   await post('/api/auth/email-otp/send-verification-otp',{email:context.email,type:'sign-in'});
   code=database.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(context.email).code;
   const login=await post('/api/auth/sign-in/email-otp',{email:context.email,otp:code});
+  assert.equal((await login.json()).user.id,context.userId,'Fixture reauthentication must retain the original owner.');
   const cookie=login.headers.getSetCookie().map(value=>value.split(';')[0]).join('; ');
   assert.ok(cookie);return cookie;
 }
@@ -82,8 +83,7 @@ async function verifyLocalRecovery(native){
  flow('ios-first-launch-offline-recovered.yaml');assert.deepEqual(snapshot(),before,'Reconnect never silently changes the explicit local choice.');
  const cookie=await fixtureCookie(),summary=await (await fetch(state.url+'/api/account',{headers:{cookie,origin:state.url}})).json();
  assert.equal(summary.user.id,context.userId);assert.equal(summary.pets[0].eventCount,1);
- assert.deepEqual({...database.prepare('SELECT trial_started_at,trial_ends_at FROM cloud_accounts WHERE account_id=?').get(context.userId)},context.trial);
- console.log('PASS recovered service retains SDK sign-in but never silently re-enrolls/uploads the local choice; every local table, cloud copy and original trial stay intact.');
+ console.log('PASS recovered service retains SDK sign-in but never silently re-enrolls/uploads the local choice; every local table and cloud copy stay intact.');
 }
 try{
  if(phase==='first-launch-local-recovered'){
@@ -146,15 +146,14 @@ try{
   code=database.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(context.email).code;
   flow('ios-first-launch-account-verify.yaml');
   assert.equal(database.prepare('SELECT id FROM user WHERE email=?').get(context.email).id,context.userId);
-  assert.deepEqual({...database.prepare('SELECT trial_started_at,trial_ends_at FROM cloud_accounts WHERE account_id=?').get(context.userId)},context.trial);
-  const native=new DatabaseSync(join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite/puptime-v2.db'),{readOnly:true});
+   const native=new DatabaseSync(join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite/puptime-v2.db'),{readOnly:true});
   try{
    assert.notEqual(native.prepare('SELECT id FROM puppies').get().id,context.localPetId);
    assert.equal(native.prepare('SELECT count(*) n FROM events').get().n,0);
    assert.equal(native.prepare('SELECT count(*) n FROM local_sync_owner').get().n,0);
    assert.equal(native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n,0);
   }finally{native.close();}
-  console.log('PASS actual native SDK returning sign-in exposes the existing cloud puppy on fresh SQLite without restoring, starting another trial or uploading anything.');
+  console.log('PASS actual native SDK returning sign-in exposes the existing cloud puppy on fresh SQLite without restoring or uploading anything.');
  }else if(phase==='first-launch-restore'){
   flow('ios-first-launch-restore.yaml');
   const nativePath=join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite/puptime-v2.db');
@@ -174,8 +173,7 @@ try{
   }finally{await local.close();}
   const cookie=await fixtureCookie(),response=await fetch(state.url+'/api/sync/pull?after=0',{headers:{cookie,origin:state.url}});assert.equal(response.status,200);
   assert.deepEqual(await response.json(),context.restoreBaseline,'A pristine restore never uploads name/routine/settings defaults or changes the remote baseline.');
-  assert.deepEqual({...database.prepare('SELECT trial_started_at,trial_ends_at FROM cloud_accounts WHERE account_id=?').get(context.userId)},context.trial);
-  console.log('PASS actual native restore preserves confirmed cloud ID/name/routine/event/preferences, uses one new stable local puppy, leaves device alerts off, uploads no defaults, and preserves the exact cloud baseline and trial.');
+   console.log('PASS actual native restore preserves confirmed cloud ID/name/routine/event/preferences, uses one new stable local puppy, leaves device alerts off, uploads no defaults, and preserves the exact cloud baseline.');
  }else if(phase==='first-launch-request'){
   const native=new DatabaseSync(join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite/puptime-v2.db'),{readOnly:true});
   try{assert.equal(native.prepare('SELECT count(*) n FROM local_sync_owner').get().n,0,'Preserve owned history.');}finally{native.close();}
@@ -189,7 +187,7 @@ try{
   console.log('PASS actual first-open SDK email request, local challenge exit/return, and explicit resend after restart; no account is created before verification.');
  }else if(phase==='first-launch-verify'){
   code=database.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(context.email).code;
-  mutateAuthFixture(`UPDATE verification SET expiresAt=0 WHERE identifier='sign-in-otp-${context.email}';`);
+  mutateAuthFixture(`UPDATE verification SET expiresAt='${new Date(0).toISOString()}' WHERE identifier='sign-in-otp-${context.email}';`);
   flow('ios-cloud-expired-code.yaml');
   assert.equal(database.prepare('SELECT id FROM user WHERE email=?').get(context.email),undefined);
   flow('ios-cloud-resend-code.yaml');
@@ -199,7 +197,6 @@ try{
   assert.equal(database.prepare('SELECT id FROM user WHERE email=?').get(context.email),undefined);
   code=correct;flow('ios-first-launch-account-verify.yaml');
   const user=database.prepare('SELECT id FROM user WHERE email=?').get(context.email);assert.ok(user);
-  assert.equal(database.prepare('SELECT account_id FROM cloud_accounts WHERE account_id=?').get(user.id),undefined,'Account creation alone never starts a trial.');
   const native=new DatabaseSync(join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite/puptime-v2.db'),{readOnly:true});
   try{
    assert.equal(native.prepare('SELECT count(*) n FROM events').get().n,0);assert.equal(native.prepare('SELECT name FROM puppies').get().name,'Maple');
@@ -208,11 +205,9 @@ try{
    context.userId=user.id;context.localPetId=native.prepare('SELECT id FROM puppies').get().id;
    writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});
   }finally{native.close();}
-  console.log('PASS actual first-open SDK expired/wrong-code recovery and verified new account; Maple/profile remain local, cloud checkpoint resumes, no trial/enrollment/upload.');
+  console.log('PASS actual first-open SDK expired/wrong-code recovery and verified new account; Maple/profile remain local, cloud checkpoint resumes without enrollment or upload.');
  }else if(phase==='first-launch-enable'){
   flow('ios-first-launch-account-enable.yaml');
-  const trial=database.prepare('SELECT trial_started_at,trial_ends_at FROM cloud_accounts WHERE account_id=?').get(context.userId);
-  assert.ok(trial);assert.equal(trial.trial_ends_at-trial.trial_started_at,14*86400000);
   const native=new DatabaseSync(join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite/puptime-v2.db'),{readOnly:true});
   try{
    let drained=false;for(let i=0;i<120;i++){drained=native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n===0;if(drained)break;await new Promise(resolve=>setTimeout(resolve,250));}assert.ok(drained);
@@ -220,7 +215,7 @@ try{
    assert.equal(native.prepare('SELECT count(*) n FROM events').get().n,1);
    assert.equal(native.prepare('SELECT id FROM puppies').get().id,context.localPetId);
    const binding=native.prepare('SELECT cloud_pet_id FROM local_sync_pets').get();assert.equal(binding.cloud_pet_id,context.localPetId);
-   context.trial={...trial};writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});
+   writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});
    const files=readdirSync(join(state.persist,'v3/do'),{recursive:true}).filter(file=>typeof file==='string'&&file.endsWith('.sqlite'));
    let found=0;
    for(const file of files){const remote=new DatabaseSync(join(state.persist,'v3/do',file),{readOnly:true});try{
@@ -229,7 +224,7 @@ try{
     assert.equal(remote.prepare('SELECT count(*) n FROM pets').get().n,1);
    }finally{remote.close();}}assert.equal(found,1);
   }finally{native.close();}
-  console.log('PASS explicit first-open trial, enrollment, walkthrough exit and first real log through the official native SDK/HTTP runner; one stable puppy and one acknowledged cloud event.');
+  console.log('PASS explicit first-open enrollment, walkthrough exit and first real log through the official native SDK/HTTP runner; one stable puppy and one acknowledged cloud event.');
  }else if(phase==='request'){
   writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});
   flow('ios-cloud-request-email.yaml');
@@ -244,7 +239,7 @@ try{
     flow('ios-cloud-cancel-code.yaml');
     assert.equal(database.prepare('SELECT id FROM user WHERE email=?').get(context.email),undefined,'Cancelling a challenge must not create an account.');
     code=database.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(context.email).code;
-    mutateAuthFixture(`UPDATE verification SET expiresAt=0 WHERE identifier='sign-in-otp-${context.email}';`);
+    mutateAuthFixture(`UPDATE verification SET expiresAt='${new Date(0).toISOString()}' WHERE identifier='sign-in-otp-${context.email}';`);
     flow('ios-cloud-expired-code.yaml');
     assert.equal(database.prepare('SELECT id FROM user WHERE email=?').get(context.email),undefined,'An expired native challenge must not create an account.');
     flow('ios-cloud-resend-code.yaml');
@@ -266,11 +261,10 @@ try{
   const correct=code;code=wrong;flow('ios-cloud-wrong-code.yaml');code=correct;
   flow('ios-cloud-verify-code.yaml');
   const user=database.prepare('SELECT id FROM user WHERE email=?').get(context.email);assert.ok(user);
-  assert.equal(database.prepare('SELECT account_id FROM cloud_accounts WHERE account_id=?').get(user.id),undefined,'Sign-in alone must not start a trial.');
   const native=new DatabaseSync(join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite/puptime-v2.db'),{readOnly:true});
   try{assert.equal(native.prepare('SELECT count(*) n FROM events').get().n,1);assert.equal(native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n,0);}finally{native.close();}
   context.userId=user.id;writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});
-  console.log('PASS actual SDK sign-in retains one local log, with no trial or upload backlog.');
+  console.log('PASS actual SDK sign-in retains one local log, without local association or an upload backlog.');
  }else if(phase==='preview'){
   context.expectedAfterCombine=(context.expectedCount??1)+1;writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});
   flow('ios-cloud-existing-preview.yaml');
@@ -291,19 +285,6 @@ try{
   }finally{native.close();}
   context.expectedCount=context.expectedAfterCombine;writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});
   console.log('PASS confirmed existing-cloud association preserves old remote edits and the new local log.');
- }else if(phase==='auto-expiry'){
-  assert.match(context.userId,/^[A-Za-z0-9_-]+$/);flow('ios-cloud-account-ready.yaml');
-  const native=new DatabaseSync(join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite/puptime-v2.db'),{readOnly:true});
-  const trial=database.prepare('SELECT trial_started_at,trial_ends_at FROM cloud_accounts WHERE account_id=?').get(context.userId);
-  context.expectedCount=native.prepare('SELECT count(*) n FROM events').get().n+1;
-  try{
-    mutateAuthFixture(`UPDATE cloud_accounts SET trial_started_at=0,trial_ends_at=1 WHERE account_id='${context.userId}';`);
-    flow('ios-cloud-outage-log.yaml');flow('ios-cloud-expired-status.yaml');
-    assert.equal(native.prepare('SELECT count(*) n FROM events').get().n,context.expectedCount);
-    assert.ok(native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n>0);
-  }finally{native.close();mutateAuthFixture(`UPDATE cloud_accounts SET trial_started_at=${trial.trial_started_at},trial_ends_at=${trial.trial_ends_at} WHERE account_id='${context.userId}';`);}
-  flow('ios-cloud-access-restored.yaml');writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});
-  console.log('PASS installed iOS discovers expiry from its automatic local-edit sync, shows the paused entitlement and recovers its retained work.');
  }else if(phase==='enrollment-race'){
   assert.match(context.userId,/^[A-Za-z0-9_-]+$/);
   // Crash/restart fixture: production engine saves the original explicit intent
@@ -317,7 +298,7 @@ try{
     const runtime=await createLocalRuntime(local,pet.value);assert.equal((await runtime.sync.status(pet.value)).state,'local');
     const cookie=await fixtureCookie();
     const account=await (await fetch(state.url+'/api/account',{headers:{cookie,origin:state.url}})).json();
-    if(!account.cloud.canSync)await post('/api/cloud/trial',{},cookie);
+    assert.deepEqual(account.cloud,{canSync:true,canExport:true});
     await runtime.sync.prepareAssociation({accountId:context.userId,localPetId:pet.value,deviceId:runtime.deviceId,enrollment:{operationId:crypto.randomUUID(),deviceId:runtime.deviceId,localPetId:pet.value,name:'My puppy'}});
     if(!account.pets.length)await post('/api/cloud/enroll',{operationId:crypto.randomUUID(),deviceId:'native-race-other-device',localPetId:'native-race-cloud-pet',name:'Other device puppy'},cookie);
     else assert.equal(account.pets[0].id,'native-race-cloud-pet','Only this synthetic interrupted race may resume.');
@@ -335,58 +316,33 @@ try{
   writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});
   console.log('PASS installed iOS recovers a real enrollment409 after restart, retains free logging and requires same-puppy confirmation before combining.');
  }else if(phase==='access-recovery'){
-  assert.match(context.userId,/^[A-Za-z0-9_-]+$/);
-  // Restore only this synthetic entitlement after an interrupted qualifier.
-  // Persist this non-secret control state before the next injected fault.
-  let trial=context.accessRecovery?.trial??database.prepare('SELECT trial_started_at,trial_ends_at FROM cloud_accounts WHERE account_id=?').get(context.userId);
-  assert.ok(trial);
-  if(trial.trial_ends_at<=Date.now()){
-    const started=Date.now();trial={trial_started_at:started,trial_ends_at:started+14*86400000};
-    console.log('Restoring an abandoned synthetic entitlement before qualification.');
-  }
-  context.accessRecovery={trial};writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});
-  mutateAuthFixture(`UPDATE cloud_accounts SET trial_started_at=${trial.trial_started_at},trial_ends_at=${trial.trial_ends_at} WHERE account_id='${context.userId}';`);
-  flow('ios-cloud-access-restored.yaml');
-  flow('ios-cloud-account-ready.yaml');
+  assert.match(context.userId,/^[A-Za-z0-9_-]+$/);flow('ios-cloud-account-ready.yaml');
   const native=new DatabaseSync(join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite/puptime-v2.db'),{readOnly:true});
-  const previousCount=native.prepare('SELECT count(*) n FROM events').get().n;
-  const originalOwner=native.prepare('SELECT generation,account_id FROM local_sync_owner').get();
   try{
-    mutateAuthFixture(`UPDATE cloud_accounts SET trial_started_at=0,trial_ends_at=1 WHERE account_id='${context.userId}';`);
-    flow('ios-cloud-access-expired.yaml');
-    context.expectedCount=previousCount+1;
-    flow('ios-cloud-outage-log.yaml');
-    assert.equal(native.prepare('SELECT count(*) n FROM events').get().n,context.expectedCount);
-    assert.ok(native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n>0);
-    const cookie=await fixtureCookie();
-    const account=await (await fetch(state.url+'/api/account',{headers:{cookie,origin:state.url}})).json();
-    assert.equal(account.cloud.canSync,false);assert.equal(account.pets[0].eventCount,previousCount);
-    const exported=await fetch(state.url+'/api/account/export',{headers:{cookie,origin:state.url}});assert.equal(exported.status,200);
-    assert.equal(JSON.parse((await exported.text()).trim().split('\n').at(-1)).type,'complete');
-    mutateAuthFixture(`UPDATE cloud_accounts SET trial_started_at=${trial.trial_started_at},trial_ends_at=${trial.trial_ends_at} WHERE account_id='${context.userId}';`);
-    flow('ios-cloud-access-restored.yaml');
-    assert.equal(native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n,0);
-    console.log('PASS installed iOS entitlement expiry keeps local writes/pending work and cloud export; restoring access drains the same history.');
-    mutateAuthFixture(`UPDATE session SET expiresAt=0 WHERE userId='${context.userId}';`);
+    const previousEvents=native.prepare('SELECT * FROM events ORDER BY rowid').all(),originalOwner=native.prepare('SELECT generation,account_id FROM local_sync_owner').get();
+    assert.equal(originalOwner.account_id,context.userId);assert.equal(native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n,0);
+    const cookie=await fixtureCookie(),before=await fetch(state.url+'/api/account',{headers:{cookie,origin:state.url}});assert.equal(before.status,200);
+    const summary=await before.json();assert.equal(summary.user.id,context.userId);assert.deepEqual(summary.cloud,{canSync:true,canExport:true});assert.equal(summary.pets[0].eventCount,previousEvents.length);
+    const oldSessions=database.prepare('SELECT id FROM session WHERE userId=?').all(context.userId).map(row=>row.id);assert.ok(oldSessions.length>0);
+    mutateAuthFixture(`UPDATE session SET expiresAt='${new Date(0).toISOString()}' WHERE userId='${context.userId}';`);
+    assert.ok(database.prepare('SELECT expiresAt FROM session WHERE userId=?').all(context.userId).every(row=>Date.parse(row.expiresAt)===0));
     flow('ios-cloud-session-revoked.yaml');
-    context.expectedCount++;
-    flow('ios-cloud-outage-log.yaml');
-    assert.equal(native.prepare('SELECT count(*) n FROM events').get().n,context.expectedCount);
-    assert.ok(native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n>0);
+    context.expectedCount=previousEvents.length+1;writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});flow('ios-cloud-outage-log.yaml');
+    assert.equal(native.prepare('SELECT count(*) n FROM events').get().n,context.expectedCount);assert.ok(native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n>0);
     assert.deepEqual(native.prepare('SELECT generation,account_id FROM local_sync_owner').get(),originalOwner);
-    flow('ios-cloud-signin-again.yaml');
-    code=database.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(context.email).code;
-    flow('ios-cloud-recover-code.yaml');
-    assert.equal(native.prepare('SELECT count(*) n FROM events').get().n,context.expectedCount);
-    assert.equal(native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n,0);
+    for(const event of previousEvents)assert.deepEqual(native.prepare('SELECT * FROM events WHERE id=?').get(event.id),event,'Session loss must not change an existing local log.');
+    const denied=await fetch(state.url+'/api/account/export',{headers:{cookie,origin:state.url}});assert.equal(denied.status,401);
+    flow('ios-cloud-signin-again.yaml');code=database.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(context.email).code;flow('ios-cloud-recover-code.yaml');
+    const fresh=database.prepare('SELECT id,createdAt,expiresAt FROM session WHERE userId=?').all(context.userId).filter(row=>!oldSessions.includes(row.id)&&Date.parse(row.expiresAt)>Date.now()&&Date.now()-Date.parse(row.createdAt)<600000);
+    assert.ok(fresh.length>0,'The actual native SDK must create a new recent same-owner session.');
+    assert.equal(native.prepare('SELECT count(*) n FROM events').get().n,context.expectedCount);assert.equal(native.prepare('SELECT count(*) n FROM local_sync_outbox').get().n,0);
     assert.deepEqual(native.prepare('SELECT generation,account_id FROM local_sync_owner').get(),originalOwner);
-    assert.deepEqual({...database.prepare('SELECT trial_started_at,trial_ends_at FROM cloud_accounts WHERE account_id=?').get(context.userId)},{...trial});
-    delete context.accessRecovery;writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});
-    console.log('PASS installed iOS revoked session preserves local logging/owner/backlog; actual SDK reauthentication resumes without another trial or association.');
-  }finally{
-    native.close();
-    mutateAuthFixture(`UPDATE cloud_accounts SET trial_started_at=${trial.trial_started_at},trial_ends_at=${trial.trial_ends_at} WHERE account_id='${context.userId}';`);
-  }
+    for(const event of previousEvents)assert.deepEqual(native.prepare('SELECT * FROM events WHERE id=?').get(event.id),event);
+    const renewed=await fixtureCookie(),account=await fetch(state.url+'/api/account',{headers:{cookie:renewed,origin:state.url}});assert.equal(account.status,200);
+    const recovered=await account.json();assert.equal(recovered.user.id,context.userId);assert.equal(recovered.pets[0].eventCount,context.expectedCount);
+    writeFileSync(contextPath,JSON.stringify(context),{mode:0o600});
+    console.log('PASS installed iOS expired SDK session preserves local logs/owner/backlog and refuses private export; genuine same-owner SDK reauthentication creates a fresh session and uploads the pending log without another association.');
+  }finally{native.close();}
  }else if(phase==='outage'||phase==='signout'){
   flow('ios-cloud-account-ready.yaml');
   const native=new DatabaseSync(join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite/puptime-v2.db'),{readOnly:true});
@@ -429,8 +385,7 @@ try{
   }finally{native.close();}
  }else{
   flow(phase==='resume'?'ios-cloud-resume.yaml':'ios-cloud-enable.yaml');
-  const cloud=database.prepare('SELECT trial_started_at,trial_ends_at FROM cloud_accounts WHERE account_id=?').get(context.userId);assert.ok(cloud);assert.equal(cloud.trial_ends_at-cloud.trial_started_at,14*86400000);
-  console.log('PASS explicit native activation grants the configured trial and reaches acknowledged sync.');
+  console.log('PASS explicit native enrollment reaches acknowledged sync without a separate activation request.');
   const cookie=await fixtureCookie();
   const pulled=await fetch(state.url+'/api/sync/pull?after=0',{headers:{cookie,origin:state.url},redirect:'error'});assert.equal(pulled.status,200);
   const page=await pulled.json(),event=page.changes.find(record=>record.kind==='event');assert.ok(event,'Native initial history must reach the real HTTP service.');

@@ -15,13 +15,12 @@ export function cloudBaseUrl(value:string|undefined,allowLocal=false):string|nul
     ||(url.protocol!=='https:'&&!(allowLocal&&url.protocol==='http:'&&['localhost','127.0.0.1','[::1]'].includes(host)))) throw new Error('Invalid Puptime cloud origin.');
   return url.origin;
 }
-export const cloudConfigSchema=z.strictObject({protocolVersion:z.literal(1),trialDays:z.number().int().min(1).max(30).default(14),providers:z.strictObject({apple:z.boolean(),google:z.boolean(),email:z.boolean()}),pricingFinalized:z.boolean()});
-export const cloudAccessSchema=z.strictObject({canSync:z.boolean(),canExport:z.boolean(),source:z.enum(['none','trial','paid']),expiresAt:z.number().int().min(0).max(8640000000000000).nullable()})
-  .refine(value=>value.canSync===(value.source!=='none')&&(value.source==='none'?value.expiresAt===null:value.expiresAt!==null));
+export const cloudConfigSchema=z.strictObject({protocolVersion:z.literal(1),providers:z.strictObject({apple:z.boolean(),google:z.boolean(),email:z.boolean()})});
+export const cloudAccessSchema=z.strictObject({canSync:z.boolean(),canExport:z.boolean()});
 export const cloudAccountSchema=z.strictObject({user:z.strictObject({id:identifierSchema,email:z.email().max(320),name:z.string().max(256)}),cloud:cloudAccessSchema,pets:z.array(z.strictObject({id:identifierSchema,name:z.string().min(1).max(256),eventCount:z.number().int().min(0).max(Number.MAX_SAFE_INTEGER)}))});
 export type CloudConfig=z.infer<typeof cloudConfigSchema>;
 export type CloudAccountSummary=z.infer<typeof cloudAccountSchema>;
-export type CloudErrorCategory='network'|'invalid-request'|'invalid-response'|'auth-required'|'expired'|'forbidden'|'conflict'|'account-deleted'|'rate-limited'|'server-error';
+export type CloudErrorCategory='network'|'invalid-request'|'invalid-response'|'auth-required'|'forbidden'|'conflict'|'account-deleted'|'rate-limited'|'server-error';
 export class CloudApiError extends Error {
   readonly category:CloudErrorCategory;
   readonly status:number;
@@ -48,7 +47,7 @@ export function createSdkRequest(fetchClient:(url:string,options:SdkOptions)=>Pr
   const base=cloudBaseUrl(origin,true);if (!base) throw new Error('Cloud origin is missing.');
   return async(path,options)=>{
     const history=historyRoute(path,options);
-    if (!/^\/api\/(?:config|account|cloud\/(?:trial|enroll)|sync\/push|sync\/pull\?after=\d+)$/.test(path)&&!history) throw new CloudApiError('invalid-request',400);
+    if (!/^\/api\/(?:config|account|cloud\/enroll|sync\/push|sync\/pull\?after=\d+)$/.test(path)&&!history) throw new CloudApiError('invalid-request',400);
     throwIfAborted(options.signal);
     let retryAfter:string|null=null;
     // Better Auth encodes path parameters itself; a pre-encoded literal ID would
@@ -64,7 +63,7 @@ function retryDelay(value:string|null|undefined):number|null {
   return Number.isFinite(milliseconds)?Math.max(0,Math.min(60000,milliseconds)):null;
 }
 export function cloudErrorCategory(status:number):CloudErrorCategory {
-  const categories:Record<number,CloudErrorCategory>={401:'auth-required',402:'expired',403:'forbidden',409:'conflict',410:'account-deleted',429:'rate-limited'};
+  const categories:Record<number,CloudErrorCategory>={401:'auth-required',403:'forbidden',409:'conflict',410:'account-deleted',429:'rate-limited'};
   return categories[status]??(status>=500?'server-error':'invalid-request');
 }
 export function createCloudApi(request:CloudRequest) {
@@ -82,7 +81,6 @@ export function createCloudApi(request:CloudRequest) {
   return {
     config:(signal?:AbortSignal)=>call('/api/config',cloudConfigSchema,undefined,signal),
     account:(signal?:AbortSignal)=>call('/api/account',cloudAccountSchema,undefined,signal),
-    startTrial:(signal?:AbortSignal)=>call('/api/cloud/trial',z.strictObject({cloud:cloudAccessSchema}),{},signal),
     async enroll(input:Enrollment,signal?:AbortSignal) {
       const request=enrollmentSchema.parse(input);
       return call('/api/cloud/enroll',z.strictObject({petId:identifierSchema}).refine(value=>value.petId===(request.confirmedPetId??request.localPetId)),request,signal);

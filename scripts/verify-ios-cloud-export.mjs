@@ -7,8 +7,7 @@
 // 3. node scripts/verify-ios-cloud-export.mjs request UDID --private-auth
 // 4. node scripts/verify-ios-cloud-export.mjs verify UDID --private-auth
 // 5. node scripts/verify-ios-cloud-export.mjs seed
-// 6. node scripts/verify-ios-cloud-export.mjs expire
-// 7. node scripts/verify-ios-cloud-export.mjs acceptance UDID --record
+// 6. node scripts/verify-ios-cloud-export.mjs acceptance UDID --record
 // request/verify/resend must never be screen-recorded. Other native phases:
 // open, inspect, dismiss, truncate, cancel, swipe, timeout, retry. The recorded
 // feedback phase checks only inline truncate/timeout errors and their retries.
@@ -26,10 +25,10 @@ import {cloudRecordId} from '../src/cloud/record-identity.ts';
 import {revisionSchema} from '../src/cloud/protocol.ts';
 
 const [phase,udid,...flags]=process.argv.slice(2),app='com.patrickchin.puptime';
-const phases=['serve','status','request','resend','verify','seed','expire','open','inspect','dismiss','truncate','cancel','swipe','timeout','retry','acceptance','feedback','self-check'];
-assert.ok(phases.includes(phase),'Use serve/status/request/resend/verify/seed/expire/open/inspect/dismiss/truncate/cancel/swipe/timeout/retry/acceptance/feedback/self-check.');
+const phases=['serve','status','request','resend','verify','seed','open','inspect','dismiss','truncate','cancel','swipe','timeout','retry','acceptance','feedback','self-check'];
+assert.ok(phases.includes(phase),'Use serve/status/request/resend/verify/seed/open/inspect/dismiss/truncate/cancel/swipe/timeout/retry/acceptance/feedback/self-check.');
 assert.ok(flags.every(flag=>flag==='--private-auth'||flag==='--record'),'No remote target or data replacement flag is supported.');
-if(['serve','status','seed','expire','self-check'].includes(phase))assert.equal(udid,undefined,'This phase does not take a target or other arguments.');
+if(['serve','status','seed','self-check'].includes(phase))assert.equal(udid,undefined,'This phase does not take a target or other arguments.');
 const root=realpathSync(process.cwd());
 assert.equal(root,realpathSync(fileURLToPath(new URL('..',import.meta.url))),'Run from the containing Puptime checkout.');
 assert.equal(JSON.parse(readFileSync('package.json','utf8')).name,'puptime');
@@ -204,8 +203,7 @@ async function verifyCode(){
  code=authRead('SELECT code FROM local_email_previews WHERE email=? AND expires_at>? ORDER BY expires_at DESC LIMIT 1',context.email,Date.now())[0]?.code;assert.match(code??'',/^\d{6}$/);
  flow('export-auth-verify',scroll('account.code.input')+'- tapOn:\n    id: account.code.input\n- eraseText\n- inputText: ${MAESTRO_TEST_CODE}\n- tapOn: ^Sign-in code$\n- waitForAnimationToEnd\n'+scroll('account.verify')+'- tapOn:\n    id: account.verify\n- extendedWaitUntil:\n    visible:\n      id: account.enable\n    timeout: 30000\n- assertVisible:\n    id: account.local.count\n    text: 1 activity log\n- assertNotVisible:\n    id: account.email.input\n',{privateAuth:true});
  assertLocalUnchanged();const user=authRead('SELECT id FROM user WHERE email=?',context.email);assert.equal(user.length,1);context.userId=user[0].id;
- assert.equal(authRead('SELECT account_id FROM cloud_accounts WHERE account_id=?',context.userId).length,0);
- context.verified=true;saveContext();console.log('PASS actual SDK OTP sign-in; no trial, native enrollment/upload or local SQL change. Private authentication is finished; recording may begin only after seed.');
+ context.verified=true;saveContext();console.log('PASS actual SDK OTP sign-in; no native enrollment/upload or local SQL change. Private authentication is finished; recording may begin only after seed.');
 }
 async function resendCode(){
  ensurePrivateAuth();assert.ok(context.requested&&!context.verified);loadDevice();
@@ -235,7 +233,7 @@ async function seedCloud(){
  assert.ok(context.verified&&!context.seeded,'Seed exactly once; retained fixture is never reset.');
  const cookie=await fixtureCookie();
  if(!context.seedPlan){context.seedPlan={pet:'export-pet-'+crypto.randomUUID(),enrollment:crypto.randomUUID(),operations:Array.from({length:1001},()=>crypto.randomUUID())};saveContext();}
- await fixturePost('/api/cloud/trial',{},cookie);const pet=context.seedPlan.pet,device='export-http-fixture';
+ const pet=context.seedPlan.pet,device='export-http-fixture';
  await fixturePost('/api/cloud/enroll',{operationId:context.seedPlan.enrollment,deviceId:device,localPetId:pet,name:'Clover 🐶 小狗'},cookie);
  for(let start=0;start<1001;start+=50){
   const mutations=Array.from({length:Math.min(50,1001-start)},(_,offset)=>({protocolVersion:1,operationId:context.seedPlan.operations[start+offset],deviceId:device,recordId:cloudRecordId('event',pet,'export-'+(start+offset)),petId:pet,kind:'event',baseRevision:0,intent:'create',patch:{type:'pee',at:1000000+start+offset,source:'app',note:'Cloud export 🐶 小狗 café '+(start+offset)}}));
@@ -243,20 +241,6 @@ async function seedCloud(){
  }
  context.cloudPet=pet;context.seeded=true;saveContext();
  console.log('PASS same-owner independent HTTP fixture seeded1001 Unicode cloud revisions; no native enrollment or data import was performed.');
-}
-async function expireFixture(){
- assert.ok(context.verified&&context.seeded&&!context.expired,'Expire only this completed disposable fixture once.');
- assert.match(context.userId,/^[A-Za-z0-9._:-]+$/);
- assert.equal(authRead('SELECT id FROM user WHERE id=? AND email=?',context.userId,context.email).length,1);
- const before=authRead('SELECT * FROM cloud_accounts WHERE account_id=?',context.userId);assert.equal(before.length,1);assert.equal(before[0].state,'active');assert.equal(before[0].paid_until,null);assert.ok(Number.isSafeInteger(before[0].trial_started_at));
- context.originalTrial=before[0];saveContext();
- const file=join(state.directory,'expire-only-this-fixture.sql');
- writeFileSync(file,`UPDATE cloud_accounts SET trial_ends_at=trial_started_at+1 WHERE account_id='${context.userId}' AND state='active' AND paid_until IS NULL;`,{mode:0o600});
- try{cli(['d1','execute','AUTH_DB','--local','--config',state.config,'--persist-to',state.persist,'--file',file,'--json']);}finally{rmSync(file,{force:true});}
- const after=authRead('SELECT * FROM cloud_accounts WHERE account_id=?',context.userId)[0];assert.deepEqual(after,{...before[0],trial_ends_at:before[0].trial_started_at+1});
- const cookie=await fixtureCookie(),response=await fetch(back+'/api/account',{headers:{origin:front,cookie},redirect:'error',signal:AbortSignal.timeout(15000)});assert.equal(response.status,200);
- const summary=await response.json();assert.equal(summary.user.id,context.userId);assert.equal(summary.cloud.canSync,false);assert.equal(summary.cloud.canExport,true);assert.equal(summary.pets[0].eventCount,1001);
- context.expired=true;saveContext();assertLocalUnchanged();evidence('cloud-access-expired',{canSync:false,canExport:true,originalTrialStartPreserved:true});
 }
 async function serve(){
  if(existsSync(pointer)){const prior=readJson(pointer);assert.ok(!prior.pid||!(()=>{try{process.kill(prior.pid,0);return true;}catch{return false;}})(),'An existing export harness is active. Preserve it.');}
@@ -314,7 +298,7 @@ if(phase==='self-check'){
  else if(phase==='request'){await requestCode();}
  else{
   assert.ok(context);assert.match(context.email,/^native-export-[a-f0-9-]{36}@example\.invalid$/);
-  if(phase==='verify')await verifyCode();else if(phase==='resend')await resendCode();else if(phase==='seed')await seedCloud();else if(phase==='expire')await expireFixture();else{
+  if(phase==='verify')await verifyCode();else if(phase==='resend')await resendCode();else if(phase==='seed')await seedCloud();else{
    assert.ok(context.seeded&&context.verified);loadDevice();
    // Preserve all failed recordings, screenshots and check timelines. Later
    // attempts share the same immutable fixture/baseline, never the same files.
@@ -339,9 +323,8 @@ if(phase==='self-check'){
      for(const fault of ['truncate','cancel','swipe','timeout']){begin(fault);await failureExport(fault);begin(fault+'-retry');await openExport();await inspectExport();await dismissExport();}
      assertLocalUnchanged();await emptyCache();evidence('acceptance',{cacheEmpty:true,realSdk:true,cloudRevisionCount:1001,localEnrollment:false,scope:'Fresh local OTP owner, independent populated cloud fixture, actual Expo file/OS share UI and transparent local body faults. No live provider, native sync enrollment or production service claim.'});
     }else if(phase==='feedback'){
-     assert.ok(context.expired,'Keep the retained expired-access fixture for this focused qualification.');
      for(const fault of ['truncate','timeout']){begin(fault);await failureExport(fault,{inlineFeedback:true});begin(fault+'-retry');await openExport();await inspectExport();await dismissExport();}
-     assertLocalUnchanged();await emptyCache();evidence('feedback',{cacheEmpty:true,realSdk:true,cloudRevisionCount:1001,localEnrollment:false,expiredCloudAccess:true,faults:['truncate','timeout'],successfulByteCheckedRetries:2,noPostFailureScrolling:true,scope:'Current inline-error Metro source after one cold restart; retained local SDK owner, expired cloud access and unchanged14-table baseline. Focused truncate/60s-timeout and actual OS-share retries only; earlier full fault matrix remains separate.'});
+     assertLocalUnchanged();await emptyCache();evidence('feedback',{cacheEmpty:true,realSdk:true,cloudRevisionCount:1001,localEnrollment:false,faults:['truncate','timeout'],successfulByteCheckedRetries:2,noPostFailureScrolling:true,scope:'Current inline-error Metro source after one cold restart; retained local SDK owner and unchanged14-table baseline. Focused truncate/60s-timeout and actual OS-share retries only; earlier full fault matrix remains separate.'});
     }
    }catch(error){check({event:'failed',phase});throw error;}finally{
     mode('normal');

@@ -1,5 +1,7 @@
 # Puptime optional cloud implementation design
 
+> Scope update, October 20: [Cloud accounts and puppy logging: development scope](2026-10-20-cloud-development-reset.md) supersedes conflicting requirements below. Payments/publication and old development-data migration are deferred/removed; shared implementation covers iOS and Android, with iOS runtime verification first. This historical design is not the current milestone checklist.
+
 Date: October 17, 2026. Execution basis: the confirmed discovery decisions and the user's delegation of remaining technical decisions. Technical defaults below are implementation choices, not additional user statements. The discovery roadmap remains the requirements/evidence inventory.
 
 ## Purpose and boundaries

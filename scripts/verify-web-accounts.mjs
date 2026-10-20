@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import {spawn,execFileSync} from 'node:child_process';
 import {createServer,request as httpRequest} from 'node:http';
 import {createRequire} from 'node:module';
-import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,readdirSync,existsSync,rmSync,createReadStream,realpathSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,readdirSync,existsSync,rmSync,createReadStream,realpathSync,statSync} from 'node:fs';
 import {join,resolve,extname,dirname} from 'node:path';
 import {tmpdir} from 'node:os';
 import {fileURLToPath} from 'node:url';
@@ -17,10 +17,10 @@ const require=createRequire(import.meta.url),{chromium}=require(process.env.PUPT
 const root=realpathSync(process.cwd());
 assert.equal(root,realpathSync(fileURLToPath(new URL('..',import.meta.url))),'Run from this script’s Puptime checkout root.');
 assert.equal(JSON.parse(readFileSync('package.json','utf8')).name,'puptime');
-assert.ok(process.argv.slice(2).every(value=>value==='--apple-deletion'),'Only --apple-deletion is supported. No remote target is accepted.');
-const appleDeletionOnly=process.argv.includes('--apple-deletion');
+const modes=process.argv.slice(2);assert.ok(modes.length<=1&&modes.every(value=>['--apple-deletion','--core-accounts'].includes(value)),'Use --apple-deletion or --core-accounts, or omit the mode for historical full qualification. No remote target is accepted.');
+const appleDeletionOnly=modes.includes('--apple-deletion'),coreAccountsOnly=modes.includes('--core-accounts');
 const front='http://127.0.0.1:8898',back='http://127.0.0.1:8798',directory=mkdtempSync(join(tmpdir(),'puptime-web-account-local-'));
-const output=resolve(appleDeletionOnly?join('output/playwright/apple-deletion',new Date().toISOString().replace(/[:.]/g,'-')):'output/playwright/web-accounts');mkdirSync(output,{recursive:true});
+const output=resolve(coreAccountsOnly?join('output/playwright/core-accounts',new Date().toISOString().replace(/[:.]/g,'-')):appleDeletionOnly?join('output/playwright/apple-deletion',new Date().toISOString().replace(/[:.]/g,'-')):'output/playwright/web-accounts');mkdirSync(output,{recursive:true});
 const persist=join(directory,'persist'),configPath=join(directory,'wrangler.json');
 const config={...JSON.parse(readFileSync('wrangler.jsonc','utf8')),name:'puptime-web-accounts-local',main:resolve('server/index.ts'),env:undefined,vars:{ENVIRONMENT:'local',AUTH_BASE_URL:front,WEB_ORIGINS:front,AUTH_SECRET:crypto.randomUUID()+crypto.randomUUID(),GOOGLE_CLIENT_ID:'synthetic-google-client',GOOGLE_CLIENT_SECRET:'synthetic-google-secret',APPLE_CLIENT_ID:'synthetic-apple-client',APPLE_CLIENT_SECRET:'synthetic-apple-secret'}};
 config.d1_databases=config.d1_databases.map(db=>({...db,migrations_dir:resolve(db.migrations_dir)}));writeFileSync(configPath,JSON.stringify(config),{mode:0o600});
@@ -56,8 +56,79 @@ async function signIn(page,email,wrongCode=false){
  await page.getByLabel('Email code',{exact:true}).fill(privateCode);await page.getByRole('button',{name:'Continue',exact:true}).click();await page.getByRole('button',{name:'Sign out',exact:true}).waitFor();
 }
 
+function coreSourceSnapshot(){
+ const digest=value=>createHash('sha256').update(value).digest('hex'),bundleRoot='dist-web/_expo/static/js/web';
+ const bundles=readdirSync(bundleRoot).filter(path=>path.endsWith('.js')).map(path=>join(bundleRoot,path));assert.ok(bundles.length>0);
+ const bundleText=bundles.map(path=>readFileSync(path,'utf8')).join('\n');
+ assert.ok(bundleText.includes('Cloud access')&&bundleText.includes('Available'),'Build the current development account status before qualification.');
+ assert.ok(!bundleText.includes('trialDays')&&!bundleText.includes('pricingFinalized'),'The served bundle must use the current no-trial contract.');
+ const frontend=['src/web/AccountPage.tsx','src/web/account-client.ts','src/cloud/api.ts'],builtAt=Math.max(...bundles.map(path=>statSync(path).mtimeMs));
+ for(const path of frontend)assert.ok(statSync(path).mtimeMs<=builtAt,`${path} changed after the web build; rebuild before qualification.`);
+ const paths=[...frontend,'server/auth.ts','server/cloud-access.ts','server/account-routes.ts','server/account-store.ts','server/migrations/0001-auth.sql','scripts/verify-web-accounts.mjs'];
+ return {head:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),files:Object.fromEntries(paths.map(path=>[path,digest(readFileSync(path))])),bundles:Object.fromEntries(bundles.map(path=>[path,digest(readFileSync(path))]))};
+}
+async function qualifyCoreAccounts(source){
+ const wrong=await context(),wrongPage=await wrong.newPage();
+ await signIn(wrongPage,`core-wrong-${crypto.randomUUID()}@example.invalid`,true);await wrong.close();
+ const auth=await context({viewport:{width:1440,height:1000}}),page=await auth.newPage(),email=`core-account-${crypto.randomUUID()}@example.invalid`;
+ const screenshot=async name=>{assert.equal(await page.getByLabel('Email code',{exact:true}).count(),0,'Never capture private OTP entry.');await page.screenshot({path:join(output,name+'.png'),fullPage:true});};
+ const signedIn=async()=>{await page.getByRole('button',{name:'Sign out',exact:true}).waitFor();await page.locator('.account-status').getByText('Available',{exact:true}).waitFor();assert.match(await page.locator('.account-status').innerText(),/Cloud access\s+Available/);};
+ const noProductWrites=()=>assert.deepEqual(apiCalls.filter(call=>!call.fixture&&/\/api\/(cloud\/(trial|enroll)|sync\/push)/.test(call.path)),[]);
+ function cloudRows(){
+  const files=readdirSync(join(persist,'v3/do'),{recursive:true}).filter(path=>String(path).endsWith('.sqlite'));
+  return Object.fromEntries(files.map(path=>{
+   const db=new DatabaseSync(join(persist,'v3/do',path),{readOnly:true});
+   try{
+    const tables=db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map(row=>row.name).filter(name=>!name.startsWith('sqlite_')&&!name.startsWith('__cf_')&&!name.startsWith('_cf_'));
+    return [path,Object.fromEntries(tables.map(name=>{
+     const table='\"'+name.replaceAll('\"','\"\"')+'\"',columns=db.prepare(`PRAGMA table_info(${table})`).all().map(row=>'\"'+row.name.replaceAll('\"','\"\"')+'\"');
+     return [name,db.prepare(`SELECT * FROM ${table} ORDER BY ${columns.join(',')}`).all()];
+    }))];
+   }finally{db.close();}
+  }));
+ }
+ await page.goto(front+'/account');await page.getByLabel('Email address',{exact:true}).waitFor();reviewPage=page;await screenshot('core-account-sign-in');
+ reviewPage=null;await signIn(page,email);reviewPage=page;await signedIn();
+ const accountResponse=await auth.request.get(front+'/api/account');assert.equal(accountResponse.status(),200);const account=await accountResponse.json(),uid=account.user.id;
+ assert.deepEqual(account.cloud,{canSync:true,canExport:true});assert.deepEqual(account.pets,[]);noProductWrites();
+ pass('Genuine UI OTP grants immediate cloud access while leaving puppy enrollment and uploads explicit.');
+ await page.reload();await signedIn();assert.equal((await(await auth.request.get(front+'/api/account')).json()).user.id,uid);noProductWrites();
+ pass('Reload preserves the real browser session and displays Cloud access Available without an activation request.');
+ await page.getByRole('button',{name:'Sign out',exact:true}).click();await page.getByLabel('Email address',{exact:true}).waitFor();
+ assert.equal((await auth.request.get(front+'/api/account')).status(),401);assert.equal(read('SELECT id FROM user WHERE id=? AND email=?',uid,email).length,1);noProductWrites();
+ pass('Sign out ends authentication and retains the same account identity.');
+ reviewPage=null;await signIn(page,email);reviewPage=page;await signedIn();assert.equal((await(await auth.request.get(front+'/api/account')).json()).user.id,uid);
+ // Seed through an explicitly marked independent HTTP fixture. The browser UI
+ // remains account management only and must never enroll or upload on its own.
+ const fixtureHeaders={'x-puptime-fixture':'true'},pet='core-pet-'+crypto.randomUUID(),device='core-http-fixture';
+ const enrolled=await auth.request.post(front+'/api/cloud/enroll',{headers:fixtureHeaders,data:{operationId:crypto.randomUUID(),deviceId:device,localPetId:pet,name:'Core puppy'}});assert.equal(enrolled.status(),200);
+ const mutation={protocolVersion:1,operationId:crypto.randomUUID(),deviceId:device,recordId:cloudRecordId('event',pet,'core-log'),petId:pet,kind:'event',baseRevision:0,intent:'create',patch:{type:'pee',at:1000000,source:'app',note:'Synthetic core session retention'}};
+ const pushed=await auth.request.post(front+'/api/sync/push',{headers:fixtureHeaders,data:{mutations:[mutation]}});assert.equal(pushed.status(),200);assert.deepEqual((await pushed.json()).rejected,[]);
+ const cloudResponse=await auth.request.get(front+'/api/sync/pull');assert.equal(cloudResponse.status(),200);const beforeCloud=await cloudResponse.json(),beforeSql=cloudRows();
+ assert.ok(beforeCloud.changes.some(record=>record.kind==='event'&&record.data.note==='Synthetic core session retention'));assert.ok(Object.keys(beforeSql).length>0);
+ const oldSessions=read('SELECT id FROM session WHERE userId=?',uid).map(row=>row.id);assert.ok(oldSessions.length>0);
+ sql(`UPDATE session SET expiresAt='${new Date(0).toISOString()}' WHERE userId='${uid}'`);
+ assert.ok(read('SELECT expiresAt FROM session WHERE userId=?',uid).every(row=>Date.parse(row.expiresAt)===0));
+ await page.reload();await page.getByLabel('Email address',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Sign out',exact:true}).count(),0);
+ assert.equal((await auth.request.get(front+'/api/account')).status(),401);assert.equal((await auth.request.get(front+'/api/account/export')).status(),401);
+ assert.equal(read('SELECT id FROM user WHERE id=? AND email=?',uid,email).length,1);assert.deepEqual(cloudRows(),beforeSql);await screenshot('core-account-expired-session');
+ pass('Actual ISO session expiry returns to sign-in, refuses private access, and preserves identity plus populated cloud SQL exactly.');
+ reviewPage=null;await signIn(page,email);reviewPage=page;await signedIn();
+ const recovered=await(await auth.request.get(front+'/api/account')).json();assert.equal(recovered.user.id,uid);assert.deepEqual(recovered.cloud,{canSync:true,canExport:true});assert.equal(recovered.pets[0].eventCount,1);
+ assert.ok(read('SELECT id,createdAt,expiresAt FROM session WHERE userId=?',uid).some(row=>!oldSessions.includes(row.id)&&Date.parse(row.expiresAt)>Date.now()&&Date.now()-Date.parse(row.createdAt)<600000));
+ const restored=await auth.request.get(front+'/api/sync/pull');assert.equal(restored.status(),200);assert.deepEqual(await restored.json(),beforeCloud);assert.deepEqual(cloudRows(),beforeSql);noProductWrites();
+ pass('Fresh genuine UI OTP reuses the same owner and cloud copy with a new recent session, without repeated enrollment or upload.');
+ await screenshot('core-account-desktop');await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);await screenshot('core-account-mobile');
+ pass('Fresh desktop and mobile account screenshots show the current Available status; this core mode records no videos.');
+ assert.equal(apiCalls.some(call=>call.method==='DELETE'),false);assert.deepEqual(coreSourceSnapshot(),source,'Qualified source or served bundles changed during the core account run.');
+ await auth.close();reviewPage=null;
+ const media=readdirSync(output).filter(path=>path.endsWith('.png')).map(path=>({path,sha256:createHash('sha256').update(readFileSync(join(output,path))).digest('hex')}));
+ writeFileSync(join(output,'verification.json'),JSON.stringify({passed:summary,source,scope:'Isolated local website + genuine Better Auth UI OTP, SDK-managed sessions, D1 and populated SQL Durable Object. Only the independent marked HTTP fixture creates a puppy/log. No native, external provider, live service or telemetry ingestion claim.',privateAuthRecorded:false,videosRecorded:false,media},null,2));
+ console.log('Core account evidence:',output);
+}
+
 async function qualifyAppleDeletion(){
- const sourceFiles=['server/auth.ts','server/account-lifecycle.ts','server/account-routes.ts','server/migrations/0003-deleting-account-credentials.sql','src/web/account-client.ts','src/web/AccountPage.tsx','scripts/verify-web-accounts.mjs'];
+ const sourceFiles=['server/auth.ts','server/account-lifecycle.ts','server/account-routes.ts','server/migrations/0001-auth.sql','src/web/account-client.ts','src/web/AccountPage.tsx','scripts/verify-web-accounts.mjs'];
  const digest=value=>createHash('sha256').update(value).digest('hex');
  const source={head:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),files:Object.fromEntries(sourceFiles.map(path=>[path,digest(readFileSync(path))])),bundles:Object.fromEntries(readdirSync('dist-web/_expo/static/js/web').filter(path=>path.endsWith('.js')).map(path=>[path,digest(readFileSync(join('dist-web/_expo/static/js/web',path)))]))};
  const fixtureHeaders={'x-puptime-fixture':'true'};
@@ -67,7 +138,6 @@ async function qualifyAppleDeletion(){
   const response=await auth.request.get(front+'/api/account');assert.equal(response.status(),200);
   const uid=(await response.json()).user.id;assert.match(uid,/^[A-Za-z0-9._:-]+$/);
   const pet='apple-review-'+crypto.randomUUID();
-  assert.equal((await auth.request.post(front+'/api/cloud/trial',{headers:fixtureHeaders,data:{}})).status(),200);
   assert.equal((await auth.request.post(front+'/api/cloud/enroll',{headers:fixtureHeaders,data:{operationId:crypto.randomUUID(),deviceId:'apple-review-device',localPetId:pet,name:'Synthetic puppy'}})).status(),200);
   const mutation={protocolVersion:1,operationId:crypto.randomUUID(),deviceId:'apple-review-device',recordId:cloudRecordId('event',pet,'synthetic-event'),petId:pet,kind:'event',baseRevision:0,intent:'create',patch:{type:'pee',at:1000000,source:'app',note:'Synthetic deletion acceptance 犬'}};
   const pushed=await auth.request.post(front+'/api/sync/push',{headers:fixtureHeaders,data:{mutations:[mutation]}});assert.equal(pushed.status(),200);assert.deepEqual((await pushed.json()).rejected,[]);
@@ -75,7 +145,7 @@ async function qualifyAppleDeletion(){
  }
  const target=await owner(),other=await owner();
  const credential=crypto.randomUUID();
- sql(`INSERT INTO account(id,accountId,providerId,userId,refreshToken,accessToken,createdAt,updatedAt) VALUES ('${credential}','${credential}','apple','${target.uid}',NULL,NULL,${Date.now()},${Date.now()})`);
+ sql(`INSERT INTO account(id,accountId,providerId,userId,refreshToken,accessToken,createdAt,updatedAt) VALUES ('${credential}','${credential}','apple','${target.uid}',NULL,NULL,'${new Date().toISOString()}','${new Date().toISOString()}')`);
  assert.equal(read("SELECT id FROM account WHERE id=? AND userId=? AND providerId='apple' AND refreshToken IS NULL AND accessToken IS NULL",credential,target.uid).length,1);
  assert.ok(read("SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'account_reject_%_while_deleting'").length===2);
  pass('Two disposable accounts use genuine local UI OTP, explicit fixture enrollment and real persisted cloud events; only the deletion owner receives a tokenless synthetic Apple credential.');
@@ -139,6 +209,7 @@ async function qualifyAppleDeletion(){
 }
 try{
  assert.ok(existsSync('dist-web/account.html'),'Build the static website first.');
+ const coreSource=coreAccountsOnly?coreSourceSnapshot():null;
  // Refuse another local service before spawning or issuing any fixture request.
  for(const port of [8798,8898])await new Promise((resolve,reject)=>{const probe=createServer();probe.once('error',reject);probe.listen(port,'127.0.0.1',()=>probe.close(resolve));});
  cli(['d1','migrations','apply','AUTH_DB','--local','--config',configPath,'--persist-to',persist]);
@@ -159,16 +230,16 @@ try{
   res.writeHead(200,{'content-type':types[extname(file)]??'application/octet-stream','cache-control':'no-store'});createReadStream(file).pipe(res);
  });await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(8898,'127.0.0.1',resolve);});
  browser=await chromium.launch({headless:true,executablePath:process.env.PUPTIME_CHROMIUM_EXECUTABLE??chromium.executablePath()});
- if(appleDeletionOnly){await qualifyAppleDeletion();}else{
+ if(appleDeletionOnly){await qualifyAppleDeletion();}else if(coreAccountsOnly){await qualifyCoreAccounts(coreSource);}else{
  const privateContext=await context(),page=await privateContext.newPage(),email=`web-review-${crypto.randomUUID().slice(0,8)}@example.invalid`;
  await page.goto(front+'/account');await page.getByLabel('Email address',{exact:true}).waitFor();assert.equal(await page.locator('meta[name=robots]').getAttribute('content'),'noindex, nofollow');
  await page.screenshot({path:join(output,'300-web-account-sign-in.png'),fullPage:true});
  const invalidContext=await context(),invalidPage=await invalidContext.newPage();await signIn(invalidPage,`web-code-${crypto.randomUUID().slice(0,8)}@example.invalid`,true);await invalidContext.close();
  await signIn(page,email);const account=await (await privateContext.request.get(front+'/api/account')).json(),uid=account.user.id;
- assert.equal(account.cloud.canSync,false);assert.deepEqual(account.pets,[]);assert.equal(read('SELECT * FROM cloud_accounts WHERE account_id=?',uid).length,0);
- pass('Genuine UI email OTP signs in with zero trial, puppy enrollment or cloud write.');
+ assert.deepEqual(account.cloud,{canSync:true,canExport:true});assert.deepEqual(account.pets,[]);
+ pass('Genuine UI email OTP signs in with immediate development cloud access, without puppy enrollment or cloud writes.');
  // A queued handler can still have uncertain=null while another operation's durable marker exists.
- const staleContext=await context(),stalePage=await staleContext.newPage(),staleEmail=`web-stale-tab-${crypto.randomUUID().slice(0,8)}@example.invalid`;await signIn(stalePage,staleEmail);const staleUid=(await(await staleContext.request.get(front+'/api/account')).json()).user.id;await stalePage.getByRole('button',{name:'Delete cloud account',exact:true}).click();await stalePage.getByRole('dialog').waitFor();const otherAttempt=String(Date.now()-1000);await stalePage.evaluate(({id,at})=>localStorage.setItem('puptime.account.deletion.'+id,at),{id:staleUid,at:otherAttempt});sql(`UPDATE session SET createdAt=0 WHERE userId='${staleUid}'`);let staleDeletes=0;stalePage.on('request',request=>{if(request.method()==='DELETE'&&new URL(request.url()).pathname==='/api/account')staleDeletes++;});await stalePage.getByRole('dialog').getByRole('button',{name:'Delete cloud account',exact:true}).click();await stalePage.getByRole('heading',{name:'Confirm it’s you',exact:true}).waitFor();assert.equal(await stalePage.evaluate(id=>localStorage.getItem('puptime.account.deletion.'+id),staleUid),otherAttempt,'Stale preflight must preserve the other unresolved attempt.');assert.equal(staleDeletes,0);assert.equal(await stalePage.getByRole('button',{name:'Verify with Google',exact:true}).count(),0);await stalePage.screenshot({path:join(output,'316-web-stale-guard-reauth.png'),fullPage:true});await staleContext.close();pass('A stale React preflight preserves another durable deletion marker and sends no DELETE.');
+ const staleContext=await context(),stalePage=await staleContext.newPage(),staleEmail=`web-stale-tab-${crypto.randomUUID().slice(0,8)}@example.invalid`;await signIn(stalePage,staleEmail);const staleUid=(await(await staleContext.request.get(front+'/api/account')).json()).user.id;await stalePage.getByRole('button',{name:'Delete cloud account',exact:true}).click();await stalePage.getByRole('dialog').waitFor();const otherAttempt=String(Date.now()-1000);await stalePage.evaluate(({id,at})=>localStorage.setItem('puptime.account.deletion.'+id,at),{id:staleUid,at:otherAttempt});sql(`UPDATE session SET createdAt='${new Date(0).toISOString()}' WHERE userId='${staleUid}'`);let staleDeletes=0;stalePage.on('request',request=>{if(request.method()==='DELETE'&&new URL(request.url()).pathname==='/api/account')staleDeletes++;});await stalePage.getByRole('dialog').getByRole('button',{name:'Delete cloud account',exact:true}).click();await stalePage.getByRole('heading',{name:'Confirm it’s you',exact:true}).waitFor();assert.equal(await stalePage.evaluate(id=>localStorage.getItem('puptime.account.deletion.'+id),staleUid),otherAttempt,'Stale preflight must preserve the other unresolved attempt.');assert.equal(staleDeletes,0);assert.equal(await stalePage.getByRole('button',{name:'Verify with Google',exact:true}).count(),0);await stalePage.screenshot({path:join(output,'316-web-stale-guard-reauth.png'),fullPage:true});await staleContext.close();pass('A stale React preflight preserves another durable deletion marker and sends no DELETE.');
  if(process.env.PUPTIME_WEB_REVIEW_GUARDS_ONLY==='1'){writeFileSync(join(output,'verification-guard-followups.json'),JSON.stringify({passed:summary,scope:'Focused stale-React guard regression using genuine local OTP/D1; no live services or credentials recorded.',privateAuthRecorded:false},null,2));console.log('Focused guard evidence:',output);}else{
  // Hold an actual successful DELETE acknowledgment while the page reloads.
  const inflightAuth=await context(),inflightPrivate=await inflightAuth.newPage(),inflightEmail=`web-inflight-${crypto.randomUUID().slice(0,8)}@example.invalid`;await signIn(inflightPrivate,inflightEmail);const inflightUid=(await(await inflightAuth.request.get(front+'/api/account')).json()).user.id;const inflightContext=await context({storageState:await inflightAuth.storageState(),recordVideo:{dir:join(output,'video'),size:{width:1440,height:1000}},viewport:{width:1440,height:1000}}),inflightPage=await inflightContext.newPage();await inflightPage.goto(front+'/account');await inflightPage.getByRole('button',{name:'Sign out',exact:true}).waitFor();await inflightPage.waitForTimeout(2000);
@@ -176,7 +247,6 @@ try{
  await inflightPage.route('**/api/account',async route=>{if(route.request().method()!=='DELETE'){await route.continue();return;}deleteArrived();await deleteDispatch;const response=await route.fetch();assert.equal(response.status(),200);commitDelete();await deleteReply;try{await route.abort('failed');}catch{/* Reload may already have cancelled this held request. */}});
  await inflightPage.getByRole('dialog').getByRole('button',{name:'Delete cloud account',exact:true}).click();await deleteEntered;const persisted=await inflightPage.evaluate(id=>localStorage.getItem('puptime.account.deletion.'+id),inflightUid);assert.ok(persisted,'Expected unresolved deletion to be saved before dispatch.');startDelete();await deleteCommitted;await inflightPage.reload();await inflightPage.getByRole('alert').filter({hasText:'response was lost'}).waitFor();assert.equal(await inflightPage.getByLabel('Email address',{exact:true}).isVisible(),false);await inflightPage.screenshot({path:join(output,'313-web-inflight-deletion.png'),fullPage:true});await inflightPage.waitForTimeout(2600);releaseDelete();const inflightVideo=inflightPage.video();await inflightPage.close();const reopened=await inflightContext.newPage();await reopened.goto(front+'/account');await reopened.getByRole('alert').filter({hasText:'response was lost'}).waitFor();assert.equal(await reopened.getByLabel('Email address',{exact:true}).isVisible(),false);assert.equal(read('SELECT id FROM user WHERE email=?',inflightEmail).length,0);await inflightContext.close();if(inflightVideo)writeFileSync(join(output,'313-video-source.txt'),await inflightVideo.path());await inflightAuth.close();pass('Pre-dispatch deletion intent survives an in-flight reload and closed-tab reopening without signup or a false acknowledgment.');
  const fixtureHeaders={'x-puptime-fixture':'true'};
- assert.equal((await privateContext.request.post(front+'/api/cloud/trial',{headers:fixtureHeaders,data:{}})).status(),200);
  const pet='web-review-pet';assert.equal((await privateContext.request.post(front+'/api/cloud/enroll',{headers:fixtureHeaders,data:{operationId:crypto.randomUUID(),deviceId:'web-review-seed',localPetId:pet,name:'Biscuit'}})).status(),200);
  for(let start=0;start<1000;start+=50){const mutations=Array.from({length:50},(_,offset)=>({protocolVersion:1,operationId:crypto.randomUUID(),deviceId:'web-review-seed',recordId:cloudRecordId('event',pet,'event-'+(start+offset)),petId:pet,kind:'event',baseRevision:0,intent:'create',patch:{type:'pee',at:1000000+start+offset,source:'app',note:'Synthetic review log 犬 '+(start+offset)}}));const result=await privateContext.request.post(front+'/api/sync/push',{headers:fixtureHeaders,data:{mutations}});assert.equal(result.status(),200);assert.deepEqual((await result.json()).rejected,[]);}
  // Synthetic browser auth is inherited in memory only after genuine OTP UI.
@@ -195,8 +265,8 @@ try{
  assert.equal(read("SELECT * FROM account WHERE userId=? AND providerId='google'",uid).length,0);pass('Real link initiation + simulated external cancel returns safely, sanitizes URL and never reports Connected.');
  await review.waitForTimeout(2600);const video=review.video();await recorded.close();if(video)writeFileSync(join(output,'306-video-source.txt'),await video.path());
  // Reauthentication is deliberately performed in the unrecorded context.
- sql(`UPDATE session SET createdAt=0 WHERE userId='${uid}'`);await page.reload();await page.getByRole('button',{name:'Delete cloud account',exact:true}).click();await page.getByRole('heading',{name:'Confirm it’s you'}).waitFor();assert.equal(await page.getByRole('dialog').isVisible(),false);await page.screenshot({path:join(output,'305-web-account-reauthentication.png'),fullPage:true});
- sql(`INSERT INTO account (id,accountId,providerId,userId,createdAt,updatedAt) VALUES ('review-google','review-google','google','${uid}',0,0)`);await page.reload();await page.getByRole('button',{name:'Delete cloud account',exact:true}).click();await page.getByRole('heading',{name:'Confirm it’s you'}).waitFor();
+ sql(`UPDATE session SET createdAt='${new Date(0).toISOString()}' WHERE userId='${uid}'`);await page.reload();await page.getByRole('button',{name:'Delete cloud account',exact:true}).click();await page.getByRole('heading',{name:'Confirm it’s you'}).waitFor();assert.equal(await page.getByRole('dialog').isVisible(),false);await page.screenshot({path:join(output,'305-web-account-reauthentication.png'),fullPage:true});
+ sql(`INSERT INTO account (id,accountId,providerId,userId,createdAt,updatedAt) VALUES ('review-google','review-google','google','${uid}','${new Date().toISOString()}','${new Date().toISOString()}')`);await page.reload();await page.getByRole('button',{name:'Delete cloud account',exact:true}).click();await page.getByRole('heading',{name:'Confirm it’s you'}).waitFor();
  await page.route('https://accounts.google.com/**',route=>route.fulfill({status:302,headers:{location:front+'/account?error=access_denied'},body:''}));await page.getByRole('button',{name:'Verify with Google',exact:true}).click();await page.getByRole('heading',{name:'Confirm it’s you'}).waitFor();await page.getByRole('alert').filter({hasText:'Sign-in wasn’t completed'}).waitFor();assert.equal(await page.getByRole('status').filter({hasText:'Signed in again'}).count(),0);assert.equal(await page.getByRole('dialog').isVisible(),false);pass('Cancelled provider reauthentication retains the stale-session gate and never claims success.');
  await page.getByRole('button',{name:'Email me a code',exact:true}).click();await page.getByLabel('Email code',{exact:true}).waitFor();await page.getByLabel('Email code',{exact:true}).fill(code(email));await page.getByRole('button',{name:'Continue',exact:true}).click();await page.getByRole('status').filter({hasText:'Signed in again'}).waitFor();assert.equal(await page.getByRole('dialog').isVisible(),false);assert.equal((await (await privateContext.request.get(front+'/api/account')).json()).user.id,uid);pass('Stale deletion requires genuine same-account OTP reauthentication and a new confirmation.');
  const freshOriginalAuth=await privateContext.storageState();
@@ -233,7 +303,7 @@ try{
  }
  // A service refusal without deletion must remain recoverable after auth becomes stale.
  const recoveryContext=await context(),recoveryPage=await recoveryContext.newPage(),recoveryEmail=`web-recovery-${crypto.randomUUID().slice(0,8)}@example.invalid`;await signIn(recoveryPage,recoveryEmail);const recoveryUid=(await(await recoveryContext.request.get(front+'/api/account')).json()).user.id;let recoveryDeletes=0;
- await recoveryPage.route('**/api/account',async route=>{if(route.request().method()!=='DELETE'){await route.continue();return;}recoveryDeletes++;await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'synthetic_service_refusal'})});});await recoveryPage.getByRole('button',{name:'Delete cloud account',exact:true}).click();await recoveryPage.getByRole('dialog').getByRole('button',{name:'Delete cloud account',exact:true}).click();await recoveryPage.getByRole('alert').filter({hasText:'response was lost'}).waitFor();sql(`UPDATE session SET createdAt=0 WHERE userId='${recoveryUid}'`);await recoveryPage.reload();await recoveryPage.getByRole('button',{name:'Retry deletion',exact:true}).click();await recoveryPage.getByRole('heading',{name:'Confirm it’s you',exact:true}).waitFor();assert.equal(await recoveryPage.getByRole('button',{name:'Verify with Google',exact:true}).count(),0);assert.equal(await recoveryPage.getByRole('dialog').isVisible(),false);assert.equal(await recoveryPage.getByLabel('Email address',{exact:true}).count(),0);
+ await recoveryPage.route('**/api/account',async route=>{if(route.request().method()!=='DELETE'){await route.continue();return;}recoveryDeletes++;await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'synthetic_service_refusal'})});});await recoveryPage.getByRole('button',{name:'Delete cloud account',exact:true}).click();await recoveryPage.getByRole('dialog').getByRole('button',{name:'Delete cloud account',exact:true}).click();await recoveryPage.getByRole('alert').filter({hasText:'response was lost'}).waitFor();sql(`UPDATE session SET createdAt='${new Date(0).toISOString()}' WHERE userId='${recoveryUid}'`);await recoveryPage.reload();await recoveryPage.getByRole('button',{name:'Retry deletion',exact:true}).click();await recoveryPage.getByRole('heading',{name:'Confirm it’s you',exact:true}).waitFor();assert.equal(await recoveryPage.getByRole('button',{name:'Verify with Google',exact:true}).count(),0);assert.equal(await recoveryPage.getByRole('dialog').isVisible(),false);assert.equal(await recoveryPage.getByLabel('Email address',{exact:true}).count(),0);
  await recoveryPage.getByRole('button',{name:'Email me a code',exact:true}).click();await recoveryPage.getByLabel('Email code',{exact:true}).waitFor();await recoveryPage.getByLabel('Email code',{exact:true}).fill(code(recoveryEmail));await recoveryPage.getByRole('button',{name:'Continue',exact:true}).click();await recoveryPage.getByRole('status').filter({hasText:'Signed in again'}).waitFor();assert.equal(recoveryDeletes,1);assert.equal(read('SELECT id FROM user WHERE id=?',recoveryUid).length,1);assert.equal((await(await recoveryContext.request.get(front+'/api/account')).json()).user.id,recoveryUid);assert.ok(await recoveryPage.evaluate(id=>localStorage.getItem('puptime.account.deletion.'+id),recoveryUid));
  const recoveryRecorded=await context({storageState:await recoveryContext.storageState(),recordVideo:{dir:join(output,'video'),size:{width:1440,height:1000}},viewport:{width:1440,height:1000}}),recoveryReview=await recoveryRecorded.newPage();await recoveryReview.goto(front+'/account');await recoveryReview.getByRole('button',{name:'Retry deletion',exact:true}).waitFor();await recoveryReview.waitForTimeout(2200);await recoveryReview.getByRole('button',{name:'Retry deletion',exact:true}).click();await recoveryReview.getByRole('dialog',{name:'Delete cloud account?'}).waitFor();await recoveryReview.screenshot({path:join(output,'314-web-deletion-recovery-confirmation.png'),fullPage:true});await recoveryReview.waitForTimeout(2200);await recoveryReview.getByRole('dialog').getByRole('button',{name:'Cancel',exact:true}).click();assert.equal(read('SELECT id FROM user WHERE id=?',recoveryUid).length,1);await recoveryReview.getByRole('button',{name:'Retry deletion',exact:true}).click();await recoveryReview.getByRole('dialog').getByRole('button',{name:'Delete cloud account',exact:true}).click();await recoveryReview.getByRole('status').filter({hasText:'Cloud account deleted'}).waitFor();assert.equal(read('SELECT id FROM user WHERE id=?',recoveryUid).length,0);assert.equal(await recoveryReview.evaluate(id=>localStorage.getItem('puptime.account.deletion.'+id),recoveryUid),null);await recoveryReview.waitForTimeout(2600);const recoveryVideo=recoveryReview.video();await recoveryRecorded.close();if(recoveryVideo)writeFileSync(join(output,'314-video-source.txt'),await recoveryVideo.path());await recoveryContext.close();pass('Uncertain deletion survives stale auth, verifies the same owner without signup, and requires a new cancellable confirmation before retry.');
  const marketingContext=await context(),marketing=await marketingContext.newPage();await marketing.goto(front+'/');await marketing.getByRole('heading',{level:1,name:'Puppy log',exact:true}).waitFor();await marketing.screenshot({path:join(output,'311-web-marketing-desktop.png'),fullPage:true});await marketing.setViewportSize({width:390,height:844});await marketing.screenshot({path:join(output,'312-web-marketing-mobile.png'),fullPage:true});assert.equal(await marketing.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);await marketing.close();await marketingContext.close();pass('The marketing homepage renders at desktop and phone widths with account navigation and platform-neutral app copy.');
@@ -243,7 +313,7 @@ try{
  console.log('Review evidence:',output);
  }
  }
-}catch(error){if(reviewPage&&!reviewPage.isClosed())await reviewPage.screenshot({path:join(output,appleDeletionOnly?'327-public-review-failure.png':'319-public-review-failure.png'),fullPage:true}).catch(()=>{});let message=error?.message??'unknown failure';for(const secret of privateCodes)message=message.replaceAll(secret,'[REDACTED]');console.error('FAIL isolated web acceptance:',message);process.exitCode=1;}
+}catch(error){if(reviewPage&&!reviewPage.isClosed())await reviewPage.screenshot({path:join(output,coreAccountsOnly?'core-public-review-failure.png':appleDeletionOnly?'327-public-review-failure.png':'319-public-review-failure.png'),fullPage:true}).catch(()=>{});let message=error?.message??'unknown failure';for(const secret of privateCodes)message=message.replaceAll(secret,'[REDACTED]');console.error('FAIL isolated web acceptance:',message);process.exitCode=1;}
 finally{
  rmSync(join(output,'private-export.ndjson'),{force:true});
  await browser?.close();if(server)await new Promise(resolve=>server.close(resolve));

@@ -2,9 +2,9 @@ import { useCallback,useEffect,useRef,useState } from 'react';
 import { AppState } from 'react-native';
 import * as Network from 'expo-network';
 import { watchAccountChanges } from './change-subscription';
-import { createNativeCloudClient } from './auth.ios';
+import { createNativeCloudClient } from './auth.native';
 import { createAccountController,type AccountController } from './account-controller';
-import { getLocalRuntime,subscribeLocalWrites } from '../local/runtime.ios';
+import { getLocalRuntime,subscribeLocalWrites } from '../local/runtime.native';
 import type { CloudHandle } from './handle';
 export type { CloudHandle } from './handle';
 

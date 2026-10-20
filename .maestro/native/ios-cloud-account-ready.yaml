@@ -5,7 +5,7 @@ name: iOS cloud qualification begins with acknowledged history
     stopApp: false
 - runFlow:
     when:
-      visible: ^Sign out on this iPhone\?$
+      visible: ^Sign out on this device\?$
     commands:
       - tapOn: Cancel
 - runFlow: ../helpers/open-account.yaml

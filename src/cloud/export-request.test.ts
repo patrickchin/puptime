@@ -49,7 +49,7 @@ test('malformed/truncated streams and disk failure never reach success or a shar
 });
 
 test('HTTP errors map existing cloud categories without parsing private response bodies',async()=>{
- for(const [status,category] of [[400,'invalid-request'],[401,'auth-required'],[402,'expired'],[403,'forbidden'],[409,'conflict'],[410,'account-deleted'],[429,'rate-limited'],[503,'server-error']] as const){
+ for(const [status,category] of [[400,'invalid-request'],[401,'auth-required'],[402,'invalid-request'],[403,'forbidden'],[409,'conflict'],[410,'account-deleted'],[429,'rate-limited'],[503,'server-error']] as const){
   const output=destination();let cancelled=false;
   const client=fixture(async()=>new Response(new ReadableStream({cancel(){cancelled=true;}}),{status}),output);
   await assert.rejects(client.request('owner-1',output.stream),error=>error instanceof CloudApiError&&error.category===category&&error.status===status);

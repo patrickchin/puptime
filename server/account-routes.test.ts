@@ -33,21 +33,26 @@ function event(recordId = 'event-1', petId = 'pet-1'): Mutation {
   return { protocolVersion: 1, operationId: crypto.randomUUID(), deviceId: 'test-device', recordId, petId, kind: 'event', baseRevision: 0, intent: 'create', patch: { type: 'pee', at: 100, source: 'app', note: 'Private care note' } };
 }
 async function enroll(user: Owner, petId = 'pet-1') {
-  expect((await call(user, 'cloud/trial', {})).status).toBe(200);
   const response = await call(user, 'cloud/enroll', { operationId: crypto.randomUUID(), deviceId: 'test-device', localPetId: petId, name: 'Pip' });
   expect(response.status).toBe(200);
 }
 
-test('sign-in does not enable sync or silently enroll a local puppy', async () => {
+test('sign-in grants development access without billing but does not silently enroll or write a puppy', async () => {
   const user = await owner();
   const account = await (await call(user, 'account')).json<{ cloud: { canSync: boolean }; pets: unknown[] }>();
-  expect(account.cloud.canSync).toBe(false);
+  expect(account.cloud.canSync).toBe(true);
   expect(account.pets).toEqual([]);
-  expect((await call(user, 'sync/push', { mutations: [event()] })).status).toBe(402);
+  const premature = await (await call(user, 'sync/push', { mutations: [event()] })).json<{accepted:unknown[];rejected:{error:string}[]}>();
+  expect(premature.accepted).toEqual([]);
+  expect(premature.rejected).toHaveLength(1);
+  expect(premature.rejected[0].error).toBe('conflict');
+  expect(await (await call(user,'sync/pull?after=0')).json()).toEqual({changes:[],cursor:0,hasMore:false});
+  expect((await call(user,'cloud/trial',{})).status).toBe(404);
+  expect(await env.AUTH_DB.prepare('SELECT account_id FROM cloud_accounts WHERE account_id=?').bind(user.id).first()).toBeNull();
   expect((await call(null, 'account/export')).status).toBe(401);
 });
 
-test('explicit activation and enrollment synchronize only the authenticated owner data', async () => {
+test('explicit enrollment synchronizes only the authenticated owner data', async () => {
   const user = await owner(); await enroll(user);
   const input = event();
   const pushed = await (await call(user, 'sync/push', { mutations: [input] })).json<{ accepted: unknown[]; rejected: unknown[] }>();
@@ -81,11 +86,11 @@ test('partial mutation batches acknowledge only durable changes and retries do n
   expect(history.revisions.length).toBe(1);
 });
 
-test('expired access stops sync while full private export remains available', async () => {
+test('private sync and full export need no subscription or trial activation', async () => {
   const user = await owner(); await enroll(user);
   await call(user, 'sync/push', { mutations: [event()] });
-  await env.AUTH_DB.prepare('UPDATE cloud_accounts SET trial_started_at = 0, trial_ends_at = 1 WHERE account_id = ?').bind(user.id).run();
-  expect((await call(user, 'sync/pull?after=0')).status).toBe(402);
+  expect(await env.AUTH_DB.prepare('SELECT account_id FROM cloud_accounts WHERE account_id=?').bind(user.id).first()).toBeNull();
+  expect((await call(user, 'sync/pull?after=0')).status).toBe(200);
   const response = await call(user, 'account/export');
   expect(response.status).toBe(200);
   expect(response.headers.get('content-type')).toContain('application/x-ndjson');
@@ -98,7 +103,7 @@ test('expired access stops sync while full private export remains available', as
 
 test('untrusted origins cannot activate cloud using an existing session cookie', async () => {
   const user = await owner();
-  const response = await worker.fetch(new Request('https://puptime.test/api/cloud/trial', {
+  const response = await worker.fetch(new Request('https://puptime.test/api/cloud/enroll', {
     method: 'POST', headers: { origin: 'https://untrusted.example', cookie: user.cookie, 'content-type': 'application/json' }, body: '{}',
   }), settings);
   expect(response.status).toBe(403);
@@ -174,7 +179,7 @@ test('account deletion requires recent authentication and preserves data on reje
 
 test('an interrupted deletion can be retried without reopening access to retained history', async () => {
   const user = await owner(); await enroll(user);
-  await env.AUTH_DB.prepare("UPDATE cloud_accounts SET state = 'deleting' WHERE account_id = ?").bind(user.id).run();
+  await env.AUTH_DB.prepare("INSERT INTO cloud_accounts(account_id,state) VALUES (?,'deleting')").bind(user.id).run();
   expect((await call(user, 'account/export')).status).toBe(410);
   expect((await deleteAccount(user)).status).toBe(200);
   expect((await call(user, 'account')).status).toBe(401);
@@ -202,9 +207,9 @@ function observeSocket(socket:WebSocket) {
  return {messages,get closed(){return closed;}};
 }
 const settleSocket=()=>new Promise(resolve=>setTimeout(resolve,30));
-test('change channel rejects anonymous, unentitled, wrong-origin and expired sessions',async()=>{
+test('change channel accepts a new signed-in account without billing and rejects anonymous, wrong-origin and expired sessions',async()=>{
  expect((await changes(null)).status).toBe(401);
- const user=await owner();expect((await changes(user)).status).toBe(402);
+ const user=await owner();const fresh=await changes(user);expect(fresh.status).toBe(101);fresh.webSocket!.accept();fresh.webSocket!.close();
  await enroll(user);expect((await changes(user,'https://untrusted.example')).status).toBe(403);
  await env.AUTH_DB.prepare('UPDATE session SET expiresAt=0 WHERE userId=?').bind(user.id).run();
  expect((await changes(user)).status).toBe(401);
@@ -222,12 +227,13 @@ test('change channel sends durable metadata only to its owner, with no duplicate
   await call(user,'sync/push',{mutations:[input]});await settleSocket();expect(seen.messages.length).toBe(2);
  }finally{socket.close();otherSocket.close();}
 });
-test('revoked sessions and expired access stop subsequent change metadata; deleting the account closes its channel',async()=>{
- for(const condition of ['revoked','expired','deleted'] as const){
+test('revoked or ISO-expired sessions and deleting accounts stop change metadata; deletion closes its channel',async()=>{
+ for(const condition of ['revoked','expired','deleting','deleted'] as const){
   const user=await owner();await enroll(user);const response=await changes(user);expect(response.status).toBe(101);
   const socket=response.webSocket!,seen=observeSocket(socket);await settleSocket();
   if(condition==='revoked')await env.AUTH_DB.prepare('DELETE FROM session WHERE userId=?').bind(user.id).run();
-  if(condition==='expired')await env.AUTH_DB.prepare('UPDATE cloud_accounts SET trial_started_at=0,trial_ends_at=1 WHERE account_id=?').bind(user.id).run();
+  if(condition==='expired')await env.AUTH_DB.prepare('UPDATE session SET expiresAt=? WHERE userId=?').bind(new Date(Date.now()-1000).toISOString(),user.id).run();
+  if(condition==='deleting')await env.AUTH_DB.prepare("INSERT INTO cloud_accounts(account_id,state) VALUES (?,'deleting')").bind(user.id).run();
   if(condition==='deleted')expect((await deleteAccount(user)).status).toBe(200);
   else await runInDurableObject(env.ACCOUNTS.getByName(user.id),async instance=>{instance.apply(event());});
   await settleSocket();expect(seen.messages).toEqual([{protocolVersion:1,cursor:0}]);expect(seen.closed).toBe(true);socket.close();
@@ -284,6 +290,6 @@ test('authenticated cloud history validates for the client across merge delete r
  expect(await (await call(user,oldPath)).json()).toEqual(old);
  const other=await owner();await enroll(other,'other-pet');expect(await (await call(other,`records/${encodeURIComponent(recordId)}/history`)).json()).toEqual({revisions:[]});
  expect((await call(null,`records/${encodeURIComponent(recordId)}/history`)).status).toBe(401);
- await env.AUTH_DB.prepare('UPDATE cloud_accounts SET trial_started_at=0,trial_ends_at=1 WHERE account_id=?').bind(user.id).run();
- expect((await call(user,`records/${encodeURIComponent(recordId)}/history`)).status).toBe(402);
+ await env.AUTH_DB.prepare('UPDATE session SET expiresAt=? WHERE userId=?').bind(new Date(Date.now()-1000).toISOString(),user.id).run();
+ expect((await call(user,`records/${encodeURIComponent(recordId)}/history`)).status).toBe(401);
 });

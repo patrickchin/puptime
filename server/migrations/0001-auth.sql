@@ -17,3 +17,24 @@ create index "verification_identifier_idx" on "verification" ("identifier");
 
 CREATE TABLE local_email_previews (id TEXT PRIMARY KEY, email TEXT NOT NULL, code TEXT NOT NULL, expires_at INTEGER NOT NULL);
 CREATE INDEX local_email_previews_by_email ON local_email_previews(email, expires_at DESC);
+
+-- Puptime's only extra account state fences confirmed deletion cleanup.
+-- Cloud sync has no trial/subscription requirement during development.
+CREATE TABLE cloud_accounts (
+  account_id TEXT PRIMARY KEY NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+  state TEXT NOT NULL DEFAULT 'active' CHECK (state IN ('active', 'deleting'))
+);
+
+CREATE TRIGGER account_reject_insert_while_deleting
+BEFORE INSERT ON account
+WHEN EXISTS (SELECT 1 FROM cloud_accounts WHERE account_id = NEW.userId AND state = 'deleting')
+BEGIN
+  SELECT RAISE(ABORT, 'account_deleting');
+END;
+
+CREATE TRIGGER account_reject_update_while_deleting
+BEFORE UPDATE ON account
+WHEN EXISTS (SELECT 1 FROM cloud_accounts WHERE account_id IN (OLD.userId, NEW.userId) AND state = 'deleting')
+BEGIN
+  SELECT RAISE(ABORT, 'account_deleting');
+END;

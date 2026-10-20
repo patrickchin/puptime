@@ -1,5 +1,9 @@
 # Cloud implementation verification
 
+Current scope is [the cloud development milestone](cloud-development.md).
+Entries below retain historical evidence, including superseded trial and release
+work; they are not acceptance claims for the new account-access contract.
+
 This is an evidence ledger, not a declaration that cloud features have shipped. Native cloud foundations and client have merged; distributed provider-authenticated Release remains gated. Unreleased first-release SQL cleanup is in progress under the October18 no-users decision.
 
 ## Environment and cost boundaries

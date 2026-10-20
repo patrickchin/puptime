@@ -6,6 +6,9 @@
   "compatibility_flags": [
     "nodejs_compat"
   ],
+  "rules": [
+    { "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }
+  ],
   "durable_objects": {
     "bindings": [
       {
@@ -37,7 +40,6 @@
         "ENVIRONMENT": "staging",
         "AUTH_BASE_URL": "https://puptime.pages.dev",
         "WEB_ORIGINS": "https://puptime.pages.dev",
-        "CLOUD_TRIAL_DAYS": "14",
         "ACCOUNT_JURISDICTION": "eu"
       },
       "durable_objects": {

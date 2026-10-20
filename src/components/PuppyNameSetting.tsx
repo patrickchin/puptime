@@ -1,3 +1,3 @@
 import type { PuppyNameSettingProps } from './puppy-name-setting-props';
-// Account and puppy setup UI for other platforms follows the iOS release.
+// Browser activity fallback; phones resolve PuppyNameSetting.native.tsx.
 export function PuppyNameSetting(_props:PuppyNameSettingProps) {return null;}

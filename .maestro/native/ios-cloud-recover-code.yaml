@@ -1,5 +1,5 @@
 appId: com.patrickchin.puptime
-name: iOS reauthentication resumes sync without another trial
+name: iOS reauthentication resumes the existing cloud association
 ---
 - launchApp:
     stopApp: false

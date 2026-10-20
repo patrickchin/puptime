@@ -6,14 +6,14 @@ import { enrollmentSchema, mutationSchema, recordIdSchema } from '../src/cloud/p
 import { getAccountStore, type AccountStore } from './account-store';
 import { createAuth } from './auth';
 import type { AppleRevocation } from './account-lifecycle';
-import { activateTrial, cloudAccess, getCloudAccount, trialDaysFromEnvironment, type CloudAccess, type CloudAccount } from './entitlements';
+import { cloudAccess, getCloudAccount, type CloudAccess } from './cloud-access';
 
 type AccountEnv = { Bindings: Cloudflare.Env; Variables: {
   user: { id: string; email: string; name: string }; sessionCreatedAt: number; sessionId: string;
-  store: DurableObjectStub<AccountStore>; cloud: CloudAccess; cloudAccount: CloudAccount | null;
+  store: DurableObjectStub<AccountStore>; cloud: CloudAccess;
 } };
 const syncAccess = createMiddleware<AccountEnv>(async (context, next) => {
-  if (!context.get('cloud').canSync) return context.json({ error: 'cloud_subscription_required' }, 402);
+  if (!context.get('cloud').canSync) return context.json({ error: 'cloud_unavailable' }, 403);
   await next();
 });
 const pushSchema = z.strictObject({ mutations: z.array(mutationSchema).min(1).max(50) });
@@ -39,18 +39,13 @@ const authenticated = createMiddleware<AccountEnv>(async (context, next) => {
   context.set('user', { id: user.id, email: user.email, name: user.name });
   context.set('sessionCreatedAt', new Date(session.createdAt).getTime());
   context.set('sessionId',session.id);
-  context.set('cloudAccount', account);
-  context.set('cloud', cloudAccess(account, Date.now()));
+  context.set('cloud', cloudAccess(account));
   context.set('store', getAccountStore(context.env, user.id));
   await next();
 });
 accountRoutes.get('/account', authenticated, async (context) => {
-  const summary = context.get('cloudAccount') ? await context.get('store').summary() : { pets: [] };
+  const summary = await context.get('store').summary();
   return context.json({ user: context.get('user'), cloud: context.get('cloud'), ...summary });
-});
-accountRoutes.post('/cloud/trial', authenticated, validator('json', (value) => z.strictObject({}).parse(value)), async (context) => {
-  const account = await activateTrial(context.env.AUTH_DB, context.get('user').id, Date.now(), trialDaysFromEnvironment(context.env.CLOUD_TRIAL_DAYS));
-  return context.json({ cloud: cloudAccess(account, Date.now()) });
 });
 accountRoutes.post('/cloud/enroll', authenticated, syncAccess, validator('json', (value) => enrollmentSchema.parse(value)), async (context) => {
   const result = await context.get('store').enrollForClient(context.req.valid('json'));

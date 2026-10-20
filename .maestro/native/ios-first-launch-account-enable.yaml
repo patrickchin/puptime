@@ -1,5 +1,5 @@
 appId: com.patrickchin.puptime
-name: First-open explicit trial reaches cloud sync and the first log
+name: First-open explicit cloud setup reaches sync and the first log
 ---
 - tapOn:
     id: setup.cloud.enable

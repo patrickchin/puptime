@@ -44,7 +44,7 @@ try {
   try{flow('ios-puppy-name-failure.yaml');}
   finally{inspection.exec('DROP TRIGGER fail_review_rename');}
   assert.deepEqual(snapshot(),failedBefore,'Failed rename must roll back all durable state.');
-  console.log('PASS actual SQL failure: committed name, populated history, revisions and outbox unchanged; retry prompt preserves attempted text.');
+  console.log('PASS actual SQL failure: committed name, populated history, revisions and outbox unchanged; inline failure preserves attempted text.');
   flow('ios-puppy-name-retry.yaml');
   const after=snapshot();
   assert.deepEqual(after.puppies,failedBefore.puppies.map(pet=>pet.id===petId?{...pet,name:'Retry biscuit'}:pet));
@@ -56,7 +56,7 @@ try {
   const projected=snapshot();
   flow('ios-puppy-name-projection.yaml');
   assert.deepEqual(snapshot(),projected,'Cancelling the draft must not overwrite the independently committed name.');
-  console.log('PASS independent production-SQLite projection and foreground refresh update the saved label while preserving the open native prompt draft; Cancel writes nothing. This is a projection fixture, not HTTP sync.');
+  console.log('PASS independent production-SQLite projection and foreground refresh update the saved label while preserving the open editor draft; Cancel writes nothing. This is a projection fixture, not HTTP sync.');
   flow('ios-puppy-name-blank.yaml');
   assert.deepEqual(snapshot(),projected,'Invalid blank rename must not create a revision or change the puppy.');
   console.log('PASS blank rename is rejected without modifying durable state.');

@@ -40,7 +40,6 @@ test('100,000 revisions cross real guarded HTTP and DO streaming in one export R
   });
   return state.storage.sql.exec<{bytes:number}>('SELECT SUM(length(CAST(body AS BLOB))) AS bytes FROM revisions').one().bytes;
  });
- await env.AUTH_DB.prepare('INSERT INTO cloud_accounts(account_id,trial_started_at,trial_ends_at) VALUES (?,0,1)').bind(user.id).run();
  let calls=0;
  // Count calls but forward every operation to the actual runtime binding. The
  // old 100-row Worker paging exhausts this budget; no response data is mocked.

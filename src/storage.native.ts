@@ -5,7 +5,7 @@ import type { NotificationPreferences } from './notification-config';
 import type { ThemePreference } from './theme';
 import type { FinishOnboardingOptions } from './onboarding';
 import type { FirstLaunchStep } from './first-launch';
-import { getLocalRuntime } from './local/runtime.ios';
+import { getLocalRuntime } from './local/runtime.native';
 export { assertValidEvents, EventsImportError, EventsStorageError } from './storage-validation';
 
 const storage=async()=>(await getLocalRuntime()).storage;

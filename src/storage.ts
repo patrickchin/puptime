@@ -1,3 +1,4 @@
+// Browser activity fallback only; iOS and Android use storage.native.ts.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { parseEvents, parseSchedule, EventsImportError, EventsStorageError } from './storage-validation.ts';
 import { storageKeys } from './local/settings.ts';

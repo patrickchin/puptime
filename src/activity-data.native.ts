@@ -1,4 +1,4 @@
-import {getLocalRuntime} from './local/runtime.ios';
+import {getLocalRuntime} from './local/runtime.native';
 export type {ActivityQueries} from './local/activity-queries';
 
 export async function getActivityData(){return (await getLocalRuntime()).activity;}

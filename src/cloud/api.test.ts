@@ -4,8 +4,8 @@ import {createAuthClient} from 'better-auth/react';
 import {Hono} from 'hono';
 import type { Mutation } from './protocol.ts';
 import * as api from './api.ts';
-const config={protocolVersion:1,trialDays:14,providers:{apple:false,google:true,email:false},pricingFinalized:false};
-const account={user:{id:'account-1',email:'person@example.com',name:'Person'},cloud:{canSync:false,canExport:true,source:'none',expiresAt:null},pets:[]};
+const config={protocolVersion:1,providers:{apple:false,google:true,email:false}};
+const account={user:{id:'account-1',email:'person@example.com',name:'Person'},cloud:{canSync:false,canExport:true},pets:[]};
 const event:Mutation={protocolVersion:1,operationId:'op-1',deviceId:'device-1',recordId:'event-1',petId:'pet-1',baseRevision:0,intent:'create',kind:'event',patch:{type:'pee',at:100,source:'app'}};
 function client(request:import('./api.ts').CloudRequest) {assert.equal(typeof api.createCloudApi,'function');return api.createCloudApi(request);}
 
@@ -18,12 +18,12 @@ test('cloud base configuration accepts explicit secure origins and development l
  assert.throws(()=>api.cloudBaseUrl('http://192.168.1.1:8787',true));
 });
 
-test('config, account and explicit trial responses validate all data without performing other actions',async()=>{
- const paths:string[]=[];const cloud=client(async path=>{paths.push(path);return {data:path.endsWith('config')?config:path.endsWith('trial')?{cloud:account.cloud}:account,error:null};});
- assert.deepEqual(await cloud.config(),config);assert.deepEqual(await cloud.account(),account);assert.deepEqual(await cloud.startTrial(),{cloud:account.cloud});
- assert.deepEqual(paths,['/api/config','/api/account','/api/cloud/trial']);
+test('config and account validate the development access contract without activation requests',async()=>{
+ const paths:string[]=[];const cloud=client(async path=>{paths.push(path);return {data:path.endsWith('config')?config:account,error:null};});
+ assert.deepEqual(await cloud.config(),config);assert.deepEqual(await cloud.account(),account);assert.equal('startTrial' in cloud,false);
+ assert.deepEqual(paths,['/api/config','/api/account']);
  for (const response of [{...config,providers:{...config.providers,email:'yes'}},{...config,protocolVersion:2}]) await assert.rejects(client(async()=>({data:response,error:null})).config(),/invalid-response/);
- for (const response of [{...account,user:{...account.user,id:'bad account'}},{...account,cloud:{...account.cloud,canSync:true}},{...account,pets:[{id:'pet',name:'Pip',eventCount:-1}]}]) await assert.rejects(client(async()=>({data:response,error:null})).account(),/invalid-response/);
+ for (const response of [{...account,user:{...account.user,id:'bad account'}},{...account,cloud:{...account.cloud,canSync:'yes'}},{...account,pets:[{id:'pet',name:'Pip',eventCount:-1}]}]) await assert.rejects(client(async()=>({data:response,error:null})).account(),/invalid-response/);
 });
 
 test('enrollment and pull responses reject mismatched identities, malformed pages and unsafe cursor requests',async()=>{
@@ -44,7 +44,7 @@ test('push enforces count and escaped UTF8 byte limits before dispatch and valid
 });
 
 test('API errors preserve actionable status and bounded retry timing without retaining server contents',async()=>{
- for (const [status,category] of [[401,'auth-required'],[402,'expired'],[403,'forbidden'],[409,'conflict'],[410,'account-deleted'],[429,'rate-limited'],[503,'server-error']] as const) {
+ for (const [status,category] of [[401,'auth-required'],[402,'invalid-request'],[403,'forbidden'],[409,'conflict'],[410,'account-deleted'],[429,'rate-limited'],[503,'server-error']] as const) {
   try {await client(async()=>({data:null,error:{status,message:'PRIVATE note token'},retryAfter:'120'})).account();assert.fail('must reject');}
   catch(error) {assert.ok(error instanceof api.CloudApiError);assert.equal(error.status,status);assert.equal(error.category,category);assert.equal(error.retryAfterMs,60000);assert.ok(!JSON.stringify(error).includes('PRIVATE'));assert.ok(!String(error).includes('PRIVATE'));}
  }
@@ -62,7 +62,8 @@ test('SDK request adapter fixes the credential origin, disables redirects and SD
  const controller=new AbortController();let calls=0;
  const request=api.createSdkRequest(async(url,options)=>{calls++;assert.equal(url,'https://puptime.test/api/account');assert.equal(options.redirect,'error');assert.equal(options.retry,0);assert.equal(options.credentials,'omit');assert.equal(options.timeout,15000);assert.equal(options.signal,controller.signal);options.onResponse({response:new Response('{}',{headers:{'retry-after':'3','set-cookie':'better-auth.session_token=PRIVATE'}})});return {data:account,error:null};},'https://puptime.test');
  assert.deepEqual(await request('/api/account',{method:'GET',signal:controller.signal}),{data:account,error:null,retryAfter:'3'});
- for(const path of ['https://other.example/api/account','//other.example/api/account','/api/../private','/api/auth/get-session','/api/account?url=https://other.example']) await assert.rejects(request(path,{method:'GET'}));
+ for(const path of ['https://other.example/api/account','//other.example/api/account','/api/../private','/api/auth/get-session','/api/account?url=https://other.example','/api/cloud/trial']) await assert.rejects(request(path,{method:'GET'}));
+ await assert.rejects(request('/api/cloud/trial',{method:'POST',body:{}}),error=>error instanceof api.CloudApiError&&error.category==='invalid-request');
  assert.equal(calls,1);
 });
 
@@ -100,11 +101,13 @@ test('the installed auth SDK delivers canonical history identities and cursors t
 });
 
 
-test('trial duration is validated configuration and legacy staging defaults to its verified fourteen days',async()=>{
- const {trialDays,...legacy}=config;
- assert.equal((await client(async()=>({data:legacy,error:null})).config()).trialDays,14);
- assert.equal((await client(async()=>({data:{...config,trialDays:21},error:null})).config()).trialDays,21);
- await assert.rejects(client(async()=>({data:{...config,trialDays:0},error:null})).config(),/invalid-response/);
+test('configuration and access reject obsolete billing fields rather than retaining a legacy wire contract',async()=>{
+ for(const extra of [{trialDays:14},{pricingFinalized:false},{unexpected:true}])await assert.rejects(client(async()=>({data:{...config,...extra},error:null})).config(),error=>error instanceof api.CloudApiError&&error.category==='invalid-response');
+ for(const extra of [{source:'trial'},{source:'paid'},{expiresAt:null},{unexpected:true}])await assert.rejects(client(async()=>({data:{...account,cloud:{...account.cloud,...extra}},error:null})).account(),error=>error instanceof api.CloudApiError&&error.category==='invalid-response');
+ for(const canSync of [false,true])for(const canExport of [false,true]){
+  const expected={...account,cloud:{canSync,canExport}};
+  assert.deepEqual(await client(async()=>({data:expected,error:null})).account(),expected);
+ }
 });
 test('installed React Native abort signals support requests and cancellation without throwIfAborted',async()=>{
  const {AbortController:NativeController}=await import('abort-controller');const native=new NativeController();

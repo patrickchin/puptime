@@ -11,10 +11,10 @@ async function fixture(t:TestContext,{pristine=false,exportCloud}:{pristine?:boo
  const database=await createLocalDatabase(sqliteTestConnection(':memory:'));t.after(()=>database.close());
  await initializeLocalDatabase(database,()=> 'pet-1');if(!pristine)await database.write(sql=>sql.runAsync('DELETE FROM routines'));
  const writes=new Set<()=>void>(),runtime=await createLocalRuntime(database,'pet-1',()=>{for(const fn of writes)fn();});
- const summary:CloudAccountSummary={user:{id:'account-1',email:'person@example.com',name:'Person'},cloud:{canSync:false,canExport:true,source:'none',expiresAt:null},pets:[]};
- const state={credentials:false,summary,trialCalls:0,signOutCalls:0,signOutFails:false,storageFails:false,requested:[] as string[],verifications:0,linkCalls:0,listCalls:0,linkedAccounts:[] as {userId:string;providerId:string}[]};
- const config={protocolVersion:1 as const,trialDays:14,providers:{apple:false,google:true,email:true},pricingFinalized:false};
- const api:CloudApi={config:async()=>config,account:async()=>{if(!state.credentials)throw new CloudApiError('auth-required',401);return structuredClone(state.summary);},startTrial:async()=>{state.trialCalls++;state.summary.cloud={canSync:true,canExport:true,source:'trial',expiresAt:8640000000000000};return {cloud:state.summary.cloud};},enroll:async request=>({petId:request.confirmedPetId??request.localPetId}),push:async mutations=>({accepted:[],rejected:mutations.map(mutation=>({operationId:mutation.operationId,error:'retry_later' as const}))}),pull:async after=>({changes:[],cursor:after,hasMore:false}),history:async()=>({revisions:[]})};
+ const summary:CloudAccountSummary={user:{id:'account-1',email:'person@example.com',name:'Person'},cloud:{canSync:true,canExport:true},pets:[]};
+ const state={credentials:false,summary,enrollCalls:0,pushCalls:0,pullCalls:0,signOutCalls:0,signOutFails:false,storageFails:false,requested:[] as string[],verifications:0,linkCalls:0,listCalls:0,linkedAccounts:[] as {userId:string;providerId:string}[]};
+ const config={protocolVersion:1 as const,providers:{apple:false,google:true,email:true}};
+ const api:CloudApi={config:async()=>config,account:async()=>{if(!state.credentials)throw new CloudApiError('auth-required',401);return structuredClone(state.summary);},enroll:async request=>{state.enrollCalls++;return {petId:request.confirmedPetId??request.localPetId};},push:async mutations=>{state.pushCalls++;return {accepted:[],rejected:mutations.map(mutation=>({operationId:mutation.operationId,error:'retry_later' as const}))};},pull:async after=>{state.pullCalls++;return {changes:[],cursor:after,hasMore:false};},history:async()=>({revisions:[]})};
  const identity:controllerModule.IdentityAdapter={requestEmail:async(email:string)=>{state.requested.push(email);return {error:null};},verifyEmail:async(_email:string,code:string)=>{state.verifications++;if(code!=='123456')return {error:{status:400,code:'INVALID_OTP'}};state.credentials=true;return {error:null};},signInSocial:async()=>{state.credentials=true;return {error:null};},linkSocial:async provider=>{state.linkCalls++;state.linkedAccounts.push({userId:state.summary.user.id,providerId:provider});return {error:null};},listAccounts:async()=>{state.listCalls++;return {data:structuredClone(state.linkedAccounts),error:null};},signOut:async()=>{state.signOutCalls++;if(!state.storageFails)state.credentials=false;return {error:state.signOutFails?{status:503,code:'NETWORK_ERROR'}:null};},hasCredentials:async()=>{if(state.storageFails)throw new Error('secure storage failed');return state.credentials;}};
  const timers:Array<{fn:()=>void;delay:number;cancelled:boolean}>=[];
  assert.equal(typeof controllerModule.createAccountController,'function');
@@ -55,13 +55,13 @@ test('connecting a provider retains every local table and pending operation with
  const before=await localTables(runtime),status=await runtime.sync.status(runtime.petId);assert.ok(status.pending>0);
  assert.equal(await controller.connectProvider('google'),'ok');assert.deepEqual(controller.read().linkedProviders,['google']);assert.equal(controller.read().linkingProvider,null);
  assert.deepEqual(await localTables(runtime),before);assert.deepEqual(await runtime.sync.status(runtime.petId),status);
- assert.equal(state.trialCalls,0);assert.equal(state.signOutCalls,0);assert.equal(state.credentials,true);assert.equal(state.linkCalls,1);
+ assert.equal(state.signOutCalls,0);assert.equal(state.credentials,true);assert.equal(state.linkCalls,1);
  assert.equal(await controller.connectProvider('google'),'ok');assert.equal(state.linkCalls,1);
 });
 
-test('a signed-in local-only owner can connect a provider without enrollment or a trial',async t=>{
+test('a signed-in local-only owner can connect a provider without enrollment or uploads',async t=>{
  const {controller,runtime,state}=await fixture(t);state.credentials=true;await runtime.storage.appendEvents([event]);await controller.refresh();const before=await localTables(runtime);
- assert.equal(await controller.connectProvider('google'),'ok');assert.deepEqual(await localTables(runtime),before);assert.equal(state.trialCalls,0);assert.equal((await runtime.sync.status(runtime.petId)).state,'local');
+ assert.equal(await controller.connectProvider('google'),'ok');assert.deepEqual(await localTables(runtime),before);assert.equal((await runtime.sync.status(runtime.petId)).state,'local');
 });
 
 test('an OAuth initiation response without a newly linked account is honestly incomplete',async t=>{
@@ -116,7 +116,7 @@ for(const change of ['session','owner','dispose','network','auth-expired'] as co
  let laterAccountCalls=0;const original=api.account;api.account=async()=>{laterAccountCalls++;return original();};
  const listCalls=state.listCalls,before=await localTables(runtime);if(change==='dispose')controller.stop();const frozen=controller.read();
  release();assert.equal(await request,'error');assert.notDeepEqual(controller.read().linkedProviders,['google']);assert.deepEqual(await localTables(runtime),before);
- assert.equal(state.signOutCalls,0);assert.equal(state.trialCalls,0);
+ assert.equal(state.signOutCalls,0);
  if(change==='dispose'){assert.equal(controller.read(),frozen);assert.equal(laterAccountCalls,0);assert.equal(state.listCalls,listCalls);}
  if(change==='session'||change==='owner')assert.equal(controller.read().problem,'account-mismatch');
  if(change==='auth-expired'){assert.equal(controller.read().account,null);assert.equal(controller.read().problem,'auth-required');}
@@ -143,25 +143,25 @@ test('an unconfirmed social browser sign-in keeps its input and explains the ori
  assert.equal(await controller.signInSocial('google'),'error');assert.equal(controller.read().problem,'social-incomplete');assert.equal(controller.read().codeSentTo,'person@example.com');assert.deepEqual(await localTables(runtime),before);
 });
 
-test('first-launch restore validates local work before activating any trial',async t=>{
+test('first-launch restore validates local work before associating local records',async t=>{
  const {controller,runtime,state}=await fixture(t,{pristine:true});
  state.credentials=true;state.summary.pets=[{id:'cloud-pet',name:'Basil',eventCount:2}];
  await runtime.storage.appendEvents([event]);await controller.refresh();
  assert.equal(await controller.enableCloud({confirmedPetId:'cloud-pet',mode:'restore'}),'confirmation-required');
- assert.equal(state.trialCalls,0);assert.equal((await runtime.sync.status('pet-1')).state,'local');
+ assert.equal((await runtime.sync.status('pet-1')).state,'local');
  assert.deepEqual(await runtime.storage.loadEvents(),[event]);
 });
 
 test('first-launch local fallback detaches a staged restore and keeps account credentials',async t=>{
  const {controller,runtime,state,timers}=await fixture(t,{pristine:true});
- state.credentials=true;state.summary.cloud={canSync:true,canExport:true,source:'trial',expiresAt:8640000000000000};
+ state.credentials=true;state.summary.cloud={canSync:true,canExport:true};
  state.summary.pets=[{id:'cloud-pet',name:'Basil',eventCount:2}];await controller.refresh();
  assert.equal(await controller.enableCloud({confirmedPetId:'cloud-pet',mode:'restore'}),'ok');
  const status=await runtime.sync.status('pet-1');assert.ok(status.generation);
  const fence={generation:status.generation,accountId:'account-1'};
  await runtime.sync.stageBaseline({...fence,page:{changes:[],cursor:0,hasMore:false}});
  assert.equal(await controller.continueLocally(),'ok');
- assert.equal(state.credentials,true);assert.equal(state.signOutCalls,0);assert.equal(state.trialCalls,0);
+ assert.equal(state.credentials,true);assert.equal(state.signOutCalls,0);
  assert.equal((await runtime.sync.status('pet-1')).state,'local');assert.equal(await runtime.sync.enrollmentState(),null);
  assert.equal((await runtime.storage.loadSchedule()).length,12);
  controller.setActive(true);await controller.refresh();await runtime.storage.appendEvents([event]);await controller.refresh();
@@ -191,12 +191,12 @@ test('first-launch confirmed local fallback retains pending records without sign
  await runtime.storage.appendEvents([event]);await controller.refresh();assert.ok((await runtime.sync.status('pet-1')).pending>0);
  assert.equal(await controller.continueLocally({confirmPending:true}),'ok');
  assert.equal((await runtime.sync.status('pet-1')).state,'local');assert.deepEqual(await runtime.storage.loadEvents(),[event]);
- assert.equal(state.credentials,true);assert.equal(state.signOutCalls,0);assert.equal(state.trialCalls,1);
+ assert.equal(state.credentials,true);assert.equal(state.signOutCalls,0);
 });
 
 test('first-launch restore confirmation pauses automatic retries until an explicit local decision',async t=>{
  const {controller,runtime,state,api,timers}=await fixture(t,{pristine:true});
- state.credentials=true;state.summary.cloud={canSync:true,canExport:true,source:'trial',expiresAt:8640000000000000};
+ state.credentials=true;state.summary.cloud={canSync:true,canExport:true};
  state.summary.pets=[{id:'cloud-pet',name:'Basil',eventCount:0}];await controller.refresh();
  let enrollments=0;api.enroll=async()=>{enrollments++;return {petId:'cloud-pet'};};
  api.pull=async after=>{await runtime.storage.appendEvents([event]);return {changes:[],cursor:after,hasMore:false};};
@@ -223,28 +223,29 @@ test('first-launch duplicate email taps dispatch one request and keep the origin
  const {controller,state}=await fixture(t);await controller.refresh();
  assert.deepEqual(await Promise.all([controller.requestEmail('person@example.com'),controller.requestEmail('person@example.com')]),['ok','cancelled']);
  assert.deepEqual(state.requested,['person@example.com']);assert.equal(controller.read().codeSentTo,'person@example.com');
- assert.equal(controller.read().problem,null);assert.equal(state.trialCalls,0);
+ assert.equal(controller.read().problem,null);
 });
 
 test('first-launch duplicate verification taps never replay a consumed code or replace successful sign-in with an error',async t=>{
  const {controller,state,runtime}=await fixture(t);await controller.refresh();await controller.requestEmail('person@example.com');
  assert.deepEqual(await Promise.all([controller.verifyEmail('person@example.com','123456'),controller.verifyEmail('person@example.com','123456')]),['ok','cancelled']);
  assert.equal(state.verifications,1);assert.equal(controller.read().account!.user.id,'account-1');assert.equal(controller.read().problem,null);
- assert.equal(state.trialCalls,0);assert.equal((await runtime.sync.status('pet-1')).state,'local');
+ assert.equal((await runtime.sync.status('pet-1')).state,'local');
 });
 
 test('first-launch duplicate social taps keep a successful account instead of reporting an account mismatch',async t=>{
  const {controller,state}=await fixture(t);await controller.refresh();
  assert.deepEqual(await Promise.all([controller.signInSocial('google'),controller.signInSocial('google')]),['ok','cancelled']);
- assert.equal(controller.read().account!.user.id,'account-1');assert.equal(controller.read().problem,null);assert.equal(state.trialCalls,0);
+ assert.equal(controller.read().account!.user.id,'account-1');assert.equal(controller.read().problem,null);
 });
 
-test('configuration and sign-in are optional and never implicitly activate trial or associate local history',async t=>{
- const {controller,runtime,state}=await fixture(t);await runtime.storage.appendEvents([event]);
+test('configuration and sign-in are optional and never implicitly upload or associate local history',async t=>{
+ const {controller,runtime,state}=await fixture(t);await runtime.storage.appendEvents([event]);const before=await localTables(runtime);
  await controller.refresh();assert.equal(controller.read().account,null);assert.equal(controller.read().config!.providers.email,true);
  assert.equal(await controller.requestEmail('person@example.com'),'ok');assert.equal(controller.read().codeSentTo,'person@example.com');
  assert.equal(await controller.verifyEmail('person@example.com','123456'),'ok');assert.equal(controller.read().account!.user.id,'account-1');
- assert.equal(state.trialCalls,0);assert.equal((await runtime.sync.status('pet-1')).state,'local');assert.deepEqual(await runtime.storage.loadEvents(),[event]);
+ assert.equal((await runtime.sync.status('pet-1')).state,'local');assert.deepEqual(await runtime.storage.loadEvents(),[event]);
+ assert.equal(controller.read().account!.cloud.canSync,true);assert.deepEqual([state.enrollCalls,state.pushCalls,state.pullCalls],[0,0,0]);assert.deepEqual(await localTables(runtime),before);
 });
 
 test('invalid fields, wrong codes and unavailable providers fail without replacing signup input or local data',async t=>{
@@ -254,17 +255,26 @@ test('invalid fields, wrong codes and unavailable providers fail without replaci
  assert.equal(await controller.signInSocial('apple'),'error');assert.equal(controller.read().problem,'provider-unavailable');assert.equal(controller.read().account,null);
 });
 
-test('existing-cloud confirmation precedes trial activation and durable local association',async t=>{
+test('explicitly enabling cloud associates existing local history without a separate activation request',async t=>{
+ const {controller,runtime,state}=await fixture(t);state.credentials=true;await runtime.storage.appendEvents([event]);await controller.refresh();
+ assert.equal((await runtime.sync.status('pet-1')).state,'local');assert.deepEqual([state.enrollCalls,state.pushCalls,state.pullCalls],[0,0,0]);
+ assert.equal(await controller.enableCloud({}),'ok');const saved=await runtime.sync.enrollmentState();
+ assert.equal(saved!.accountId,'account-1');assert.equal(saved!.request.localPetId,'pet-1');assert.equal((await runtime.sync.status('pet-1')).state,'preparing');
+ assert.deepEqual(await runtime.storage.loadEvents(),[event]);assert.deepEqual([state.enrollCalls,state.pushCalls,state.pullCalls],[0,0,0]);
+});
+
+test('existing-cloud confirmation precedes durable local association',async t=>{
  const {controller,runtime,state}=await fixture(t);state.credentials=true;state.summary.pets=[{id:'cloud-pet',name:'Cloud puppy',eventCount:12}];await runtime.storage.appendEvents([event]);await controller.refresh();
- assert.equal(await controller.enableCloud({}),'confirmation-required');assert.equal(state.trialCalls,0);assert.equal((await runtime.sync.status('pet-1')).state,'local');
- assert.equal(await controller.enableCloud({confirmedPetId:'different'}),'confirmation-required');assert.equal(state.trialCalls,0);
- assert.equal(await controller.enableCloud({confirmedPetId:'cloud-pet'}),'ok');assert.equal(state.trialCalls,1);
+ assert.equal(await controller.enableCloud({}),'confirmation-required');assert.equal((await runtime.sync.status('pet-1')).state,'local');
+ assert.equal(await controller.enableCloud({confirmedPetId:'different'}),'confirmation-required');
+ assert.equal(await controller.enableCloud({confirmedPetId:'cloud-pet'}),'ok');
  const saved=await runtime.sync.enrollmentState();assert.equal(saved!.request.confirmedPetId,'cloud-pet');assert.equal(saved!.accountId,'account-1');assert.equal((await runtime.sync.status('pet-1')).state,'preparing');
 });
 
-test('a trial that remains unavailable never prepares or uploads history',async t=>{
- const {controller,runtime,state,api}=await fixture(t);state.credentials=true;api.startTrial=async()=>({cloud:state.summary.cloud});await controller.refresh();
- assert.equal(await controller.enableCloud({}),'error');assert.equal(controller.read().problem,'trial-unavailable');assert.equal((await runtime.sync.status('pet-1')).state,'local');
+test('forbidden cloud access never prepares or uploads local history',async t=>{
+ const {controller,runtime,state}=await fixture(t);state.credentials=true;state.summary.cloud={canSync:false,canExport:false};await runtime.storage.appendEvents([event]);await controller.refresh();const before=await localTables(runtime);
+ assert.equal(await controller.enableCloud({}),'error');assert.equal(controller.read().problem,'forbidden');assert.equal((await runtime.sync.status('pet-1')).state,'local');
+ assert.deepEqual(await localTables(runtime),before);assert.deepEqual([state.enrollCalls,state.pushCalls,state.pullCalls],[0,0,0]);
 });
 
 async function enrollLocal(runtime:Awaited<ReturnType<typeof createLocalRuntime>>) {
@@ -288,14 +298,14 @@ test('secure storage failure never claims sign-out succeeded or starts another u
  assert.equal(await controller.signOut({confirmPending:true}),'error');assert.equal(controller.read().problem,'sign-out-failed');assert.ok(controller.read().account);assert.equal(timers.filter(task=>!task.cancelled).length,0);
 });
 
-test('a different signed-in account never reassigns the old queue or starts its own trial',async t=>{
+test('a different signed-in account never reassigns or uploads the old queue',async t=>{
  const {controller,runtime,state}=await fixture(t);state.credentials=true;await enrollLocal(runtime);state.summary.user.id='account-2';await controller.refresh();
- assert.equal(await controller.enableCloud({}),'error');assert.equal(controller.read().problem,'account-mismatch');assert.equal(state.trialCalls,0);assert.equal((await runtime.sync.status('pet-1')).accountId,'account-1');
+ assert.equal(await controller.enableCloud({}),'error');assert.equal(controller.read().problem,'account-mismatch');assert.equal((await runtime.sync.status('pet-1')).accountId,'account-1');
 });
 
 const tick=()=>new Promise<void>(resolve=>setImmediate(resolve));
 test('foreground work coalesces local commits and stops timers on background, disconnection and disposal',async t=>{
- const {controller,runtime,state,timers}=await fixture(t);state.credentials=true;state.summary.cloud={canSync:true,canExport:true,source:'trial',expiresAt:8640000000000000};await enrollLocal(runtime);await controller.refresh();
+ const {controller,runtime,state,timers}=await fixture(t);state.credentials=true;state.summary.cloud={canSync:true,canExport:true};await enrollLocal(runtime);await controller.refresh();
  controller.setActive(true);await controller.refresh();assert.equal(timers.filter(task=>!task.cancelled).length,1);
  await runtime.storage.appendEvents([event]);await runtime.storage.updateEvent(event.id,{note:'new'});await tick();assert.equal(timers.filter(task=>!task.cancelled).length,1);
  controller.setOnline(false);assert.equal(timers.filter(task=>!task.cancelled).length,0);
@@ -305,19 +315,19 @@ test('foreground work coalesces local commits and stops timers on background, di
 });
 
 test('sign-out aborts and awaits an in-flight runner before SDK credentials are cleared',async t=>{
- const {controller,runtime,state,api,timers}=await fixture(t);state.credentials=true;state.summary.cloud={canSync:true,canExport:true,source:'trial',expiresAt:8640000000000000};await enrollLocal(runtime);
+ const {controller,runtime,state,api,timers}=await fixture(t);state.credentials=true;state.summary.cloud={canSync:true,canExport:true};await enrollLocal(runtime);
  let entered=false,aborted=false;
  api.pull=async(_after,signal)=>{entered=true;return new Promise((_,reject)=>{signal!.addEventListener('abort',()=>{aborted=true;reject(signal!.reason);},{once:true});});};
  controller.setActive(true);await controller.refresh();const timer=timers.find(task=>!task.cancelled)!;timer.cancelled=true;timer.fn();await tick();assert.equal(entered,true);
  assert.equal(await controller.signOut({confirmPending:true}),'ok');assert.equal(aborted,true);assert.equal(state.credentials,false);assert.equal(controller.read().running,false);assert.equal((await runtime.sync.status('pet-1')).state,'local');
 });
 
-test('disposing during configuration loading prevents subsequent account and trial requests',async t=>{
+test('disposing during configuration loading prevents subsequent account and enrollment requests',async t=>{
  const {controller,state,api}=await fixture(t);state.credentials=true;
  let release:()=>void=()=>{};const waiting=new Promise<void>(resolve=>{release=resolve;});let accountCalls=0;
  const config=await api.config();api.config=async()=>{await waiting;return config;};api.account=async()=>{accountCalls++;return state.summary;};
  const request=controller.refresh();await tick();controller.stop();release();await request;
- assert.equal(accountCalls,0);assert.equal(state.trialCalls,0);
+ assert.equal(accountCalls,0);
 });
 test('cold-start service failure still permits confirmed local sign-out of a saved association',async t=>{
  const {controller,runtime,state,api}=await fixture(t);state.credentials=true;state.signOutFails=true;
@@ -329,18 +339,18 @@ test('cold-start service failure still permits confirmed local sign-out of a sav
  assert.deepEqual(await runtime.storage.loadEvents(),[event]);assert.equal(controller.read().problem,'remote-sign-out-unconfirmed');
 });
 
-test('automatic runner expiry exposes a paused entitlement without another manual account refresh',async t=>{
+test('automatic runner access denial pauses uploads without losing pending work',async t=>{
  const {controller,runtime,state,timers}=await fixture(t);
- state.credentials=true;state.summary.cloud={canSync:true,canExport:true,source:'trial',expiresAt:8640000000000000};await enrollLocal(runtime);
+ state.credentials=true;state.summary.cloud={canSync:true,canExport:true};await enrollLocal(runtime);
  controller.setActive(true);await controller.refresh();
- state.summary.cloud={canSync:false,canExport:true,source:'none',expiresAt:null};
+ state.summary.cloud={canSync:false,canExport:true};
  await runtime.storage.appendEvents([event]);await tick();
  const pending=timers.find(timer=>!timer.cancelled)!;pending.cancelled=true;pending.fn();
  for(let i=0;i<50&&controller.read().running;i++)await tick();
- assert.equal(controller.read().run!.state,'expired');
- assert.equal(controller.read().problem,'expired');
+ assert.equal(controller.read().run!.state,'error');
+ assert.equal(controller.read().problem,'forbidden');
  assert.ok(controller.read().sync!.pending>0);assert.deepEqual(await runtime.storage.loadEvents(),[event]);
- const {accountStatus}=await import('./account-status.ts');assert.equal(accountStatus(controller.read()),'expired');
+ const {accountStatus}=await import('./account-status.ts');assert.equal(accountStatus(controller.read()),'paused');
  assert.equal(timers.filter(timer=>!timer.cancelled).length,0);
 });
 
@@ -353,35 +363,35 @@ test('another device winning first enrollment returns to explicit puppy confirma
  for(let i=0;i<50&&controller.read().running;i++)await tick();
  assert.equal((await runtime.sync.status(runtime.petId)).state,'local');
  assert.equal(controller.read().problem,'confirmation-required');assert.equal(controller.read().account!.pets[0].id,'other-device-pet');
- assert.deepEqual(await runtime.storage.loadEvents(),[event]);assert.equal(state.trialCalls,1);
+ assert.deepEqual(await runtime.storage.loadEvents(),[event]);
  await controller.retry();assert.equal(requests.length,1);
  assert.equal(await controller.enableCloud({}),'confirmation-required');assert.equal((await runtime.sync.status(runtime.petId)).state,'local');
  assert.equal(await controller.enableCloud({confirmedPetId:'other-device-pet'}),'ok');
  const saved=await runtime.sync.enrollmentState();assert.equal(saved!.request.confirmedPetId,'other-device-pet');
- assert.notEqual(saved!.request.operationId,requests[0].operationId);assert.equal(state.trialCalls,1);
+ assert.notEqual(saved!.request.operationId,requests[0].operationId);
 });
 
 const historical:Revision={recordId:'["event","cloud-1","one"]',revision:1,sequence:2,operationId:'server-first',deviceId:'other-device',acceptedAt:1000,baseRevision:0,intent:'create',proposal:{type:'pee',at:100,source:'app',note:'First'},before:null,after:{id:'["event","cloud-1","one"]',petId:'cloud-1',kind:'event',revision:1,sequence:2,deleted:false,updatedAt:1000,data:{type:'pee',at:100,source:'app',note:'First'}},reason:'created'};
 async function historyFixture(t:TestContext){
  const f=await fixture(t);assert.equal(typeof f.controller.eventHistory,'function');
- f.state.credentials=true;f.state.summary.cloud={canSync:true,canExport:true,source:'trial',expiresAt:8640000000000000};f.state.summary.pets=[{id:'cloud-1',name:'My puppy',eventCount:1}];
+ f.state.credentials=true;f.state.summary.cloud={canSync:true,canExport:true};f.state.summary.pets=[{id:'cloud-1',name:'My puppy',eventCount:1}];
  const owner={...await f.runtime.sync.prepareAssociation({accountId:'account-1',localPetId:'pet-1',deviceId:f.runtime.deviceId,enrollment:{operationId:'history-enroll',deviceId:f.runtime.deviceId,localPetId:'pet-1',name:'My puppy',confirmedPetId:'cloud-1'}}),accountId:'account-1'};
  await f.runtime.sync.stageBaseline({...owner,page:{changes:[{id:'cloud-1',petId:'cloud-1',kind:'puppy',revision:1,sequence:1,deleted:false,updatedAt:1000,data:{name:'My puppy'}},{...historical.after,revision:2,sequence:3,updatedAt:2000,data:{type:'pee',at:100,source:'app',note:'Second'}}],cursor:3,hasMore:false}});
  await f.runtime.sync.completeAssociation({...owner,cloudPetId:'cloud-1'});await f.controller.refresh();return {...f,owner};
 }
 
-test('cloud history resolves only the enrolled record and leaves local versions trial and account status alone',async t=>{
+test('cloud history resolves only the enrolled record and leaves local versions and account status alone',async t=>{
  const {controller,runtime,state,api}=await historyFixture(t),signal=new AbortController().signal;let requests=0;
  api.history=async(recordId,beforeRevision,received)=>{requests++;assert.equal(recordId,'["event","cloud-1","one"]');assert.equal(beforeRevision,2);assert.equal(received,signal);return {revisions:[historical]};};
  const local=await runtime.history.eventPage('one');assert.deepEqual(await controller.eventHistory('one',2,signal),{revisions:[historical]});
- assert.equal(requests,1);assert.equal(state.trialCalls,0);assert.equal(controller.read().problem,null);assert.deepEqual(await runtime.history.eventPage('one'),local);
+ assert.equal(requests,1);assert.equal(controller.read().problem,null);assert.deepEqual(await runtime.history.eventPage('one'),local);
 });
 
 test('cloud history refuses unauthenticated unenrolled or offline requests while local history stays available',async t=>{
  const {controller,runtime,state,api}=await fixture(t);assert.equal(typeof controller.eventHistory,'function');let requests=0;api.history=async()=>{requests++;return {revisions:[]};};
  await runtime.storage.appendEvents([event]);await controller.refresh();
  await assert.rejects(controller.eventHistory('one'),error=>error instanceof CloudApiError&&error.category==='auth-required');
- state.credentials=true;state.summary.cloud={canSync:true,canExport:true,source:'trial',expiresAt:8640000000000000};await controller.refresh();
+ state.credentials=true;state.summary.cloud={canSync:true,canExport:true};await controller.refresh();
  await assert.rejects(controller.eventHistory('one'),error=>error instanceof CloudApiError&&error.category==='forbidden');
  controller.setOnline(false);await assert.rejects(controller.eventHistory('one'),error=>error instanceof CloudApiError&&error.category==='network');
  assert.equal(requests,0);assert.equal((await runtime.history.eventPage('one')).entries.length,1);assert.deepEqual(await runtime.storage.loadEvents(),[event]);
@@ -389,8 +399,8 @@ test('cloud history refuses unauthenticated unenrolled or offline requests while
 
 test('a remote history access failure never replaces local history or the account problem state',async t=>{
  const {controller,runtime,api}=await historyFixture(t),before=await runtime.history.eventPage('one');
- api.history=async()=>{throw new CloudApiError('expired',402);};
- await assert.rejects(controller.eventHistory('one'),error=>error instanceof CloudApiError&&error.category==='expired');
+ api.history=async()=>{throw new CloudApiError('forbidden',403);};
+ await assert.rejects(controller.eventHistory('one'),error=>error instanceof CloudApiError&&error.category==='forbidden');
  assert.deepEqual(await runtime.history.eventPage('one'),before);assert.equal(controller.read().problem,null);
 });
 
@@ -403,22 +413,22 @@ for(const action of ['sign-out','account-switch','generation-change','dispose'] 
  if(action==='generation-change'){await runtime.sync.detach(owner);await runtime.sync.prepareAssociation({accountId:'account-1',localPetId:'pet-1',deviceId:runtime.deviceId,enrollment:{operationId:'new-generation',deviceId:runtime.deviceId,localPetId:'pet-1',name:'My puppy',confirmedPetId:'cloud-1'}});}
  if(action==='dispose')controller.stop();
  release({revisions:[historical]});await assert.rejects(request,error=>error instanceof CloudApiError&&error.category==='conflict');
- assert.equal((await runtime.storage.loadEvents())[0].note,'Second');assert.equal(state.trialCalls,0);
+ assert.equal((await runtime.storage.loadEvents())[0].note,'Second');
 });
 
 
-test('cloud export works after paid access expires and preserves every local row and pending operation',async t=>{
+test('cloud export preserves every local row and pending operation without enabling sync',async t=>{
  let calls=0;
  const f=await fixture(t,{exportCloud:async(expected,ready,signal)=>{calls++;assert.equal(expected,'account-1');assert.equal(signal?.aborted,false);assert.equal(await ready(),true);return 'shared';}});
- f.state.credentials=true;await enrollLocal(f.runtime);await f.runtime.storage.appendEvents([event]);await f.controller.refresh();
+ f.state.credentials=true;f.state.summary.cloud={canSync:false,canExport:true};await enrollLocal(f.runtime);await f.runtime.storage.appendEvents([event]);await f.controller.refresh();
  const before=await localTables(f.runtime);assert.equal(f.controller.read().account!.cloud.canSync,false);assert.ok(f.controller.read().sync!.pending>0);
- assert.equal(await f.controller.exportData(),'ok');assert.equal(calls,1);assert.deepEqual(await localTables(f.runtime),before);assert.equal(f.state.trialCalls,0);assert.equal(f.controller.read().exporting,false);assert.equal(f.controller.read().problem,null);
+ assert.equal(await f.controller.exportData(),'ok');assert.equal(calls,1);assert.deepEqual(await localTables(f.runtime),before);assert.equal(f.controller.read().exporting,false);assert.equal(f.controller.read().problem,null);
 });
 
 test('cloud export pauses an in-flight sync runner and ignores duplicate taps',async t=>{
  let entered!:()=>void,release!:()=>void,aborted=false,calls=0;const started=new Promise<void>(resolve=>{entered=resolve;}),waiting=new Promise<void>(resolve=>{release=resolve;});
  const f=await fixture(t,{exportCloud:async(_expected,ready)=>{calls++;assert.equal(aborted,true);entered();await waiting;assert.equal(await ready(),true);return 'shared';}});
- f.state.credentials=true;f.state.summary.cloud={canSync:true,canExport:true,source:'trial',expiresAt:8640000000000000};await enrollLocal(f.runtime);
+ f.state.credentials=true;f.state.summary.cloud={canSync:true,canExport:true};await enrollLocal(f.runtime);
  f.api.pull=async(_after,signal)=>new Promise((_,reject)=>signal!.addEventListener('abort',()=>{aborted=true;reject(new Error('cancelled'));},{once:true}));
  f.controller.setActive(true);await f.controller.refresh();const timer=f.timers.find(task=>!task.cancelled)!;timer.cancelled=true;timer.fn();await tick();
  const download=f.controller.exportData();await started;assert.equal(f.controller.read().exporting,true);assert.equal(f.controller.read().running,false);
@@ -435,11 +445,11 @@ for(const change of ['account','generation','dispose','offline'] as const)test(`
  if(change==='dispose')f.controller.stop();if(change==='offline')f.controller.setOnline(false);
  const before=await localTables(f.runtime);release();assert.equal(await pending,'cancelled');assert.equal(shares,0);assert.deepEqual(await localTables(f.runtime),before);
  if(change==='dispose'||change==='offline')assert.equal(signal?.aborted,true);
- assert.equal(f.state.trialCalls,0);assert.equal(f.state.signOutCalls,0);
+ assert.equal(f.state.signOutCalls,0);
 });
 
 for(const fault of [new Error('Private file path must not escape'),new CloudApiError('network'),new CloudApiError('server-error',503),new CloudApiError('rate-limited',429)])test(`export ${fault.message} failure stays scoped to the export and preserves pending work`,async t=>{
- const f=await fixture(t,{exportCloud:async()=>{throw fault;}});f.state.credentials=true;f.state.summary.cloud={canSync:true,canExport:true,source:'trial',expiresAt:8640000000000000};await enrollLocal(f.runtime);await f.runtime.storage.appendEvents([event]);f.controller.setActive(true);await f.controller.refresh();
+ const f=await fixture(t,{exportCloud:async()=>{throw fault;}});f.state.credentials=true;f.state.summary.cloud={canSync:true,canExport:true};await enrollLocal(f.runtime);await f.runtime.storage.appendEvents([event]);f.controller.setActive(true);await f.controller.refresh();
  const before=await localTables(f.runtime);assert.equal(await f.controller.exportData(),'error');assert.equal(f.controller.read().problem,'export-failed');assert.equal(f.controller.read().account!.user.id,'account-1');assert.equal(f.controller.read().exporting,false);assert.deepEqual(await localTables(f.runtime),before);assert.equal(f.timers.filter(task=>!task.cancelled).length,1);
 });
 

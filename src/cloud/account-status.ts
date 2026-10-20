@@ -9,7 +9,7 @@ export function accountStatus(state:AccountSnapshot|null) {
   if(state.sync?.accountId&&state.sync.accountId!==state.account.user.id)return 'mismatch';
   if(!state.sync?.accountId||state.sync.state==='local')return 'notEnabled';
   if(!state.online)return 'offline';
-  if(!state.account.cloud.canSync||state.problem==='expired')return 'expired';
+  if(!state.account.cloud.canSync)return 'paused';
   if(state.sync.state==='preparing')return 'preparing';
   if(state.sync.blocked)return 'attention';
   if(state.problem)return 'paused';

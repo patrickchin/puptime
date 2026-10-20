@@ -13,7 +13,7 @@ import {createCloudApi,CloudApiError} from '../src/cloud/api.ts';
 import {createSyncRunner} from '../src/cloud/runner.ts';
 import {cloudRecordId} from '../src/cloud/record-identity.ts';
 const mode=process.argv[2]??'local';assert.ok(['local','staging'].includes(mode));
-const local=mode==='local'?JSON.parse(readFileSync('/tmp/puptime-native-cloud-state.json','utf8')):null;
+const local=mode==='local'?JSON.parse(readFileSync(process.env.PUPTIME_CLOUD_STATE_FILE??'/tmp/puptime-native-cloud-state.json','utf8')):null;
 const base=local?.url??'https://puptime-api-staging.p-ch.workers.dev';
 assert.equal(base,mode==='local'?'http://127.0.0.1:8793':'https://puptime-api-staging.p-ch.workers.dev');
 const origin=mode==='local'?base:'https://puptime.pages.dev';
@@ -25,12 +25,16 @@ function sql(query){
  const options=local?['--local','--config',local.config,'--persist-to',local.persist]:['--remote','--env','staging'];
  try{execFileSync('npx',['wrangler','d1','execute','AUTH_DB',...options,'--file',path,'--json'],{stdio:['ignore','pipe','pipe'],env:{...process.env,CI:'1'}});}catch(error){const raw=String(error.stdout??'')+'\n'+String(error.stderr??'');const codes=[...raw.matchAll(/(?:code[:\"\s]+)([0-9]{3,6})/gi)].map(match=>match[1]);throw new Error('Administrative fixture SQL failed (exit '+error.status+', numeric codes '+codes.join(',')+'); private output withheld.');}
 }
-async function fixture(){
- const id=crypto.randomUUID(),token=crypto.randomUUID(),now=Date.now();
+async function issueSession(owner){
+ const token=crypto.randomUUID(),now=Date.now(),created=new Date(now).toISOString(),expires=new Date(now+3600000).toISOString();
  const cookie=(await serializeSignedCookie(mode==='local'?'better-auth.session_token':'__Secure-better-auth.session_token',token,secret,{path:'/',httpOnly:true,secure:mode==='staging'})).split(';')[0];
- const owner={id,cookie};owners.push(owner);
- sql(`INSERT INTO user(id,name,email,emailVerified,createdAt,updatedAt) VALUES ('${id}','HTTP qualification','${id}@example.invalid',1,${now},${now}); INSERT INTO session(id,token,userId,expiresAt,createdAt,updatedAt) VALUES ('${crypto.randomUUID()}','${token}','${id}',${now+3600000},${now},${now});`);
- return owner;
+ sql(`INSERT INTO session(id,token,userId,expiresAt,createdAt,updatedAt) VALUES ('${crypto.randomUUID()}','${token}','${owner.id}','${expires}','${created}','${created}');`);
+ owner.cookie=cookie;
+}
+async function fixture(){
+ const id=crypto.randomUUID(),now=new Date().toISOString(),owner={id,cookie:''};owners.push(owner);
+ sql(`INSERT INTO user(id,name,email,emailVerified,createdAt,updatedAt) VALUES ('${id}','HTTP qualification','${id}@example.invalid',1,'${now}','${now}');`);
+ await issueSession(owner);return owner;
 }
 async function response(owner,path,{method='GET',body,signal}={}){
  return fetch(base+path,{method,headers:{origin,cookie:owner.cookie,...(body?{'content-type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{}),redirect:'error',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(15000)]):AbortSignal.timeout(15000)});
@@ -75,8 +79,8 @@ async function drain(client){for(let i=0;i<15;i++){const result=await run(client
 async function history(recordId){const result=await response(primary,`/api/records/${encodeURIComponent(recordId)}/history`);assert.equal(result.status,200);return (await result.json()).revisions;}
 try{
  primary=await fixture();remote=transport(primary);sessionId=primary.id;
- await remote.api.startTrial();
- const other=await fixture();assert.equal((await response(other,'/api/cloud/trial',{method:'POST',body:{}})).status,200);
+ assert.deepEqual((await remote.api.account()).cloud,{canSync:true,canExport:true});
+ const other=await fixture();assert.deepEqual((await transport(other).api.account()).cloud,{canSync:true,canExport:true});
  const primaryChannel=await channel(primary),otherChannel=await channel(other);
  let a=await open('local-a');
  const events=Array.from({length:1000},(_,index)=>({id:index===0?'old-export-犬/'+ 'x'.repeat(230):`history-${String(index).padStart(4,'0')}`,type:index%2?'meal':'pee',at:1000000+index,source:'app',note:`Fixture history ${index}`}));
@@ -155,17 +159,24 @@ try{
  assert.equal((await remote.api.account()).pets[0].eventCount,1001,'Reconnecting detached history must not duplicate the old cloud copy.');
  console.log(`PASS ${mode}:detachment, free offline logging and confirmed reassociation preserve1000 prior records without duplicating them.`);
  const before=remote.calls;sessionId=other.id;assert.equal((await run(a)).problem,'account-mismatch');assert.equal(remote.calls,before);sessionId=primary.id;
- sql(`UPDATE cloud_accounts SET trial_started_at=0,trial_ends_at=1 WHERE account_id='${primary.id}';`);
- await a.storage.appendEvents([{id:'expired-offline-event',type:'poop',at:2000000,source:'app'}]);
- assert.equal((await run(a)).state,'expired');assert.equal((await a.storage.loadEvents()).length,1002);assert.ok((await a.sync.status(a.name)).pending>0);
+ const beforeSessionLoss=await cloudSnapshot();
+ sql(`UPDATE session SET expiresAt='${new Date(0).toISOString()}' WHERE userId='${primary.id}';`);
+ await a.storage.appendEvents([{id:'session-expired-offline-event',type:'poop',at:2000000,source:'app'}]);
+ const pending=await a.sync.status(a.name),localEvents=await a.storage.loadEvents();
+ assert.equal((await run(a)).state,'auth-required');assert.equal(localEvents.length,1002);assert.ok(pending.pending>0);
+ assert.deepEqual(await a.sync.status(a.name),pending);assert.deepEqual(await a.storage.loadEvents(),localEvents);
+ assert.equal((await response(primary,'/api/account/export')).status,401,'An expired identity session cannot download private cloud data.');
+ const expiredCookie=primary.cookie;await issueSession(primary);assert.notEqual(primary.cookie,expiredCookie);
+ assert.equal((await remote.api.account()).user.id,primary.id);assert.deepEqual(await cloudSnapshot(),beforeSessionLoss,'Session expiry and renewal must not alter cloud records.');
  const exported=await response(primary,'/api/account/export');assert.equal(exported.status,200);
  const text=await exported.text(),lines=text.trim().split('\n').map(line=>JSON.parse(line));assert.equal(lines[0].type,'manifest');assert.equal(lines.at(-1).type,'complete');assert.ok(lines.some(line=>line.type==='revision'&&line.after.data.note==='Pending edit survives complete resync'));assert.equal(text.includes(primary.cookie),false);
- console.log(`PASS ${mode}:account mismatch dispatches nothing; expiry retains1002 local records/pending work and full authenticated cloud history export.`);
+ await drain(a);await drain(b);assert.equal((await remote.api.account()).pets[0].eventCount,1002);assert.deepEqual(await a.storage.loadEvents(),await b.storage.loadEvents());
+ console.log(`PASS ${mode}:account mismatch dispatches nothing; actual session-row expiry retains1002 local records/pending work and rejects private export; a new administrative session restores full export and synchronizes the same owner without duplicate records. This is not SDK reauthentication evidence.`);
  success=true;
 }finally{
  for(const client of clients)await client.close();
  let cleaned=true;
- for(const owner of owners){try{const result=await response(owner,'/api/account',{method:'DELETE',body:{confirm:true}});if(result.status!==200){cleaned=false;console.error('Fixture cleanup requires attention:',result.status);}else for(const observed of channels.filter(item=>item.owner===owner))await until(()=>observed.closed,'Account retirement must close the actual socket.');}catch{cleaned=false;console.error('Fixture cleanup or channel retirement failed.');}}
+ for(const owner of owners){try{await issueSession(owner);const result=await response(owner,'/api/account',{method:'DELETE',body:{confirm:true}});if(result.status!==200){cleaned=false;console.error('Fixture cleanup requires attention:',result.status);}else for(const observed of channels.filter(item=>item.owner===owner))await until(()=>observed.closed,'Account retirement must close the actual socket.');}catch{cleaned=false;console.error('Fixture cleanup or channel retirement failed.');}}
  for(const observed of channels)observed.socket.close();
  if(cleaned&&channels.length)console.log(`PASS ${mode}:normal account retirement closes both authenticated change channels.`);
  writeFileSync(join(directory,'fixture.sql'),'-- private fixture SQL removed\n',{mode:0o600});
