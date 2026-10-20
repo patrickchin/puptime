@@ -123,7 +123,7 @@ export function SettingsScreen({
   };
 
   return (
-    <ScrollView testID="screen.settings" contentContainerStyle={styles.content}>
+    <ScrollView testID="screen.settings" keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
       {showHeader?<View style={styles.header}>
         <Pressable
           testID="settings.back"
