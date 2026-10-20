@@ -1,38 +1,5 @@
 {
-  "journeys": [
-    {
-      "title": "First open: profile, optional account and first log",
-      "description": "Welcome, puppy profile, optional account choice, contextual reminders and the first real log. Earlier cloud-disabled Release build; the companion shows a deployed email request with private code entry omitted.",
-      "primary": "195-clean-first-open-and-timed-reminder",
-      "companion": "260-live-account-setup"
-    },
-    {
-      "title": "Everyday use: drawer and timed reminders",
-      "description": "Feature walkthrough after setup: navigate the drawer, create a reminder, reopen it and cancel. Earlier standalone Release capture.",
-      "primary": "188-drawer-and-native-timer-journeys"
-    },
-    {
-      "title": "Google: signed in after restart",
-      "description": "Genuine deployed Google session after cold restart. Private provider interaction is omitted.",
-      "primary": "298-google-session-ready-cold-restart"
-    },
-    {
-      "title": "Apple: signed in after restart",
-      "description": "Genuine deployed Apple session after cold restart. Private provider interaction is omitted.",
-      "primary": "320-apple-session-ready-cold-restart"
-    },
-    {
-      "title": "Cloud: restore, log and receive an update",
-      "description": "Explicitly restore a puppy, add a log and reopen. The companion shows incoming sync from a genuine peer without refresh.",
-      "primary": "263-live-puppy-restore-log-and-reopen",
-      "companion": "267-live-incoming-sync-without-refresh"
-    },
-    {
-      "title": "Recovery: log offline and reconnect",
-      "description": "One representative unhappy path: logging stays durable during a service outage, then the backlog syncs. Earlier Debug build against a local HTTP service.",
-      "primary": "07-offline-logging-and-recovery"
-    }
-  ],
+  "journeys": [],
   "review_notes": {
     "248-cloud-enabled-signed-in-ios": "Previous local-backend qualification. This recording proves the local SDK journey; the selected live recordings use the deployed Pages API.",
     "259-live-account-setup": "Diagnostic failure: the initial welcome tap did not open the profile step. No email request occurred; local data remained unchanged. The successful retry is recording260.",
@@ -185,5 +152,39 @@
       "289-local-history-service-restacked",
       "Local history HTTP and SQL acceptance"
     ]
+  ],
+  "historical_journeys": [
+    {
+      "title": "First open: profile, optional account and first log",
+      "description": "Welcome, puppy profile, optional account choice, contextual reminders and the first real log. Earlier cloud-disabled Release build; the companion shows a deployed email request with private code entry omitted.",
+      "primary": "195-clean-first-open-and-timed-reminder",
+      "companion": "260-live-account-setup"
+    },
+    {
+      "title": "Everyday use: drawer and timed reminders",
+      "description": "Feature walkthrough after setup: navigate the drawer, create a reminder, reopen it and cancel. Earlier standalone Release capture.",
+      "primary": "188-drawer-and-native-timer-journeys"
+    },
+    {
+      "title": "Google: signed in after restart",
+      "description": "Genuine deployed Google session after cold restart. Private provider interaction is omitted.",
+      "primary": "298-google-session-ready-cold-restart"
+    },
+    {
+      "title": "Apple: signed in after restart",
+      "description": "Genuine deployed Apple session after cold restart. Private provider interaction is omitted.",
+      "primary": "320-apple-session-ready-cold-restart"
+    },
+    {
+      "title": "Cloud: restore, log and receive an update",
+      "description": "Explicitly restore a puppy, add a log and reopen. The companion shows incoming sync from a genuine peer without refresh.",
+      "primary": "263-live-puppy-restore-log-and-reopen",
+      "companion": "267-live-incoming-sync-without-refresh"
+    },
+    {
+      "title": "Recovery: log offline and reconnect",
+      "description": "One representative unhappy path: logging stays durable during a service outage, then the backlog syncs. Earlier Debug build against a local HTTP service.",
+      "primary": "07-offline-logging-and-recovery"
+    }
   ]
 }

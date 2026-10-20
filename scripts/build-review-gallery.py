@@ -66,14 +66,18 @@ def build(root, catalog=None):
     terminal = [(p, d) for p, d in items if d.get('rendered_actual_output') or not d.get('video') or not (root / d['video']).is_file()]
     native = {p.stem: (p, d) for p, d in items if d.get('video') and not d.get('rendered_actual_output') and (root / d['video']).is_file()}
     journeys = [journey for journey in catalog['journeys'] if journey['primary'] in native]
-    selected = {journey[key] for journey in journeys for key in ('primary', 'companion') if key in journey and journey[key] in native}
+    historical = [journey for journey in catalog.get('historical_journeys', []) if journey['primary'] in native]
+    selected = {journey[key] for journey in journeys + historical for key in ('primary', 'companion') if key in journey and journey[key] in native}
     previous = [item for stem, item in native.items() if stem not in selected]
     parts = ['<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Puptime review</title>',
-        f'<style>{STYLE}</style></head><body><aside><strong>Puptime review</strong><nav aria-label="Review sections"><a href="#journeys">Selected journeys</a><a href="#archive">Archive</a><a href="#test-results">Technical checks</a></nav></aside><main>',
-        '<h1>Puptime in six journeys</h1><p class="muted">A short review of setup, everyday use, signed-in restarts, cloud sync and recovery. These are existing development captures; their dates, build scopes and original results apply.</p>',
-        '<ol class="review-list">']
-    parts.extend(f'<li><a href="#journey-{e(journey["primary"])}">{e(journey["title"])}</a></li>' for journey in journeys)
-    parts.append('</ol><div id="journeys">')
+        f'<style>{STYLE}</style></head><body><aside><strong>Puptime review</strong><nav aria-label="Review sections"><a href="#journeys">Current journeys</a><a href="#historical-journeys">Historical review</a><a href="#archive">Archive</a><a href="#test-results">Technical checks</a></nav></aside><main>',
+        '<h1>Puptime review</h1><div id="journeys">']
+    if journeys:
+        parts.append('<p class="muted">Selected development journeys. Capture dates, build scopes and original results apply.</p><ol class="review-list">')
+        parts.extend(f'<li><a href="#journey-{e(journey["primary"])}">{e(journey["title"])}</a></li>' for journey in journeys)
+        parts.append('</ol>')
+    else:
+        parts.append('<h2>Current footage pending</h2><p class="muted">Updated cloud-development recordings are being qualified. Earlier footage, including cloud-unavailable and trial-era screens, is kept in historical review.</p><p><a href="#historical-journeys">Browse historical review</a></p>')
 
     def status(data):
         return 'EXPECTED RED' if data.get('expected_failure') else 'PASS' if data['exit_code'] == 0 else 'FAILED'
@@ -107,19 +111,27 @@ def build(root, catalog=None):
             out.append('</div></details>')
         return '\n'.join(out + ['</article>'])
 
-    for number, journey in enumerate(journeys, 1):
-        stem = journey['primary']
-        opened = ' open' if number == 1 else ''
-        parts.append(f'<details class="journey" id="journey-{e(stem)}"{opened}><summary>{number:02d} · {e(journey["title"])}</summary><p class="muted">{e(journey["description"])}</p>')
-        parts.append(recording(*native[stem], featured=number == 1))
-        companion = journey.get('companion')
-        if companion in native:
-            parts.append('<details class="companion"><summary>Companion: ' + e(native[companion][1]['title']) + '</summary>')
-            parts.append(recording(*native[companion]))
+    def render_journeys(entries, historical=False):
+        for number, journey in enumerate(entries, 1):
+            stem = journey['primary']
+            featured = number == 1 and not historical
+            opened = ' open' if featured else ''
+            label = 'Historical · ' if historical else ''
+            parts.append(f'<details class="journey" id="journey-{e(stem)}"{opened}><summary>{label}{number:02d} · {e(journey["title"])}</summary><p class="muted">{e(journey["description"])}</p>')
+            parts.append(recording(*native[stem], featured=featured))
+            companion = journey.get('companion')
+            if companion in native:
+                parts.append('<details class="companion"><summary>Companion: ' + e(native[companion][1]['title']) + '</summary>')
+                parts.append(recording(*native[companion]))
+                parts.append('</details>')
             parts.append('</details>')
-        parts.append('</details>')
-    parts.append('</div><section><details id="archive"><summary>Archive · ' + str(len(previous)) + ' more recordings · ' + str(len(terminal)) + ' technical checks</summary><p class="muted">Earlier iterations, diagnostics and focused acceptance. Original results are retained; archive placement does not qualify a newer build.</p><p><a href="#previous-captures">Browse app recordings</a> · <a href="#test-results">Search technical checks</a></p>')
-    parts.append('<section><details id="previous-captures"><summary>More app recordings (' + str(len(previous)) + ')</summary>')
+
+    render_journeys(journeys)
+    archived_count = len(native) - sum(1 + int(journey.get('companion') in native) for journey in journeys)
+    parts.append('</div><section><details id="archive"><summary>Archive · ' + str(archived_count) + ' historical recordings · ' + str(len(terminal)) + ' technical checks</summary><p class="muted">Earlier builds, diagnostics and focused acceptance. These captures predate the current milestone and retain their original results.</p><p><a href="#historical-journeys">Historical review</a> · <a href="#previous-captures">Browse app recordings</a> · <a href="#test-results">Search technical checks</a></p>')
+    parts.append('<section><details id="historical-journeys"><summary>Historical review (' + str(len(historical)) + ' earlier journeys)</summary><p class="muted">The former review selection includes cloud-unavailable, trial-era and older platform-specific copy. It does not demonstrate the current cloud-development contract.</p>')
+    render_journeys(historical, historical=True)
+    parts.append('</details></section><section><details id="previous-captures"><summary>More app recordings (' + str(len(previous)) + ')</summary>')
     parts.extend(recording(*item) for item in reversed(previous))
     parts.append('</details></section><section><details id="test-results"><summary>Technical checks (' + str(len(terminal)) + ')</summary><label for="search-results">Search checks and full output</label><input id="search-results" type="search" placeholder="Search results…"><p id="result-count" class="muted" aria-live="polite">' + str(len(terminal)) + ' checks</p>')
     available_text = {path.stem for path, _ in terminal}
@@ -136,7 +148,7 @@ def build(root, catalog=None):
         parts.extend([screenshots(data), f'<pre>{e(output)}</pre></details>'])
     parts.append('</details></section></details></section><footer>Browser seeking uses partial downloads. Each check and capture remains limited to its stated scope. This curation adds no new product qualification.</footer></main><script>' + SCRIPT + '</script></body></html>')
     (root / 'index.html').write_text('\n'.join(parts))
-    print(f'Indexed {len(journeys)} selected journeys ({len(selected)} clips), {len(terminal)} text checks, {len(previous)} archived app captures.')
+    print(f'Indexed {len(journeys)} current journeys, {len(historical)} historical journeys, {len(terminal)} text checks, {len(previous)} archived app captures.')
 
 
 if __name__ == '__main__':
