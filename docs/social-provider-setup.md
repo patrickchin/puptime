@@ -2,8 +2,9 @@
 
 On iOS, Apple sign-in uses Expo's native Apple authentication sheet and system
 button, then passes the identity token through Better Auth 1.7.10's supported
-ID-token API. Google and non-iOS Apple keep the existing browser OAuth flow and
-Expo return. Both providers still require their complete server credential
+ID-token API. Google uses its supported iOS SDK and the same ID-token API.
+Non-iOS clients retain the existing browser OAuth flow and Expo return.
+Both providers still require their complete server credential
 pair. See the [Expo Apple SDK](https://docs.expo.dev/versions/v57.0.0/sdk/apple-authentication/)
 and [Better Auth ID-token integration](https://better-auth.com/docs/integrations/expo#idtoken-sign-in).
 
@@ -59,6 +60,38 @@ are not signing, device or provider-login evidence: after review/build, qualify
 the native sheet, cancellation, genuine session, cold restart and explicit
 linking on a dedicated iOS fixture. Native runtime verification is pending.
 
+## Native iOS Google setup
+
+The mature free `@react-native-google-signin/google-signin` 16.1.5 wraps Google's
+iOS SDK 9. The dedicated public **Puptime iOS development** OAuth client belongs
+to `puptime-512111`, bundle `com.patrickchin.puptime`, team `U74A8SFAYB`.
+`src/cloud/google-native.ts` holds its public client ID and the existing Web
+client ID. The official Expo config plugin registers the iOS client's reversed
+URL scheme. No iOS client secret, Firebase setup or new Worker secret is needed.
+[Google iOS setup](https://developers.google.com/identity/sign-in/ios/start-integrating),
+[Expo plugin setup](https://react-native-google-signin.github.io/docs/setting-up/expo).
+
+The app uses the SDK's official button and interactive sign-in, with only basic
+identity scopes and `offlineAccess: false`. It forwards only the returned ID
+token to Better Auth; the existing Web client is its server audience. Google's
+SDK owns its credential UI and may present a system browser sheet for Google
+authentication. Native cancellation returns quietly. Explicit **Connect
+Google** uses the same native credentials with authenticated `linkSocial`.
+Neither action associates or uploads local puppy data.
+
+Puptime sign-out clears Google's SDK credentials before the Better Auth session.
+If native cleanup fails, sign-out stays incomplete and retains the account and
+pending queue for retry. This uses `signOut`, which retains provider consent;
+it does not call `revokeAccess`.
+[Google sign-out guidance](https://developers.google.com/identity/sign-in/ios/sign-in#4_add_a_sign-out_button).
+
+A fresh binary is required for the native Google module and registered return
+scheme. Genuine provider sign-in, cancellation, existing-email refusal,
+explicit linking, account selection after sign-out and authenticated restart
+still require iOS runtime qualification. The console remains in external
+Testing; adding this public client does not publish the app or enable billing.
+Android runtime and platform-specific sign-in changes remain deferred.
+
 ## Earlier browser staging checkpoint — October 20, 2026
 
 Both complete credential pairs are installed on the staging Worker. The Google Web client belongs to the dedicated `puptime-512111` project and remains in external Testing. Apple's Services ID is `com.patrickchin.puptime.web`, associated with the existing Puptime primary App ID. Both use the exact callbacks above. The main App Store provisioning profile was regenerated with Sign in with Apple; refreshing a cached EAS profile and verifying a distributed build remain separate work.
@@ -73,7 +106,7 @@ Actual deployed HTTPS checks confirm both providers are advertised, authorizatio
 
 `disableImplicitLinking: true` remains enabled. A Google or Apple identity with an existing email must not silently attach itself to that account. Existing users sign in with their original method, then use **Connect Apple** or **Connect Google** in Backup and sync. The controller uses the SDK's authenticated `linkSocial`, checks the same session user and local ownership generation before and after the provider request, and shows Connected only after the server confirms the provider. Connecting never enrolls a puppy or changes pending local work. Different-email linking remains disabled; an Apple Hide My Email address can represent a separate account. Do not use the retained live qualification owner to test linking or deletion. [Account linking](https://better-auth.com/docs/concepts/users-accounts).
 
-For remaining browser flows, the installed Expo SDK resolves its initial OAuth response even after browser cancellation and does not expose callback errors to Puptime. Both completion URLs return to the app. If the expected session or provider cannot be confirmed, show the contextual incomplete-flow message and a retry; do not claim a particular provider error or report Connected from the initial response alone. Native iOS Apple cancellation instead returns the explicit cancelled result.
+For remaining browser flows, the installed Expo SDK resolves its initial OAuth response even after browser cancellation and does not expose callback errors to Puptime. Both completion URLs return to the app. If the expected session or provider cannot be confirmed, show the contextual incomplete-flow message and a retry; do not claim a particular provider error or report Connected from the initial response alone. Native iOS Apple and Google cancellation instead return the explicit cancelled result.
 
 Apple OAuth itself does not require an email-code delivery. Email recovery to Hide My Email addresses requires an approved sender and Apple relay registration. The current `onboarding@resend.dev` test sender cannot deliver to arbitrary users, so it cannot establish that recovery path. A verified sender domain remains separate deferred work. [Apple relay configuration](https://developer.apple.com/help/account/capabilities/configure-private-email-relay-service/), [Resend test-domain restriction](https://resend.com/docs/knowledge-base/403-error-resend-dev-domain).
 
