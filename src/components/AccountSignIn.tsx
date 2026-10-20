@@ -2,6 +2,7 @@ import {MaterialCommunityIcons} from '@expo/vector-icons';
 import {useEffect,useState} from 'react';
 import {ActivityIndicator,Keyboard,Platform,Pressable,StyleSheet,Text,TextInput,View} from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import {GoogleSigninButton} from '@react-native-google-signin/google-signin';
 import type {CloudHandle} from '../cloud/use-cloud';
 import {useAccountSnapshot} from '../cloud/use-account-snapshot';
 import type {AccountProblem} from '../cloud/account-controller';
@@ -54,7 +55,7 @@ export function AccountSignIn({cloud,theme,showError=true,showIntro=true}:{cloud
             pointerEvents={busy||!state.online?'none':'auto'} style={{height:52,width:'100%',opacity:busy||!state.online?0.5:1}}
             onPress={()=>{if(!busy&&state.online)void cloud.controller!.signInSocial('apple');}}/>:null)
             :<AccountButton theme={theme} testID="account.apple" label={t('account.apple')} icon="apple" disabled={busy||!state.online} onPress={()=>{void cloud.controller!.signInSocial('apple');}}/>):null}
-          {state.config.providers.google?<AccountButton theme={theme} testID="account.google" label={t('account.google')} icon="google" disabled={busy||!state.online} onPress={()=>{void cloud.controller!.signInSocial('google');}}/>:null}
+          {state.config.providers.google?(Platform.OS==='ios'?<GoogleSigninButton testID="account.google" size={GoogleSigninButton.Size.Wide} color={theme.isDark?GoogleSigninButton.Color.Dark:GoogleSigninButton.Color.Light} disabled={busy||!state.online} accessibilityState={{disabled:busy||!state.online,busy}} style={{height:52,width:'100%'}} onPress={()=>{if(!busy&&state.online)void cloud.controller!.signInSocial('google');}}/>:<AccountButton theme={theme} testID="account.google" label={t('account.google')} icon="google" disabled={busy||!state.online} onPress={()=>{void cloud.controller!.signInSocial('google');}}/>):null}
           {state.config.providers.email?state.codeSentTo&&!editingEmail?(<View style={styles.stack}>
             <Text style={[styles.body,{color:theme.text}]}>{t('account.codeSent',{email:state.codeSentTo})}</Text>
             <Text style={[styles.label,{color:theme.text}]}>{t('account.code')}</Text>

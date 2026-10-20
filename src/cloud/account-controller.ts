@@ -3,6 +3,7 @@ import { CloudApiError,throwIfAborted,type CloudApi,type CloudAccountSummary,typ
 import { createSyncRunner,type RunResult } from './runner.ts';
 import type { createLocalRuntime } from '../local/runtime-factory.ts';
 import type { AppleIdToken } from './apple-native.ts';
+import type { GoogleIdToken } from './google-native.ts';
 
 type Runtime=Awaited<ReturnType<typeof createLocalRuntime>>;
 type SyncStatus=Awaited<ReturnType<Runtime['sync']['status']>>;
@@ -14,15 +15,16 @@ type IdentityOutcome={error:{status:number;code?:string}|null;cancelled?:boolean
 type LinkedIdentity={userId:string;providerId:string};
 type IdentityListOutcome=IdentityOutcome&{data:LinkedIdentity[]|null};
 export type IdentityAdapter={requestEmail:(email:string)=>Promise<IdentityOutcome>;verifyEmail:(email:string,code:string)=>Promise<IdentityOutcome>;signInSocial:(provider:SocialProvider)=>Promise<IdentityOutcome>;linkSocial:(provider:SocialProvider)=>Promise<IdentityOutcome>;listAccounts:()=>Promise<IdentityListOutcome>;signOut:()=>Promise<IdentityOutcome>;hasCredentials:()=>Promise<boolean>};
-type SocialInput={provider:SocialProvider;callbackURL:string;errorCallbackURL:string;idToken?:AppleIdToken};
+type SocialInput={provider:SocialProvider;callbackURL:string;errorCallbackURL:string;idToken?:AppleIdToken|GoogleIdToken};
 type SdkIdentityClient={emailOtp:{sendVerificationOtp:(input:{email:string;type:'sign-in'})=>Promise<IdentityOutcome>};signIn:{emailOtp:(input:{email:string;otp:string})=>Promise<IdentityOutcome>;social:(input:SocialInput)=>Promise<IdentityOutcome>};linkSocial:(input:SocialInput)=>Promise<IdentityOutcome>;listAccounts:()=>Promise<IdentityOutcome&{data?:unknown}>;signOut:()=>Promise<IdentityOutcome>;getCookie:()=>Promise<string>};
-export function createIdentityAdapter(auth:SdkIdentityClient,{appleIdToken}:{appleIdToken?:()=>Promise<AppleIdToken|null>}={}):IdentityAdapter {
+export function createIdentityAdapter(auth:SdkIdentityClient,{appleIdToken,googleIdToken,nativeSignOut}:{appleIdToken?:()=>Promise<AppleIdToken|null>;googleIdToken?:()=>Promise<GoogleIdToken|null>;nativeSignOut?:()=>Promise<void>}={}):IdentityAdapter {
   const result=(value:IdentityOutcome):IdentityOutcome=>({error:value.error?{status:value.error.status,code:value.error.code}:null});
   async function social(provider:SocialProvider,link:boolean):Promise<IdentityOutcome> {
     const input:SocialInput={provider,callbackURL:'puptime://account',errorCallbackURL:'puptime://account'};
-    if(provider==='apple'&&appleIdToken){
-      let credential:AppleIdToken|null;
-      try{credential=await appleIdToken();}catch{return {error:{status:400,code:'NATIVE_AUTH_FAILED'}};}
+    const requestIdToken=provider==='apple'?appleIdToken:googleIdToken;
+    if(requestIdToken){
+      let credential:AppleIdToken|GoogleIdToken|null;
+      try{credential=await requestIdToken();}catch{return {error:{status:400,code:'NATIVE_AUTH_FAILED'}};}
       if(!credential)return {error:null,cancelled:true};
       input.idToken=credential;
     }
@@ -38,7 +40,10 @@ export function createIdentityAdapter(auth:SdkIdentityClient,{appleIdToken}:{app
       const parsed=z.array(z.object({userId:z.string().min(1),providerId:z.string().min(1)})).safeParse(response.data);
       return parsed.success?{data:parsed.data,error:null}:{data:null,error:{status:502,code:'INVALID_RESPONSE'}};
     },
-    signOut:()=>auth.signOut().then(result),
+    signOut:async()=>{
+      try{await nativeSignOut?.();}catch{return {error:{status:500,code:'NATIVE_SIGN_OUT_FAILED'}};}
+      return result(await auth.signOut());
+    },
     hasCredentials:async()=>!!(await auth.getCookie()),
   };
 }
@@ -354,6 +359,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
       if(status.pending&&!confirmPending){emit({problem:'pending-confirmation-required'});return 'pending-confirmation-required';}
       await pauseTransport();signOutUnfinished=true;
       const result=await outcome(()=>identity.signOut());
+      if(result.error?.code==='NATIVE_SIGN_OUT_FAILED')return fail('sign-out-failed');
       // Expo may clear secure credentials before a failed network response.
       // Check the official SDK rather than preserving stale signed-in UI.
       try{if(await identity.hasCredentials())return fail('sign-out-failed');}catch{return fail('sign-out-failed');}
