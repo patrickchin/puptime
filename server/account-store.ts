@@ -2,8 +2,9 @@ import { DurableObject } from 'cloudflare:workers';
 import { z } from 'zod';
 import { cloudRecordSchema,eventDataSchema,routineDataSchema,enrollmentSchema, mutationSchema, recordIdSchema, type Enrollment, type CloudRecord, type Mutation, type MutationResult, type PullPage, type Revision } from '../src/cloud/protocol';
 import {cloudAccess,getCloudAccount} from './cloud-access';
-import {eventSqlDefinition,routineSqlDefinition,eventSqlColumns,routineSqlColumns,eventSqlValues,routineSqlValues,eventDataFromSql,routineDataFromSql,type EventSqlRow,type RoutineSqlRow} from '../src/record-sql';
+import {eventSqlColumns,routineSqlColumns,eventSqlValues,routineSqlValues,eventDataFromSql,routineDataFromSql,type EventSqlRow,type RoutineSqlRow} from '../src/record-sql';
 import { reconcileMutation, ReconciliationError } from '../src/cloud/reconcile';
+import accountSchema from './migrations/account/0003-account-store.sql';
 
 const cursorSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const pageSizeSchema = z.number().int().min(1).max(100);
@@ -22,29 +23,7 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
         return;
       }
       if(tables.some(name=>!name.startsWith('sqlite_')&&!name.startsWith('__cf_')))throw new Error('The existing account database schema is incomplete.');
-      ctx.storage.sql.exec(`
-        CREATE TABLE schema_metadata (version INTEGER NOT NULL);
-        CREATE TABLE account_state (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
-        CREATE TABLE pets (id TEXT PRIMARY KEY, initial_name TEXT NOT NULL, created_at INTEGER NOT NULL);
-        CREATE TABLE records (
-          id TEXT PRIMARY KEY NOT NULL, pet_id TEXT REFERENCES pets(id),
-          kind TEXT NOT NULL CHECK(kind IN ('event','routine','puppy','customActivity','customization','accountPreferences')),
-          revision INTEGER NOT NULL CHECK(revision>=1), sequence INTEGER NOT NULL UNIQUE CHECK(sequence>=1),
-          deleted INTEGER NOT NULL CHECK(deleted IN (0,1)), updated_at INTEGER NOT NULL,
-          data_json TEXT,
-          CHECK((kind='accountPreferences' AND pet_id IS NULL) OR (kind!='accountPreferences' AND pet_id IS NOT NULL)),
-          CHECK((kind IN ('event','routine') AND data_json IS NULL) OR (kind NOT IN ('event','routine') AND data_json IS NOT NULL AND json_valid(data_json)))
-        );
-        CREATE TABLE record_events(record_id TEXT PRIMARY KEY NOT NULL REFERENCES records(id) ON DELETE CASCADE, ${eventSqlDefinition});
-        CREATE TABLE record_routines(record_id TEXT PRIMARY KEY NOT NULL REFERENCES records(id) ON DELETE CASCADE, ${routineSqlDefinition});
-        CREATE TABLE revisions (sequence INTEGER PRIMARY KEY, record_id TEXT NOT NULL, revision INTEGER NOT NULL, body TEXT NOT NULL, UNIQUE(record_id, revision));
-        CREATE INDEX revisions_by_record ON revisions(record_id, revision DESC);
-        CREATE TABLE operations (id TEXT PRIMARY KEY, payload TEXT NOT NULL, result TEXT NOT NULL);
-        CREATE TABLE enrollments (id TEXT PRIMARY KEY, payload TEXT NOT NULL, result TEXT NOT NULL);
-        CREATE TABLE enrolled_devices (id TEXT NOT NULL, pet_id TEXT NOT NULL REFERENCES pets(id), PRIMARY KEY(id, pet_id));
-        CREATE INDEX records_by_pet_kind ON records(pet_id,kind,deleted);
-        INSERT INTO schema_metadata(version) VALUES (3);
-      `);
+      ctx.storage.sql.exec(accountSchema);
     });
   }
 
