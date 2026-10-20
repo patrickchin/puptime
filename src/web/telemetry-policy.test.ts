@@ -11,8 +11,8 @@ test('telemetry drops unknown events and strips sensitive properties and URL val
     email: 'private@example.com', note: 'private note', $set: { name: 'private' }, distinct_id: 'anonymous-id',
   } });
   assert.deepEqual(result?.properties, {
-    page: '/puppy-care/toilet-training', $current_url: 'https://puptime.pages.dev/puppy-care/toilet-training',
-    $pathname: '/puppy-care/toilet-training', $process_person_profile: false, destination: 'android_download', distinct_id: 'anonymous-id',
+    page: '/puppy-care/toilet-training',
+    $pathname: '/puppy-care/toilet-training', $process_person_profile: false, $geoip_disable: true, destination: 'android_download', distinct_id: 'anonymous-id',
   });
   assert.equal(sanitizeWebsiteEvent({ event: 'website_error', properties: { page: '/private-token', error_kind: 'secret' } })?.properties.page, '/404');
   assert.equal(privacySignalActive({ doNotTrack: '1' }), true);
@@ -34,7 +34,7 @@ test('every public page has unique metadata and a clean canonical URL', () => {
 
 test('private account telemetry keeps only coarse actions and never callback or identity data',()=>{
  const result=sanitizeWebsiteEvent({event:'website_account',properties:{page:'/account',action:'link_provider',result:'success',email:'secret@example.invalid',userId:'private-owner',providerId:'private-subject',code:'123456',cookie:'private-session',$current_url:'https://puptime.pages.dev/account?code=secret&state=private',error:'private raw response'}});
- assert.deepEqual(result?.properties,{page:'/account',$current_url:'https://puptime.pages.dev/account',$pathname:'/account',$process_person_profile:false,action:'link_provider',result:'success'});
+ assert.deepEqual(result?.properties,{page:'/account',$pathname:'/account',$process_person_profile:false,$geoip_disable:true,action:'link_provider',result:'success'});
  assert.equal(sanitizeWebsiteEvent({event:'website_account',properties:{page:'/account',action:'secret',result:'success'}}),null);
  assert.equal(publicPaths.includes('/account'),false);
 });
