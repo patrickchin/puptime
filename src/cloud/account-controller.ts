@@ -2,10 +2,12 @@ import { z } from 'zod';
 import { CloudApiError,throwIfAborted,type CloudApi,type CloudAccountSummary,type CloudConfig,type CloudErrorCategory } from './api.ts';
 import { createSyncRunner,type RunResult } from './runner.ts';
 import type { createLocalRuntime } from '../local/runtime-factory.ts';
+import type {AccountLifecycle,LifecycleIdentity} from './account-lifecycle.ts';
+import type {AccountDeletionIntent,AccountDeletionNotice} from '../local/account-deletion.ts';
 
 type Runtime=Awaited<ReturnType<typeof createLocalRuntime>>;
 type SyncStatus=Awaited<ReturnType<Runtime['sync']['status']>>;
-export type AccountProblem=CloudErrorCategory|'local-storage'|'confirmation-required'|'pending-confirmation-required'|'account-mismatch'|'trial-unavailable'|'provider-unavailable'|'invalid-email'|'invalid-code'|'code-expired'|'too-many-attempts'|'sign-in-failed'|'social-incomplete'|'link-incomplete'|'sign-out-failed'|'remote-sign-out-unconfirmed'|'export-failed';
+export type AccountProblem=CloudErrorCategory|'local-storage'|'confirmation-required'|'pending-confirmation-required'|'account-mismatch'|'trial-unavailable'|'provider-unavailable'|'invalid-email'|'invalid-code'|'code-expired'|'too-many-attempts'|'sign-in-failed'|'social-incomplete'|'link-incomplete'|'sign-out-failed'|'remote-sign-out-unconfirmed'|'export-failed'|'deletion-pending'|'reauth-incomplete';
 export type AccountActionResult='ok'|'error'|'cancelled'|'confirmation-required'|'pending-confirmation-required';
 export type SocialProvider='apple'|'google';
 export type CloudExportAction=(expectedAccount:string,ready:()=>Promise<boolean>,signal?:AbortSignal)=>Promise<'shared'|'cancelled'>;
@@ -31,7 +33,8 @@ export function createIdentityAdapter(auth:SdkIdentityClient):IdentityAdapter {
     hasCredentials:async()=>!!(await auth.getCookie()),
   };
 }
-export type AccountSnapshot={config:CloudConfig|null;account:CloudAccountSummary|null;linkedProviders:SocialProvider[]|null;linkingProvider:SocialProvider|null;local:{name:string;eventCount:number}|null;sync:SyncStatus|null;run:RunResult|null;problem:AccountProblem|null;codeSentTo:string|null;busy:boolean;exporting:boolean;running:boolean;active:boolean;online:boolean;lastSyncedAt:number|null};
+export type DeletionView={stage:'verify'|'code'|'ready'|'pending'|'cleanup';email:string|null;provider:SocialProvider|null;status:'not-started'|'pending'|'unknown'|null;canCancel:boolean};
+export type AccountSnapshot={config:CloudConfig|null;account:CloudAccountSummary|null;linkedProviders:SocialProvider[]|null;linkingProvider:SocialProvider|null;local:{name:string;eventCount:number}|null;sync:SyncStatus|null;run:RunResult|null;problem:AccountProblem|null;codeSentTo:string|null;busy:boolean;exporting:boolean;enabling:boolean;deletion:DeletionView|null;deletionNotice:AccountDeletionNotice|null;running:boolean;active:boolean;online:boolean;lastSyncedAt:number|null};
 const defaultDefer=(fn:()=>void,delay:number)=>{const timer=setTimeout(fn,delay);return()=>clearTimeout(timer);};
 // Call only after pausing the owning controller, or when no client exists.
 export async function continueFirstLaunchLocally(runtime:Runtime,confirmPending=false):Promise<AccountActionResult> {
@@ -41,13 +44,15 @@ export async function continueFirstLaunchLocally(runtime:Runtime,confirmPending=
   if(status.generation&&status.accountId)await runtime.sync.detach({generation:status.generation,accountId:status.accountId});
   return 'ok';
 }
-export function createAccountController({runtime,api,identity,subscribeLocalWrites,defer=defaultDefer,changed,exportCloud}:{runtime:Runtime;exportCloud?:CloudExportAction;api:CloudApi;identity:IdentityAdapter;subscribeLocalWrites:(fn:()=>void)=>()=>void;defer?:(fn:()=>void,delay:number)=>()=>void;changed:()=>void}) {
-  let snapshot:AccountSnapshot={config:null,account:null,linkedProviders:null,linkingProvider:null,local:null,sync:null,run:null,problem:null,codeSentTo:null,busy:false,exporting:false,running:false,active:false,online:true,lastSyncedAt:null};
+export function createAccountController({runtime,api,identity,subscribeLocalWrites,defer=defaultDefer,changed,exportCloud,lifecycle}:{runtime:Runtime;exportCloud?:CloudExportAction;lifecycle?:AccountLifecycle;api:CloudApi;identity:IdentityAdapter;subscribeLocalWrites:(fn:()=>void)=>()=>void;defer?:(fn:()=>void,delay:number)=>()=>void;changed:()=>void}) {
+  let snapshot:AccountSnapshot={config:null,account:null,linkedProviders:null,linkingProvider:null,local:null,sync:null,run:null,problem:null,codeSentTo:null,busy:false,exporting:false,enabling:false,deletion:null,deletionNotice:null,running:false,active:false,online:true,lastSyncedAt:null};
   const listeners=new Set<()=>void>();
   let disposed=false,suspended=false,signOutUnfinished=false,rerun=false,associationConfirmationNeeded=false;
   let actions:Promise<unknown>=Promise.resolve(),refreshing:Promise<AccountActionResult>|null=null,running:Promise<void>|null=null,aborter:AbortController|null=null,cancelScheduled:(()=>void)|null=null;
   let identityPending:Promise<AccountActionResult>|null=null,exportPending:Promise<AccountActionResult>|null=null;
   let exportAborter:AbortController|null=null;
+  type DeletionSetup={epoch:number;accountId:string;generation:string|null;sessionId:string;reauthIntentId:string|null};
+  let deletionIntent:AccountDeletionIntent|null=null,deletionSetup:DeletionSetup|null=null,deletionEpoch=0,deletionCommitted=false;
   const runner=createSyncRunner({sync:runtime.sync,api,petId:runtime.petId,deviceId:runtime.deviceId,sessionAccountId:()=>snapshot.account?.user.id??null,changed});
   function emit(patch:Partial<AccountSnapshot>) {
     if (disposed) return;snapshot={...snapshot,...patch};
@@ -59,7 +64,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
     emit({sync,local:{name,eventCount:count!.n}});
   }
   function cancelTimer() {cancelScheduled?.();cancelScheduled=null;}
-  function eligible() {return !disposed&&!suspended&&!associationConfirmationNeeded&&!snapshot.busy&&snapshot.active&&snapshot.online&&!!snapshot.account?.cloud.canSync&&snapshot.sync?.accountId===snapshot.account?.user.id&&snapshot.sync?.state!=='local';}
+  function eligible() {return !disposed&&!suspended&&!deletionIntent&&!deletionSetup&&!deletionCommitted&&!associationConfirmationNeeded&&!snapshot.busy&&snapshot.active&&snapshot.online&&!!snapshot.account?.cloud.canSync&&snapshot.sync?.accountId===snapshot.account?.user.id&&snapshot.sync?.state!=='local';}
   function kick(delay=0,force=false) {
     if (!eligible()) return;
     if (cancelScheduled&&!force) return;cancelTimer();
@@ -91,18 +96,22 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
     })();
   }
   async function pauseTransport() {suspended=true;rerun=false;cancelTimer();aborter?.abort();if(running)await running;}
-  function perform(action:()=>Promise<AccountActionResult>):Promise<AccountActionResult> {
+  function perform(action:()=>Promise<AccountActionResult>,kind:'standard'|'deletion'|'refresh'|'enable'='standard'):Promise<AccountActionResult> {
     const result=actions.then(async()=>{
-      if(disposed)return 'error' as const;emit({busy:true,problem:null});
+      if(disposed)return 'error' as const;
+      try{deletionIntent=await runtime.deletion.read();}catch{return fail('local-storage');}
+      if(deletionIntent){await pauseTransport();if(!deletionSetup&&!snapshot.deletion)emit({deletion:pendingDeletionView()});}
+      if(kind!=='deletion'&&kind!=='refresh'&&(deletionIntent||deletionSetup||deletionCommitted))return fail('deletion-pending');
+      emit({busy:true,enabling:kind==='enable',problem:null});
       try{return await action();}
       catch(error){return fail(error instanceof CloudApiError?error.category:'local-storage');}
-      finally{try{await localState();}catch{fail('local-storage');}emit({busy:false});kick();}
+      finally{try{await localState();}catch{fail('local-storage');}emit({busy:false,enabling:false});kick();}
     });
     actions=result.catch(()=>undefined);return result;
   }
-  function authenticate(action:()=>Promise<AccountActionResult>):Promise<AccountActionResult> {
+  function authenticate(action:()=>Promise<AccountActionResult>,kind:'standard'|'deletion'='standard'):Promise<AccountActionResult> {
     if(identityPending)return Promise.resolve('cancelled');
-    identityPending=perform(action).finally(()=>{identityPending=null;});return identityPending;
+    identityPending=perform(action,kind).finally(()=>{identityPending=null;});return identityPending;
   }
   async function loadAccount():Promise<boolean> {
     if(disposed)return false;
@@ -169,16 +178,97 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
     if(!snapshot.config!.providers.apple&&!snapshot.config!.providers.google){emit({linkedProviders:[]});return true;}
     const fence=await captureIdentityFence();return !!fence&&await loadLinkedProviders(fence);
   }
+  function pendingDeletionView():DeletionView {
+    return {stage:deletionIntent?.phase==='acknowledged'?'cleanup':'pending',email:null,provider:null,status:deletionIntent?.phase==='prepared'?'not-started':null,canCancel:deletionIntent?.phase==='prepared'};
+  }
+  async function sameDeletionOwner(fence:{accountId:string;generation:string|null}):Promise<boolean> {
+    const owner=await runtime.deletion.owner();
+    if(fence.generation===null?owner!==null:owner?.accountId!==fence.accountId||owner.generation!==fence.generation){fail('account-mismatch');return false;}
+    return true;
+  }
+  async function deletionIdentity(setup:DeletionSetup):Promise<LifecycleIdentity|null> {
+    if(disposed||deletionSetup!==setup||setup.epoch!==deletionEpoch)return null;
+    if(!snapshot.online){fail('network');return null;}
+    if(!await sameDeletionOwner(setup))return null;
+    const current=await lifecycle!.identity();
+    if(disposed||deletionSetup!==setup||setup.epoch!==deletionEpoch)return null;
+    if(!await sameDeletionOwner(setup))return null;
+    if(!current){fail('auth-required');return null;}
+    if(current.user.id!==setup.accountId){emit({account:null,linkedProviders:null});fail('account-mismatch');return null;}
+    if(disposed||deletionSetup!==setup||setup.epoch!==deletionEpoch)return null;
+    return current;
+  }
+  async function cancelDeletion(){
+    if(deletionCommitted)return;
+    const setup=deletionSetup,epoch=++deletionEpoch;deletionSetup=null;
+    if(setup?.reauthIntentId)void lifecycle?.cancelReauthentication(setup.accountId,setup.reauthIntentId).catch(()=>{});
+    emit({deletion:deletionIntent?pendingDeletionView():null,problem:null});
+    if(!deletionIntent||deletionIntent.phase!=='prepared'){suspended=!!deletionIntent||signOutUnfinished;kick();return;}
+    try{
+      const intent=await runtime.deletion.read();if(epoch!==deletionEpoch)return;
+      if(intent?.phase==='prepared')await runtime.deletion.cancelPrepared(intent.receipt);
+      if(epoch!==deletionEpoch)return;
+      deletionIntent=intent?.phase==='prepared'?null:intent;
+      suspended=!!deletionIntent||signOutUnfinished;
+      emit({deletion:deletionIntent?pendingDeletionView():null});kick();
+    }catch{await pauseTransport();fail('local-storage');}
+  }
+  async function finishDeletion():Promise<AccountActionResult> {
+    const intent=deletionIntent;
+    if(!intent||intent.phase!=='acknowledged'||!lifecycle)return fail('deletion-pending');
+    emit({deletion:pendingDeletionView()});
+    if(!await sameDeletionOwner(intent))return 'error';
+    // A completed receipt belongs to the old account. Never clear a different
+    // owner's credentials merely because that old account finished deletion.
+    const current=await lifecycle.identity();
+    if(current&&current.user.id!==intent.accountId)return fail('account-mismatch');
+    if(await identity.hasCredentials()) {
+      const latest=await lifecycle.identity();
+      if(latest&&latest.user.id!==intent.accountId)return fail('account-mismatch');
+      if(!await sameDeletionOwner(intent))return 'error';
+      await outcome(()=>identity.signOut());
+      if(await identity.hasCredentials())return fail('sign-out-failed');
+    }
+    await runtime.deletion.complete(intent.receipt);
+    deletionIntent=null;deletionSetup=null;deletionCommitted=false;deletionEpoch++;
+    associationConfirmationNeeded=false;signOutUnfinished=false;suspended=false;
+    emit({account:null,linkedProviders:null,run:null,codeSentTo:null,deletion:null,deletionNotice:await runtime.deletion.readNotice(),problem:null});
+    changed();return 'ok';
+  }
+  async function checkDeletion():Promise<AccountActionResult> {
+    deletionIntent=await runtime.deletion.read();
+    emit({deletionNotice:await runtime.deletion.readNotice()});
+    if(!deletionIntent)return 'ok';
+    await pauseTransport();emit({deletion:pendingDeletionView()});
+    if(!lifecycle)return fail('deletion-pending');
+    if(deletionIntent.phase==='acknowledged')return finishDeletion();
+    if(!snapshot.online)return fail('network');
+    const receipt=deletionIntent.receipt,result=await lifecycle.status(receipt);
+    if(result.status!=='deleted'){emit({deletion:{...pendingDeletionView(),status:result.status}});return 'ok';}
+    // Status can acknowledge an uncertain request; it can never authorize one.
+    if(deletionIntent.phase==='prepared')return fail('invalid-response');
+    await runtime.deletion.acknowledge(receipt,result.appleRevocation);
+    deletionIntent=await runtime.deletion.read();return finishDeletion();
+  }
+  async function reauthenticationFinished(setup:DeletionSetup):Promise<AccountActionResult> {
+    const current=await deletionIdentity(setup);
+    if(!current)return setup.epoch===deletionEpoch?'error':'cancelled';
+    if(current.session.id===setup.sessionId)return fail('reauth-incomplete');
+    emit({deletion:{stage:'ready',email:current.user.email,provider:null,status:null,canCancel:true}});return 'ok';
+  }
   function refresh():Promise<AccountActionResult> {
     if(refreshing)return refreshing;
     refreshing=perform(async()=>{
+      if(deletionIntent)return checkDeletion();
+      emit({deletionNotice:await runtime.deletion.readNotice()});
+      if(deletionSetup||deletionCommitted)return 'ok';
       if(!snapshot.online)return fail('network');emit({config:await api.config()});await localState();
       const loaded=await loadAccount();
       if(loaded&&!await refreshLinkedProviders())return 'error';
       if(loaded&&associationConfirmationNeeded&&snapshot.account?.pets.length&&snapshot.sync?.state!=='active'
         &&(!snapshot.sync?.accountId||snapshot.sync.accountId===snapshot.account.user.id))emit({problem:'confirmation-required'});
       return 'ok';
-    }).finally(()=>{refreshing=null;});
+    },'refresh').finally(()=>{refreshing=null;});
     return refreshing;
   }
   async function outcome(action:()=>Promise<IdentityOutcome>):Promise<IdentityOutcome> {try{return await action();}catch{return {error:{status:0,code:'NETWORK_ERROR'}};}}
@@ -201,9 +291,105 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
     read:()=>snapshot,
     subscribe(listener:()=>void){listeners.add(listener);return()=>{listeners.delete(listener);};},
     refresh,
+    beginDeletion(){return authenticate(async()=>{
+      if(!lifecycle)return fail('provider-unavailable');
+      if(deletionCommitted)return fail('deletion-pending');
+      const epoch=++deletionEpoch;
+      await pauseTransport();
+      if(deletionIntent?.phase==='acknowledged')return finishDeletion();
+      const accountId=deletionIntent?.accountId??snapshot.account?.user.id;
+      if(!accountId)return fail('auth-required');
+      const owner=await runtime.deletion.owner();
+      if(owner&&owner.accountId!==accountId)return fail('account-mismatch');
+      const generation=deletionIntent?deletionIntent.generation:owner?.generation??null;
+      if(!await sameDeletionOwner({accountId,generation}))return 'error';
+      if(!snapshot.online)return fail('network');
+      const current=await lifecycle.identity();
+      if(disposed||epoch!==deletionEpoch)return 'cancelled';
+      if(!current)return fail('auth-required');
+      if(current.user.id!==accountId)return fail('account-mismatch');
+      if(!await sameDeletionOwner({accountId,generation}))return 'error';
+      if(disposed||epoch!==deletionEpoch)return 'cancelled';
+      const setup:DeletionSetup={epoch,accountId,generation,sessionId:current.session.id,reauthIntentId:null};deletionSetup=setup;
+      emit({deletion:{stage:'verify',email:current.user.email,provider:null,status:null,canCancel:true}});
+      if(!snapshot.config)emit({config:await api.config()});
+      if(!await deletionIdentity(setup))return epoch===deletionEpoch?'error':'cancelled';
+      if(snapshot.config!.providers.apple||snapshot.config!.providers.google){
+        const methods=await identity.listAccounts();
+        if(!await deletionIdentity(setup))return epoch===deletionEpoch?'error':'cancelled';
+        if(methods.error)return fail(identityProblem(methods.error));
+        if(!methods.data)return fail('invalid-response');
+        if(methods.data.some(method=>method.userId!==accountId))return fail('account-mismatch');
+        emit({linkedProviders:[...new Set(methods.data.map(method=>method.providerId).filter((provider):provider is SocialProvider=>provider==='apple'||provider==='google'))]});
+      }else emit({linkedProviders:[]});
+      return 'ok';
+    },'deletion');},
+    requestDeletionCode(){return authenticate(async()=>{
+      const setup=deletionSetup;if(!setup||!lifecycle)return fail('reauth-incomplete');
+      if(!await deletionIdentity(setup))return 'error';
+      await lifecycle.requestEmail(setup.accountId);
+      if(deletionSetup!==setup||setup.epoch!==deletionEpoch)return 'cancelled';
+      emit({deletion:{...snapshot.deletion!,stage:'code',provider:null}});return 'ok';
+    },'deletion');},
+    verifyDeletionCode(code:string){return authenticate(async()=>{
+      const setup=deletionSetup;if(!setup||!lifecycle||snapshot.deletion?.stage!=='code')return fail('reauth-incomplete');
+      if(!/^\d{6}$/.test(code))return fail('invalid-code');
+      if(!await deletionIdentity(setup))return 'error';
+      try{await lifecycle.verifyEmail(setup.accountId,code);}catch(error){
+        if(error instanceof CloudApiError&&error.status===400)return fail('invalid-code');throw error;
+      }
+      return reauthenticationFinished(setup);
+    },'deletion');},
+    reauthenticateDeletion(provider:SocialProvider){return authenticate(async()=>{
+      const setup=deletionSetup;if(!setup||!lifecycle)return fail('reauth-incomplete');
+      if(!snapshot.config?.providers[provider]||!snapshot.linkedProviders?.includes(provider))return fail('provider-unavailable');
+      if(!await deletionIdentity(setup))return 'error';
+      emit({deletion:{...snapshot.deletion!,provider}});
+      try{
+        await lifecycle.reauthenticate(setup.accountId,provider,intentId=>{
+          setup.reauthIntentId=intentId;
+          if(deletionSetup!==setup||setup.epoch!==deletionEpoch){void lifecycle.cancelReauthentication(setup.accountId,intentId).catch(()=>{});return false;}return true;
+        });
+        return reauthenticationFinished(setup);
+      }catch(error){if(deletionSetup!==setup||setup.epoch!==deletionEpoch)return 'cancelled';throw error;
+      }finally{if(deletionSetup===setup&&snapshot.deletion)emit({deletion:{...snapshot.deletion,provider:null}});}
+    },'deletion');},
+    cancelDeletion,
+    deleteCloudAccount({confirmed=false}:{confirmed?:boolean}={}){return authenticate(async()=>{
+      const setup=deletionSetup;
+      if(!confirmed)return fail('confirmation-required');
+      if(!setup||!lifecycle||snapshot.deletion?.stage!=='ready')return fail('reauth-incomplete');
+      const current=await deletionIdentity(setup);
+      if(!current)return setup.epoch===deletionEpoch?'error':'cancelled';
+      if(current.session.id===setup.sessionId)return fail('reauth-incomplete');
+      // From this point closing the screen cannot pretend to cancel deletion.
+      deletionCommitted=true;emit({deletion:{stage:'pending',email:null,provider:null,status:null,canCancel:false}});
+      try{
+        // A saved, unexpired receipt may already represent a partial deletion.
+        // Reusing it requires this new proof and explicit confirmation each time.
+        if(!deletionIntent||deletionIntent.expiresAt<=Date.now()){
+          const prepared=await lifecycle.prepare(setup.accountId);
+          if(!await sameDeletionOwner(setup))return 'error';
+          deletionIntent=await runtime.deletion.save({...prepared,accountId:setup.accountId,generation:setup.generation},deletionIntent?.receipt??null);
+        }
+        if(!await sameDeletionOwner(setup))return 'error';
+        await runtime.deletion.markDispatched(deletionIntent.receipt);
+        deletionIntent=await runtime.deletion.read();
+        const result=await lifecycle.remove(setup.accountId,deletionIntent!.receipt);
+        await runtime.deletion.acknowledge(deletionIntent!.receipt,result.appleRevocation);
+        deletionIntent=await runtime.deletion.read();return finishDeletion();
+      }finally{
+        deletionCommitted=false;deletionSetup=null;
+        deletionIntent=await runtime.deletion.read();
+        if(deletionIntent)emit({deletion:pendingDeletionView()});
+        else if(snapshot.deletion)emit({deletion:null});
+      }
+    },'deletion');},
+    checkDeletion(){return perform(checkDeletion,'deletion');},
+    dismissDeletionNotice(){return perform(async()=>{await runtime.deletion.dismissNotice();emit({deletionNotice:null});return 'ok';},'deletion');},
     async eventHistory(eventId:string,beforeRevision?:number,signal?:AbortSignal) {
       throwIfAborted(signal);
-      if(disposed||snapshot.busy||identityPending)throw new CloudApiError('conflict');
+      if(disposed||snapshot.busy||identityPending||deletionIntent||deletionSetup||deletionCommitted)throw new CloudApiError('conflict');
       const accountId=snapshot.account?.user.id,actionFence=actions;
       if(!accountId)throw new CloudApiError('auth-required',401);
       function currentSession() {
@@ -326,7 +512,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
       const operationId=await runtime.database.read(async sql=>(await sql.getFirstAsync<{id:string}>('SELECT lower(hex(randomblob(16))) id'))!.id);
       await runtime.sync.prepareAssociation({accountId:account.user.id,localPetId:runtime.petId,deviceId:runtime.deviceId,mode:associationMode,enrollment:{operationId,deviceId:runtime.deviceId,localPetId:runtime.petId,name:associationMode==='restore'?existing!.name:snapshot.local!.name,...(confirmedPetId?{confirmedPetId}:{})}});
       associationConfirmationNeeded=false;suspended=false;return 'ok';
-    });},
+    },'enable');},
     continueLocally({confirmPending=false}:{confirmPending?:boolean}={}) {return perform(async()=>{
       if(!await runtime.storage.loadFirstLaunch())return 'cancelled';
       await pauseTransport();const result=await continueFirstLaunchLocally(runtime,confirmPending);
@@ -353,7 +539,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
     // refresh would otherwise immediately erase its completion/error state.
     setActive(active:boolean) {if(snapshot.active===active)return;emit({active});if(!active){cancelTimer();aborter?.abort();}else if(snapshot.online&&!identityPending)void refresh();},
     setOnline(online:boolean) {if(snapshot.online===online)return;emit({online});if(!online){cancelTimer();aborter?.abort();exportAborter?.abort();}else if(snapshot.active&&!identityPending)void refresh();},
-    stop(){if(disposed)return;disposed=true;cancelTimer();aborter?.abort();exportAborter?.abort();unsubscribe();listeners.clear();},
+    stop(){if(disposed)return;void cancelDeletion();disposed=true;cancelTimer();aborter?.abort();exportAborter?.abort();unsubscribe();listeners.clear();},
   };
 }
 export type AccountController=ReturnType<typeof createAccountController>;

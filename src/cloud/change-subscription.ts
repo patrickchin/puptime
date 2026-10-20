@@ -3,7 +3,7 @@ export type OpenChanges=(options:{signal:AbortSignal;onCursor:(cursor:number)=>v
 type Controller={read:()=>AccountSnapshot;subscribe:(fn:()=>void)=>()=>void;invalidate:()=>void};
 const defaultDefer=(fn:()=>void,delay:number)=>{const timer=setTimeout(fn,delay);return()=>clearTimeout(timer);};
 function ownerKey(state:AccountSnapshot):string|null {
-  if(!state.active||!state.online||state.busy||state.problem||!state.account?.cloud.canSync||state.sync?.accountId!==state.account.user.id||state.sync.state==='local')return null;
+  if(!state.active||!state.online||state.busy||state.deletion||state.problem||!state.account?.cloud.canSync||state.sync?.accountId!==state.account.user.id||state.sync.state==='local')return null;
   return JSON.stringify([state.account.user.id,state.sync.generation]);
 }
 export function watchAccountChanges({controller,open,defer=defaultDefer}:{controller:Controller;open:OpenChanges;defer?:(fn:()=>void,delay:number)=>()=>void}) {

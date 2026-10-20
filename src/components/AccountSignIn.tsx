@@ -20,6 +20,8 @@ export function accountProblemKey(problem:AccountProblem|null):MessageKey|null {
   if(problem==='sign-out-failed')return 'account.error.signOut';
   if(problem==='remote-sign-out-unconfirmed')return 'account.error.remoteSignOut';
   if(problem==='export-failed')return 'account.error.export';
+  if(problem==='reauth-incomplete')return 'account.error.reauth';
+  if(problem==='deletion-pending')return 'account.error.deletionPending';
   if(problem==='local-storage')return 'account.error.storage';
   if(problem==='social-incomplete')return 'account.error.socialIncomplete';
   if(problem==='link-incomplete')return 'account.error.linkIncomplete';
@@ -64,9 +66,9 @@ export function AccountSignIn({cloud,theme,showError=true,showIntro=true}:{cloud
   </>}
  </View>;
 }
-export function AccountButton({theme,label,onPress,testID,primary=false,disabled=false,loading=false,icon}:{theme:Theme;label:string;onPress:()=>void;testID:string;primary?:boolean;disabled?:boolean;loading?:boolean;icon?:keyof typeof MaterialCommunityIcons.glyphMap}) {
-  const color=disabled?theme.textMuted:primary?theme.onPrimary:theme.primary;
-  return <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{disabled,busy:loading}} disabled={disabled} onPress={onPress} style={({pressed})=>[styles.button,{borderColor:theme.border,borderRadius:theme.presentation.controlRadius,backgroundColor:disabled?theme.surface:primary?(pressed?theme.primaryPressed:theme.primary):(pressed?theme.primarySoft:theme.surfaceRaised)}]}>
+export function AccountButton({theme,label,onPress,testID,primary=false,destructive=false,disabled=false,loading=false,icon}:{theme:Theme;label:string;onPress:()=>void;testID:string;primary?:boolean;destructive?:boolean;disabled?:boolean;loading?:boolean;icon?:keyof typeof MaterialCommunityIcons.glyphMap}) {
+  const color=disabled?theme.textMuted:primary?theme.onPrimary:destructive?theme.danger:theme.primary;
+  return <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{disabled,busy:loading}} disabled={disabled} onPress={onPress} style={({pressed})=>[styles.button,{borderColor:theme.border,borderRadius:theme.presentation.controlRadius,backgroundColor:disabled?theme.surface:primary?(destructive?theme.danger:pressed?theme.primaryPressed:theme.primary):(pressed?(destructive?theme.dangerSoft:theme.primarySoft):theme.surfaceRaised)}]}>
     {loading?<ActivityIndicator color={color}/>:icon?<MaterialCommunityIcons name={icon} size={22} color={color} accessibilityElementsHidden importantForAccessibility="no"/>:null}
     <Text style={[styles.buttonText,{color}]}>{label}</Text>
   </Pressable>;

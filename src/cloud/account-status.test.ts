@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { AccountSnapshot } from './account-controller.ts';
 import * as statuses from './account-status.ts';
-const state:AccountSnapshot={config:null,linkedProviders:null,linkingProvider:null,account:{user:{id:'one',email:'person@example.com',name:'Person'},cloud:{canSync:true,canExport:true,source:'trial',expiresAt:9999999999999},pets:[]},local:null,sync:{state:'active',generation:'generation',accountId:'one',pending:0,blocked:0,cursor:10},run:{state:'synced',pending:0,blocked:0,retryAfterMs:null,problem:null},problem:null,codeSentTo:null,busy:false,exporting:false,running:false,active:true,online:true,lastSyncedAt:100};
+const state:AccountSnapshot={config:null,linkedProviders:null,linkingProvider:null,account:{user:{id:'one',email:'person@example.com',name:'Person'},cloud:{canSync:true,canExport:true,source:'trial',expiresAt:9999999999999},pets:[]},local:null,sync:{state:'active',generation:'generation',accountId:'one',pending:0,blocked:0,cursor:10},run:{state:'synced',pending:0,blocked:0,retryAfterMs:null,problem:null},problem:null,codeSentTo:null,busy:false,exporting:false,enabling:false,deletion:null,deletionNotice:null,running:false,active:true,online:true,lastSyncedAt:100};
 function status(input:AccountSnapshot|null){assert.equal(typeof statuses.accountStatus,'function');return statuses.accountStatus(input);}
 
 test('a previous successful sync never hides new pending or blocked local changes',()=>{

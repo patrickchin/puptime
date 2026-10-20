@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect,useState } from 'react';
-import { Alert,KeyboardAvoidingView,Linking,Pressable,ScrollView,StyleSheet,Switch,Text,View } from 'react-native';
+import { Alert,Keyboard,KeyboardAvoidingView,Linking,Pressable,ScrollView,StyleSheet,Switch,Text,TextInput,View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { CloudHandle } from '../cloud/use-cloud';
 import {AccountButton,AccountSignIn,accountProblemKey} from '../components/AccountSignIn';
@@ -13,13 +13,15 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
   const {t,locale}=useLocalization(),state=useAccountSnapshot(cloud.controller);
   const [localName,setLocalName]=useState<string|null>(null),[readFailed,setReadFailed]=useState(false);
   const [samePuppy,setSamePuppy]=useState(false);
+  const [deletionCode,setDeletionCode]=useState('');
   const account=state?.account,existing=account?.pets[0],busy=state?.busy??false;
   const status=accountStatus(state),errorKey=accountProblemKey(state?.problem??(readFailed?'local-storage':null));
   const enrolled=!!state?.sync?.accountId&&state.sync.state!=='local';
   const days=state?.config?.trialDays??14;
   useEffect(()=>{let mounted=true;cloud.getLocalName().then(name=>{if(mounted)setLocalName(name);}).catch(()=>{if(mounted)setReadFailed(true);});return()=>{mounted=false;};},[cloud.getLocalName]);
   useEffect(()=>{setSamePuppy(false);},[account?.user.id,existing?.id]);
-  useEffect(()=>()=>cloud.controller?.cancelExport(),[cloud.controller]);
+  useEffect(()=>()=>{cloud.controller?.cancelExport();void cloud.controller?.cancelDeletion();},[cloud.controller]);
+  useEffect(()=>{if(state?.deletion?.stage!=='code'){setDeletionCode('');Keyboard.dismiss();}},[state?.deletion?.stage]);
   const titleStyle={color:theme.text,fontFamily:theme.presentation.headingFont,fontSize:theme.presentation.titleSize,lineHeight:theme.presentation.titleLineHeight,fontWeight:theme.presentation.titleWeight};
   const bodyStyle={color:theme.textMuted};
   const cardStyle=[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border,borderRadius:theme.presentation.cardRadius}];
@@ -31,11 +33,16 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
     {text:t('account.cancel'),style:'cancel'},
     {text:t('account.signOut'),style:'destructive',onPress:()=>{void cloud.controller?.signOut({confirmPending:true});}},
   ]);
+  const deleteAccount=()=>{Keyboard.dismiss();Alert.alert(t('account.deleteTitle'),t('account.deleteBody'),[
+    {text:t('account.cancel'),style:'cancel'},
+    {text:t('account.delete'),style:'destructive',onPress:()=>{void cloud.controller?.deleteCloudAccount({confirmed:true});}},
+  ]);};
+  const deletion=state?.deletion,notice=state?.deletionNotice;
   return <SafeAreaView style={[styles.root,{backgroundColor:theme.background}]} edges={['top','bottom']}>
     <KeyboardAvoidingView behavior="padding" style={styles.root}>
       <ScrollView testID="screen.account" keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <Pressable testID="account.back" accessibilityRole="button" accessibilityLabel={t('account.back')} onPress={()=>{cloud.controller?.cancelExport();onBack();}} style={({pressed})=>[styles.back,{backgroundColor:pressed?theme.primarySoft:theme.surfaceRaised,borderRadius:theme.presentation.controlRadius}]}>
+          <Pressable testID="account.back" accessibilityRole="button" accessibilityLabel={t('account.back')} onPress={()=>{cloud.controller?.cancelExport();void cloud.controller?.cancelDeletion();onBack();}} style={({pressed})=>[styles.back,{backgroundColor:pressed?theme.primarySoft:theme.surfaceRaised,borderRadius:theme.presentation.controlRadius}]}>
             <MaterialCommunityIcons name="arrow-left" size={24} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no" />
           </Pressable>
           <Text accessibilityRole="header" maxFontSizeMultiplier={2} style={[styles.title,titleStyle]}>{t('account.title')}</Text>
@@ -44,10 +51,33 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
           <View style={styles.summaryHeader}><MaterialCommunityIcons name="dog-side" size={31} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no" /><Text maxFontSizeMultiplier={2} style={[styles.eyebrow,{color:theme.primary}]}>{t('account.onDevice')}</Text></View>
           <Text maxFontSizeMultiplier={2} style={[styles.puppy,{color:theme.text,fontFamily:theme.presentation.headingFont}]}>{shownName}</Text>
           <Text testID="account.local.count" style={[styles.body,bodyStyle]}>{readFailed?t('account.error.storage'):countLabel(count)}</Text>
-          <Text testID="account.status" accessibilityLiveRegion="polite" style={[styles.status,{color:theme.primary}]}>{t(`account.status.${status}`)}</Text>
+          <Text testID="account.status" accessibilityLiveRegion="polite" style={[styles.status,{color:theme.primary}]}>{deletion?t('account.status.paused'):t(`account.status.${status}`)}</Text>
         </View>
         {errorKey&&errorKey!=='account.error.export'?<Text testID="account.error" accessibilityRole="alert" style={[styles.notice,{color:theme.danger,backgroundColor:theme.dangerSoft,borderRadius:theme.presentation.controlRadius}]}>{t(errorKey)}</Text>:null}
-        {!account?<AccountSignIn cloud={cloud} theme={theme} showError={false}/>:(<View style={styles.stack}>
+        {notice?<View testID="account.delete.done" style={cardStyle}>
+          <MaterialCommunityIcons name="check-circle-outline" size={32} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
+          <Text accessibilityRole="header" style={[styles.puppy,{color:theme.text}]}>{t('account.deleteDone')}</Text>
+          <Text style={[styles.body,bodyStyle]}>{t('account.deleteKept')}</Text>
+          {notice.appleRevocation==='manual'?<><Text style={[styles.body,bodyStyle]}>{t('account.deleteApple')}</Text><AccountButton theme={theme} testID="account.delete.appleManage" label={t('account.deleteAppleManage')} onPress={()=>{void Linking.openURL('https://account.apple.com/account/manage').catch(()=>Alert.alert(t('learn.linkError'),t('learn.linkErrorBody')));}}/></>:null}
+          <AccountButton theme={theme} testID="account.delete.done.dismiss" label={t('account.done')} primary disabled={busy} onPress={()=>{void cloud.controller!.dismissDeletionNotice();}}/>
+        </View>:deletion?<View testID="account.delete.panel" style={cardStyle}>
+          <Text accessibilityRole="header" style={[styles.puppy,{color:theme.text}]}>{t(deletion.stage==='ready'?'account.deleteReady':deletion.stage==='cleanup'?'account.deleteCleanup':deletion.stage==='pending'?'account.deletePending':'account.deleteVerify')}</Text>
+          <Text style={[styles.body,bodyStyle]}>{t(deletion.stage==='ready'?'account.deleteReadyBody':deletion.stage==='pending'||deletion.stage==='cleanup'?deletion.status==='unknown'?'account.deleteUnknown':'account.deletePendingBody':'account.deleteVerifyBody')}</Text>
+          {deletion.email?<Text selectable style={[styles.body,{color:theme.text}]}>{deletion.email}</Text>:null}
+          {deletion.stage==='verify'||deletion.stage==='code'?<>
+            {(['apple','google'] as const).filter(provider=>state?.config?.providers[provider]&&state.linkedProviders?.includes(provider)).map(provider=><AccountButton key={provider} theme={theme} testID={`account.delete.${provider}`} label={t(provider==='apple'?'account.apple':'account.google')} icon={provider} disabled={busy||!state?.online} loading={deletion.provider===provider} onPress={()=>{void cloud.controller!.reauthenticateDeletion(provider);}}/>)}
+            {deletion.stage==='code'?<>
+              <Text style={[styles.label,{color:theme.text}]}>{t('account.code')}</Text>
+              <TextInput testID="account.delete.code" accessibilityLabel={t('account.code')} style={[styles.input,{color:theme.text,backgroundColor:theme.surface,borderColor:theme.border,borderRadius:theme.presentation.controlRadius}]} value={deletionCode} onChangeText={text=>setDeletionCode(text.replace(/\D/g,'').slice(0,6))} keyboardType="number-pad" textContentType="oneTimeCode" autoComplete="one-time-code" maxLength={6} selectTextOnFocus editable={!busy}/>
+              <AccountButton theme={theme} testID="account.delete.verify" label={t('account.verify')} primary disabled={busy||!state?.online||deletionCode.length!==6} loading={busy&&!deletion.provider} onPress={()=>{void cloud.controller!.verifyDeletionCode(deletionCode);}}/>
+            </>:null}
+            {state?.config?.providers.email?<AccountButton theme={theme} testID="account.delete.sendCode" label={t(deletion.stage==='code'?'account.resend':'account.deleteEmail')} disabled={busy||!state.online} onPress={()=>{setDeletionCode('');void cloud.controller!.requestDeletionCode();}}/>:null}
+          </>:deletion.stage==='ready'?<AccountButton theme={theme} testID="account.delete.confirm" label={t('account.delete')} primary destructive disabled={busy||!state?.online} onPress={deleteAccount}/>:<>
+            <AccountButton theme={theme} testID="account.delete.check" label={t('account.deleteCheck')} disabled={busy||!state?.online} loading={busy} onPress={()=>{void cloud.controller!.checkDeletion();}}/>
+            {deletion.stage==='pending'?<AccountButton theme={theme} testID="account.delete.again" label={t('account.deleteAgain')} disabled={busy||!state?.online} onPress={()=>{void cloud.controller!.beginDeletion();}}/>:null}
+          </>}
+          {deletion.canCancel?<AccountButton theme={theme} testID="account.delete.cancel" label={t('account.cancel')} onPress={()=>{void cloud.controller!.cancelDeletion();}}/>:null}
+        </View>:!account?<AccountSignIn cloud={cloud} theme={theme} showError={false}/>:(<View style={styles.stack}>
           <Text selectable style={[styles.body,{color:theme.text}]}>{account.user.email}</Text>
           {!enrolled?(<View style={cardStyle}>
             <Text style={[styles.body,bodyStyle]}>{t('account.enrollBody')}</Text>
@@ -57,7 +87,7 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
               <Text style={[styles.body,bodyStyle]}>{t('account.combineBody')}</Text>
               <View style={styles.confirm}><Switch testID="account.samePuppy" accessibilityLabel={t('account.samePuppy')} value={samePuppy} onValueChange={setSamePuppy} disabled={busy} trackColor={{true:theme.primary,false:theme.border}}/><Text style={[styles.body,styles.grow,{color:theme.text}]}>{t('account.samePuppy')}</Text></View>
             </View>):null}
-            <AccountButton theme={theme} testID="account.enable" label={existing?t('account.combine'):account.cloud.canSync?t('account.enable'):t('account.startTrial',{days})} primary disabled={busy||!state!.online||!!existing&&!samePuppy} loading={busy} onPress={()=>{void cloud.controller!.enableCloud({...(existing?{confirmedPetId:existing.id}:{})});}}/>
+            <AccountButton theme={theme} testID="account.enable" label={existing?t('account.combine'):account.cloud.canSync?t('account.enable'):t('account.startTrial',{days})} primary disabled={busy||!state!.online||!!existing&&!samePuppy} loading={state?.enabling} onPress={()=>{void cloud.controller!.enableCloud({...(existing?{confirmedPetId:existing.id}:{})});}}/>
           </View>):(<View style={cardStyle}>
             {state!.lastSyncedAt!==null?<Text testID="account.lastSynced" style={[styles.body,bodyStyle]}>{t('account.lastSynced',{date:new Intl.DateTimeFormat(locale,{dateStyle:'medium',timeStyle:'short'}).format(state!.lastSyncedAt)})}</Text>:null}
             {state!.sync!.pending?<Text style={[styles.body,{color:theme.text}]}>{t('account.pending',{count:state!.sync!.pending})}</Text>:null}
@@ -78,13 +108,14 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
             {state?.exporting?<AccountButton theme={theme} testID="account.export.cancel" label={t('account.cancel')} onPress={()=>cloud.controller!.cancelExport()}/>:state?.sync?.pending?<Text style={[styles.body,bodyStyle]}>{t('account.exportPending')}</Text>:null}
           </View>
           <AccountButton theme={theme} testID="account.signOut" label={t('account.signOut')} disabled={busy} onPress={signOut}/>
+          <AccountButton theme={theme} testID="account.delete" label={t('account.delete')} destructive disabled={busy||!state!.online} onPress={()=>{void cloud.controller!.beginDeletion();}}/>
         </View>)}
-        {!account&&state?.sync?.accountId?<AccountButton theme={theme} testID="account.signOut" label={t('account.signOut')} disabled={busy} onPress={signOut}/>:null}
+        {!account&&!deletion&&!notice&&state?.sync?.accountId?<AccountButton theme={theme} testID="account.signOut" label={t('account.signOut')} disabled={busy} onPress={signOut}/>:null}
         <Pressable accessibilityRole="link" accessibilityLabel={t('account.privacy')} onPress={()=>{void Linking.openURL('https://github.com/patrickchin/puptime/blob/main/PRIVACY.md').catch(()=>Alert.alert(t('learn.linkError'),t('learn.linkErrorBody')));}} style={styles.privacy}><Text style={[styles.body,{color:theme.primary,textDecorationLine:'underline'}]}>{t('account.privacy')}</Text></Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
   </SafeAreaView>;
 }
 const styles=StyleSheet.create({
- root:{flex:1},content:{width:'100%',maxWidth:720,alignSelf:'center',padding:spacing.md,gap:spacing.md,paddingBottom:spacing.xl},header:{flexDirection:'row',alignItems:'flex-start',gap:12},back:{width:48,height:48,alignItems:'center',justifyContent:'center'},title:{flex:1},card:{borderWidth:1,padding:spacing.md,gap:12},summaryHeader:{flexDirection:'row',alignItems:'center',gap:12},eyebrow:{fontSize:14,fontWeight:'700',flex:1},puppy:{fontSize:25,lineHeight:32,fontWeight:'700'},status:{fontSize:16,lineHeight:23,fontWeight:'700'},body:{fontSize:16,lineHeight:24},label:{fontSize:16,lineHeight:23,fontWeight:'700'},stack:{gap:12},notice:{fontSize:16,lineHeight:24,padding:14},confirm:{flexDirection:'row',alignItems:'center',gap:12},grow:{flex:1},privacy:{minHeight:48,justifyContent:'center',alignSelf:'flex-start'},
+ root:{flex:1},content:{width:'100%',maxWidth:720,alignSelf:'center',padding:spacing.md,gap:spacing.md,paddingBottom:spacing.xl},header:{flexDirection:'row',alignItems:'flex-start',gap:12},back:{width:48,height:48,alignItems:'center',justifyContent:'center'},title:{flex:1},card:{borderWidth:1,padding:spacing.md,gap:12},summaryHeader:{flexDirection:'row',alignItems:'center',gap:12},eyebrow:{fontSize:14,fontWeight:'700',flex:1},puppy:{fontSize:25,lineHeight:32,fontWeight:'700'},status:{fontSize:16,lineHeight:23,fontWeight:'700'},body:{fontSize:16,lineHeight:24},label:{fontSize:16,lineHeight:23,fontWeight:'700'},stack:{gap:12},input:{minHeight:52,borderWidth:1,paddingHorizontal:14,paddingVertical:12,fontSize:18},notice:{fontSize:16,lineHeight:24,padding:14},confirm:{flexDirection:'row',alignItems:'center',gap:12},grow:{flex:1},privacy:{minHeight:48,justifyContent:'center',alignSelf:'flex-start'},
 });

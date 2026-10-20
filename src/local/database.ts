@@ -50,6 +50,14 @@ export async function createLocalDatabase(connection: SqlConnection): Promise<Lo
 }
 
 const revisionChangesIndex='CREATE INDEX IF NOT EXISTS local_revision_changes ON local_revisions(pet_id,kind,sequence DESC);';
+const accountDeletionSchema=`CREATE TABLE IF NOT EXISTS local_account_deletion (
+  singleton INTEGER PRIMARY KEY CHECK(singleton=1), account_id TEXT NOT NULL,
+  generation TEXT, receipt TEXT NOT NULL CHECK(length(receipt)=43 AND receipt NOT GLOB '*[^A-Za-z0-9_-]*' AND substr(receipt,-1) GLOB '[AEIMQUYcgkosw048]'),
+  expires_at INTEGER NOT NULL CHECK(expires_at>0), saved_at INTEGER NOT NULL CHECK(saved_at>=0),
+  phase TEXT NOT NULL CHECK(phase IN ('prepared','dispatched','acknowledged')),
+  apple_revocation TEXT CHECK(apple_revocation IN ('revoked','manual','not-linked')),
+  CHECK((phase='acknowledged' AND apple_revocation IS NOT NULL) OR (phase IN ('prepared','dispatched') AND apple_revocation IS NULL))
+);`;
 export const localSchema = `
 CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS puppies (id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL);
@@ -111,6 +119,7 @@ CREATE TABLE IF NOT EXISTS local_sync_baseline (
   generation TEXT NOT NULL REFERENCES local_sync_owner(generation) ON DELETE CASCADE,
   record_id TEXT NOT NULL, body TEXT NOT NULL CHECK(json_valid(body)), PRIMARY KEY(generation,record_id)
 );
+${accountDeletionSchema}
 `;
 
 export async function initializeLocalDatabase(database: LocalDatabase, newId?: () => string): Promise<{ petId: string }> {
@@ -127,6 +136,7 @@ export async function initializeLocalDatabase(database: LocalDatabase, newId?: (
       if(required.some(name=>!tables.some(table=>table.name===name))||!pet||!identifierSchema.safeParse(pet.value).success||!onboarding||!['true','false'].includes(onboarding.value)
         ||!await sql.getFirstAsync('SELECT id FROM puppies WHERE id=?',pet.value)) throw new Error('The local database metadata or active puppy is incomplete.');
       await sql.execAsync(revisionChangesIndex);
+      await sql.execAsync(accountDeletionSchema);
       return { petId: pet.value };
     }
     if(await sql.getFirstAsync("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' LIMIT 1")) throw new Error('The existing local database is incomplete. The original data has been preserved.');
