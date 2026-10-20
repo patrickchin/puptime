@@ -63,10 +63,19 @@ sequence integers likewise keep their relational/ordering meaning. Provider
 subjects (`account.accountId`), session tokens, OAuth state and OTP values remain
 owned by their respective authentication SDKs/providers.
 
-Node persistence, real Better Auth adapter and static Metro/bundle checks cover
-the ID paths. Running this source on Hermes to create, save and upload a fresh
-event remains an iOS qualification step; earlier app recordings do not establish
-that result. Android runtime testing remains deferred.
+Node persistence, real Better Auth adapter and Metro/bundle checks cover the ID
+paths. Frozen source `814db2dd` also passed actual Hermes creation, editing,
+explicit SDK enrollment/upload and authenticated cold restart: the same puppy,
+device, event, generation and accepted operation IDs persisted, with no pending
+work. Native routine SQL failure preserved the open draft and every table;
+one retry saved one prefixed routine. Actual-component tests separately prove
+the unexposed failed draft's exact ID stays equal on retry. The OS reminder's
+`rem_` identifier also survived restart.
+
+Those native checks reused a compatible Debug shell and the local development
+service. They do not establish a fresh build, Android runtime or a new deployed
+provider sign-in. The reviewed ID candidate is deployed to the development API
+without a schema reset; live SDK/provider qualification remains separate.
 
 ## Account tables and queries
 
