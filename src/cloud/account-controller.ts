@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CloudApiError,throwIfAborted,type CloudApi,type CloudAccountSummary,type CloudConfig,type CloudErrorCategory } from './api.ts';
+import { CloudApiError,cloudErrorCategory,retryDelay,throwIfAborted,type CloudApi,type CloudAccountSummary,type CloudConfig,type CloudErrorCategory } from './api.ts';
 import { createSyncRunner,type RunResult } from './runner.ts';
 import type { createLocalRuntime } from '../local/runtime-factory.ts';
 import type { AppleIdToken } from './apple-native.ts';
@@ -13,10 +13,10 @@ export type SocialProvider='apple'|'google';
 export type CloudExportAction=(expectedAccount:string,ready:()=>Promise<boolean>,signal?:AbortSignal)=>Promise<'shared'|'cancelled'>;
 type IdentityOutcome={error:{status:number;code?:string}|null;cancelled?:boolean};
 type LinkedIdentity={userId:string;providerId:string};
-type IdentityListOutcome=IdentityOutcome&{data:LinkedIdentity[]|null};
+type IdentityListOutcome=IdentityOutcome&{data:LinkedIdentity[]|null;retryAfterMs?:number|null};
 export type IdentityAdapter={requestEmail:(email:string)=>Promise<IdentityOutcome>;verifyEmail:(email:string,code:string)=>Promise<IdentityOutcome>;signInSocial:(provider:SocialProvider)=>Promise<IdentityOutcome>;linkSocial:(provider:SocialProvider)=>Promise<IdentityOutcome>;listAccounts:()=>Promise<IdentityListOutcome>;signOut:()=>Promise<IdentityOutcome>;hasCredentials:()=>Promise<boolean>};
 type SocialInput={provider:SocialProvider;callbackURL:string;errorCallbackURL:string;idToken?:AppleIdToken|GoogleIdToken};
-type SdkIdentityClient={emailOtp:{sendVerificationOtp:(input:{email:string;type:'sign-in'})=>Promise<IdentityOutcome>};signIn:{emailOtp:(input:{email:string;otp:string})=>Promise<IdentityOutcome>;social:(input:SocialInput)=>Promise<IdentityOutcome>};linkSocial:(input:SocialInput)=>Promise<IdentityOutcome>;listAccounts:()=>Promise<IdentityOutcome&{data?:unknown}>;signOut:()=>Promise<IdentityOutcome>;getCookie:()=>Promise<string>};
+type SdkIdentityClient={emailOtp:{sendVerificationOtp:(input:{email:string;type:'sign-in'})=>Promise<IdentityOutcome>};signIn:{emailOtp:(input:{email:string;otp:string})=>Promise<IdentityOutcome>;social:(input:SocialInput)=>Promise<IdentityOutcome>};linkSocial:(input:SocialInput)=>Promise<IdentityOutcome>;listAccounts:(options?:{fetchOptions:{onResponse:(context:{response:Response})=>void}})=>Promise<IdentityOutcome&{data?:unknown}>;signOut:()=>Promise<IdentityOutcome>;getCookie:()=>Promise<string>};
 export function createIdentityAdapter(auth:SdkIdentityClient,{appleIdToken,googleIdToken,nativeSignOut}:{appleIdToken?:()=>Promise<AppleIdToken|null>;googleIdToken?:()=>Promise<GoogleIdToken|null>;nativeSignOut?:()=>Promise<void>}={}):IdentityAdapter {
   const result=(value:IdentityOutcome):IdentityOutcome=>({error:value.error?{status:value.error.status,code:value.error.code}:null});
   async function social(provider:SocialProvider,link:boolean):Promise<IdentityOutcome> {
@@ -36,7 +36,9 @@ export function createIdentityAdapter(auth:SdkIdentityClient,{appleIdToken,googl
     signInSocial:provider=>social(provider,false),
     linkSocial:provider=>social(provider,true),
     listAccounts:async()=>{
-      const response=await auth.listAccounts();if(response.error)return {...result(response),data:null};
+      let retryAfterMs:number|null=null;
+      const response=await auth.listAccounts({fetchOptions:{onResponse:({response})=>{retryAfterMs=retryDelay(response.headers.get('retry-after'));}}});
+      if(response.error)return {...result(response),data:null,retryAfterMs};
       const parsed=z.array(z.object({userId:z.string().min(1),providerId:z.string().min(1)})).safeParse(response.data);
       return parsed.success?{data:parsed.data,error:null}:{data:null,error:{status:502,code:'INVALID_RESPONSE'}};
     },
@@ -64,6 +66,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
   let actions:Promise<unknown>=Promise.resolve(),refreshing:Promise<AccountActionResult>|null=null,running:Promise<void>|null=null,aborter:AbortController|null=null,cancelScheduled:(()=>void)|null=null;
   let identityPending:Promise<AccountActionResult>|null=null,exportPending:Promise<AccountActionResult>|null=null;
   let exportAborter:AbortController|null=null;
+  let refreshGeneration=0,refreshFailures=0,cancelRefreshScheduled:(()=>void)|null=null;
   const runner=createSyncRunner({sync:runtime.sync,api,petId:runtime.petId,deviceId:runtime.deviceId,sessionAccountId:()=>snapshot.account?.user.id??null,changed});
   function emit(patch:Partial<AccountSnapshot>) {
     if (disposed) return;snapshot={...snapshot,...patch};
@@ -75,6 +78,8 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
     emit({sync,local:{name,eventCount:count!.n}});
   }
   function cancelTimer() {cancelScheduled?.();cancelScheduled=null;}
+  function cancelRefreshRecovery(reset=true) {cancelRefreshScheduled?.();cancelRefreshScheduled=null;refreshGeneration++;refreshing=null;if(reset)refreshFailures=0;}
+  function refreshCurrent(fence?:number) {return !disposed&&(fence===undefined||fence===refreshGeneration);}
   function eligible() {return !disposed&&!suspended&&!associationConfirmationNeeded&&!snapshot.busy&&snapshot.active&&snapshot.online&&!!snapshot.account?.cloud.canSync&&snapshot.sync?.accountId===snapshot.account?.user.id&&snapshot.sync?.state!=='local';}
   function kick(delay=0,force=false) {
     if (!eligible()) return;
@@ -107,9 +112,12 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
     })();
   }
   async function pauseTransport() {suspended=true;rerun=false;cancelTimer();aborter?.abort();if(running)await running;}
-  function perform(action:()=>Promise<AccountActionResult>):Promise<AccountActionResult> {
+  function perform(action:()=>Promise<AccountActionResult>,refreshFence?:number):Promise<AccountActionResult> {
+    if(refreshFence===undefined)cancelRefreshRecovery();
     const result=actions.then(async()=>{
-      if(disposed)return 'error' as const;emit({busy:true,problem:null});
+      if(disposed)return 'error' as const;
+      if(refreshFence!==undefined&&refreshFence!==refreshGeneration)return 'cancelled' as const;
+      emit({busy:true,problem:null});
       try{return await action();}
       catch(error){return fail(error instanceof CloudApiError?error.category:'local-storage');}
       finally{try{await localState();}catch{fail('local-storage');}emit({busy:false});kick();}
@@ -120,35 +128,37 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
     if(identityPending)return Promise.resolve('cancelled');
     identityPending=perform(action).finally(()=>{identityPending=null;});return identityPending;
   }
-  async function loadAccount():Promise<boolean> {
-    if(disposed)return false;
+  async function loadAccount(refreshFence?:number):Promise<boolean> {
+    if(!refreshCurrent(refreshFence))return false;
     if(!snapshot.online){fail('network');return false;}
     try {
       const account=await api.account();
-      if(disposed)return false;
+      if(!refreshCurrent(refreshFence))return false;
       if(snapshot.account&&snapshot.account.user.id!==account.user.id)await pauseTransport();
+      if(!refreshCurrent(refreshFence))return false;
       emit({account,...(snapshot.account?.user.id!==account.user.id?{linkedProviders:null}:{})});suspended=signOutUnfinished;
       if(snapshot.sync?.accountId&&snapshot.sync.accountId!==account.user.id)emit({problem:'account-mismatch'});
       return true;
     }catch(error){
-      if(error instanceof CloudApiError&&error.category==='auth-required') {await pauseTransport();emit({account:null,linkedProviders:null,run:null,problem:snapshot.sync?.accountId?'auth-required':null});return false;}
+      if(!refreshCurrent(refreshFence))return false;
+      if(error instanceof CloudApiError&&error.category==='auth-required') {await pauseTransport();if(refreshCurrent(refreshFence))emit({account:null,linkedProviders:null,run:null,problem:snapshot.sync?.accountId?'auth-required':null});return false;}
       throw error;
     }
   }
   type IdentityFence={userId:string;generation:string|null;accountId:string|null};
-  async function captureIdentityFence():Promise<IdentityFence|null> {
-    if(disposed)return null;
+  async function captureIdentityFence(refreshFence?:number):Promise<IdentityFence|null> {
+    if(!refreshCurrent(refreshFence))return null;
     const userId=snapshot.account?.user.id;if(!userId){fail('auth-required');return null;}
-    const owner=await runtime.sync.status(runtime.petId);if(disposed)return null;
-    if(owner.accountId&&owner.accountId!==userId){await pauseTransport();emit({linkedProviders:null});fail('account-mismatch');return null;}
+    const owner=await runtime.sync.status(runtime.petId);if(!refreshCurrent(refreshFence))return null;
+    if(owner.accountId&&owner.accountId!==userId){await pauseTransport();if(refreshCurrent(refreshFence)){emit({linkedProviders:null});fail('account-mismatch');}return null;}
     return {userId,generation:owner.generation,accountId:owner.accountId};
   }
-  async function currentIdentity(fence:IdentityFence):Promise<boolean> {
-    if(disposed)return false;
+  async function currentIdentity(fence:IdentityFence,refreshFence?:number):Promise<boolean> {
+    if(!refreshCurrent(refreshFence))return false;
     if(!snapshot.online){fail('network');return false;}
-    const owner=await runtime.sync.status(runtime.petId);if(disposed)return false;
+    const owner=await runtime.sync.status(runtime.petId);if(!refreshCurrent(refreshFence))return false;
     if(snapshot.account?.user.id!==fence.userId||owner.generation!==fence.generation||owner.accountId!==fence.accountId){
-      await pauseTransport();emit({linkedProviders:null});fail('account-mismatch');return false;
+      await pauseTransport();if(refreshCurrent(refreshFence)){emit({linkedProviders:null});fail('account-mismatch');}return false;
     }
     return true;
   }
@@ -164,38 +174,61 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
       throw error;
     }
   }
-  async function loadLinkedProviders(fence:IdentityFence):Promise<boolean> {
+  async function loadLinkedProviders(fence:IdentityFence,refreshFence?:number):Promise<boolean> {
+    if(!refreshCurrent(refreshFence))return false;
     emit({linkedProviders:null});
     let result:IdentityListOutcome;
-    try{result=await identity.listAccounts();}catch{throw new CloudApiError('network');}
-    if(!await currentIdentity(fence))return false;
+    try{result=await identity.listAccounts();}catch{if(!refreshCurrent(refreshFence))return false;throw new CloudApiError('network');}
+    if(!await currentIdentity(fence,refreshFence)||!refreshCurrent(refreshFence))return false;
     if(result.error){
-      if(result.error.status===401){await pauseTransport();emit({account:null});fail('auth-required');}
+      const {status,code}=result.error;
+      if(refreshFence!==undefined&&code!=='INVALID_RESPONSE'&&(!status||status===429||status>=500))throw new CloudApiError(status?cloudErrorCategory(status):'network',status,result.retryAfterMs??null);
+      if(result.error.status===401){await pauseTransport();if(refreshCurrent(refreshFence)){emit({account:null});fail('auth-required');}}
       else fail(result.error.code==='INVALID_RESPONSE'?'invalid-response':identityProblem(result.error));
       return false;
     }
     if(!result.data){fail('invalid-response');return false;}
-    if(result.data.some(account=>account.userId!==fence.userId)){await pauseTransport();fail('account-mismatch');return false;}
+    if(result.data.some(account=>account.userId!==fence.userId)){await pauseTransport();if(refreshCurrent(refreshFence))fail('account-mismatch');return false;}
     const linkedProviders=[...new Set(result.data.map(account=>account.providerId).filter((provider):provider is SocialProvider=>provider==='apple'||provider==='google'))];
     emit({linkedProviders});return true;
   }
-  async function refreshLinkedProviders():Promise<boolean> {
-    if(disposed)return false;
-    if(!snapshot.config)emit({config:await api.config()});if(disposed)return false;
+  async function refreshLinkedProviders(refreshFence?:number):Promise<boolean> {
+    if(!refreshCurrent(refreshFence))return false;
+    if(!snapshot.config){const config=await api.config();if(!refreshCurrent(refreshFence))return false;emit({config});}
     if(!snapshot.config!.providers.apple&&!snapshot.config!.providers.google){emit({linkedProviders:[]});return true;}
-    const fence=await captureIdentityFence();return !!fence&&await loadLinkedProviders(fence);
+    const fence=await captureIdentityFence(refreshFence);return !!fence&&await loadLinkedProviders(fence,refreshFence);
   }
   function refresh():Promise<AccountActionResult> {
     if(refreshing)return refreshing;
-    refreshing=perform(async()=>{
-      if(!snapshot.online)return fail('network');emit({config:await api.config()});await localState();
-      const loaded=await loadAccount();
-      if(loaded&&!await refreshLinkedProviders())return 'error';
-      if(loaded&&associationConfirmationNeeded&&snapshot.account?.pets.length&&snapshot.sync?.state!=='active'
-        &&(!snapshot.sync?.accountId||snapshot.sync.accountId===snapshot.account.user.id))emit({problem:'confirmation-required'});
-      return 'ok';
-    }).finally(()=>{refreshing=null;});
-    return refreshing;
+    cancelRefreshRecovery(false);const generation=refreshGeneration;
+    let failure:CloudApiError|null=null;
+    const current=()=>refreshCurrent(generation);
+    const request=perform(async()=>{
+      try {
+        if(!snapshot.online)return fail('network');
+        const config=await api.config();if(!current())return 'cancelled';emit({config});await localState();
+        if(!current())return 'cancelled';const loaded=await loadAccount(generation);if(!current())return 'cancelled';
+        if(loaded){const linked=await refreshLinkedProviders(generation);if(!current())return 'cancelled';if(!linked)return 'error';}
+        if(loaded&&associationConfirmationNeeded&&snapshot.account?.pets.length&&snapshot.sync?.state!=='active'
+          &&(!snapshot.sync?.accountId||snapshot.sync.accountId===snapshot.account.user.id))emit({problem:'confirmation-required'});
+        return 'ok';
+      }catch(error){
+        if(!current())return 'cancelled';
+        if(error instanceof CloudApiError&&['network','rate-limited','server-error'].includes(error.category))failure=error;
+        throw error;
+      }
+    },generation).finally(()=>{
+      if(refreshing===request)refreshing=null;
+      // Only refresh's own transient failure can recover automatically. An
+      // explicit account action invalidates this fence before it is queued.
+      if(!current())return;
+      if(!failure){refreshFailures=0;return;}
+      const retry=failure,ready=()=>current()&&snapshot.active&&snapshot.online&&(snapshot.problem===null||['network','rate-limited','server-error'].includes(snapshot.problem));
+      if(!ready())return;
+      const delay=Math.max(retry.retryAfterMs??0,Math.min(60000,1000*2**Math.min(refreshFailures++,6)));
+      cancelRefreshScheduled=defer(()=>{if(!current())return;cancelRefreshScheduled=null;if(ready())void refresh();},delay);
+    });
+    refreshing=request;return request;
   }
   async function outcome(action:()=>Promise<IdentityOutcome>):Promise<IdentityOutcome> {try{return await action();}catch{return {error:{status:0,code:'NETWORK_ERROR'}};}}
   function identityProblem(error:NonNullable<IdentityOutcome['error']>,verifying=false):AccountProblem {
@@ -369,9 +402,9 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
     });},
     // The identity action verifies its own browser return; a queued lifecycle
     // refresh would otherwise immediately erase its completion/error state.
-    setActive(active:boolean) {if(snapshot.active===active)return;emit({active});if(!active){cancelTimer();aborter?.abort();}else if(snapshot.online&&!identityPending)void refresh();},
-    setOnline(online:boolean) {if(snapshot.online===online)return;emit({online});if(!online){cancelTimer();aborter?.abort();exportAborter?.abort();}else if(snapshot.active&&!identityPending)void refresh();},
-    stop(){if(disposed)return;disposed=true;cancelTimer();aborter?.abort();exportAborter?.abort();unsubscribe();listeners.clear();},
+    setActive(active:boolean) {if(snapshot.active===active)return;emit({active});if(!active){cancelRefreshRecovery();cancelTimer();aborter?.abort();}else if(snapshot.online&&!identityPending)void refresh();},
+    setOnline(online:boolean) {if(snapshot.online===online)return;emit({online});if(!online){cancelRefreshRecovery();cancelTimer();aborter?.abort();exportAborter?.abort();}else if(snapshot.active&&!identityPending)void refresh();},
+    stop(){if(disposed)return;disposed=true;cancelRefreshRecovery();cancelTimer();aborter?.abort();exportAborter?.abort();unsubscribe();listeners.clear();},
   };
 }
 export type AccountController=ReturnType<typeof createAccountController>;

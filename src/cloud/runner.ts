@@ -97,7 +97,7 @@ export function createSyncRunner({sync,api,petId,deviceId,sessionAccountId,chang
         if (error.category==='auth-required') return result('auth-required',null,error.category);
         if (['network','rate-limited','server-error'].includes(error.category)) {
           const delay=Math.min(60000,1000*2**Math.min(failures++,16));
-          return result('retry',Math.min(60000,Math.max(error.retryAfterMs??0,1000,Math.round(delay*(0.8+0.2*random())))),error.category);
+          return result('retry',Math.max(error.retryAfterMs??0,1000,Math.round(delay*(0.8+0.2*random()))),error.category);
         }
         return result('error',null,error.category);
       }
