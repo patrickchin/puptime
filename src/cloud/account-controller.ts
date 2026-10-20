@@ -33,7 +33,7 @@ export function createIdentityAdapter(auth:SdkIdentityClient):IdentityAdapter {
     hasCredentials:async()=>!!(await auth.getCookie()),
   };
 }
-export type DeletionView={stage:'verify'|'code'|'ready'|'pending'|'cleanup';email:string|null;provider:SocialProvider|null;status:'not-started'|'pending'|'unknown'|null;canCancel:boolean};
+export type DeletionView={stage:'verify'|'code'|'ready'|'pending'|'cleanup';email:string|null;provider:SocialProvider|null;status:'not-started'|'pending'|'unknown'|null;canCancel:boolean;recovery?:boolean};
 export type AccountSnapshot={config:CloudConfig|null;account:CloudAccountSummary|null;linkedProviders:SocialProvider[]|null;linkingProvider:SocialProvider|null;local:{name:string;eventCount:number}|null;sync:SyncStatus|null;run:RunResult|null;problem:AccountProblem|null;codeSentTo:string|null;busy:boolean;exporting:boolean;enabling:boolean;deletion:DeletionView|null;deletionNotice:AccountDeletionNotice|null;running:boolean;active:boolean;online:boolean;lastSyncedAt:number|null};
 const defaultDefer=(fn:()=>void,delay:number)=>{const timer=setTimeout(fn,delay);return()=>clearTimeout(timer);};
 // Call only after pausing the owning controller, or when no client exists.
@@ -51,7 +51,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
   let actions:Promise<unknown>=Promise.resolve(),refreshing:Promise<AccountActionResult>|null=null,running:Promise<void>|null=null,aborter:AbortController|null=null,cancelScheduled:(()=>void)|null=null;
   let identityPending:Promise<AccountActionResult>|null=null,exportPending:Promise<AccountActionResult>|null=null;
   let exportAborter:AbortController|null=null;
-  type DeletionSetup={epoch:number;accountId:string;generation:string|null;sessionId:string;reauthIntentId:string|null};
+  type DeletionSetup={epoch:number;accountId:string;generation:string|null;sessionId:string|null;reauthIntentId:string|null;recoveryReceipt:string|null};
   let deletionIntent:AccountDeletionIntent|null=null,deletionSetup:DeletionSetup|null=null,deletionEpoch=0,deletionCommitted=false;
   const runner=createSyncRunner({sync:runtime.sync,api,petId:runtime.petId,deviceId:runtime.deviceId,sessionAccountId:()=>snapshot.account?.user.id??null,changed});
   function emit(patch:Partial<AccountSnapshot>) {
@@ -188,6 +188,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
   }
   async function deletionIdentity(setup:DeletionSetup):Promise<LifecycleIdentity|null> {
     if(disposed||deletionSetup!==setup||setup.epoch!==deletionEpoch)return null;
+    if(setup.recoveryReceipt&&deletionIntent?.receipt!==setup.recoveryReceipt){fail('deletion-pending');return null;}
     if(!snapshot.online){fail('network');return null;}
     if(!await sameDeletionOwner(setup))return null;
     const current=await lifecycle!.identity();
@@ -198,10 +199,30 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
     if(disposed||deletionSetup!==setup||setup.epoch!==deletionEpoch)return null;
     return current;
   }
+  async function beforeDeletionProof(setup:DeletionSetup):Promise<boolean> {
+    if(snapshot.deletion?.status==='unknown'){fail('deletion-pending');return false;}
+    if(!setup.recoveryReceipt)return !!await deletionIdentity(setup);
+    if(disposed||deletionSetup!==setup||setup.epoch!==deletionEpoch)return false;
+    if(!snapshot.online){fail('network');return false;}
+    if(deletionIntent?.receipt!==setup.recoveryReceipt||!await sameDeletionOwner(setup))return false;
+    if(disposed||deletionSetup!==setup||setup.epoch!==deletionEpoch)return false;
+    const current=await lifecycle!.identity();
+    if(disposed||deletionSetup!==setup||setup.epoch!==deletionEpoch)return false;
+    if(!await sameDeletionOwner(setup))return false;
+    if(disposed||deletionSetup!==setup||setup.epoch!==deletionEpoch)return false;
+    if(!snapshot.online){fail('network');return false;}
+    if(current&&current.user.id!==setup.accountId){fail('account-mismatch');return false;}
+    // If a session appeared before this proof, it must also be replaced.
+    if(current)setup.sessionId=current.session.id;
+    return true;
+  }
+  function cancelDeletionProof(setup:DeletionSetup,intentId:string) {
+    return setup.recoveryReceipt?lifecycle!.cancelRecovery(setup.accountId,setup.recoveryReceipt,intentId):lifecycle!.cancelReauthentication(setup.accountId,intentId);
+  }
   async function cancelDeletion(){
     if(deletionCommitted)return;
     const setup=deletionSetup,epoch=++deletionEpoch;deletionSetup=null;
-    if(setup?.reauthIntentId)void lifecycle?.cancelReauthentication(setup.accountId,setup.reauthIntentId).catch(()=>{});
+    if(setup?.reauthIntentId)void cancelDeletionProof(setup,setup.reauthIntentId).catch(()=>{});
     emit({deletion:deletionIntent?pendingDeletionView():null,problem:null});
     if(!deletionIntent||deletionIntent.phase!=='prepared'){suspended=!!deletionIntent||signOutUnfinished;kick();return;}
     try{
@@ -297,6 +318,12 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
       const epoch=++deletionEpoch;
       await pauseTransport();
       if(deletionIntent?.phase==='acknowledged')return finishDeletion();
+      if(deletionIntent){
+        const result=await checkDeletion();
+        if(disposed||epoch!==deletionEpoch)return deletionIntent?'cancelled':result;
+        if(result!=='ok'||!deletionIntent)return result;
+        if(snapshot.deletion?.status==='unknown')return fail('deletion-pending');
+      }
       const accountId=deletionIntent?.accountId??snapshot.account?.user.id;
       if(!accountId)return fail('auth-required');
       const owner=await runtime.deletion.owner();
@@ -306,13 +333,14 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
       if(!snapshot.online)return fail('network');
       const current=await lifecycle.identity();
       if(disposed||epoch!==deletionEpoch)return 'cancelled';
-      if(!current)return fail('auth-required');
-      if(current.user.id!==accountId)return fail('account-mismatch');
+      if(!current&&!deletionIntent)return fail('auth-required');
+      if(current&&current.user.id!==accountId)return fail('account-mismatch');
       if(!await sameDeletionOwner({accountId,generation}))return 'error';
       if(disposed||epoch!==deletionEpoch)return 'cancelled';
-      const setup:DeletionSetup={epoch,accountId,generation,sessionId:current.session.id,reauthIntentId:null};deletionSetup=setup;
-      emit({deletion:{stage:'verify',email:current.user.email,provider:null,status:null,canCancel:true}});
+      const setup:DeletionSetup={epoch,accountId,generation,sessionId:current?.session.id??null,reauthIntentId:null,recoveryReceipt:current?null:deletionIntent!.receipt};deletionSetup=setup;
+      emit({deletion:{stage:'verify',email:current?.user.email??null,provider:null,status:null,canCancel:true,recovery:!!setup.recoveryReceipt},...(!current?{account:null,linkedProviders:null}:{})});
       if(!snapshot.config)emit({config:await api.config()});
+      if(setup.recoveryReceipt)return await beforeDeletionProof(setup)?'ok':epoch===deletionEpoch?'error':'cancelled';
       if(!await deletionIdentity(setup))return epoch===deletionEpoch?'error':'cancelled';
       if(snapshot.config!.providers.apple||snapshot.config!.providers.google){
         const methods=await identity.listAccounts();
@@ -326,30 +354,42 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
     },'deletion');},
     requestDeletionCode(){return authenticate(async()=>{
       const setup=deletionSetup;if(!setup||!lifecycle)return fail('reauth-incomplete');
-      if(!await deletionIdentity(setup))return 'error';
-      await lifecycle.requestEmail(setup.accountId);
+      if(!await beforeDeletionProof(setup))return 'error';
+      try{
+        if(setup.recoveryReceipt){
+          const {recoveryIntentId}=await lifecycle.requestRecoveryEmail(setup.accountId,setup.recoveryReceipt);
+          if(deletionSetup!==setup||setup.epoch!==deletionEpoch){void cancelDeletionProof(setup,recoveryIntentId).catch(()=>{});return 'cancelled';}
+          setup.reauthIntentId=recoveryIntentId;
+        }else await lifecycle.requestEmail(setup.accountId);
+      }catch(error){if(deletionSetup!==setup||setup.epoch!==deletionEpoch)return 'cancelled';throw error;}
       if(deletionSetup!==setup||setup.epoch!==deletionEpoch)return 'cancelled';
       emit({deletion:{...snapshot.deletion!,stage:'code',provider:null}});return 'ok';
     },'deletion');},
     verifyDeletionCode(code:string){return authenticate(async()=>{
       const setup=deletionSetup;if(!setup||!lifecycle||snapshot.deletion?.stage!=='code')return fail('reauth-incomplete');
       if(!/^\d{6}$/.test(code))return fail('invalid-code');
-      if(!await deletionIdentity(setup))return 'error';
-      try{await lifecycle.verifyEmail(setup.accountId,code);}catch(error){
+      if(!await beforeDeletionProof(setup))return 'error';
+      try{
+        if(setup.recoveryReceipt){if(!setup.reauthIntentId)return fail('reauth-incomplete');await lifecycle.verifyRecoveryEmail(setup.accountId,setup.recoveryReceipt,setup.reauthIntentId,code);}
+        else await lifecycle.verifyEmail(setup.accountId,code);
+      }catch(error){
+        if(deletionSetup!==setup||setup.epoch!==deletionEpoch)return 'cancelled';
         if(error instanceof CloudApiError&&error.status===400)return fail('invalid-code');throw error;
       }
       return reauthenticationFinished(setup);
     },'deletion');},
     reauthenticateDeletion(provider:SocialProvider){return authenticate(async()=>{
       const setup=deletionSetup;if(!setup||!lifecycle)return fail('reauth-incomplete');
-      if(!snapshot.config?.providers[provider]||!snapshot.linkedProviders?.includes(provider))return fail('provider-unavailable');
-      if(!await deletionIdentity(setup))return 'error';
+      if(!snapshot.config?.providers[provider]||!setup.recoveryReceipt&&!snapshot.linkedProviders?.includes(provider))return fail('provider-unavailable');
+      if(!await beforeDeletionProof(setup))return 'error';
       emit({deletion:{...snapshot.deletion!,provider}});
       try{
-        await lifecycle.reauthenticate(setup.accountId,provider,intentId=>{
+        const started=(intentId:string)=>{
           setup.reauthIntentId=intentId;
-          if(deletionSetup!==setup||setup.epoch!==deletionEpoch){void lifecycle.cancelReauthentication(setup.accountId,intentId).catch(()=>{});return false;}return true;
-        });
+          if(deletionSetup!==setup||setup.epoch!==deletionEpoch){void cancelDeletionProof(setup,intentId).catch(()=>{});return false;}return true;
+        };
+        if(setup.recoveryReceipt)await lifecycle.recoverSocial(setup.accountId,setup.recoveryReceipt,provider,started);
+        else await lifecycle.reauthenticate(setup.accountId,provider,started);
         return reauthenticationFinished(setup);
       }catch(error){if(deletionSetup!==setup||setup.epoch!==deletionEpoch)return 'cancelled';throw error;
       }finally{if(deletionSetup===setup&&snapshot.deletion)emit({deletion:{...snapshot.deletion,provider:null}});}
@@ -365,18 +405,21 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
       // From this point closing the screen cannot pretend to cancel deletion.
       deletionCommitted=true;emit({deletion:{stage:'pending',email:null,provider:null,status:null,canCancel:false}});
       try{
-        // A saved, unexpired receipt may already represent a partial deletion.
-        // Reusing it requires this new proof and explicit confirmation each time.
-        if(!deletionIntent||deletionIntent.expiresAt<=Date.now()){
+        // Started proof stays bound while the original server user exists,
+        // even beyond its unused-reference expiry. Never discard it by age.
+        if(!deletionIntent){
           const prepared=await lifecycle.prepare(setup.accountId);
           if(!await sameDeletionOwner(setup))return 'error';
-          deletionIntent=await runtime.deletion.save({...prepared,accountId:setup.accountId,generation:setup.generation},deletionIntent?.receipt??null);
+          deletionIntent=await runtime.deletion.save({...prepared,accountId:setup.accountId,generation:setup.generation},null);
         }
         if(!await sameDeletionOwner(setup))return 'error';
-        await runtime.deletion.markDispatched(deletionIntent.receipt);
+        const receipt=deletionIntent.receipt;
+        await runtime.deletion.markDispatched(receipt);
         deletionIntent=await runtime.deletion.read();
-        const result=await lifecycle.remove(setup.accountId,deletionIntent!.receipt);
-        await runtime.deletion.acknowledge(deletionIntent!.receipt,result.appleRevocation);
+        if(!deletionIntent||deletionIntent.receipt!==receipt||deletionIntent.accountId!==setup.accountId)return fail('deletion-pending');
+        if(!await sameDeletionOwner(setup))return 'error';
+        const result=await lifecycle.remove(setup.accountId,receipt);
+        await runtime.deletion.acknowledge(receipt,result.appleRevocation);
         deletionIntent=await runtime.deletion.read();return finishDeletion();
       }finally{
         deletionCommitted=false;deletionSetup=null;

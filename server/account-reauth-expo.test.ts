@@ -6,6 +6,7 @@ import { expoClient } from '@better-auth/expo/client';
 import { generateKeyPair, SignJWT } from 'jose';
 import { afterEach, beforeAll, expect, inject, test, vi } from 'vitest';
 import worker from './index';
+import { createAccountLifecycleClient } from '../src/cloud/account-lifecycle';
 
 // Only native platform surfaces are modeled. The installed Expo client plugin,
 // its managed cookie storage, server SDK, HTTP routes and D1 are all real.
@@ -48,7 +49,7 @@ test('installed Expo client preserves reauth starter headers, proxy state and fi
   expect(await sdk.getCookie()).not.toContain('session_token'); expect((await sdk.getSession({ query: { disableRefresh: true } })).data).toBeNull();
 });
 
-test('installed Expo SDK recovers without a source session using POST-only social receipt and owned email proof', async () => {
+for (const facade of [false, true]) test(`installed Expo SDK ${facade ? 'through native lifecycle facade' : 'directly'} recovers without a source session using POST-only receipt and email proof`, async () => {
   const storage = new Map<string, string>(), bodies: { path: string; body: Record<string, unknown> }[] = [];
   let address = 0;
   const sdk = createAuthClient({ baseURL: base, plugins: [expoClient({ scheme: 'puptime', storagePrefix: 'receipt-recovery-test', storage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => { storage.set(key, value); }, getItemAsync: async key => storage.get(key) ?? null, setItemAsync: async (key, value) => { storage.set(key, value); } } }), emailOTPClient()], fetchOptions: { customFetchImpl: async (input, init) => {
@@ -56,13 +57,16 @@ test('installed Expo SDK recovers without a source session using POST-only socia
     if (typeof init?.body === 'string') bodies.push({ path: new URL(String(input)).pathname, body: JSON.parse(init.body) });
     return worker.fetch(new Request(String(input), { ...init, headers, redirect: 'manual' }), settings);
   } } });
+  const lifecycle = createAccountLifecycleClient({ fetch: (path, options) => sdk.$fetch<unknown>(path, options), social: (body, options) => sdk.signIn.social(body, options) }, base);
   const email = `expo-recovery-${crypto.randomUUID()}@example.invalid`; expect((await sdk.emailOtp.sendVerificationOtp({ email, type: 'sign-in' })).error).toBeNull();
   const code = (await env.AUTH_DB.prepare('SELECT code FROM local_email_previews WHERE email=?').bind(email).first<{ code: string }>())!.code;
   expect((await sdk.signIn.emailOtp({ email, otp: code })).error).toBeNull();
   const original = (await sdk.getSession({ query: { disableRefresh: true } })).data!, headers = { 'x-puptime-account': original.user.id };
   const prepared = await sdk.$fetch<{ receipt: string }>(base + '/api/account/deletion/prepare', { method: 'POST', body: {}, headers }); expect(prepared.error).toBeNull(); const receipt = prepared.data!.receipt;
   const subject = crypto.randomUUID(), now = Date.now(); await env.AUTH_DB.prepare('INSERT INTO account(id,accountId,providerId,userId,accessToken,createdAt,updatedAt) VALUES(?,?,?,?,?,?,?)').bind(crypto.randomUUID(), subject, 'google', original.user.id, 'old-access', now, now).run();
-  await env.AUTH_DB.prepare('DELETE FROM session WHERE userId=?').bind(original.user.id).run();
+  if (facade) await env.AUTH_DB.prepare('UPDATE session SET expiresAt=? WHERE userId=?').bind(new Date(now - 1000).toISOString(), original.user.id).run();
+  else await env.AUTH_DB.prepare('DELETE FROM session WHERE userId=?').bind(original.user.id).run();
+  expect(await lifecycle.identity()).toBeNull(); expect(await lifecycle.status(receipt)).toEqual({ status: 'not-started' });
   const token = await new SignJWT({ email, email_verified: true }).setProtectedHeader({ alg: 'RS256' }).setSubject(subject).setIssuer('https://accounts.google.com').setAudience(settings.GOOGLE_CLIENT_ID).setIssuedAt().setExpirationTime('5m').sign(key);
   vi.spyOn(globalThis, 'fetch').mockImplementation(async input => { expect(String(input)).toBe('https://oauth2.googleapis.com/token'); return Response.json({ access_token: 'replacement-token', token_type: 'Bearer', expires_in: 300, id_token: token }); });
   browser.open.mockImplementation(async (proxyURL: string, destination: string) => {
@@ -72,16 +76,17 @@ test('installed Expo SDK recovers without a source session using POST-only socia
     const response = await worker.fetch(new Request(base + '/api/auth/callback/google?' + new URLSearchParams({ code: 'synthetic-recovery', state: authorization.searchParams.get('state')! }), { headers: { cookie: stateCookie }, redirect: 'manual' }), settings);
     return { type: 'success', url: response.headers.get('location')! };
   });
-  const recovered = await sdk.signIn.social({ provider: 'google', callbackURL: 'puptime://account', errorCallbackURL: 'puptime://account' }, { headers: { ...headers, 'x-puptime-reauth': 'account-deletion-recovery' }, body: { receipt } });
+  const recovered = facade ? { error: null, data: await lifecycle.recoverSocial(original.user.id, receipt, 'google', id => { expect(id).toMatch(/^[a-f0-9-]{36}$/); return true; }) } : await sdk.signIn.social({ provider: 'google', callbackURL: 'puptime://account', errorCallbackURL: 'puptime://account' }, { headers: { ...headers, 'x-puptime-reauth': 'account-deletion-recovery' }, body: { receipt } });
   expect(recovered.error).toBeNull(); expect(browser.open).toHaveBeenCalledTimes(1);
   expect(bodies.find(row => row.path === '/api/auth/sign-in/social')!.body.receipt).toBe(receipt);
   expect((await sdk.getSession({ query: { disableRefresh: true } })).data?.user.id).toBe(original.user.id);
   expect(await env.AUTH_DB.prepare('SELECT accessToken FROM account WHERE userId=?').bind(original.user.id).first()).toEqual({ accessToken: 'old-access' });
   await env.AUTH_DB.prepare('DELETE FROM session WHERE userId=?').bind(original.user.id).run();
-  const started = await sdk.$fetch<{ recoveryIntentId: string }>(base + '/api/account/recovery/email/start', { method: 'POST', body: { receipt }, headers }); expect(started.error).toBeNull();
+  const started = facade ? { error: null, data: await lifecycle.requestRecoveryEmail(original.user.id, receipt) } : await sdk.$fetch<{ recoveryIntentId: string }>(base + '/api/account/recovery/email/start', { method: 'POST', body: { receipt }, headers }); expect(started.error).toBeNull();
   const otp = (await env.AUTH_DB.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC').bind(email).first<{ code: string }>())!.code;
-  const verified = await sdk.$fetch(base + '/api/account/recovery/email/verify', { method: 'POST', body: { receipt, intentId: started.data!.recoveryIntentId, otp }, headers }); expect(verified.error).toBeNull();
-  expect((await sdk.getSession({ query: { disableRefresh: true } })).data?.user.id).toBe(original.user.id);
+  if (facade) await lifecycle.verifyRecoveryEmail(original.user.id, receipt, started.data!.recoveryIntentId, otp);
+  else expect((await sdk.$fetch(base + '/api/account/recovery/email/verify', { method: 'POST', body: { receipt, intentId: started.data!.recoveryIntentId, otp }, headers })).error).toBeNull();
+  expect((await lifecycle.identity())?.user.id).toBe(original.user.id);
   expect((await sdk.$fetch<{ status: string }>(base + '/api/account/deletion/status', { method: 'POST', body: { receipt } })).data?.status).toBe('not-started');
   expect(await env.AUTH_DB.prepare('SELECT id FROM user WHERE id=?').bind(original.user.id).first()).not.toBeNull();
 });

@@ -211,3 +211,50 @@ test('network and HTTP errors expose only actionable categories, never private t
 test('unsafe cloud origins are rejected before any SDK operation',()=>{
  for(const value of ['', 'https://harpapro.com','https://auth.harpapro.com','https://puptime.test/api','https://puptime.test/?token=PRIVATE','https://user:PRIVATE@puptime.test','http://elsewhere.test'])assert.throws(()=>createAccountLifecycleClient({fetch:async()=>{assert.fail('Invalid origin must not dispatch');},social:async()=>{assert.fail('Invalid origin must not dispatch');}},value));
 });
+
+for(const provider of ['apple','google'] as const)test(`installed SDK ${provider} recovery sends a POST-only receipt and preserves guarded native hook order`,async()=>{
+ const sdk=sdkFixture({recoveryIntentId:intent,url:'https://accounts.example/recovery',redirect:true});
+ assert.equal(await sdk.client.recoverSocial(owner,receipt,provider,id=>{assert.equal(id,intent);sdk.order.push('started');return true;}),intent);
+ assert.deepEqual(sdk.order,['request','started','plugin-response','cookie-hook','browser']);assert.equal(sdk.browserCalls,1);
+ const [call]=sdk.calls;assert.equal(call.url,origin+'/api/auth/sign-in/social');assert.ok(!call.url.includes(receipt));
+ assert.deepEqual(JSON.parse(String(call.options.body)),{provider,callbackURL:'puptime://account',errorCallbackURL:'puptime://account',receipt});
+ const headers=new Headers(call.options.headers);assert.equal(headers.get('x-puptime-account'),owner);assert.equal(headers.get('x-puptime-reauth'),'account-deletion-recovery');
+});
+
+test('a cancelled recovery starter and an old live-reauth server reply cannot reach installed cookie/browser hooks',async()=>{
+ for(const data of [{reauthIntentId:intent,url:'https://accounts.example/old-mode',redirect:true},{recoveryIntentId:intent,url:'https://accounts.example/recovery',redirect:true},{recoveryIntentId:'bad',redirect:true}]){
+  const sdk=sdkFixture(data);await assert.rejects(sdk.client.recoverSocial(owner,receipt,'google',()=>false));assert.equal(sdk.browserCalls,0);assert.deepEqual(sdk.cookies,[]);assert.deepEqual(sdk.order,['request']);assert.equal(sdk.calls.length,1);
+ }
+});
+
+test('recovery email and cancellation use only receipt-bound owned POST APIs without requiring or exposing an email',async()=>{
+ const order:string[]=[];
+ const calls:{path:string;options:Options}[]=[];
+ const client=createAccountLifecycleClient({dismissBrowser:()=>{order.push('dismiss');},fetch:async(path,options)=>{calls.push({path,options});order.push('request');return succeeds(path.endsWith('/start')?{success:true,recoveryIntentId:intent}:path.endsWith('/verify')?{user:{id:owner},token:'PRIVATE'}:{success:true});},social:async()=>assert.fail('No ordinary provider fallback')},origin);
+ assert.deepEqual(await client.requestRecoveryEmail(owner,receipt),{success:true,recoveryIntentId:intent});await client.verifyRecoveryEmail(owner,receipt,intent,'123456');assert.deepEqual(await client.cancelRecovery(owner,receipt,intent),{success:true});
+ assert.deepEqual(calls.map(call=>({path:call.path,method:call.options.method,headers:call.options.headers,body:call.options.body})),[
+  {path:origin+'/api/account/recovery/email/start',method:'POST',headers:{'x-puptime-account':owner},body:{receipt}},
+  {path:origin+'/api/account/recovery/email/verify',method:'POST',headers:{'x-puptime-account':owner},body:{receipt,intentId:intent,otp:'123456'}},
+  {path:origin+'/api/account/recovery/cancel',method:'POST',headers:{'x-puptime-account':owner},body:{receipt,intentId:intent}},
+ ]);assert.deepEqual(order,['request','request','dismiss','request']);
+ await assert.rejects(fixture(()=>succeeds({user:{id:'other-owner'}})).client.verifyRecoveryEmail(owner,receipt,intent,'123456'),hasError('invalid-response'));
+ for(const code of ['12345','1234567','abcdef'])await assert.rejects(client.verifyRecoveryEmail(owner,receipt,intent,code),hasError('invalid-request',400));assert.equal(calls.length,3);
+});
+
+for(const operation of ['email-start','email-verify','cancel','social'] as const)test(`recovery ${operation} complete-body deadline rejects a stalled reply before native success hooks`,async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});let successes=0,calls=0,signal:AbortSignal|undefined;
+ const auth=createAuthClient({baseURL:origin,fetchOptions:{customFetchImpl:async(_input,options)=>{calls++;signal=options?.signal??undefined;return new Response(new ReadableStream<Uint8Array>({start(controller){controller.enqueue(new TextEncoder().encode('{"success":'));signal!.addEventListener('abort',()=>controller.error(new Error('Synthetic aborted recovery body')),{once:true});}}),{headers:{'content-type':'application/json','set-cookie':'better-auth.session_token=must-not-persist'}});}},plugins:[{id:'recovery-body-proof',fetchPlugins:[{id:'recovery-body-proof',name:'Recovery body proof',hooks:{onSuccess(){successes++;}}}]}]});
+ const client=createAccountLifecycleClient({fetch:(path,options)=>auth.$fetch<unknown>(path,options),social:(body,options)=>auth.signIn.social(body,options)},origin);
+ const request=operation==='email-start'?client.requestRecoveryEmail(owner,receipt):operation==='email-verify'?client.verifyRecoveryEmail(owner,receipt,intent,'123456'):operation==='cancel'?client.cancelRecovery(owner,receipt,intent):client.recoverSocial(owner,receipt,'google',()=>assert.fail('Stalled response cannot announce proof'));
+ const rejection=assert.rejects(request,hasError('network'));
+ try{await new Promise<void>(resolve=>setImmediate(resolve));t.mock.timers.tick(15001);await rejection;assert.equal(calls,1);assert.equal(successes,0);assert.equal(signal?.aborted,true);}finally{t.mock.timers.reset();}
+});
+
+for(const operation of ['email-start','email-verify','social'] as const)test(`recovery ${operation} failures never retry or use ordinary signup`,async()=>{
+ for(const status of [403,429,503]){
+  const paths:string[]=[];const auth=createAuthClient({baseURL:origin,fetchOptions:{retry:3,customFetchImpl:async(input)=>{paths.push(new URL(String(input)).pathname);return Response.json({error:'PRIVATE provider details'},{status});}}});
+  const client=createAccountLifecycleClient({fetch:(path,options)=>auth.$fetch<unknown>(path,options),social:(body,options)=>auth.signIn.social(body,options)},origin);
+  const request=operation==='email-start'?client.requestRecoveryEmail(owner,receipt):operation==='email-verify'?client.verifyRecoveryEmail(owner,receipt,intent,'123456'):client.recoverSocial(owner,receipt,'google',()=>assert.fail('Denied proof cannot start'));
+  await assert.rejects(request,hasError(status===403?'forbidden':status===429?'rate-limited':'server-error',status));assert.equal(paths.length,1);
+ }
+});

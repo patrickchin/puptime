@@ -16,7 +16,7 @@ export type DeletionStatus=z.infer<typeof statusSchema>;
 type SdkOptions={method:'GET'|'POST'|'DELETE';body?:object;headers?:Record<string,string>;credentials:'omit';redirect:'error';retry:0;timeout:number;signal:AbortSignal;onResponse:(context:{response:Response})=>Promise<void>};
 type SdkResult={data:unknown;error:{status:number}|null};
 type SocialResult={data?:unknown;error:{status:number}|null};
-type Client={fetch:(path:string,options:SdkOptions)=>Promise<SdkResult>;social:(body:{provider:'apple'|'google';callbackURL:string;errorCallbackURL:string},options:{headers:Record<string,string>;signal:AbortSignal;onResponse:(context:{response:Response})=>Promise<void>})=>Promise<SocialResult>;dismissBrowser?:()=>void};
+type Client={fetch:(path:string,options:SdkOptions)=>Promise<SdkResult>;social:(body:{provider:'apple'|'google';callbackURL:string;errorCallbackURL:string},options:{headers:Record<string,string>;body?:{receipt:string};credentials:'omit';redirect:'error';retry:0;timeout:number;signal:AbortSignal;onResponse:(context:{response:Response})=>Promise<void>})=>Promise<SocialResult>;dismissBrowser?:()=>void};
 
 async function lifecycleBody(response:Response,signal:AbortSignal):Promise<string>{
  if(signal.aborted)throw new CloudApiError('network');
@@ -54,6 +54,25 @@ export function createAccountLifecycleClient(client:Client,origin:string,{reques
   if(result.error)throw new CloudApiError(result.error.status?cloudErrorCategory(result.error.status):'network',result.error.status);
   const parsed=schema.safeParse(result.data);if(!parsed.success)throw new CloudApiError('invalid-response');return parsed.data;
  }
+ async function socialProof(accountId:string,provider:'apple'|'google',started:(intentId:string)=>boolean|void,receipt?:string){
+   identifierSchema.parse(accountId);z.enum(['apple','google']).parse(provider);if(receipt!==undefined)deletionReceiptSchema.parse(receipt);
+   const intentSchema=receipt===undefined?z.object({reauthIntentId:z.uuid()}):z.object({recoveryIntentId:z.uuid()});
+   function intentId(data:unknown){const value=intentSchema.safeParse(data);if(!value.success)throw new CloudApiError('invalid-response');return 'recoveryIntentId' in value.data?value.data.recoveryIntentId:value.data.reauthIntentId;}
+   let result:SocialResult;
+   const aborter=new AbortController(),timer=setTimeout(()=>aborter.abort(),requestTimeoutMs);
+   try{result=await client.social({provider,callbackURL:'puptime://account',errorCallbackURL:'puptime://account'},{headers:{...ownerHeaders(accountId),'x-puptime-reauth':receipt===undefined?'account-deletion':'account-deletion-recovery'},...(receipt===undefined?{}:{body:{receipt}}),credentials:'omit',redirect:'error',retry:0,timeout:requestTimeoutMs,signal:aborter.signal,onResponse:async({response})=>{
+    const body=await lifecycleBody(response,aborter.signal);
+    if(!response.ok)return;
+    const id=intentId(await Promise.resolve().then(()=>JSON.parse(body)).catch(()=>null));
+    // Refuse an old server's ordinary signup response before Expo opens it.
+    if(started(id)===false)throw new CloudApiError('conflict');
+    clearTimeout(timer); // The following native browser waits for the person.
+   }});}
+   catch(error){if(error instanceof CloudApiError)throw error;throw new CloudApiError('network');}
+   finally{clearTimeout(timer);}
+   if(result.error)throw new CloudApiError(result.error.status?cloudErrorCategory(result.error.status):'network',result.error.status);
+   return intentId(result.data);
+ }
  async function identity():Promise<LifecycleIdentity|null>{return call('/api/auth/get-session',identitySchema.nullable());}
  return {
   identity,
@@ -67,24 +86,14 @@ export function createAccountLifecycleClient(client:Client,origin:string,{reques
    // This route derives the original user's email and disables account signup.
    await call('/api/account/reauth',z.object({user:z.object({id:z.literal(accountId)})}),{otp:code},accountId);
   },
-  async reauthenticate(accountId:string,provider:'apple'|'google',started:(intentId:string)=>boolean|void){
-   identifierSchema.parse(accountId);z.enum(['apple','google']).parse(provider);
-   let result:SocialResult;
-   const aborter=new AbortController(),timer=setTimeout(()=>aborter.abort(),requestTimeoutMs);
-   try{result=await client.social({provider,callbackURL:'puptime://account',errorCallbackURL:'puptime://account'},{headers:{...ownerHeaders(accountId),'x-puptime-reauth':'account-deletion'},signal:aborter.signal,onResponse:async({response})=>{
-    const body=await lifecycleBody(response,aborter.signal);
-    if(!response.ok)return;
-    const value=z.object({reauthIntentId:z.string().uuid()}).safeParse(await Promise.resolve().then(()=>JSON.parse(body)).catch(()=>null));
-    // Refuse an old server's ordinary signup response before Expo opens it.
-    if(!value.success)throw new CloudApiError('invalid-response');if(started(value.data.reauthIntentId)===false)throw new CloudApiError('conflict');
-    clearTimeout(timer); // The following native browser waits for the person.
-   }});}
-   catch(error){if(error instanceof CloudApiError)throw error;throw new CloudApiError('network');}
-   finally{clearTimeout(timer);}
-   if(result.error)throw new CloudApiError(result.error.status?cloudErrorCategory(result.error.status):'network',result.error.status);
-   const data=z.object({reauthIntentId:z.string().uuid()}).safeParse(result.data);
-   if(!data.success)throw new CloudApiError('invalid-response');return data.data.reauthIntentId;
+  reauthenticate:(accountId:string,provider:'apple'|'google',started:(intentId:string)=>boolean|void)=>socialProof(accountId,provider,started),
+  recoverSocial:(accountId:string,receipt:string,provider:'apple'|'google',started:(intentId:string)=>boolean|void)=>socialProof(accountId,provider,started,deletionReceiptSchema.parse(receipt)),
+  requestRecoveryEmail:(accountId:string,receipt:string)=>call('/api/account/recovery/email/start',z.object({success:z.literal(true),recoveryIntentId:z.uuid()}),{receipt:deletionReceiptSchema.parse(receipt)},accountId),
+  async verifyRecoveryEmail(accountId:string,receipt:string,intentId:string,code:string){
+   if(!/^\d{6}$/.test(code))throw new CloudApiError('invalid-request',400);
+   await call('/api/account/recovery/email/verify',z.object({user:z.object({id:z.literal(accountId)})}),{receipt:deletionReceiptSchema.parse(receipt),intentId:z.uuid().parse(intentId),otp:code},accountId);
   },
+  cancelRecovery:(accountId:string,receipt:string,intentId:string)=>{client.dismissBrowser?.();return call('/api/account/recovery/cancel',z.object({success:z.literal(true)}),{receipt:deletionReceiptSchema.parse(receipt),intentId:z.uuid().parse(intentId)},accountId);},
   cancelReauthentication:(accountId:string,intentId:string)=>{client.dismissBrowser?.();return call('/api/account/reauth/cancel',z.object({success:z.literal(true)}),{intentId:z.string().uuid().parse(intentId)},accountId);},
   prepare:(accountId:string)=>call('/api/account/deletion/prepare',z.strictObject({receipt:deletionReceiptSchema,expiresAt:timestamp}),{},accountId),
   remove:(accountId:string,receipt:string)=>call('/api/account',z.object({success:z.literal(true),appleRevocation:appleRevocationSchema}),{confirm:true,receipt:deletionReceiptSchema.parse(receipt)},accountId,'DELETE'),
