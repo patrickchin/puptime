@@ -1,5 +1,7 @@
 # First-release SQL storage
 
+> Scope update, October 20: [Cloud accounts and puppy logging: development scope](2026-10-20-cloud-development-reset.md) supersedes conflicting requirements below. Old Puptime development data may be reset; compatibility preservation is not required. Shared native implementation covers both iOS and Android; runtime testing is on iOS for now.
+
 The user confirmed that Puptime is unreleased and has no users. Remove obsolete development-format compatibility, and make the restrained changes we would choose with accounts and synchronization known from the beginning. This is required follow-up to onboarding PR97, not a replacement for the optional paid-cloud rollout.
 
 ## Boundaries
