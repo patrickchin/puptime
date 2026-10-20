@@ -1,96 +1,49 @@
-import { type ComponentProps, type ComponentType, useEffect } from 'react';
-import {
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { useScreenDimensions } from './src/use-screen-dimensions';
+import { useEffect, useState } from 'react';
 import { LearnScreen } from './src/screens/LearnScreen';
 import { careArticles } from './src/puppy-care';
 import { lightTheme } from './src/theme';
 import { WebsiteMetadata } from './src/web/WebsiteMetadata';
 import { openAnalyticsSettings, WebsiteAnalytics } from './src/web/WebsiteAnalytics';
 import { captureWebsiteEvent } from './src/web/telemetry';
+import { marketingStyles } from './src/web/marketing-styles';
 
-const accountUrl = '/account';
 const sourceUrl = 'https://github.com/patrickchin/puptime';
-const privacyUrl = 'https://github.com/patrickchin/puptime/blob/main/PRIVACY.md';
-
-type AnchorProps = ComponentProps<typeof Pressable> & { href: string };
-const Anchor = Pressable as ComponentType<AnchorProps>;
-
-const colors = {
-  paper: '#F6F4ED',
-  white: '#FFFEFA',
-  ink: '#17231E',
-  muted: '#5C6962',
-  green: '#176B52',
-  greenDark: '#0E4E3A',
-  greenSoft: '#DCEFE7',
-  line: '#D6DED8',
-  coral: '#D94D3F',
-};
-
-const day = [
-  ['06:55', 'Potty trip'],
-  ['08:10', 'Breakfast'],
-  ['13:00', 'Potty trip'],
-  ['17:40', 'Walk'],
-];
-
-const details = [
-  ['Activity', 'Pee, poop, meals, potty trips, walks, and custom logs.'],
-  ['History', 'Edit logs, compare timing, or export CSV.'],
-  ['Schedule', 'Set routine times and optional reminders.'],
-];
-
+const privacyUrl = `${sourceUrl}/blob/main/PRIVACY.md`;
+// Metro supplies web images as URI objects; keep them in the asset pipeline.
+const assetUrl = (asset: string | { uri: string }): string => typeof asset === 'string' ? asset : asset.uri;
+const icon = assetUrl(require('./assets/puptime-icon.png'));
+const puppy = assetUrl(require('./assets/mascots/scruffy-terrier.png'));
+const careImage = assetUrl(require('./assets/puppy-care/home.jpg'));
+const timingImage = assetUrl(require('./assets/screenshots/insights-timeline.png'));
+const routineImage = assetUrl(require('./assets/screenshots/schedule.png'));
 const previews = [
-  ['Today', require('./assets/screenshots/today.png')],
-  ['History', require('./assets/screenshots/activity.png')],
-  ['Insights', require('./assets/screenshots/insights-summary.png')],
+  { name: 'Today', image: assetUrl(require('./assets/screenshots/today.png')), description: 'Keep potty breaks, meals, and notes together. Look back when you need to know what happened and when.' },
+  { name: 'History', image: assetUrl(require('./assets/screenshots/activity.png')), description: 'Look back through recorded days. Change a time, add a note, or export your activity as CSV.' },
+  { name: 'Insights', image: assetUrl(require('./assets/screenshots/insights-summary.png')), description: 'See recorded activity counts and timing patterns across days, with possible missing logs clearly marked.' },
+  { name: 'Routine', image: routineImage, description: 'Build a routine around your puppy. Review suggested times, make them your own, and choose optional reminders.' },
 ];
 
-function LinkButton({
-  children,
-  href,
-  quiet = false,
-}: {
-  children: string;
-  href: string;
-  quiet?: boolean;
-}) {
-  return (
-    <Anchor
-      accessibilityRole="link"
-      href={href}
-      onPress={() => {
-        if (href === sourceUrl) {
-          captureWebsiteEvent('website_cta', { destination: 'source' });
-        }
-      }}
-      style={({ pressed }) => [
-        styles.button,
-        quiet && styles.buttonQuiet,
-        pressed && styles.buttonPressed,
-      ]}
-    >
-      <Text style={[styles.buttonText, quiet && styles.buttonQuietText]}>{children}</Text>
-    </Anchor>
-  );
+function SourceLink({ className = '', children = 'View the source' }: { className?: string; children?: string }) {
+  return <a className={className} href={sourceUrl} onClick={() => captureWebsiteEvent('website_cta', { destination: 'source' })}>{children}</a>;
+}
+
+function Header({ learning = false }: { learning?: boolean }) {
+  return <header className="site-header">
+    <a className="site-brand" href="/" aria-label="Puptime home"><img src={icon} width="38" height="38" alt="" />Puptime</a>
+    <nav aria-label="Website">
+      <a className="product-nav" href={learning ? '/#app' : '#app'}>The app</a>
+      <a href="/puppy-care/">Puppy care</a>
+      <a href="/account">Account</a>
+    </nav>
+  </header>;
 }
 
 export default function MarketingSite({ path = '/' }: { path?: string }) {
-  const { width } = useScreenDimensions();
-  const compact = width < 760;
-  const narrow = width < 1040;
+  const [selected, setSelected] = useState(0);
   const learning = path === '/puppy-care' || path.startsWith('/puppy-care/');
   const articleId = path.startsWith('/puppy-care/') ? path.slice('/puppy-care/'.length) : null;
 
   useEffect(() => {
-    // Keep previously shared guide links working after moving to crawlable URLs.
     const hash = window.location.hash;
     if (hash === '#puppy-care' || hash.startsWith('#puppy-care/')) {
       const target = hash.slice(1);
@@ -100,605 +53,110 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
     }
   }, []);
 
-  if (learning) return (
-    <View style={styles.learningPage}>
-      <WebsiteMetadata path={path} />
-      <WebsiteAnalytics path={path} />
-      <View style={[styles.header, compact && styles.headerCompact]}>
-        <Anchor accessibilityRole="link" href="/" style={styles.brand} accessibilityLabel="Puptime home">
-          <Image source={require('./assets/puptime-icon.png')} style={styles.logo} />
-          <Text style={styles.brandName}>Puptime</Text>
-        </Anchor>
-        <View style={styles.headerLinks}>
-          <Pressable accessibilityRole="button" onPress={openAnalyticsSettings} style={styles.navLink}><Text style={styles.textLink}>Analytics settings</Text></Pressable>
-          <LinkButton href={accountUrl}>Account</LinkButton>
-        </View>
-      </View>
-      <LearnScreen theme={lightTheme} articleId={articleId} onArticleChange={(id) => { window.location.assign(id ? `/puppy-care/${id}` : '/puppy-care/'); }} />
-    </View>
-  );
+  useEffect(() => {
+    if (learning || !('IntersectionObserver' in window)) return;
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('arrived');
+          observer.unobserve(entry.target);
+        }
+      }
+    }, { threshold: 0.12 });
+    document.querySelectorAll('.marketing-site [data-reveal]').forEach((element) => observer.observe(element));
+    return () => observer.disconnect();
+  }, [learning]);
 
-  return (
-    <ScrollView style={styles.page} contentContainerStyle={styles.pageContent}>
-      <WebsiteMetadata path={path} />
-      <WebsiteAnalytics path={path} />
-      <View style={[styles.header, compact && styles.headerCompact]}>
-        <View style={styles.brand}>
-          <Image source={require('./assets/puptime-icon.png')} style={styles.logo} />
-          <Text style={styles.brandName}>Puptime</Text>
-        </View>
-        <View style={styles.headerLinks}>
-          <Anchor accessibilityRole="link" href="/puppy-care/" style={styles.navLink}>
-            <Text style={styles.textLink}>Puppy care</Text>
-          </Anchor>
-          {!compact && (
-            <Anchor accessibilityRole="link" href={privacyUrl}>
-              <Text style={styles.textLink}>Privacy</Text>
-            </Anchor>
-          )}
-          <LinkButton href={accountUrl}>Account</LinkButton>
-        </View>
-      </View>
+  return <div className={`marketing-site${learning ? ' care-page' : ''}`} id="top">
+    <style>{marketingStyles}</style>
+    <WebsiteMetadata path={path} />
+    <WebsiteAnalytics path={path} />
+    <a className="skip-link" href="#main">Skip to content</a>
+    <Header learning={learning} />
+    {learning ? <main id="main" className="learning-content"><LearnScreen theme={lightTheme} articleId={articleId} onArticleChange={(id) => { window.location.assign(id ? `/puppy-care/${id}` : '/puppy-care/'); }} /></main> : <main id="main">
+      <section className="hero" aria-labelledby="hero-title">
+        <div className="hero-copy">
+          <h1 id="hero-title">Puppy days,<br />remembered.</h1>
+          <p>Puptime is a puppy log for potty breaks, meals, walks, and everything you want to remember.</p>
+          <a className="primary-action" href="#app">See the app <span aria-hidden="true">↘</span></a>
+          <p className="hero-note">Free local logging. No account needed.</p>
+        </div>
+        <div className="hero-art"><img className="hero-puppy" src={puppy} alt="Puptime’s scruffy terrier, ready for the day" width="1024" height="1024" fetchPriority="high" /></div>
+      </section>
 
-      <View style={[styles.hero, narrow && styles.heroStacked, compact && styles.heroCompact]}>
-        <View style={[styles.heroCopy, narrow && styles.heroCopyStacked]}>
-          <Text
-            accessibilityRole="header"
-            aria-level={1}
-            style={[styles.title, narrow && styles.titleNarrow, compact && styles.titleCompact]}
-          >
-            Puppy log
-          </Text>
-          <Text style={[styles.intro, compact && styles.introCompact]}>
-            Potty breaks, meals, walks, and the little moments between. Log freely, with optional cloud backup and device sync.
-          </Text>
-          <View style={[styles.actions, compact && styles.actionsCompact]}>
-            <LinkButton href={accountUrl}>Manage your account</LinkButton>
-            <LinkButton href={sourceUrl} quiet>View the source</LinkButton>
-          </View>
-          <Text style={styles.note}>Free local logging · Open source</Text>
-        </View>
+      <section className="app-chapter chapter" id="app" aria-labelledby="app-title">
+        <div className="preview-copy">
+          <h2 id="app-title" data-reveal>A day,<br />all together</h2>
+          <div className="preview-choices" role="group" aria-label="App screens" data-reveal>
+            {previews.map((preview, index) => <button type="button" key={preview.name} aria-pressed={selected === index} aria-controls="app-preview" onClick={() => setSelected(index)}>{preview.name}<span aria-hidden="true">↗</span></button>)}
+          </div>
+          <p className="preview-description" aria-live="polite" aria-atomic="true">{previews[selected].description}</p>
+          <p className="small-copy">Screens from the offline release.</p>
+        </div>
+        <figure className="app-preview" id="app-preview" data-reveal>
+          <img key={selected} src={previews[selected].image} alt={`Puptime ${previews[selected].name} screen`} width="430" height="932" />
+          <figcaption>{previews[selected].name} on Puptime</figcaption>
+        </figure>
+      </section>
 
-        <View style={[styles.dayCard, narrow && styles.dayCardStacked, compact && styles.dayCardCompact]}>
-          <View style={[styles.dayRail, compact && styles.dayRailCompact]}>
-            <Text style={styles.dayLabel}>EXAMPLE DAY</Text>
-            {day.map(([time, label], index) => (
-              <View key={time} style={styles.dayEvent}>
-                <View style={[styles.dot, index === 2 && styles.dotCoral]} />
-                <Text style={styles.dayTime}>{time}</Text>
-                <Text style={styles.dayEventLabel}>{label}</Text>
-              </View>
-            ))}
-          </View>
-          <View style={[styles.phone, compact && styles.phoneCompact]}>
-            <Image
-              accessibilityLabel="Puptime Today screen"
-              resizeMode="cover"
-              source={require('./assets/screenshots/today.png')}
-              style={styles.phoneImage}
-            />
-          </View>
-        </View>
-      </View>
+      <section className="rhythm-chapter chapter" aria-labelledby="rhythm-title">
+        <div className="rhythm-intro">
+          <h2 id="rhythm-title" data-reveal>Find your<br />rhythm</h2>
+          <p data-reveal>Yesterday’s little moments can help you make sense of today.</p>
+        </div>
+        <div className="rhythm-stories">
+          <article className="rhythm-story">
+            <h3 data-reveal>Patterns over time</h3>
+            <div className="story-content">
+              <img src={timingImage} alt="Puptime timeline comparing activity times across ten days" width="430" height="932" loading="lazy" data-reveal />
+              <p data-reveal>Compare activity across 10, 20, or 30 days. See when things tend to happen, with estimates kept separate from recorded logs.</p>
+            </div>
+          </article>
+          <article className="rhythm-story">
+            <h3 data-reveal>A routine that fits</h3>
+            <div className="story-content reverse">
+              <img src={routineImage} alt="Editable daily routine with activity times and optional reminders" width="430" height="932" loading="lazy" data-reveal />
+              <p data-reveal>Set your own times or review suggestions from your history. Adjust each activity and choose which reminders you want.</p>
+            </div>
+          </article>
+        </div>
+      </section>
 
-      <View style={[styles.mainSection, compact && styles.mainSectionCompact]}>
-        <View style={[styles.careFeature, compact && styles.careFeatureCompact]}>
-          <View style={styles.widgetCopy}>
-            <Text style={styles.detailLabel}>NEW TO PUPPY LIFE?</Text>
-            <Text accessibilityRole="header" aria-level={2} style={styles.widgetTitle}>How often is “often”?</Text>
-            <Text style={styles.widgetDescription}>Potty breaks, meals, sleep, and the first few weeks. Start with the essentials, then explore guides with sources from the Kennel Club, animal welfare charities, and veterinary specialists.</Text>
-          </View>
-          <View style={styles.careActions}>
-            <LinkButton href="/puppy-care/getting-started">Getting started</LinkButton>
-            <LinkButton href="/puppy-care/" quiet>All puppy care guides</LinkButton>
-          </View>
-        </View>
-        <View style={[styles.detailGrid, compact && styles.detailGridCompact]}>
-          {details.map(([label, copy]) => (
-            <View key={label} style={[styles.detail, compact && styles.detailCompact]}>
-              <Text style={styles.detailLabel}>{label}</Text>
-              <Text style={styles.detailCopy}>{copy}</Text>
-            </View>
-          ))}
-        </View>
+      <section className="care-chapter chapter" aria-labelledby="care-title">
+        <div className="care-art" data-reveal><img src={careImage} alt="A golden puppy arriving home beside a bag and green blanket" width="1024" height="1024" loading="lazy" /></div>
+        <div className="care-copy">
+          <h2 id="care-title" data-reveal>Growing up<br />together</h2>
+          <p data-reveal>The first nights, the food bowl, the trip outside. Find practical puppy-care guides with sources you can follow.</p>
+          <div className="guide-links" data-reveal>
+            <a href="/puppy-care/getting-started">Getting started</a>
+            <a href="/puppy-care/toilet-training">Toilet training</a>
+            <a href="/puppy-care/feeding">Feeding</a>
+            <a href="/puppy-care/sleep-and-first-nights">Sleep & first nights</a>
+          </div>
+          <a className="text-action" href="/puppy-care/" data-reveal>All puppy care guides</a>
+        </div>
+      </section>
 
-        <View style={[styles.widgetFeature, narrow && styles.widgetFeatureNarrow]}>
-          <View style={styles.widgetCopy}>
-            <Text style={styles.detailLabel}>OPTIONAL CLOUD BACKUP</Text>
-            <Text accessibilityRole="header" aria-level={2} style={styles.widgetTitle}>A little peace of mind.</Text>
-            <Text style={styles.widgetDescription}>
-              Local logging is free without an account. Sign in when you want to manage your cloud backup and sign-in methods. Your saved cloud data stays yours when sync is paused.
-            </Text>
-          </View>
-          <LinkButton href={accountUrl}>Your account</LinkButton>
-        </View>
+      <section className="local-chapter chapter" aria-labelledby="local-title">
+        <h2 id="local-title" data-reveal>Local first.<br />Yours always.</h2>
+        <div className="local-columns">
+          <p data-reveal>Log for free, without an account. Keep notes, edit your history, and export your activity as CSV. The everyday record belongs to you.</p>
+          <div data-reveal><p>Cloud backup and device sync are optional. Use your account to manage sign-in methods and saved cloud data. Your saved cloud data stays yours when sync is paused.</p><SourceLink className="text-action" /></div>
+        </div>
+      </section>
 
-        <View style={[styles.previewGrid, compact && styles.previewGridCompact]}>
-          {previews.map(([label, source], index) => (
-            <View
-              key={label as string}
-              style={[
-                styles.preview,
-                compact && styles.previewCompact,
-                index === 1 && styles.previewLift,
-              ]}
-            >
-              <Text style={styles.previewLabel}>{label as string}</Text>
-              <View style={styles.previewFrame}>
-                <Image
-                  accessibilityLabel={`Puptime ${label as string} screen`}
-                  resizeMode="cover"
-                  source={source}
-                  style={styles.previewImage}
-                />
-              </View>
-            </View>
-          ))}
-        </View>
-      </View>
-
-      <View style={[styles.footer, compact && styles.footerCompact]}>
-        <Text style={styles.footerLine}>Puptime</Text>
-        <View style={[styles.footerLinks, compact && styles.footerLinksCompact]}>
-          <Anchor accessibilityRole="link" href={accountUrl}><Text style={styles.textLink}>Account</Text></Anchor>
-          <Pressable accessibilityRole="button" onPress={openAnalyticsSettings} style={styles.navLink}><Text style={styles.textLink}>Analytics settings</Text></Pressable>
-          <Anchor accessibilityRole="link" href="/puppy-care/"><Text style={styles.textLink}>Puppy care</Text></Anchor>
-          <Anchor accessibilityRole="link" href={sourceUrl}>
-            <Text style={styles.textLink}>GitHub</Text>
-          </Anchor>
-          <Anchor accessibilityRole="link" href={privacyUrl}>
-            <Text style={styles.textLink}>Privacy</Text>
-          </Anchor>
-        </View>
-      </View>
-    </ScrollView>
-  );
+      <a className="account-chapter" href="/account">
+        <p>Manage your sign-in methods and saved cloud data.</p>
+        <span className="account-word">Account</span>
+        <span className="account-arrow" aria-hidden="true">↗</span>
+      </a>
+    </main>}
+    <footer className="site-footer">
+      <p className="footer-wordmark" aria-hidden="true">Puptime</p>
+      <div className="footer-bottom">
+        <p>A little record of growing up.</p>
+        <nav aria-label="Footer"><SourceLink>GitHub</SourceLink><a href="/puppy-care/">Puppy care</a><a href="/account">Account</a><a href={privacyUrl}>Privacy</a><button type="button" onClick={openAnalyticsSettings}>Analytics settings</button><a href="#top">Back to top</a></nav>
+      </div>
+    </footer>
+  </div>;
 }
-
-const styles = StyleSheet.create({
-  learningPage: { flex: 1, backgroundColor: colors.paper },
-  navLink: { minHeight: 44, justifyContent: 'center' },
-  careFeature: { flexDirection: 'row', alignItems: 'center', gap: 48, paddingVertical: 36, borderBottomWidth: 1, borderColor: colors.line, marginBottom: 36 },
-  careFeatureCompact: { flexDirection: 'column', alignItems: 'stretch', gap: 24 },
-  careActions: { gap: 12 },
-  page: {
-    backgroundColor: colors.paper,
-  },
-  pageContent: {
-    minHeight: '100%',
-  },
-  header: {
-    width: '100%',
-    maxWidth: 1240,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 40,
-    paddingTop: 24,
-    paddingBottom: 18,
-  },
-  headerCompact: {
-    flexWrap: 'wrap',
-    gap: 16,
-    paddingHorizontal: 20,
-    paddingTop: 18,
-  },
-  brand: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  logo: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-  },
-  brandName: {
-    color: colors.ink,
-    fontFamily: 'Arial Rounded MT Bold, ui-rounded, system-ui, sans-serif',
-    fontSize: 21,
-    fontWeight: '800',
-    letterSpacing: -0.6,
-  },
-  headerLinks: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 24,
-  },
-  textLink: {
-    color: colors.greenDark,
-    fontFamily: 'Avenir Next, Avenir, system-ui, sans-serif',
-    fontSize: 15,
-    fontWeight: '700',
-    textDecorationLine: 'underline',
-    textDecorationStyle: 'solid',
-  },
-  hero: {
-    width: '100%',
-    maxWidth: 1240,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 48,
-    paddingHorizontal: 40,
-    paddingTop: 52,
-    paddingBottom: 96,
-  },
-  heroStacked: {
-    flexDirection: 'column',
-    alignItems: 'stretch',
-  },
-  heroCompact: {
-    gap: 48,
-    paddingHorizontal: 20,
-    paddingTop: 46,
-    paddingBottom: 64,
-  },
-  heroCopy: {
-    flexGrow: 1,
-    flexShrink: 0,
-    flexBasis: 0,
-    minWidth: 0,
-  },
-  heroCopyStacked: {
-    flexGrow: 0,
-    flexBasis: 'auto',
-    width: '100%',
-  },
-  title: {
-    maxWidth: 620,
-    color: colors.ink,
-    fontFamily: 'Arial Rounded MT Bold, ui-rounded, system-ui, sans-serif',
-    fontSize: 72,
-    fontWeight: '800',
-    letterSpacing: -3.6,
-    lineHeight: 76,
-  },
-  titleNarrow: {
-    fontSize: 58,
-    lineHeight: 63,
-    letterSpacing: -2.8,
-  },
-  titleCompact: {
-    fontSize: 47,
-    lineHeight: 51,
-    letterSpacing: -2.2,
-  },
-  intro: {
-    maxWidth: 560,
-    color: colors.muted,
-    fontFamily: 'Avenir Next, Avenir, system-ui, sans-serif',
-    fontSize: 20,
-    lineHeight: 31,
-    marginTop: 26,
-  },
-  introCompact: {
-    fontSize: 18,
-    lineHeight: 28,
-  },
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginTop: 32,
-  },
-  actionsCompact: {
-    alignItems: 'stretch',
-    flexDirection: 'column',
-  },
-  button: {
-    minHeight: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.green,
-    borderColor: colors.green,
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingHorizontal: 20,
-    paddingVertical: 13,
-  },
-  buttonQuiet: {
-    backgroundColor: 'transparent',
-    borderColor: colors.line,
-  },
-  buttonPressed: {
-    opacity: 0.72,
-    transform: [{ translateY: 1 }],
-  },
-  buttonText: {
-    color: colors.white,
-    fontFamily: 'Avenir Next, Avenir, system-ui, sans-serif',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  buttonQuietText: {
-    color: colors.greenDark,
-  },
-  note: {
-    color: colors.muted,
-    fontFamily: 'Avenir Next, Avenir, system-ui, sans-serif',
-    fontSize: 13,
-    marginTop: 18,
-  },
-  dayCard: {
-    flexGrow: 1,
-    flexShrink: 0,
-    flexBasis: 0,
-    minWidth: 0,
-    height: 650,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    backgroundColor: colors.greenSoft,
-    borderRadius: 44,
-    padding: 28,
-  },
-  dayCardStacked: {
-    flexGrow: 0,
-    flexBasis: 'auto',
-    width: '100%',
-  },
-  dayCardCompact: {
-    width: '100%',
-    height: 580,
-    borderRadius: 32,
-    paddingHorizontal: 12,
-    paddingVertical: 22,
-  },
-  dayRail: {
-    width: '36%',
-    maxWidth: 156,
-    alignSelf: 'stretch',
-    justifyContent: 'space-around',
-    paddingVertical: 42,
-    zIndex: 2,
-  },
-  dayRailCompact: {
-    width: '30%',
-    maxWidth: 104,
-    paddingVertical: 32,
-  },
-  dayLabel: {
-    color: colors.greenDark,
-    fontFamily: 'Avenir Next, Avenir, system-ui, sans-serif',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1.5,
-    lineHeight: 15,
-  },
-  dayEvent: {
-    position: 'relative',
-    borderTopColor: '#A7CCBC',
-    borderTopWidth: 1,
-    paddingTop: 11,
-    paddingLeft: 1,
-  },
-  dot: {
-    position: 'absolute',
-    top: -5,
-    left: -5,
-    width: 9,
-    height: 9,
-    borderRadius: 5,
-    backgroundColor: colors.green,
-  },
-  dotCoral: {
-    backgroundColor: colors.coral,
-  },
-  dayTime: {
-    color: colors.greenDark,
-    fontFamily: 'Avenir Next, Avenir, system-ui, sans-serif',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  dayEventLabel: {
-    color: colors.muted,
-    fontFamily: 'Avenir Next, Avenir, system-ui, sans-serif',
-    fontSize: 11,
-    lineHeight: 15,
-    marginTop: 2,
-  },
-  phone: {
-    width: '64%',
-    maxWidth: 270,
-    maxHeight: 588,
-    aspectRatio: 430 / 932,
-    overflow: 'hidden',
-    backgroundColor: colors.white,
-    borderColor: colors.ink,
-    borderRadius: 38,
-    borderWidth: 8,
-    transform: [{ rotate: '2.5deg' }],
-  },
-  phoneCompact: {
-    width: '70%',
-    maxWidth: 238,
-    borderRadius: 34,
-    borderWidth: 7,
-    marginLeft: -8,
-  },
-  phoneImage: {
-    width: '100%',
-    height: '100%',
-  },
-  mainSection: {
-    width: '100%',
-    backgroundColor: colors.white,
-    borderTopColor: colors.line,
-    borderTopWidth: 1,
-    paddingHorizontal: 40,
-    paddingTop: 100,
-    paddingBottom: 112,
-  },
-  mainSectionCompact: {
-    paddingHorizontal: 20,
-    paddingTop: 68,
-    paddingBottom: 72,
-  },
-  detailGrid: {
-    width: '100%',
-    maxWidth: 1160,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    borderBottomColor: colors.line,
-    borderBottomWidth: 1,
-    borderTopColor: colors.line,
-    borderTopWidth: 1,
-  },
-  detailGridCompact: {
-    flexDirection: 'column',
-  },
-  detail: {
-    flex: 1,
-    minHeight: 162,
-    borderRightColor: colors.line,
-    borderRightWidth: 1,
-    paddingHorizontal: 24,
-    paddingVertical: 28,
-  },
-  detailCompact: {
-    minHeight: 0,
-    borderBottomColor: colors.line,
-    borderBottomWidth: 1,
-    borderRightWidth: 0,
-    paddingHorizontal: 0,
-    paddingVertical: 24,
-  },
-  detailLabel: {
-    color: colors.green,
-    fontFamily: 'Avenir Next, Avenir, system-ui, sans-serif',
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 1,
-    marginBottom: 12,
-    textTransform: 'uppercase',
-  },
-  detailCopy: {
-    color: colors.ink,
-    fontFamily: 'Avenir Next, Avenir, system-ui, sans-serif',
-    fontSize: 17,
-    lineHeight: 26,
-  },
-  widgetFeature: {
-    width: '100%',
-    maxWidth: 1160,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 64,
-    marginTop: 100,
-    padding: 48,
-    backgroundColor: colors.greenSoft,
-    borderRadius: 36,
-  },
-  widgetFeatureNarrow: {
-    flexDirection: 'column',
-    gap: 36,
-    padding: 28,
-  },
-  widgetCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  widgetTitle: {
-    color: colors.ink,
-    fontFamily: 'Arial Rounded MT Bold, ui-rounded, system-ui, sans-serif',
-    fontSize: 42,
-    fontWeight: '800',
-    letterSpacing: -1.6,
-    lineHeight: 47,
-  },
-  widgetDescription: {
-    maxWidth: 480,
-    color: colors.muted,
-    fontFamily: 'Avenir Next, Avenir, system-ui, sans-serif',
-    fontSize: 18,
-    lineHeight: 28,
-    marginTop: 20,
-  },
-  previewGrid: {
-    width: '100%',
-    maxWidth: 1160,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-    gap: 24,
-    overflow: 'hidden',
-    marginTop: 84,
-    paddingTop: 24,
-  },
-  previewGridCompact: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 48,
-    marginTop: 52,
-  },
-  preview: {
-    width: '31%',
-    maxWidth: 330,
-  },
-  previewCompact: {
-    width: '100%',
-    maxWidth: 310,
-  },
-  previewLift: {
-    transform: [{ translateY: -24 }],
-  },
-  previewLabel: {
-    color: colors.muted,
-    fontFamily: 'Avenir Next, Avenir, system-ui, sans-serif',
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 1.4,
-    marginBottom: 12,
-    textTransform: 'uppercase',
-  },
-  previewFrame: {
-    width: '100%',
-    aspectRatio: 430 / 932,
-    overflow: 'hidden',
-    backgroundColor: colors.paper,
-    borderColor: colors.ink,
-    borderRadius: 34,
-    borderWidth: 6,
-  },
-  previewImage: {
-    width: '100%',
-    height: '100%',
-  },
-  footer: {
-    width: '100%',
-    maxWidth: 1240,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 40,
-    paddingVertical: 36,
-  },
-  footerCompact: {
-    alignItems: 'flex-start',
-    flexDirection: 'column',
-    gap: 18,
-    paddingHorizontal: 20,
-    paddingVertical: 30,
-  },
-  footerLine: {
-    color: colors.ink,
-    fontFamily: 'Arial Rounded MT Bold, ui-rounded, system-ui, sans-serif',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  footerLinks: {
-    flexDirection: 'row',
-    gap: 24,
-  },
-  footerLinksCompact: {
-    width: '100%',
-    flexWrap: 'wrap',
-  },
-});

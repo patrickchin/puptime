@@ -124,7 +124,7 @@ See [Puppy care research](PUPPY_CARE_RESEARCH.md) for the source selection, evid
 
 ## License
 
-MIT for the application code. The ElevenLabs recordings in `assets/puppy-care/audio` are provided for noncommercial use with attribution; they are not licensed under MIT. See [narration notes](assets/puppy-care/audio/README.md).
+MIT for the application code. The website’s bundled Red Hat Display and Red Hat Text fonts use the SIL Open Font License; see `public/fonts/*-OFL.txt`. The ElevenLabs recordings in `assets/puppy-care/audio` are provided for noncommercial use with attribution; they are not licensed under MIT. See [narration notes](assets/puppy-care/audio/README.md).
 
 ## Privacy
 
