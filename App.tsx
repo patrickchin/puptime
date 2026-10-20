@@ -49,7 +49,8 @@ import {NotificationsScreen} from './src/screens/NotificationsScreen';
 import { AccountScreen } from './src/screens/AccountScreen';
 import { useCloud } from './src/cloud/use-cloud';
 import {getNotificationDelivery,setNotificationDelivery} from './src/cloud/notification-delivery';
-import {getActivityData,getActivityPetId,type ActivityQueries} from './src/activity-data';
+import {getActivityData,getActivityPetId,getEventHistoryData,type ActivityQueries,type EventHistoryData} from './src/activity-data';
+import {EventHistoryScreen} from './src/screens/EventHistoryScreen';
 import { TimelineScreen } from './src/screens/TimelineScreen';
 import {
   ADD_NOTE_ACTION,
@@ -113,6 +114,7 @@ export default function App() {
   const [languagePreference, setLanguagePreference] = useState<LanguagePreference>('system');
   const [preferencePicker, setPreferencePicker] = useState<'theme' | 'language' | null>(null);
   const [settingsVisible, setSettingsVisible] = useState(false);
+  const [historyVisible,setHistoryVisible]=useState(false);
   const [accountVisible,setAccountVisible]=useState(false);
   const [drawerOpen,setDrawerOpen]=useState(false);
   const [onboardingVisible, setOnboardingVisible] = useState<boolean | null>(null);
@@ -129,6 +131,7 @@ export default function App() {
   const [tab, setTab] = useState<AppTab>('log');
   const [events, setEvents] = useState<PuppyEvent[]>([]);
   const [activity,setActivity]=useState<ActivityQueries>();
+  const [eventHistory,setEventHistory]=useState<EventHistoryData>();
   const [petId,setPetId]=useState<string>();
   const activityRef=useRef<ActivityQueries|undefined>(undefined);
   const [refreshToken,setRefreshToken]=useState(0);
@@ -154,7 +157,7 @@ export default function App() {
 
   const refresh = useCallback(async () => {
     const generation=++refreshGeneration.current;
-    const [data,nextPetId]=await Promise.all([getActivityData(),getActivityPetId()]);
+    const [data,nextPetId,history]=await Promise.all([getActivityData(),getActivityPetId(),getEventHistoryData()]);
     activityRef.current=data;
     const pending = await readPendingWidgetEvents();
     if (pending.length) await appendEvents(pending);
@@ -163,6 +166,7 @@ export default function App() {
     else{nextEvents=await loadEvents();count=nextEvents.length;}
     if(generation!==refreshGeneration.current)return nextEvents;
     setActivity(data);
+    setEventHistory(history);
     setPetId(nextPetId);
     setEvents(nextEvents);
     setEventCount(count);
@@ -254,6 +258,7 @@ export default function App() {
 
   const navigateToTab = (nextTab: AppTab) => {
     setDrawerOpen(false);
+    setHistoryVisible(false);
     setSettingsVisible(false);
     setScheduleOpenedFromSettings(false);
     setTab(nextTab);
@@ -264,6 +269,7 @@ export default function App() {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if(drawerOpen){setDrawerOpen(false);return true;}
       if(accountVisible){setAccountVisible(false);return true;}
+      if(historyVisible){setHistoryVisible(false);return true;}
       if (preferencePicker !== null) {
         setPreferencePicker(null);
         return true;
@@ -285,7 +291,7 @@ export default function App() {
       return false;
     });
     return () => subscription.remove();
-  }, [accountVisible,drawerOpen,onboardingVisible, preferencePicker, scheduleOpenedFromSettings, settingsVisible, tab]);
+  }, [accountVisible,drawerOpen,historyVisible,onboardingVisible, preferencePicker, scheduleOpenedFromSettings, settingsVisible, tab]);
 
   useEffect(() => {
     configureNotificationActions(language).catch(() => undefined);
@@ -294,10 +300,11 @@ export default function App() {
   const handleNotificationResponse = useCallback(async (response: Notifications.NotificationResponse) => {
     const data = response.notification.request.content.data;
     if(nativeApp&&data?.kind===CUSTOM_TIMED_REMINDER_NOTIFICATION_KIND){
-      setDrawerOpen(false);setAccountVisible(false);setSettingsVisible(false);setTab('notifications');return;
+      setDrawerOpen(false);setAccountVisible(false);setHistoryVisible(false);setSettingsVisible(false);setTab('notifications');return;
     }
     if (data?.kind === POTTY_REMINDER_NOTIFICATION_KIND) {
       setAccountVisible(false);
+      setHistoryVisible(false);
       setSettingsVisible(false);
       setTab('log');
       return;
@@ -339,6 +346,7 @@ export default function App() {
       await refreshCommittedState();
     }
     setAccountVisible(false);
+    setHistoryVisible(false);
     setSettingsVisible(false);
     setTab('log');
     setEditRequest({
@@ -584,10 +592,11 @@ export default function App() {
   };
 
   const screen = useMemo(() => {
+    if(historyVisible&&eventHistory)return <EventHistoryScreen data={eventHistory} cloud={cloud} theme={theme} refreshToken={refreshToken} onBack={()=>setHistoryVisible(false)} onRestored={()=>{void refreshCommittedState();}}/>;
     if (settingsVisible) {
       return (
         <SettingsScreen
-          {...{showHeader:!nativeApp,notificationDelivery:nativeApp?notificationDelivery:undefined,
+          {...{showHeader:!nativeApp,onOpenHistory:eventHistory?()=>setHistoryVisible(true):undefined,notificationDelivery:nativeApp?notificationDelivery:undefined,
             onNotificationDeliveryChange:changeNotificationDelivery,routineReminderCount:schedule.filter(entry=>entry.reminder).length,
             onOpenSchedule:()=>{setSettingsVisible(false);setScheduleOpenedFromSettings(true);setTab('schedule');}}}
           theme={theme}
@@ -645,6 +654,9 @@ export default function App() {
         showHeader={!nativeApp}
         events={events}
         activity={activity}
+        history={eventHistory}
+        cloud={cloud}
+        onHistoryRestored={()=>{void refreshCommittedState();}}
         refreshToken={refreshToken}
         customActivities={customActivities}
         editRequest={editRequest}
@@ -664,7 +676,10 @@ export default function App() {
     editRequest,
     events,
     activity,
+    eventHistory,
+    historyVisible,
     petId,
+    refreshCommittedState,
     refreshToken,
     language,
     languagePreference,
@@ -688,13 +703,13 @@ export default function App() {
         >
           <StatusBar style={theme.isDark ? 'light' : 'dark'} />
           <SideNavigation open={drawerOpen} enabled={onboardingVisible===false} tab={tab} settingsVisible={settingsVisible} theme={theme}
-            onOpen={()=>setDrawerOpen(true)} onClose={()=>setDrawerOpen(false)} onChange={navigateToTab} onSettings={()=>setSettingsVisible(true)}>
-          {nativeApp&&onboardingVisible===false?<View style={styles.navigationHeader}>
+            onOpen={()=>setDrawerOpen(true)} onClose={()=>setDrawerOpen(false)} onChange={navigateToTab} onSettings={()=>{setHistoryVisible(false);setSettingsVisible(true);}}>
+          {nativeApp&&onboardingVisible===false&&!historyVisible?<View style={styles.navigationHeader}>
             <Pressable testID="nav.open" accessibilityRole="button" accessibilityLabel={translate(language,'nav.open')} onPress={()=>setDrawerOpen(true)}
               style={({pressed})=>[styles.menuButton,{backgroundColor:pressed?theme.primarySoft:theme.surface,borderRadius:theme.presentation.controlRadius}]}>
               <MaterialCommunityIcons accessible={false} name="menu" size={25} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
             </Pressable>
-            <Text accessibilityRole={settingsVisible||tab==='notifications'?'header':undefined} style={[styles.navigationTitle,{color:theme.text}]}>{settingsVisible?translate(language,'settings.title'):tab==='notifications'?translate(language,'notifications.title'):'Puptime'}</Text>
+            <Text accessibilityRole={settingsVisible||tab==='notifications'?'header':undefined} maxFontSizeMultiplier={1.5} style={[styles.navigationTitle,{color:theme.text}]}>{settingsVisible?translate(language,'settings.title'):tab==='notifications'?translate(language,'notifications.title'):'Puptime'}</Text>
             {settingsVisible?<Pressable testID="settings.back" accessibilityRole="button" accessibilityLabel={translate(language,'settings.back')} onPress={()=>setSettingsVisible(false)} style={styles.menuButton}>
               <MaterialCommunityIcons accessible={false} name="close" size={24} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
             </Pressable>:null}

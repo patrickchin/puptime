@@ -12,6 +12,12 @@ export type EventHistoryHead={
 export type EventHistoryPage={entries:EventHistoryEntry[];next:number|null;head:EventHistoryHead};
 export type EventHistorySelection={source:'local';sequence:number}|{source:'cloud';revision:Revision};
 export type EventHistoryRestore={eventId:string;selection:EventHistorySelection;expected:EventHistoryHead};
+export type EventHistoryOptions={before?:number;limit?:number};
+export type EventHistoryData={
+ eventPage:(eventId:string,options?:EventHistoryOptions)=>Promise<EventHistoryPage>;
+ recentPage:(options?:EventHistoryOptions)=>Promise<{entries:EventHistoryEntry[];next:number|null}>;
+ restore:(input:EventHistoryRestore)=>Promise<PuppyEvent>;
+};
 export type EventHistoryProblem='read'|'stale'|'pending'|'unavailable'|'unsupported';
 export class EventHistoryError extends Error {
  readonly category:EventHistoryProblem;
