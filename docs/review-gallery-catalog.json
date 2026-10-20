@@ -11,6 +11,11 @@
       "primary": "361-ios-current-email-upload-restart"
     },
     {
+      "title": "Native providers: Apple session after restart",
+      "description": "Safe Today footage shows an authenticated Apple-session cold restart returning to the saved log. Fresh local Xcode Release151c with its 294-file manifest, public Pages API and no Metro. Native Apple sign-in was privately completed and is not filmed; the native Google companion remains pending.",
+      "primary": "362-ios-current-apple-restart"
+    },
+    {
       "title": "Restore: fresh device and incoming peer edit",
       "description": "Explicitly restore the confirmed cloud puppy on a fresh empty device, then receive a peer edit. Exact ad54 shared core source in a reused qualified Debug shell against the local HTTP API; private code entry omitted.",
       "primary": "364-ios-current-restore-incoming"
@@ -65,7 +70,8 @@
     "364-ios-current-restore-incoming": "Recorded on a fresh empty synthetic device. The confirmed puppy restore and incoming edit use fully paged peer revision state and complete cloud-mirror checks. This is local HTTP/proxy qualification, not a deployed-service or fresh native-build claim.",
     "366-ios-current-history-restore": "The 1,001-log prepared fixture contains 1,000 unrelated events. Cancel preserves every SQL table; one confirmed restore preserves identity, provenance and unrelated tables. Fixture IDs were minted by the Node product runtime; this capture does not establish Hermes ID generation.",
     "363-ios-current-google-restart": "Historical browser-SDK Google restart capture. It remains archived while iOS provider integration moves to native Apple/Google SDKs; it does not qualify the pending native-provider journey.",
-    "365-ios-current-offline-reconnect": "The same original event and operation survive the failed ad54 run and fixed 0472307 offline cold restart; every SQL table is exact before reconnect. No UI, foreground/lifecycle action or manual Retry occurs before automatic-upload SQL proof. The original operation is accepted once with revision1 and exact echo, an empty outbox and a fully paged server cursor17; 15 other records are unchanged. UI inspection follows that proof. The original failure is retained separately."
+    "365-ios-current-offline-reconnect": "The same original event and operation survive the failed ad54 run and fixed 0472307 offline cold restart; every SQL table is exact before reconnect. No UI, foreground/lifecycle action or manual Retry occurs before automatic-upload SQL proof. The original operation is accepted once with revision1 and exact echo, an empty outbox and a fully paged server cursor17; 15 other records are unchanged. UI inspection follows that proof. The original failure is retained separately.",
+    "362-ios-current-apple-restart": "Separate root-reviewed acceptance covers the official native Apple system sheet and private sign-in without automatic association/upload, explicit restore, and one deliberately new event/operation accepted once at revision1 with exact echo. The recorded cold restart preserves all14 SQL tables with no pending uploads. This video shows only safe Today/restart footage; provider, account-identity and private password screens were not recorded. This is a fresh local Release build, not a CI artifact or a reused Debug shell."
   },
   "evidence_links": [
     [
@@ -220,6 +226,7 @@
     }
   ],
   "pending_journeys": [
-    "Native Apple and Google SDK post-auth restarts — actual sign-in qualification pending"
-  ]
+    "Native Google SDK post-auth restart companion — qualification pending"
+  ],
+  "pending_label": "Pending companion"
 }
