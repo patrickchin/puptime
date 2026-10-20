@@ -340,7 +340,7 @@ for(const [fault,delays] of [
  [new CloudApiError('network'),[1000,2000,4000,8000,16000,32000,60000,60000]],
  [new CloudApiError('server-error',503),[1000,2000]],
  [new CloudApiError('rate-limited',429,45000),[45000,45000]],
- [new CloudApiError('rate-limited',429,120000),[60000,60000]],
+ [new CloudApiError('rate-limited',429,120000),[120000,120000]],
 ] as const)test(`refresh recovery backs off ${fault.category}/${fault.retryAfterMs} and respects the retry cap`,async t=>{
  const {controller,runtime,state,api,timers}=await fixture(t);state.credentials=true;const original=api.config;
  await runtime.storage.appendEvents([event]);const before=await localTables(runtime);
@@ -428,6 +428,30 @@ test('an in-flight recovery invalidated by an account action cannot load the acc
  const pending=timers.find(task=>!task.cancelled)!;pending.cancelled=true;pending.fn();await started;
  const action=controller.requestEmail('invalid');release(config);assert.equal(await action,'error');await tick();
  assert.equal(accountCalls,0);assert.equal(controller.read().problem,'invalid-email');assert.equal(timers.filter(task=>!task.cancelled).length,0);
+});
+
+for(const response of ['success','auth-required'] as const)test(`an invalidated refresh ignores a deferred account ${response} response before publishing identity`,async t=>{
+ const {controller,state,api,timers}=await fixture(t);state.credentials=true;controller.setActive(true);await controller.refresh();
+ const account=structuredClone(controller.read().account),config=await api.config();
+ api.config=async()=>{throw new CloudApiError('network');};await controller.refresh();api.config=async()=>config;
+ let release!:()=>void,entered!:()=>void;const started=new Promise<void>(resolve=>{entered=resolve;});
+ api.account=()=>{entered();return new Promise((resolve,reject)=>{release=()=>response==='success'?resolve({...state.summary,user:{...state.summary.user,id:'replacement-user'}}):reject(new CloudApiError('auth-required',401));});};
+ const pending=timers.find(task=>!task.cancelled)!;pending.cancelled=true;pending.fn();await started;const listCalls=state.listCalls;
+ const action=controller.requestEmail('invalid');release();assert.equal(await action,'error');await tick();
+ assert.deepEqual(controller.read().account,account);assert.equal(state.listCalls,listCalls);
+ assert.equal(controller.read().problem,'invalid-email');assert.equal(timers.filter(task=>!task.cancelled).length,0);
+});
+
+for(const response of ['success','auth-required'] as const)test(`an invalidated refresh ignores a deferred provider ${response} response before publishing identity`,async t=>{
+ const {controller,state,api,identity,timers}=await fixture(t);state.credentials=true;controller.setActive(true);await controller.refresh();
+ const account=structuredClone(controller.read().account),config=await api.config();
+ api.config=async()=>{throw new CloudApiError('network');};await controller.refresh();api.config=async()=>config;
+ let release!:()=>void,entered!:()=>void;const started=new Promise<void>(resolve=>{entered=resolve;});
+ identity.listAccounts=()=>{entered();return new Promise(resolve=>{release=()=>resolve(response==='success'?{data:[{userId:'account-1',providerId:'google'}],error:null}:{data:null,error:{status:401}});});};
+ const pending=timers.find(task=>!task.cancelled)!;pending.cancelled=true;pending.fn();await started;
+ assert.equal(controller.read().linkedProviders,null);const action=controller.requestEmail('invalid');release();assert.equal(await action,'error');await tick();
+ assert.deepEqual(controller.read().account,account);assert.equal(controller.read().linkedProviders,null);
+ assert.equal(controller.read().problem,'invalid-email');assert.equal(timers.filter(task=>!task.cancelled).length,0);
 });
 test('foreground work coalesces local commits and stops timers on background, disconnection and disposal',async t=>{
  const {controller,runtime,state,timers}=await fixture(t);state.credentials=true;state.summary.cloud={canSync:true,canExport:true};await enrollLocal(runtime);await controller.refresh();

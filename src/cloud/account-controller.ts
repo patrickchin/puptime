@@ -61,6 +61,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
   }
   function cancelTimer() {cancelScheduled?.();cancelScheduled=null;}
   function cancelRefreshRecovery(reset=true) {cancelRefreshScheduled?.();cancelRefreshScheduled=null;refreshGeneration++;refreshing=null;if(reset)refreshFailures=0;}
+  function refreshCurrent(fence?:number) {return !disposed&&(fence===undefined||fence===refreshGeneration);}
   function eligible() {return !disposed&&!suspended&&!associationConfirmationNeeded&&!snapshot.busy&&snapshot.active&&snapshot.online&&!!snapshot.account?.cloud.canSync&&snapshot.sync?.accountId===snapshot.account?.user.id&&snapshot.sync?.state!=='local';}
   function kick(delay=0,force=false) {
     if (!eligible()) return;
@@ -109,35 +110,37 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
     if(identityPending)return Promise.resolve('cancelled');
     identityPending=perform(action).finally(()=>{identityPending=null;});return identityPending;
   }
-  async function loadAccount():Promise<boolean> {
-    if(disposed)return false;
+  async function loadAccount(refreshFence?:number):Promise<boolean> {
+    if(!refreshCurrent(refreshFence))return false;
     if(!snapshot.online){fail('network');return false;}
     try {
       const account=await api.account();
-      if(disposed)return false;
+      if(!refreshCurrent(refreshFence))return false;
       if(snapshot.account&&snapshot.account.user.id!==account.user.id)await pauseTransport();
+      if(!refreshCurrent(refreshFence))return false;
       emit({account,...(snapshot.account?.user.id!==account.user.id?{linkedProviders:null}:{})});suspended=signOutUnfinished;
       if(snapshot.sync?.accountId&&snapshot.sync.accountId!==account.user.id)emit({problem:'account-mismatch'});
       return true;
     }catch(error){
-      if(error instanceof CloudApiError&&error.category==='auth-required') {await pauseTransport();emit({account:null,linkedProviders:null,run:null,problem:snapshot.sync?.accountId?'auth-required':null});return false;}
+      if(!refreshCurrent(refreshFence))return false;
+      if(error instanceof CloudApiError&&error.category==='auth-required') {await pauseTransport();if(refreshCurrent(refreshFence))emit({account:null,linkedProviders:null,run:null,problem:snapshot.sync?.accountId?'auth-required':null});return false;}
       throw error;
     }
   }
   type IdentityFence={userId:string;generation:string|null;accountId:string|null};
-  async function captureIdentityFence():Promise<IdentityFence|null> {
-    if(disposed)return null;
+  async function captureIdentityFence(refreshFence?:number):Promise<IdentityFence|null> {
+    if(!refreshCurrent(refreshFence))return null;
     const userId=snapshot.account?.user.id;if(!userId){fail('auth-required');return null;}
-    const owner=await runtime.sync.status(runtime.petId);if(disposed)return null;
-    if(owner.accountId&&owner.accountId!==userId){await pauseTransport();emit({linkedProviders:null});fail('account-mismatch');return null;}
+    const owner=await runtime.sync.status(runtime.petId);if(!refreshCurrent(refreshFence))return null;
+    if(owner.accountId&&owner.accountId!==userId){await pauseTransport();if(refreshCurrent(refreshFence)){emit({linkedProviders:null});fail('account-mismatch');}return null;}
     return {userId,generation:owner.generation,accountId:owner.accountId};
   }
-  async function currentIdentity(fence:IdentityFence):Promise<boolean> {
-    if(disposed)return false;
+  async function currentIdentity(fence:IdentityFence,refreshFence?:number):Promise<boolean> {
+    if(!refreshCurrent(refreshFence))return false;
     if(!snapshot.online){fail('network');return false;}
-    const owner=await runtime.sync.status(runtime.petId);if(disposed)return false;
+    const owner=await runtime.sync.status(runtime.petId);if(!refreshCurrent(refreshFence))return false;
     if(snapshot.account?.user.id!==fence.userId||owner.generation!==fence.generation||owner.accountId!==fence.accountId){
-      await pauseTransport();emit({linkedProviders:null});fail('account-mismatch');return false;
+      await pauseTransport();if(refreshCurrent(refreshFence)){emit({linkedProviders:null});fail('account-mismatch');}return false;
     }
     return true;
   }
@@ -153,42 +156,44 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
       throw error;
     }
   }
-  async function loadLinkedProviders(fence:IdentityFence):Promise<boolean> {
+  async function loadLinkedProviders(fence:IdentityFence,refreshFence?:number):Promise<boolean> {
+    if(!refreshCurrent(refreshFence))return false;
     emit({linkedProviders:null});
     let result:IdentityListOutcome;
-    try{result=await identity.listAccounts();}catch{throw new CloudApiError('network');}
-    if(!await currentIdentity(fence))return false;
+    try{result=await identity.listAccounts();}catch{if(!refreshCurrent(refreshFence))return false;throw new CloudApiError('network');}
+    if(!await currentIdentity(fence,refreshFence)||!refreshCurrent(refreshFence))return false;
     if(result.error){
-      if(result.error.status===401){await pauseTransport();emit({account:null});fail('auth-required');}
+      if(result.error.status===401){await pauseTransport();if(refreshCurrent(refreshFence)){emit({account:null});fail('auth-required');}}
       else fail(result.error.code==='INVALID_RESPONSE'?'invalid-response':identityProblem(result.error));
       return false;
     }
     if(!result.data){fail('invalid-response');return false;}
-    if(result.data.some(account=>account.userId!==fence.userId)){await pauseTransport();fail('account-mismatch');return false;}
+    if(result.data.some(account=>account.userId!==fence.userId)){await pauseTransport();if(refreshCurrent(refreshFence))fail('account-mismatch');return false;}
     const linkedProviders=[...new Set(result.data.map(account=>account.providerId).filter((provider):provider is SocialProvider=>provider==='apple'||provider==='google'))];
     emit({linkedProviders});return true;
   }
-  async function refreshLinkedProviders():Promise<boolean> {
-    if(disposed)return false;
-    if(!snapshot.config)emit({config:await api.config()});if(disposed)return false;
+  async function refreshLinkedProviders(refreshFence?:number):Promise<boolean> {
+    if(!refreshCurrent(refreshFence))return false;
+    if(!snapshot.config){const config=await api.config();if(!refreshCurrent(refreshFence))return false;emit({config});}
     if(!snapshot.config!.providers.apple&&!snapshot.config!.providers.google){emit({linkedProviders:[]});return true;}
-    const fence=await captureIdentityFence();return !!fence&&await loadLinkedProviders(fence);
+    const fence=await captureIdentityFence(refreshFence);return !!fence&&await loadLinkedProviders(fence,refreshFence);
   }
   function refresh():Promise<AccountActionResult> {
     if(refreshing)return refreshing;
     cancelRefreshRecovery(false);const generation=refreshGeneration;
     let failure:CloudApiError|null=null;
-    const current=()=>!disposed&&generation===refreshGeneration;
+    const current=()=>refreshCurrent(generation);
     const request=perform(async()=>{
       try {
         if(!snapshot.online)return fail('network');
         const config=await api.config();if(!current())return 'cancelled';emit({config});await localState();
-        if(!current())return 'cancelled';const loaded=await loadAccount();if(!current())return 'cancelled';
-        if(loaded&&!await refreshLinkedProviders())return 'error';
+        if(!current())return 'cancelled';const loaded=await loadAccount(generation);if(!current())return 'cancelled';
+        if(loaded){const linked=await refreshLinkedProviders(generation);if(!current())return 'cancelled';if(!linked)return 'error';}
         if(loaded&&associationConfirmationNeeded&&snapshot.account?.pets.length&&snapshot.sync?.state!=='active'
           &&(!snapshot.sync?.accountId||snapshot.sync.accountId===snapshot.account.user.id))emit({problem:'confirmation-required'});
         return 'ok';
       }catch(error){
+        if(!current())return 'cancelled';
         if(error instanceof CloudApiError&&['network','rate-limited','server-error'].includes(error.category))failure=error;
         throw error;
       }
@@ -200,8 +205,8 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
       if(!failure){refreshFailures=0;return;}
       const retry=failure,ready=()=>current()&&snapshot.active&&snapshot.online&&snapshot.problem===retry.category;
       if(!ready())return;
-      const delay=Math.max(retry.retryAfterMs??0,1000*2**Math.min(refreshFailures++,6));
-      cancelRefreshScheduled=defer(()=>{if(!current())return;cancelRefreshScheduled=null;if(ready())void refresh();},Math.min(60000,delay));
+      const delay=Math.max(retry.retryAfterMs??0,Math.min(60000,1000*2**Math.min(refreshFailures++,6)));
+      cancelRefreshScheduled=defer(()=>{if(!current())return;cancelRefreshScheduled=null;if(ready())void refresh();},delay);
     });
     refreshing=request;return request;
   }
