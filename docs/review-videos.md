@@ -1,6 +1,10 @@
 # Review videos
 
-[Open the local gallery](http://127.0.0.1:8877/). The default view says **Current footage pending** while the updated cloud-development journeys are qualified. It shows no earlier-build videos as current.
+[Open the local gallery](http://127.0.0.1:8877/). One current journey is available: **360 — First open: Mochi, first log and timed reminder**. It is an actual passing recorded rerun of full setup, optional local use, practice, the first real log, drawer navigation and a timed reminder.
+
+The capture uses frozen product `ad54af8` with the public Pages API configured and a reused qualified Debug shell; it is not a fresh native build. Only `clearState` was omitted after fresh-data proof to retain the separate Metro binding. No credentials or provider pages were recorded. It demonstrates local use, with no owner or queued upload; sign-in and cloud sync remain separate.
+
+Five entries remain pending: email auth/upload/restart; Apple and Google post-auth restarts together; restore/incoming edit; offline/reconnect; and populated history Cancel/restore. They appear as pending text, with no absent clips registered as current.
 
 The former six-entry selection and its two companions remain under **Archive → Historical review**, collapsed by default:
 
@@ -15,7 +19,7 @@ The former six-entry selection and its two companions remain under **Archive →
 
 These are historical development captures. They include cloud-unavailable setup, a 14-day trial offer in the Apple/Google restart clips, and older platform-specific copy. They do not establish the current optional-account, explicit-upload, trial-free development contract. Dates, recorded-rerun labels, original build/service scopes, diagnostic notes and results stay visible.
 
-The catalog's `journeys` list is intentionally empty until qualified current clips are supplied. `historical_journeys` retains the six earlier entries and two companions. The collapsed archive contains all 172 recordings and 191 searchable text checks: eight clips in historical review and 164 other app captures. Deep links open their enclosing disclosures automatically. No media, sidecar, log, screenshot or chapter data was deleted or rewritten.
+The catalog's `journeys` list contains only supplied, qualified clips. `pending_journeys` lists the five remaining slots without recording references. `historical_journeys` retains the six earlier entries and two companions. The collapsed archive retains the 172 earlier recordings and 191 searchable text checks: eight clips in historical review and 164 other app captures. Deep links open their enclosing disclosures automatically. No media, sidecar, log, screenshot or chapter data was deleted or rewritten.
 
 `scripts/build-review-gallery.py` reads the checked-in `docs/review-gallery-catalog.json`: current/historical selection, descriptions, original review notes and service-evidence links. This replaces the frozen e9 builder plus ordered runtime overrides previously used to publish the gallery. The source builder and catalog reproduce the displayed page from the existing evidence directory; editing the artifact directory's legacy `build-index.py` is unnecessary. New unselected captures go into the archive. Current evidence and remaining development checks are recorded in `docs/cloud-development.md`. `docs/cloud-verification.md` is the historical ledger.
 

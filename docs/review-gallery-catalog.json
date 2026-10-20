@@ -1,5 +1,11 @@
 {
-  "journeys": [],
+  "journeys": [
+    {
+      "title": "First open: Mochi, first log and timed reminder",
+      "description": "Actual full setup, optional account-free choice, practice, first real log, drawer and first timed reminder. Frozen product ad54af8 with the public Pages API configured; qualified Debug shell reused, not a fresh native build.",
+      "primary": "360-ios-current-first-open"
+    }
+  ],
   "review_notes": {
     "248-cloud-enabled-signed-in-ios": "Previous local-backend qualification. This recording proves the local SDK journey; the selected live recordings use the deployed Pages API.",
     "259-live-account-setup": "Diagnostic failure: the initial welcome tap did not open the profile step. No email request occurred; local data remained unchanged. The successful retry is recording260.",
@@ -33,7 +39,8 @@
     "288-history-accessibility-label-green-verified": "The signed f0a8 correction reuses the visible event/custom label and note in the spoken row label. Actual native hierarchy assertions pass for both Recent changes and local-version rows, followed by detail and Back. The SAME backup-restored 1,002-log fixture preserves all 14 tables, owner/outbox and original raw hashes. The earlier c0c9 full13 result remains scoped to that build; no layout, storage or navigation behavior changed.",
     "285-confirmation-scroll-context-red": "Expected RED on the previous signed build: the maximum-text confirmation retained the detail scroll offset and hid its explanation. The translated explanation-visible assertion failed before any restoration; the database and original preferences were preserved.",
     "285-confirmation-scroll-context-green": "The final signed build resets only the local history pane when opening confirmation. The explanation-visible regression, full maximum-text journeys and all-table read-only checks run in English, Spanish and Chinese.",
-    "195-clean-first-open-and-timed-reminder": "This earlier reminder journey uses a cloud-disabled build. The companion email-request recording and cloud restore recordings use the deployed Pages API."
+    "195-clean-first-open-and-timed-reminder": "This earlier reminder journey uses a cloud-disabled build. The companion email-request recording and cloud restore recordings use the deployed Pages API.",
+    "360-ios-current-first-open": "Recorded rerun with synthetic Mochi data: one real log and one timed reminder; no account owner or queued upload. Only clearState was omitted after fresh-data proof to preserve the separate Metro binding. Sign-in and sync are separate pending journeys; full provenance and retained diagnostic limitations are in Details."
   },
   "evidence_links": [
     [
@@ -186,5 +193,12 @@
       "description": "One representative unhappy path: logging stays durable during a service outage, then the backlog syncs. Earlier Debug build against a local HTTP service.",
       "primary": "07-offline-logging-and-recovery"
     }
+  ],
+  "pending_journeys": [
+    "Email sign-in, explicit upload and cold restart",
+    "Apple and Google post-auth restart companions",
+    "Fresh-device restore and incoming peer edit",
+    "Local HTTP outage, offline save, process restart and reconnect",
+    "Populated history, Cancel and one confirmed restore"
   ]
 }

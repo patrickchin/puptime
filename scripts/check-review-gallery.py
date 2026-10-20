@@ -78,7 +78,7 @@ with TemporaryDirectory(prefix='puptime-gallery-check-') as folder:
     assert page.count('<video ') == 1
     assert 'id="search-results"' in page
     # Selected clips appear once; companion clips and all other evidence stay collapsed.
-    catalog = {'journeys': [{'title': 'Setup', 'description': 'Original scope',
+    catalog = {'pending_journeys': ['Unrecorded & pending'], 'journeys': [{'title': 'Setup', 'description': 'Original scope',
         'primary': '997-app', 'companion': '996-companion'}]}
     (root / '996-companion.json').write_text(json.dumps({**native, 'started_at': 1792388891,
         'recorded_rerun': True, 'capture_kind': 'Actual browser recording',
@@ -88,6 +88,8 @@ with TemporaryDirectory(prefix='puptime-gallery-check-') as folder:
     page = (root / 'index.html').read_text()
     archive = page.index('<details id="archive">')
     assert page.count('class="journey"') == 1 and page.count('<video ') == 3
+    assert 'Pending journeys (1)' in page and 'Unrecorded &amp; pending' in page
+    assert page.index('id="pending-journeys"') < archive
     assert page.index('id="997-app"') < page.index('class="companion"') < archive
     assert page.index('id="996-companion"') < archive < page.index('id="995-archived"')
     assert 'Recorded 2026-10-19 UTC · Recorded rerun' in page
