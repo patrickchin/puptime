@@ -31,7 +31,7 @@ async function lifecycleBody(response:Response,signal:AbortSignal):Promise<strin
   }
   if(signal.aborted)throw new CloudApiError('network');
   const bytes=new Uint8Array(length);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}
-  return new TextDecoder('utf-8',{fatal:true}).decode(bytes);
+  return new TextDecoder('utf-8',{fatal:true,ignoreBOM:false}).decode(bytes);
  }finally{
   signal.removeEventListener('abort',abort);
   if(!complete){void reader.cancel().catch(()=>{});void response.body?.cancel().catch(()=>{});}reader.releaseLock();

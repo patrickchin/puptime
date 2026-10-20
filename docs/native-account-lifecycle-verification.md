@@ -34,7 +34,9 @@ browser is excluded from the initiation deadline.
 
 ## Executed checks
 
-- 425 Node tests, base types and iOS types pass on this native slice.
+- 425 Node tests, 155 Workers tests, nine web tests, and base/iOS/server types
+  pass on the integrated native/server slice. Cloudflare's decoder declaration
+  requires an explicit `ignoreBOM:false`, matching the platform default.
 - The lifecycle SDK/controller files include 45 passing checks covering the
   actual installed SDK hook order, cancellation, body deadlines, cold restart,
   new-session proof, explicit confirmation, lost replies, secure-storage failure,
