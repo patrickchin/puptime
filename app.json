@@ -9,6 +9,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
+      "usesAppleSignIn": true,
       "bundleIdentifier": "com.patrickchin.puptime",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Allow Puptime to access your photo library only when you choose to save or share content there."
@@ -105,6 +106,7 @@
         }
       ],
       "expo-secure-store",
+      "expo-apple-authentication",
       "expo-web-browser",
       "expo-sqlite",
       [
