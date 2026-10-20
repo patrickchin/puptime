@@ -79,7 +79,7 @@ trial, migration-preservation and release gates do not define this milestone.
 
 ## Current verified checkpoint — October 20, 2026
 
-Main `ad54af8` includes the shared-native/explicit-SQL work, prefixed entity IDs,
+Baseline main `ad54af8` includes the shared-native/explicit-SQL work, prefixed entity IDs,
 shared log history and the historical-footage gallery update. Its
 [source checks](https://github.com/patrickchin/puptime/actions/runs/39429174179)
 passed: 386 Node tests, nine web tests, 98 Workers tests, default/iOS/server
@@ -92,17 +92,22 @@ Release build and the standard Maestro suite in their respective
 [ID run](https://github.com/patrickchin/puptime/actions/runs/39413545899) and
 [history run](https://github.com/patrickchin/puptime/actions/runs/39419151941).
 The [combined main native run](https://github.com/patrickchin/puptime/actions/runs/39429174087)
-is still in progress at this checkpoint. The individual passes do not establish
-a completed native run for the combined source.
+also completed successfully, including its Release build and Maestro step.
+Thirteen flows were selected in source; the retained evidence does not include
+parsed JUnit counts. The subsequent
+[native Apple run](https://github.com/patrickchin/puptime/actions/runs/39443848026)
+passed its Release build and Maestro step and completed successfully. These
+automated suites do not establish genuine provider authentication.
 
-The public API Worker version is `91096bb5-a12a-4265-94e9-a4babbff1540`. Its
-server tree `c72deaec` matches main `ad54af8`; the merged ID/history work did not
-require another deployment or database reset. The local service on port 8793
-also reloaded that source: loaded-source inspection and a successful public
-configuration response confirm the running backend, with its configuration and
-persistence paths unchanged. No new exact Pages frontend deployment ID has
-been confirmed; public-origin behavior below is not a claim that the frontend
-was rebuilt from `ad54af8`.
+The public API Worker version is `4fe8d9e9-5ef1-4f54-bd2f-9ee745353bc5`, with
+server tree `c054dad3590f80bab84d92693b5473dcefa95f0a` from reviewed source
+`151c6f2`. It accepts the configured Apple Services ID and Puptime's native
+bundle audience through Better Auth's built-in verifier and requires a nonce
+for Apple ID-token sign-in/linking. Deployment preserved the existing D1 and
+Durable Object bindings, data and secrets. The actual Pages API origin returned
+its configured providers and rejected anonymous account/export requests.
+The local service on port 8793 retains the earlier `ad54af8` source and its
+existing persistence; local email/sync demonstrations use a task-owned proxy.
 
 | Actual SDK journey | Verified scope |
 | --- | --- |
@@ -110,12 +115,22 @@ was rebuilt from `ad54af8`.
 | Public browser Google | Sign-in completed through the existing Google provider session, account navigation retained it and sign-out worked. No new scope grant or puppy upload occurred. |
 | Public browser Apple | The SDK reached Apple's authorization page; authentication has not completed. |
 | iOS Release email | The fresh `814db2dd` CI app used a real delivered code and the official native SDK against the public Pages API, without Metro, a local API override or session injection. Sign-in preserved every local SQL table without association or upload. Explicit enable then uploaded the original event once; all 15 initial operations were acknowledged with zero pending. Authenticated cold restart preserved every SQL table and did not duplicate that event. |
-| iOS Google / Apple | Google sign-in remains unverified. Apple reached the real authorization page and awaits private authentication. Native automation is paused; neither provider is counted as a completed native sign-in. |
+| iOS Google, earlier browser flow | Release `814db2dd` completed the official SDK's browser provider flow against Pages. Sign-in preserved SQL without uploading; explicit enable uploaded both original events once, and authenticated cold restart preserved SQL. This does not qualify the replacement native Google SDK. |
+| iOS native Apple | Fresh local Release `151c6f2` used the official Expo Apple system sheet and private password confirmation against Pages. Quiet cancellation preserved all 14 SQL tables. Genuine sign-in preserved domain data without association or upload; only the expected setup-step marker advanced. Explicit restore hydrated the existing puppy and 14 cloud records without outbound mutations. One new native log then uploaded once with revision 1 and an exact remote echo. Authenticated and recorded cold restarts preserved all 14 SQL tables, with zero pending. |
+| iOS native Google | Fresh integrated local Release `a1bb417` completed genuine sign-in through the official Google iOS SDK and its secure system browser against Pages. Quiet cancellation and sign-in preserved all 14 SQL tables without association or upload. Explicit same-puppy confirmation and enable kept both original event IDs at revision 1 and all 16 cloud bodies unchanged, without extra mutations. Authenticated and recorded cold restarts preserved all 14 tables. |
+| Local iOS email and restore | Current `ad54af8` in a qualified Debug shell completed SDK email-code sign-in using a synthetic local address, explicit upload, restart, second-device restore and passive incoming-edit convergence. This local code preview is separate from real Resend delivery. |
+| Local iOS history | A separate account-free fixture with 1,001 events and 61 target revisions preserved every SQL table on Cancel. Confirmed restore added one target revision while 1,000 unrelated events and other domain/sync tables stayed exact. |
+| Local iOS automatic recovery | An actual `ad54af8` cold-start outage left an operation pending after the service returned. Fixed source `0472307` retained that exact event/operation across another closed-proxy cold restart, then uploaded it automatically once with revision 1 and an exact remote echo. No Retry, foreground action or lifecycle change occurred between restoring the proxy and the SQL proof; the outbox drained and unrelated data stayed unchanged. This used the compatible Debug shell and local service. |
 
 Configuration flags and authorization-page handoffs are not completed sign-in
-evidence. No current-source review clips have been recorded. The finite
-replacement capture set remains pending; earlier footage stays labelled
-historical. Android runtime, payments and publication remain deferred.
+evidence. Current first-open, local email/upload/restart, restore/incoming-edit
+and populated-history clips have been recorded; see [review videos](review-videos.md)
+for their source and environment limits. Short native Apple and Google restart
+clips and the offline-recovery clip are also recorded; the final gallery cohort
+and obsolete-media cleanup are being assembled. Private provider authentication
+is omitted from footage. Earlier footage stays labelled historical until it is
+retired. Android runtime, product web work, payments and publication remain
+deferred.
 
 ## Earlier qualification and deployment checkpoints
 
