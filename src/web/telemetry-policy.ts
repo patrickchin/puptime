@@ -1,4 +1,4 @@
-import { publicPaths, siteUrl } from './site.ts';
+import { publicPaths } from './site.ts';
 
 export const consentKey = 'puptime.website.analytics';
 export const telemetryPaths=[...publicPaths,'/account'];
@@ -9,7 +9,7 @@ export function sanitizeWebsiteEvent<T extends { event: string; properties: Reco
   if (!['website_page_view', 'website_cta', 'website_error','website_account'].includes(event.event)) return null;
   const input = event.properties;
   const page = telemetryPaths.includes(String(input.page)) ? String(input.page) : '/404';
-  const properties: Record<string, unknown> = { page, $current_url: `${siteUrl}${page}`, $pathname: page, $process_person_profile: false };
+  const properties: Record<string, unknown> = { page, $pathname: page, $process_person_profile: false, $geoip_disable: true };
   for (const key of ['distinct_id', '$device_id', '$session_id', '$window_id', '$lib', '$lib_version', 'token']) {
     if (typeof input[key] === 'string') properties[key] = input[key];
   }

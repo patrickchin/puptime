@@ -19,6 +19,12 @@ configuration contains only `protocolVersion` and configured `providers`.
 `account.cloud` contains only `canSync` and `canExport`. These are access flags,
 not an indication that a device has enrolled or uploaded anything.
 
+The tracked `.env` contains only the public development API address, so ordinary
+Expo and simulator Release builds include account access. Server/provider
+credentials remain Worker secrets. For local Debug testing, override the address
+and `EXPO_PUBLIC_CLOUD_ALLOW_LOCAL=1` in `.env.local`; HTTP stays forbidden in
+Release. No production/store release is implied by this development endpoint.
+
 Local creates, edits and deletes save first in SQLite. An enrolled device
 retains its ordered outbox across interruption and retries with the same
 operation IDs. The server reconciles edits and commits the result, immutable
