@@ -13,7 +13,7 @@ const privacyUrl = `${sourceUrl}/blob/main/PRIVACY.md`;
 const assetUrl = (asset: string | { uri: string }): string => typeof asset === 'string' ? asset : asset.uri;
 const icon = assetUrl(require('./assets/puptime-icon.png'));
 const puppy = assetUrl(require('./assets/mascots/scruffy-terrier.png'));
-const careImage = assetUrl(require('./assets/puppy-care/home.jpg'));
+const careImage = assetUrl(require('./assets/puppy-care/potty.jpg'));
 const timingImage = assetUrl(require('./assets/screenshots/insights-timeline.png'));
 const routineImage = assetUrl(require('./assets/screenshots/schedule.png'));
 const previews = [
@@ -76,8 +76,8 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
     {learning ? <main id="main" className="learning-content"><LearnScreen theme={lightTheme} articleId={articleId} onArticleChange={(id) => { window.location.assign(id ? `/puppy-care/${id}` : '/puppy-care/'); }} /></main> : <main id="main">
       <section className="hero" aria-labelledby="hero-title">
         <div className="hero-copy">
-          <h1 id="hero-title">Puppy days,<br />remembered.</h1>
-          <p>Puptime is a puppy log for potty breaks, meals, walks, and everything you want to remember.</p>
+          <h1 id="hero-title">Potty training,<br />day by day.</h1>
+          <p>Log potty breaks, spot your puppy’s patterns, and build a daily routine with Puptime.</p>
           <a className="primary-action" href="#app">See the app <span aria-hidden="true">↘</span></a>
           <p className="hero-note">Free local logging. No account needed.</p>
         </div>
@@ -86,7 +86,7 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
 
       <section className="app-chapter chapter" id="app" aria-labelledby="app-title">
         <div className="preview-copy">
-          <h2 id="app-title" data-reveal>A day,<br />all together</h2>
+          <h2 id="app-title" data-reveal>Log a break</h2>
           <div className="preview-choices" role="group" aria-label="App screens" data-reveal>
             {previews.map((preview, index) => <button type="button" key={preview.name} aria-pressed={selected === index} aria-controls="app-preview" onClick={() => setSelected(index)}>{preview.name}<span aria-hidden="true">↗</span></button>)}
           </div>
@@ -102,34 +102,34 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
       <section className="rhythm-chapter chapter" aria-labelledby="rhythm-title">
         <div className="rhythm-intro">
           <h2 id="rhythm-title" data-reveal>Find your<br />rhythm</h2>
-          <p data-reveal>Yesterday’s little moments can help you make sense of today.</p>
+          <p data-reveal>See when your puppy usually needs to go, then make a routine you can adjust.</p>
         </div>
         <div className="rhythm-stories">
           <article className="rhythm-story">
-            <h3 data-reveal>Patterns over time</h3>
+            <h3 data-reveal>Spot the potty patterns</h3>
             <div className="story-content">
-              <img src={timingImage} alt="Puptime timeline comparing activity times across ten days" width="430" height="932" loading="lazy" data-reveal />
-              <p data-reveal>Compare activity across 10, 20, or 30 days. See when things tend to happen, with estimates kept separate from recorded logs.</p>
+              <img src={timingImage} alt="Puptime timeline comparing activity times across ten days" width="1206" height="2622" loading="lazy" data-reveal />
+              <p data-reveal>Compare activity across 10, 20, or 30 days. Look for recurring potty times, with estimates kept separate from recorded logs.</p>
             </div>
           </article>
           <article className="rhythm-story">
             <h3 data-reveal>A routine that fits</h3>
             <div className="story-content reverse">
               <img src={routineImage} alt="Editable daily routine with activity times and optional reminders" width="430" height="932" loading="lazy" data-reveal />
-              <p data-reveal>Set your own times or review suggestions from your history. Adjust each activity and choose which reminders you want.</p>
+              <p data-reveal>Review suggested times from your puppy’s history, then adjust each activity. Choose reminders for the routine you want to follow.</p>
             </div>
           </article>
         </div>
       </section>
 
       <section className="care-chapter chapter" aria-labelledby="care-title">
-        <div className="care-art" data-reveal><img src={careImage} alt="A golden puppy arriving home beside a bag and green blanket" width="1024" height="1024" loading="lazy" /></div>
+        <div className="care-art" data-reveal><img src={careImage} alt="A golden puppy outside an open garden door, ready for a potty break" width="1024" height="1024" loading="lazy" /></div>
         <div className="care-copy">
           <h2 id="care-title" data-reveal>Growing up<br />together</h2>
-          <p data-reveal>The first nights, the food bowl, the trip outside. Find practical puppy-care guides with sources you can follow.</p>
+          <p data-reveal>Toilet training is part of puppy life. Find practical guides on trips outside, meals, sleep, and settling in, with sources you can follow.</p>
           <div className="guide-links" data-reveal>
-            <a href="/puppy-care/getting-started">Getting started</a>
             <a href="/puppy-care/toilet-training">Toilet training</a>
+            <a href="/puppy-care/getting-started">Getting started</a>
             <a href="/puppy-care/feeding">Feeding</a>
             <a href="/puppy-care/sleep-and-first-nights">Sleep & first nights</a>
           </div>
