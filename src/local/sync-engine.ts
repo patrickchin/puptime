@@ -26,7 +26,7 @@ const historySelection=z.discriminatedUnion('source',[
 ]);
 export function createLocalSync(database:LocalDatabase,options:{newId?:()=>string;now?:()=>number;afterCommit?:()=>void}={}) {
   const now=options.now??Date.now;
-  async function id(sql:SqlExecutor) {return identifierSchema.parse(options.newId?.()??(await sql.getFirstAsync<{id:string}>('SELECT lower(hex(randomblob(16))) id'))!.id);}
+  async function id(sql:SqlExecutor,prefix:'op'|'gen'='op') {return identifierSchema.parse(options.newId?.()??(await sql.getFirstAsync<{id:string}>('SELECT ? || lower(hex(randomblob(16))) id',prefix+'_'))!.id);}
   async function owner(sql:SqlExecutor,fence?:Fence):Promise<Owner|null> {
     const value=await sql.getFirstAsync<Owner>('SELECT * FROM local_sync_owner WHERE singleton=1');
     return value&&(!fence||(value.generation===fence.generation&&value.account_id===fence.accountId))?value:null;
@@ -224,7 +224,7 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
         if (current?.pending_pet_id||current?.resyncing) throw new Error('Finish the pending enrollment or baseline first.');
         if(mode==='restore'&&!await pristineSetup(sql,input.localPetId))throw new RestoreNeedsConfirmationError();
         if (!current) {
-          const generation=await id(sql);
+          const generation=await id(sql,'gen');
           await sql.runAsync('INSERT INTO local_sync_owner(singleton,generation,account_id,device_id,pending_pet_id) VALUES (1,?,?,?,?)',generation,input.accountId,input.deviceId,input.localPetId);
           current=(await owner(sql))!;
         } else await sql.runAsync('UPDATE local_sync_owner SET pending_pet_id=?,staging_cursor=0,staging_complete=0 WHERE singleton=1',input.localPetId);

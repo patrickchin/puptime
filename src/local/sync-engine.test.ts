@@ -9,6 +9,7 @@ import { createNativeStorage } from './native-storage.ts';
 import { cloudRecordId } from '../cloud/record-identity.ts';
 import type { CloudRecord } from '../cloud/protocol.ts';
 import * as engine from './sync-engine.ts';
+import { createEvent } from '../domain.ts';
 
 async function setup(t:TestContext,{pristine=false}={}) {
   const directory=await mkdtemp(join(tmpdir(),'puptime-sync-'));
@@ -30,6 +31,26 @@ async function activate(sync:ReturnType<typeof engine.createLocalSync>) {
  await sync.completeAssociation({generation,accountId:input.accountId,cloudPetId:'local-pet'});
  return {generation,accountId:input.accountId};
 }
+
+test('prefixed generation and mutation IDs survive reopen and an unacknowledged retry byte-for-byte',async t=>{
+ const {database,path,sync,storage}=await setup(t),fence=await activate(sync);
+ assert.match(fence.generation,/^gen_[a-f0-9]{32}$/);
+ const generated=createEvent('pee','app',100);
+ await storage.appendEvents([generated]);
+ assert.deepEqual(await storage.loadEvents(),[generated]);
+ const before=await sync.nextBatch(fence);
+ assert.ok(before.length>0);
+ for(const mutation of before)assert.match(mutation.operationId,/^op_[a-f0-9]{32}$/);
+ assert.equal(before.find(mutation=>mutation.kind==='event')!.recordId,cloudRecordId('event','local-pet',generated.id));
+ const reopened=await createLocalDatabase(sqliteTestConnection(path));
+ try {
+  const resumed=engine.createLocalSync(reopened);
+  assert.deepEqual(await createNativeStorage(reopened,'local-pet').loadEvents(),[generated]);
+  assert.equal(JSON.stringify(await resumed.nextBatch(fence)),JSON.stringify(before));
+  assert.equal(JSON.stringify(await resumed.nextBatch(fence)),JSON.stringify(before));
+  assert.deepEqual((await database.read(sql=>sql.getAllAsync<{operation_id:string}>('SELECT operation_id FROM local_sync_outbox ORDER BY sequence'))).map(row=>row.operation_id),before.map(row=>row.operationId));
+ }finally{await reopened.close();}
+});
 
 test('first-launch restore resumes the exact cloud puppy without uploading local starter defaults',async t=>{
  const {database,path,sync,storage}=await setup(t,{pristine:true});

@@ -22,6 +22,61 @@ repeat startup validates the version/tables without replaying the DDL. An
 unsupported or incomplete database fails without silently deleting data. Any
 future development reset must be explicit and limited to Puptime-owned fixtures.
 
+## Generated identifiers
+
+New application-owned entities use `prefix_` followed by 32 lowercase hexadecimal
+characters. The same value is the stored identifier and public identifier; there
+is no second UUID column. The body is opaque and carries no time or sort order.
+
+| Prefix | Entity |
+| --- | --- |
+| `usr`, `ses`, `acc`, `ver`, `rlm` | Better Auth user, session, provider-account row, verification row and rate-limit row |
+| `prv` | Local development email preview |
+| `pet`, `dev` | Puppy and persisted installation/device |
+| `evt`, `rtn`, `rem` | Logged activity, user-created routine and custom timed OS reminder |
+| `op`, `gen` | Sync/enrollment operation and local sync-owner generation |
+
+JavaScript generators use standard Web Crypto in browsers, Node and Workers.
+Hermes uses the installed public `expo-modules-core/src/uuid` native v4 primitive
+through the package's `react-native` import condition. Removing the UUID encoding
+separators gives a 32-character body with 122 random bits; it does not change the
+underlying entropy. Existing device SQL generators use SQLite `randomblob(16)`
+with the same body format and 128 random bits. Neither path falls back to clocks
+or `Math.random`, and neither silently changes an already persisted operation ID
+after a collision or a lost acknowledgment. Database constraints remain `TEXT`;
+this convention requires no schema migration or database reset.
+
+New routine/reminder drafts retain their ID across failed saves. Learned routine
+previews keep deterministic suggestion keys, then mint `rtn_` IDs on acceptance;
+the attempted proposal and its IDs stay together when retrying. Starter routines,
+derived estimates, preference keys and recurring notification identifiers remain
+stable semantic keys. CSV imports retain their validated original event IDs.
+The deferred iOS widget extension still uses its existing timestamp/type pending
+IDs; it has a separate runtime and is not covered by the app entropy adapter.
+
+`records.id` and mirrored `record_id` values are protocol identities, not random
+entity IDs: puppy records use the puppy ID; puppy-scoped records encode the
+deterministic `[kind, petId, localId]` tuple; account preferences use the fixed
+`["accountPreferences"]` key. That scoping permits imported IDs to repeat across
+puppies or record kinds without collisions. Composite SQL keys and revision
+sequence integers likewise keep their relational/ordering meaning. Provider
+subjects (`account.accountId`), session tokens, OAuth state and OTP values remain
+owned by their respective authentication SDKs/providers.
+
+Node persistence, real Better Auth adapter and Metro/bundle checks cover the ID
+paths. Frozen source `814db2dd` also passed actual Hermes creation, editing,
+explicit SDK enrollment/upload and authenticated cold restart: the same puppy,
+device, event, generation and accepted operation IDs persisted, with no pending
+work. Native routine SQL failure preserved the open draft and every table;
+one retry saved one prefixed routine. Actual-component tests separately prove
+the unexposed failed draft's exact ID stays equal on retry. The OS reminder's
+`rem_` identifier also survived restart.
+
+Those native checks reused a compatible Debug shell and the local development
+service. They do not establish a fresh build, Android runtime or a new deployed
+provider sign-in. The reviewed ID candidate is deployed to the development API
+without a schema reset; live SDK/provider qualification remains separate.
+
 ## Account tables and queries
 
 The account owner is determined by the authenticated Better Auth user and the

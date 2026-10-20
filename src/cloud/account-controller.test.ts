@@ -259,6 +259,7 @@ test('explicitly enabling cloud associates existing local history without a sepa
  const {controller,runtime,state}=await fixture(t);state.credentials=true;await runtime.storage.appendEvents([event]);await controller.refresh();
  assert.equal((await runtime.sync.status('pet-1')).state,'local');assert.deepEqual([state.enrollCalls,state.pushCalls,state.pullCalls],[0,0,0]);
  assert.equal(await controller.enableCloud({}),'ok');const saved=await runtime.sync.enrollmentState();
+ assert.match(saved!.request.operationId,/^op_[a-f0-9]{32}$/);
  assert.equal(saved!.accountId,'account-1');assert.equal(saved!.request.localPetId,'pet-1');assert.equal((await runtime.sync.status('pet-1')).state,'preparing');
  assert.deepEqual(await runtime.storage.loadEvents(),[event]);assert.deepEqual([state.enrollCalls,state.pushCalls,state.pullCalls],[0,0,0]);
 });

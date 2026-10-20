@@ -323,7 +323,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
       if(associationMode==='restore'&&(!existing||!await runtime.sync.canRestoreSetup(runtime.petId))){emit({problem:'confirmation-required'});return 'confirmation-required';}
       if(!account.cloud.canSync)return fail('forbidden');
       if(disposed)return 'error';
-      const operationId=await runtime.database.read(async sql=>(await sql.getFirstAsync<{id:string}>('SELECT lower(hex(randomblob(16))) id'))!.id);
+      const operationId=await runtime.database.read(async sql=>(await sql.getFirstAsync<{id:string}>("SELECT 'op_' || lower(hex(randomblob(16))) id"))!.id);
       await runtime.sync.prepareAssociation({accountId:account.user.id,localPetId:runtime.petId,deviceId:runtime.deviceId,mode:associationMode,enrollment:{operationId,deviceId:runtime.deviceId,localPetId:runtime.petId,name:associationMode==='restore'?existing!.name:snapshot.local!.name,...(confirmedPetId?{confirmedPetId}:{})}});
       associationConfirmationNeeded=false;suspended=false;return 'ok';
     });},

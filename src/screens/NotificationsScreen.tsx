@@ -14,6 +14,7 @@ import {
 } from '../notification-config';
 import { cancelCustomTimedReminder, cancelCustomTimedRemindersIfDeliveryOff, countCustomTimedReminders, createCustomTimedReminder, CustomTimedReminderLimitError, CUSTOM_TIMED_REMINDER_NOTIFICATION_KIND, listCustomTimedReminders, type CustomTimedReminder, type NotificationPermissionState } from '../reminders';
 import { spacing, surfaceTreatment, type Theme } from '../theme';
+import { entityId } from '../entity-id';
 
 export function NotificationsScreen({
   theme,
@@ -44,7 +45,7 @@ export function NotificationsScreen({
   const [timed, setTimed] = useState<CustomTimedReminder[]>([]);
   const [timedLoading, setTimedLoading] = useState(true);
   const [timedLoadFailed, setTimedLoadFailed] = useState(false);
-  const [draft, setDraft] = useState<{ label: string; at: Date } | null>(null);
+  const [draft, setDraft] = useState<{ id: string; label: string; at: Date } | null>(null);
   const [draftError, setDraftError] = useState<string | null>(null);
   const loadGeneration = useRef(0);
   const [saving, setSaving] = useState(false);
@@ -131,7 +132,7 @@ export function NotificationsScreen({
     const at = new Date(Date.now() + 3600000);
     at.setSeconds(0, 0);
     setDraftError(null);
-    setDraft({ label: '', at });
+    setDraft({ id: entityId('rem'), label: '', at });
   };
 
   const saveTimed = () => {
@@ -144,7 +145,7 @@ export function NotificationsScreen({
       setDraftError(null);
       try {
         if ((notificationPermission !== 'granted' || notificationDelivery === false) && !(await requestNotifications())) return;
-        const created = await createCustomTimedReminder({ petId, label, at: draft.at.getTime() });
+        const created = await createCustomTimedReminder({ id: draft.id, petId, label, at: draft.at.getTime() });
         if (!created) { setDraftError(t('notifications.timedEnable')); return; }
         setDraft(null);
         await reloadTimed();

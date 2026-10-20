@@ -131,7 +131,7 @@ export async function initializeLocalDatabase(database: LocalDatabase, newId?: (
     }
     if(await sql.getFirstAsync("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' LIMIT 1")) throw new Error('The existing local database is incomplete. The original data has been preserved.');
     await sql.execAsync(localSchema);
-    const petId = identifierSchema.parse(newId ? newId() : (await sql.getFirstAsync<{ id: string }>('SELECT lower(hex(randomblob(16))) AS id'))!.id);
+    const petId = identifierSchema.parse(newId ? newId() : (await sql.getFirstAsync<{ id: string }>("SELECT 'pet_' || lower(hex(randomblob(16))) AS id"))!.id);
     await sql.runAsync('INSERT INTO puppies(id,name) VALUES (?,?)', petId, 'My puppy');
     for (const {id,...data} of STARTER_SCHEDULE) await sql.runAsync(upsertRoutineSql,petId,id,...routineSqlValues(data));
     for (const [key, value] of Object.entries({ schema_version: '4', active_pet_id: petId, show_onboarding: 'true', first_launch_step:'welcome', notify_on_device:'false' })) {

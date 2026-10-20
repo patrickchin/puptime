@@ -89,7 +89,8 @@ test('custom one-off uses native durable requests without implicit permission or
  assert.equal(state.scheduled.length,0);assert.deepEqual(state.writes,[]);assert.equal(state.requests,0);
  state.granted=true;
  const created=await reminders.createCustomTimedReminder({...timedInput,label:'  Give flea treatment  '});
- assert.deepEqual(created,{id:'native-1',...timedInput});
+ assert.match(created!.id,/^rem_[a-f0-9]{32}$/);
+ assert.deepEqual(created,{id:created!.id,...timedInput});
  const scheduled=state.scheduled[0];
  assert.equal(scheduled.content?.title,timedInput.label);assert.equal(scheduled.trigger?.type,'date');assert.equal(scheduled.trigger?.date,timedInput.at);
  assert.deepEqual(scheduled.content?.data,{app:'com.patrickchin.puptime',version:1,kind:'customTimedReminder',...timedInput});

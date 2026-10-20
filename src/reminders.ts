@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { z } from 'zod';
+import { entityId } from './entity-id';
 import { localIdSchema } from './cloud/protocol';
 import {getNotificationDelivery,setNotificationDelivery} from './cloud/notification-delivery';
 
@@ -169,8 +170,10 @@ export async function listCustomTimedReminders(petId: string, now = Date.now()):
     .sort((left, right) => left.at - right.at || left.id.localeCompare(right.id)));
 }
 
-export async function createCustomTimedReminder(input: { petId: string; label: string; at: number }): Promise<CustomTimedReminder | null> {
-  const data = customTimedDataSchema.parse({ ...input, app: 'com.patrickchin.puptime', version: 1, kind: CUSTOM_TIMED_REMINDER_NOTIFICATION_KIND });
+export async function createCustomTimedReminder(input: { id?: string; petId: string; label: string; at: number }): Promise<CustomTimedReminder | null> {
+  const { id = entityId('rem'), ...content } = input;
+  localIdSchema.parse(id);
+  const data = customTimedDataSchema.parse({ ...content, app: 'com.patrickchin.puptime', version: 1, kind: CUSTOM_TIMED_REMINDER_NOTIFICATION_KIND });
   if (data.at <= Date.now()) throw new RangeError('Choose a future reminder time.');
   return updateReminders(async () => {
     if (!await getNotificationDelivery() || !permissionAllowsNotifications(await Notifications.getPermissionsAsync())) return null;
@@ -178,11 +181,12 @@ export async function createCustomTimedReminder(input: { petId: string; label: s
     if ((await Notifications.getAllScheduledNotificationsAsync()).length >= 60) throw new CustomTimedReminderLimitError();
     if (data.at <= Date.now()) throw new RangeError('Choose a future reminder time.');
     await ensureReminderChannel();
-    const id = await Notifications.scheduleNotificationAsync({
+    const scheduledId = await Notifications.scheduleNotificationAsync({
+      identifier: id,
       content: { title: data.label, sound: 'default', data },
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: data.at, channelId: ROUTINE_CHANNEL_ID },
     });
-    return { id, petId: data.petId, label: data.label, at: data.at };
+    return { id: scheduledId, petId: data.petId, label: data.label, at: data.at };
   });
 }
 
