@@ -150,13 +150,13 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
             Puppy log
           </Text>
           <Text style={[styles.intro, compact && styles.introCompact]}>
-            Potty breaks, meals, walks, and the little moments between. Log freely on your iPhone, with optional cloud backup and device sync.
+            Potty breaks, meals, walks, and the little moments between. Log freely, with optional cloud backup and device sync.
           </Text>
           <View style={[styles.actions, compact && styles.actionsCompact]}>
             <LinkButton href={accountUrl}>Manage your account</LinkButton>
             <LinkButton href={sourceUrl} quiet>View the source</LinkButton>
           </View>
-          <Text style={styles.note}>iPhone first · Free local logging · Open source</Text>
+          <Text style={styles.note}>Free local logging · Open source</Text>
         </View>
 
         <View style={[styles.dayCard, narrow && styles.dayCardStacked, compact && styles.dayCardCompact]}>
