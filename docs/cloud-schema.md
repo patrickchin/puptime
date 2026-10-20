@@ -72,10 +72,13 @@ one retry saved one prefixed routine. Actual-component tests separately prove
 the unexposed failed draft's exact ID stays equal on retry. The OS reminder's
 `rem_` identifier also survived restart.
 
-Those native checks reused a compatible Debug shell and the local development
-service. They do not establish a fresh build, Android runtime or a new deployed
-provider sign-in. The reviewed ID candidate is deployed to the development API
-without a schema reset; live SDK/provider qualification remains separate.
+Those original native checks reused a compatible Debug shell and the local
+development service; they do not establish a fresh build or Android runtime.
+The ID source later passed fresh iOS Release CI and actual native email-code
+sign-in, explicit upload and cold restart against the deployed development API.
+See the [current development checkpoint](cloud-development.md#current-verified-checkpoint--october-20-2026)
+for that evidence and the pending native Apple/Google checks. The ID convention
+required no schema reset.
 
 ## Account tables and queries
 
