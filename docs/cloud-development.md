@@ -137,9 +137,14 @@ The default origin is `https://puptime.pages.dev`, matching the app. The only
 optional origin is `https://puptime-api-staging.p-ch.workers.dev`, selected with
 `PUPTIME_STAGING_ORIGIN`. Invalid origins fail before credentials are read or
 fixtures are created. This host's ordinary DNS still cannot resolve the Worker
-hostname; its direct-Worker check used `node --require ./scripts/staging-dns.cjs
-scripts/verify-cloud-clients.mjs staging` without changing hostname or TLS
-verification. The scoped DNS helper is unnecessary for the default Pages origin.
+hostname; its direct-Worker check used the scoped DNS helper without changing
+hostname or TLS verification. To select that origin on the current verifier:
+
+```sh
+PUPTIME_STAGING_ORIGIN=https://puptime-api-staging.p-ch.workers.dev node --require ./scripts/staging-dns.cjs scripts/verify-cloud-clients.mjs staging
+```
+
+The scoped DNS helper is unnecessary for the default Pages origin.
 
 Transport failures report only a fixed route name, fetch/JSON phase, elapsed
 time, HTTP status and allowlisted error category/code. Credentials, response
