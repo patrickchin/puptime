@@ -4,9 +4,10 @@ This is a server foundation. Native deletion controls, durable local deletion
 intent, real provider reauthentication, deployment and distributed tests remain
 release gates. Local records are not part of these server operations.
 
-Apply migration0004 after0003 **before** deploying this server. It adds typed SQL
-intent and receipt tables; it does not rewrite authentication dates or relax the
-credential fence in0003. No new dependency or provider redirect URL is needed.
+Apply migrations 0004–0006 after 0003 **before** deploying this server. They add
+typed SQL intent, receipt and completion tables without rewriting authentication
+dates or relaxing the credential fence in 0003. No new dependency or provider
+redirect URL is needed.
 
 ## Provider reauthentication
 
@@ -63,10 +64,11 @@ requires recent authentication, so cancellation cannot turn a stale session fres
 
 Receipts contain 32 random bytes, appear only in request/response bodies, and are
 stored as hashes server-side. Unused preparations expire after thirty days;
-started proofs retain their owner binding while that user exists, and completed
-status remains for thirty days from completion. At most five usable receipts are
-retained per owner. A fresh authenticated preparation can
-replace the oldest unstarted, lease-free preparation when full, so lost responses
+started proofs retain their owner binding while that user exists. Successful
+completion retains only the receipt hash and actual Apple revocation outcome
+indefinitely, removing the original owner ID and active receipt atomically. At
+most five active receipts are retained per owner. A fresh authenticated preparation
+can replace the oldest unstarted, lease-free preparation when full, so lost responses
 cannot consume every slot. Replacement and insertion share one atomic transaction.
 A replaced unstarted receipt reports `unknown` and cannot confirm deletion; save
 the newly prepared receipt before a new explicit confirmation. Started proofs and
@@ -77,9 +79,12 @@ session. The separate [receipt-bound recovery server contract](account-recovery-
 supports original-owner proof without one; its native integration and real
 provider/email acceptance remain separate gates. Status receipts can confirm a
 completed deletion without authentication.
-The bounded non-content receipt row deliberately has
-no user foreign key so a successful user deletion cannot erase its status proof.
-It retains no email, provider subject, credential, raw receipt or OAuth state.
+The two-column `account_deletion_completions` table has no user foreign key or
+expiry. It retains no owner ID, email, provider subject, credential, raw receipt,
+OAuth state or timestamps. A device retaining its dispatched receipt can confirm
+completion after any offline interval, provided the server proof remains stored.
+Unused expired, rotated, unissued or previously purged proofs remain `unknown`;
+missing proof never means success.
 
 The same deletion boundary serves existing web callers using `{ "confirm": true }`.
 They keep the existing JSON response and SDK clearing cookies. Existing callers
@@ -95,11 +100,18 @@ AccountStore and removes owned OTPs. Only then does the receipt record
 The SDK's D1 deletion otherwise removes sessions, accounts and user sequentially;
 its D1 adapter cannot wrap interactive transactions. This owned route instead
 uses one native user DELETE with the existing FK cascades, in a D1 batch with
-receipt completion. A child-delete or receipt-commit error rolls back all auth
+completion-marker insertion and removal of all owned active receipt rows.
+A child-delete, marker-insert or active-receipt-delete error rolls back all auth
 cleanup together, preserving the original provider link and session for guarded
 reauthentication and an explicit retry. Cloud retirement already happened and
 does not roll back. Public SDK `signOut` handles signed cookie expiry after the
 cascade; its user-deletion endpoints remain disabled.
+
+Migration 0006 copies only known completed receipts whose original user is absent,
+including those past the former thirty-day TTL but not yet purged, then removes
+their owner-bound rows. It cannot restore already-purged proofs. Apply before the
+first receipt-capable release; do not scrub rows while an older receipt writer
+still relies on the old completion acknowledgement query.
 
 If acknowledgement fails after commit, the receipt still confirms completion
 after the user and sessions disappear. Pending or active-lease attempts never
@@ -122,8 +134,12 @@ The focused account-reauth tests exercise real HTTP routing, Better Auth, local 
 and the actual AccountStore. They cover original/wrong/new/deleted owners, linked
 subjects, state/context forgery, expiry, cancellation, replay, forced concurrent
 callbacks, source-session changes, receipt bounds and lease races, lost responses,
-FK rollback, receipt-commit rollback and unrelated-owner preservation. Credential
+FK rollback, marker/removal rollback and unrelated-owner preservation. They also
+cover migration backfill, all five saved references, each Apple outcome, and
+anonymous status after a simulated century plus unrelated cleanup. Credential
 values are hashed before equality assertions so failures cannot print them.
+Status reads active and completed proofs in one SQL snapshot so a concurrent
+completion cannot temporarily appear as a missing proof.
 
 The Expo test runs the installed client plugin, modeling only native platform
 surfaces, secure storage and browser handoff. The actual proxy and callback run

@@ -72,9 +72,14 @@ Unused prepared receipts expire after 30 days. Started `deleting`/`cloud-retired
 proofs remain usable while their original user exists, including beyond 30 days;
 unrelated preparation cleanup and capped renewal cannot erase them. Existing
 five-receipt bounds remain: only unused, lease-free prepared references rotate.
-All of an owner's saved proofs become completed atomically with identity removal
-and are retained for 30 days **from completion**. Status then expires to `unknown`.
-No retention rule authenticates, retries deletion or recreates an identity.
+All of an owner's saved proofs move atomically with identity removal into the
+permanent two-column `account_deletion_completions` table. Only the receipt hash
+and actual Apple outcome remain; the owner ID and active receipt rows are removed.
+There is no completion TTL. A saved dispatched receipt can confirm completion
+after any offline interval while that proof remains stored. Unissued, rotated,
+expired unused and already-purged proofs stay `unknown`. No retention rule
+authenticates, retries deletion or recreates an identity. Migration 0006 must be
+applied before deploying this completion boundary.
 
 ## Repeatable checks and limits
 
@@ -92,7 +97,8 @@ HTTP/SQL checks cover wrong/new/deleted identities, exact Apple subject fallback
 ISO/numeric expiry, no-source email proof, SDK promotion prevention, cancellation,
 replay, concurrent callbacks/OTP, admission-time SQL races, failed session insert,
 generic errors, send bounds, actual SDK limiter pruning, long-offline pending
-retention and completion TTL. The SDK-pruning regression failed with the shared
+retention, permanent anonymous completion and atomic marker/removal rollback.
+The SDK-pruning regression failed with the shared
 table (200 instead of 429 after two minutes) and passes with isolated counters.
 
 No live provider, email sender, deployed migration, native client/UI, simulator,

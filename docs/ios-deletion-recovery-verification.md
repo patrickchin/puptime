@@ -81,10 +81,13 @@ verification task. The current card/layout/theme, accessibility labels and OTP
 paste/autofill are reused; the new recovery and unknown states still need that
 visual and assistive-technology pass before completion is claimed.
 
-Completed status lasts 30 days from completion. A much later offline device may
-receive `unknown` after the original user is gone, and an unused expired or
-rotated preparation can also be unknown. This slice does not claim unlimited
-offline completion recovery. It preserves the unresolved local intent/history
-and does not invent automatic unlink/cleanup or treat missing proof as success.
-A longer-lived minimal completion tombstone or explicit unresolved local-only
-continuation is a separate product/retention policy gate.
+The server completion boundary in migration 0006 keeps a permanent receipt-hash
+and Apple-outcome marker, removing the owner ID and active receipt atomically.
+The existing status-first controller can acknowledge an old dispatched intention
+without authentication or another DELETE after any offline interval while the
+device receipt and server proof remain stored. This server change adds no native
+API shape or behavior; installed-app and deployed acceptance remain separate gates.
+An unused expired or rotated preparation, unissued receipt or previously purged
+completion can still be `unknown`. The controller preserves that unresolved local
+intention/history and does not automatically unlink, delete or treat missing proof
+as success. A merely prepared local intention is not a dispatched deletion.

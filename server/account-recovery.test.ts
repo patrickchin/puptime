@@ -210,26 +210,28 @@ test('started proof survives 30-day expiry and unrelated prepare cleanup, then n
   expect(await status(a)).toEqual({ status: 'pending' }); expect((await call('account/deletion/prepare', {}, { cookie: b.cookie, expected: b.user.id })).status).toBe(200);
   expect(await status(a)).toEqual({ status: 'pending' }); const flow = await emailStart(a), response = await emailVerify(a, flow); expect(response.status).toBe(200);
   expect(await status(a)).toEqual({ status: 'pending' }); expect(await sessions(a)).toHaveLength(1);
-  const now = Date.now(), deleted = await call('account', { confirm: true, receipt: a.receipt }, { cookie: cookies(response), expected: a.user.id, method: 'DELETE' });
+  const deleted = await call('account', { confirm: true, receipt: a.receipt }, { cookie: cookies(response), expected: a.user.id, method: 'DELETE' });
   expect(deleted.status).toBe(200); expect(await status(a)).toEqual({ status: 'deleted', appleRevocation: 'not-linked' });
-  const row = await env.AUTH_DB.prepare('SELECT expires_at FROM account_deletion_receipts WHERE receipt_hash=?').bind(await hashCapability(a.receipt)).first<{ expires_at: number }>();
-  expect(row!.expires_at).toBeGreaterThanOrEqual(now + 30 * 86400000); expect(row!.expires_at).toBeLessThan(Date.now() + 30 * 86400000 + 1000);
+  const hash = await hashCapability(a.receipt);
+  expect(await env.AUTH_DB.prepare('SELECT * FROM account_deletion_receipts WHERE receipt_hash=?').bind(hash).first()).toBeNull();
+  expect(await env.AUTH_DB.prepare('SELECT * FROM account_deletion_completions WHERE receipt_hash=?').bind(hash).first()).toEqual({ receipt_hash: hash, apple_revocation: 'not-linked' });
   expect((await call('account/recovery/email/start', { receipt: a.receipt }, { expected: a.user.id })).status).toBe(403);
 });
-test('unused prepared and completed status expire, while capped renewal retains every started owner binding', async () => {
-  const a = await owner(); const original = a.receipt;
+test('unused prepared status expires, while capped renewal retains every started owner binding until confirmed completion', async () => {
+  const a = await owner(); const original = a.receipt, started: string[] = [];
   await env.AUTH_DB.prepare('UPDATE account_deletion_receipts SET created_at=0,expires_at=1 WHERE receipt_hash=?').bind(await hashCapability(original)).run();
   expect(await status(a)).toEqual({ status: 'unknown' }); expect((await call('account/recovery/email/start', { receipt: original }, { expected: a.user.id })).status).toBe(403);
   for (let n = 0; n < 5; n++) {
     const response = await call('account/deletion/prepare', {}, { cookie: a.cookie, expected: a.user.id }); expect(response.status).toBe(200);
-    const receipt = (await response.json<{ receipt: string }>()).receipt;
+    const receipt = (await response.json<{ receipt: string }>()).receipt; started.push(receipt);
     await env.AUTH_DB.prepare("UPDATE account_deletion_receipts SET phase='deleting',created_at=0,expires_at=1 WHERE receipt_hash=?").bind(await hashCapability(receipt)).run();
   }
   expect((await call('account/deletion/prepare', {}, { cookie: a.cookie, expected: a.user.id })).status).toBe(429);
   expect((await env.AUTH_DB.prepare('SELECT receipt_hash FROM account_deletion_receipts WHERE account_id=?').bind(a.user.id).all()).results).toHaveLength(5);
-  await env.AUTH_DB.prepare("UPDATE account_deletion_receipts SET phase='completed',apple_revocation='not-linked' WHERE account_id=?").bind(a.user.id).run();
-  expect((await call('account/deletion/prepare', {}, { cookie: a.cookie, expected: a.user.id })).status).toBe(200);
-  expect((await env.AUTH_DB.prepare('SELECT receipt_hash FROM account_deletion_receipts WHERE account_id=?').bind(a.user.id).all()).results).toHaveLength(1);
+  expect((await call('account', { confirm: true, receipt: started[0] }, { cookie: a.cookie, expected: a.user.id, method: 'DELETE' })).status).toBe(200);
+  expect((await env.AUTH_DB.prepare('SELECT receipt_hash FROM account_deletion_receipts WHERE account_id=?').bind(a.user.id).all()).results).toHaveLength(0);
+  for (const receipt of started) expect(await status({ ...a, receipt })).toEqual({ status: 'deleted', appleRevocation: 'not-linked' });
+  expect(await status(a)).toEqual({ status: 'unknown' });
 });
 test('email sends are atomically bounded per original owner and receipt across changing IPs, with opaque counter keys', async () => {
   const a = await owner(); await revoke(a); const responses = await Promise.all(Array.from({ length: 8 }, () => call('account/recovery/email/start', { receipt: a.receipt }, { expected: a.user.id })));

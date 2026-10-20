@@ -7,7 +7,7 @@ export type AppleRevocation = 'not-linked' | 'revoked' | 'manual';
 export const deletionReceiptSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
 const receiptLifetime = 30 * 86400000;
 const sessionCreated = authTimestampSql('createdAt'), sessionExpiry = authTimestampSql('expiresAt');
-type ReceiptRow = { receipt_hash: string; account_id: string; phase: 'prepared' | 'deleting' | 'cloud-retired' | 'completed'; apple_revocation: AppleRevocation | null; expires_at: number };
+type ReceiptRow = { account_id: string | null; phase: 'prepared' | 'deleting' | 'cloud-retired' | 'completed'; apple_revocation: AppleRevocation | null };
 
 // A started operation must keep its owner binding while that identity exists,
 // even if the client stays offline beyond the unused-reference lifetime.
@@ -41,8 +41,11 @@ export async function prepareDeletionReceipt(db: D1Database, accountId: string, 
   return { receipt, expiresAt };
 }
 export async function deletionReceiptStatus(db: D1Database, receipt: string) {
-  const row = await db.prepare(`SELECT * FROM account_deletion_receipts WHERE receipt_hash=? AND ${usableReceiptSql()}`)
-    .bind(await hashCapability(receipt), Date.now()).first<ReceiptRow>();
+  const hash = await hashCapability(receipt);
+  // One SQL snapshot cannot miss both rows while completion moves the proof.
+  const row = await db.prepare(`SELECT NULL AS account_id,'completed' AS phase,apple_revocation FROM account_deletion_completions WHERE receipt_hash=?
+    UNION ALL SELECT account_id,phase,apple_revocation FROM account_deletion_receipts WHERE receipt_hash=? AND ${usableReceiptSql()} LIMIT 1`)
+    .bind(hash, hash, Date.now()).first<ReceiptRow>();
   if (!row) return { status: 'unknown' as const };
   const absent = row.phase === 'cloud-retired' && !await db.prepare('SELECT id FROM user WHERE id=?').bind(row.account_id).first();
   if (row.phase === 'completed' || absent) return { status: 'deleted' as const, appleRevocation: row.apple_revocation! };
@@ -80,11 +83,14 @@ export async function deleteCloudAccount(env: Cloudflare.Env, user: { id: string
       db.prepare(`DELETE FROM user WHERE id=? AND EXISTS(SELECT 1 FROM account_deletion_receipts
         WHERE receipt_hash=? AND account_id=? AND phase='cloud-retired' AND attempt_id=? AND attempt_until>? AND ${usableReceiptSql()})`)
         .bind(user.id, hash, user.id, attempt, finishedAt, finishedAt),
-      db.prepare(`UPDATE account_deletion_receipts SET phase='completed',apple_revocation=?,attempt_id=NULL,attempt_until=NULL,expires_at=?
-        WHERE account_id=? AND NOT EXISTS(SELECT 1 FROM user WHERE id=?)`)
-        .bind(appleRevocation, finishedAt + receiptLifetime, user.id, user.id),
+      // Keep every saved completion proof indefinitely, without its owner ID.
+      db.prepare(`INSERT INTO account_deletion_completions(receipt_hash,apple_revocation)
+        SELECT receipt_hash,? FROM account_deletion_receipts WHERE account_id=? AND NOT EXISTS(SELECT 1 FROM user WHERE id=?)`)
+        .bind(appleRevocation, user.id, user.id),
+      db.prepare('DELETE FROM account_deletion_receipts WHERE account_id=? AND NOT EXISTS(SELECT 1 FROM user WHERE id=?)')
+        .bind(user.id, user.id),
     ]);
-    const completed = await db.prepare("SELECT receipt_hash FROM account_deletion_receipts WHERE receipt_hash=? AND phase='completed'").bind(hash).first();
+    const completed = await db.prepare('SELECT receipt_hash FROM account_deletion_completions WHERE receipt_hash=?').bind(hash).first();
     if (!completed) lifecycleError(409, 'deletion_unavailable');
     return appleRevocation;
   } finally {

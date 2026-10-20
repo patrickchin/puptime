@@ -188,6 +188,36 @@ test('lost successful DELETE is resolved anonymously by receipt with cookies and
   expect(await createAuth(settings).api.getSession({ headers: new Headers({ cookie: a.cookie }), query: { disableRefresh: true } })).toBeNull(); expect((await remove(a, receipt.receipt)).status).toBe(401);
   expect(await (await status('A'.repeat(43))).json()).toEqual({ status: 'unknown' });
 });
+for (const appleRevocation of ['not-linked', 'revoked', 'manual'] as const) test(appleRevocation + ' durable completion survives arbitrary offline age and cleanup without retaining an owner', async () => {
+  const a = await owner(appleRevocation === 'not-linked' ? 'google' : 'apple'), b = await owner(), receipts = [];
+  for (let n = 0; n < 5; n++) receipts.push(await prepare(a));
+  if (appleRevocation !== 'not-linked') vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: appleRevocation === 'revoked' ? 200 : 503 }));
+  const removed = await remove(a, receipts[0].receipt); expect(removed.status).toBe(200);
+  expect(await removed.json()).toEqual({ success: true, message: 'User deleted', appleRevocation });
+  const future = Date.now() + 100 * 365 * 86400000; vi.spyOn(Date, 'now').mockReturnValue(future);
+  // Simulate another freshly authenticated owner at the later cleanup time.
+  await env.AUTH_DB.prepare('UPDATE session SET createdAt=?,expiresAt=? WHERE id=?').bind(future, future + 86400000, b.session.id).run();
+  const other = await snapshot(b);
+  for (const reference of receipts) {
+    const response = await status(reference.receipt); expect(response.headers.get('cache-control')).toBe('no-store'); expect(response.headers.getSetCookie()).toEqual([]);
+    expect(await response.json()).toEqual({ status: 'deleted', appleRevocation });
+  }
+  await prepare(b); expect(await snapshot(b)).toEqual(other);
+  expect(await snapshot(a)).toEqual({ users: [], accounts: [], sessions: [] });
+  expect((await env.AUTH_DB.prepare('SELECT * FROM account_deletion_receipts WHERE account_id=?').bind(a.user.id).all()).results).toEqual([]);
+  for (const reference of receipts) {
+    const hash = await hashCapability(reference.receipt);
+    expect(await env.AUTH_DB.prepare('SELECT * FROM account_deletion_completions WHERE receipt_hash=?').bind(hash).first()).toEqual({ receipt_hash: hash, apple_revocation: appleRevocation });
+    expect(await (await status(reference.receipt)).json()).toEqual({ status: 'deleted', appleRevocation });
+  }
+  expect(await (await status('A'.repeat(43))).json()).toEqual({ status: 'unknown' });
+  const headers = { 'x-puptime-account': a.user.id };
+  const recovery = await call('account/recovery/email/start', { receipt: receipts[0].receipt }, { headers });
+  expect(recovery.status).toBe(403); expect(await recovery.json()).toEqual({ error: 'recovery_unavailable' });
+  const social = await call('auth/sign-in/social', { provider: a.provider, callbackURL: base + '/account', receipt: receipts[0].receipt }, { headers: { ...headers, 'x-puptime-reauth': 'account-deletion-recovery' } });
+  expect(social.status).toBe(403); expect(await social.json()).toEqual({ error: 'recovery_unavailable' });
+  expect((await remove(a, receipts[0].receipt)).status).toBe(401);
+});
 for (const dates of ['stale-iso', 'future-iso', 'expired-iso', 'stale-numeric', 'future-numeric', 'expired-numeric'] as const) test(dates + ' actual session cannot prepare or confirm deletion', async () => {
   const a = await owner(), receipt = await prepare(a), numeric = dates.endsWith('numeric'), expired = dates.startsWith('expired'), future = dates.startsWith('future');
   const timestamp = Date.now() + (future ? 60000 : -86400000), value = numeric ? timestamp : new Date(timestamp).toISOString();
@@ -215,13 +245,14 @@ test('receipt preparation persistence failure has no cloud or authentication sid
   const a = await owner(), before = await snapshot(a); await env.AUTH_DB.exec("CREATE TRIGGER reject_prepare BEFORE INSERT ON account_deletion_receipts BEGIN SELECT RAISE(ABORT,'synthetic-prepare-failure'); END;");
   try { const response = await call('account/deletion/prepare', {}, { cookie: a.cookie, headers: { 'x-puptime-account': a.user.id } }); expect(response.status).toBe(503); expect(await response.json()).toEqual({ error: 'service_unavailable' }); expect(await snapshot(a)).toEqual(before); expect(await env.AUTH_DB.prepare('SELECT state FROM cloud_accounts WHERE account_id=?').bind(a.user.id).first()).toBeNull(); } finally { await env.AUTH_DB.exec('DROP TRIGGER reject_prepare'); }
 });
-for (const failure of ['content', 'child-cascade', 'receipt-completion'] as const) test(failure + ' failure retains auth and an honest pending receipt; recovery requires another confirmation', async () => {
+for (const failure of ['content', 'child-cascade', 'receipt-completion', 'receipt-removal'] as const) test(failure + ' failure retains auth and an honest pending receipt; recovery requires another confirmation', async () => {
   const a = await owner(), receipt = await prepare(a), before = await snapshot(a);
   const broken = failure === 'content' ? { ...settings, ACCOUNTS: { idFromName: env.ACCOUNTS.idFromName.bind(env.ACCOUNTS), get: () => ({ retire: async () => { throw new Error('synthetic-content-failure'); } }) } } as unknown as Cloudflare.Env : settings;
-  if (failure !== 'content') await env.AUTH_DB.exec(failure === 'child-cascade' ? "CREATE TRIGGER reject_final BEFORE DELETE ON account BEGIN SELECT RAISE(ABORT,'synthetic-child-failure'); END;" : "CREATE TRIGGER reject_final BEFORE UPDATE ON account_deletion_receipts WHEN NEW.phase='completed' BEGIN SELECT RAISE(ABORT,'synthetic-receipt-failure'); END;");
+  if (failure !== 'content') await env.AUTH_DB.exec(failure === 'child-cascade' ? "CREATE TRIGGER reject_final BEFORE DELETE ON account BEGIN SELECT RAISE(ABORT,'synthetic-child-failure'); END;" : failure === 'receipt-completion' ? "CREATE TRIGGER reject_final BEFORE INSERT ON account_deletion_completions BEGIN SELECT RAISE(ABORT,'synthetic-completion-failure'); END;" : "CREATE TRIGGER reject_final BEFORE DELETE ON account_deletion_receipts BEGIN SELECT RAISE(ABORT,'synthetic-removal-failure'); END;");
   try { const response = await remove(a, receipt.receipt, { env: broken }); expect(response.status).toBe(503); expect(await response.json()).toEqual({ error: 'service_unavailable' }); expect(await snapshot(a)).toEqual(before); expect(await (await status(receipt.receipt)).json()).toEqual({ status: 'pending' }); }
   finally { if (failure !== 'content') await env.AUTH_DB.exec('DROP TRIGGER reject_final'); }
   const row = await env.AUTH_DB.prepare('SELECT phase,attempt_id,attempt_until FROM account_deletion_receipts WHERE receipt_hash=?').bind(await hashCapability(receipt.receipt)).first(); expect(row).toMatchObject({ phase: failure === 'content' ? 'deleting' : 'cloud-retired', attempt_id: null, attempt_until: null });
+  expect(await env.AUTH_DB.prepare('SELECT * FROM account_deletion_completions WHERE receipt_hash=?').bind(await hashCapability(receipt.receipt)).first()).toBeNull();
   await env.AUTH_DB.prepare('UPDATE session SET createdAt=? WHERE id=?').bind(new Date(Date.now() - 86400000).toISOString(), a.session.id).run(); const flow = await begin(a); await reply(a); const refreshed = await callback(flow, a.provider); expect(refreshed.location?.href).toBe(base + '/account'); expect(await (await status(receipt.receipt)).json()).toEqual({ status: 'pending' });
   const explicitRetry = await remove({ ...a, cookie: cookies(refreshed.response) }, receipt.receipt); expect(explicitRetry.status).toBe(200); expect(await (await status(receipt.receipt)).json()).toEqual({ status: 'deleted', appleRevocation: 'not-linked' });
 });
@@ -239,8 +270,18 @@ test('stale deletion lease allows a new explicitly confirmed attempt, while acti
   await env.AUTH_DB.prepare('UPDATE account_deletion_receipts SET attempt_until=0 WHERE receipt_hash=?').bind(hash).run(); expect(await (await status(receipt.receipt)).json()).toEqual({ status: 'pending' }); expect((await remove(a, receipt.receipt)).status).toBe(200);
 });
 test('completion acknowledgement failure remains recoverable after atomic auth removal', async () => {
-  const a = await owner(), receipt = await prepare(a), db = gatedDatabase({ before: async sql => { if (sql.startsWith('SELECT receipt_hash FROM account_deletion_receipts WHERE receipt_hash=') && sql.includes("phase='completed'")) throw new Error('synthetic-lost-acknowledgement'); } });
+  const a = await owner(), receipt = await prepare(a), db = gatedDatabase({ before: async sql => { if (sql.startsWith('SELECT receipt_hash FROM account_deletion_completions WHERE receipt_hash=')) throw new Error('synthetic-lost-acknowledgement'); } });
   expect((await remove(a, receipt.receipt, { env: { ...settings, AUTH_DB: db } })).status).toBe(503); expect(await snapshot(a)).toEqual({ users: [], accounts: [], sessions: [] }); expect(await (await status(receipt.receipt)).json()).toEqual({ status: 'deleted', appleRevocation: 'not-linked' });
+});
+test('status cannot miss both proofs when completion commits during its lookup', async () => {
+  const a = await owner(), receipt = await prepare(a); let completed = false;
+  const db = gatedDatabase({ before: async sql => {
+    if (!completed && sql.includes('FROM account_deletion_receipts') && sql.includes('receipt_hash=?')) {
+      completed = true; expect((await remove(a, receipt.receipt)).status).toBe(200);
+    }
+  } });
+  const response = await call('account/deletion/status', { receipt: receipt.receipt }, { env: { ...settings, AUTH_DB: db } });
+  expect(completed).toBe(true); expect(response.status).toBe(200); expect(await response.json()).toEqual({ status: 'deleted', appleRevocation: 'not-linked' });
 });
 test('ISO session expiry closes an already-open live metadata socket; numeric compatibility remains covered', async () => {
   const a = await owner(); expect((await call('cloud/trial', {}, { cookie: a.cookie })).status).toBe(200); expect((await call('cloud/enroll', { operationId: crypto.randomUUID(), deviceId: 'socket-device', localPetId: 'socket-pet', name: 'Pip' }, { cookie: a.cookie })).status).toBe(200);
