@@ -88,6 +88,7 @@ jobs:
         env:
           MAESTRO_CLI_NO_ANALYTICS: "1"
           MAESTRO_DRIVER_STARTUP_TIMEOUT: "180000"
+          PUPTIME_HISTORY_RELOAD_PROBE: "1"
         run: bash scripts/run-ios-history-ci.sh
       - name: Upload local log-history acceptance
         if: always()

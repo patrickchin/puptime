@@ -496,3 +496,22 @@ exact-head CI/integration follow review; PR100 is already merged and is not this
 history PR. Distribution/physical-device notification delivery, billing, the wider
 lifecycle/export/web rollout and full observability/Sentry gates remain separate.
 Android, widgets and nap work remain deferred by the human.
+
+### PR106 Reload diagnostic follow-up
+
+Exact-head CI `e9c5831` / run39309663565 built successfully and passed all13 app
+flows, then failed its separate history check after a single Reload history tap.
+The retained screenshot/hierarchy show an enabled button and the unchanged stale
+confirmation; the artifacts do not establish whether the app received onPress.
+One local observed-source journey passes the same coordinate(201,825), actual
+press callbacks, one handler with `savingRef=false`, the resulting history list
+and unchanged SQL. This does not reproduce or explain the slow-runner failure.
+
+The next CI history step opts into a qualification-only observer on a private
+copy of the normal signed Release. The original app artifact stays unchanged.
+Bounded logs record touch coordinates, press/handler delivery and boolean state;
+the exit trap collects them before deleting its disposable simulator, including
+on assertion failure. Existing Maestro/list/SQL assertions and product handlers
+remain unchanged. No tap retry or new CI pass is claimed before this runs.
+After diagnosis, the history gate must again qualify the uninstrumented Release;
+an observer-build pass alone does not explain the original CI failure.
