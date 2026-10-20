@@ -7,6 +7,9 @@ import { ActivityIcon } from '../components/ActivityIcon';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { EventRow } from '../components/EventRow';
 import {ActivityLoadState} from '../components/ActivityLoadState';
+import {EventHistoryPanel} from '../components/EventHistoryPanel';
+import type {EventHistoryData} from '../event-history';
+import type {CloudHandle} from '../cloud/handle';
 import {useActivityPages,type ActivityViewProps} from '../activity-view';
 import { NoteInput } from '../components/NoteInput';
 import {
@@ -86,6 +89,9 @@ function sectionTitle(
 export function LogScreen({
   events:projectedEvents,
   activity,
+  history,
+  cloud,
+  onHistoryRestored,
   refreshToken,
   customActivities,
   editRequest,
@@ -98,6 +104,9 @@ export function LogScreen({
   theme,
 }: {
   events: PuppyEvent[];
+  history?:EventHistoryData;
+  cloud?:CloudHandle;
+  onHistoryRestored?:(event:PuppyEvent)=>void;
   customActivities: string[];
   editRequest?: LogEditRequest | null;
   onEditRequestHandled?: () => void;
@@ -120,6 +129,9 @@ export function LogScreen({
   const [customTouched, setCustomTouched] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [closing, setClosing] = useState(false);
+  const [historyOpen,setHistoryOpen]=useState(false);
+  const historyBusy=useRef(false);
+  const onHistoryRestoredRef=useRef(onHistoryRestored);onHistoryRestoredRef.current=onHistoryRestored;
   const [now, setNow] = useState(Date.now());
   const [focusNote, setFocusNote] = useState(false);
   const [loadedOlderDays, setLoadedOlderDays] = useState(olderDaysPerPage);
@@ -153,6 +165,7 @@ export function LogScreen({
     closingRef.current = false;
     setSaveStatus('idle');
     setClosing(false);
+    setHistoryOpen(false);
     setFocusNote(shouldFocusNote);
     setCustomTouched(false);
     const next = createDraft(event);
@@ -326,6 +339,37 @@ export function LogScreen({
     closingRef.current = false;
     setClosing(false);
     setDraft(null);
+    setHistoryOpen(false);
+  };
+
+  const requestHistory = async () => {
+    if(!history||!draftRef.current||closingRef.current)return;
+    closingRef.current=true;setClosing(true);setFocusNote(false);Keyboard.dismiss();
+    const session=sessionRef.current,revision=revisionRef.current;
+    try{
+      if(await flushAutoSave()&&sessionRef.current===session&&revisionRef.current===revision){
+        clearSaveTimer();setHistoryOpen(true);
+      }
+    }finally{closingRef.current=false;setClosing(false);}
+  };
+
+  const returnFromHistory = async () => {
+    if(!history||!draftRef.current||closingRef.current||historyBusy.current)return;
+    closingRef.current=true;setClosing(true);
+    const eventId=draftRef.current.event.id,session=sessionRef.current;
+    try{
+      const {head}=await history.eventPage(eventId,{limit:1});
+      if(sessionRef.current!==session)return;
+      if(head.event)startEditing(head.event);
+      else {setSaveStatus('deleted');setHistoryOpen(false);}
+    }catch{
+      if(sessionRef.current===session){setHistoryOpen(false);Alert.alert(t('app.loadErrorTitle'),t('app.loadErrorBody'));}
+    }finally{closingRef.current=false;setClosing(false);}
+  };
+
+  const restoredHistory = (event:PuppyEvent) => {
+    startEditing(event);setHistoryOpen(true);
+    onHistoryRestoredRef.current?.(event);
   };
 
   const requestCloseEditor = async () => {
@@ -354,6 +398,8 @@ export function LogScreen({
   };
 
   const handleSystemClose = () => {
+    if(historyOpen){void returnFromHistory();return;}
+    if(closingRef.current)return;
     const focusedInput = TextInput.State.currentlyFocusedInput();
     if (focusedInput) {
       focusedInput.blur();
@@ -535,14 +581,20 @@ export function LogScreen({
           testID="editor"
           accessibilityViewIsModal
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          enabled={Platform.OS !== 'ios'}
           style={styles.scrim}
         >
           <ScrollView
+            automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+            accessibilityElementsHidden={historyOpen}
+            importantForAccessibility={historyOpen?'no-hide-descendants':'auto'}
+            pointerEvents={closing||historyOpen?'none':'auto'}
             bounces={false}
             keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
             keyboardShouldPersistTaps="handled"
             style={[
               styles.sheet,
+              historyOpen&&styles.hiddenEditor,
               {
                 backgroundColor: theme.surfaceRaised,
                 borderTopLeftRadius: theme.presentation.cardRadius + 6,
@@ -862,13 +914,16 @@ export function LogScreen({
               <NoteInput
                 key={draft.event.id}
                 autoFocus={focusNote}
+                active={!historyOpen&&!closing}
                 value={draft.note}
                 onBlur={() => void flushAutoSave()}
                 onChangeText={(note) => updateDraft((current) => ({ ...current, note }))}
                 theme={theme}
               />
             ) : null}
+            {history?<Pressable testID="editor.history" accessibilityRole="button" disabled={closing} accessibilityState={{disabled:closing,busy:closing}} onPress={()=>{void requestHistory();}} style={({pressed})=>[styles.historyAction,{borderColor:theme.border,backgroundColor:pressed?theme.primarySoft:theme.surface,borderRadius:theme.presentation.controlRadius,opacity:closing?0.5:1}]}><MaterialCommunityIcons accessible={false} name="history" size={21} color={theme.primary}/><Text style={[styles.historyLabel,{color:theme.primary}]}>{t('history.open')}</Text><MaterialCommunityIcons accessible={false} name="chevron-right" size={20} color={theme.textMuted}/></Pressable>:null}
           </ScrollView>
+          {historyOpen&&history&&draft?<View style={[styles.sheet,styles.historySheet,{backgroundColor:theme.surfaceRaised,borderTopLeftRadius:theme.presentation.cardRadius+6,borderTopRightRadius:theme.presentation.cardRadius+6}]}><EventHistoryPanel data={history} eventId={draft.event.id} cloud={cloud} theme={theme} refreshToken={refreshToken} onBack={()=>{void returnFromHistory();}} onRestored={restoredHistory} onBusyChange={value=>{historyBusy.current=value;}}/></View>:null}
         </KeyboardAvoidingView>
       </Modal>
 
@@ -940,6 +995,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
   },
   sheetContent: { padding: spacing.lg, paddingBottom: 34 },
+  hiddenEditor:{display:'none'},historySheet:{height:'92%',overflow:'hidden'},historyAction:{minHeight:50,marginTop:20,borderWidth:1,paddingHorizontal:14,flexDirection:'row',alignItems:'center',gap:10},historyLabel:{flex:1,fontSize:16,lineHeight:22,fontWeight:'600'},
   sheetHeading: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: spacing.md },
   editorIcon: { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   editorHeadingCopy: { flex: 1, minWidth: 0 },

@@ -19,12 +19,14 @@ import { type Theme } from '../theme';
 
 export function NoteInput({
   autoFocus = false,
+  active = true,
   value,
   onChangeText,
   onBlur,
   theme,
 }: {
   autoFocus?: boolean;
+  active?: boolean;
   value: string;
   onChangeText: (value: string) => void;
   onBlur?: () => void;
@@ -45,6 +47,7 @@ export function NoteInput({
     setListening(false);
   });
   useSpeechRecognitionEvent('result', (event) => {
+    if(!active)return;
     const transcript = event.results[0]?.transcript.trim();
     if (!transcript) return;
     onChangeText([baseNote.current, transcript].filter(Boolean).join(' ').slice(0, 300));
@@ -60,6 +63,8 @@ export function NoteInput({
         : t('note.tryAgain'),
     );
   });
+
+  useEffect(()=>{if(!active&&listeningRef.current)ExpoSpeechRecognitionModule.abort();},[active]);
 
   useEffect(() => () => {
     if (listeningRef.current) ExpoSpeechRecognitionModule.abort();
@@ -110,6 +115,7 @@ export function NoteInput({
           testID="editor.note.input"
           accessibilityLabel={t('note.label')}
           autoFocus={autoFocus}
+          editable={active}
           autoCapitalize="sentences"
           maxLength={300}
           multiline
@@ -125,6 +131,7 @@ export function NoteInput({
           accessibilityRole="button"
           accessibilityLabel={listening ? t('note.stopDictating') : t('note.dictate')}
           accessibilityState={{ selected: listening }}
+          disabled={!active}
           onPress={toggleListening}
           style={({ pressed }) => [
             styles.micButton,
