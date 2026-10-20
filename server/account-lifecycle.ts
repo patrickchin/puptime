@@ -1,6 +1,92 @@
 import { getAccountStore } from './account-store';
+import { z } from 'zod';
+import { hashCapability, lifecycleError } from './account-reauth';
+import { authTimestampSql } from './auth-timestamps';
 
 export type AppleRevocation = 'not-linked' | 'revoked' | 'manual';
+export const deletionReceiptSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
+const receiptLifetime = 30 * 86400000;
+const sessionCreated = authTimestampSql('createdAt'), sessionExpiry = authTimestampSql('expiresAt');
+type ReceiptRow = { receipt_hash: string; account_id: string; phase: 'prepared' | 'deleting' | 'cloud-retired' | 'completed'; apple_revocation: AppleRevocation | null; expires_at: number };
+
+export function recentAuthentication(createdAt: number, now = Date.now()): boolean {
+  const age = now - createdAt;
+  return Number.isFinite(age) && age >= 0 && age < 600000;
+}
+export async function prepareDeletionReceipt(db: D1Database, accountId: string, sessionId: string) {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  const receipt = btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const hash = await hashCapability(receipt), now = Date.now(), expiresAt = now + receiptLifetime;
+  const prepared = await db.batch<{ receipt_hash: string }>([
+    db.prepare('DELETE FROM account_deletion_receipts WHERE expires_at<=?').bind(now),
+    // A lost preparation response has no recoverable plaintext receipt. Renew
+    // only an unstarted, lease-free reference; never displace a started proof.
+    // Rotation and insertion share a transaction, including concurrent retries.
+    db.prepare(`DELETE FROM account_deletion_receipts WHERE receipt_hash=(
+      SELECT receipt_hash FROM account_deletion_receipts WHERE account_id=? AND phase='prepared' AND attempt_id IS NULL
+      ORDER BY created_at,receipt_hash LIMIT 1)
+      AND (SELECT COUNT(*) FROM account_deletion_receipts WHERE account_id=?)>=5
+      AND EXISTS(SELECT 1 FROM session WHERE id=? AND userId=? AND ${sessionExpiry}>? AND ${sessionCreated}>? AND ${sessionCreated}<=?)`)
+      .bind(accountId, accountId, sessionId, accountId, now, now - 600000, now),
+    db.prepare(`INSERT INTO account_deletion_receipts(receipt_hash,account_id,phase,created_at,expires_at)
+      SELECT ?,?,'prepared',?,? WHERE EXISTS(SELECT 1 FROM session WHERE id=? AND userId=? AND ${sessionExpiry}>? AND ${sessionCreated}>? AND ${sessionCreated}<=?)
+      AND (SELECT COUNT(*) FROM account_deletion_receipts WHERE account_id=?)<5 RETURNING receipt_hash`)
+      .bind(hash, accountId, now, expiresAt, sessionId, accountId, now, now - 600000, now, accountId),
+  ]);
+  if (!prepared[2].results.length) lifecycleError(429, 'deletion_preparation_unavailable');
+  return { receipt, expiresAt };
+}
+export async function deletionReceiptStatus(db: D1Database, receipt: string) {
+  const row = await db.prepare('SELECT * FROM account_deletion_receipts WHERE receipt_hash=? AND expires_at>?')
+    .bind(await hashCapability(receipt), Date.now()).first<ReceiptRow>();
+  if (!row) return { status: 'unknown' as const };
+  const absent = row.phase === 'cloud-retired' && !await db.prepare('SELECT id FROM user WHERE id=?').bind(row.account_id).first();
+  if (row.phase === 'completed' || absent) return { status: 'deleted' as const, appleRevocation: row.apple_revocation! };
+  return { status: row.phase === 'prepared' ? 'not-started' as const : 'pending' as const };
+}
+
+export async function deleteCloudAccount(env: Cloudflare.Env, user: { id: string; email: string }, sessionId: string, receipt?: string): Promise<AppleRevocation> {
+  const db = env.AUTH_DB;
+  let hash: string;
+  if (receipt) hash = await hashCapability(receipt);
+  else {
+    // Legacy web callers share the same serialization and atomic SQL boundary.
+    // The native client prepares and durably saves its own receipt first.
+    const existing = await db.prepare("SELECT receipt_hash FROM account_deletion_receipts WHERE account_id=? AND expires_at>? AND phase!='completed' ORDER BY created_at DESC LIMIT 1")
+      .bind(user.id, Date.now()).first<{ receipt_hash: string }>();
+    hash = existing?.receipt_hash ?? await hashCapability((await prepareDeletionReceipt(db, user.id, sessionId)).receipt);
+  }
+  const now = Date.now(), attempt = crypto.randomUUID();
+  const claimed = await db.prepare(`UPDATE account_deletion_receipts SET phase=CASE WHEN phase='prepared' THEN 'deleting' ELSE phase END,attempt_id=?,attempt_until=?
+    WHERE receipt_hash=? AND account_id=? AND phase!='completed' AND expires_at>?
+    AND NOT EXISTS(SELECT 1 FROM account_deletion_receipts active WHERE active.account_id=? AND active.attempt_until>?)
+    AND EXISTS(SELECT 1 FROM session WHERE id=? AND userId=? AND ${sessionExpiry}>? AND ${sessionCreated}>? AND ${sessionCreated}<=?) RETURNING receipt_hash`)
+    .bind(attempt, now + 60000, hash, user.id, now, user.id, now, sessionId, user.id, now, now - 600000, now).first();
+  if (!claimed) lifecycleError(409, 'deletion_unavailable');
+  try {
+    const appleRevocation = await retireCloudAccount(env, user);
+    const retired = await db.prepare("UPDATE account_deletion_receipts SET phase='cloud-retired',apple_revocation=? WHERE receipt_hash=? AND account_id=? AND attempt_id=? AND attempt_until>? RETURNING receipt_hash")
+      .bind(appleRevocation, hash, user.id, attempt, Date.now()).first();
+    if (!retired) lifecycleError(409, 'deletion_unavailable');
+    const finishedAt = Date.now();
+    // D1's native FK cascade is atomic. Better Auth's D1 deleteUser otherwise
+    // deletes sessions, accounts and the user in separate operations. Keep the
+    // original session/link intact on any failure so explicit retries can reauth.
+    await db.batch([
+      db.prepare(`DELETE FROM user WHERE id=? AND EXISTS(SELECT 1 FROM account_deletion_receipts
+        WHERE receipt_hash=? AND account_id=? AND phase='cloud-retired' AND attempt_id=? AND attempt_until>? AND expires_at>?)`)
+        .bind(user.id, hash, user.id, attempt, finishedAt, finishedAt),
+      db.prepare(`UPDATE account_deletion_receipts SET phase='completed',apple_revocation=?,attempt_id=NULL,attempt_until=NULL
+        WHERE account_id=? AND expires_at>? AND NOT EXISTS(SELECT 1 FROM user WHERE id=?)`)
+        .bind(appleRevocation, user.id, finishedAt, user.id),
+    ]);
+    const completed = await db.prepare("SELECT receipt_hash FROM account_deletion_receipts WHERE receipt_hash=? AND phase='completed'").bind(hash).first();
+    if (!completed) lifecycleError(409, 'deletion_unavailable');
+    return appleRevocation;
+  } finally {
+    await db.prepare('UPDATE account_deletion_receipts SET attempt_id=NULL,attempt_until=NULL WHERE receipt_hash=? AND attempt_id=?').bind(hash, attempt).run();
+  }
+}
 
 async function revokeApple(env: Cloudflare.Env, userId: string): Promise<AppleRevocation> {
   // Better Auth's current encryptOAuthTokens setting is false. These credentials

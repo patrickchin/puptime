@@ -106,16 +106,26 @@ The installed Better Auth 1.7.10 exposes supported server OAuth context and
 `user.validateUserInfo` hooks for pinning an already-linked provider subject to
 the original owner. A regular `linkSocial` does not refresh session age, and
 `requestSignUp: false` alone does not prohibit a new identity under the current
-configuration. Provider reauthentication needs its own guarded implementation
-and rejection tests before native deletion can rely on it.
+configuration. The guarded server implementation below has local rejection tests;
+native deletion must still qualify the complete provider/browser journey.
 
-Recovery after interrupted deletion has a separate constraint: migration0003
-correctly blocks returning-provider credential updates before the SDK creates a
-new session. A scoped auth configuration with `account.updateAccountOnSignIn:
-false` needs qualification; no safe per-flow selection on the shared callback
-has been established. Preserve the database guard. A returning Apple identity
-with no email must also resolve only through its verified, already-linked
-provider subject. These remain release gates, not implemented recovery paths.
+The server foundation now implements a guarded provider reauthentication flow
+through the existing SDK social endpoint and callback. A typed app-owned state
+hash index selects a per-request configuration with provider token updates
+disabled; trusted SDK context, original owner/session and the exact already-linked
+subject are independently verified. Atomic intent consumption prevents replay and
+concurrent callbacks. Apple omitted-email callbacks resolve only through that
+existing linked subject. Migration0003 remains intact. Native durable intent and
+real provider/deployed qualification remain release gates.
+
+Migration0004 also introduces status-only deletion receipts, so losing a successful
+response can be resolved after identity/session removal. This owned deletion route
+uses the existing D1 user FK cascade and receipt completion in one atomic batch;
+public SDK signOut supplies its cookie cleanup. Auth cleanup failure retains the
+original session and provider link, while cloud retirement remains irreversible.
+See `docs/account-lifecycle-server-verification.md` for contracts, failure states,
+local checks and remaining boundaries. This checkpoint does not complete native
+deletion or release qualification.
 
 The current store-copy commit describes the candidate and is not a published
 listing. Terms, subscription purchase/cancellation, actual provider revocation,
