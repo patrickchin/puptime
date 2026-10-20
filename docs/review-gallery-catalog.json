@@ -7,7 +7,7 @@
     },
     {
       "title": "Email: explicit upload and cold restart",
-      "description": "Real email authentication completed privately, followed by explicit enable/upload of the retained local log and an authenticated cold restart. Exact ad54 shared core source in a reused qualified Debug shell, through a local HTTP proxy/API; no fresh Release-build claim.",
+      "description": "Actual SDK email-code sign-in with a synthetic address against the local API, completed privately, followed by explicit enable/upload of the retained local log and an authenticated cold restart. Exact ad54 shared core source in a reused qualified Debug shell, through a local HTTP proxy/API; no fresh Release-build claim.",
       "primary": "361-ios-current-email-upload-restart"
     },
     {
@@ -56,7 +56,7 @@
     "285-confirmation-scroll-context-green": "The final signed build resets only the local history pane when opening confirmation. The explanation-visible regression, full maximum-text journeys and all-table read-only checks run in English, Spanish and Chinese.",
     "195-clean-first-open-and-timed-reminder": "This earlier reminder journey uses a cloud-disabled build. The companion email-request recording and cloud restore recordings use the deployed Pages API.",
     "360-ios-current-first-open": "Recorded rerun with synthetic Mochi data: one real log and one timed reminder; no account owner or queued upload. Only clearState was omitted after fresh-data proof to preserve the separate Metro binding. This local-choice clip does not establish sign-in or cloud sync; the qualified email and restore journeys are separate; full provenance and retained diagnostic limitations are in Details.",
-    "361-ios-current-email-upload-restart": "The first explicit enable uses the retained 360 Mochi fixture after private email verification. The SQL retained-data comparison excludes OS scheduled-notification request state. A later separate UI/Expo timer readback is not part of this clip’s SQL equality claim. Corrected Details preserve that boundary.",
+    "361-ios-current-email-upload-restart": "The first explicit enable uses the retained 360 Mochi fixture after private SDK email-code verification using a local preview code and an @example.invalid address. This recording does not establish delivered email. The SQL retained-data comparison excludes OS scheduled-notification request state. A later separate UI/Expo timer readback is not part of this clip’s SQL equality claim. Corrected Details preserve that boundary.",
     "364-ios-current-restore-incoming": "Recorded on a fresh empty synthetic device. The confirmed puppy restore and incoming edit use fully paged peer revision state and complete cloud-mirror checks. This is local HTTP/proxy qualification, not a deployed-service or fresh native-build claim.",
     "366-ios-current-history-restore": "The 1,001-log prepared fixture contains 1,000 unrelated events. Cancel preserves every SQL table; one confirmed restore preserves identity, provenance and unrelated tables. Fixture IDs were minted by the Node product runtime; this capture does not establish Hermes ID generation.",
     "363-ios-current-google-restart": "Historical browser-SDK Google restart capture. It remains archived while iOS provider integration moves to native Apple/Google SDKs; it does not qualify the pending native-provider journey."

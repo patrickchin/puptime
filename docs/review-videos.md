@@ -5,7 +5,7 @@
 | Clip | Demonstrated journey | Scope |
 | --- | --- | --- |
 | 360 | Full setup, optional local choice, practice, first real log and timed reminder | Public Pages API configured; no owner or queued upload |
-| 361 | Privately completed real email authentication, retained local log, explicit upload and cold restart | Local HTTP proxy/API; SQL equality excludes OS-timer state |
+| 361 | Actual SDK email-code sign-in with a synthetic address against the local API, retained local log, explicit upload and cold restart | Local HTTP proxy/API; SQL equality excludes OS-timer state |
 | 364 | Explicit fresh-device restore and incoming peer edit | Local HTTP proxy/API; private code entry omitted |
 | 366 | Populated history, Cancel and exactly one confirmed restore | Account-free prepared fixture with 1,001 local logs; Node-minted fixture IDs do not establish Hermes generation |
 
