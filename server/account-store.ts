@@ -4,6 +4,7 @@ import { cloudRecordSchema,eventDataSchema,routineDataSchema,enrollmentSchema, m
 import {cloudAccess,getCloudAccount} from './entitlements';
 import {eventSqlDefinition,routineSqlDefinition,eventSqlColumns,routineSqlColumns,eventSqlValues,routineSqlValues,eventDataFromSql,routineDataFromSql,type EventSqlRow,type RoutineSqlRow} from '../src/record-sql';
 import { reconcileMutation, ReconciliationError } from '../src/cloud/reconcile';
+import { authTimestampSql } from './auth-timestamps';
 
 const cursorSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const pageSizeSchema = z.number().int().min(1).max(100);
@@ -65,7 +66,7 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
     this.#assertActive();
     // Recheck the SDK-managed session row, without persisting a cookie/token in
     // hibernation attachments or introducing a second credential mechanism.
-    const session=await this.env.AUTH_DB.prepare('SELECT id FROM session WHERE id=? AND userId=? AND expiresAt>?').bind(sessionId,accountId,Date.now()).first();
+    const session=await this.env.AUTH_DB.prepare(`SELECT id FROM session WHERE id=? AND userId=? AND ${authTimestampSql('expiresAt')}>?`).bind(sessionId,accountId,Date.now()).first();
     const account=await getCloudAccount(this.env.AUTH_DB,accountId);
     this.#assertActive();
     return !!session&&cloudAccess(account,Date.now()).canSync;

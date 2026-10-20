@@ -1,10 +1,10 @@
 import { expo } from '@better-auth/expo';
 import { betterAuth } from 'better-auth';
-import { APIError, createAuthMiddleware } from 'better-auth/api';
+import { APIError, addOAuthServerContext, createAuthMiddleware } from 'better-auth/api';
 import { emailOTP } from 'better-auth/plugins';
 import { Resend } from 'resend';
 import { z } from 'zod';
-import { retireCloudAccount, type AppleRevocation } from './account-lifecycle';
+import { consumeReauthIntent, intentBinding, reauthAppleEmail, validateReauthIdentity, type ReauthIntent } from './account-reauth';
 
 function emailSenderAvailable(env: Cloudflare.Env): boolean {
   const sender = z.email().safeParse(env.EMAIL_FROM);
@@ -21,7 +21,7 @@ export function configuredProviders(env: Cloudflare.Env) {
   };
 }
 
-export function createAuth(env: Cloudflare.Env, options: { disableEmailSignUp?: boolean; onAccountRetired?: (appleRevocation: AppleRevocation) => void } = {}) {
+export function createAuth(env: Cloudflare.Env, options: { disableEmailSignUp?: boolean; startReauth?: ReauthIntent; callbackReauth?: ReauthIntent } = {}) {
   const baseURL = z.url().parse(env.AUTH_BASE_URL);
   const secret = z.string().min(32).parse(env.AUTH_SECRET);
   const base = new URL(baseURL);
@@ -34,20 +34,26 @@ export function createAuth(env: Cloudflare.Env, options: { disableEmailSignUp?: 
     appName: 'Puptime', baseURL, secret, database: env.AUTH_DB,
     trustedOrigins: [base.origin, ...(env.WEB_ORIGINS ?? '').split(',').filter(Boolean), 'puptime://*', ...(providers.apple ? ['https://appleid.apple.com'] : [])],
     emailAndPassword: { enabled: false },
-    account: { accountLinking: { enabled: true, disableImplicitLinking: true } },
-    user: { deleteUser: { enabled: true, beforeDelete: async (user) => { const outcome = await retireCloudAccount(env, user); options.onAccountRetired?.(outcome); } } },
+    account: { ...(options.callbackReauth ? { updateAccountOnSignIn: false } : {}), accountLinking: { enabled: true, disableImplicitLinking: true } },
+    databaseHooks: { session: { create: { before: session => consumeReauthIntent(env.AUTH_DB, options.callbackReauth, session.userId) } } },
+    user: {
+      validateUserInfo: data => validateReauthIdentity(env.AUTH_DB, options.callbackReauth, data),
+    },
     session: { expiresIn: 60 * 60 * 24 * 30, updateAge: 60 * 60 * 24, freshAge: 60 * 10, cookieCache: { enabled: false } },
     rateLimit: { enabled: true, storage: 'database', window: 60, max: 30 },
     logger: { disabled: true },
     advanced: { ipAddress: { ipAddressHeaders: ['cf-connecting-ip'] } },
     hooks: { before: createAuthMiddleware(async (context) => {
+      if (context.path === '/sign-in/social' && options.startReauth) {
+        await addOAuthServerContext({ puptimeReauth: intentBinding(options.startReauth) });
+      }
       if (!providers.email && (context.path.startsWith('/email-otp/') || context.path === '/sign-in/email-otp')) {
         throw new APIError('SERVICE_UNAVAILABLE', { message: 'Email sign-in is not configured yet.' });
       }
     }) },
     socialProviders: {
-      ...(providers.google ? { google: { clientId: env.GOOGLE_CLIENT_ID!, clientSecret: env.GOOGLE_CLIENT_SECRET! } } : {}),
-      ...(providers.apple ? { apple: { clientId: env.APPLE_CLIENT_ID!, clientSecret: env.APPLE_CLIENT_SECRET! } } : {}),
+      ...(providers.google ? { google: { ...(options.callbackReauth ? { disableSignUp: true } : {}), clientId: env.GOOGLE_CLIENT_ID!, clientSecret: env.GOOGLE_CLIENT_SECRET! } } : {}),
+      ...(providers.apple ? { apple: { ...(options.callbackReauth ? { disableSignUp: true } : {}), clientId: env.APPLE_CLIENT_ID!, clientSecret: env.APPLE_CLIENT_SECRET!, mapProfileToUser: profile => reauthAppleEmail(env.AUTH_DB, options.callbackReauth, profile) } } : {}),
     },
     disabledPaths: ['/email-otp/request-password-reset', '/forget-password/email-otp', '/email-otp/reset-password', '/delete-user', '/delete-user/callback'],
     plugins: [expo(), emailOTP({
