@@ -11,7 +11,7 @@ function fixture(){
   if(url.endsWith('/api/account')&&init?.method==='DELETE'){if(state.throwDelete)throw new TypeError('synthetic disconnect');return Response.json(state.deleteBody,{status:state.deleteStatus});}
   if(url.includes('/link-social'))return Response.json({url:'https://accounts.google.com/synthetic',redirect:false});
   if(url.endsWith('/list-accounts'))return Response.json([{userId:state.userId,providerId:'google',accessToken:'synthetic-private-field'}]);
-  return Response.json({user:{id:state.userId,email:'fixture@example.invalid',name:'Fixture'},cloud:{canSync:false,canExport:true,source:'none',expiresAt:null},pets:[]});
+  return Response.json({user:{id:state.userId,email:'fixture@example.invalid',name:'Fixture'},cloud:{canSync:false,canExport:true},pets:[]});
  });
  return {client,calls,state};
 }

@@ -9,13 +9,12 @@ import type {MessageKey} from '../localization';
 import type {Theme} from '../theme';
 
 export function accountProblemKey(problem:AccountProblem|null):MessageKey|null {
-  if(!problem||['confirmation-required','pending-confirmation-required','auth-required','expired'].includes(problem))return null;
+  if(!problem||['confirmation-required','pending-confirmation-required','auth-required'].includes(problem))return null;
   if(problem==='invalid-email')return 'account.error.email';
   if(problem==='invalid-code')return 'account.error.code';
   if(problem==='code-expired')return 'account.error.expiredCode';
   if(problem==='too-many-attempts'||problem==='rate-limited')return 'account.error.attempts';
   if(problem==='network')return 'account.error.network';
-  if(problem==='trial-unavailable')return 'account.error.trial';
   if(problem==='account-mismatch')return 'account.error.mismatch';
   if(problem==='sign-out-failed')return 'account.error.signOut';
   if(problem==='remote-sign-out-unconfirmed')return 'account.error.remoteSignOut';
@@ -23,7 +22,7 @@ export function accountProblemKey(problem:AccountProblem|null):MessageKey|null {
   if(problem==='local-storage')return 'account.error.storage';
   if(problem==='social-incomplete')return 'account.error.socialIncomplete';
   if(problem==='link-incomplete')return 'account.error.linkIncomplete';
-  if(problem==='provider-unavailable'||problem==='server-error'||problem==='invalid-response'||problem==='account-deleted')return 'account.error.service';
+  if(problem==='provider-unavailable'||problem==='server-error'||problem==='invalid-response'||problem==='account-deleted'||problem==='forbidden')return 'account.error.service';
   return 'account.error.signIn';
 }
 export function AccountSignIn({cloud,theme,showError=true,showIntro=true}:{cloud:CloudHandle;theme:Theme;showError?:boolean;showIntro?:boolean}) {

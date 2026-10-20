@@ -1,7 +1,11 @@
 # iOS cloud export verification
 
+The current [cloud development milestone](cloud-development.md) removes trial
+gating. Historical recordings below retain their original source scope; rerun
+the updated harness against the new baseline before claiming current acceptance.
+
 The account screen exports the complete cloud revision history independently of
-sync entitlement. It uses the installed Better Auth SDK, a guarded same-origin
+device sync status. It uses the installed Better Auth SDK, a guarded same-origin
 POST, streamed validation, a private temporary Expo File and the native share
 sheet. Export does not enroll the local puppy, upload pending changes or alter
 local history. Activity CSV remains a separate action in Insights.
@@ -45,14 +49,14 @@ node scripts/verify-ios-cloud-export.mjs serve
 node scripts/verify-ios-cloud-export.mjs request "$PUPTIME_TEST_DEVICE" --private-auth
 node scripts/verify-ios-cloud-export.mjs verify "$PUPTIME_TEST_DEVICE" --private-auth
 node scripts/verify-ios-cloud-export.mjs seed
-node scripts/verify-ios-cloud-export.mjs expire
-node scripts/verify-ios-cloud-export.mjs acceptance "$PUPTIME_TEST_DEVICE" --record
+node scripts/verify-ios-cloud-export.mjs acceptance "$PUPTIME_TEST_DEVICE"
 ```
 
 The harness owns ports8799/8899 and disposable local persistence. Authentication
-phases refuse recording and remove their raw private artifacts. Each post-auth
-attempt receives a separate video, screenshots and actual chapter timestamps;
-reruns preserve the existing fixture and failures. It never resets a simulator,
+phases refuse recording and remove their raw private artifacts. Post-auth checks
+retain screenshots and text evidence. Use `--record` only when replacing a
+curated review journey; reruns preserve the existing fixture and failures.
+It never resets a simulator,
 replaces native SQLite or targets a live service.
 
 Deployed timing, distributed standalone Release/physical-device acceptance,

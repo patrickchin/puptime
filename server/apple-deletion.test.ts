@@ -58,7 +58,6 @@ test.each(['access-only', 'missing-token', 'missing-config', 'network', 'non-200
   const user = await owner(); await credential(user, scenario === 'access-only' || scenario === 'missing-token' ? null : 'synthetic-refresh', scenario === 'missing-token' ? null : 'synthetic-access');
   if (scenario === 'network') {
     const post = (path: string, body: object) => worker.fetch(new Request(origin + '/api/' + path, { method: 'POST', headers: { origin, cookie: user.cookie, 'content-type': 'application/json' }, body: JSON.stringify(body) }), settings);
-    expect((await post('cloud/trial', {})).status).toBe(200);
     expect((await post('cloud/enroll', { operationId: crypto.randomUUID(), deviceId: 'synthetic-device', localPetId: 'synthetic-pet', name: 'Synthetic puppy' })).status).toBe(200);
     const exported = await worker.fetch(new Request(origin + '/api/account/export', { headers: { origin, cookie: user.cookie } }), settings);
     expect(new TextDecoder().decode(await exported.arrayBuffer())).toContain('Synthetic puppy');

@@ -4,7 +4,7 @@ import type {AccountSnapshot} from './account-controller.ts';
 import * as subscription from './change-subscription.ts';
 const tick=()=>new Promise<void>(resolve=>setImmediate(resolve));
 function fixture(){
- let state:AccountSnapshot={active:true,online:true,busy:false,exporting:false,problem:null,account:{user:{id:'one',email:'one@example.invalid',name:'One'},cloud:{canSync:true,canExport:true,source:'trial',expiresAt:null},pets:[]},sync:{accountId:'one',generation:'first',state:'active',pending:0,blocked:0,cursor:0},config:null,linkedProviders:null,linkingProvider:null,local:null,run:null,codeSentTo:null,running:false,lastSyncedAt:null};
+ let state:AccountSnapshot={active:true,online:true,busy:false,exporting:false,problem:null,account:{user:{id:'one',email:'one@example.invalid',name:'One'},cloud:{canSync:true,canExport:true},pets:[]},sync:{accountId:'one',generation:'first',state:'active',pending:0,blocked:0,cursor:0},config:null,linkedProviders:null,linkingProvider:null,local:null,run:null,codeSentTo:null,running:false,lastSyncedAt:null};
  const listeners=new Set<()=>void>();let invalidations=0;
  const timers:Array<{fn:()=>void;delay:number;cancelled:boolean}>=[],calls:Array<{signal:AbortSignal;onCursor:(cursor:number)=>void;onClose:()=>void;closed:number;resolve?:(value:{close:()=>void})=>void}>=[];
  const controller={read:()=>state,subscribe:(fn:()=>void)=>{listeners.add(fn);return()=>{listeners.delete(fn);};},invalidate:()=>{invalidations++;}};
@@ -13,7 +13,7 @@ function fixture(){
  const update=(patch:Partial<AccountSnapshot>)=>{state={...state,...patch};listeners.forEach(fn=>fn());};
  return {controller,open,defer,update,calls,timers,get invalidations(){return invalidations;}};
 }
-test('only active online entitled matching owners subscribe; old generation callbacks are ignored',async()=>{
+test('only active online authorized matching owners subscribe; old generation callbacks are ignored',async()=>{
  const f=fixture(),stop=subscription.watchAccountChanges({controller:f.controller,open:f.open,defer:f.defer});await tick();assert.equal(f.calls.length,1);
  f.calls[0].onCursor(1);f.calls[0].onCursor(1);f.calls[0].onCursor(0);assert.equal(f.invalidations,1);
  f.update({active:false});assert.equal(f.calls[0].signal.aborted,true);assert.equal(f.calls[0].closed,1);f.calls[0].onCursor(2);assert.equal(f.invalidations,1);
@@ -21,6 +21,12 @@ test('only active online entitled matching owners subscribe; old generation call
  f.update({sync:{...f.controller.read().sync!,accountId:'other'}});assert.equal(f.calls[1].signal.aborted,true);
  f.update({sync:{...f.controller.read().sync!,accountId:'one',generation:'second'}});await tick();assert.equal(f.calls.length,3);
  f.update({busy:true});assert.equal(f.calls[2].signal.aborted,true);f.update({busy:false,exporting:false,online:false});await tick();assert.equal(f.calls.length,3);stop();
+});
+test('revoked cloud access closes the old subscription and only a fresh authorization can reopen it',async()=>{
+ const f=fixture(),stop=subscription.watchAccountChanges({controller:f.controller,open:f.open,defer:f.defer});await tick();assert.equal(f.calls.length,1);
+ const account=f.controller.read().account!;f.update({account:{...account,cloud:{canSync:false,canExport:true}}});
+ assert.equal(f.calls[0].signal.aborted,true);assert.equal(f.calls[0].closed,1);f.calls[0].onCursor(2);assert.equal(f.invalidations,0);
+ await tick();assert.equal(f.calls.length,1);f.update({account});await tick();assert.equal(f.calls.length,2);stop();
 });
 test('a delayed credential read cannot install a socket after account change or disposal',async()=>{
  const f=fixture();let release:(value:{close:()=>void})=>void=()=>{};let closed=0;

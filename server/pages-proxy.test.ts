@@ -79,11 +79,9 @@ test('installed SDK sign-in sync scoped history and WebSocket invalidations work
  expect((await user.request('/api/account')).status).toBe(401);
  expect((await user.request('/api/sync/changes',undefined,{upgrade:'websocket'})).status).toBe(401);
  await user.login();
- const account=await user.api.account();expect(account.cloud.canSync).toBe(false);expect(account.pets).toEqual([]);
- expect((await user.request('/api/sync/changes',undefined,{upgrade:'websocket'})).status).toBe(402);
- expect((await user.api.startTrial()).cloud.canSync).toBe(true);
+ const account=await user.api.account();expect(account.cloud).toEqual({canSync:true,canExport:true});expect(account.pets).toEqual([]);
  expect(await user.api.enroll({operationId:'pages-enroll',deviceId:'pages-device',localPetId:'pages-pet',name:'Pages puppy'})).toEqual({petId:'pages-pet'});
- expect((await user.request('/api/cloud/trial',{}, {origin:'https://untrusted.example'})).status).toBe(403);
+ expect((await user.request('/api/cloud/enroll',{}, {origin:'https://untrusted.example'})).status).toBe(403);
  expect((await user.request('/api/sync/changes',undefined,{upgrade:'websocket',origin:'https://untrusted.example'})).status).toBe(403);
  const response=await user.request('/api/sync/changes',undefined,{upgrade:'websocket'});
  expect(response.status).toBe(101);expect(response.webSocket).not.toBeNull();
@@ -98,7 +96,7 @@ test('installed SDK sign-in sync scoped history and WebSocket invalidations work
   expect(history.revisions[0].after.data).toMatchObject({note:'Second Pages version'});
   expect((await user.api.history(id,2)).revisions.map(revision=>revision.revision)).toEqual([1]);
   expect((await user.api.pull(0)).changes.at(-1)?.id).toBe(id);
-  const other=client('192.0.2.247');await other.login();await other.api.startTrial();
+  const other=client('192.0.2.247');await other.login();
   await other.api.enroll({operationId:'pages-other-enroll',deviceId:'pages-other-device',localPetId:'pages-other-pet',name:'Other puppy'});
   expect(await other.api.history(id)).toEqual({revisions:[]});expect((await other.api.pull(0)).changes).toEqual([]);
   expect((await other.auth.signOut()).error).toBeNull();

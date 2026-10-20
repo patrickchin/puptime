@@ -5,7 +5,7 @@ import type { z } from 'zod';
 
 type Sync=ReturnType<typeof createLocalSync>;
 type PushResult=z.infer<typeof pushResponseSchema>;
-export type RunResult={state:'idle'|'synced'|'pending'|'blocked'|'auth-required'|'expired'|'retry'|'error';pending:number;blocked:number;retryAfterMs:number|null;problem:CloudErrorCategory|'local-storage'|'account-mismatch'|'confirmation-required'|null};
+export type RunResult={state:'idle'|'synced'|'pending'|'blocked'|'auth-required'|'retry'|'error';pending:number;blocked:number;retryAfterMs:number|null;problem:CloudErrorCategory|'local-storage'|'account-mismatch'|'confirmation-required'|null};
 class BudgetReached extends Error {}
 class OwnerChanged extends Error {}
 class EnrollmentRejected extends Error {}
@@ -74,7 +74,7 @@ export function createSyncRunner({sync,api,petId,deviceId,sessionAccountId,chang
       try {
         const account=await invoke(()=>api.account(signal));
         if (account.user.id!==accountId) throw new OwnerChanged();
-        if (!account.cloud.canSync) return result('expired',null,'expired');
+        if (!account.cloud.canSync) return result('error',null,'forbidden');
         await resumeEnrollment();if (await sync.resyncState()) await resumeBaseline();
         await pull();
         for (;;) {
@@ -95,7 +95,6 @@ export function createSyncRunner({sync,api,petId,deviceId,sessionAccountId,chang
         if (error instanceof BudgetReached) return result('pending',0);
         if (!(error instanceof CloudApiError)) return result('error',null,'local-storage');
         if (error.category==='auth-required') return result('auth-required',null,error.category);
-        if (error.category==='expired') return result('expired',null,error.category);
         if (['network','rate-limited','server-error'].includes(error.category)) {
           const delay=Math.min(60000,1000*2**Math.min(failures++,16));
           return result('retry',Math.min(60000,Math.max(error.retryAfterMs??0,1000,Math.round(delay*(0.8+0.2*random())))),error.category);

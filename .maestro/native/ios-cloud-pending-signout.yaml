@@ -15,13 +15,13 @@ name: iOS pending sign-out cancels safely and keeps offline history
     visibilityPercentage: 100
 - tapOn:
     id: account.signOut
-- assertVisible: ^Sign out on this iPhone\?$
+- assertVisible: ^Sign out on this device\?$
 - tapOn: Cancel
 - assertVisible:
     id: account.signOut
 - tapOn:
     id: account.signOut
-- assertVisible: ^Sign out on this iPhone\?$
+- assertVisible: ^Sign out on this device\?$
 - tapOn:
     text: ^Sign out$
     rightOf:
@@ -29,7 +29,7 @@ name: iOS pending sign-out cancels safely and keeps offline history
 - extendedWaitUntil:
     visible:
       id: account.status
-      text: Stored on this iPhone
+      text: Stored on this device
     timeout: 30000
 - scrollUntilVisible:
     element:
@@ -41,4 +41,4 @@ name: iOS pending sign-out cancels safely and keeps offline history
     text: ${MAESTRO_EXPECTED_COUNT} activity logs
 - assertVisible:
     id: account.status
-    text: Stored on this iPhone
+    text: Stored on this device

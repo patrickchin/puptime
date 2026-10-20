@@ -16,7 +16,6 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
   const account=state?.account,existing=account?.pets[0],busy=state?.busy??false;
   const status=accountStatus(state),errorKey=accountProblemKey(state?.problem??(readFailed?'local-storage':null));
   const enrolled=!!state?.sync?.accountId&&state.sync.state!=='local';
-  const days=state?.config?.trialDays??14;
   useEffect(()=>{let mounted=true;cloud.getLocalName().then(name=>{if(mounted)setLocalName(name);}).catch(()=>{if(mounted)setReadFailed(true);});return()=>{mounted=false;};},[cloud.getLocalName]);
   useEffect(()=>{setSamePuppy(false);},[account?.user.id,existing?.id]);
   useEffect(()=>()=>cloud.controller?.cancelExport(),[cloud.controller]);
@@ -51,20 +50,19 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
           <Text selectable style={[styles.body,{color:theme.text}]}>{account.user.email}</Text>
           {!enrolled?(<View style={cardStyle}>
             <Text style={[styles.body,bodyStyle]}>{t('account.enrollBody')}</Text>
-            {!account.cloud.canSync?<Text style={[styles.body,bodyStyle]}>{t('account.trialBody',{days})}</Text>:null}
+            {!account.cloud.canSync?<Text style={[styles.body,bodyStyle]}>{t('account.pausedBody')}</Text>:null}
             {existing?(<View style={styles.stack}>
               <Text style={[styles.label,{color:theme.primary}]}>{t('account.cloudPuppy')}</Text><Text maxFontSizeMultiplier={2} style={[styles.puppy,{color:theme.text}]}>{existing.name}</Text><Text style={[styles.body,bodyStyle]}>{countLabel(existing.eventCount)}</Text>
               <Text style={[styles.body,bodyStyle]}>{t('account.combineBody')}</Text>
               <View style={styles.confirm}><Switch testID="account.samePuppy" accessibilityLabel={t('account.samePuppy')} value={samePuppy} onValueChange={setSamePuppy} disabled={busy} trackColor={{true:theme.primary,false:theme.border}}/><Text style={[styles.body,styles.grow,{color:theme.text}]}>{t('account.samePuppy')}</Text></View>
             </View>):null}
-            <AccountButton theme={theme} testID="account.enable" label={existing?t('account.combine'):account.cloud.canSync?t('account.enable'):t('account.startTrial',{days})} primary disabled={busy||!state!.online||!!existing&&!samePuppy} loading={busy} onPress={()=>{void cloud.controller!.enableCloud({...(existing?{confirmedPetId:existing.id}:{})});}}/>
+            <AccountButton theme={theme} testID="account.enable" label={t(existing?'account.combine':'account.enable')} primary disabled={busy||!state!.online||!account.cloud.canSync||!!existing&&!samePuppy} loading={busy} onPress={()=>{void cloud.controller!.enableCloud({...(existing?{confirmedPetId:existing.id}:{})});}}/>
           </View>):(<View style={cardStyle}>
             {state!.lastSyncedAt!==null?<Text testID="account.lastSynced" style={[styles.body,bodyStyle]}>{t('account.lastSynced',{date:new Intl.DateTimeFormat(locale,{dateStyle:'medium',timeStyle:'short'}).format(state!.lastSyncedAt)})}</Text>:null}
             {state!.sync!.pending?<Text style={[styles.body,{color:theme.text}]}>{t('account.pending',{count:state!.sync!.pending})}</Text>:null}
             {state!.sync!.blocked?<><Text style={[styles.body,bodyStyle]}>{t('account.blocked',{count:state!.sync!.blocked})}</Text><AccountButton theme={theme} testID="account.viewLogs" label={t('account.viewLogs')} onPress={onOpenActivity}/></>:null}
-            {status==='expired'||status==='offline'||status==='paused'?<Text style={[styles.body,bodyStyle]}>{t('account.pausedBody')}</Text>:null}
-            {account.cloud.expiresAt?<Text style={[styles.body,bodyStyle]}>{t('account.expires',{date:new Intl.DateTimeFormat(locale,{dateStyle:'medium'}).format(account.cloud.expiresAt)})}</Text>:null}
-            <AccountButton theme={theme} testID="account.retry" label={t(status==='expired'?'account.refresh':'account.retry')} disabled={busy||state!.running||!state!.online} onPress={()=>{void cloud.controller!.retry();}}/>
+            {status==='offline'||status==='paused'?<Text style={[styles.body,bodyStyle]}>{t('account.pausedBody')}</Text>:null}
+            <AccountButton theme={theme} testID="account.retry" label={t('account.retry')} disabled={busy||state!.running||!state!.online} onPress={()=>{void cloud.controller!.retry();}}/>
           </View>)}
           {state?.config&&(state.config.providers.apple||state.config.providers.google)?<View style={cardStyle}>
             {state.linkedProviders===null?<AccountButton theme={theme} testID="account.methods.refresh" label={t(busy?'account.methodsLoading':'account.refreshMethods')} disabled={busy||!state.online} loading={busy} onPress={()=>{void cloud.controller!.refresh();}}/>:(['apple','google'] as const).filter(provider=>state.config!.providers[provider]).map(provider=>state.linkedProviders!.includes(provider)?<View key={provider} testID={`account.${provider}.connected`} style={styles.summaryHeader}>

@@ -27,7 +27,7 @@ export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPerm
  const enrolled=!!state?.sync?.accountId&&state.sync.state!=='local';
  const active=state?.sync?.state==='active'&&state.sync.accountId===account?.user.id&&!!account?.cloud.canSync;
  const shownName=progress.puppyName==='My puppy'?t('account.defaultName'):progress.puppyName;
- const cloudError=accountProblemKey(state?.problem??null),days=state?.config?.trialDays??14;
+ const cloudError=accountProblemKey(state?.problem??null);
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
  useEffect(()=>{
   const show=Keyboard.addListener('keyboardWillShow',()=>setKeyboardVisible(true)),hide=Keyboard.addListener('keyboardWillHide',()=>setKeyboardVisible(false));
@@ -140,7 +140,7 @@ export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPerm
       <Text style={bodyStyle}>{t(existing.eventCount===1?'account.logsOne':'account.logsMany',{count:new Intl.NumberFormat(locale).format(existing.eventCount)})}</Text>
       {!enrolled?<Text style={bodyStyle}>{t(pristine?'setup.restoreBody':'account.combineBody')}</Text>:null}
      </View>:null}
-     {!account.cloud.canSync?<Text style={bodyStyle}>{t(account.cloud.source==='none'?'account.trialBody':'account.pausedBody',{days})}</Text>:null}
+     {!account.cloud.canSync?<Text style={bodyStyle}>{t('account.pausedBody')}</Text>:null}
      {active?<>
       <Text testID="setup.cloud.active" style={[styles.label,{color:theme.primary}]}>{t('setup.cloudReady')}</Text>
       {button('setup.cloud.next',t('onboarding.continue'),()=>{void act(()=>checkpoint('walkthrough'));},true)}
@@ -148,7 +148,7 @@ export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPerm
       {state?.running?<View style={styles.loading}><ActivityIndicator color={theme.primary}/><Text style={bodyStyle}>{t('setup.cloudLoading')}</Text></View>:null}
       {button('setup.cloud.retry',t('account.retry'),()=>{void cloud.controller?.retry();},false,working||!!state?.running||!state?.online)}
      </>:<>
-      {button('setup.cloud.enable',existing?t(pristine?'setup.restore':'account.combine'):t(account.cloud.canSync?'account.enable':'account.startTrial',{days}),()=>{if(existing&&!pristine)combine();else void activate(existing?'restore':'combine');},true,working||!state?.online||!!existing&&pristine===null,working)}
+      {button('setup.cloud.enable',existing?t(pristine?'setup.restore':'account.combine'):t('account.enable'),()=>{if(existing&&!pristine)combine();else void activate(existing?'restore':'combine');},true,working||!state?.online||!account.cloud.canSync||!!existing&&pristine===null,working)}
      </>}
     </>}
     <View style={styles.space}/>

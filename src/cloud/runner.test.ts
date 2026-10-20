@@ -15,7 +15,7 @@ import { cloudRecordSchema } from './protocol.ts';
 import * as runner from './runner.ts';
 const event={id:'event-1',type:'pee' as const,at:100,source:'app' as const};
 const enrollment={operationId:'enroll-1',deviceId:'device-1',localPetId:'local-pet',name:'My puppy'};
-const account:CloudAccountSummary={user:{id:'account-1',email:'person@example.com',name:'Person'},cloud:{canSync:true,canExport:true,source:'trial',expiresAt:8640000000000000},pets:[]};
+const account:CloudAccountSummary={user:{id:'account-1',email:'person@example.com',name:'Person'},cloud:{canSync:true,canExport:true},pets:[]};
 async function fixture(t:TestContext,{pristine=false}={}) {
  const directory=await mkdtemp(join(tmpdir(),'puptime-runner-')),path=join(directory,'data.db');
  const database=await createLocalDatabase(sqliteTestConnection(path));t.after(async()=>{await database.close();await rm(directory,{force:true,recursive:true});});
@@ -85,19 +85,19 @@ test('first-launch restore asks for confirmation when local work arrives during 
  assert.equal((await sync.status('local-pet')).state,'preparing');assert.deepEqual(await storage.loadEvents(),[event]);
 });
 
-test('first-launch expired access leaves a prepared restore untouched and never reports it restored',async t=>{
+test('first-launch denied access leaves a prepared restore untouched and never reports it restored',async t=>{
  const {sync,storage}=await fixture(t,{pristine:true});
  await storage.saveFirstLaunchProfile('Local draft');
  await sync.prepareAssociation({accountId:'account-1',deviceId:'device-1',localPetId:'local-pet',enrollment:{...enrollment,name:'Basil',confirmedPetId:'cloud-pet'},mode:'restore'});
  const before=await sync.enrollmentState(),calls:string[]=[];
- const api:Pick<CloudApi,'account'|'enroll'|'push'|'pull'>={account:async()=>({...account,cloud:{canSync:false,canExport:true,source:'trial',expiresAt:1}}),enroll:async()=>{calls.push('enroll');throw new Error('Expired.');},pull:async()=>{calls.push('pull');throw new Error('Expired.');},push:async()=>{calls.push('push');throw new Error('Expired.');}};
+ const api:Pick<CloudApi,'account'|'enroll'|'push'|'pull'>={account:async()=>({...account,cloud:{canSync:false,canExport:true}}),enroll:async()=>{calls.push('enroll');throw new Error('Forbidden.');},pull:async()=>{calls.push('pull');throw new Error('Forbidden.');},push:async()=>{calls.push('push');throw new Error('Forbidden.');}};
  const result=await make(sync,api).run(signal());
- assert.equal(result.state,'expired');assert.equal(result.retryAfterMs,null);assert.deepEqual(calls,[]);
+ assert.equal(result.state,'error');assert.equal(result.problem,'forbidden');assert.equal(result.retryAfterMs,null);assert.deepEqual(calls,[]);
  assert.deepEqual(await sync.enrollmentState(),before);assert.equal(await storage.loadPuppyName(),'Local draft');
  assert.equal((await storage.loadSchedule()).length,12);assert.equal((await sync.status('local-pet')).state,'preparing');
 });
 
-test('free and signed-in unenrolled profiles never send cloud or trial requests',async t=>{
+test('free and signed-in unenrolled profiles never dispatch cloud requests',async t=>{
  const {sync}=await fixture(t),remote=server();
  assert.equal((await make(sync,remote.api,()=>null).run(signal())).state,'idle');
  assert.equal((await make(sync,remote.api).run(signal())).state,'idle');assert.deepEqual(remote.calls,[]);
@@ -145,8 +145,8 @@ test('interrupted full baseline resumes without replacing local history or ackno
  assert.equal((await make(sync,api).run(signal())).state,'synced');assert.equal(await sync.resyncState(),null);assert.equal((await sync.status('local-pet')).pending,0);
 });
 
-test('authentication and entitlement errors pause uploads while transient errors back off without blocking local edits',async t=>{
- for(const [category,status,state] of [['auth-required',401,'auth-required'],['expired',402,'expired'],['account-deleted',410,'error'],['rate-limited',429,'retry'],['server-error',503,'retry'],['invalid-response',0,'error']] as const){
+test('authentication and access errors pause uploads while transient errors back off without blocking local edits',async t=>{
+ for(const [category,status,state] of [['auth-required',401,'auth-required'],['forbidden',403,'error'],['account-deleted',410,'error'],['rate-limited',429,'retry'],['server-error',503,'retry'],['invalid-response',0,'error']] as const){
   const {sync,storage}=await fixture(t);await active(sync);const remote=server();
   const api={...remote.api,account:async()=>{throw new CloudApiError(category,status,status===429?60000:null);}};
   const run=make(sync,api),result=await run.run(signal());assert.equal(result.state,state);if(status===429)assert.equal(result.retryAfterMs,60000);
@@ -172,10 +172,13 @@ test('large backlogs continue in bounded runs and retry_later never spins or rep
  assert.equal((await make(sync,api).run(signal())).state,'retry');assert.equal(pushes,1);assert.equal((await sync.status('local-pet')).pending,1);
 });
 
-test('server access remains authoritative when the device clock is ahead of its reported expiry',async t=>{
- const {sync}=await fixture(t),remote=server();await active(sync);
- const api={...remote.api,account:async()=>({...account,cloud:{...account.cloud,expiresAt:1}})};
- assert.equal((await make(sync,api).run(signal())).state,'synced');
+test('every run rechecks server access and denied work resumes only after access returns',async t=>{
+ const {sync,storage}=await fixture(t),remote=server();await active(sync);let canSync=true;
+ const api={...remote.api,account:async()=>({...account,cloud:{canSync,canExport:true}})},run=make(sync,api);
+ assert.equal((await run.run(signal())).state,'synced');await storage.appendEvents([event]);canSync=false;
+ const calls=remote.calls.length,denied=await run.run(signal());assert.equal(denied.state,'error');assert.equal(denied.problem,'forbidden');assert.equal(denied.retryAfterMs,null);
+ assert.equal(remote.calls.length,calls);assert.equal((await sync.status('local-pet')).pending,1);assert.deepEqual(await storage.loadEvents(),[event]);
+ canSync=true;assert.equal((await run.run(signal())).state,'synced');assert.equal((await sync.status('local-pet')).pending,0);assert.equal([...remote.records.values()].filter(record=>record.kind==='event').length,1);
 });
 test('the actual installed native AbortController can enroll, sync and fence a cancelled run',async t=>{
  const {AbortController:NativeController}=await import('abort-controller');const {sync,storage}=await fixture(t),remote=server();await storage.appendEvents([event]);await prepare(sync);

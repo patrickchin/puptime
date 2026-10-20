@@ -8,7 +8,6 @@ declare global {
       AUTH_BASE_URL?: string;
       WEB_ORIGINS?: string;
       AUTH_SECRET?: string;
-      CLOUD_TRIAL_DAYS?: string;
       ACCOUNT_JURISDICTION?: 'eu';
       RESEND_API_KEY?: string;
       EMAIL_FROM?: string;

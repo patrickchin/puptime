@@ -10,8 +10,8 @@ import * as controllers from '../src/cloud/account-controller';
 
 beforeAll(()=>applyD1Migrations(env.AUTH_DB,inject('migrations')));
 
-test('installed auth SDK and cloud API carry explicit OTP, trial, enrollment and bounded sync through the actual Worker',async()=>{
- const settings={...env,ENVIRONMENT:'local' as const,AUTH_BASE_URL:'https://puptime.test',WEB_ORIGINS:'https://puptime.test',AUTH_SECRET:'local-test-secret-with-at-least-32-characters',CLOUD_TRIAL_DAYS:'21'};
+test('installed auth SDK signs in without billing and only explicit enrollment enables bounded sync',async()=>{
+ const settings={...env,ENVIRONMENT:'local' as const,AUTH_BASE_URL:'https://puptime.test',WEB_ORIGINS:'https://puptime.test',AUTH_SECRET:'local-test-secret-with-at-least-32-characters'};
  const paths:string[]=[];let cookie='';
  // Test-only browser cookie transport. Native uses the official Expo plugin and
  // SecureStore; this test makes no claim about that native runtime boundary.
@@ -28,16 +28,15 @@ test('installed auth SDK and cloud API carry explicit OTP, trial, enrollment and
  expect(typeof controllers.createIdentityAdapter).toBe('function');
  const identity=controllers.createIdentityAdapter({emailOtp:auth.emailOtp,signIn:auth.signIn,linkSocial:auth.linkSocial,listAccounts:auth.listAccounts,signOut:auth.signOut,getCookie:async()=>cookie});
  const api=createCloudApi(createSdkRequest((url,options)=>auth.$fetch<unknown>(url,options),'https://puptime.test'));
- expect((await api.config()).providers.email).toBe(true);expect((await api.config()).trialDays).toBe(21);
+ expect(await api.config()).toEqual({protocolVersion:1,providers:{apple:false,google:false,email:true}});
  const email=`sdk-${crypto.randomUUID()}@example.com`;
  expect((await identity.requestEmail(email)).error).toBeNull();
  const preview=await env.AUTH_DB.prepare('SELECT code FROM local_email_previews WHERE email=?').bind(email).first<{code:string}>();
  expect((await identity.verifyEmail(email,preview!.code)).error).toBeNull();
  expect(await identity.hasCredentials()).toBe(true);
- const signedIn=await api.account();expect(signedIn.cloud.canSync).toBe(false);expect(signedIn.pets).toEqual([]);
+ const signedIn=await api.account();expect(signedIn.cloud).toEqual({canSync:true,canExport:true});expect(signedIn.pets).toEqual([]);
  expect(paths).not.toContain('/api/cloud/trial');expect(paths).not.toContain('/api/cloud/enroll');expect(paths).not.toContain('/api/sync/push');
- expect((await api.startTrial()).cloud.canSync).toBe(true);
- const duration=await env.AUTH_DB.prepare('SELECT trial_ends_at-trial_started_at duration FROM cloud_accounts WHERE account_id=?').bind(signedIn.user.id).first<{duration:number}>();expect(duration!.duration).toBe(21*86400000);
+ expect(await env.AUTH_DB.prepare('SELECT account_id FROM cloud_accounts WHERE account_id=?').bind(signedIn.user.id).first()).toBeNull();
  const enrollment={operationId:'enroll-sdk',deviceId:'device-sdk',localPetId:'pet-sdk',name:'SDK puppy'};
  expect(await api.enroll(enrollment)).toEqual({petId:'pet-sdk'});
  const mutation={protocolVersion:1 as const,operationId:'operation-sdk',deviceId:'device-sdk',recordId:cloudRecordId('event','pet-sdk','活动-'.repeat(80)),petId:'pet-sdk',kind:'event' as const,baseRevision:0,intent:'create' as const,patch:{type:'pee' as const,at:100,source:'app' as const}};

@@ -5,7 +5,7 @@ import type { createLocalRuntime } from '../local/runtime-factory.ts';
 
 type Runtime=Awaited<ReturnType<typeof createLocalRuntime>>;
 type SyncStatus=Awaited<ReturnType<Runtime['sync']['status']>>;
-export type AccountProblem=CloudErrorCategory|'local-storage'|'confirmation-required'|'pending-confirmation-required'|'account-mismatch'|'trial-unavailable'|'provider-unavailable'|'invalid-email'|'invalid-code'|'code-expired'|'too-many-attempts'|'sign-in-failed'|'social-incomplete'|'link-incomplete'|'sign-out-failed'|'remote-sign-out-unconfirmed'|'export-failed';
+export type AccountProblem=CloudErrorCategory|'local-storage'|'confirmation-required'|'pending-confirmation-required'|'account-mismatch'|'provider-unavailable'|'invalid-email'|'invalid-code'|'code-expired'|'too-many-attempts'|'sign-in-failed'|'social-incomplete'|'link-incomplete'|'sign-out-failed'|'remote-sign-out-unconfirmed'|'export-failed';
 export type AccountActionResult='ok'|'error'|'cancelled'|'confirmation-required'|'pending-confirmation-required';
 export type SocialProvider='apple'|'google';
 export type CloudExportAction=(expectedAccount:string,ready:()=>Promise<boolean>,signal?:AbortSignal)=>Promise<'shared'|'cancelled'>;
@@ -77,7 +77,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
         confirmEnrollment=result.problem==='confirmation-required';
         if(confirmEnrollment){associationConfirmationNeeded=true;cancelTimer();}
         emit({run:result,problem:result.problem,...(result.state==='synced'?{lastSyncedAt:Date.now()}:{}),...(result.state==='auth-required'?{account:null,linkedProviders:null}:{})});
-        if(['auth-required','expired','error'].includes(result.state))suspended=true;
+        if(['auth-required','error'].includes(result.state))suspended=true;
         nextDelay=result.retryAfterMs;
       }catch{if(!controller.signal.aborted&&!disposed)fail('local-storage');}
       finally{
@@ -214,12 +214,12 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
       currentSession();
       const {head}=await runtime.history.eventPage(eventId,{limit:1});currentSession();
       if(head.owner?.accountId!==accountId||!head.cloudRecord)throw new CloudApiError('forbidden',403);
-      if(!snapshot.account!.cloud.canSync)throw new CloudApiError('expired',402);
+      if(!snapshot.account!.cloud.canSync)throw new CloudApiError('forbidden',403);
       const result=await api.history(head.cloudRecord.id,beforeRevision,signal);currentSession();
       const {head:latest}=await runtime.history.eventPage(eventId,{limit:1});currentSession();
       if(latest.owner?.generation!==head.owner.generation||latest.owner?.accountId!==accountId
         ||latest.cloudRecord?.id!==head.cloudRecord.id||latest.cloudRecord?.petId!==head.cloudRecord.petId)throw new CloudApiError('conflict');
-      if(!snapshot.account!.cloud.canSync)throw new CloudApiError('expired',402);
+      if(!snapshot.account!.cloud.canSync)throw new CloudApiError('forbidden',403);
       return result;
     },
     cancelExport(){exportAborter?.abort();},
@@ -321,7 +321,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
       const existing=account.pets[0];
       if((existing&&confirmedPetId!==existing.id)||(!existing&&confirmedPetId)) {emit({problem:'confirmation-required'});return 'confirmation-required';}
       if(associationMode==='restore'&&(!existing||!await runtime.sync.canRestoreSetup(runtime.petId))){emit({problem:'confirmation-required'});return 'confirmation-required';}
-      if(!account.cloud.canSync){const trial=await api.startTrial();emit({account:{...account,cloud:trial.cloud}});if(!trial.cloud.canSync)return fail('trial-unavailable');}
+      if(!account.cloud.canSync)return fail('forbidden');
       if(disposed)return 'error';
       const operationId=await runtime.database.read(async sql=>(await sql.getFirstAsync<{id:string}>('SELECT lower(hex(randomblob(16))) id'))!.id);
       await runtime.sync.prepareAssociation({accountId:account.user.id,localPetId:runtime.petId,deviceId:runtime.deviceId,mode:associationMode,enrollment:{operationId,deviceId:runtime.deviceId,localPetId:runtime.petId,name:associationMode==='restore'?existing!.name:snapshot.local!.name,...(confirmedPetId?{confirmedPetId}:{})}});

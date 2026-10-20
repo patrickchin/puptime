@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { z } from 'zod';
 import { cloudRecordSchema,eventDataSchema,routineDataSchema,enrollmentSchema, mutationSchema, recordIdSchema, type Enrollment, type CloudRecord, type Mutation, type MutationResult, type PullPage, type Revision } from '../src/cloud/protocol';
-import {cloudAccess,getCloudAccount} from './entitlements';
+import {cloudAccess,getCloudAccount} from './cloud-access';
 import {eventSqlDefinition,routineSqlDefinition,eventSqlColumns,routineSqlColumns,eventSqlValues,routineSqlValues,eventDataFromSql,routineDataFromSql,type EventSqlRow,type RoutineSqlRow} from '../src/record-sql';
 import { reconcileMutation, ReconciliationError } from '../src/cloud/reconcile';
 
@@ -65,10 +65,11 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
     this.#assertActive();
     // Recheck the SDK-managed session row, without persisting a cookie/token in
     // hibernation attachments or introducing a second credential mechanism.
-    const session=await this.env.AUTH_DB.prepare('SELECT id FROM session WHERE id=? AND userId=? AND expiresAt>?').bind(sessionId,accountId,Date.now()).first();
+    const session=await this.env.AUTH_DB.prepare('SELECT expiresAt FROM session WHERE id=? AND userId=?').bind(sessionId,accountId).first<{expiresAt:string|number}>();
+    const expiresAt=typeof session?.expiresAt==='number'?session.expiresAt:new Date(session?.expiresAt??'').getTime();
     const account=await getCloudAccount(this.env.AUTH_DB,accountId);
     this.#assertActive();
-    return !!session&&cloudAccess(account,Date.now()).canSync;
+    return Number.isFinite(expiresAt)&&expiresAt>Date.now()&&cloudAccess(account).canSync;
   }
   async #notify(cursor:number):Promise<void> {
     await Promise.all(this.ctx.getWebSockets().map(async socket=>{
