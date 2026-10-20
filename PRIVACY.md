@@ -26,6 +26,12 @@ Use **Analytics settings** in the website footer or guide header to withdraw con
 
 Website analytics do not receive your puppy activity history from the native app.
 
+## API diagnostics
+
+The API implementation supports limited operational error reporting through Sentry. It is disabled when no valid reporting endpoint is configured. Sentry reporting has not yet been enabled on the deployed service.
+
+When enabled, reports contain a random error identifier, time, API environment/release, a generic error category and locations in Puptime's source code. They exclude names, email addresses, account or pet identifiers, puppy records, notes, codes, tokens, authentication cookies, request URLs/bodies, SQL queries/values and raw error messages. Attachments, session recordings and performance traces are excluded. This server diagnostic feature does not enable analytics or crash reporting in the native app. See [Sentry's privacy policy](https://sentry.io/privacy/).
+
 ## Speech recognition
 
 If you choose to dictate a note, Puptime asks for the relevant microphone and speech-recognition permissions. It uses Apple's speech-recognition service on iOS and your device's configured speech-recognition service on Android, which may be provided by Google or another provider.
