@@ -4,6 +4,21 @@
       "title": "First open: Mochi, first log and timed reminder",
       "description": "Actual full setup, optional account-free choice, practice, first real log, drawer and first timed reminder. Frozen product ad54af8 with the public Pages API configured; qualified Debug shell reused, not a fresh native build.",
       "primary": "360-ios-current-first-open"
+    },
+    {
+      "title": "Email: explicit upload and cold restart",
+      "description": "Real email authentication completed privately, followed by explicit enable/upload of the retained local log and an authenticated cold restart. Exact ad54 shared core source in a reused qualified Debug shell, through a local HTTP proxy/API; no fresh Release-build claim.",
+      "primary": "361-ios-current-email-upload-restart"
+    },
+    {
+      "title": "Restore: fresh device and incoming peer edit",
+      "description": "Explicitly restore the confirmed cloud puppy on a fresh empty device, then receive a peer edit. Exact ad54 shared core source in a reused qualified Debug shell against the local HTTP API; private code entry omitted.",
+      "primary": "364-ios-current-restore-incoming"
+    },
+    {
+      "title": "History: preview, Cancel and one restore",
+      "description": "A prepared synthetic fixture with 1,001 local logs: save the editor draft, preview an older version, Cancel and confirm exactly one restore. Exact ad54 shared core source in a reused qualified Debug shell; account-free local history.",
+      "primary": "366-ios-current-history-restore"
     }
   ],
   "review_notes": {
@@ -40,7 +55,11 @@
     "285-confirmation-scroll-context-red": "Expected RED on the previous signed build: the maximum-text confirmation retained the detail scroll offset and hid its explanation. The translated explanation-visible assertion failed before any restoration; the database and original preferences were preserved.",
     "285-confirmation-scroll-context-green": "The final signed build resets only the local history pane when opening confirmation. The explanation-visible regression, full maximum-text journeys and all-table read-only checks run in English, Spanish and Chinese.",
     "195-clean-first-open-and-timed-reminder": "This earlier reminder journey uses a cloud-disabled build. The companion email-request recording and cloud restore recordings use the deployed Pages API.",
-    "360-ios-current-first-open": "Recorded rerun with synthetic Mochi data: one real log and one timed reminder; no account owner or queued upload. Only clearState was omitted after fresh-data proof to preserve the separate Metro binding. Sign-in and sync are separate pending journeys; full provenance and retained diagnostic limitations are in Details."
+    "360-ios-current-first-open": "Recorded rerun with synthetic Mochi data: one real log and one timed reminder; no account owner or queued upload. Only clearState was omitted after fresh-data proof to preserve the separate Metro binding. This local-choice clip does not establish sign-in or cloud sync; the qualified email and restore journeys are separate; full provenance and retained diagnostic limitations are in Details.",
+    "361-ios-current-email-upload-restart": "The first explicit enable uses the retained 360 Mochi fixture after private email verification. The SQL retained-data comparison excludes OS scheduled-notification request state. A later separate UI/Expo timer readback is not part of this clip’s SQL equality claim. Corrected Details preserve that boundary.",
+    "364-ios-current-restore-incoming": "Recorded on a fresh empty synthetic device. The confirmed puppy restore and incoming edit use fully paged peer revision state and complete cloud-mirror checks. This is local HTTP/proxy qualification, not a deployed-service or fresh native-build claim.",
+    "366-ios-current-history-restore": "The 1,001-log prepared fixture contains 1,000 unrelated events. Cancel preserves every SQL table; one confirmed restore preserves identity, provenance and unrelated tables. Fixture IDs were minted by the Node product runtime; this capture does not establish Hermes ID generation.",
+    "363-ios-current-google-restart": "Historical browser-SDK Google restart capture. It remains archived while iOS provider integration moves to native Apple/Google SDKs; it does not qualify the pending native-provider journey."
   },
   "evidence_links": [
     [
@@ -195,10 +214,7 @@
     }
   ],
   "pending_journeys": [
-    "Email sign-in, explicit upload and cold restart",
-    "Apple and Google post-auth restart companions",
-    "Fresh-device restore and incoming peer edit",
-    "Local HTTP outage, offline save, process restart and reconnect",
-    "Populated history, Cancel and one confirmed restore"
+    "Native Apple and Google SDK post-auth restarts — fresh-build qualification pending",
+    "Offline save, process restart and reconnect — bug fix and qualification pending"
   ]
 }
