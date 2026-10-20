@@ -1,6 +1,6 @@
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {ActivityIndicator,FlatList,Pressable,ScrollView,StyleSheet,Text,View} from 'react-native';
+import {ActivityIndicator,FlatList,Pressable,ScrollView,StyleSheet,Text,View,useWindowDimensions} from 'react-native';
 import {CloudApiError} from '../cloud/api';
 import {eventDataSchema,type Revision} from '../cloud/protocol';
 import {useAccountSnapshot} from '../cloud/use-account-snapshot';
@@ -20,6 +20,7 @@ export type EventHistoryPanelProps={data:EventHistoryData;eventId:string;cloud?:
 
 export function EventHistoryPanel({data,eventId,cloud,theme,onBack,onRestored,refreshToken,onBusyChange}:EventHistoryPanelProps) {
  const {t,locale}=useLocalization(),account=useAccountSnapshot(cloud?.controller??null);
+ const {fontScale}=useWindowDimensions();
  const [page,setPage]=useState<EventHistoryPage|null>(null),[loading,setLoading]=useState(true),[readError,setReadError]=useState(false);
  const [selected,setSelected]=useState<Version|null>(null),[confirm,setConfirm]=useState(false),[restored,setRestored]=useState<PuppyEvent|null>(null),[changed,setChanged]=useState(false);
  const [saving,setSaving]=useState(false),[restoreError,setRestoreError]=useState<MessageKey|null>(null);
@@ -138,7 +139,8 @@ export function EventHistoryPanel({data,eventId,cloud,theme,onBack,onRestored,re
   const revision=item.revision,event=revision.after.kind==='event'?{id:eventId,...eventDataSchema.parse(revision.after.data)}:null;
   return <HistoryVersionRow theme={theme} event={event} testID={`history.cloud.${revision.revision}`} title={date(revision.acceptedAt)} detail={`${t('history.cloudVersion',{revision:revision.revision})} · ${t(`history.reason.${revision.reason}`)}`} deleted={revision.after.deleted} onPress={()=>openCloud(revision)}/>;
  };
- return <View testID="history.panel" style={[styles.root,{backgroundColor:theme.background}]}>
+ // Recreate stale native text layout after a live font-size change; keep panel state.
+ return <View key={fontScale} testID="history.panel" style={[styles.root,{backgroundColor:theme.background}]}>
   <View style={styles.header}>
    <Pressable testID="history.back" accessibilityRole="button" accessibilityLabel={t('onboarding.back')} accessibilityState={{disabled:saving}} disabled={saving} onPress={back} style={({pressed})=>[styles.back,{backgroundColor:pressed?theme.primarySoft:theme.surfaceRaised,borderRadius:theme.presentation.controlRadius}]}><MaterialCommunityIcons name="arrow-left" size={24} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/></Pressable>
    <Text accessibilityRole="header" maxFontSizeMultiplier={1.5} style={[styles.title,text,{fontFamily:theme.presentation.headingFont}]}>{t(confirm?'history.confirmTitle':'history.title')}</Text>
