@@ -77,19 +77,72 @@ technical test output as text. Never record credentials or verification codes.
 Historical verification ledgers describe earlier code and environments. Their
 trial, migration-preservation and release gates do not define this milestone.
 
-Current local access-slice checks: 373 app tests, 95 actual Workers tests, nine
-web tests, default/iOS/server types and the static website build pass. The real
-HTTP matrix passes on a freshly initialized development database with two
-persistent SQLite clients and 1,000 initial logs: interrupted upload/restore,
-disk reopen, duplicate receipts, concurrent edits, owner isolation, ISO session
-expiry, retained pending work and convergence to 1,002 logs. Its sessions are
-administrative fixtures; this is not native SDK or social-provider acceptance.
-The new baseline has not yet been reset/deployed on staging.
+The core shared-native/explicit-SQL change merged in PR #119. It passes 374 app
+checks, 97 Workers checks, nine web checks, default/iOS/Android-static/server
+types, and a fresh iOS Release build with all 13 standard Maestro flows. The
+real local HTTP matrix covers two persistent SQLite clients and 1,000 initial
+logs: interrupted upload/restore, disk reopen, duplicate receipts, concurrent
+edits, owner isolation, ISO session expiry, retained pending work and convergence
+to 1,002 logs. Those sessions are administrative fixtures.
 
-The combined shared-native/explicit-SQL branch passes 374 app checks and 97
-Workers checks, with default, iOS, Android-static and server types. The focused
+Separate local iOS SDK checks verify signup without upload, explicit enrollment
+preserving the original event, cold restart, offline create/edit/delete through
+process death, automatic queue drain, duplicate replay and incoming remote edits.
+Fresh first-open setup covers profile, signup, cloud enable, the full walkthrough,
+reminder deferral and the first cloud log. These checks use an existing Debug
+shell and frozen ordinary Metro source; driver-selector failures and observed
+coordinate continuations are retained separately. They do not prove a new
+provider login on the deployed service or Android behavior. The focused
 browser command `node scripts/verify-web-accounts.mjs --core-accounts` passes
 seven reported checks using real local UI email-code authentication and a
 populated cloud store. It verifies reload, sign-out, ISO session expiry and
 same-owner recovery without automatic puppy upload. It captures screenshots
-and no videos. Native qualification and deployed acceptance remain separate.
+and no videos.
+
+## Deployed development checkpoint — October 20, 2026
+
+The dedicated staging D1 database was explicitly reset and the consolidated
+`0001-auth.sql` applied. Its ledger now contains only that baseline;
+`cloud_accounts` contains only the owner key and deletion-cleanup state. This
+reset concerns authentication data, not a claim that every old Durable Object
+was removed.
+
+Merged source `d1ff65b` serves Pages deployment
+`5af75424-2dc9-4b7f-999e-dc5251a02f70`. The matching API Worker version is
+`c4a3f771-97d5-4b93-8fad-687cd8da07ed`. Main and immutable homepage/account HTML
+match, account responses retain no-store/noindex headers, and both Pages API
+bindings return the new configuration. Apple, Google and email are configured;
+configuration flags alone are not completed provider-sign-in evidence.
+
+The deployed API qualifier passes ownership, immediate development access,
+explicit association, duplicate retry, partial batches, automatic merge,
+session-row expiry, administrative renewal, private export and cleanup checks.
+It uses synthetic signed sessions and sends no provider email.
+
+The direct-Worker persistent-client run passed 1,000-log upload, lost replies,
+restart and owner-isolated WebSockets. Its interrupted-restore data assertions
+also passed, before a later verification snapshot read failed with a network
+error. That failed run is retained; it is not a full-matrix pass. Qualification
+through the app's actual Pages API origin passes the full matrix over normal
+DNS and HTTPS/WSS: interrupted 1,000-log upload and restore, disk restart,
+concurrent merges, pending-work resync, detachment/reassociation, expiry and
+renewal, and retirement of both change channels. Final cleanup confirms zero
+fixture users, sessions and cloud accounts, with only the fresh migration
+baseline remaining. These are administrative-session checks, not SDK or provider
+sign-in evidence.
+
+Run `node scripts/verify-cloud-clients.mjs staging` with staging Wrangler access
+and `PUPTIME_STAGING_AUTH_SECRET` supplied privately through the environment.
+The default origin is `https://puptime.pages.dev`, matching the app. The only
+optional origin is `https://puptime-api-staging.p-ch.workers.dev`, selected with
+`PUPTIME_STAGING_ORIGIN`. Invalid origins fail before credentials are read or
+fixtures are created. This host's ordinary DNS still cannot resolve the Worker
+hostname; its direct-Worker check used `node --require ./scripts/staging-dns.cjs
+scripts/verify-cloud-clients.mjs staging` without changing hostname or TLS
+verification. The scoped DNS helper is unnecessary for the default Pages origin.
+
+Transport failures report only a fixed route name, fetch/JSON phase, elapsed
+time, HTTP status and allowlisted error category/code. Credentials, response
+bodies and record identifiers are excluded. Request budgets, deliberate lost
+replies, semantic assertions and cleanup are unchanged; failures are not hidden
+by an added retry layer.
