@@ -40,6 +40,27 @@ test('identity adapter uses official explicit linking and normalizes only safe a
  assert.deepEqual(await identity.listAccounts(),{data:null,error:{status:502,code:'INVALID_RESPONSE'}});
 });
 
+test('native Apple credentials use official SDK sign-in and explicit linking; cancellation or credential failure never dispatches',async()=>{
+ const calls:unknown[]=[],sdk={emailOtp:{sendVerificationOtp:async()=>({error:null})},signIn:{emailOtp:async()=>({error:null}),social:async(input:unknown)=>{calls.push(['sign-in',input]);return {error:null};}},signOut:async()=>({error:null}),getCookie:async()=>'',linkSocial:async(input:unknown)=>{calls.push(['link',input]);return {error:null};},listAccounts:async()=>({data:[],error:null})};
+ const idToken={token:'native-signed-token',nonce:'raw-nonce'};
+ const identity=controllerModule.createIdentityAdapter(sdk,{appleIdToken:async()=>idToken});
+ await identity.signInSocial('apple');await identity.linkSocial('apple');await identity.signInSocial('google');
+ const input={provider:'apple',callbackURL:'puptime://account',errorCallbackURL:'puptime://account',idToken};
+ assert.deepEqual(calls,[['sign-in',input],['link',input],['sign-in',{provider:'google',callbackURL:'puptime://account',errorCallbackURL:'puptime://account'}]]);
+ const cancelled=controllerModule.createIdentityAdapter(sdk,{appleIdToken:async()=>null});
+ assert.deepEqual(await cancelled.signInSocial('apple'),{error:null,cancelled:true});assert.deepEqual(await cancelled.linkSocial('apple'),{error:null,cancelled:true});
+ const failed=controllerModule.createIdentityAdapter(sdk,{appleIdToken:async()=>{throw new Error('private native details');}});
+ assert.deepEqual(await failed.signInSocial('apple'),{error:{status:400,code:'NATIVE_AUTH_FAILED'}});assert.equal(calls.length,3);
+});
+
+test('cancelled native sign-in and linking keep every local table and account choice intact without an error',async t=>{
+ const {controller,runtime,state,identity,config}=await fixture(t);config.providers.apple=true;await runtime.storage.appendEvents([event]);await controller.refresh();
+ const before=await localTables(runtime);identity.signInSocial=async()=>({error:null,cancelled:true});
+ assert.equal(await controller.signInSocial('apple'),'cancelled');assert.equal(controller.read().problem,null);assert.equal(controller.read().busy,false);assert.equal(controller.read().account,null);assert.deepEqual(await localTables(runtime),before);
+ state.credentials=true;await controller.refresh();identity.linkSocial=async()=>({error:null,cancelled:true});
+ assert.equal(await controller.connectProvider('apple'),'cancelled');assert.equal(controller.read().problem,null);assert.equal(controller.read().linkingProvider,null);assert.equal(controller.read().account!.user.id,'account-1');assert.deepEqual(await localTables(runtime),before);assert.equal(state.enrollCalls,0);assert.equal(state.pushCalls,0);
+});
+
 test('refresh and retry load connected providers only for configured signed-in identities',async t=>{
  const {controller,state,config}=await fixture(t);config.providers.google=false;state.credentials=true;
  assert.equal(await controller.refresh(),'ok');assert.equal(state.listCalls,0);assert.deepEqual(controller.read().linkedProviders,[]);

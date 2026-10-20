@@ -1,6 +1,7 @@
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import {useEffect,useState} from 'react';
-import {ActivityIndicator,Keyboard,Pressable,StyleSheet,Text,TextInput,View} from 'react-native';
+import {ActivityIndicator,Keyboard,Platform,Pressable,StyleSheet,Text,TextInput,View} from 'react-native';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import type {CloudHandle} from '../cloud/use-cloud';
 import {useAccountSnapshot} from '../cloud/use-account-snapshot';
 import type {AccountProblem} from '../cloud/account-controller';
@@ -28,11 +29,13 @@ export function accountProblemKey(problem:AccountProblem|null):MessageKey|null {
 export function AccountSignIn({cloud,theme,showError=true,showIntro=true}:{cloud:CloudHandle;theme:Theme;showError?:boolean;showIntro?:boolean}) {
  const {t}=useLocalization(),state=useAccountSnapshot(cloud.controller);
  const [email,setEmail]=useState(''),[code,setCode]=useState(''),[editingEmail,setEditingEmail]=useState(false);
+ const [nativeAppleAvailable,setNativeAppleAvailable]=useState(false);
  const busy=state?.busy??false,account=state?.account;
  const configured=!!state?.config&&(state.config.providers.apple||state.config.providers.google||state.config.providers.email);
  const errorKey=accountProblemKey(state?.problem??null),bodyStyle={color:theme.textMuted};
  const inputStyle=[styles.input,{color:theme.text,backgroundColor:theme.surface,borderColor:theme.border,borderRadius:theme.presentation.controlRadius}];
  useEffect(()=>{if(state?.codeSentTo)setEmail(state.codeSentTo);if(account){setCode('');Keyboard.dismiss();}},[state?.codeSentTo,account?.user.id]);
+ useEffect(()=>{let mounted=true;if(Platform.OS==='ios')void AppleAuthentication.isAvailableAsync().then(available=>{if(mounted)setNativeAppleAvailable(available);}).catch(()=>{});return()=>{mounted=false;};},[]);
  if(account)return null;
  return <View style={styles.stack}>
   {showError&&errorKey?<Text testID="account.error" accessibilityRole="alert" style={[styles.body,{color:theme.danger}]}>{t(errorKey)}</Text>:null}
@@ -44,7 +47,13 @@ export function AccountSignIn({cloud,theme,showError=true,showIntro=true}:{cloud
    <AccountButton theme={theme} testID="account.refresh" label={t('account.refresh')} disabled={busy||!state?.online} onPress={()=>{void cloud.controller!.refresh();}}/>
   </>:<>
           {showIntro||!configured?<Text style={[styles.body,bodyStyle]}>{t(configured?'account.intro':'account.unavailable')}</Text>:null}
-          {state.config.providers.apple?<AccountButton theme={theme} testID="account.apple" label={t('account.apple')} icon="apple" disabled={busy||!state.online} onPress={()=>{void cloud.controller!.signInSocial('apple');}}/>:null}
+          {state.config.providers.apple?(Platform.OS==='ios'?(nativeAppleAvailable?<AppleAuthentication.AppleAuthenticationButton
+            testID="account.apple" buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+            buttonStyle={theme.isDark?AppleAuthentication.AppleAuthenticationButtonStyle.WHITE:AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+            cornerRadius={theme.presentation.controlRadius} accessibilityState={{disabled:busy||!state.online,busy}}
+            pointerEvents={busy||!state.online?'none':'auto'} style={{height:52,width:'100%',opacity:busy||!state.online?0.5:1}}
+            onPress={()=>{if(!busy&&state.online)void cloud.controller!.signInSocial('apple');}}/>:null)
+            :<AccountButton theme={theme} testID="account.apple" label={t('account.apple')} icon="apple" disabled={busy||!state.online} onPress={()=>{void cloud.controller!.signInSocial('apple');}}/>):null}
           {state.config.providers.google?<AccountButton theme={theme} testID="account.google" label={t('account.google')} icon="google" disabled={busy||!state.online} onPress={()=>{void cloud.controller!.signInSocial('google');}}/>:null}
           {state.config.providers.email?state.codeSentTo&&!editingEmail?(<View style={styles.stack}>
             <Text style={[styles.body,{color:theme.text}]}>{t('account.codeSent',{email:state.codeSentTo})}</Text>

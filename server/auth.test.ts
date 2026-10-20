@@ -77,7 +77,7 @@ test('browser OAuth uses the canonical origin, configured client and standard mi
   }
 });
 
-test('Apple verifies signed Services ID tokens without accepting a native bundle audience or invalid claims', async () => {
+test('Apple default verification accepts only the configured Service ID/native bundle and rejects invalid nonce, claims and signature', async () => {
   const auth = createAuth(socialSettings);
   const { privateKey, publicKey } = await generateKeyPair('RS256', { extractable: true });
   const jwk = { ...await exportJWK(publicKey), alg: 'RS256', kid: 'synthetic-apple-key', use: 'sig' };
@@ -90,17 +90,48 @@ test('Apple verifies signed Services ID tokens without accepting a native bundle
     nonce: 'synthetic-nonce', iss: 'https://appleid.apple.com', aud: socialSettings.APPLE_CLIENT_ID,
     iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 300, ...changes,
   }).setProtectedHeader({ alg: 'RS256', kid: jwk.kid }).sign(privateKey);
-  const valid = await auth.handler(request('sign-in/social', { provider: 'apple', idToken: { token: await sign(), nonce: 'synthetic-nonce' } }, undefined, socialClientIP()));
-  expect(valid.status).toBe(200);
-  expect((await auth.api.getSession({ headers: new Headers({ cookie: cookieHeader(valid) }) }))?.user.email).toBe('apple-token@example.invalid');
+  for (const aud of [socialSettings.APPLE_CLIENT_ID, 'com.patrickchin.puptime']) {
+    const nonce = aud === socialSettings.APPLE_CLIENT_ID ? 'synthetic-nonce' : Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('synthetic-nonce'))), value=>value.toString(16).padStart(2,'0')).join('');
+    const valid = await auth.handler(request('sign-in/social', { provider: 'apple', idToken: { token: await sign({ aud, nonce }), nonce: 'synthetic-nonce' } }, undefined, socialClientIP()));
+    expect(valid.status).toBe(200);
+    expect((await auth.api.getSession({ headers: new Headers({ cookie: cookieHeader(valid) }) }))?.user.email).toBe('apple-token@example.invalid');
+  }
   for (const claims of [
-    { aud: 'com.patrickchin.puptime' }, { iss: 'https://untrusted.example' },
-    { nonce: 'wrong-nonce' }, { exp: Math.floor(Date.now() / 1000) - 120 },
+    { aud: 'com.patrickchin.puptime.widget' }, { aud: 'another-service-id' }, { iss: 'https://untrusted.example' },
+    { nonce: 'wrong-nonce' }, { nonce: undefined }, { exp: Math.floor(Date.now() / 1000) - 120 },
   ]) {
     const invalid = await auth.handler(request('sign-in/social', { provider: 'apple', idToken: { token: await sign(claims), nonce: 'synthetic-nonce' } }, undefined, socialClientIP()));
     expect(invalid.status).toBe(401);
     expect(invalid.headers.get('set-cookie')).toBeNull();
   }
+  for (const nonce of [undefined, '', ' ']) {
+    const invalid = await auth.handler(request('sign-in/social', { provider: 'apple', idToken: { token: await sign(), nonce } }, undefined, socialClientIP()));
+    expect(invalid.status).toBe(400);expect(invalid.headers.get('set-cookie')).toBeNull();
+  }
+  const otherKey = (await generateKeyPair('RS256')).privateKey;
+  const wrongSignature = await new SignJWT({ sub: 'untrusted-subject', email: 'untrusted@example.invalid', nonce: 'synthetic-nonce' }).setIssuer('https://appleid.apple.com').setAudience('com.patrickchin.puptime').setIssuedAt().setExpirationTime('5m').setProtectedHeader({alg:'RS256',kid:jwk.kid}).sign(otherKey);
+  for (const token of ['not-a-jwt', wrongSignature]) {
+    const invalid = await auth.handler(request('sign-in/social', { provider: 'apple', idToken: { token, nonce: 'synthetic-nonce' } }, undefined, socialClientIP()));
+    expect(invalid.status).toBe(401);expect(invalid.headers.get('set-cookie')).toBeNull();
+  }
+});
+
+test('native Apple ID-token linking uses the authenticated owner without implicit linking or cloud enrollment',async()=>{
+ const auth=createAuth(socialSettings),email='native-apple-link@example.invalid';
+ await auth.handler(request('email-otp/send-verification-otp',{email,type:'sign-in'}));
+ const preview=await env.AUTH_DB.prepare('SELECT code FROM local_email_previews WHERE email=?').bind(email).first<{code:string}>();
+ const login=await auth.handler(request('sign-in/email-otp',{email,otp:preview!.code})),cookie=cookieHeader(login),owner=await auth.api.getSession({headers:new Headers({cookie})});
+ const {privateKey,publicKey}=await generateKeyPair('RS256',{extractable:true}),jwk={...await exportJWK(publicKey),alg:'RS256',kid:'native-link-key',use:'sig'};
+ vi.spyOn(globalThis,'fetch').mockImplementation(async input=>{expect(String(input)).toBe('https://appleid.apple.com/auth/keys');return Response.json({keys:[jwk]});});
+ const token=await new SignJWT({email,email_verified:true,nonce:'link-nonce'}).setSubject('native-link-subject').setIssuer('https://appleid.apple.com').setAudience('com.patrickchin.puptime').setIssuedAt().setExpirationTime('5m').setProtectedHeader({alg:'RS256',kid:jwk.kid}).sign(privateKey);
+ const linked=await auth.handler(request('link-social',{provider:'apple',idToken:{token,nonce:'link-nonce'},callbackURL:'puptime://account'},cookie,socialClientIP()));
+ expect(linked.status).toBe(200);
+ const row=await env.AUTH_DB.prepare("SELECT userId,accountId FROM account WHERE providerId='apple' AND accountId=?").bind('native-link-subject').first();
+ expect(row).toEqual({userId:owner!.user.id,accountId:'native-link-subject'});
+ expect((await auth.api.getSession({headers:new Headers({cookie})}))?.user.id).toBe(owner!.user.id);
+ expect((await env.AUTH_DB.prepare('SELECT * FROM cloud_accounts WHERE account_id=?').bind(owner!.user.id).all()).results).toEqual([]);
+ const anonymous=await auth.handler(request('link-social',{provider:'apple',idToken:{token,nonce:'link-nonce'}},undefined,socialClientIP()));
+ expect(anonymous.status).toBe(401);
 });
 
 test.each(['apple', 'google'] as const)('%s browser callback cannot implicitly link an existing email account', async (provider) => {

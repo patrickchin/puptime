@@ -51,10 +51,14 @@ export function createAuth(env: Cloudflare.Env, options: { disableEmailSignUp?: 
       if (!providers.email && (context.path.startsWith('/email-otp/') || context.path === '/sign-in/email-otp')) {
         throw new APIError('SERVICE_UNAVAILABLE', { message: 'Email sign-in is not configured yet.' });
       }
+      if ((context.path === '/sign-in/social' || context.path === '/link-social') && context.body?.provider === 'apple'
+        && context.body.idToken && (typeof context.body.idToken.nonce !== 'string' || !context.body.idToken.nonce.trim())) {
+        throw new APIError('BAD_REQUEST', { message: 'Apple ID-token authentication requires a nonce.' });
+      }
     }) },
     socialProviders: {
       ...(providers.google ? { google: { clientId: env.GOOGLE_CLIENT_ID!, clientSecret: env.GOOGLE_CLIENT_SECRET! } } : {}),
-      ...(providers.apple ? { apple: { clientId: env.APPLE_CLIENT_ID!, clientSecret: env.APPLE_CLIENT_SECRET! } } : {}),
+      ...(providers.apple ? { apple: { clientId: env.APPLE_CLIENT_ID!, clientSecret: env.APPLE_CLIENT_SECRET!, audience: [env.APPLE_CLIENT_ID!, 'com.patrickchin.puptime'] } } : {}),
     },
     disabledPaths: ['/email-otp/request-password-reset', '/forget-password/email-otp', '/email-otp/reset-password', '/delete-user', '/delete-user/callback'],
     plugins: [expo(), emailOTP({

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { CloudApiError,throwIfAborted,type CloudApi,type CloudAccountSummary,type CloudConfig,type CloudErrorCategory } from './api.ts';
 import { createSyncRunner,type RunResult } from './runner.ts';
 import type { createLocalRuntime } from '../local/runtime-factory.ts';
+import type { AppleIdToken } from './apple-native.ts';
 
 type Runtime=Awaited<ReturnType<typeof createLocalRuntime>>;
 type SyncStatus=Awaited<ReturnType<Runtime['sync']['status']>>;
@@ -9,19 +10,29 @@ export type AccountProblem=CloudErrorCategory|'local-storage'|'confirmation-requ
 export type AccountActionResult='ok'|'error'|'cancelled'|'confirmation-required'|'pending-confirmation-required';
 export type SocialProvider='apple'|'google';
 export type CloudExportAction=(expectedAccount:string,ready:()=>Promise<boolean>,signal?:AbortSignal)=>Promise<'shared'|'cancelled'>;
-type IdentityOutcome={error:{status:number;code?:string}|null};
+type IdentityOutcome={error:{status:number;code?:string}|null;cancelled?:boolean};
 type LinkedIdentity={userId:string;providerId:string};
 type IdentityListOutcome=IdentityOutcome&{data:LinkedIdentity[]|null};
 export type IdentityAdapter={requestEmail:(email:string)=>Promise<IdentityOutcome>;verifyEmail:(email:string,code:string)=>Promise<IdentityOutcome>;signInSocial:(provider:SocialProvider)=>Promise<IdentityOutcome>;linkSocial:(provider:SocialProvider)=>Promise<IdentityOutcome>;listAccounts:()=>Promise<IdentityListOutcome>;signOut:()=>Promise<IdentityOutcome>;hasCredentials:()=>Promise<boolean>};
-type SocialInput={provider:SocialProvider;callbackURL:string;errorCallbackURL:string};
+type SocialInput={provider:SocialProvider;callbackURL:string;errorCallbackURL:string;idToken?:AppleIdToken};
 type SdkIdentityClient={emailOtp:{sendVerificationOtp:(input:{email:string;type:'sign-in'})=>Promise<IdentityOutcome>};signIn:{emailOtp:(input:{email:string;otp:string})=>Promise<IdentityOutcome>;social:(input:SocialInput)=>Promise<IdentityOutcome>};linkSocial:(input:SocialInput)=>Promise<IdentityOutcome>;listAccounts:()=>Promise<IdentityOutcome&{data?:unknown}>;signOut:()=>Promise<IdentityOutcome>;getCookie:()=>Promise<string>};
-export function createIdentityAdapter(auth:SdkIdentityClient):IdentityAdapter {
+export function createIdentityAdapter(auth:SdkIdentityClient,{appleIdToken}:{appleIdToken?:()=>Promise<AppleIdToken|null>}={}):IdentityAdapter {
   const result=(value:IdentityOutcome):IdentityOutcome=>({error:value.error?{status:value.error.status,code:value.error.code}:null});
+  async function social(provider:SocialProvider,link:boolean):Promise<IdentityOutcome> {
+    const input:SocialInput={provider,callbackURL:'puptime://account',errorCallbackURL:'puptime://account'};
+    if(provider==='apple'&&appleIdToken){
+      let credential:AppleIdToken|null;
+      try{credential=await appleIdToken();}catch{return {error:{status:400,code:'NATIVE_AUTH_FAILED'}};}
+      if(!credential)return {error:null,cancelled:true};
+      input.idToken=credential;
+    }
+    return result(await (link?auth.linkSocial(input):auth.signIn.social(input)));
+  }
   return {
     requestEmail:email=>auth.emailOtp.sendVerificationOtp({email,type:'sign-in'}).then(result),
     verifyEmail:(email,otp)=>auth.signIn.emailOtp({email,otp}).then(result),
-    signInSocial:provider=>auth.signIn.social({provider,callbackURL:'puptime://account',errorCallbackURL:'puptime://account'}).then(result),
-    linkSocial:provider=>auth.linkSocial({provider,callbackURL:'puptime://account',errorCallbackURL:'puptime://account'}).then(result),
+    signInSocial:provider=>social(provider,false),
+    linkSocial:provider=>social(provider,true),
     listAccounts:async()=>{
       const response=await auth.listAccounts();if(response.error)return {...result(response),data:null};
       const parsed=z.array(z.object({userId:z.string().min(1),providerId:z.string().min(1)})).safeParse(response.data);
@@ -279,7 +290,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
     });},
     signInSocial(provider:'apple'|'google') {return authenticate(async()=>{
       if(!await canSignIn(provider))return 'error';
-      const result=await outcome(()=>identity.signInSocial(provider));if(result.error){const problem=identityProblem(result.error);return fail(problem==='sign-in-failed'?'social-incomplete':problem);}
+      const result=await outcome(()=>identity.signInSocial(provider));if(result.cancelled)return 'cancelled';if(result.error){const problem=identityProblem(result.error);return fail(problem==='sign-in-failed'?'social-incomplete':problem);}
       if(!await loadAccount())return disposed||snapshot.problem==='network'?'error':fail('social-incomplete');return await refreshLinkedProviders()?'ok':'error';
     });},
     connectProvider(provider:SocialProvider) {return authenticate(async()=>{
@@ -292,6 +303,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
         if(!await confirmIdentity(fence)||!await loadLinkedProviders(fence))return 'error';
         if(snapshot.linkedProviders!.includes(provider))return 'ok';
         const result=await outcome(()=>identity.linkSocial(provider));
+        if(result.cancelled)return 'cancelled';
         if(!await currentIdentity(fence))return 'error';
         if(result.error){
           if(result.error.status===401){emit({account:null,linkedProviders:null});return fail('auth-required');}
