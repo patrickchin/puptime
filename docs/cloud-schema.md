@@ -63,6 +63,9 @@ directly replace the read/reconcile/write callback. See Cloudflare's
 [SQLite transaction API](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/#transactionsync)
 and [Text module rules](https://developers.cloudflare.com/workers/wrangler/configuration/#bundling).
 
-The D1 trial/access and deletion credential fences remain as they are in this
-change. Simplifying account access and lifecycle is separate work; the extracted
-account SQL does not introduce a new authentication or migration framework.
+The fresh D1 baseline is `server/migrations/0001-auth.sql`: Better Auth's tables,
+local-only email previews, and a small deletion-cleanup fence. It has no trial
+or subscription columns. Authenticated development accounts have cloud access;
+explicit device enrollment still controls uploading local puppy data. See the
+[development milestone](cloud-development.md) for the reset and acceptance
+boundary. The account SQL introduces no authentication or migration framework.

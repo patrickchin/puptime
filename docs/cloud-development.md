@@ -38,7 +38,7 @@ Top-level `server/migrations/0001-auth.sql` is the fresh D1 baseline. Account
 data uses a separate per-account database; applying D1 migrations does not
 initialize that database. Its constructor initializes its own schema within a
 synchronous transaction. See [the schema map](cloud-schema.md) for the explicit
-account SQL and query indexes after the SQL-baseline PR is integrated.
+account SQL and query indexes.
 
 Stable puppy IDs and puppy foreign keys make ownership support multiple
 puppies. The first UI presents one. Events and routines use SQL columns rather
