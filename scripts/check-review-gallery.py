@@ -96,6 +96,13 @@ with TemporaryDirectory(prefix='puptime-gallery-check-') as folder:
     first_build = page
     builder.build(root, catalog)
     assert (root / 'index.html').read_text() == first_build
+    builder.build(root, {'journeys': [], 'historical_journeys': catalog['journeys']})
+    page = (root / 'index.html').read_text()
+    archive = page.index('<details id="archive">')
+    assert 'Current footage pending' in page and '<ol class="review-list">' not in page
+    assert archive < page.index('id="historical-journeys"') < page.index('id="journey-997-app"')
+    assert 'Historical · 01 · Setup' in page and 'id="journey-997-app" open' not in page
+    assert page.count('<video ') == 3 and 'data-seek="7.2"' in page
     (root / 'clip.mp4').unlink()
     builder.build(root)
     page = (root / 'index.html').read_text()

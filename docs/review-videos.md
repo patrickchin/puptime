@@ -1,6 +1,8 @@
 # Review videos
 
-[Open the curated local gallery](http://127.0.0.1:8877/). Six entries cover the main happy paths and one offline/recovery path. Only the first entry opens by default:
+[Open the local gallery](http://127.0.0.1:8877/). The default view says **Current footage pending** while the updated cloud-development journeys are qualified. It shows no earlier-build videos as current.
+
+The former six-entry selection and its two companions remain under **Archive → Historical review**, collapsed by default:
 
 | Review entry | Existing evidence | Scope |
 | --- | --- | --- |
@@ -11,11 +13,11 @@
 | Cloud restore and incoming sync | 263; optional companion 267 | Explicit puppy restore, log and reopen; genuine peer update without refresh. |
 | Offline recovery | 07 | Earlier Debug build, isolated local HTTP outage, durable log and reconnect. |
 
-The six primary clips total about 5½ minutes; the two optional companions add about a minute. They are selected development evidence, not new recordings or qualification of the latest build. First-open setup remains separate from the feature walkthrough. Capture dates, recorded-rerun labels, original build/service scopes, diagnostic notes and results stay visible.
+These are historical development captures. They include cloud-unavailable setup, a 14-day trial offer in the Apple/Google restart clips, and older platform-specific copy. They do not establish the current optional-account, explicit-upload, trial-free development contract. Dates, recorded-rerun labels, original build/service scopes, diagnostic notes and results stay visible.
 
-The collapsed archive retains all other app captures (including deletion variants) and searchable technical logs. Deep links open their enclosing disclosures automatically. At curation, the 46-current / 126-previous / 191-text publication becomes six primary clips, two companions, 164 archived app captures and 191 text checks. No media, sidecar, log, screenshot or chapter data was deleted or rewritten.
+The catalog's `journeys` list is intentionally empty until qualified current clips are supplied. `historical_journeys` retains the six earlier entries and two companions. The collapsed archive contains all 172 recordings and 191 searchable text checks: eight clips in historical review and 164 other app captures. Deep links open their enclosing disclosures automatically. No media, sidecar, log, screenshot or chapter data was deleted or rewritten.
 
-`scripts/build-review-gallery.py` reads the checked-in `docs/review-gallery-catalog.json`: selection order, descriptions, original review notes and service-evidence links. This replaces the frozen e9 builder plus ordered runtime overrides previously used to publish the gallery. The source builder and catalog reproduce the displayed page from the existing evidence directory; editing the artifact directory's legacy `build-index.py` is unnecessary. New unselected captures go into the archive. Current evidence and remaining integration gates are recorded in `docs/cloud-verification.md`.
+`scripts/build-review-gallery.py` reads the checked-in `docs/review-gallery-catalog.json`: current/historical selection, descriptions, original review notes and service-evidence links. This replaces the frozen e9 builder plus ordered runtime overrides previously used to publish the gallery. The source builder and catalog reproduce the displayed page from the existing evidence directory; editing the artifact directory's legacy `build-index.py` is unnecessary. New unselected captures go into the archive. Current evidence and remaining development checks are recorded in `docs/cloud-development.md`. `docs/cloud-verification.md` is the historical ledger.
 
 Record actual iOS journeys as acceptance evidence, with the test logs alongside
 them. Keep terminal-only checks as searchable text; do not render terminal output
@@ -67,8 +69,8 @@ python3 scripts/serve-review-gallery.py /absolute/path/puptime-review-videos --p
 
 Use the range-aware server above rather than `python -m http.server`: partial
 responses (`206`, `Content-Range`, `Accept-Ranges: bytes`) let browser video
-controls seek before the entire recording downloads. Selected app journeys appear
-first. Other captures and technical logs remain in the collapsed archive, and old terminal-replay metadata is
+controls seek before the entire recording downloads. Qualified current app journeys appear
+first when available; otherwise the pending state is shown. Other captures and technical logs remain in the collapsed archive, and old terminal-replay metadata is
 presented as readable, searchable logs. Existing deep links are preserved.
 
 Run `python3 scripts/check-review-gallery.py` to verify byte ranges, HEAD, error
