@@ -30,9 +30,9 @@ Web Analytics is already enabled for the Pages project and automatically injects
 
 ## PostHog
 
-Use a dedicated Puptime organization/project in the EU cloud. Do not reuse the other product’s Default project 308052 in Harpa Pro. Its free organization has already used its one project; adding another there requires billing. Keep synthetic tests on the local collector. A genuine live acceptance journey belongs only in the dedicated Puptime project after its free-plan state is verified.
+The dedicated **Puptime** organization uses EU Cloud project **312576** (Default project). Do not reuse project 308052 in Harpa Pro. Keep synthetic tests on the local collector; bounded genuine browser acceptance uses only the dedicated Puptime project.
 
-After the Puptime project is available, set `EXPO_PUBLIC_POSTHOG_KEY` to its public `phc_…` browser token and `EXPO_PUBLIC_POSTHOG_HOST=https://eu.i.posthog.com` in the Cloudflare Pages **production** build environment, then rebuild. Do not enable real PostHog capture in previews; use the local collector below for synthetic events. The browser token is public; personal API keys must never be exposed through `EXPO_PUBLIC_` variables. Review the project's retention, access, and billing limits before enabling production capture.
+Cloudflare Pages **production** has `EXPO_PUBLIC_POSTHOG_KEY` set to this project’s public `phc_…` browser token and `EXPO_PUBLIC_POSTHOG_HOST=https://eu.i.posthog.com`. Changes take effect on the next build, so verify the deployed bundle before claiming activation. Do not enable real PostHog capture in previews; use the local collector below for synthetic events. The browser token is public; personal API keys must never be exposed through `EXPO_PUBLIC_` variables. Review the project's retention, access, and billing limits before enabling production capture.
 
 Optional PostHog analytics load only after consent and respect Do Not Track/Global Privacy Control. The SDK disables autocapture, automatic page/pageleave events, exception capture, session replay, surveys, feature flags, and person profiles. An outbound allowlist removes all full URLs (including canonical URLs), referrers, campaign values, and arbitrary properties. `$geoip_disable: true` requests no server GeoIP enrichment. Consent defaults to off inside the SDK as well as the website. Withdrawal resets the device ID before opting out, because the installed SDK’s `reset()` clears its own consent state. SDK persistence is disabled while opted out. Batching and beacon transport are disabled; each consent period owns an abortable fetch signal that also prevents its failed requests from retrying over the network after withdrawal. Fetch omits credentials and referrers. Only these events are accepted:
 
@@ -43,7 +43,7 @@ Optional PostHog analytics load only after consent and respect Do Not Track/Glob
 | `website_error` | `page`, `error_kind`: `script`, `unhandled_rejection`, or `render` | Failure counts; no messages, stacks, or private contents |
 | `website_account` | `page`: `/account`, allowlisted `action` and `result` | Coarse sign-in/link/export/deletion outcomes, with no account identity |
 
-The exact shared property boundary is `page`, `$pathname` (both known route paths or `/404`), `$process_person_profile: false`, `$geoip_disable: true`, and SDK-generated string values for `distinct_id`, `$device_id`, `$session_id`, `$window_id`, `$lib`, `$lib_version`, and `token`. Event-specific properties are limited to the values above. The SDK envelope includes event time/UUID. The public `token` is the project ingestion token; it is never a personal API credential. Network requests still expose connection information to the provider. The SDK also sends anonymous IDs and library metadata. It creates no person profiles, and the app does not identify website visitors. Browser failure events are coarse counts, not full stack-trace error monitoring. Native/API diagnostics and Sentry remain separate cloud-rollout work.
+The exact shared property boundary is `page`, `$pathname` (both known route paths or `/404`), `$process_person_profile: false`, `$geoip_disable: true`, and SDK-generated string values for `distinct_id`, `$device_id`, `$session_id`, `$window_id`, `$lib`, `$lib_version`, and `token`. Event-specific properties are limited to the values above. The SDK/provider delivery metadata includes event time/UUID, sent-at and ingestion timestamps. Received events also have service metadata such as team ID and propertyless person mode. The public `token` is the project ingestion token; it is never a personal API credential. Network requests still expose connection information to the provider. The SDK also sends anonymous IDs and library metadata. It creates no person profiles, and the app does not identify website visitors. Browser failure events are coarse counts, not full stack-trace error monitoring. Native/API diagnostics and Sentry remain separate cloud-rollout work.
 
 Before calling PostHog live, verify both the browser request and the event visible in PostHog Activity. Test a fresh visitor (no SDK request before choosing), decline, allow, withdrawal, reload persistence, blocked storage, provider/network failure, and privacy signals. Confirm event properties omit query strings, fragments, referrers, search input, notes, and raw error contents. Create the small dashboard described below. Do not enable session replay.
 
@@ -62,7 +62,7 @@ Rebuild with `EXPO_NO_DOTENV=1 npm run build:web` afterward. With no production 
 
 ### Small PostHog dashboard
 
-Use a private dashboard named **Puptime website**, last 7 days, daily buckets. These are saved-insight instructions until the dedicated project is available, not a claim that a dashboard already exists.
+The saved [Puptime website dashboard](https://eu.posthog.com/project/312576/dashboard/1038801) contains four insights with a seven-day range and daily intervals. Public sharing is off. The organization has one owner and no pending invites; no additional access was granted. Object-level permissions require a paid add-on and were not enabled.
 
 | Tile | Query | Decision |
 | --- | --- | --- |
@@ -73,10 +73,30 @@ Use a private dashboard named **Puptime website**, last 7 days, daily buckets. T
 
 Do not add user identification, raw event exports, person profiles, replay, AI integrations or a public dashboard. Inspect organization members/project access, EU region, retention, payment-method absence, and free usage cap in the service before setting the build key. PostHog’s [published free tier](https://posthog.com/pricing) currently lists one project, one-year retention and 1 million product-analytics events/month; the actual dedicated organization’s state must still be checked. Do not attach a card, upgrade or accept overage. A service-side ingestion transformation/access check remains necessary because SDK settings alone do not prove project-wide privacy configuration.
 
-### Service checkpoint — October 20, 2026
+### Production activation — October 20, 2026
 
-- The deployed source at this checkpoint is main `7f59afb2c052f54678b66e2efb7a57482d62b357`, Pages deployment `a7169b86-6542-4f65-b783-ab24d44eaa4a`. Its optional PostHog initialization has no configured key. The changes in this PR are not deployed by this checkpoint.
-- Cloudflare Web Analytics receipt is proven in the Puptime-only dashboard: last 24 hours (GMT+8), exclude bots, **1 page view / 1 visit**, page load time **1,079 ms**. The dashboard reports insufficient data for detailed charts; do not claim representative performance or production usage from this sample.
-- Dedicated Puptime PostHog organization creation is pending private reauthentication. No existing-project reuse, hosted ingestion, project access/retention/billing verification, production environment change or saved PostHog dashboard is claimed. Continue after the human confirms sign-in; leave their private login tab untouched meanwhile.
+PR [117](https://github.com/patrickchin/puptime/pull/117) merged the consent hardening at `3c9fceaa55c0d592a8c39bfb47a58f44c21e659b`. After setting the dedicated production variables, the reviewed source was rebuilt as Pages deployment `fa5f6a78-440a-4e08-b9a9-5df24c548523`. Both its immutable URL and `https://puptime.pages.dev` served `index-a2fad4494700b7e63e154fae0b7ecf89.js`, SHA-256 `b3b870aa08b6e50bb3b11e729cfb3dd0d7a63845298f508affd4919288b026a6`, with the dedicated public token, EU collector and hardened transport settings. Later copy-only builds change that bundle hash.
 
-The isolated installed-SDK check passed nine scenarios with `posthog-js` 1.438.12, including no cookie/referrer headers, withdrawal of queued and failed requests, and both browser privacy signals. Only the local `/telemetry/e/` endpoint was used. Web unit checks (9), TypeScript and the 15-page static build also passed. This does not change the hosted PostHog gate above.
+The bounded genuine Chrome incognito journey confirmed no PostHog requests before consent or after decline/reload; opting in produced accepted `POST https://eu.i.posthog.com/e/` requests with no cookies or referrer. Home, a guide, the source link and anonymous Google sign-in start produced actual `website_page_view`, `website_cta` and `website_account` receipts in PostHog Activity. Provider authentication was abandoned before entering credentials; no account was created. Withdrawal and reload again produced no PostHog requests. Firefox Private Browsing sent `Sec-GPC: 1`; the website kept analytics off and disabled Allow, with no PostHog request.
+
+The received account event contained only anonymous SDK IDs/library data, the known `/account` path, `action=sign_in`, `result=started`, privacy flags and delivery metadata. It had `person_mode=propertyless`, no full URL/referrer, account/provider identity, IP/location enrichment or raw error contents. The Persons list showed **0**. Real dashboard data appeared after ingestion delay: guide/page readership, account actions, and one anonymous browser completing the source funnel. This small acceptance sample is not representative traffic or a meaningful conversion rate. The browser-failure tile correctly has no received errors; synthetic failures were tested only locally.
+
+Cloudflare Web Analytics receipt is separately proven in the Puptime-only dashboard: last 24 hours (GMT+8), exclude bots, **1 page view / 1 visit**, page load time **1,079 ms** at the earlier check. It reported insufficient data for detailed charts; do not interpret that sample as representative performance.
+
+The isolated installed-SDK check passed nine scenarios with `posthog-js` 1.438.12, including no cookie/referrer headers, withdrawal of pending and failed requests, and DNT/GPC overriding stored consent. Only the local `/telemetry/e/` collector was used. Web unit checks (9), TypeScript and the 15-page static build passed. DNT, blocked storage, failed delivery and synthetic browser-error cases are local regression evidence; the live checks above are separate service-receipt evidence.
+
+Rollback without a source change: remove the production `EXPO_PUBLIC_POSTHOG_KEY` and rebuild the reviewed source. Alternatively, Pages deployment `e9bb7faf-4d0b-4dc1-9438-a4c0d8e31ea3` contains the same hardened source before the key was present and is the recorded analytics-off rollback artifact. Keep previews free of real analytics configuration.
+
+### Dedicated service configuration — October 20, 2026
+
+The Puptime organization’s free-plan UI confirms **1 project**, **1-year event retention**, and a **1 million product-analytics event monthly billing limit**, equal to its free allocation. The service still offers “add your credit card”; no card, paid plan, add-on or overage was enabled.
+
+The following settings were verified in this organization/project before production ingestion:
+
+- Third-party AI services off; internal AI training off; Desktop beta terms not accepted.
+- Client IP discard on. The default GeoIP transformation is paused; no active transformations or configured destinations forward/enrich the events.
+- Web autocapture, web-vitals autocapture, dead-click capture, session replay, console capture, network recording and exception autocapture off. Replay header/body/canvas capture are also off.
+- Person last-seen tracking off. The website uses `person_profiles: never` and `$process_person_profile: false` for every accepted event.
+- Production has only the two public PostHog build variables above; the preview environment has neither variable. The existing API service binding was not changed.
+
+Saved insight IDs: readership `QTguqrZu`, failures `gfbhDWeZ`, account outcomes `ZEtYIZ5x`, and source conversion `twGTZUGC`. The account tile separates results into series and breaks down by action; the funnel uses a one-hour sequential conversion window. Empty charts or onboarding sample data are not hosted-ingestion proof.
