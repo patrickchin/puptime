@@ -43,7 +43,7 @@ The screenshots, features, and Android installation instructions below describe 
 - See possible missing logs, including estimated nap spans, automatically faded on the timeline without adding them to history. Saved estimates stay labeled and do not influence learned routines or recorded statistics.
 - Export and import activity CSV backups with stable IDs, notes, exact timestamps, nap states, and estimate labels. Reimporting preserves existing edits.
 - Choose two to four Home Screen widget actions and optional confirmation notifications.
-- Choose Default (follows device light/dark appearance), Puppy journal, Soft play, or Day trails in Settings. The three playful themes include Day and Compare timeline views. Removed theme selections fall back to Default.
+- Use the default style in Light or Dark mode, or follow the device setting. Removed theme selections fall back to the device setting.
 - Manage language, widget actions, and notifications in Settings.
 - Browse illustrated topic cards in **Learn**, with a short getting-started guide and 12 detailed puppy-care articles. Each article opens with an at-a-glance overview and links to its sections and sources, plus further reading and selected YouTube demonstrations. The same guides are on the website under **Puppy care**. Articles are currently in English; in-app navigation supports all app languages. Text and bundled English ElevenLabs narration work offline in the app; external resources need a browser and internet connection. Each guide has play/pause, 15-second skips, and playback speed controls.
 - Keep data on the device without an account, subscription, server, ads, analytics, or tracking.

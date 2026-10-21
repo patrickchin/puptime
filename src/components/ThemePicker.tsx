@@ -21,10 +21,9 @@ const choices: Record<ThemePreference, {
   descriptionKey: MessageKey;
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
 }> = {
-  system: { descriptionKey: 'theme.system.detail', icon: 'paw-outline' },
-  'puppy-journal': { descriptionKey: 'theme.puppy-journal.detail', icon: 'notebook-outline' },
-  'soft-play': { descriptionKey: 'theme.soft-play.detail', icon: 'shape-outline' },
-  'day-trails': { descriptionKey: 'theme.day-trails.detail', icon: 'map-marker-path' },
+  system: { descriptionKey: 'theme.system.detail', icon: 'cellphone-cog' },
+  light: { descriptionKey: 'theme.light.detail', icon: 'white-balance-sunny' },
+  dark: { descriptionKey: 'theme.dark.detail', icon: 'weather-night' },
 };
 
 const languageLabels: Record<Exclude<LanguagePreference, 'system'>, string> = {
@@ -32,13 +31,6 @@ const languageLabels: Record<Exclude<LanguagePreference, 'system'>, string> = {
   'zh-Hans': '简体中文',
   es: 'Español',
 };
-
-function previewTheme(
-  preference: ThemePreference,
-  colorScheme: 'light' | 'dark' | 'unspecified' | null,
-): Theme {
-  return resolveTheme(preference, colorScheme);
-}
 
 export function ThemePicker({
   visible,
@@ -139,7 +131,7 @@ export function ThemePicker({
             {(mode === 'theme' ? themeChoices : []).map((id) => {
               const choice = choices[id];
               const active = selected === id;
-              const preview = previewTheme(id, colorScheme);
+              const preview = resolveTheme(id, colorScheme);
               const label = t(`theme.${id}.name`);
               const description = t(choice.descriptionKey);
               return (
@@ -179,7 +171,7 @@ export function ThemePicker({
                   </View>
                   <View style={styles.choiceCopy}>
                     <Text style={[styles.choiceLabel, headingStyle(preview), { color: theme.text }]}>{label}</Text>
-                    <Text numberOfLines={1} style={[styles.choiceDescription, { color: theme.textMuted }]}>{description}</Text>
+                    <Text style={[styles.choiceDescription, { color: theme.textMuted }]}>{description}</Text>
                   </View>
                   <View
                     accessibilityElementsHidden
@@ -259,7 +251,7 @@ export function ThemePicker({
                   <View style={styles.choiceCopy}>
                     <Text style={[styles.choiceLabel, { color: theme.text }]}>{label}</Text>
                     {preference === 'system' ? (
-                      <Text numberOfLines={1} style={[styles.choiceDescription, { color: theme.textMuted }]}>{detail}</Text>
+                      <Text style={[styles.choiceDescription, { color: theme.textMuted }]}>{detail}</Text>
                     ) : null}
                   </View>
                   <MaterialCommunityIcons

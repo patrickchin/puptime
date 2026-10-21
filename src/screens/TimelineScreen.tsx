@@ -29,8 +29,6 @@ import {
   type TimelineMark,
 } from '../analytics';
 import { activityFromKey, activityKey, customActivityKey, dateKey, formatDuration, isOpenNap, quickEventTypes, type Activity, type ActivityKey, type PuppyEvent } from '../domain';
-import { IllustratedTimelineTrack, TIMELINE_ART_GUTTER } from '../components/IllustratedTimelineTrack';
-import { DayTimeline } from '../components/DayTimeline';
 import {ActivityLoadState} from '../components/ActivityLoadState';
 import {activityWindowBounds,useActivityWindow,type ActivityViewProps} from '../activity-view';
 import { ActivityIcon } from '../components/ActivityIcon';
@@ -149,14 +147,14 @@ function TimelineDateLabel({
         styles.dateCell,
         {
           backgroundColor: isToday ? theme.primarySoft : theme.background,
-          borderColor: theme.presentation.iconProfile === 'default' ? theme.border : 'transparent',
+          borderColor: theme.border,
           height: rowHeight,
-          borderRightWidth: theme.presentation.iconProfile === 'default' ? StyleSheet.hairlineWidth : 0,
+          borderRightWidth: StyleSheet.hairlineWidth,
           transform: [{ translateX: horizontalOffset }],
         },
       ]}
     >
-      <Text numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.5} style={[styles.weekday, headingStyle(theme), { fontSize: theme.presentation.iconProfile === 'default' ? 10 : 13, lineHeight: theme.presentation.iconProfile === 'default' ? 13 : 18, color: isToday ? theme.primary : theme.text }]}>
+      <Text numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.5} style={[styles.weekday, headingStyle(theme), { fontSize: 10, lineHeight: 13, color: isToday ? theme.primary : theme.text }]}>
         {isToday ? t('insights.today') : shortDay.format(day.date).toUpperCase()}
       </Text>
       <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} maxFontSizeMultiplier={1.5} style={[styles.calendarDate, { color: theme.textMuted }]}>
@@ -365,13 +363,11 @@ function TimelineAxis({
   horizontalOffset: Animated.Value;
   theme: Theme;
 }) {
-  const { language, t } = useLocalization();
+  const { t } = useLocalization();
   const { fontScale } = useWindowDimensions();
   const staggerLabels = trackWidth / 24 < 22 * Math.min(fontScale, 1.4);
-  const playful = theme.presentation.iconProfile !== 'default';
-  const plotWidth = playful ? Math.max(1, trackWidth - TIMELINE_ART_GUTTER * 2) : trackWidth;
-  const axisHeight = !playful && staggerLabels ? 42 : 30;
-  const labelWidth = playful ? 48 : trackWidth / 12;
+  const axisHeight = staggerLabels ? 42 : 30;
+  const labelWidth = trackWidth / 12;
   return (
     <View style={[styles.axisRow, { height: axisHeight, backgroundColor: theme.background, borderColor: theme.border }]}>
       <Animated.View
@@ -392,25 +388,25 @@ function TimelineAxis({
         importantForAccessibility="no-hide-descendants"
         style={[styles.axisTrack, { height: axisHeight, width: trackWidth }]}
       >
-        {AXIS_HOURS.filter((hour) => theme.presentation.iconProfile === 'default' || hour % (trackWidth > 800 ? 3 : 6) === 0).map((hour) => (
+        {AXIS_HOURS.map((hour) => (
           <Text
             key={hour}
             maxFontSizeMultiplier={1.4}
             style={[
               styles.axisLabel,
-              playful ? { left: TIMELINE_ART_GUTTER + hour / 24 * plotWidth - labelWidth / 2, textAlign: 'center' } : hour === 0
+              hour === 0
                 ? styles.axisStart
                 : hour === 24
                   ? styles.axisEnd
                   : { left: `${(hour / 24) * 100}%`, marginLeft: -labelWidth / 2, textAlign: 'center' },
-              { color: theme.textMuted, width: labelWidth, top: theme.presentation.iconProfile === 'default' && staggerLabels && hour % 2 ? 20 : 4 },
+              { color: theme.textMuted, width: labelWidth, top: staggerLabels && hour % 2 ? 20 : 4 },
             ]}
           >
-            {playful ? timelineFormatters(language).hour.format(new Date(2000, 0, 1, hour)) : hour}
+            {hour}
           </Text>
         ))}
-        {GRID_HOURS.filter((hour) => !playful || hour % 6 === 0).map((hour) => (
-          <View key={hour} style={[styles.axisTick, { left: (playful ? TIMELINE_ART_GUTTER : 0) + hour / 24 * plotWidth, backgroundColor: theme.textMuted }]} />
+        {GRID_HOURS.map((hour) => (
+          <View key={hour} style={[styles.axisTick, { left: hour / 24 * trackWidth, backgroundColor: theme.textMuted }]} />
         ))}
       </View>
     </View>
@@ -422,41 +418,11 @@ const MemoTimelineTrack = memo(TimelineTrack);
 const MemoTimelineAxis = memo(TimelineAxis);
 
 type TimelineProps={events:PuppyEvent[];customActivities:string[];theme:Theme}&ActivityViewProps;
-export function TimelineScreen(props: TimelineProps) {
-  if (props.theme.presentation.iconProfile === 'default') return <ComparisonTimelineScreen {...props} />;
-  return <PlayfulTimelineScreen {...props} />;
-}
-
-function PlayfulTimelineScreen(props: TimelineProps) {
-  const { t } = useLocalization();
-  const { theme } = props;
-  const [mode, setMode] = useState<'day' | 'compare'>(() => theme.presentation.iconProfile === 'soft-play' ? 'compare' : 'day');
-  return (
-    <View style={{ flex: 1 }}>
-      <View style={styles.modeRow}>
-        {(['day', 'compare'] as const).map((value) => (
-          <Pressable key={value} testID={`timeline.mode.${value}`} accessibilityRole="tab" accessibilityState={{ selected: mode === value }} onPress={() => setMode(value)} style={({ pressed }) => [styles.modeButton, { backgroundColor: mode === value ? theme.primary : theme.surfaceRaised, borderRadius: theme.presentation.controlRadius, opacity: pressed ? 0.7 : 1 }]}>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: mode === value ? theme.onPrimary : theme.textMuted }}>{t(`timeline.${value}`)}</Text>
-          </Pressable>
-        ))}
-      </View>
-      {mode === 'day' ? (
-        <View testID="screen.timeline" style={{ flex: 1 }}>
-          <Text style={[styles.dayViewTitle, headingStyle(theme), { color: theme.text }]}>{t('timeline.title')}</Text>
-          <DayTimeline events={props.events} activity={props.activity} refreshToken={props.refreshToken} theme={theme} />
-        </View>
-      ) : <ComparisonTimelineScreen {...props} />}
-    </View>
-  );
-}
-
-function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken,customActivities,theme }:TimelineProps) {
+export function TimelineScreen({ events:projectedEvents,activity,refreshToken,customActivities,theme }:TimelineProps) {
   const { activityColors, activityLabel, language, t } = useLocalization();
   const { fontScale, height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const playful = theme.presentation.iconProfile !== 'default';
-  const RowTrack = playful ? IllustratedTimelineTrack : MemoTimelineTrack;
-  const activityFilters: ActivityKey[] = useMemo(() => playful ? ['pee', 'poop', 'meal'] : [...quickEventTypes, ...customActivities.map(customActivityKey)], [customActivities, playful]);
+  const activityFilters: ActivityKey[] = useMemo(() => [...quickEventTypes, ...customActivities.map(customActivityKey)], [customActivities]);
   const [selectedType, setSelectedType] = useState<ActivityKey | 'all'>('all');
   const selectedTypes = useMemo(() => selectedType === 'all' ? activityFilters : [selectedType], [activityFilters, selectedType]);
   useEffect(() => {
@@ -478,7 +444,7 @@ function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken
   },[activity,refreshToken,summaryAttempt]);
   const [selection, setSelection] = useState<string[]>([]);
   const [isLoadingEarlier, startLoadingEarlier] = useTransition();
-  const rowHeight = Math.round((playful ? 80 : 52) * Math.min(fontScale, 1.5));
+  const rowHeight = Math.round(52 * Math.min(fontScale, 1.5));
   const viewportWidth = width - insets.left - insets.right;
   const baseTrackWidth = Math.max(1, viewportWidth - DATE_COLUMN_WIDTH);
   const trackWidth = baseTrackWidth * timeScale;
@@ -528,10 +494,10 @@ function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken
   const didUserScroll = useRef(false);
   const timeScaleValue = useRef(timeScale);
   const pendingHorizontalOffset = useRef<number | null>(null);
-  const zoomMetrics = useRef({ baseTrackWidth, viewportWidth, gutter: playful ? TIMELINE_ART_GUTTER : 0 });
+  const zoomMetrics = useRef({ baseTrackWidth, viewportWidth, gutter: 0 });
   const pinch = useRef({ distance: 0, scale: 1, offset: 0, focalX: 0 });
   timeScaleValue.current = timeScale;
-  zoomMetrics.current = { baseTrackWidth, viewportWidth, gutter: playful ? TIMELINE_ART_GUTTER : 0 };
+  zoomMetrics.current = { baseTrackWidth, viewportWidth, gutter: 0 };
 
   useEffect(() => {
     const timer = setInterval(() => setNowTime(Date.now()), 60_000);
@@ -798,7 +764,7 @@ function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken
                 ]}
               >
                 {activity
-                  ? <ActivityIcon activity={activity} theme={theme} size={playful ? 24 : 17} color={active ? color : theme.textMuted} />
+                  ? <ActivityIcon activity={activity} theme={theme} size={17} color={active ? color : theme.textMuted} />
                   : <MaterialCommunityIcons accessibilityElementsHidden importantForAccessibility="no" name="layers-outline" size={17} color={active ? color : theme.textMuted} />}
                 <Text style={[styles.filterLabel, { color: active ? color : theme.textMuted }]}>{label}</Text>
                 {active ? (
@@ -862,7 +828,7 @@ function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken
                     theme={theme}
                   />
                   <View style={{ width: trackWidth }}>
-                    <RowTrack
+                    <MemoTimelineTrack
                       day={day}
                       selectedTypes={selectedTypes}
                       savedEstimateIds={savedEstimateIds}
@@ -1018,9 +984,6 @@ function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken
 }
 
 const styles = StyleSheet.create({
-  modeRow: { flexDirection: 'row', paddingHorizontal: 16, paddingTop: 8, gap: 8 },
-  modeButton: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
-  dayViewTitle: { fontSize: 34, lineHeight: 44, marginHorizontal: 16, marginTop: 12 },
   screen: { flex: 1 },
   header: {
     paddingHorizontal: spacing.md,

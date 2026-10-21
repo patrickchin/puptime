@@ -1,0 +1,79 @@
+appId: com.patrickchin.puptime
+name: Default appearance supports light, dark and the device setting
+tags:
+  - ios
+  - settings
+---
+- launchApp:
+    permissions: {}
+    clearState: true
+- runFlow: ../helpers/skip-onboarding.yaml
+- extendedWaitUntil:
+    visible:
+      id: quick.pee
+    timeout: 90000
+- tapOn:
+    id: quick.pee
+- tapOn:
+    id: quick.poop
+- tapOn:
+    id: quick.meal
+- tapOn:
+    id: settings.open
+- tapOn:
+    id: settings.theme.open
+- assertVisible:
+    id: appearance.theme.system
+- assertVisible:
+    id: appearance.theme.light
+- assertVisible:
+    id: appearance.theme.dark
+- assertNotVisible:
+    id: appearance.theme.puppy-journal
+- tapOn:
+    id: appearance.theme.dark
+- tapOn:
+    id: settings.back
+- assertVisible:
+    id: event.pee
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.timeline
+- assertVisible:
+    id: timeline.zoom.in
+- assertVisible:
+    id: timeline.filter.nap
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.log
+- tapOn:
+    id: settings.open
+- tapOn:
+    id: settings.theme.open
+- assertVisible:
+    id: appearance.theme.dark
+    text: radio button, checked
+- tapOn:
+    id: appearance.theme.light
+- stopApp
+- launchApp:
+    permissions: {}
+- extendedWaitUntil:
+    visible:
+      id: settings.open
+    timeout: 90000
+- tapOn:
+    id: settings.open
+- tapOn:
+    id: settings.theme.open
+- assertVisible:
+    id: appearance.theme.light
+    text: radio button, checked
+- tapOn:
+    id: appearance.theme.system
+- tapOn:
+    id: settings.back
+- assertVisible:
+    id: event.pee

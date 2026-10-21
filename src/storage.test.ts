@@ -158,12 +158,12 @@ test('removed theme preferences fall back to default without touching activity d
   stored.clear();
   const events = JSON.stringify([createEvent('pee', 'app', 100)]);
   stored.set(eventsKey, events);
-  for (const theme of ['meadow', 'sunrise', 'midnight', 'paper', 'bubblegum', 'blueprint', 'trail', 'tide', 'plum', 'contrast']) {
+  for (const theme of ['puppy-journal', 'soft-play', 'day-trails', 'meadow', 'sunrise', 'midnight', 'paper', 'bubblegum', 'blueprint', 'trail', 'tide', 'plum', 'contrast']) {
     stored.set('puptime.theme.v1', theme);
     assert.equal(await storage.loadThemePreference(), 'system');
     assert.equal(stored.get(eventsKey), events);
   }
-  for (const theme of ['system', 'puppy-journal', 'soft-play', 'day-trails'] as const) {
+  for (const theme of ['system', 'light', 'dark'] as const) {
     await storage.saveThemePreference(theme);
     assert.equal(await storage.loadThemePreference(), theme);
   }

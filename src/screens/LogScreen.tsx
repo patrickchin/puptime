@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, FlatList, Image, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { QuickActions } from '../components/QuickActions';
 import { ActivityIcon } from '../components/ActivityIcon';
@@ -28,7 +28,7 @@ import { useLocalization } from '../localization-context';
 import { createEventEditor,eventEditValues,type EventEditValues } from '../event-editor';
 import { EventDeletedError } from '../storage-validation';
 import { groupLogHistory } from '../log-history';
-import { headingStyle, spacing, surfaceTreatment, type Theme } from '../theme';
+import { spacing, surfaceTreatment, type Theme } from '../theme';
 
 const timeAdjustments = [-60, -15, 15, 60] as const;
 const editableEventTypes = eventTypes.filter((type) => type !== 'nap');
@@ -427,7 +427,6 @@ export function LogScreen({
     }
   };
 
-  const playful = theme.presentation.iconProfile !== 'default';
 
   return (
     <>
@@ -456,7 +455,6 @@ export function LogScreen({
                 <Text
                   numberOfLines={1}
                   adjustsFontSizeToFit
-                  maxFontSizeMultiplier={playful ? 1.5 : undefined}
                   style={[
                     styles.title,
                     {
@@ -469,7 +467,7 @@ export function LogScreen({
                     },
                   ]}
                 >
-                  {playful ? 'Puptime' : t('nav.log')}
+                  {t('nav.log')}
                 </Text>
               </View>
               <View style={styles.headerActions}>
@@ -498,20 +496,14 @@ export function LogScreen({
                 </Pressable>
               </View>
             </View>:null}
-            {playful ? (
-              <View style={styles.greetingRow}>
-                <Text maxFontSizeMultiplier={1.5} style={[styles.greeting, headingStyle(theme), { color: theme.text }]}>{t(`theme.${theme.presentation.iconProfile as 'puppy-journal' | 'soft-play' | 'day-trails'}.greeting`)}</Text>
-                <Image source={require('../../assets/mascots/scruffy-terrier.png')} accessible={false} style={styles.puppy} resizeMode="contain" />
-              </View>
-            ) : null}
             <QuickActions events={activity?projectedEvents:events} onLog={onLog} now={now} theme={theme} />
             <View style={styles.activityHeading}>
-              <Text style={[styles.sectionTitle, playful && headingStyle(theme), { color: theme.text }]}>{t('log.activity')}</Text>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('log.activity')}</Text>
             </View>
           </>
         }
         renderItem={({ item: section }) => (
-          <View style={[styles.dayCard, !playful && surfaceTreatment(theme), { backgroundColor: playful ? 'transparent' : theme.surfaceRaised, borderColor: theme.border }]}>
+          <View style={[styles.dayCard, surfaceTreatment(theme), { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
             <Pressable
               testID={`history.day.${section.key === todayKey ? 'today' : section.key === yesterdayKey ? 'yesterday' : section.key}`}
               accessibilityRole="button"
@@ -526,7 +518,7 @@ export function LogScreen({
                 {
                   backgroundColor: pressed ? theme.primarySoft : 'transparent',
                   borderBottomColor: theme.border,
-                  borderBottomWidth: section.expanded && !playful ? StyleSheet.hairlineWidth : 0,
+                  borderBottomWidth: section.expanded ? StyleSheet.hairlineWidth : 0,
                   borderRadius: section.expanded ? 0 : theme.presentation.cardRadius,
                   borderTopLeftRadius: theme.presentation.cardRadius,
                   borderTopRightRadius: theme.presentation.cardRadius,
@@ -954,9 +946,6 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: spacing.xl,
   },
-  greetingRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
-  greeting: { flex: 1, fontSize: 27, lineHeight: 34 },
-  puppy: { width: 84, height: 68 },
   titleBlock: {
     flexDirection: 'row',
     alignItems: 'center',

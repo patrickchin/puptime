@@ -29,7 +29,6 @@ export const EventRow = memo(function EventRow({
 }) {
   const { activityColors, eventPastLabel, t } = useLocalization();
   const colors = activityColors(theme, event);
-  const playful = theme.presentation.iconProfile !== 'default';
   const note = event.note?.trim();
   const timedNap = event.type === 'nap' && event.endedAt !== undefined;
   const running = isOpenNap(event);
@@ -43,26 +42,25 @@ export const EventRow = memo(function EventRow({
       testID={`event.${event.type}`}
       style={[
         styles.row,
-        playful && { backgroundColor: colors.softColor, borderRadius: theme.presentation.cardRadius - 6, paddingHorizontal: 10, marginVertical: 5 },
-        { borderBottomColor: theme.border, borderBottomWidth: showDivider && !playful ? StyleSheet.hairlineWidth : 0 },
+        { borderBottomColor: theme.border, borderBottomWidth: showDivider ? StyleSheet.hairlineWidth : 0 },
       ]}
     >
       <View
         style={[
           styles.iconCircle,
-          { backgroundColor: playful ? theme.surfaceRaised : colors.softColor, borderRadius: theme.presentation.iconRadius },
+          { backgroundColor: colors.softColor, borderRadius: theme.presentation.iconRadius },
         ]}
       >
         <ActivityIcon activity={event} theme={theme} color={colors.color} size={22} />
       </View>
       <View style={styles.copy}>
-        <Text testID={`event.${event.type}.label`} numberOfLines={playful ? undefined : 1} style={[styles.label, { color: theme.text }]}>{pastLabel}</Text>
+        <Text testID={`event.${event.type}.label`} numberOfLines={1} style={[styles.label, { color: theme.text }]}>{pastLabel}</Text>
         {event.estimated ? (
           <Text testID={`event.${event.type}.estimated`} style={[styles.estimated, { color: theme.text }]}>
             {t('eventRow.estimated')}
           </Text>
         ) : null}
-        <Text numberOfLines={playful ? undefined : 1} style={[styles.source, { color: theme.textMuted }]}>{timeSummary}</Text>
+        <Text numberOfLines={1} style={[styles.source, { color: theme.textMuted }]}>{timeSummary}</Text>
         {note ? (
           <View style={styles.noteRow}>
             <MaterialCommunityIcons name="note-text-outline" size={14} color={theme.primary} />

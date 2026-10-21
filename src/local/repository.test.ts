@@ -45,7 +45,7 @@ test('ordinary mutations read only requested records with 10000 saved events and
   assert.deepEqual(await storage.importEvents([event('event-101'),event('imported')]),{imported:1,skipped:1});
   assert.deepEqual(reads.filter(read=>/\bFROM events\b/i.test(read.sql)).map(read=>read.rows),[1,0,0]);
   reads.length=0;
-  await storage.savePuppyName('Biscuit');await storage.saveThemePreference('soft-play');await storage.loadCustomActivities();
+  await storage.savePuppyName('Biscuit');await storage.saveThemePreference('dark');await storage.loadCustomActivities();
   assert.equal(reads.filter(read=>/\bFROM events\b/i.test(read.sql)).length,0,'Settings must use stored activity state.');
   await storage.saveSchedule([{id:'one',type:'meal',minutes:500},{id:'two',type:'walk',minutes:600}]);
   reads.length=0;
