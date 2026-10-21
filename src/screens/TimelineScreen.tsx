@@ -28,14 +28,14 @@ import {
   type TimelineDay,
   type TimelineMark,
 } from '../analytics';
-import { activityFromKey, activityKey, customActivityKey, dateKey, formatDuration, isOpenNap, quickEventTypes, type Activity, type ActivityKey, type PuppyEvent } from '../domain';
+import { activityFromKey, activityKey, customActivityKey, dateKey, formatDuration, formatScheduleWindow, isOpenNap, quickEventTypes, type Activity, type ActivityKey, type PuppyEvent, type ScheduleEntry } from '../domain';
 import {ActivityLoadState} from '../components/ActivityLoadState';
 import {activityWindowBounds,useActivityWindow,type ActivityViewProps} from '../activity-view';
 import { ActivityIcon } from '../components/ActivityIcon';
 import { useLocalization } from '../localization-context';
 import { translate, type AppLanguage } from '../localization';
 import { headingStyle, spacing, type Theme } from '../theme';
-import { collapseEmptyTimelineDays, timelineDetailTime, timelineFormatters, type TimelineGap } from '../timeline-format';
+import { collapseEmptyTimelineDays, timelineDetailTime, timelineExpectedWindows, timelineFormatters, type ExpectedWindow, type TimelineGap } from '../timeline-format';
 
 const INITIAL_DAYS = 14;
 const LOAD_DAYS = 14;
@@ -166,6 +166,7 @@ function TimelineDateLabel({
 
 function TimelineTrack({
   day,
+  expectedWindows,
   selectedTypes,
   savedEstimateIds,
   isToday,
@@ -177,6 +178,7 @@ function TimelineTrack({
   theme,
 }: {
   day: TimelineDay;
+  expectedWindows: readonly ExpectedWindow[];
   selectedTypes: readonly ActivityKey[];
   savedEstimateIds: ReadonlySet<string>;
   isToday: boolean;
@@ -210,6 +212,20 @@ function TimelineTrack({
         },
       ]}
     >
+      {expectedWindows.map((window) => (
+        <View
+          key={`${window.id}-${window.start}`}
+          testID={`timeline.window.${window.type}.${day.key}.${window.start}`}
+          pointerEvents="none"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={[styles.expectedWindow, {
+            backgroundColor: activityColors(theme, { type: window.type }).color,
+            left: `${window.start / 1440 * 100}%`,
+            width: `${(window.end - window.start) / 1440 * 100}%`,
+          }]}
+        />
+      ))}
       {gridHours.map((hour) => (
         <View key={hour} pointerEvents="none" style={[styles.gridLine, {
           backgroundColor: hour % 3 === 0 ? theme.textMuted : theme.border,
@@ -417,14 +433,17 @@ const MemoTimelineDateLabel = memo(TimelineDateLabel);
 const MemoTimelineTrack = memo(TimelineTrack);
 const MemoTimelineAxis = memo(TimelineAxis);
 
-type TimelineProps={events:PuppyEvent[];customActivities:string[];theme:Theme}&ActivityViewProps;
-export function TimelineScreen({ events:projectedEvents,activity,refreshToken,customActivities,theme }:TimelineProps) {
-  const { activityColors, activityLabel, language, t } = useLocalization();
+type TimelineProps={events:PuppyEvent[];schedule:ScheduleEntry[];onOpenSchedule:()=>void;customActivities:string[];theme:Theme}&ActivityViewProps;
+export function TimelineScreen({ events:projectedEvents,activity,refreshToken,schedule,onOpenSchedule,customActivities,theme }:TimelineProps) {
+  const { activityColors, activityLabel, language, locale, t } = useLocalization();
   const { fontScale, height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const activityFilters: ActivityKey[] = useMemo(() => [...quickEventTypes, ...customActivities.map(customActivityKey)], [customActivities]);
   const [selectedType, setSelectedType] = useState<ActivityKey | 'all'>('all');
   const selectedTypes = useMemo(() => selectedType === 'all' ? activityFilters : [selectedType], [activityFilters, selectedType]);
+  const expectedWindows = useMemo(() => timelineExpectedWindows(schedule, selectedTypes), [schedule, selectedTypes]);
+  const expectedDescription = schedule.filter(entry => expectedWindows.some(window => window.id === entry.id))
+    .map(entry => `${activityLabel(entry)}: ${formatScheduleWindow(entry, locale)}`).join('. ');
   useEffect(() => {
     if (selectedType !== 'all' && !activityFilters.includes(selectedType)) setSelectedType('all');
   }, [activityFilters, selectedType]);
@@ -460,7 +479,7 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,cu
     [events, estimates, loadedDayCount, maxHistoryDays, now],
   );
   const todayKey = dateKey(now);
-  const rows = useMemo(() => collapseEmptyTimelineDays(days, todayKey), [days, todayKey]);
+  const rows = useMemo(() => expectedWindows.length ? days : collapseEmptyTimelineDays(days, todayKey), [days, todayKey, expectedWindows]);
   const savedEstimateIds = useMemo(() => new Set(events.filter((event) => event.estimated).map((event) => event.id)), [events]);
   const visibleEventCount = new Set(
     days.flatMap((day) => day.marks.filter((mark) => !mark.estimated && selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label }))).map((mark) => mark.id)),
@@ -782,6 +801,24 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,cu
           })}
         </ScrollView>
 
+        <Pressable
+          testID="timeline.windows.edit"
+          accessibilityRole="button"
+          accessibilityLabel={`${t('schedule.expectedWindow')}. ${expectedDescription ? `${t('timeline.windowsDaily')}. ${expectedDescription}. ` : ''}${t('timeline.editWindows')}`}
+          onPress={onOpenSchedule}
+          style={({ pressed }) => [styles.windowLegend, pressed && { backgroundColor: theme.primarySoft }]}
+        >
+          <MaterialCommunityIcons accessibilityElementsHidden importantForAccessibility="no" name="calendar-clock-outline" size={18} color={theme.textMuted} />
+          <Text style={[styles.windowLegendText, { color: theme.textMuted }]}>{t(expectedWindows.length ? 'timeline.windowsDaily' : 'timeline.editWindows')}</Text>
+          {(['meal', 'poop'] as const).filter(type => expectedWindows.some(window => window.type === type)).map(type => (
+            <View key={type} style={styles.windowLegendActivity}>
+              <View style={[styles.windowLegendSwatch, { backgroundColor: activityColors(theme, { type }).color }]} />
+              <Text style={[styles.windowLegendText, { color: theme.text }]}>{activityLabel({ type })}</Text>
+            </View>
+          ))}
+          <MaterialCommunityIcons accessibilityElementsHidden importantForAccessibility="no" name="chevron-right" size={18} color={theme.textMuted} />
+        </Pressable>
+
         {!isCompactHeight && !window.loading && !window.error && !summaryError && visibleMarkCount === 0 ? (
           <View testID="timeline.empty" style={[styles.emptyNote, { backgroundColor: theme.surface, borderRadius: theme.presentation.controlRadius }]}>
             <MaterialCommunityIcons name="clock-outline" size={18} color={theme.textMuted} />
@@ -846,6 +883,7 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,cu
                   <View style={{ width: trackWidth }}>
                     <MemoTimelineTrack
                       day={day}
+                      expectedWindows={expectedWindows}
                       selectedTypes={selectedTypes}
                       savedEstimateIds={savedEstimateIds}
                       isToday={day.key === todayKey}
@@ -1000,6 +1038,11 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,cu
 }
 
 const styles = StyleSheet.create({
+  expectedWindow: { position: 'absolute', top: 0, bottom: 0, opacity: 0.16 },
+  windowLegend: { minHeight: 48, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: 8, rowGap: 4, paddingVertical: 6 },
+  windowLegendText: { fontSize: 12, lineHeight: 18, flexShrink: 1 },
+  windowLegendActivity: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  windowLegendSwatch: { width: 14, height: 14, opacity: 0.4, borderRadius: 3 },
   screen: { flex: 1 },
   header: {
     paddingHorizontal: spacing.md,

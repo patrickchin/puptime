@@ -3,8 +3,36 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { collapseEmptyTimelineDays, timelineDayEvents, timelineDetailTime, timelineFormatters } from './timeline-format.ts';
+import { collapseEmptyTimelineDays, timelineDayEvents, timelineDetailTime, timelineExpectedWindows, timelineFormatters } from './timeline-format.ts';
 import { buildTimelineDays } from './analytics.ts';
+
+test('expected routine bands keep exact minutes, repeat across midnight, and follow activity filters', () => {
+  const schedule = [
+    { id: 'rtn_breakfast', type: 'meal' as const, minutes: 487, toleranceMinutes: 15 },
+    { id: 'rtn_early', type: 'poop' as const, minutes: 10, toleranceMinutes: 30 },
+    { id: 'rtn_late', type: 'meal' as const, minutes: 1430, toleranceMinutes: 30 },
+    { id: 'rtn_point', type: 'meal' as const, minutes: 720 },
+    { id: 'rtn_off', type: 'poop' as const, minutes: 720, toleranceMinutes: 0 },
+    { id: 'rtn_pee', type: 'pee' as const, minutes: 720, toleranceMinutes: 30 },
+  ];
+  const before = structuredClone(schedule);
+  assert.deepEqual(timelineExpectedWindows(schedule, ['meal', 'poop', 'pee']), [
+    { id: 'rtn_breakfast', type: 'meal', start: 472, end: 502 },
+    { id: 'rtn_early', type: 'poop', start: 0, end: 40 },
+    { id: 'rtn_early', type: 'poop', start: 1420, end: 1440 },
+    { id: 'rtn_late', type: 'meal', start: 1400, end: 1440 },
+    { id: 'rtn_late', type: 'meal', start: 0, end: 20 },
+  ]);
+  assert.equal(timelineExpectedWindows(schedule, ['meal']).length, 3);
+  assert.deepEqual(timelineExpectedWindows(schedule, ['pee']), []);
+  assert.deepEqual(timelineExpectedWindows([], ['meal', 'poop']), []);
+  for (const toleranceMinutes of [720, 1440]) {
+    assert.deepEqual(timelineExpectedWindows([{ id: 'rtn_all', type: 'poop', minutes: 20, toleranceMinutes }], ['poop']), [
+      { id: 'rtn_all', type: 'poop', start: 0, end: 1440 },
+    ]);
+  }
+  assert.deepEqual(schedule, before);
+});
 
 test('collapses consecutive empty days while retaining today, isolated days, and all activity marks', () => {
   const now = new Date(2026, 9, 21, 12);
