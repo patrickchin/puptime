@@ -65,6 +65,10 @@ export const mutationSchema = z.discriminatedUnion('kind', [
   }
 });
 export type Mutation = z.infer<typeof mutationSchema>;
+// Resource endpoints and offline sync accept the same field-level patches.
+export function recordPatchSchema(kind: RecordKind) {
+  return mutationSchema.options.find((schema) => schema.shape.kind.value === kind)!.shape.patch;
+}
 const revisionReasons = ['created', 'updated', 'merged', 'deleted', 'preserved-deletion', 'restored', 'preserved-timing', 'inferred-nap-end'] as const;
 const recordMetadata = {
   id: recordIdSchema, petId: identifierSchema.nullable(),
