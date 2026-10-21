@@ -1,3 +1,9 @@
+import type {ScheduleEntry} from './domain.ts';
+
+export function previewScheduleToKeep(schedule:ScheduleEntry[],keepFullPlan:boolean):ScheduleEntry[]{
+  return keepFullPlan?schedule:schedule.filter(entry=>entry.type==='meal'||entry.type==='poop');
+}
+
 // General feeding guidance, not an individual feeding prescription:
 // https://www.merckvetmanual.com/multimedia/table/feeding-schedule-for-puppies
 export const puppyAges = [

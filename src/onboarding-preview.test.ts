@@ -1,6 +1,19 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {poopDelays,poopWindowsAfterMeals,starterMealTimes,suggestedMealCount} from './onboarding-preview.ts';
+import {poopDelays,poopWindowsAfterMeals,previewScheduleToKeep,starterMealTimes,suggestedMealCount} from './onboarding-preview.ts';
+import type {ScheduleEntry} from './domain.ts';
+
+test('the guided path discards extra examples while an explicitly adopted full plan retains them',()=>{
+  const schedule:ScheduleEntry[]=[
+    {id:'rtn_rG8nhm2k',type:'pee',minutes:420},
+    {id:'rtn_9bH3yWEk',type:'meal',minutes:435},
+    {id:'rtn_p4MmB9Vw',type:'poop',minutes:465,toleranceMinutes:15},
+    {id:'rtn_3PF6wAmn',type:'nap',minutes:540},
+  ];
+  assert.deepEqual(previewScheduleToKeep(schedule,false),[schedule[1],schedule[2]]);
+  assert.deepEqual(previewScheduleToKeep(schedule,true),schedule);
+  assert.deepEqual(previewScheduleToKeep([schedule[0],schedule[3]],false),[]);
+});
 
 test('age guidance leaves unknown age open and offers the age-specific meal count',()=>{
   assert.equal(suggestedMealCount(null),null);

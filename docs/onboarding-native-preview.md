@@ -2,8 +2,38 @@
 
 `index.onboarding-preview.tsx` is a separate Expo entry for reviewing onboarding
 with real native inputs. The normal `index.ts` entry and production first-launch
-flow are unchanged. Answers and routine drafts stay in component state; the
-preview does not open account, database, sync, or notification services.
+flow are unchanged. Answers, routine drafts, and preview logs stay in component
+state. The preview does not open account, database, or sync services. Its optional
+notification choice uses the real OS permission prompt, but schedules nothing.
+
+## The whole journey
+
+Keep one conversational voice from opening the app through the first real log.
+The welcome page combines welcome and account entry, retaining the approved
+emerald palette, real app icon, large Puptime name, Scruffy scene, and one equal
+row of Apple/Google/email choices. These provider entry buttons explicitly explain
+that sign-in is not connected in this design preview and offer the guest path;
+they never pretend that authentication succeeded or send an email.
+
+The guest path asks one question at a time: puppy name, age, meals, and poop
+routine. Replies carry into later prompts and previous times are acknowledged.
+There are no duplicated visible field labels. Screen-reader focus moves to each
+new question; inputs retain accessible names and native keyboard behavior.
+
+After reviewing the plan, a friendly reminder choice asks before invoking the
+native notification-permission sheet. Declining or skipping proceeds normally.
+Granting permission does not enable or schedule individual reminders in this
+preview. A final invitation offers a brief tour or independent exploration.
+
+The tour continues inside the actual `LogScreen`, using its real `QuickActions`,
+event rows, and event editor. A pointer connects the opening hint to the logging
+buttons. The owner can dismiss it without creating a made-up entry. Logging an
+activity replaces the hint with a short acknowledgment; editing and deleting
+those preview records update the in-memory draft. Logs survive navigation back
+to the plan during that run, but relaunching resets the whole preview.
+
+`LogScreen` only gains an optional `quickActionsHelp` slot after its existing
+buttons. Normal callers omit it and retain their current layout and behavior.
 
 ## Conversational routine setup
 
@@ -23,7 +53,9 @@ behind an optional link at the end rather than requiring it during setup.
    predicted digestion delay or an instruction to wait before taking a puppy out.
 6. For known clock times, ask how many usual windows, then one time per page.
    These start with 30 minutes either side and remain editable later.
-7. Review the meal and poop plan. The primary action keeps only those entries.
+7. Review the meal and poop plan. The primary action keeps only those entries
+   and continues to the reminder question, unless a full plan was explicitly
+   adopted earlier. Back navigation preserves that choice.
    The optional full schedule also offers the existing starter pee/nap examples;
    adopting that full plan requires its separate action.
 
@@ -49,7 +81,9 @@ removed now that guided setup owns these questions.
 ## Running on iOS
 
 Use a simulator dedicated to this branch and a native host built from the
-project's current Expo SDK. Export the preview bundle into a copy of that host:
+project's current Expo SDK **and current native modules**, including Google
+Sign-In. An older host without that module cannot load the current log screen's
+account-related imports. Export the preview bundle into a copy of that host:
 
 ```sh
 node node_modules/expo/bin/cli export:embed \
@@ -74,9 +108,23 @@ times, observed post-meal windows, an unknown poop routine left unset, and the
 optional full editor carrying the chosen entries.
 
 General, iOS, and Android TypeScript checks pass. The focused helper, domain,
-native module-parity, and timeline-format tests pass (28 tests), including
-unknown-age guidance and post-meal windows that cross midnight. Android runtime
-layout has not been reviewed in this pass.
+native module-parity, and timeline-format tests pass (29 tests), including
+unknown-age guidance, post-meal windows that cross midnight, and retaining an
+explicitly adopted full plan.
+
+Additional iOS checks cover the full guest journey, the explicit provider-preview
+disclosure, the real notification-permission sheet, declining permission, and
+the handoff into the actual log screen with its contextual hint.
+The final interaction pass after the full-plan retention adjustment is pending:
+computer control is blocked while the host Mac is locked. Its filtering behavior
+is covered by the focused test above.
+
+Android verification uses the dedicated **Puptime_Onboarding_2f17** emulator and
+an ignored native QA fixture with 1,382 synthetic records. The hint and populated
+history render correctly. A temporary EventRow render probe records 58 loaded
+rows: opening the log editor changes none of their counters. The QA entry,
+instrumentation, APK, and records remain under ignored build output; no fixtures
+or debug entry points are added to production.
 
 Red Hat Display and Red Hat Text are bundled as static font weights. Their shared
 SIL Open Font License is in `assets/fonts/RedHat-OFL.txt`.
