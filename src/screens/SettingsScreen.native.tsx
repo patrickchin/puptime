@@ -6,6 +6,7 @@ import { customActivityKey, quickEventTypes, type ActivityKey, type EventType } 
 import { ActivityIcon } from '../components/ActivityIcon';
 import { SettingsRow } from '../components/SettingsRow';
 import { PuppyNameSetting } from '../components/PuppyNameSetting';
+import { ActivityBackupSettings } from '../components/ActivityBackupSettings.native';
 import type { CloudHandle } from '../cloud/use-cloud';
 import { useAccountSnapshot } from '../cloud/use-account-snapshot';
 import { accountStatus } from '../cloud/account-status';
@@ -44,6 +45,7 @@ export function SettingsScreen({
   cloudHandle,
   onOpenAccount,
   onOpenHistory,
+  onBackupsRestored,
   showHeader=true,
 }: {
   theme: Theme;
@@ -63,6 +65,7 @@ export function SettingsScreen({
   cloudHandle?: CloudHandle;
   onOpenAccount?: () => void;
   onOpenHistory?: () => void;
+  onBackupsRestored?: () => Promise<void>;
   showHeader?:boolean;
 }) {
   const { activityColors, activityLabel, t } = useLocalization();
@@ -181,6 +184,7 @@ export function SettingsScreen({
 
       {cloudHandle?.available&&onOpenAccount?<AccountSettingsRow cloud={cloudHandle} theme={theme} onOpen={onOpenAccount}/>:null}
       <PuppyNameSetting theme={theme} cloud={cloudHandle}/>
+      <ActivityBackupSettings theme={theme} onRestored={onBackupsRestored}/>
       {onOpenHistory?<View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}><SettingsRow testID="settings.history.open" icon="history" label={t('history.recentTitle')} detail={t('history.recentDetail')} onPress={onOpenHistory} theme={theme} wrap/></View>:null}
       <View style={[styles.card, surfaceTreatment(theme), { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
         <SettingsRow

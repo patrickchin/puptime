@@ -4,6 +4,7 @@ import { createNativeStorage } from './native-storage.ts';
 import { createLocalSync } from './sync-engine.ts';
 import { createActivityQueries } from './activity-queries.ts';
 import { createEventHistoryQueries } from './event-history.ts';
+import { createLocalRepository } from './repository.ts';
 import type {EventHistoryRestore} from '../event-history.ts';
 
 export async function createLocalRuntime(database:LocalDatabase,petId:string,afterCommit?:()=>void) {
@@ -13,5 +14,6 @@ export async function createLocalRuntime(database:LocalDatabase,petId:string,aft
   });
   const sync=createLocalSync(database,{afterCommit}),storage=createNativeStorage(database,petId,sync.changeSink(petId),afterCommit);
   const history={...createEventHistoryQueries(database,petId),restore:(input:EventHistoryRestore)=>sync.restoreEventHistory({...input,petId})};
-  return {database,petId,deviceId,sync,storage,activity:createActivityQueries(database,petId),history};
+  const recoverEvents=createLocalRepository(database,petId,sync.changeSink(petId,{restoreMissing:true}),afterCommit).importEvents;
+  return {database,petId,deviceId,sync,storage,recoverEvents,activity:createActivityQueries(database,petId),history};
 }

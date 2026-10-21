@@ -590,7 +590,7 @@ export default function App() {
     if (settingsVisible) {
       return (
         <SettingsScreen
-          {...{showHeader:!nativeApp,onOpenHistory:eventHistory?()=>setHistoryVisible(true):undefined,notificationDelivery:nativeApp?notificationDelivery:undefined,
+          {...{showHeader:!nativeApp,onBackupsRestored:refreshCommittedState,onOpenHistory:eventHistory?()=>setHistoryVisible(true):undefined,notificationDelivery:nativeApp?notificationDelivery:undefined,
             onNotificationDeliveryChange:changeNotificationDelivery,routineReminderCount:schedule.filter(entry=>entry.reminder).length,
             onOpenSchedule:()=>{setSettingsVisible(false);setScheduleOpenedFromSettings(true);setTab('schedule');}}}
           theme={theme}
