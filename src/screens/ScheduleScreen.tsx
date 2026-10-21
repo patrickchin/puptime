@@ -41,6 +41,7 @@ export function ScheduleScreen({
   onRequestReminderPermission,
   theme,
   setupHeader,
+  setupActivities,
 }: {
   events: PuppyEvent[];
   schedule: ScheduleEntry[];
@@ -51,6 +52,7 @@ export function ScheduleScreen({
   onRequestReminderPermission: () => Promise<boolean>;
   theme: Theme;
   setupHeader?: ReactNode;
+  setupActivities?: readonly EventType[];
 }&ActivityViewProps) {
   const { activityColors, activityLabel, locale, t } = useLocalization();
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -98,7 +100,9 @@ export function ScheduleScreen({
   const openNew = () => {
     const now = new Date();
     const rounded = Math.round((now.getHours() * 60 + now.getMinutes()) / 15) * 15;
-    originalDraft.current=undefined;setDraft({ id: entityId('rtn'), type: 'pee', minutes: rounded % (24 * 60), reminder: false });
+    const type = setupActivities?.[0] ?? 'pee';
+    originalDraft.current=undefined;setDraft({ id: entityId('rtn'), type, minutes: rounded % (24 * 60), reminder: false,
+      ...(setupActivities && (type === 'meal' || type === 'poop') ? {toleranceMinutes:30} : {}) });
     setShowTimeSelector(false);
   };
 
@@ -376,14 +380,14 @@ export function ScheduleScreen({
                   <View style={[styles.timelineDot, { backgroundColor: colors.color }]} />
                   {index < schedule.length - 1 ? <View style={[styles.timelineLine, { backgroundColor: theme.border }]} /> : null}
                 </View>
-                <Text style={[styles.time, { color: theme.text }]}>{formatMinutes(entry.minutes, locale)}</Text>
+                {!setupActivities ? <Text style={[styles.time, { color: theme.text }]}>{formatMinutes(entry.minutes, locale)}</Text> : null}
                 <View style={styles.rowCopy}>
                   <Text style={[styles.rowTitle, { color: theme.text }]}>{label}</Text>
                   {entry.toleranceMinutes !== undefined ? (
-                    <Text style={[styles.windowDetail, { color: theme.textMuted }]}>
-                      {t('schedule.usualWindow', { range: formatScheduleWindow(entry, locale) })}
+                    <Text style={[setupActivities ? styles.setupWindow : styles.windowDetail, { color: setupActivities ? theme.text : theme.textMuted }]}>
+                      {setupActivities ? formatScheduleWindow(entry, locale) : t('schedule.usualWindow', { range: formatScheduleWindow(entry, locale) })}
                     </Text>
-                  ) : null}
+                  ) : setupActivities ? <Text style={[styles.setupWindow, {color:theme.text}]}>{formatMinutes(entry.minutes,locale)}</Text> : null}
                   {!setupHeader ? <View
                     style={[
                       styles.statusPill,
@@ -441,14 +445,15 @@ export function ScheduleScreen({
           onPress={openNew}
           style={({ pressed }) => [
             styles.addButton,
+            setupActivities && {minHeight:44,marginTop:0},
             {
-              backgroundColor: pressed ? theme.primaryPressed : theme.primary,
+              backgroundColor: setupActivities ? pressed ? theme.primarySoft : 'transparent' : pressed ? theme.primaryPressed : theme.primary,
               borderRadius: theme.presentation.controlRadius,
             },
           ]}
         >
-          <MaterialCommunityIcons name="plus" color={theme.onPrimary} size={22} />
-          <Text style={[styles.addButtonText, { color: theme.onPrimary }]}>{t('schedule.addTime')}</Text>
+          <MaterialCommunityIcons name="plus" color={setupActivities ? theme.primary : theme.onPrimary} size={22} />
+          <Text style={[styles.addButtonText, { color: setupActivities ? theme.primary : theme.onPrimary }]}>{t('schedule.addTime')}</Text>
         </Pressable>
       </ScrollView>
 
@@ -573,7 +578,7 @@ export function ScheduleScreen({
           >
             <View style={styles.sheetHeading}>
               <Text style={[styles.sheetTitle, { color: theme.text }]}>
-                {t(draft?.id ? 'schedule.editTime' : 'schedule.addTime')}
+                {t(originalDraft.current ? 'schedule.editTime' : 'schedule.addTime')}
               </Text>
               <Pressable
                 testID="schedule.editor.close"
@@ -587,8 +592,8 @@ export function ScheduleScreen({
 
             <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{t('schedule.activity')}</Text>
             <View style={styles.typePicker}>
-              {[...quickEventTypes.map((type) => ({ type, customLabel: undefined as string | undefined })),
-                ...customActivities.map((customLabel) => ({ type: 'custom' as EventType, customLabel }))].map(({ type, customLabel }) => {
+              {[...(setupActivities ?? quickEventTypes).map((type) => ({ type, customLabel: undefined as string | undefined })),
+                ...(!setupActivities ? customActivities : []).map((customLabel) => ({ type: 'custom' as EventType, customLabel }))].map(({ type, customLabel }) => {
                 const selected = draft?.type === type && (type !== 'custom' || customActivityKey(draft.customLabel ?? '') === customActivityKey(customLabel ?? ''));
                 const activity = { type, customLabel };
                 const colors = activityColors(theme, activity);
@@ -598,7 +603,7 @@ export function ScheduleScreen({
                     key={customLabel ? customActivityKey(customLabel) : type}
                     testID={`schedule.editor.type.${type}`}
                     accessibilityState={{ selected }}
-                    onPress={() => draft && setDraft({ ...draft, type, customLabel, toleranceMinutes: selected ? draft.toleranceMinutes : undefined })}
+                    onPress={() => draft && setDraft({ ...draft, type, customLabel, toleranceMinutes: selected ? draft.toleranceMinutes : setupActivities && (type === 'meal' || type === 'poop') ? 30 : undefined })}
                     style={({ pressed }) => [
                       styles.typeChoice,
                       {
@@ -740,6 +745,7 @@ export function ScheduleScreen({
 }
 
 const styles = StyleSheet.create({
+  setupWindow: { fontSize: 20, fontWeight: '600', lineHeight: 28, marginTop: 3, fontVariant: ['tabular-nums'] },
   windowChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   windowChoice: { minHeight: 48, minWidth: 72, borderWidth: 1, borderRadius: 14, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
   content: {

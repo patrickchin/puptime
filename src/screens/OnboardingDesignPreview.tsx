@@ -9,6 +9,7 @@ import {
 import {SafeAreaProvider,SafeAreaView} from 'react-native-safe-area-context';
 
 import {STARTER_SCHEDULE,type ScheduleEntry} from '../domain';
+import {entityId} from '../entity-id';
 import {LocalizationProvider} from '../localization-context';
 import {lightTheme,type Theme} from '../theme';
 import {ScheduleScreen} from './ScheduleScreen';
@@ -37,9 +38,12 @@ export function OnboardingDesignPreview(){
 }
 
 function PreviewFlow(){
-  const [step,setStep]=useState<'profile'|'schedule'|'done'>('profile');
+  const [step,setStep]=useState<'profile'|'times'|'schedule'|'done'>('profile');
   const [name,setName]=useState('');
-  const [schedule,setSchedule]=useState<ScheduleEntry[]>(()=>STARTER_SCHEDULE.map(entry=>({...entry,reminder:false})));
+  const [schedule,setSchedule]=useState<ScheduleEntry[]>(()=>[
+    ...STARTER_SCHEDULE.map(entry=>({...entry,reminder:false,...(entry.type==='meal'?{toleranceMinutes:30}:{})})),
+    ...[8*60,18*60].map(minutes=>({id:entityId('rtn'),type:'poop' as const,minutes,toleranceMinutes:30,reminder:false})),
+  ].sort((a,b)=>a.minutes-b.minutes));
   const [mascot]=useState(()=>mascots[Math.floor(Math.random()*mascots.length)]);
   const [keyboardVisible,setKeyboardVisible]=useState(Keyboard.isVisible());
   const scroll=useRef<ScrollView>(null);
@@ -49,13 +53,14 @@ function PreviewFlow(){
     const hide=Keyboard.addListener(Platform.OS==='ios'?'keyboardWillHide':'keyboardDidHide',()=>setKeyboardVisible(false));
     return()=>{show.remove();hide.remove();};
   },[]);
-  function next(){Keyboard.dismiss();setStep('schedule');}
+  function next(){Keyboard.dismiss();setStep('times');}
+  const focusedTimes=step==='times';
   const brand=<View style={styles.brand}><Image source={require('../../assets/puptime-icon.png')} style={styles.icon}/><Text style={styles.brandName}>Puptime</Text></View>;
   const header=<View style={styles.header}>
-    {step==='schedule'?<Pressable testID="preview.back" accessibilityRole="button" accessibilityLabel="Back to puppy name" onPress={()=>setStep('profile')} style={styles.back}>
+    {step==='schedule'||focusedTimes?<Pressable testID="preview.back" accessibilityRole="button" accessibilityLabel={focusedTimes?'Back to puppy name':'Back to eat and poop times'} onPress={()=>setStep(focusedTimes?'profile':'times')} style={styles.back}>
       <MaterialCommunityIcons name="chevron-left" size={18} color={theme.textMuted}/><Text style={styles.backText}>Back</Text>
     </Pressable>:<View style={styles.back}/>}
-    {brand}<Text style={styles.optional}>{step==='schedule'||step==='profile'?'Optional':''}</Text>
+    {brand}<Text style={styles.optional}>{step!=='done'?'Optional':''}</Text>
   </View>;
   const footer=(label:string,onPress:()=>void,skip:()=>void)=><View style={styles.footer}>
     <Pressable testID="preview.continue" accessibilityRole="button" onPress={onPress} style={({pressed})=>[styles.primary,pressed&&styles.pressed]}>
@@ -78,23 +83,24 @@ function PreviewFlow(){
           </View>
         </ScrollView>
         {footer('Continue',next,()=>{setName('');next();})}
-      </>:step==='schedule'?<>
+      </>:step==='schedule'||focusedTimes?<>
         <View style={styles.schedule}>
-          <ScheduleScreen theme={theme} events={[]} schedule={schedule} customActivities={[]}
+          <ScheduleScreen theme={theme} events={[]} schedule={focusedTimes?schedule.filter(entry=>entry.type==='meal'||entry.type==='poop'):schedule} customActivities={[]}
+            setupActivities={focusedTimes?['meal','poop']:undefined}
             setupHeader={<View style={styles.scheduleHeader}>
-              <Text accessibilityRole="header" style={styles.title}>Let’s set up{'\n'}your schedule.</Text>
-              <View style={styles.learning}>
+              <Text accessibilityRole="header" style={styles.title}>{focusedTimes?'Eat & poop\ntimes.':'Let’s set up\nyour schedule.'}</Text>
+              {focusedTimes?<Text style={styles.learningBody}>Adjust these example windows, or skip. Puptime can suggest times from your logs later.</Text>:<View style={styles.learning}>
                 <View style={styles.learningTitle}><MaterialCommunityIcons name="clock-outline" size={18} color={theme.primary}/><Text style={styles.learningHeading}>Let your logs lead</Text></View>
                 <Text style={styles.learningBody}>Edit these starter times, or skip. Puptime can suggest times from your logs for you to review later.</Text>
-              </View>
-              <Text style={styles.starterLabel}>Starter schedule</Text>
+              </View>}
+              {!focusedTimes?<Text style={styles.starterLabel}>Starter schedule</Text>:null}
             </View>}
             onChange={async nextSchedule=>setSchedule(nextSchedule)}
             onSaveEntry={async entry=>setSchedule(current=>[...current.filter(item=>item.id!==entry.id),entry].sort((a,b)=>a.minutes-b.minutes))}
             onRemoveEntry={async id=>setSchedule(current=>current.filter(item=>item.id!==id))}
             onRequestReminderPermission={async()=>false}/>
         </View>
-        {footer('Use this schedule',()=>setStep('done'),()=>{setSchedule([]);setStep('done');})}
+        {focusedTimes?footer('Continue',()=>setStep('schedule'),()=>setStep('schedule')):footer('Use this schedule',()=>setStep('done'),()=>{setSchedule([]);setStep('done');})}
       </>:<View testID="preview.ready" style={styles.ready}>
         <MaterialCommunityIcons name="check-circle-outline" size={48} color={theme.primary}/>
         <Text accessibilityRole="header" style={styles.title}>Ready to go.</Text>
