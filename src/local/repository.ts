@@ -5,6 +5,7 @@ import { applyScheduleEntryEdit } from '../schedule-editor.ts';
 import { localChanges, notifyLocalCommit, retainCustomActivities, type LocalChange, type LocalChangeSink } from './sync-projection.ts';
 import { localIdSchema } from '../cloud/protocol.ts';
 import { eventDataFromSql, routineDataFromSql, eventSqlValues, routineSqlValues, upsertEventSql, upsertRoutineSql, type EventSqlRow, type RoutineSqlRow } from '../record-sql.ts';
+import type { BackupGuard } from './activity-backups.ts';
 
 type EventRow = { id: string; at: number; body: string; event: PuppyEvent };
 const records=(kind:'event'|'routine',value:PuppyEvent|ScheduleEntry|null)=>{
@@ -18,7 +19,20 @@ export async function writeEventRecord(sql:SqlExecutor,petId:string,before:Puppy
   else await sql.runAsync('DELETE FROM events WHERE pet_id=? AND id=?',petId,before!.id);
   return changes;
 }
-export function createLocalRepository(database: LocalDatabase, petId: string, onChange?: LocalChangeSink, afterCommit?:()=>void) {
+// Shared by CSV imports and recovery, inside the caller's transaction.
+export async function importEventRecords(sql:SqlExecutor,petId:string,incoming:PuppyEvent[]) {
+  const changes:LocalChange[]=[];let imported=0;
+  for (const event of incoming) {
+    if (await sql.getFirstAsync('SELECT id FROM events WHERE pet_id=? AND id=?',petId,event.id)) continue;
+    changes.push(...await writeEventRecord(sql,petId,null,event));imported++;
+  }
+  const open=await sql.getAllAsync("SELECT id FROM events WHERE pet_id=? AND type='nap' AND end_state=1 LIMIT 2",petId);
+  if (open.length>1) throw new EventsImportError();
+  const labels=changes.flatMap(change=>change.after?.type==='custom'?[String(change.after.customLabel)]:[]);
+  changes.push(...await retainCustomActivities(sql,petId,labels));
+  return {changes,value:{imported,skipped:incoming.length-imported}};
+}
+export function createLocalRepository(database: LocalDatabase, petId: string, onChange?: LocalChangeSink, afterCommit?:()=>void, beforeChange?:BackupGuard) {
   const cache = new Map<string, { body: string; event: PuppyEvent }>();
   async function requirePet(sql: SqlExecutor) {
     if (!await sql.getFirstAsync('SELECT id FROM puppies WHERE id=?', petId)) throw new Error('The local puppy could not be found.');
@@ -104,20 +118,18 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
     async importEvents(incoming:PuppyEvent[]):Promise<{imported:number;skipped:number}> {
       incoming=parseEvents(incoming);
       return commit(async sql=>{
-        const changes:LocalChange[]=[];let imported=0;
-        for (const event of incoming) {
-          if (await readEvent(sql,event.id)) continue;
-          changes.push(...await writeEvent(sql,null,event));imported++;
-        }
-        const open=await sql.getAllAsync("SELECT id FROM events WHERE pet_id=? AND type='nap' AND end_state=1 LIMIT 2",petId);
-        if (open.length>1) throw new EventsImportError();
-        return {changes:await eventLabels(sql,changes),value:{imported,skipped:incoming.length-imported}};
+        if (incoming.length) await beforeChange?.(sql,'import');
+        return importEventRecords(sql,petId,incoming);
       });
     },
     updateEvent,
     updateEventTime:(id:string,at:number)=>updateEvent(id,{at}),
     async removeEvent(id:string):Promise<void> {
-      await commit(async sql=>({changes:await writeEvent(sql,await readEvent(sql,id),null),value:undefined}));
+      await commit(async sql=>{
+        const before=await readEvent(sql,id);
+        if(before)await beforeChange?.(sql,'delete');
+        return {changes:await writeEvent(sql,before,null),value:undefined};
+      });
     },
     loadSchedule:()=>database.read(readSchedule),
     async saveSchedule(entries:ScheduleEntry[]):Promise<void> {

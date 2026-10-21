@@ -1,4 +1,3 @@
-import { useFonts } from 'expo-font';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
@@ -104,11 +103,6 @@ configureReminderHandling();
 const nativeApp = Platform.OS !== 'web';
 
 export default function App() {
-  const [fontsLoaded, fontError] = useFonts({
-    Delius: require('./assets/fonts/Delius-Regular.ttf'),
-    LilitaOne: require('./assets/fonts/LilitaOne-Regular.ttf'),
-    Itim: require('./assets/fonts/Itim-Regular.ttf'),
-  });
   const colorScheme = useColorScheme();
   const [themePreference, setThemePreference] = useState<ThemePreference>('system');
   const [languagePreference, setLanguagePreference] = useState<LanguagePreference>('system');
@@ -596,7 +590,7 @@ export default function App() {
     if (settingsVisible) {
       return (
         <SettingsScreen
-          {...{showHeader:!nativeApp,onOpenHistory:eventHistory?()=>setHistoryVisible(true):undefined,notificationDelivery:nativeApp?notificationDelivery:undefined,
+          {...{showHeader:!nativeApp,onBackupsRestored:refreshCommittedState,onOpenHistory:eventHistory?()=>setHistoryVisible(true):undefined,notificationDelivery:nativeApp?notificationDelivery:undefined,
             onNotificationDeliveryChange:changeNotificationDelivery,routineReminderCount:schedule.filter(entry=>entry.reminder).length,
             onOpenSchedule:()=>{setSettingsVisible(false);setScheduleOpenedFromSettings(true);setTab('schedule');}}}
           theme={theme}
@@ -631,7 +625,7 @@ export default function App() {
       onNotificationDeliveryChange={changeNotificationDelivery} onOpenSystemSettings={()=>{void Linking.openSettings().catch(()=>undefined);}}
       onOpenSchedule={()=>navigateToTab('schedule')}/>;
     if (tab === 'learn') return <LearnScreen theme={theme} />;
-    if (tab === 'timeline') return <TimelineScreen events={events} activity={activity} refreshToken={refreshToken} customActivities={customActivities} theme={theme} />;
+    if (tab === 'timeline') return <TimelineScreen events={events} activity={activity} refreshToken={refreshToken} schedule={schedule} onOpenSchedule={()=>navigateToTab('schedule')} theme={theme} />;
     if (tab === 'insights') return <InsightsScreen events={events} activity={activity} refreshToken={refreshToken} customActivities={customActivities} onImport={importActivity} theme={theme} />;
     if (tab === 'schedule') {
       return (
@@ -718,7 +712,7 @@ export default function App() {
             </Pressable>:null}
           </View>:null}
           <View style={styles.screen}>
-            {onboardingVisible === null || (!fontsLoaded && !fontError) ? nativeApp?<View testID="setup.loading" style={styles.startup}>
+            {onboardingVisible === null ? nativeApp?<View testID="setup.loading" style={styles.startup}>
               {startupFailed?<>
                 <Text testID="setup.loadError" accessibilityRole="alert" style={[styles.startupText,{color:theme.text}]}>{translate(language,'setup.loadError')}</Text>
                 <Pressable testID="setup.retry" accessibilityRole="button" onPress={()=>{cloud.retry?.();void openJournal();}} style={[styles.startupRetry,{backgroundColor:theme.primary}]}><Text style={[styles.startupText,{color:theme.onPrimary}]}>{translate(language,'setup.retry')}</Text></Pressable>

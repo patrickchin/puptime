@@ -323,11 +323,15 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
     verifyEmail(email:string,code:string) {return authenticate(async()=>{
       if(!/^\d{6}$/.test(code)||email!==snapshot.codeSentTo)return fail('invalid-code');
       if(!await canSignIn('email'))return 'error';
+      await runtime.checkpoint('account-change');
+      if(disposed)return 'cancelled';
       const result=await outcome(()=>identity.verifyEmail(email,code));if(result.error)return fail(identityProblem(result.error,true));
       if(!await loadAccount())return 'error';emit({codeSentTo:null});return await refreshLinkedProviders()?'ok':'error';
     });},
     signInSocial(provider:'apple'|'google') {return authenticate(async()=>{
       if(!await canSignIn(provider))return 'error';
+      await runtime.checkpoint('account-change');
+      if(disposed)return 'cancelled';
       const result=await outcome(()=>identity.signInSocial(provider));if(result.cancelled)return 'cancelled';if(result.error){const problem=identityProblem(result.error);return fail(problem==='sign-in-failed'?'social-incomplete':problem);}
       if(!await loadAccount())return disposed||snapshot.problem==='network'?'error':fail('social-incomplete');return await refreshLinkedProviders()?'ok':'error';
     });},
@@ -390,7 +394,10 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
     signOut({confirmPending=false}:{confirmPending?:boolean}) {return perform(async()=>{
       const status=await runtime.sync.status(runtime.petId);
       if(status.pending&&!confirmPending){emit({problem:'pending-confirmation-required'});return 'pending-confirmation-required';}
-      await pauseTransport();signOutUnfinished=true;
+      await pauseTransport();
+      await runtime.checkpoint('account-change');
+      if(disposed)return 'cancelled';
+      signOutUnfinished=true;
       const result=await outcome(()=>identity.signOut());
       if(result.error?.code==='NATIVE_SIGN_OUT_FAILED')return fail('sign-out-failed');
       // Expo may clear secure credentials before a failed network response.

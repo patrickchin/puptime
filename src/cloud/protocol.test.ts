@@ -64,6 +64,14 @@ test('personal preference records require account scope and reject OS/device sta
   }
 });
 
+test('appearance sync accepts explicit modes and preferences from older clients', () => {
+  for (const theme of ['system', 'light', 'dark', 'puppy-journal', 'soft-play', 'day-trails']) {
+    assert.equal(recordDataSchema('accountPreferences').safeParse({ theme }).success, true);
+    assert.equal(mutationSchema.safeParse({ ...mutation, petId: null, kind: 'accountPreferences', patch: { theme } }).success, true);
+  }
+  assert.equal(recordDataSchema('accountPreferences').safeParse({ theme: 'unknown' }).success, false);
+});
+
 test('cloud custom activity labels cannot exceed native normalization limits', () => {
   const tooLong = 'a'.repeat(40) + 'b';
   assert.equal(recordDataSchema('customActivity').safeParse({ label: tooLong }).success, false);

@@ -24,7 +24,7 @@ const careImages = {
 };
 
 function GuideImage({ article, style }: { article: CareArticle; style: ComponentProps<typeof Image>['style'] }) {
-  return <View style={[style, styles.imageFrame]} pointerEvents="none" aria-hidden>
+  return <View testID={`learn.image.${article.id}`} style={[style, styles.imageFrame, Platform.OS === 'web' && { backgroundColor: 'transparent' }]} pointerEvents="none" aria-hidden>
     <Image source={careImages[article.image]} style={styles.imageFill} resizeMode="contain" accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" />
   </View>;
 }
@@ -53,12 +53,12 @@ function ArticleRow({ article, theme, onOpen, featured = false, wide = false, pl
   const largeText = fontScale > 1.5;
   const content = plain ? <Text style={[styles.linkText, { color: theme.primary }]}>{article.shortTitle} →</Text> : (
     <>
-      <GuideImage article={article} style={featured ? [styles.featuredImage, width < 360 && styles.smallFeaturedImage] : [styles.cardImage, largeText && styles.cardImageLargeText]} />
+      <GuideImage article={article} style={featured ? [styles.featuredImage, width < 360 && styles.smallFeaturedImage, Platform.OS === 'web' && [webStyles.featuredImage, width < 700 && webStyles.featuredImageCompact]] : [styles.cardImage, largeText && styles.cardImageLargeText, Platform.OS === 'web' && webStyles.cardImage]} />
       <View style={featured ? [styles.rowCopy, largeText && styles.columnCopy] : undefined}>
         {featured && article.id === 'getting-started' && <Text style={[styles.eyebrow, { color: theme.primary }]}>{t('learn.start')}</Text>}
-        <Text style={[styles.rowTitle, featured && styles.featuredTitle, { color: theme.text }]}>{article.shortTitle}</Text>
+        <Text style={[styles.rowTitle, featured && styles.featuredTitle, { color: theme.text }, Platform.OS === 'web' && webStyles.rowTitle]}>{article.shortTitle}</Text>
         {featured
-          ? <Text style={[styles.rowSummary, { color: theme.textMuted }]}>{article.summary}</Text>
+          ? <Text style={[styles.rowSummary, { color: theme.textMuted }, Platform.OS === 'web' && webStyles.rowSummary]}>{article.summary}</Text>
           : <><Text style={[styles.cardTakeaway, { color: article.image === 'urgent' ? theme.danger : theme.primary }]}>{article.glance[0].value}</Text>
               <Text style={[styles.cardContext, { color: theme.textMuted }]}>{article.glance[0].label}</Text></>}
       </View>
@@ -70,6 +70,7 @@ function ArticleRow({ article, theme, onOpen, featured = false, wide = false, pl
     accessibilityLabel: `${t('learn.read')}: ${article.shortTitle}`,
     style: ({ pressed }: { pressed: boolean }) => plain ? [styles.relatedLink, pressed && styles.pressed] : [
       styles.articleCard, featured ? styles.featured : wide ? styles.cardWide : styles.cardSmall,
+      Platform.OS === 'web' && [webStyles.card, featured ? [webStyles.featured, width < 700 && webStyles.featuredCompact] : width >= 700 ? webStyles.cardWide : webStyles.cardSmall],
       largeText && (featured ? styles.featuredLargeText : styles.cardLargeText),
       { borderColor: theme.border, backgroundColor: featured ? theme.primarySoft : theme.surface, borderRadius: theme.presentation.controlRadius },
       pressed && styles.pressed,
@@ -124,7 +125,7 @@ export function LearnScreen({ theme, articleId, onArticleChange }: {
     // React Native Web exposes the DOM node; move keyboard focus with page navigation.
     const node = heading.current as unknown as HTMLElement;
     node.setAttribute('tabindex', '-1');
-    node.focus?.();
+    node.focus?.({ preventScroll: true });
   }, [selectedId]);
 
   useEffect(() => {
@@ -142,8 +143,8 @@ export function LearnScreen({ theme, articleId, onArticleChange }: {
   const title = article?.shortTitle ?? (invalidArticle ? t('learn.notFound') : t('learn.title'));
 
   const content = (
-    <ScrollView key={selectedId ?? 'library'} testID="screen.learn" style={{ backgroundColor: theme.background }} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-      <View style={[styles.content, article && styles.articleContent]}>
+    <ScrollView key={selectedId ?? 'library'} testID="screen.learn" style={{ backgroundColor: theme.background }} contentContainerStyle={[styles.scrollContent, Platform.OS === 'web' && webStyles.scrollContent]} keyboardShouldPersistTaps="handled">
+      <View style={[styles.content, article && styles.articleContent, Platform.OS === 'web' && [webStyles.content, article && webStyles.articleContent]]}>
         {selectedId !== null && (
           <Pressable testID="learn.back" accessibilityRole="button" onPress={() => open(null)} style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
             {Platform.OS === 'web'
@@ -152,22 +153,22 @@ export function LearnScreen({ theme, articleId, onArticleChange }: {
             <Text style={[styles.linkText, { color: theme.primary }]}>{t('learn.back')}</Text>
           </Pressable>
         )}
-        <View style={[styles.headingRow, fontScale > 1.5 && styles.headingLargeText]}>
+        <View style={[styles.headingRow, fontScale > 1.5 && styles.headingLargeText, Platform.OS === 'web' && article && webStyles.articleHeading]}>
           <View style={[styles.rowCopy, fontScale > 1.5 && styles.columnCopy]}>
             {!article && <Text style={[styles.eyebrow, { color: theme.primary }]}>{t('learn.eyebrow')}</Text>}
-            <Text ref={heading} accessibilityRole="header" aria-level={1} style={[styles.title, { color: theme.text, fontSize: theme.presentation.titleSize, lineHeight: theme.presentation.titleLineHeight, fontWeight: theme.presentation.titleWeight }]}>{title}</Text>
+            <Text ref={heading} accessibilityRole="header" aria-level={1} style={[styles.title, { color: theme.text, fontSize: theme.presentation.titleSize, lineHeight: theme.presentation.titleLineHeight, fontWeight: theme.presentation.titleWeight }, Platform.OS === 'web' && webStyles.title]}>{title}</Text>
             {!article && <Text style={[styles.intro, { color: theme.textMuted }]}>{invalidArticle ? t('learn.notFoundBody') : t('learn.intro')}</Text>}
           </View>
-          {article && <GuideImage article={article} style={[styles.heroImage, width < 360 && styles.smallFeaturedImage, wide && styles.heroImageWide]} />}
+          {article && <GuideImage article={article} style={[styles.heroImage, width < 360 && styles.smallFeaturedImage, wide && styles.heroImageWide, Platform.OS === 'web' && webStyles.heroImage]} />}
         </View>
         {language !== 'en' && <Text style={[styles.meta, { color: theme.textMuted }]}>{t('learn.english')}</Text>}
 
         {article ? (
           <>
             {article.sections.map((section) => (
-              <View key={section.title} style={styles.section}>
+              <View key={section.title} style={[styles.section, Platform.OS === 'web' && webStyles.section]}>
                 <Text accessibilityRole="header" aria-level={2} style={[styles.sectionTitle, { color: theme.text }]}>{section.title}</Text>
-                {section.paragraphs.map((paragraph) => <Text key={paragraph} selectable style={[styles.body, { color: theme.text }]}>{paragraph}</Text>)}
+                {section.paragraphs.map((paragraph) => <Text key={paragraph} selectable style={[styles.body, { color: theme.text }, Platform.OS === 'web' && webStyles.body]}>{paragraph}</Text>)}
               </View>
             ))}
             <View style={[styles.section, styles.divided, { borderColor: theme.border }]}>
@@ -270,4 +271,27 @@ const styles = StyleSheet.create({
   referenceContent: { gap: 8 },
   divided: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 24 },
   video: { marginTop: 8 },
+});
+
+// The website has room for illustrations and a comfortable reading measure.
+// Keep the compact native layout for the app's Learn tab.
+const webStyles = StyleSheet.create({
+  scrollContent: { paddingHorizontal: 24, paddingTop: 40, paddingBottom: 64 },
+  content: { maxWidth: 1160 },
+  articleContent: { maxWidth: 720 },
+  title: { fontSize: 44, lineHeight: 49, fontWeight: '900', marginBottom: 16 },
+  articleHeading: { flexDirection: 'column', alignItems: 'stretch', gap: 12 },
+  heroImage: { width: '100%', height: 'auto', aspectRatio: 1.6, borderRadius: 16, marginTop: 8, marginBottom: 12 },
+  featuredImage: { width: 160, height: 160 },
+  featuredImageCompact: { width: '100%', height: 'auto', aspectRatio: 1.6 },
+  card: { padding: 16, gap: 12 },
+  featured: { gap: 24, flexWrap: 'wrap' },
+  featuredCompact: { flexDirection: 'column', alignItems: 'stretch', gap: 12 },
+  cardWide: { width: '31.5%' },
+  cardSmall: { width: '100%' },
+  cardImage: { aspectRatio: 1.2 },
+  rowTitle: { fontSize: 22, lineHeight: 28 },
+  rowSummary: { fontSize: 16, lineHeight: 25 },
+  section: { marginTop: 36, gap: 16 },
+  body: { fontSize: 18, lineHeight: 30 },
 });

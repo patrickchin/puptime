@@ -10,6 +10,8 @@ import { cloudRecordId } from '../cloud/record-identity.ts';
 import type { CloudRecord } from '../cloud/protocol.ts';
 import * as engine from './sync-engine.ts';
 import { createEvent } from '../domain.ts';
+import { createLocalRepository } from './repository.ts';
+import { createLocalRuntime } from './runtime-factory.ts';
 
 async function setup(t:TestContext,{pristine=false}={}) {
   const directory=await mkdtemp(join(tmpdir(),'puptime-sync-'));
@@ -59,7 +61,7 @@ test('first-launch restore resumes the exact cloud puppy without uploading local
   {id:'cloud-pet',petId:'cloud-pet',kind:'puppy',data:{name:'Basil'},revision:1,sequence:1,deleted:false,updatedAt:1},
   {id:cloudRecordId('routine','cloud-pet','starter-1'),petId:'cloud-pet',kind:'routine',data:{type:'pee',minutes:500,reminder:true},revision:1,sequence:2,deleted:false,updatedAt:1},
   {id:cloudRecordId('routine','cloud-pet','cloud-walk'),petId:'cloud-pet',kind:'routine',data:{type:'walk',minutes:700},revision:1,sequence:3,deleted:false,updatedAt:1},
-  {id:cloudRecordId('accountPreferences',null,'preferences'),petId:null,kind:'accountPreferences',data:{language:'es',theme:'soft-play'},revision:1,sequence:4,deleted:false,updatedAt:1},
+  {id:cloudRecordId('accountPreferences',null,'preferences'),petId:null,kind:'accountPreferences',data:{language:'es',theme:'dark'},revision:1,sequence:4,deleted:false,updatedAt:1},
   {id:cloudRecordId('event','cloud-pet','cloud-log'),petId:'cloud-pet',kind:'event',data:{type:'meal',at:1000,source:'app',note:'Cloud only'},revision:1,sequence:5,deleted:false,updatedAt:1},
  ];
  const request={...input,mode:'restore' as const,enrollment:{...enrollment,name:'Basil',confirmedPetId:'cloud-pet'}};
@@ -73,7 +75,7 @@ test('first-launch restore resumes the exact cloud puppy without uploading local
  assert.equal(await storage.loadPuppyName(),'Basil');
  assert.deepEqual(await storage.loadSchedule(),[{id:'starter-1',type:'pee',minutes:500,reminder:true},{id:'cloud-walk',type:'walk',minutes:700}]);
  assert.deepEqual(await storage.loadEvents(),[{id:'cloud-log',type:'meal',at:1000,source:'app',note:'Cloud only'}]);
- assert.equal(await storage.loadLanguagePreference(),'es');assert.equal(await storage.loadThemePreference(),'soft-play');
+ assert.equal(await storage.loadLanguagePreference(),'es');assert.equal(await storage.loadThemePreference(),'dark');
  assert.deepEqual(await resumed.nextBatch(fence),[]);
  assert.equal(saved.mode,'restore');assert.ok(!('mode' in saved.request));
  assert.deepEqual(saved.request,request.enrollment);
@@ -107,7 +109,7 @@ test('first-launch restore requires explicit confirmation and untouched preferen
  const plain=await setup(t,{pristine:true});
  await assert.rejects(plain.sync.prepareAssociation({...input,mode:'restore'}),/restore|pristine|confirmation/i);
  const changes:Array<(storage:ReturnType<typeof createNativeStorage>)=>Promise<unknown>>=[
-  storage=>storage.saveThemePreference('soft-play'),
+  storage=>storage.saveThemePreference('dark'),
   storage=>storage.saveScheduleEntry({id:'starter-1',type:'pee',minutes:500},{id:'starter-1',type:'pee',minutes:420}),
   storage=>storage.completeOnboarding(),
  ];
@@ -222,13 +224,13 @@ test('joining cloud combines confirmed local fields, remote-only records and clo
  {id:'cloud-pet',petId:'cloud-pet',kind:'puppy',data:{name:'Cloud puppy'},revision:1,sequence:1,deleted:false,updatedAt:1},
  {id:cloudRecordId('event','cloud-pet','event-1'),petId:'cloud-pet',kind:'event',data:{type:'pee',at:100,source:'app',note:'cloud note',estimated:true},revision:1,sequence:2,deleted:false,updatedAt:1},
  {id:cloudRecordId('event','cloud-pet','remote-only'),petId:'cloud-pet',kind:'event',data:{type:'meal',at:200,source:'app'},revision:1,sequence:3,deleted:false,updatedAt:1},
- {id:cloudRecordId('accountPreferences',null,'preferences'),petId:null,kind:'accountPreferences',data:{theme:'soft-play',language:'es'},revision:1,sequence:4,deleted:false,updatedAt:1},
+ {id:cloudRecordId('accountPreferences',null,'preferences'),petId:null,kind:'accountPreferences',data:{theme:'dark',language:'es'},revision:1,sequence:4,deleted:false,updatedAt:1},
  ];
  const {generation}=await sync.prepareAssociation({...input,enrollment:{...enrollment,confirmedPetId:'cloud-pet'}});
  await sync.stageBaseline({generation,accountId:'account-1',page:{changes:records.slice(0,2),cursor:2,hasMore:true}});
  await sync.stageBaseline({generation,accountId:'account-1',page:{changes:records.slice(2),cursor:4,hasMore:false}});
  await sync.completeAssociation({generation,accountId:'account-1',cloudPetId:'cloud-pet'});
- assert.equal(await storage.loadPuppyName(),'Cloud puppy'); assert.equal(await storage.loadThemePreference(),'soft-play');
+ assert.equal(await storage.loadPuppyName(),'Cloud puppy'); assert.equal(await storage.loadThemePreference(),'dark');
  const history=await storage.loadEvents(); assert.equal(history.length,2);
  const combined=history.find(value=>value.id==='event-1')!;
  assert.equal(combined.note,'local note'); assert.equal(combined.estimated,true);
@@ -568,12 +570,12 @@ test('two puppy projections apply account preferences once and preserve independ
  const other=createNativeStorage(database,'pet-2',sync.changeSink('pet-2'));
  await sync.prepareAssociation({...input,localPetId:'pet-2',enrollment:{...enrollment,operationId:'enroll-2',localPetId:'pet-2'}});
  await sync.stageBaseline({...owner,page:server.pull(0)});await sync.completeAssociation({...owner,cloudPetId:'pet-2'});await cycle(sync,owner,server);
- await other.saveThemePreference('soft-play');
+ await other.saveThemePreference('dark');
  const preferences=server.record(cloudRecordId('accountPreferences',null,'preferences'));
  server.push([{protocolVersion:1,operationId:'remote-language',deviceId:'other-device',recordId:preferences.id,petId:null,kind:'accountPreferences',baseRevision:preferences.revision,intent:'patch',patch:{language:'es'}}]);
  await sync.applySync({...owner,accepted:[],page:server.pull((await sync.status('local-pet')).cursor)});
- assert.equal(await storage.loadLanguagePreference(),'es');assert.equal(await other.loadThemePreference(),'soft-play');
- await cycle(sync,owner,server);assert.equal((server.record(preferences.id).data as Record<string,unknown>).language,'es');assert.equal((server.record(preferences.id).data as Record<string,unknown>).theme,'soft-play');
+ assert.equal(await storage.loadLanguagePreference(),'es');assert.equal(await other.loadThemePreference(),'dark');
+ await cycle(sync,owner,server);assert.equal((server.record(preferences.id).data as Record<string,unknown>).language,'es');assert.equal((server.record(preferences.id).data as Record<string,unknown>).theme,'dark');
 });
 
 test('oversized escaped restores reject atomically without starving independent work',async t=>{
@@ -631,4 +633,62 @@ test('enrollment cancellation cannot discard a baseline that already began or an
  await assert.rejects(sync.cancelEnrollment({...owner,operationId:next.operationId}),/baseline/i);
  assert.ok(await sync.enrollmentState());
  assert.deepEqual(await database.read(async sql=>(await sql.getAllAsync<{mutation_json:string}>('SELECT mutation_json FROM local_sync_outbox ORDER BY sequence')).map(row=>JSON.parse(row.mutation_json))),before);
+});
+
+
+test('inactive dog backup recovery explicitly restores synced deletions and rejects pending deletes atomically',async t=>{
+ const {database,sync,storage}=await setup(t),owner=await activate(sync),server=replicaServer();await cycle(sync,owner,server);
+ await database.write(async sql=>{
+  await sql.runAsync("INSERT INTO puppies(id,name) VALUES ('pet_active','Other dog')");
+  await sql.runAsync("UPDATE metadata SET value='pet_active' WHERE key='active_pet_id'");
+ });
+ const active=await createLocalRuntime(database,'pet_active');
+ const recover=(events:Parameters<typeof active.recoverBackup>[0])=>active.recoverBackup(events,{petId:'local-pet',puppyName:'My puppy'});
+ const nap={id:'nap-backup',type:'nap' as const,at:200,endedAt:300,source:'widget' as const};
+ await storage.appendEvents([event,nap]);await cycle(sync,owner,server);
+ await storage.removeEvent(event.id);await storage.removeEvent(nap.id);
+ const before=await storage.loadEvents(),pending=await sync.nextBatch(owner);
+ await assert.rejects(recover([{...event,id:'new-backup-log'},event,nap]),/pending/);
+ assert.deepEqual(await storage.loadEvents(),before);assert.deepEqual(await sync.nextBatch(owner),pending);
+ await cycle(sync,owner,server);
+ assert.deepEqual(await recover([event,nap]),{imported:2,skipped:0});
+ const restored=(await sync.nextBatch(owner)).filter(mutation=>mutation.kind==='event');
+ assert.equal(restored.length,2);assert.ok(restored.every(mutation=>mutation.intent==='restore'));
+ await cycle(sync,owner,server);
+ assert.deepEqual((await storage.loadEvents()).map(item=>item.id).sort(),[event.id,nap.id].sort());
+ assert.deepEqual(await recover([event,nap]),{imported:0,skipped:2});
+ assert.equal((await sync.status('local-pet')).pending,0);
+ assert.deepEqual(await active.storage.loadEvents(),[]);
+});
+
+
+test('checkpoints protect account association, destructive cloud projections, resync and detach',async t=>{
+ const f=await setup(t);let failed=false;
+ const checkpoints:Array<{reason:string;ids:string[]}>=[];
+ const sync=engine.createLocalSync(f.database,{beforeChange:async(sql,reason)=>{
+  checkpoints.push({reason,ids:(await sql.getAllAsync<{id:string}>('SELECT id FROM events ORDER BY id')).map(row=>row.id)});
+  if(failed)throw new Error('Backup unavailable');
+ }});
+ const storage=createNativeStorage(f.database,'local-pet',sync.changeSink('local-pet'));
+ await storage.appendEvents([event]);
+ const owner=await activate(sync),server=replicaServer();await cycle(sync,owner,server);
+ assert.ok(checkpoints.some(item=>item.reason==='account-change'&&item.ids.includes(event.id)));
+ assert.ok(checkpoints.some(item=>item.reason==='cloud-replace'&&item.ids.includes(event.id)));
+ const record=server.record(cloudRecordId('event','local-pet',event.id));
+ server.push([{protocolVersion:1,operationId:'remote-delete-backup',deviceId:'other-device',recordId:record.id,petId:record.petId,kind:'event',intent:'delete',baseRevision:record.revision,patch:{}}]);
+ const cursor=(await sync.status('local-pet')).cursor,page=server.pull(cursor);
+ failed=true;
+ await assert.rejects(sync.applySync({...owner,accepted:[],page}),/Backup unavailable/);
+ assert.deepEqual(await storage.loadEvents(),[event]);assert.equal((await sync.status('local-pet')).cursor,cursor);
+ failed=false;await sync.applySync({...owner,accepted:[],page});assert.deepEqual(await storage.loadEvents(),[]);
+ assert.deepEqual(checkpoints.at(-1),{reason:'cloud-replace',ids:[event.id]});
+ await storage.appendEvents([{...event,id:'local-after-delete'}]);await cycle(sync,owner,server);
+ await sync.resetBaseline(owner);await sync.stageBaseline({...owner,page:server.pull(0)});
+ failed=true;await assert.rejects(sync.finishResync(owner),/Backup unavailable/);
+ assert.equal((await sync.status('local-pet')).state,'resyncing');
+ failed=false;await sync.finishResync(owner);
+ failed=true;await assert.rejects(sync.detach(owner),/Backup unavailable/);
+ assert.equal((await sync.status('local-pet')).state,'active');
+ failed=false;await sync.detach(owner);assert.equal((await sync.status('local-pet')).state,'local');
+ assert.ok((await storage.loadEvents()).some(item=>item.id==='local-after-delete'));
 });

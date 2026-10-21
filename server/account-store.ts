@@ -1,10 +1,15 @@
 import { DurableObject } from 'cloudflare:workers';
 import { z } from 'zod';
-import { cloudRecordSchema,eventDataSchema,routineDataSchema,enrollmentSchema, mutationSchema, recordIdSchema, type Enrollment, type CloudRecord, type Mutation, type MutationResult, type PullPage, type Revision } from '../src/cloud/protocol';
+import { cloudRecordSchema,eventDataSchema,routineDataSchema,enrollmentSchema, identifierSchema, mutationSchema, recordIdSchema, type Enrollment, type CloudRecord, type Mutation, type MutationResult, type PullPage, type Revision } from '../src/cloud/protocol';
 import {cloudAccess,getCloudAccount} from './cloud-access';
 import {eventSqlColumns,routineSqlColumns,eventSqlValues,routineSqlValues,eventDataFromSql,routineDataFromSql,type EventSqlRow,type RoutineSqlRow} from '../src/record-sql';
 import { reconcileMutation, ReconciliationError } from '../src/cloud/reconcile';
+import { cloudRecordId } from '../src/cloud/record-identity';
+import { entityId } from '../src/entity-id';
+import { customActivityKey } from '../src/domain';
+import { resourceKindSchema, resourceListSchema, resourceWriteSchema, type ResourceKind, type ResourceListQuery, type ResourceList, type ResourceWrite, type ResourceWriteResult } from './resource-types';
 import accountSchema from './migrations/account/0003-account-store.sql';
+import resourceSchema from './migrations/account/0004-resource-api.sql';
 
 const cursorSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const pageSizeSchema = z.number().int().min(1).max(100);
@@ -18,12 +23,15 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
       const tables=ctx.storage.sql.exec<{name:string}>("SELECT name FROM sqlite_master WHERE type='table'").toArray().map(row=>row.name);
       if(tables.includes('schema_metadata')){
         const versions=ctx.storage.sql.exec<{version:number}>('SELECT version FROM schema_metadata').toArray();
-        if(versions.length!==1||versions[0].version!==3)throw new Error('Unsupported development or newer account schema.');
+        if(versions.length!==1||![3,4].includes(versions[0].version))throw new Error('Unsupported development or newer account schema.');
         if(['account_state','records','record_events','record_routines','revisions','operations','pets','enrollments','enrolled_devices'].some(name=>!tables.includes(name)))throw new Error('The account database schema is incomplete.');
+        if(versions[0].version===3)ctx.storage.sql.exec(resourceSchema);
+        else if(!tables.includes('api_requests'))throw new Error('The account database schema is incomplete.');
         return;
       }
       if(tables.some(name=>!name.startsWith('sqlite_')&&!name.startsWith('__cf_')))throw new Error('The existing account database schema is incomplete.');
       ctx.storage.sql.exec(accountSchema);
+      ctx.storage.sql.exec(resourceSchema);
     });
   }
 
@@ -90,7 +98,7 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
     for(const socket of this.ctx.getWebSockets())socket.close(1008,'Account deleted');
     this.ctx.storage.transactionSync(() => {
       this.ctx.storage.sql.exec(`
-        DELETE FROM records; DELETE FROM revisions; DELETE FROM operations;
+        DELETE FROM records; DELETE FROM revisions; DELETE FROM operations; DELETE FROM api_requests;
         DELETE FROM enrolled_devices; DELETE FROM enrollments; DELETE FROM pets;
         INSERT INTO account_state(key, value) VALUES ('retired', 1) ON CONFLICT(key) DO UPDATE SET value = 1;
       `);
@@ -100,12 +108,21 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
   apply(input: Mutation): MutationResult {
     this.#assertActive();
     const mutation = mutationSchema.parse(input);
-    const payload = JSON.stringify(mutation);
     const beforeCursor=this.#cursor();
-    const result=this.ctx.storage.transactionSync(() => {
+    const result=this.ctx.storage.transactionSync(() => this.#applyMutation(mutation));
+    if(result.sequence>beforeCursor)this.ctx.waitUntil(this.#notify(result.sequence));
+    return result;
+  }
+
+  // Both the mobile change protocol and REST writes commit through this engine.
+  // Its caller owns the transaction and sends notifications only after commit.
+  #applyMutation(mutation: Mutation, accountPreferenceActor = false): MutationResult {
+      const payload = JSON.stringify(mutation);
+      if (!accountPreferenceActor) {
       const device = this.ctx.storage.sql.exec<{ pet_id: string }>('SELECT pet_id FROM enrolled_devices WHERE id = ? AND (? IS NULL OR pet_id = ?) LIMIT 1', mutation.deviceId, mutation.petId, mutation.petId).toArray()[0];
       if (!device || (mutation.petId !== null && mutation.petId !== device.pet_id)) {
         throw new ReconciliationError('Pet is not enrolled for this account.');
+      }
       }
       const prior = this.ctx.storage.sql.exec<{ payload: string; result: string }>('SELECT payload, result FROM operations WHERE id = ?', mutation.operationId).toArray()[0];
       if (prior) {
@@ -127,9 +144,117 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
       this.ctx.storage.sql.exec('INSERT INTO revisions(sequence, record_id, revision, body) VALUES (?, ?, ?, ?)', sequence, record.id, record.revision, JSON.stringify(revision));
       this.ctx.storage.sql.exec('INSERT INTO operations(id, payload, result) VALUES (?, ?, ?)', mutation.operationId, payload, JSON.stringify(result));
       return result;
-    });
-    if(result.sequence>beforeCursor)this.ctx.waitUntil(this.#notify(result.sequence));
-    return result;
+  }
+
+  resourceGet(kind: ResourceKind, petId: string | null, localId: string): CloudRecord | null {
+    this.#assertActive();
+    resourceKindSchema.parse(kind);
+    const id = cloudRecordId(kind, petId, localId);
+    const record = this.#record(id);
+    if (record) return record.kind === kind && record.petId === petId ? record : null;
+    if (kind !== 'puppy') return null;
+    // Older enrolled clients can have a puppy name without a profile revision.
+    // Expose that real saved profile at revision zero; the first edit creates its
+    // normal revision without rewriting history or changing GET's state.
+    const pet = this.ctx.storage.sql.exec<{ initial_name: string; created_at: number }>('SELECT initial_name,created_at FROM pets WHERE id=?', id).toArray()[0];
+    return pet ? { id, petId: id, kind: 'puppy', data: { name: pet.initial_name }, revision: 0, sequence: 0, deleted: false, updatedAt: pet.created_at } : null;
+  }
+
+  resourceList(input: ResourceListQuery): ResourceList {
+    this.#assertActive();
+    const query = resourceListSchema.parse(input), after = query.after ?? 0;
+    if (query.kind === 'puppy') {
+      // Puppy pagination includes enrolled profiles without a record yet. The
+      // stable insertion rowid is its cursor, rather than a revision sequence.
+      const rows = this.ctx.storage.sql.exec<{ id: string; cursor: number }>(
+        `SELECT p.id,p.rowid AS cursor FROM pets p LEFT JOIN records r ON r.id=p.id
+         WHERE p.rowid>? AND (r.id IS NULL OR r.deleted=0) ${query.petId ? 'AND p.id=?' : ''} ORDER BY p.rowid LIMIT ?`,
+        after, ...(query.petId ? [query.petId] : []), query.limit + 1,
+      ).toArray();
+      return { records: rows.slice(0, query.limit).map(row => this.resourceGet('puppy', row.id, row.id)!),
+        nextCursor: rows.length > query.limit ? rows[query.limit - 1].cursor : null };
+    }
+    const clauses = ['r.kind=?', 'r.pet_id IS ?', 'r.deleted=0', 'r.sequence>?'];
+    const bindings: (string | number | null)[] = [query.kind, query.petId, after];
+    if (query.since !== undefined) { clauses.push('e.at>=?'); bindings.push(query.since); }
+    if (query.until !== undefined) { clauses.push('e.at<?'); bindings.push(query.until); }
+    if (query.type !== undefined) { clauses.push('e.type=?'); bindings.push(query.type); }
+    const filteredEvents = query.kind === 'event' && (query.since !== undefined || query.until !== undefined || query.type !== undefined);
+    // Drive narrow filters from their typed index. CROSS JOIN prevents SQLite
+    // from scanning every puppy log in sequence order before checking its time.
+    const source = filteredEvents
+      ? `record_events e INDEXED BY ${query.type === undefined ? 'record_events_by_at' : 'record_events_by_type_at'} CROSS JOIN records r ON r.id=e.record_id`
+      : `records r ${query.kind === 'event' ? 'JOIN record_events e ON e.record_id=r.id' : ''}`;
+    const rows = this.ctx.storage.sql.exec<{ id: string; sequence: number }>(
+      `SELECT r.id,r.sequence FROM ${source}
+       WHERE ${clauses.join(' AND ')} ORDER BY r.sequence LIMIT ?`, ...bindings, query.limit + 1,
+    ).toArray();
+    return { records: rows.slice(0, query.limit).map(row => this.#record(row.id)!),
+      nextCursor: rows.length > query.limit ? rows[query.limit - 1].sequence : null };
+  }
+
+  resourceHistory(kind: ResourceKind, petId: string | null, localId: string, beforeRevision = Number.MAX_SAFE_INTEGER): Revision[] {
+    resourceKindSchema.parse(kind);
+    return this.history(cloudRecordId(kind, petId, localId), beforeRevision);
+  }
+
+  resourceWrite(input: ResourceWrite): ResourceWriteResult {
+    try {
+      this.#assertActive();
+      const request = resourceWriteSchema.parse(input);
+      const payload = JSON.stringify({ ...request, patch: Object.fromEntries(Object.entries(request.patch).sort(([a], [b]) => a.localeCompare(b))) });
+      if (new TextEncoder().encode(payload).byteLength > 65536) return { ok: false, error: 'invalid_request', message: 'Request exceeds 64 KiB.' };
+      const beforeCursor = this.#cursor();
+      const result = this.ctx.storage.transactionSync<ResourceWriteResult>(() => {
+        const prior = this.ctx.storage.sql.exec<{ payload: string; result: string }>('SELECT payload,result FROM api_requests WHERE id=?', request.requestId).toArray()[0];
+        if (prior) return prior.payload === payload ? JSON.parse(prior.result) as ResourceWriteResult
+          : { ok: false, error: 'conflict', message: 'Idempotency key was already used for a different request.' };
+        const prefix = { event: 'evt', routine: 'rtn', puppy: 'pet' } as const;
+        const localId = request.kind === 'accountPreferences' ? 'preferences'
+          : request.localId ?? (request.kind === 'customActivity' ? customActivityKey(typeof request.patch.label === 'string' ? request.patch.label : '')
+            : request.kind === 'customization' ? (typeof request.patch.activityKey === 'string' ? request.patch.activityKey : 'invalid')
+              : request.kind === 'puppy' && request.petId ? request.petId : entityId(prefix[request.kind]));
+        const petId = request.kind === 'puppy' ? request.petId ?? identifierSchema.parse(localId) : request.petId;
+        const recordId = cloudRecordId(request.kind, petId, localId);
+        const before = this.resourceGet(request.kind, petId, localId);
+        if (request.intent === 'create' && before) return { ok: false, error: 'conflict', message: 'Resource already exists.' };
+        if (request.intent !== 'create' && (!before || (before.deleted && request.intent !== 'restore'))) {
+          return { ok: false, error: 'not_found', message: 'Resource does not exist.' };
+        }
+        if (request.intent !== 'create' && request.expectedRevision !== before!.revision) {
+          return { ok: false, error: 'precondition_failed', message: 'Resource has changed. Fetch its current revision and retry.' };
+        }
+        if (request.intent === 'restore' && !before!.deleted) return { ok: false, error: 'conflict', message: 'Resource is not deleted.' };
+        const pet = petId === null ? null : this.ctx.storage.sql.exec<{ id: string }>('SELECT id FROM pets WHERE id=?', petId).toArray()[0];
+        if (petId !== null && !pet && !(request.kind === 'puppy' && request.intent === 'create')) {
+          return { ok: false, error: 'not_found', message: 'Puppy does not exist.' };
+        }
+        const legacyProfile = request.kind === 'puppy' && before?.revision === 0;
+        const mutation = mutationSchema.parse({ protocolVersion: 1, operationId: request.requestId, deviceId: request.actorId,
+          kind: request.kind, petId, recordId, baseRevision: before?.revision ?? 0,
+          intent: legacyProfile ? 'create' : request.intent,
+          patch: request.intent === 'restore' || legacyProfile ? { ...before!.data, ...request.patch } : request.patch });
+        const identityData = { ...before?.data, ...mutation.patch };
+        if ((request.kind === 'customActivity' && (!('label' in identityData) || typeof identityData.label !== 'string' || customActivityKey(identityData.label) !== localId))
+          || (request.kind === 'customization' && (!('activityKey' in identityData) || identityData.activityKey !== localId))) {
+          return { ok: false, error: 'invalid_request', message: 'Activity identity cannot change. Create a separate activity instead.' };
+        }
+        if (request.kind === 'puppy' && !pet) {
+          this.ctx.storage.sql.exec('INSERT INTO pets(id,initial_name,created_at) VALUES(?,?,?)', petId, 'name' in mutation.patch ? mutation.patch.name! : '', Date.now());
+        }
+        if (petId !== null) this.ctx.storage.sql.exec('INSERT INTO enrolled_devices(id,pet_id) VALUES(?,?) ON CONFLICT(id,pet_id) DO NOTHING', request.actorId, petId);
+        const applied = this.#applyMutation(mutation, request.kind === 'accountPreferences');
+        const result: ResourceWriteResult = { ok: true, record: applied.record };
+        this.ctx.storage.sql.exec('INSERT INTO api_requests(id,payload,result) VALUES(?,?,?)', request.requestId, payload, JSON.stringify(result));
+        return result;
+      });
+      if (result.ok && result.record.sequence > beforeCursor) this.ctx.waitUntil(this.#notify(result.record.sequence));
+      return result;
+    } catch (error) {
+      if (error instanceof z.ZodError) return { ok: false, error: 'invalid_request', message: 'Resource data or identity is invalid.' };
+      if (error instanceof ReconciliationError) return { ok: false, error: 'conflict', message: error.message };
+      throw error;
+    }
   }
 
   enroll(input: Enrollment): { petId: string } {

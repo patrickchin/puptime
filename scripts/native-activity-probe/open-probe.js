@@ -1,7 +1,7 @@
 import {File,Paths} from 'expo-file-system';
 import {openLocalDatabase as originalOpen} from '../../src/local/open.native';
-export async function openLocalDatabase(){
- const opened=await originalOpen(),original=opened.database;
+export async function openLocalDatabase(...args){
+ const opened=await originalOpen(...args),original=opened.database;
  const file=new File(Paths.document,'sql-query-probe.json');
  const state={scope:'actual iOS SQLite reads, no values or credentials',reads:[],decoded:0};let scheduled=false;
  function flush(){try{file.write(JSON.stringify(state));}catch{}}

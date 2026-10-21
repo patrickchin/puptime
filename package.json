@@ -9,14 +9,17 @@
     }
   },
   "dependencies": {
-    "@better-auth/expo": "^1.7.10",
+    "@better-auth/api-key": "1.7.12",
+    "@better-auth/expo": "1.7.12",
     "@expo/ui": "57.0.25",
     "@expo/vector-icons": "^15.0.2",
+    "@hono/zod-openapi": "1.6.3",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-google-signin/google-signin": "16.1.5",
-    "better-auth": "^1.7.10",
+    "better-auth": "1.7.12",
     "expo": "~57.0.24",
     "expo-apple-authentication": "~57.0.2",
+    "expo-application": "~57.0.3",
     "expo-asset": "~57.0.18",
     "expo-audio": "~57.0.5",
     "expo-crypto": "~57.0.4",
@@ -74,6 +77,7 @@
     "prebuild": "expo prebuild",
     "build:android": "cd android && ./gradlew assembleRelease",
     "test:server": "vitest run --config server/vitest.config.mts",
+    "test:api:http": "node scripts/test-resource-api.mjs",
     "typecheck:server": "tsc --noEmit -p server/tsconfig.json",
     "dev:server": "wrangler dev",
     "test:web": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/web/*.test.ts"

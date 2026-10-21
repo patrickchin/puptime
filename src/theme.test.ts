@@ -6,11 +6,8 @@ import { EVENT_META } from './domain.ts';
 import {
   darkTheme,
   eventColors,
-  eventIcon,
   isThemePreference,
   lightTheme,
-  namedThemes,
-  navigationIcon,
   resolveTheme,
   themeChoices,
 } from './theme.ts';
@@ -24,54 +21,20 @@ function contrastRatio(foreground: string, background: string): number {
   return (Math.max(...values) + 0.05) / (Math.min(...values) + 0.05);
 }
 
-test('resolves system and named themes', () => {
-  assert.equal(resolveTheme('system', 'light'), lightTheme);
-  assert.equal(resolveTheme('system', 'dark'), darkTheme);
-  assert.deepEqual(themeChoices, ['system', 'puppy-journal', 'soft-play', 'day-trails']);
-  Object.entries(namedThemes).forEach(([preference, theme]) => {
-    assert.equal(resolveTheme(preference as keyof typeof namedThemes, 'light'), theme);
-  });
-});
-
-test('accepts only supported stored theme preferences', () => {
-  for (const value of themeChoices) assert.equal(isThemePreference(value), true);
-  for (const value of ['meadow', 'sunrise', 'midnight', 'paper', 'bubblegum', 'blueprint', 'trail', 'tide', 'plum', 'contrast', 'unknown', null]) {
-    assert.equal(isThemePreference(value), false);
+test('resolves default light and dark modes, with an optional device setting', () => {
+  assert.deepEqual(themeChoices, ['system', 'light', 'dark']);
+  for (const scheme of ['light', 'dark', 'unspecified', null, undefined] as const) {
+    assert.equal(resolveTheme('light', scheme), lightTheme);
+    assert.equal(resolveTheme('dark', scheme), darkTheme);
+    assert.equal(resolveTheme('system', scheme), scheme === 'dark' ? darkTheme : lightTheme);
   }
 });
 
-test('named themes have distinct presentation systems', () => {
-  const themes = Object.values(namedThemes);
-  const signatures = themes.map(({ presentation }) => [
-    presentation.cardRadius,
-    presentation.controlRadius,
-    presentation.borderWidth,
-    presentation.cardPadding,
-    presentation.actionHeight,
-    presentation.titleSize,
-    presentation.titleWeight,
-    presentation.shadowRadius,
-    presentation.markIcon,
-    presentation.iconProfile,
-  ].join(':'));
-
-  assert.equal(themes.length, 3);
-  assert.equal(new Set(signatures).size, themes.length);
-});
-
-test('every theme has a distinct semantic icon profile', () => {
-  const signatures = Object.values(namedThemes).map((theme) => [
-    eventIcon(theme, 'pee'),
-    eventIcon(theme, 'meal'),
-    eventIcon(theme, 'walk'),
-    eventIcon(theme, 'nap'),
-    navigationIcon(theme, 'log'),
-    navigationIcon(theme, 'timeline'),
-    navigationIcon(theme, 'insights'),
-    navigationIcon(theme, 'schedule'),
-  ].join(':'));
-
-  assert.equal(new Set(signatures).size, Object.keys(namedThemes).length);
+test('accepts supported preferences and rejects removed themes', () => {
+  for (const value of themeChoices) assert.equal(isThemePreference(value), true);
+  for (const value of ['puppy-journal', 'soft-play', 'day-trails', 'meadow', 'sunrise', 'midnight', 'paper', 'bubblegum', 'blueprint', 'trail', 'tide', 'plum', 'contrast', 'unknown', null]) {
+    assert.equal(isThemePreference(value), false);
+  }
 });
 
 test('activity colors keep accessible contrast in chips and timeline tracks', () => {
@@ -83,7 +46,7 @@ test('activity colors keep accessible contrast in chips and timeline tracks', ()
     assert.ok(contrastRatio(meta.color, meta.softColor) >= 4.5);
     assert.ok(contrastRatio(meta.darkColor, meta.darkSoftColor) >= 4.5);
 
-    Object.values(namedThemes).forEach((theme) => {
+    [lightTheme, darkTheme].forEach((theme) => {
       const { color, softColor } = eventColors(theme, type as keyof typeof EVENT_META);
       assert.equal(softColor, theme.isDark ? meta.darkSoftColor : meta.softColor);
       assert.ok(contrastRatio(color, theme.surface) >= 3);
@@ -96,9 +59,9 @@ test('custom activity colors remain legible in light and dark themes', () => {
   activityColors.forEach((option) => {
     assert.ok(contrastRatio(option.light, option.softLight) >= 4.5, option.name);
     assert.ok(contrastRatio(option.dark, option.softDark) >= 4.5, option.name);
-    Object.values(namedThemes).forEach((theme) => {
+    [lightTheme, darkTheme].forEach((theme) => {
       const color = theme.isDark ? option.dark : option.light;
-      assert.ok(contrastRatio(color, theme.surface) >= 3, `${option.name} on ${theme.presentation.iconProfile}`);
+      assert.ok(contrastRatio(color, theme.surface) >= 3, `${option.name} on ${theme.isDark ? 'dark' : 'light'}`);
     });
   });
 });

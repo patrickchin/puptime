@@ -31,7 +31,7 @@ export const routineDataSchema = routineObject.refine((data) => data.type !== 'c
 const customization = z.strictObject({ activityKey, name: customLabel.optional(), emoji: z.enum(activityEmojis).optional(), color: z.number().int().min(0).max(6).optional() });
 const customActivity = z.strictObject({ label: customLabel });
 const accountPreferences = z.strictObject({
-  theme: z.enum(['system', 'puppy-journal', 'soft-play', 'day-trails']).optional(),
+  theme: z.enum(['system', 'light', 'dark', 'puppy-journal', 'soft-play', 'day-trails']).optional(),
   language: z.enum(['system', 'en', 'zh-Hans', 'es']).optional(),
   widgetActions: z.array(activityKey).min(2).max(4).refine((values) => new Set(values).size === values.length).optional(),
   reminderLeadMinutes: z.union([z.literal(0), z.literal(5), z.literal(10), z.literal(15), z.literal(30)]).optional(),
@@ -65,6 +65,10 @@ export const mutationSchema = z.discriminatedUnion('kind', [
   }
 });
 export type Mutation = z.infer<typeof mutationSchema>;
+// Resource endpoints and offline sync accept the same field-level patches.
+export function recordPatchSchema(kind: RecordKind) {
+  return mutationSchema.options.find((schema) => schema.shape.kind.value === kind)!.shape.patch;
+}
 const revisionReasons = ['created', 'updated', 'merged', 'deleted', 'preserved-deletion', 'restored', 'preserved-timing', 'inferred-nap-end'] as const;
 const recordMetadata = {
   id: recordIdSchema, petId: identifierSchema.nullable(),

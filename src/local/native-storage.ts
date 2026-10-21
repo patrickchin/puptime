@@ -10,9 +10,10 @@ import { localChanges, notifyLocalCommit, readLocalSettingsRecords, type LocalCh
 import { recordDataSchema } from '../cloud/protocol.ts';
 import type { FinishOnboardingOptions } from '../onboarding.ts';
 import {firstLaunchStepSchema,type FirstLaunchStep,type FirstLaunchProgress} from '../first-launch.ts';
+import type { BackupGuard } from './activity-backups.ts';
 
-export function createNativeStorage(database: LocalDatabase, petId: string, onChange?: LocalChangeSink, afterCommit?:()=>void) {
-  const repository = createLocalRepository(database, petId, onChange,afterCommit);
+export function createNativeStorage(database: LocalDatabase, petId: string, onChange?: LocalChangeSink, afterCommit?:()=>void, beforeChange?:BackupGuard) {
+  const repository = createLocalRepository(database, petId, onChange,afterCommit,beforeChange);
   async function settingsWrite<T>(action:(sql:SqlExecutor)=>Promise<T>):Promise<T> {
     let changed=false;
     const result=await database.write(async sql=> {

@@ -28,16 +28,14 @@ import {
   type TimelineDay,
   type TimelineMark,
 } from '../analytics';
-import { activityFromKey, activityKey, customActivityKey, dateKey, formatDuration, isOpenNap, quickEventTypes, type Activity, type ActivityKey, type PuppyEvent } from '../domain';
-import { IllustratedTimelineTrack, TIMELINE_ART_GUTTER } from '../components/IllustratedTimelineTrack';
-import { DayTimeline } from '../components/DayTimeline';
+import { activityFromKey, activityKey, dateKey, formatDuration, formatScheduleWindow, isOpenNap, type Activity, type ActivityKey, type PuppyEvent, type ScheduleEntry } from '../domain';
 import {ActivityLoadState} from '../components/ActivityLoadState';
 import {activityWindowBounds,useActivityWindow,type ActivityViewProps} from '../activity-view';
 import { ActivityIcon } from '../components/ActivityIcon';
 import { useLocalization } from '../localization-context';
 import { translate, type AppLanguage } from '../localization';
 import { headingStyle, spacing, type Theme } from '../theme';
-import { timelineDetailTime, timelineFormatters } from '../timeline-format';
+import { collapseEmptyTimelineDays, timelineDetailTime, timelineExpectedWindows, timelineFormatters, type ExpectedWindow, type TimelineGap } from '../timeline-format';
 
 const INITIAL_DAYS = 14;
 const LOAD_DAYS = 14;
@@ -49,6 +47,10 @@ const ZOOM_STEP = 0.5;
 const ESTIMATE_OPACITY = 0.35;
 const AXIS_HOURS = Array.from({ length: 25 }, (_, index) => index);
 const GRID_HOURS = Array.from({ length: 23 }, (_, index) => index + 1);
+const TIMELINE_VIEWS = [
+  { id: 'pee', types: ['pee'] },
+  { id: 'poop-meal', types: ['poop', 'meal'] },
+] as const;
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
@@ -82,10 +84,11 @@ function describeMark(mark: TimelineMark, language: AppLanguage, activityLabel: 
   return savedEstimate ? translate(language, 'timeline.estimatedDescription', { description }) : description;
 }
 
-function filterName(types: readonly ActivityKey[], language: AppLanguage, allCount: number, activityLabel: (activity: Activity) => string): string {
-  if (types.length === allCount) return translate(language, 'insights.activity');
-  if (types.length === 1) return activityLabel(activityFromKey(types[0], [])).toLocaleLowerCase(language);
-  return translate(language, 'insights.selectedActivity');
+function filterName(types: readonly ActivityKey[], language: AppLanguage, activityLabel: (activity: Activity) => string): string {
+  return (types.length === 1
+    ? activityLabel(activityFromKey(types[0], []))
+    : translate(language, 'timeline.poopAndEat', { poop: activityLabel({ type: 'poop' }), meal: activityLabel({ type: 'meal' }) }))
+    .toLocaleLowerCase(language);
 }
 
 function calendarDayDistance(older: Date, newer: Date): number {
@@ -108,7 +111,6 @@ function TimelineDateLabel({
   day,
   selectedTypes,
   savedEstimateIds,
-  activityCount,
   isToday,
   currentTime,
   rowHeight,
@@ -118,7 +120,6 @@ function TimelineDateLabel({
   day: TimelineDay;
   selectedTypes: readonly ActivityKey[];
   savedEstimateIds: ReadonlySet<string>;
-  activityCount: number;
   isToday: boolean;
   currentTime?: Date;
   rowHeight: number;
@@ -131,9 +132,9 @@ function TimelineDateLabel({
     return marks.length
       ? marks.map((mark) => describeMark(mark, language, activityLabel, savedEstimateIds.has(mark.id))).join('. ')
       : selectedTypes.length
-        ? t('insights.noLogged', { activity: filterName(selectedTypes, language, activityCount, activityLabel) })
+        ? t('insights.noLogged', { activity: filterName(selectedTypes, language, activityLabel) })
         : t('insights.noActivitySelected');
-  }, [day, selectedTypes, savedEstimateIds, language, activityCount, activityLabel, t]);
+  }, [day, selectedTypes, savedEstimateIds, language, activityLabel, t]);
   const { fullDate, weekday: shortDay, shortDate, time } = timelineFormatters(language);
   const currentTimeDescription = currentTime
     ? t('insights.currentTime', {
@@ -143,20 +144,21 @@ function TimelineDateLabel({
 
   return (
     <Animated.View
+      testID={`timeline.date.${day.key}`}
       accessible
       accessibilityLabel={`${[fullDate.format(day.date), currentTimeDescription, description].filter(Boolean).join('. ')}.`}
       style={[
         styles.dateCell,
         {
           backgroundColor: isToday ? theme.primarySoft : theme.background,
-          borderColor: theme.presentation.iconProfile === 'default' ? theme.border : 'transparent',
+          borderColor: theme.border,
           height: rowHeight,
-          borderRightWidth: theme.presentation.iconProfile === 'default' ? StyleSheet.hairlineWidth : 0,
+          borderRightWidth: StyleSheet.hairlineWidth,
           transform: [{ translateX: horizontalOffset }],
         },
       ]}
     >
-      <Text numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.5} style={[styles.weekday, headingStyle(theme), { fontSize: theme.presentation.iconProfile === 'default' ? 10 : 13, lineHeight: theme.presentation.iconProfile === 'default' ? 13 : 18, color: isToday ? theme.primary : theme.text }]}>
+      <Text numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.5} style={[styles.weekday, headingStyle(theme), { fontSize: 10, lineHeight: 13, color: isToday ? theme.primary : theme.text }]}>
         {isToday ? t('insights.today') : shortDay.format(day.date).toUpperCase()}
       </Text>
       <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} maxFontSizeMultiplier={1.5} style={[styles.calendarDate, { color: theme.textMuted }]}>
@@ -168,6 +170,7 @@ function TimelineDateLabel({
 
 function TimelineTrack({
   day,
+  expectedWindows,
   selectedTypes,
   savedEstimateIds,
   isToday,
@@ -179,6 +182,7 @@ function TimelineTrack({
   theme,
 }: {
   day: TimelineDay;
+  expectedWindows: readonly ExpectedWindow[];
   selectedTypes: readonly ActivityKey[];
   savedEstimateIds: ReadonlySet<string>;
   isToday: boolean;
@@ -212,6 +216,20 @@ function TimelineTrack({
         },
       ]}
     >
+      {expectedWindows.map((window) => (
+        <View
+          key={`${window.id}-${window.start}`}
+          testID={`timeline.window.${window.type}.${day.key}.${window.start}`}
+          pointerEvents="none"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={[styles.expectedWindow, {
+            backgroundColor: activityColors(theme, { type: window.type }).color,
+            left: `${window.start / 1440 * 100}%`,
+            width: `${(window.end - window.start) / 1440 * 100}%`,
+          }]}
+        />
+      ))}
       {gridHours.map((hour) => (
         <View key={hour} pointerEvents="none" style={[styles.gridLine, {
           backgroundColor: hour % 3 === 0 ? theme.textMuted : theme.border,
@@ -365,13 +383,11 @@ function TimelineAxis({
   horizontalOffset: Animated.Value;
   theme: Theme;
 }) {
-  const { language, t } = useLocalization();
+  const { t } = useLocalization();
   const { fontScale } = useWindowDimensions();
   const staggerLabels = trackWidth / 24 < 22 * Math.min(fontScale, 1.4);
-  const playful = theme.presentation.iconProfile !== 'default';
-  const plotWidth = playful ? Math.max(1, trackWidth - TIMELINE_ART_GUTTER * 2) : trackWidth;
-  const axisHeight = !playful && staggerLabels ? 42 : 30;
-  const labelWidth = playful ? 48 : trackWidth / 12;
+  const axisHeight = staggerLabels ? 42 : 30;
+  const labelWidth = trackWidth / 12;
   return (
     <View style={[styles.axisRow, { height: axisHeight, backgroundColor: theme.background, borderColor: theme.border }]}>
       <Animated.View
@@ -392,25 +408,25 @@ function TimelineAxis({
         importantForAccessibility="no-hide-descendants"
         style={[styles.axisTrack, { height: axisHeight, width: trackWidth }]}
       >
-        {AXIS_HOURS.filter((hour) => theme.presentation.iconProfile === 'default' || hour % (trackWidth > 800 ? 3 : 6) === 0).map((hour) => (
+        {AXIS_HOURS.map((hour) => (
           <Text
             key={hour}
             maxFontSizeMultiplier={1.4}
             style={[
               styles.axisLabel,
-              playful ? { left: TIMELINE_ART_GUTTER + hour / 24 * plotWidth - labelWidth / 2, textAlign: 'center' } : hour === 0
+              hour === 0
                 ? styles.axisStart
                 : hour === 24
                   ? styles.axisEnd
                   : { left: `${(hour / 24) * 100}%`, marginLeft: -labelWidth / 2, textAlign: 'center' },
-              { color: theme.textMuted, width: labelWidth, top: theme.presentation.iconProfile === 'default' && staggerLabels && hour % 2 ? 20 : 4 },
+              { color: theme.textMuted, width: labelWidth, top: staggerLabels && hour % 2 ? 20 : 4 },
             ]}
           >
-            {playful ? timelineFormatters(language).hour.format(new Date(2000, 0, 1, hour)) : hour}
+            {hour}
           </Text>
         ))}
-        {GRID_HOURS.filter((hour) => !playful || hour % 6 === 0).map((hour) => (
-          <View key={hour} style={[styles.axisTick, { left: (playful ? TIMELINE_ART_GUTTER : 0) + hour / 24 * plotWidth, backgroundColor: theme.textMuted }]} />
+        {GRID_HOURS.map((hour) => (
+          <View key={hour} style={[styles.axisTick, { left: hour / 24 * trackWidth, backgroundColor: theme.textMuted }]} />
         ))}
       </View>
     </View>
@@ -421,47 +437,16 @@ const MemoTimelineDateLabel = memo(TimelineDateLabel);
 const MemoTimelineTrack = memo(TimelineTrack);
 const MemoTimelineAxis = memo(TimelineAxis);
 
-type TimelineProps={events:PuppyEvent[];customActivities:string[];theme:Theme}&ActivityViewProps;
-export function TimelineScreen(props: TimelineProps) {
-  if (props.theme.presentation.iconProfile === 'default') return <ComparisonTimelineScreen {...props} />;
-  return <PlayfulTimelineScreen {...props} />;
-}
-
-function PlayfulTimelineScreen(props: TimelineProps) {
-  const { t } = useLocalization();
-  const { theme } = props;
-  const [mode, setMode] = useState<'day' | 'compare'>(() => theme.presentation.iconProfile === 'soft-play' ? 'compare' : 'day');
-  return (
-    <View style={{ flex: 1 }}>
-      <View style={styles.modeRow}>
-        {(['day', 'compare'] as const).map((value) => (
-          <Pressable key={value} testID={`timeline.mode.${value}`} accessibilityRole="tab" accessibilityState={{ selected: mode === value }} onPress={() => setMode(value)} style={({ pressed }) => [styles.modeButton, { backgroundColor: mode === value ? theme.primary : theme.surfaceRaised, borderRadius: theme.presentation.controlRadius, opacity: pressed ? 0.7 : 1 }]}>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: mode === value ? theme.onPrimary : theme.textMuted }}>{t(`timeline.${value}`)}</Text>
-          </Pressable>
-        ))}
-      </View>
-      {mode === 'day' ? (
-        <View testID="screen.timeline" style={{ flex: 1 }}>
-          <Text style={[styles.dayViewTitle, headingStyle(theme), { color: theme.text }]}>{t('timeline.title')}</Text>
-          <DayTimeline events={props.events} activity={props.activity} refreshToken={props.refreshToken} theme={theme} />
-        </View>
-      ) : <ComparisonTimelineScreen {...props} />}
-    </View>
-  );
-}
-
-function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken,customActivities,theme }:TimelineProps) {
-  const { activityColors, activityLabel, language, t } = useLocalization();
+type TimelineProps={events:PuppyEvent[];schedule:ScheduleEntry[];onOpenSchedule:()=>void;theme:Theme}&ActivityViewProps;
+export function TimelineScreen({ events:projectedEvents,activity,refreshToken,schedule,onOpenSchedule,theme }:TimelineProps) {
+  const { activityColors, activityLabel, language, locale, t } = useLocalization();
   const { fontScale, height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const playful = theme.presentation.iconProfile !== 'default';
-  const RowTrack = playful ? IllustratedTimelineTrack : MemoTimelineTrack;
-  const activityFilters: ActivityKey[] = useMemo(() => playful ? ['pee', 'poop', 'meal'] : [...quickEventTypes, ...customActivities.map(customActivityKey)], [customActivities, playful]);
-  const [selectedType, setSelectedType] = useState<ActivityKey | 'all'>('all');
-  const selectedTypes = useMemo(() => selectedType === 'all' ? activityFilters : [selectedType], [activityFilters, selectedType]);
-  useEffect(() => {
-    if (selectedType !== 'all' && !activityFilters.includes(selectedType)) setSelectedType('all');
-  }, [activityFilters, selectedType]);
+  const [selectedView, setSelectedView] = useState<(typeof TIMELINE_VIEWS)[number]>(TIMELINE_VIEWS[0]);
+  const selectedTypes: readonly ActivityKey[] = selectedView.types;
+  const expectedWindows = useMemo(() => timelineExpectedWindows(schedule, selectedTypes), [schedule, selectedTypes]);
+  const expectedDescription = schedule.filter(entry => expectedWindows.some(window => window.id === entry.id))
+    .map(entry => `${activityLabel(entry)}: ${formatScheduleWindow(entry, locale)}`).join('. ');
   const [loadedDayCount, setLoadedDayCount] = useState(INITIAL_DAYS);
   const [timeScale, setTimeScale] = useState(1);
   const timeScaleLabel = timeScale.toFixed(2).replace(/0$/, '');
@@ -478,7 +463,7 @@ function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken
   },[activity,refreshToken,summaryAttempt]);
   const [selection, setSelection] = useState<string[]>([]);
   const [isLoadingEarlier, startLoadingEarlier] = useTransition();
-  const rowHeight = Math.round((playful ? 80 : 52) * Math.min(fontScale, 1.5));
+  const rowHeight = Math.round(52 * Math.min(fontScale, 1.5));
   const viewportWidth = width - insets.left - insets.right;
   const baseTrackWidth = Math.max(1, viewportWidth - DATE_COLUMN_WIDTH);
   const trackWidth = baseTrackWidth * timeScale;
@@ -494,6 +479,7 @@ function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken
     [events, estimates, loadedDayCount, maxHistoryDays, now],
   );
   const todayKey = dateKey(now);
+  const rows = useMemo(() => expectedWindows.length ? days : collapseEmptyTimelineDays(days, todayKey), [days, todayKey, expectedWindows]);
   const savedEstimateIds = useMemo(() => new Set(events.filter((event) => event.estimated).map((event) => event.id)), [events]);
   const visibleEventCount = new Set(
     days.flatMap((day) => day.marks.filter((mark) => !mark.estimated && selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label }))).map((mark) => mark.id)),
@@ -519,7 +505,7 @@ function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken
       : new Date(sharedDetailDay).getFullYear() === now.getFullYear()
         ? timelineFormatters(language).fullDate.format(sharedDetailDay)
         : timelineFormatters(language).rangeDate.format(sharedDetailDay);
-  const listRef = useRef<FlatList<TimelineDay>>(null);
+  const listRef = useRef<FlatList<TimelineDay | TimelineGap>>(null);
   const horizontalRef = useRef<ScrollView>(null);
   const horizontalOffset = useRef(new Animated.Value(0)).current;
   const horizontalOffsetValue = useRef(0);
@@ -528,10 +514,10 @@ function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken
   const didUserScroll = useRef(false);
   const timeScaleValue = useRef(timeScale);
   const pendingHorizontalOffset = useRef<number | null>(null);
-  const zoomMetrics = useRef({ baseTrackWidth, viewportWidth, gutter: playful ? TIMELINE_ART_GUTTER : 0 });
+  const zoomMetrics = useRef({ baseTrackWidth, viewportWidth, gutter: 0 });
   const pinch = useRef({ distance: 0, scale: 1, offset: 0, focalX: 0 });
   timeScaleValue.current = timeScale;
-  zoomMetrics.current = { baseTrackWidth, viewportWidth, gutter: playful ? TIMELINE_ART_GUTTER : 0 };
+  zoomMetrics.current = { baseTrackWidth, viewportWidth, gutter: 0 };
 
   useEffect(() => {
     const timer = setInterval(() => setNowTime(Date.now()), 60_000);
@@ -763,29 +749,24 @@ function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken
           <Text style={[styles.estimateLegendText, { color: theme.text }]}>{t('timeline.estimatedLegend')}</Text>
         ) : null}
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filters}
-        >
-          {(['all', ...activityFilters] as const).map((type) => {
-            const isAll = type === 'all';
-            const active = selectedType === type;
-            const activity = isAll ? null : activityFromKey(type, customActivities);
-            const label = activity ? activityLabel(activity) : t('insights.all');
-            const colors = activity ? activityColors(theme, activity) : { color: theme.primary, softColor: theme.primarySoft };
+        <View style={[styles.timelineControls, isCompactHeight && styles.compactControls]}>
+        <View accessibilityRole="radiogroup" style={[styles.filters, isCompactHeight && styles.compactFilters]}>
+          {TIMELINE_VIEWS.map((view) => {
+            const active = selectedView === view;
+            const label = view.id === 'pee' ? activityLabel({ type: 'pee' }) : t('timeline.poopAndEat', { poop: activityLabel({ type: 'poop' }), meal: activityLabel({ type: 'meal' }) });
+            const colors = view.id === 'pee' ? activityColors(theme, { type: 'pee' }) : { color: theme.primary, softColor: theme.primarySoft };
             const color = colors.color;
             const activeBackground = colors.softColor;
             return (
               <Pressable
-                key={type}
-                testID={`timeline.filter.${type}`}
+                key={view.id}
+                testID={`timeline.filter.${view.id}`}
                 accessibilityRole="radio"
                 accessibilityLabel={label}
                 accessibilityState={{ checked: active }}
                 onPress={() => {
                   setSelection([]);
-                  setSelectedType(type);
+                  setSelectedView(view);
                 }}
                 style={({ pressed }) => [
                   styles.filterChip,
@@ -797,9 +778,7 @@ function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken
                   },
                 ]}
               >
-                {activity
-                  ? <ActivityIcon activity={activity} theme={theme} size={playful ? 24 : 17} color={active ? color : theme.textMuted} />
-                  : <MaterialCommunityIcons accessibilityElementsHidden importantForAccessibility="no" name="layers-outline" size={17} color={active ? color : theme.textMuted} />}
+                {view.types.map(type => <ActivityIcon key={type} activity={{ type }} theme={theme} size={17} color={active ? activityColors(theme, { type }).color : theme.textMuted} />)}
                 <Text style={[styles.filterLabel, { color: active ? color : theme.textMuted }]}>{label}</Text>
                 {active ? (
                   <MaterialCommunityIcons
@@ -813,13 +792,32 @@ function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken
               </Pressable>
             );
           })}
-        </ScrollView>
+        </View>
+
+        {selectedView.id === 'poop-meal' ? <Pressable
+          testID="timeline.windows.edit"
+          accessibilityRole="button"
+          accessibilityLabel={`${t('schedule.expectedWindow')}. ${expectedDescription ? `${t('timeline.windowsDaily')}. ${expectedDescription}. ` : ''}${t('timeline.editWindows')}`}
+          onPress={onOpenSchedule}
+          style={({ pressed }) => [styles.windowLegend, isCompactHeight && styles.compactWindowLegend, pressed && { backgroundColor: theme.primarySoft }]}
+        >
+          <MaterialCommunityIcons accessibilityElementsHidden importantForAccessibility="no" name="calendar-clock-outline" size={18} color={theme.textMuted} />
+          <Text style={[styles.windowLegendText, { color: theme.textMuted }]}>{t(expectedWindows.length ? 'timeline.windowsDaily' : 'timeline.editWindows')}</Text>
+          {(['meal', 'poop'] as const).filter(type => expectedWindows.some(window => window.type === type)).map(type => (
+            <View key={type} style={styles.windowLegendActivity}>
+              <View style={[styles.windowLegendSwatch, { backgroundColor: activityColors(theme, { type }).color }]} />
+              <Text style={[styles.windowLegendText, { color: theme.text }]}>{activityLabel({ type })}</Text>
+            </View>
+          ))}
+          <MaterialCommunityIcons accessibilityElementsHidden importantForAccessibility="no" name="chevron-right" size={18} color={theme.textMuted} />
+        </Pressable> : null}
+        </View>
 
         {!isCompactHeight && !window.loading && !window.error && !summaryError && visibleMarkCount === 0 ? (
           <View testID="timeline.empty" style={[styles.emptyNote, { backgroundColor: theme.surface, borderRadius: theme.presentation.controlRadius }]}>
             <MaterialCommunityIcons name="clock-outline" size={18} color={theme.textMuted} />
             <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-              {t('insights.noRangeLogs', { activity: filterName(selectedTypes, language, activityFilters.length, activityLabel) })}
+              {t('insights.noRangeLogs', { activity: filterName(selectedTypes, language, activityLabel) })}
             </Text>
           </View>
         ) : null}
@@ -846,15 +844,29 @@ function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken
             />
             <FlatList
               ref={listRef}
-              data={days}
+              data={rows}
               keyExtractor={(day) => day.key}
-              renderItem={({ item: day }) => (
+              renderItem={({ item: day }) => 'emptyDays' in day ? (
+                <View style={{ height: rowHeight, width: totalWidth, backgroundColor: theme.background }}>
+                  <Animated.View
+                    testID={`timeline.gap.${day.key}`}
+                    accessible
+                    accessibilityLabel={`${formatDateRange(day.start, day.end, language)}. ${t('timeline.emptyDays', { count: day.emptyDays })}`}
+                    style={[styles.gapRow, { height: rowHeight, width: viewportWidth, borderColor: theme.border, transform: [{ translateX: horizontalOffset }] }]}
+                  >
+                    <Text accessibilityElementsHidden importantForAccessibility="no" style={[styles.gapDots, { color: theme.textMuted }]}>⋮</Text>
+                    <View style={styles.gapCopy}>
+                      <Text maxFontSizeMultiplier={1.5} style={[styles.gapLabel, { color: theme.textMuted }]}>{t('timeline.emptyDays', { count: day.emptyDays })}</Text>
+                      <Text maxFontSizeMultiplier={1.5} style={[styles.gapDates, { color: theme.textMuted }]}>{formatDateRange(day.start, day.end, language)}</Text>
+                    </View>
+                  </Animated.View>
+                </View>
+              ) : (
                 <View style={[styles.dayRow, { height: rowHeight, width: totalWidth }]}>
                   <MemoTimelineDateLabel
                     day={day}
                     selectedTypes={selectedTypes}
                     savedEstimateIds={savedEstimateIds}
-                    activityCount={activityFilters.length}
                     isToday={day.key === todayKey}
                     currentTime={day.key === todayKey ? now : undefined}
                     rowHeight={rowHeight}
@@ -862,8 +874,9 @@ function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken
                     theme={theme}
                   />
                   <View style={{ width: trackWidth }}>
-                    <RowTrack
+                    <MemoTimelineTrack
                       day={day}
+                      expectedWindows={expectedWindows}
                       selectedTypes={selectedTypes}
                       savedEstimateIds={savedEstimateIds}
                       isToday={day.key === todayKey}
@@ -879,6 +892,7 @@ function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken
               )}
               ListHeaderComponent={(
                 <Pressable
+                  testID="timeline.loadEarlier"
                   accessibilityRole={hasEarlierDays ? 'button' : 'text'}
                   accessibilityLabel={t(hasEarlierDays ? 'timeline.loadEarlier' : 'timeline.historyStart')}
                   accessibilityState={{ busy: isLoadingEarlier, disabled: !hasEarlierDays }}
@@ -1018,9 +1032,15 @@ function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken
 }
 
 const styles = StyleSheet.create({
-  modeRow: { flexDirection: 'row', paddingHorizontal: 16, paddingTop: 8, gap: 8 },
-  modeButton: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
-  dayViewTitle: { fontSize: 34, lineHeight: 44, marginHorizontal: 16, marginTop: 12 },
+  expectedWindow: { position: 'absolute', top: 0, bottom: 0, opacity: 0.16 },
+  timelineControls: { gap: spacing.sm },
+  compactControls: { flexDirection: 'row', alignItems: 'center' },
+  compactFilters: { flex: 1 },
+  compactWindowLegend: { maxWidth: '50%' },
+  windowLegend: { minHeight: 48, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: 8, rowGap: 4, paddingVertical: 6 },
+  windowLegendText: { fontSize: 12, lineHeight: 18, flexShrink: 1 },
+  windowLegendActivity: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  windowLegendSwatch: { width: 14, height: 14, opacity: 0.4, borderRadius: 3 },
   screen: { flex: 1 },
   header: {
     paddingHorizontal: spacing.md,
@@ -1047,8 +1067,10 @@ const styles = StyleSheet.create({
   zoomValue: { minWidth: 44, textAlign: 'center', fontSize: 12, fontWeight: '800', fontVariant: ['tabular-nums'] },
   timelineMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   rangeText: { flex: 1, minWidth: 0, fontSize: 11, lineHeight: 15, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  filters: { gap: spacing.sm, paddingRight: spacing.md },
+  filters: { flexDirection: 'row', gap: spacing.sm },
   filterChip: {
+    flex: 1,
+    justifyContent: 'center',
     minHeight: 48,
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 10,
@@ -1056,7 +1078,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  filterLabel: { fontSize: 12, lineHeight: 17, fontWeight: '700' },
+  filterLabel: { flexShrink: 1, fontSize: 12, lineHeight: 17, fontWeight: '700' },
   emptyNote: { minHeight: 36, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   emptyText: { flex: 1, fontSize: 11, lineHeight: 16 },
   timelineViewport: { flex: 1, overflow: 'hidden' },
@@ -1079,6 +1101,11 @@ const styles = StyleSheet.create({
   axisEnd: { right: 1, textAlign: 'right' },
   dayList: { flex: 1 },
   dayRow: { flexDirection: 'row' },
+  gapRow: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth },
+  gapDots: { width: DATE_COLUMN_WIDTH, textAlign: 'center', fontSize: 24 },
+  gapCopy: { flex: 1, paddingHorizontal: 8 },
+  gapLabel: { fontSize: 12, lineHeight: 17, fontWeight: '600' },
+  gapDates: { fontSize: 11, lineHeight: 16 },
   dateCell: {
     width: DATE_COLUMN_WIDTH,
     flexShrink: 0,

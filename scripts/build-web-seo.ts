@@ -3,7 +3,6 @@ import { publicPaths, siteUrl } from '../src/web/site.ts';
 
 writeFileSync('dist-web/sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${publicPaths.map((path) => `  <url><loc>${siteUrl}${path}</loc></url>`).join('\n')}\n</urlset>\n`);
 writeFileSync('dist-web/robots.txt', `User-agent: *\nAllow: /\nSitemap: ${siteUrl}/sitemap.xml\n`);
-copyFileSync('assets/puptime-icon.png', 'dist-web/social-preview.png');
 // A top-level 404 disables Pages' SPA fallback for nonexistent guide URLs.
 copyFileSync('dist-web/+not-found.html', 'dist-web/404.html');
 for (const path of ['+not-found.html', '_sitemap.html', 'puppy-care/[id].html']) rmSync(`dist-web/${path}`, { force: true });

@@ -34,7 +34,7 @@
       "predictiveBackGestureEnabled": true
     },
     "web": {
-      "favicon": "./assets/favicon.png",
+      "favicon": "./public/social-preview.png",
       "output": "static"
     },
     "plugins": [
