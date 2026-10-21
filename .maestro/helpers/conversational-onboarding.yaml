@@ -58,11 +58,9 @@ name: Complete conversational setup into the real app
       platform: Android
     commands:
       - tapOn:
-          id: time.mode
-      - tapOn:
-          id: time.input.hour
-      - eraseText
-      - inputText: '8'
+          id: time.wheel.hour
+          point: "50%,70%"
+      - takeScreenshot: conversational-android-time-wheel
 - tapOn:
     id: picker.done
 - tapOn:
@@ -96,11 +94,8 @@ name: Complete conversational setup into the real app
       platform: Android
     commands:
       - tapOn:
-          id: time.mode
-      - tapOn:
-          id: time.input.hour
-      - eraseText
-      - inputText: '9'
+          id: time.wheel.hour
+          point: "50%,70%"
 - tapOn:
     id: picker.done
 - assertVisible:

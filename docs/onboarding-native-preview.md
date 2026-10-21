@@ -122,8 +122,11 @@ personal history.
   skipping optional setup plus the tour. All three pass after the meal/poop page,
   cream picker, timeline and navigation changes.
 - The dedicated **Puptime_Onboarding_2f17** Android emulator passes the onboarding
-  handoff into the real app and spotlight with 1,382 synthetic SQLite records.
-  Dismissing the guide, opening the log editor, and closing it each leave all 62
+  flow with the new activity art, wheel-edited meal/poop times, Back preservation,
+  review timeline, reminder choices, spotlight logging and normal navigation,
+  with 1,382 synthetic SQLite records. Android tests tap the next wheel row
+  directly rather than switching to typing. Earlier render probes confirmed
+  dismissing the guide, opening the log editor, and closing it each leave all 62
   observed EventRow render counters unchanged. The real quick-action positions
   stay fixed when the overlay disappears. QA fixtures, native artifacts, and
   render probes remain in ignored build output.
