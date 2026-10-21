@@ -9,6 +9,7 @@ import { firstLaunchStepSchema } from '../first-launch.ts';
 import {EventHistoryError,type EventHistoryRestore} from '../event-history.ts';
 import {readEventHistoryEntry,readEventHistoryHead} from './event-history.ts';
 import {writeEventRecord} from './repository.ts';
+import type { BackupGuard } from './activity-backups.ts';
 
 export class RestoreNeedsConfirmationError extends Error {
   constructor(){super('Restore requires confirmation because this setup is no longer pristine.');this.name='RestoreNeedsConfirmationError';}
@@ -24,7 +25,7 @@ const historySelection=z.discriminatedUnion('source',[
   z.strictObject({source:z.literal('local'),sequence:z.number().int().min(1).max(Number.MAX_SAFE_INTEGER)}),
   z.strictObject({source:z.literal('cloud'),revision:revisionSchema}),
 ]);
-export function createLocalSync(database:LocalDatabase,options:{newId?:()=>string;now?:()=>number;afterCommit?:()=>void}={}) {
+export function createLocalSync(database:LocalDatabase,options:{newId?:()=>string;now?:()=>number;afterCommit?:()=>void;beforeChange?:BackupGuard}={}) {
   const now=options.now??Date.now;
   async function id(sql:SqlExecutor,prefix:'op'|'gen'='op') {return identifierSchema.parse(options.newId?.()??(await sql.getFirstAsync<{id:string}>('SELECT ? || lower(hex(randomblob(16))) id',prefix+'_'))!.id);}
   async function owner(sql:SqlExecutor,fence?:Fence):Promise<Owner|null> {
@@ -171,6 +172,7 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
       if (change.kind==='event'&&base) {if ('estimated' in base.data&&base.data.estimated) data.estimated=true;retainValidEventTiming(base.data,data);}
       values.set(key(change),{kind:change.kind,localId:change.localId,data});deletions.get(item.pet.pet_id)!.delete(key(change));
     }
+    if(pets.some(pet=>localChanges(before.get(pet.pet_id)!,[...projected.get(pet.pet_id)!.values()]).some(change=>change.kind==='event'&&change.before!==null)))await options.beforeChange?.(sql,source==='restore'?'recovery':'cloud-replace');
     for (const pet of pets) await applyLocalRecords(sql,pet.pet_id,[...projected.get(pet.pet_id)!.values()].filter(record=>pet===primary||record.kind!=='accountPreferences'),[...deletions.get(pet.pet_id)!.values()]);
     for (const pet of pets) await retainRevisions(sql,pet.pet_id,localChanges(before.get(pet.pet_id)!,await readLocalRecords(sql,pet.pet_id)).filter(change=>pet.pet_id===primary.pet_id||change.kind!=='accountPreferences'),source);
   }
@@ -226,6 +228,7 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
         }
         if (current?.pending_pet_id||current?.resyncing) throw new Error('Finish the pending enrollment or baseline first.');
         if(mode==='restore'&&!await pristineSetup(sql,input.localPetId))throw new RestoreNeedsConfirmationError();
+        await options.beforeChange?.(sql,'account-change');
         if (!current) {
           const generation=await id(sql,'gen');
           await sql.runAsync('INSERT INTO local_sync_owner(singleton,generation,account_id,device_id,pending_pet_id) VALUES (1,?,?,?,?)',generation,input.accountId,input.deviceId,input.localPetId);
@@ -297,6 +300,7 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
         const rows=await sql.getAllAsync<{body:string}>('SELECT body FROM local_sync_baseline WHERE generation=? ORDER BY json_extract(body,\'$.sequence\')',current.generation);
         const cloud=rows.map(row=>cloudRecordSchema.parse(JSON.parse(row.body)));
         if(restoring&&cloud.some(record=>record.kind==='puppy'&&record.petId===input.cloudPetId&&record.deleted))throw new RestoreNeedsConfirmationError();
+        await options.beforeChange?.(sql,'cloud-replace');
         for (const record of cloud) await sql.runAsync('INSERT INTO local_sync_records(generation,record_id,body) VALUES (?,?,?) ON CONFLICT(generation,record_id) DO UPDATE SET body=excluded.body',current.generation,record.id,JSON.stringify(record));
         const old=new Map<string,LocalRecord>(),desired=new Map<string,LocalRecord>(),deleted:Array<{kind:LocalRecord['kind'];localId:string}>=[];
         for (const record of cloud) {
@@ -413,6 +417,7 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
     async finishResync(input:Fence):Promise<void> {
       await database.write(async sql=>{
         const current=await required(sql,input);if (!current.resyncing) return;if (!current.staging_complete) throw new Error('The full baseline is incomplete.');
+        await options.beforeChange?.(sql,'cloud-replace');
         const former=(await sql.getAllAsync<{body:string}>('SELECT body FROM local_sync_records WHERE generation=?',current.generation)).map(row=>cloudRecordSchema.parse(JSON.parse(row.body)));
         const rows=await sql.getAllAsync<{body:string}>('SELECT body FROM local_sync_baseline WHERE generation=?',current.generation);
         await sql.runAsync('DELETE FROM local_sync_records WHERE generation=?',current.generation);
@@ -453,6 +458,7 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
         const {id:_,...snapshot}=selected;
         const desired={id:eventId,...eventDataSchema.parse({...snapshot,...(previous?.estimated||cloudData?.estimated?{estimated:true}:{})})};
         if(head.event&&!Object.keys(fieldPatch(head.event,desired)).length)return {event:head.event,changed:false};
+        await options.beforeChange?.(sql,'recovery');
         if(pet){
           if(!head.owner||!head.cloudRecord)throw new EventHistoryError('unavailable');
           const {id:__,...data}=desired;
@@ -469,7 +475,7 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
       if(result.changed)notifyLocalCommit(options.afterCommit);
       return result.event;
     },
-    async detach(input:Fence):Promise<void> {await database.write(async sql=>{await required(sql,input);await sql.runAsync('DELETE FROM local_sync_owner WHERE generation=?',input.generation);await clearRestoreIntent(sql);});},
+    async detach(input:Fence):Promise<void> {await database.write(async sql=>{await required(sql,input);await options.beforeChange?.(sql,'account-change');await sql.runAsync('DELETE FROM local_sync_owner WHERE generation=?',input.generation);await clearRestoreIntent(sql);});},
     async status(petId:string):Promise<{state:'local'|'preparing'|'active'|'resyncing';generation:string|null;accountId:string|null;pending:number;blocked:number;cursor:number}> {
       return database.read(async sql=>{
         const current=await owner(sql),pet=await binding(sql,petId);

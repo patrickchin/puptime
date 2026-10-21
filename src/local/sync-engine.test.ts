@@ -653,3 +653,35 @@ test('backup recovery explicitly restores synced deletions and rejects pending d
  assert.deepEqual(await recover([event,nap]),{imported:0,skipped:2});
  assert.equal((await sync.status('local-pet')).pending,0);
 });
+
+
+test('checkpoints protect account association, destructive cloud projections, resync and detach',async t=>{
+ const f=await setup(t);let failed=false;
+ const checkpoints:Array<{reason:string;ids:string[]}>=[];
+ const sync=engine.createLocalSync(f.database,{beforeChange:async(sql,reason)=>{
+  checkpoints.push({reason,ids:(await sql.getAllAsync<{id:string}>('SELECT id FROM events ORDER BY id')).map(row=>row.id)});
+  if(failed)throw new Error('Backup unavailable');
+ }});
+ const storage=createNativeStorage(f.database,'local-pet',sync.changeSink('local-pet'));
+ await storage.appendEvents([event]);
+ const owner=await activate(sync),server=replicaServer();await cycle(sync,owner,server);
+ assert.ok(checkpoints.some(item=>item.reason==='account-change'&&item.ids.includes(event.id)));
+ assert.ok(checkpoints.some(item=>item.reason==='cloud-replace'&&item.ids.includes(event.id)));
+ const record=server.record(cloudRecordId('event','local-pet',event.id));
+ server.push([{protocolVersion:1,operationId:'remote-delete-backup',deviceId:'other-device',recordId:record.id,petId:record.petId,kind:'event',intent:'delete',baseRevision:record.revision,patch:{}}]);
+ const cursor=(await sync.status('local-pet')).cursor,page=server.pull(cursor);
+ failed=true;
+ await assert.rejects(sync.applySync({...owner,accepted:[],page}),/Backup unavailable/);
+ assert.deepEqual(await storage.loadEvents(),[event]);assert.equal((await sync.status('local-pet')).cursor,cursor);
+ failed=false;await sync.applySync({...owner,accepted:[],page});assert.deepEqual(await storage.loadEvents(),[]);
+ assert.deepEqual(checkpoints.at(-1),{reason:'cloud-replace',ids:[event.id]});
+ await storage.appendEvents([{...event,id:'local-after-delete'}]);await cycle(sync,owner,server);
+ await sync.resetBaseline(owner);await sync.stageBaseline({...owner,page:server.pull(0)});
+ failed=true;await assert.rejects(sync.finishResync(owner),/Backup unavailable/);
+ assert.equal((await sync.status('local-pet')).state,'resyncing');
+ failed=false;await sync.finishResync(owner);
+ failed=true;await assert.rejects(sync.detach(owner),/Backup unavailable/);
+ assert.equal((await sync.status('local-pet')).state,'active');
+ failed=false;await sync.detach(owner);assert.equal((await sync.status('local-pet')).state,'local');
+ assert.ok((await storage.loadEvents()).some(item=>item.id==='local-after-delete'));
+});
