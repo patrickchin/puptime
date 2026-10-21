@@ -45,6 +45,10 @@ Pages slide horizontally as a whole, including their header and footer. Back
 reverses the direction. Reduce Motion disables these transitions. The welcome
 scene remains static; the new meal and poop illustrations are coherent generated
 images, not programmatically composed props. See the mascot README for prompts.
+Every onboarding illustration uses the same 160-point image height, including
+welcome, name, age, meal times, poop windows and the final page. Images retain
+their proportions and fit within the same 320-point maximum width. The poop
+scene has a visible gap between Scruffy and the small painted poop.
 
 ## Notifications
 

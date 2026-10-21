@@ -64,7 +64,7 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
   const permissionRequest=useRef(false);
   const scroll=useRef<ScrollView>(null);
   const heading=useRef<Text>(null);
-  const {fontScale,width,height}=useWindowDimensions();
+  const {fontScale,width}=useWindowDimensions();
   const [reduceMotion,setReduceMotion]=useState(true);
   const [outgoing,setOutgoing]=useState<ReactNode>(null);
   const [direction,setDirection]=useState(1);
@@ -161,11 +161,11 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
     <Text style={styles.choiceText}>{label}</Text><MaterialCommunityIcons name="chevron-right" size={21} color={appTheme.primary}/>
   </Pressable>;
   const prompt=(title:string,body?:string)=><View style={styles.prompt}><Text ref={heading} testID="preview.prompt" accessibilityRole="header" accessibilityLiveRegion="polite" style={styles.title}>{title}</Text>{body?<Text style={styles.body}>{body}</Text>:null}</View>;
-  const smallMascot=<Image accessible={false} source={mascot} resizeMode="contain" style={styles.smallMascot}/>;
+  const mascotImage=<Image accessible={false} source={mascot} resizeMode="contain" style={styles.mascot}/>;
   const mealStep=step==='mealTime';
   const timeIndex=mealStep?mealIndex:poopIndex;
   const time=mealStep?mealTimes[timeIndex]??0:((poopWindows[timeIndex]?.minutes??15)-15+1440)%1440;
-  const activityArt=(source:ImageSourcePropType,maxHeight=200)=><View style={styles.activityArt}><Image accessible={false} source={source} resizeMode="contain" style={[styles.activityImage,{height:Math.min(maxHeight,height*.23)}]}/></View>;
+  const activityArt=(source:ImageSourcePropType)=><View style={styles.activityArt}><Image accessible={false} source={source} resizeMode="contain" style={styles.mascot}/></View>;
 
   let body;
   if(step==='welcome')body=<ScrollView testID="preview.welcome" contentContainerStyle={styles.welcome}>
@@ -197,7 +197,7 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
     <ScrollView key={step} contentContainerStyle={styles.conversation}>
       {prompt(`How old is ${pup}?`)}
       <View style={styles.answers}>{puppyAges.map(item=>choice(item.id,item.label,()=>{setAge(item.id);go('meals');}))}</View>
-      {smallMascot}
+      {mascotImage}
     </ScrollView>
     {later('I’m not sure yet',()=>{setAge(null);go('meals');})}
   </>;
@@ -228,7 +228,7 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
           <Text style={[styles.windowTime,{flex:1}]}>{formatScheduleWindow(window,'en')}</Text><MaterialCommunityIcons name="chevron-down" color={appTheme.primary} size={20}/>
         </Pressable>
       </View>)}</View>
-      {activityArt(require('../../assets/mascots/onboarding/scruffy-pooping.png'),128)}
+      {activityArt(require('../../assets/mascots/onboarding/scruffy-pooping.png'))}
     </ScrollView>
     {footer('That works for us',()=>{replaceTimes('poop',poopWindows);go('review');},'Skip for now',()=>{replaceTimes('poop',[]);go('review');})}
   </>;
@@ -262,7 +262,7 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
   </>;
   else if(step==='ready')body=<>
     <ScrollView testID="preview.ready" contentContainerStyle={styles.ready}>
-      {smallMascot}{prompt('Ready for today?',reminderAnswer==='granted'?'You can change reminders in Notifications.':undefined)}
+      {mascotImage}{prompt('Ready for today?',reminderAnswer==='granted'?'You can change reminders in Notifications.':undefined)}
     </ScrollView>
     {finishError?<Text accessibilityRole="alert" style={[styles.error,{paddingHorizontal:22}]}>We couldn’t save your setup. Your answers are still here—please try again.</Text>:null}
     {footer(finishing?'Saving…':'Show me around',()=>{void complete(true);},'I’ll explore on my own',()=>{void complete(false);})}
@@ -293,15 +293,15 @@ const styles=StyleSheet.create({
   brand:{flexDirection:'row',alignItems:'center',gap:7},icon:{width:28,height:28,borderRadius:7},brandName:{fontFamily:'RedHatDisplayBold',fontSize:20,color:theme.text,letterSpacing:-.5},
   back:{minWidth:62,minHeight:44,flexDirection:'row',alignItems:'center'},backText:{fontFamily:'RedHatText',fontSize:13,color:theme.textMuted},headerSpacer:{width:62},
   profileContent:{flexGrow:1,paddingHorizontal:22,paddingTop:22},title:{fontFamily:'RedHatDisplayBold',fontSize:26,lineHeight:33,letterSpacing:-.5,color:theme.text},
-  art:{flex:1,minHeight:140,alignItems:'center',justifyContent:'center',marginTop:12},mascot:{width:'100%',height:'100%',maxHeight:300,minHeight:140},keyboardSpace:{flexGrow:1,minHeight:16},
+  art:{flex:1,minHeight:160,alignItems:'center',justifyContent:'center',marginTop:12},mascot:{width:'100%',maxWidth:320,height:160,alignSelf:'center'},keyboardSpace:{flexGrow:1,minHeight:16},
   nameField:{paddingTop:18,paddingBottom:20},nameInput:{fontFamily:'RedHatText',fontSize:27,minHeight:60,paddingVertical:10,borderBottomWidth:2,borderBottomColor:theme.primary,color:theme.text},
   footer:{paddingHorizontal:22,paddingTop:18,paddingBottom:2,backgroundColor:theme.background},primary:{minHeight:52,paddingHorizontal:16,paddingVertical:12,borderRadius:999,backgroundColor:theme.primary,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:10},
   primaryText:{fontFamily:'RedHatTextSemiBold',fontSize:15,color:theme.onPrimary},pressed:{opacity:.75},secondary:{minHeight:44,alignItems:'center',justifyContent:'center',paddingVertical:8,marginTop:4},secondaryText:{fontFamily:'RedHatText',fontSize:14,color:theme.textMuted},
   conversation:{flexGrow:1,paddingHorizontal:22,paddingTop:28,paddingBottom:20,gap:28},prompt:{gap:18},body:{fontFamily:'RedHatText',fontSize:16,lineHeight:24,color:theme.textMuted},
   mealRow:{gap:10},mealTime:{fontFamily:'RedHatTextSemiBold',fontSize:20,color:appTheme.primary,fontVariant:['tabular-nums']},
   answers:{gap:12},choice:{minHeight:62,paddingVertical:16,paddingHorizontal:18,borderWidth:1,borderColor:theme.border,borderRadius:18,backgroundColor:appTheme.surface,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12},choicePressed:{backgroundColor:appTheme.primarySoft,borderColor:appTheme.primary},choiceText:{fontFamily:'RedHatTextSemiBold',fontSize:17,lineHeight:24,color:appTheme.text,flex:1},
-  activityArt:{flexGrow:1,justifyContent:'flex-end',alignItems:'center'},activityImage:{width:'100%',maxWidth:320},
-  poopConversation:{gap:22},poopAnswers:{gap:18},poopPair:{gap:8},mealReference:{fontFamily:'RedHatText',fontSize:14,lineHeight:20,color:'#B6CBC1',paddingHorizontal:4,fontVariant:['tabular-nums']},windowTime:{fontFamily:'RedHatTextSemiBold',fontSize:18,lineHeight:25,color:appTheme.primary,fontVariant:['tabular-nums']},
-  smallMascot:{height:150,width:180,alignSelf:'center'},progress:{fontFamily:'RedHatText',fontSize:13,color:theme.textMuted},timeSpace:{flexGrow:1,justifyContent:'center',gap:28,paddingVertical:12},timeAnswer:{minHeight:96,padding:20,borderRadius:24,backgroundColor:appTheme.surface,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:18},timeText:{fontFamily:'RedHatDisplayBold',fontSize:40,lineHeight:52,color:appTheme.primary,fontVariant:['tabular-nums'],flexShrink:1},
+  activityArt:{flexGrow:1,justifyContent:'flex-end',alignItems:'center'},
+  poopConversation:{gap:16,paddingTop:20},poopAnswers:{gap:14},poopPair:{gap:8},mealReference:{fontFamily:'RedHatText',fontSize:14,lineHeight:20,color:'#B6CBC1',paddingHorizontal:4,fontVariant:['tabular-nums']},windowTime:{fontFamily:'RedHatTextSemiBold',fontSize:18,lineHeight:25,color:appTheme.primary,fontVariant:['tabular-nums']},
+  progress:{fontFamily:'RedHatText',fontSize:13,color:theme.textMuted},timeSpace:{flexGrow:1,justifyContent:'center',gap:28,paddingVertical:12},timeAnswer:{minHeight:96,padding:20,borderRadius:24,backgroundColor:appTheme.surface,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:18},timeText:{fontFamily:'RedHatDisplayBold',fontSize:40,lineHeight:52,color:appTheme.primary,fontVariant:['tabular-nums'],flexShrink:1},
   plan:{borderTopWidth:1,borderColor:theme.border,paddingTop:20,gap:12},planHeading:{fontFamily:'RedHatTextSemiBold',fontSize:15,color:theme.textMuted},planTime:{fontFamily:'RedHatTextSemiBold',fontSize:22,lineHeight:30,color:theme.text,fontVariant:['tabular-nums']},schedule:{flex:1},ready:{flexGrow:1,padding:24,justifyContent:'center',gap:28},
 });

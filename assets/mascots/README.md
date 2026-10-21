@@ -33,3 +33,7 @@ Final prompt set:
   forest-green and ochre fur and asymmetrical ears. No squatting, anatomical
   detail, pasted Unicode emoji, glossy 3D rendering, text or extra props.
   Transparent background.
+
+Spacing revision (built-in ImageGen edit of `onboarding/scruffy-pooping.png`):
+
+> Use case: precise-object-edit. Edit target: the supplied transparent illustration of Scruffy sitting beside a small smiling poop. Change only their spacing: move the little painted poop farther to the viewer's right so there is a clear transparent gap between Scruffy's rightmost paw/fur and the poop, about half the width of his face (roughly one poop-width of empty ground). Keep both on the same baseline. Preserve Scruffy's exact happy sitting pose, expression, tongue, asymmetrical ears, proportions, cream/forest-green/ochre fur, rough brushwork, and the small poop's painted design, scale and smile. This must stay one coherent flat hand-painted illustration, with genuine transparent alpha, no background or ground patch. Keep the full dog and poop fully in frame with modest transparent padding; widen the canvas if needed rather than shrinking Scruffy. No additional props, no text, no 3D effects.
