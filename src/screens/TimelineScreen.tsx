@@ -37,7 +37,7 @@ import { ActivityIcon } from '../components/ActivityIcon';
 import { useLocalization } from '../localization-context';
 import { translate, type AppLanguage } from '../localization';
 import { headingStyle, spacing, type Theme } from '../theme';
-import { timelineDetailTime, timelineFormatters } from '../timeline-format';
+import { collapseEmptyTimelineDays, timelineDetailTime, timelineFormatters, type TimelineGap } from '../timeline-format';
 
 const INITIAL_DAYS = 14;
 const LOAD_DAYS = 14;
@@ -494,6 +494,7 @@ function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken
     [events, estimates, loadedDayCount, maxHistoryDays, now],
   );
   const todayKey = dateKey(now);
+  const rows = useMemo(() => collapseEmptyTimelineDays(days, todayKey), [days, todayKey]);
   const savedEstimateIds = useMemo(() => new Set(events.filter((event) => event.estimated).map((event) => event.id)), [events]);
   const visibleEventCount = new Set(
     days.flatMap((day) => day.marks.filter((mark) => !mark.estimated && selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label }))).map((mark) => mark.id)),
@@ -519,7 +520,7 @@ function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken
       : new Date(sharedDetailDay).getFullYear() === now.getFullYear()
         ? timelineFormatters(language).fullDate.format(sharedDetailDay)
         : timelineFormatters(language).rangeDate.format(sharedDetailDay);
-  const listRef = useRef<FlatList<TimelineDay>>(null);
+  const listRef = useRef<FlatList<TimelineDay | TimelineGap>>(null);
   const horizontalRef = useRef<ScrollView>(null);
   const horizontalOffset = useRef(new Animated.Value(0)).current;
   const horizontalOffsetValue = useRef(0);
@@ -846,9 +847,24 @@ function ComparisonTimelineScreen({ events:projectedEvents,activity,refreshToken
             />
             <FlatList
               ref={listRef}
-              data={days}
+              data={rows}
               keyExtractor={(day) => day.key}
-              renderItem={({ item: day }) => (
+              renderItem={({ item: day }) => 'emptyDays' in day ? (
+                <View style={{ height: rowHeight, width: totalWidth, backgroundColor: theme.background }}>
+                  <Animated.View
+                    testID={`timeline.gap.${day.key}`}
+                    accessible
+                    accessibilityLabel={`${formatDateRange(day.start, day.end, language)}. ${t('timeline.emptyDays', { count: day.emptyDays })}`}
+                    style={[styles.gapRow, { height: rowHeight, width: viewportWidth, borderColor: theme.border, transform: [{ translateX: horizontalOffset }] }]}
+                  >
+                    <Text accessibilityElementsHidden importantForAccessibility="no" style={[styles.gapDots, { color: theme.textMuted }]}>⋮</Text>
+                    <View style={styles.gapCopy}>
+                      <Text maxFontSizeMultiplier={1.5} style={[styles.gapLabel, { color: theme.textMuted }]}>{t('timeline.emptyDays', { count: day.emptyDays })}</Text>
+                      <Text maxFontSizeMultiplier={1.5} style={[styles.gapDates, { color: theme.textMuted }]}>{formatDateRange(day.start, day.end, language)}</Text>
+                    </View>
+                  </Animated.View>
+                </View>
+              ) : (
                 <View style={[styles.dayRow, { height: rowHeight, width: totalWidth }]}>
                   <MemoTimelineDateLabel
                     day={day}
@@ -1079,6 +1095,11 @@ const styles = StyleSheet.create({
   axisEnd: { right: 1, textAlign: 'right' },
   dayList: { flex: 1 },
   dayRow: { flexDirection: 'row' },
+  gapRow: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth },
+  gapDots: { width: DATE_COLUMN_WIDTH, textAlign: 'center', fontSize: 24 },
+  gapCopy: { flex: 1, paddingHorizontal: 8 },
+  gapLabel: { fontSize: 12, lineHeight: 17, fontWeight: '600' },
+  gapDates: { fontSize: 11, lineHeight: 16 },
   dateCell: {
     width: DATE_COLUMN_WIDTH,
     flexShrink: 0,
