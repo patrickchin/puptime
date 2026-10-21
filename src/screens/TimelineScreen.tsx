@@ -749,10 +749,12 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
           <Text style={[styles.estimateLegendText, { color: theme.text }]}>{t('timeline.estimatedLegend')}</Text>
         ) : null}
 
+        <View style={[styles.timelineControls, isCompactHeight && styles.compactControls]}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filters}
+          style={isCompactHeight && styles.compactFilters}
         >
           {(['all', ...activityFilters] as const).map((type) => {
             const isAll = type === 'all';
@@ -806,7 +808,7 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
           accessibilityRole="button"
           accessibilityLabel={`${t('schedule.expectedWindow')}. ${expectedDescription ? `${t('timeline.windowsDaily')}. ${expectedDescription}. ` : ''}${t('timeline.editWindows')}`}
           onPress={onOpenSchedule}
-          style={({ pressed }) => [styles.windowLegend, pressed && { backgroundColor: theme.primarySoft }]}
+          style={({ pressed }) => [styles.windowLegend, isCompactHeight && styles.compactWindowLegend, pressed && { backgroundColor: theme.primarySoft }]}
         >
           <MaterialCommunityIcons accessibilityElementsHidden importantForAccessibility="no" name="calendar-clock-outline" size={18} color={theme.textMuted} />
           <Text style={[styles.windowLegendText, { color: theme.textMuted }]}>{t(expectedWindows.length ? 'timeline.windowsDaily' : 'timeline.editWindows')}</Text>
@@ -818,6 +820,7 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
           ))}
           <MaterialCommunityIcons accessibilityElementsHidden importantForAccessibility="no" name="chevron-right" size={18} color={theme.textMuted} />
         </Pressable>
+        </View>
 
         {!isCompactHeight && !window.loading && !window.error && !summaryError && visibleMarkCount === 0 ? (
           <View testID="timeline.empty" style={[styles.emptyNote, { backgroundColor: theme.surface, borderRadius: theme.presentation.controlRadius }]}>
@@ -1039,6 +1042,10 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
 
 const styles = StyleSheet.create({
   expectedWindow: { position: 'absolute', top: 0, bottom: 0, opacity: 0.16 },
+  timelineControls: { gap: spacing.sm },
+  compactControls: { flexDirection: 'row', alignItems: 'center' },
+  compactFilters: { flex: 1 },
+  compactWindowLegend: { maxWidth: '50%' },
   windowLegend: { minHeight: 48, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: 8, rowGap: 4, paddingVertical: 6 },
   windowLegendText: { fontSize: 12, lineHeight: 18, flexShrink: 1 },
   windowLegendActivity: { flexDirection: 'row', alignItems: 'center', gap: 5 },
