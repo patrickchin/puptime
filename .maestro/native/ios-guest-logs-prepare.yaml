@@ -1,0 +1,8 @@
+appId: com.patrickchin.puptime
+name: Guest logs before account sign-in
+---
+- launchApp:
+    clearState: true
+    clearKeychain: true
+- runFlow: ../helpers/skip-onboarding.yaml
+- stopApp
