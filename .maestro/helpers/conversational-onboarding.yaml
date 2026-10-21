@@ -73,6 +73,12 @@ name: Complete conversational setup into the real app
 - tapOn:
     id: preview.continue
 - assertVisible:
+    id: preview.poopMealTime.0
+    text: '.*Meal 1.*8:00.*'
+- assertVisible:
+    id: preview.poopMealTime.1
+    text: '.*Meal 2.*12:00.*'
+- assertVisible:
     id: preview.poopTime.0
     text: '.*8:30.*9:00.*'
 - assertVisible:
@@ -89,6 +95,7 @@ name: Complete conversational setup into the real app
           id: time.nativeWheel
           point: "28%,64%"
       - assertVisible: "9 o.clock"
+      - takeScreenshot: conversational-poop-time-wheel
 - runFlow:
     when:
       platform: Android
@@ -101,6 +108,10 @@ name: Complete conversational setup into the real app
 - assertVisible:
     id: preview.poopTime.0
     text: '.*9:30.*10:00.*'
+- assertVisible:
+    id: preview.poopMealTime.0
+    text: '.*Meal 1.*8:00.*'
+- takeScreenshot: conversational-poop-window-edited
 - tapOn:
     id: preview.back
 - tapOn:

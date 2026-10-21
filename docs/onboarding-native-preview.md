@@ -28,6 +28,8 @@ age-based meal guidance, time-window behavior, and what happens to the plan.
    7am/6pm for two; 7am/noon/6pm for three; 7am/11am/3pm/7pm for four.
    Back preserves edited times when the meal count stays the same.
 4. Show editable poop windows together, initially 30–60 minutes after each meal.
+   Each window sits below its meal time in muted, read-only text. That reference
+   stays fixed when the poop time changes; skipped meals show no meal references.
    Moving a start time moves the whole 30-minute window. Back preserves edits
    unless the meal anchors change. Skipping keeps no poop entries. If meals were
    skipped, label these as adjustable starting windows rather than chosen meals.
@@ -107,8 +109,9 @@ The iOS Simulator pull-request workflow builds this entry into a separate copy
 of the native host and runs these flows on its own CI simulator, uploading a
 separate report alongside the main app results.
 
-The flows edit a default meal time, verify the resulting poop windows, move a
-window and verify both edits survive Back. They check the review timeline,
+The flows edit a default meal time, verify the meal references and resulting poop
+windows, move a window and confirm its meal reference stays fixed, then verify
+both edits survive Back. They check the review timeline,
 select all four notification timings, finish setup, dismiss or act through the spotlight, navigate
 normal Schedule/Notifications/Timeline, and reopen the app with the real log still
 present. They assert the old preview plan route is absent. These flows clear test

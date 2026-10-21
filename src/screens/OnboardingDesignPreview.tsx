@@ -165,7 +165,7 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
   const mealStep=step==='mealTime';
   const timeIndex=mealStep?mealIndex:poopIndex;
   const time=mealStep?mealTimes[timeIndex]??0:((poopWindows[timeIndex]?.minutes??15)-15+1440)%1440;
-  const activityArt=(source:ImageSourcePropType)=><View style={styles.activityArt}><Image accessible={false} source={source} resizeMode="contain" style={[styles.activityImage,{height:Math.min(200,height*.23)}]}/></View>;
+  const activityArt=(source:ImageSourcePropType,maxHeight=200)=><View style={styles.activityArt}><Image accessible={false} source={source} resizeMode="contain" style={[styles.activityImage,{height:Math.min(maxHeight,height*.23)}]}/></View>;
 
   let body;
   if(step==='welcome')body=<ScrollView testID="preview.welcome" contentContainerStyle={styles.welcome}>
@@ -219,13 +219,16 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
     {footer('That works for us',()=>{replaceTimes('meal',mealTimes.map(minutes=>({minutes})));preparePoop(mealTimes);},'Let’s do this later',()=>{replaceTimes('meal',[]);preparePoop(mealTimes);})}
   </>;
   else if(step==='poop')body=<>
-    <ScrollView testID="preview.poopTimes" contentContainerStyle={styles.conversation}>
+    <ScrollView testID="preview.poopTimes" contentContainerStyle={[styles.conversation,styles.poopConversation]}>
       {prompt(`When does ${pup} poop?`,meals.length?'We’ve started 30–60 minutes after meals. Move a window to suit your pup.':'Some starting windows to adjust or skip. Each covers 30 minutes.')}
-      <View style={styles.answers}>{poopWindows.map((window,index)=><Pressable key={index} testID={`preview.poopTime.${index}`} accessibilityRole="button"
+      <View style={styles.poopAnswers}>{poopWindows.map((window,index)=><View key={index} style={styles.poopPair}>
+        {meals.length>0?<Text testID={`preview.poopMealTime.${index}`} style={styles.mealReference}>Meal {index+1} · {formatMinutes(poopMealTimes.current[index],'en')}</Text>:null}
+        <Pressable testID={`preview.poopTime.${index}`} accessibilityRole="button"
         accessibilityLabel={`Poop window ${index+1}, ${formatScheduleWindow(window,'en')}, change start time`} onPress={()=>{setPoopIndex(index);setPickingTime(true);}} style={[styles.choice,styles.mealRow]}>
-        <Text style={styles.windowNumber}>{index+1}</Text><Text style={[styles.windowTime,{flex:1}]}>{formatScheduleWindow(window,'en')}</Text><MaterialCommunityIcons name="chevron-down" color={appTheme.primary} size={20}/>
-      </Pressable>)}</View>
-      {activityArt(require('../../assets/mascots/onboarding/scruffy-pooping.png'))}
+          <Text style={[styles.windowTime,{flex:1}]}>{formatScheduleWindow(window,'en')}</Text><MaterialCommunityIcons name="chevron-down" color={appTheme.primary} size={20}/>
+        </Pressable>
+      </View>)}</View>
+      {activityArt(require('../../assets/mascots/onboarding/scruffy-pooping.png'),128)}
     </ScrollView>
     {footer('That works for us',()=>{replaceTimes('poop',poopWindows);go('review');},'Skip for now',()=>{replaceTimes('poop',[]);go('review');})}
   </>;
@@ -297,7 +300,8 @@ const styles=StyleSheet.create({
   conversation:{flexGrow:1,paddingHorizontal:22,paddingTop:28,paddingBottom:20,gap:28},prompt:{gap:18},body:{fontFamily:'RedHatText',fontSize:16,lineHeight:24,color:theme.textMuted},
   mealRow:{gap:10},mealTime:{fontFamily:'RedHatTextSemiBold',fontSize:20,color:appTheme.primary,fontVariant:['tabular-nums']},
   answers:{gap:12},choice:{minHeight:62,paddingVertical:16,paddingHorizontal:18,borderWidth:1,borderColor:theme.border,borderRadius:18,backgroundColor:appTheme.surface,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12},choicePressed:{backgroundColor:appTheme.primarySoft,borderColor:appTheme.primary},choiceText:{fontFamily:'RedHatTextSemiBold',fontSize:17,lineHeight:24,color:appTheme.text,flex:1},
-  activityArt:{flexGrow:1,justifyContent:'flex-end',alignItems:'center'},activityImage:{width:'100%',maxWidth:320},windowNumber:{fontFamily:'RedHatTextSemiBold',fontSize:14,color:appTheme.textMuted,minWidth:14},windowTime:{fontFamily:'RedHatTextSemiBold',fontSize:18,lineHeight:25,color:appTheme.primary,fontVariant:['tabular-nums']},
+  activityArt:{flexGrow:1,justifyContent:'flex-end',alignItems:'center'},activityImage:{width:'100%',maxWidth:320},
+  poopConversation:{gap:22},poopAnswers:{gap:18},poopPair:{gap:8},mealReference:{fontFamily:'RedHatText',fontSize:14,lineHeight:20,color:'#B6CBC1',paddingHorizontal:4,fontVariant:['tabular-nums']},windowTime:{fontFamily:'RedHatTextSemiBold',fontSize:18,lineHeight:25,color:appTheme.primary,fontVariant:['tabular-nums']},
   smallMascot:{height:150,width:180,alignSelf:'center'},progress:{fontFamily:'RedHatText',fontSize:13,color:theme.textMuted},timeSpace:{flexGrow:1,justifyContent:'center',gap:28,paddingVertical:12},timeAnswer:{minHeight:96,padding:20,borderRadius:24,backgroundColor:appTheme.surface,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:18},timeText:{fontFamily:'RedHatDisplayBold',fontSize:40,lineHeight:52,color:appTheme.primary,fontVariant:['tabular-nums'],flexShrink:1},
   plan:{borderTopWidth:1,borderColor:theme.border,paddingTop:20,gap:12},planHeading:{fontFamily:'RedHatTextSemiBold',fontSize:15,color:theme.textMuted},planTime:{fontFamily:'RedHatTextSemiBold',fontSize:22,lineHeight:30,color:theme.text,fontVariant:['tabular-nums']},schedule:{flex:1},ready:{flexGrow:1,padding:24,justifyContent:'center',gap:28},
 });

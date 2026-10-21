@@ -17,6 +17,8 @@ name: Skipping optional setup and the tour still reaches the normal app
     id: preview.skip
 - tapOn:
     id: preview.skip
+- assertNotVisible:
+    id: preview.poopMealTime.0
 - tapOn:
     id: preview.skip
 - tapOn:
