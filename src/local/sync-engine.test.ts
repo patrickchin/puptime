@@ -59,7 +59,7 @@ test('first-launch restore resumes the exact cloud puppy without uploading local
   {id:'cloud-pet',petId:'cloud-pet',kind:'puppy',data:{name:'Basil'},revision:1,sequence:1,deleted:false,updatedAt:1},
   {id:cloudRecordId('routine','cloud-pet','starter-1'),petId:'cloud-pet',kind:'routine',data:{type:'pee',minutes:500,reminder:true},revision:1,sequence:2,deleted:false,updatedAt:1},
   {id:cloudRecordId('routine','cloud-pet','cloud-walk'),petId:'cloud-pet',kind:'routine',data:{type:'walk',minutes:700},revision:1,sequence:3,deleted:false,updatedAt:1},
-  {id:cloudRecordId('accountPreferences',null,'preferences'),petId:null,kind:'accountPreferences',data:{language:'es',theme:'soft-play'},revision:1,sequence:4,deleted:false,updatedAt:1},
+  {id:cloudRecordId('accountPreferences',null,'preferences'),petId:null,kind:'accountPreferences',data:{language:'es',theme:'dark'},revision:1,sequence:4,deleted:false,updatedAt:1},
   {id:cloudRecordId('event','cloud-pet','cloud-log'),petId:'cloud-pet',kind:'event',data:{type:'meal',at:1000,source:'app',note:'Cloud only'},revision:1,sequence:5,deleted:false,updatedAt:1},
  ];
  const request={...input,mode:'restore' as const,enrollment:{...enrollment,name:'Basil',confirmedPetId:'cloud-pet'}};
@@ -73,7 +73,7 @@ test('first-launch restore resumes the exact cloud puppy without uploading local
  assert.equal(await storage.loadPuppyName(),'Basil');
  assert.deepEqual(await storage.loadSchedule(),[{id:'starter-1',type:'pee',minutes:500,reminder:true},{id:'cloud-walk',type:'walk',minutes:700}]);
  assert.deepEqual(await storage.loadEvents(),[{id:'cloud-log',type:'meal',at:1000,source:'app',note:'Cloud only'}]);
- assert.equal(await storage.loadLanguagePreference(),'es');assert.equal(await storage.loadThemePreference(),'soft-play');
+ assert.equal(await storage.loadLanguagePreference(),'es');assert.equal(await storage.loadThemePreference(),'dark');
  assert.deepEqual(await resumed.nextBatch(fence),[]);
  assert.equal(saved.mode,'restore');assert.ok(!('mode' in saved.request));
  assert.deepEqual(saved.request,request.enrollment);
@@ -107,7 +107,7 @@ test('first-launch restore requires explicit confirmation and untouched preferen
  const plain=await setup(t,{pristine:true});
  await assert.rejects(plain.sync.prepareAssociation({...input,mode:'restore'}),/restore|pristine|confirmation/i);
  const changes:Array<(storage:ReturnType<typeof createNativeStorage>)=>Promise<unknown>>=[
-  storage=>storage.saveThemePreference('soft-play'),
+  storage=>storage.saveThemePreference('dark'),
   storage=>storage.saveScheduleEntry({id:'starter-1',type:'pee',minutes:500},{id:'starter-1',type:'pee',minutes:420}),
   storage=>storage.completeOnboarding(),
  ];
@@ -222,13 +222,13 @@ test('joining cloud combines confirmed local fields, remote-only records and clo
  {id:'cloud-pet',petId:'cloud-pet',kind:'puppy',data:{name:'Cloud puppy'},revision:1,sequence:1,deleted:false,updatedAt:1},
  {id:cloudRecordId('event','cloud-pet','event-1'),petId:'cloud-pet',kind:'event',data:{type:'pee',at:100,source:'app',note:'cloud note',estimated:true},revision:1,sequence:2,deleted:false,updatedAt:1},
  {id:cloudRecordId('event','cloud-pet','remote-only'),petId:'cloud-pet',kind:'event',data:{type:'meal',at:200,source:'app'},revision:1,sequence:3,deleted:false,updatedAt:1},
- {id:cloudRecordId('accountPreferences',null,'preferences'),petId:null,kind:'accountPreferences',data:{theme:'soft-play',language:'es'},revision:1,sequence:4,deleted:false,updatedAt:1},
+ {id:cloudRecordId('accountPreferences',null,'preferences'),petId:null,kind:'accountPreferences',data:{theme:'dark',language:'es'},revision:1,sequence:4,deleted:false,updatedAt:1},
  ];
  const {generation}=await sync.prepareAssociation({...input,enrollment:{...enrollment,confirmedPetId:'cloud-pet'}});
  await sync.stageBaseline({generation,accountId:'account-1',page:{changes:records.slice(0,2),cursor:2,hasMore:true}});
  await sync.stageBaseline({generation,accountId:'account-1',page:{changes:records.slice(2),cursor:4,hasMore:false}});
  await sync.completeAssociation({generation,accountId:'account-1',cloudPetId:'cloud-pet'});
- assert.equal(await storage.loadPuppyName(),'Cloud puppy'); assert.equal(await storage.loadThemePreference(),'soft-play');
+ assert.equal(await storage.loadPuppyName(),'Cloud puppy'); assert.equal(await storage.loadThemePreference(),'dark');
  const history=await storage.loadEvents(); assert.equal(history.length,2);
  const combined=history.find(value=>value.id==='event-1')!;
  assert.equal(combined.note,'local note'); assert.equal(combined.estimated,true);
@@ -568,12 +568,12 @@ test('two puppy projections apply account preferences once and preserve independ
  const other=createNativeStorage(database,'pet-2',sync.changeSink('pet-2'));
  await sync.prepareAssociation({...input,localPetId:'pet-2',enrollment:{...enrollment,operationId:'enroll-2',localPetId:'pet-2'}});
  await sync.stageBaseline({...owner,page:server.pull(0)});await sync.completeAssociation({...owner,cloudPetId:'pet-2'});await cycle(sync,owner,server);
- await other.saveThemePreference('soft-play');
+ await other.saveThemePreference('dark');
  const preferences=server.record(cloudRecordId('accountPreferences',null,'preferences'));
  server.push([{protocolVersion:1,operationId:'remote-language',deviceId:'other-device',recordId:preferences.id,petId:null,kind:'accountPreferences',baseRevision:preferences.revision,intent:'patch',patch:{language:'es'}}]);
  await sync.applySync({...owner,accepted:[],page:server.pull((await sync.status('local-pet')).cursor)});
- assert.equal(await storage.loadLanguagePreference(),'es');assert.equal(await other.loadThemePreference(),'soft-play');
- await cycle(sync,owner,server);assert.equal((server.record(preferences.id).data as Record<string,unknown>).language,'es');assert.equal((server.record(preferences.id).data as Record<string,unknown>).theme,'soft-play');
+ assert.equal(await storage.loadLanguagePreference(),'es');assert.equal(await other.loadThemePreference(),'dark');
+ await cycle(sync,owner,server);assert.equal((server.record(preferences.id).data as Record<string,unknown>).language,'es');assert.equal((server.record(preferences.id).data as Record<string,unknown>).theme,'dark');
 });
 
 test('oversized escaped restores reject atomically without starving independent work',async t=>{

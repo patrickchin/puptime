@@ -42,7 +42,7 @@ test('change sink failure rolls back local save and reopening remains usable', a
   const failing=createNativeStorage(database,'pet-1',async()=>{throw new Error('queue quota');});
   await assert.rejects(failing.appendEvents([event]),/queue quota/);
   assert.deepEqual(await storage.loadEvents(),[]);
-  await assert.rejects(failing.saveThemePreference('day-trails'),/queue quota/);
+  await assert.rejects(failing.saveThemePreference('light'),/queue quota/);
   assert.equal(await storage.loadThemePreference(),'system');
   await storage.appendEvents([event]); assert.equal((await storage.loadEvents()).length,1);
 });
@@ -51,9 +51,9 @@ test('settings capture explicit actions without uploads merely from loading deri
   const {database,storage,changes}=await setup(t);
   await storage.appendEvents([{...event,type:'custom',customLabel:'Training'}]); changes.length=0;
   await storage.loadCustomActivities(); assert.equal(changes.length,0);
-  await storage.saveThemePreference('soft-play');
-  assert.deepEqual(changes.pop(),[{kind:'accountPreferences',localId:'preferences',before:{theme:'system',language:'system',widgetActions:['pee','poop','meal'],reminderLeadMinutes:10,widgetConfirmations:false,pottyAfterPeeEnabled:true,pottyAfterPeeDelayMinutes:120,pottyAfterMealEnabled:true,pottyAfterMealDelayMinutes:30},after:{theme:'soft-play',language:'system',widgetActions:['pee','poop','meal'],reminderLeadMinutes:10,widgetConfirmations:false,pottyAfterPeeEnabled:true,pottyAfterPeeDelayMinutes:120,pottyAfterMealEnabled:true,pottyAfterMealDelayMinutes:30}}]);
-  await storage.saveThemePreference('soft-play'); assert.equal(changes.length,0);
+  await storage.saveThemePreference('dark');
+  assert.deepEqual(changes.pop(),[{kind:'accountPreferences',localId:'preferences',before:{theme:'system',language:'system',widgetActions:['pee','poop','meal'],reminderLeadMinutes:10,widgetConfirmations:false,pottyAfterPeeEnabled:true,pottyAfterPeeDelayMinutes:120,pottyAfterMealEnabled:true,pottyAfterMealDelayMinutes:30},after:{theme:'dark',language:'system',widgetActions:['pee','poop','meal'],reminderLeadMinutes:10,widgetConfirmations:false,pottyAfterPeeEnabled:true,pottyAfterPeeDelayMinutes:120,pottyAfterMealEnabled:true,pottyAfterMealDelayMinutes:30}}]);
+  await storage.saveThemePreference('dark'); assert.equal(changes.length,0);
   await storage.saveActivityCustomization('custom:training',{emoji:'🎾'}); changes.length=0;
   await storage.deleteCustomActivity('Training');
   assert.deepEqual(new Set(changes[0].map(change=>change.kind)),new Set(['customActivity','customization']));
@@ -154,7 +154,7 @@ test('local commit signals fire only after successful changed writes, never for 
  const storage=createNativeStorage(database,'pet-1',undefined,()=>{commits++;});
  await storage.appendEvents([event]);assert.equal(commits,1);
  await storage.importEvents([event]);await storage.saveSchedule([]);await storage.saveThemePreference('system');await storage.loadCustomActivities();assert.equal(commits,1);
- await storage.updateEvent(event.id,{note:'saved'});await storage.saveSchedule([{id:'routine',type:'meal',minutes:300}]);await storage.saveThemePreference('soft-play');assert.equal(commits,4);
+ await storage.updateEvent(event.id,{note:'saved'});await storage.saveSchedule([{id:'routine',type:'meal',minutes:300}]);await storage.saveThemePreference('dark');assert.equal(commits,4);
  await database.write(sql=>projection.applyLocalRecords(sql,'pet-1',[{kind:'event',localId:event.id,data:{type:'pee',at:200,source:'app',estimated:true}}],[]));assert.equal(commits,4);
 });
 
@@ -164,9 +164,9 @@ test('a deferred SQL commit failure emits no local signal and advisory listener 
  const storage=createNativeStorage(database,'pet-1',async sql=>{if(fail)await sql.runAsync("INSERT INTO commit_child(parent_id) VALUES ('missing')");},()=>{commits++;});
  fail=true;await assert.rejects(storage.appendEvents([event]),/FOREIGN KEY/i);assert.equal(commits,0);assert.deepEqual(await storage.loadEvents(),[]);
  await assert.rejects(storage.saveSchedule([{id:'routine',type:'meal',minutes:300}]),/FOREIGN KEY/i);assert.equal(commits,0);
- await assert.rejects(storage.saveThemePreference('soft-play'),/FOREIGN KEY/i);assert.equal(commits,0);assert.equal(await storage.loadThemePreference(),'system');
+ await assert.rejects(storage.saveThemePreference('dark'),/FOREIGN KEY/i);assert.equal(commits,0);assert.equal(await storage.loadThemePreference(),'system');
  fail=false;
  let advisoryCalls=0;const advisory=createNativeStorage(database,'pet-1',async()=>{},()=>{advisoryCalls++;throw new Error('listener failed');});
- await advisory.appendEvents([event]);await advisory.saveThemePreference('soft-play');await advisory.saveSchedule([{id:'routine',type:'meal',minutes:300}]);
- assert.equal(advisoryCalls,3);assert.equal((await storage.loadEvents()).length,1);assert.equal(await storage.loadThemePreference(),'soft-play');assert.equal((await storage.loadSchedule()).length,1);
+ await advisory.appendEvents([event]);await advisory.saveThemePreference('dark');await advisory.saveSchedule([{id:'routine',type:'meal',minutes:300}]);
+ assert.equal(advisoryCalls,3);assert.equal((await storage.loadEvents()).length,1);assert.equal(await storage.loadThemePreference(),'dark');assert.equal((await storage.loadSchedule()).length,1);
 });

@@ -8,7 +8,7 @@ import { sqliteTestConnection } from './sqlite-test-adapter.ts';
 import { createNativeStorage } from './native-storage.ts';
 import { createLocalRuntime } from './runtime-factory.ts';
 import { DEFAULT_NOTIFICATION_PREFERENCES, type NotificationPreferences } from '../notification-config.ts';
-import type { PuppyEvent } from '../domain.ts';
+import { createEvent, type PuppyEvent } from '../domain.ts';
 import { csvToEvents, eventsToCsv } from '../export.ts';
 import { readLocalRecords,applyLocalRecords } from './sync-projection.ts';
 async function setup(t: TestContext) {
@@ -172,7 +172,7 @@ test('native facade preserves onboarding, theme, language, routines and notifica
   const {storage}=await setup(t);
   assert.equal(await storage.shouldShowOnboarding(),true);
   await storage.completeOnboarding(); assert.equal(await storage.shouldShowOnboarding(),false);
-  assert.equal(await storage.loadThemePreference(),'system'); await storage.saveThemePreference('day-trails'); assert.equal(await storage.loadThemePreference(),'day-trails');
+  assert.equal(await storage.loadThemePreference(),'system'); await storage.saveThemePreference('light'); assert.equal(await storage.loadThemePreference(),'light');
   await storage.saveLanguagePreference('es'); assert.equal(await storage.loadLanguagePreference(),'es');
   assert.deepEqual(await storage.loadNotificationPreferences(),DEFAULT_NOTIFICATION_PREFERENCES);
   const preferences:NotificationPreferences={...DEFAULT_NOTIFICATION_PREFERENCES,reminderLeadMinutes:5,widgetConfirmations:true,pottyAfterMeal:{enabled:false,delayMinutes:60}};
@@ -262,9 +262,9 @@ test('account appearance is shared while custom activity settings stay with thei
   const other=createNativeStorage(database,'pet-2');
   await storage.saveCustomActivity('Training');
   await storage.saveActivityCustomization('pee',{emoji:'💧'});
-  await storage.saveThemePreference('soft-play');
+  await storage.saveThemePreference('dark');
   assert.deepEqual(await other.loadCustomActivities(),[]); assert.deepEqual(await other.loadActivityCustomizations(),{});
-  assert.equal(await other.loadThemePreference(),'soft-play');
+  assert.equal(await other.loadThemePreference(),'dark');
   await storage.saveWidgetActions(['pee','custom:training']); assert.deepEqual(await storage.loadWidgetActions(),['pee','custom:training']);
   assert.deepEqual(await other.loadWidgetActions(),['pee','poop','meal']);
 });
@@ -290,6 +290,17 @@ test('retired preferences fall back but malformed JSON cannot overwrite retained
   assert.equal(await storage.loadThemePreference(),'system');
   await assert.rejects(storage.saveCustomActivity('Overwrite'),/settings/i);
   assert.equal((await database.read((sql)=>sql.getFirstAsync<{value:string}>('SELECT value FROM pet_settings WHERE pet_id=? AND key=?','pet-1','puptime.customActivities.v1')))!.value,'{broken');
+});
+
+test('retired themes fall back to the device setting while preserving native history', async (t) => {
+  const {storage,database}=await setup(t);
+  const event=createEvent('pee','app',100);
+  await storage.appendEvents([event]);
+  for (const theme of ['puppy-journal','soft-play','day-trails']) {
+    await database.write(sql=>sql.runAsync('INSERT OR REPLACE INTO settings(key,value) VALUES (?,?)','puptime.theme.v1',theme));
+    assert.equal(await storage.loadThemePreference(),'system');
+    assert.deepEqual(await storage.loadEvents(),[event]);
+  }
 });
 
 test('explicit null JSON settings are corruption rather than an absent preference', async (t) => {

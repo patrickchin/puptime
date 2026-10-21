@@ -29,7 +29,7 @@ const labels={
  es:{EXPECTED_WELCOME:'Su día a día, en un lugar.',EXPECTED_PROFILE:'¿Cómo se llama tu cachorro?',EXPECTED_ACCOUNT:'¿Usarlo en varios dispositivos?',EXPECTED_LOG:'Prueba un registro',EXPECTED_SAMPLE:'.*registro de práctica',EXPECTED_REMINDERS:'¿Un recordatorio?',EXPECTED_READY:'Todo listo.'},
  'zh-Hans':{EXPECTED_WELCOME:'小狗日常，都在这里。',EXPECTED_PROFILE:'小狗叫什么？',EXPECTED_ACCOUNT:'想在多台设备上使用？',EXPECTED_LOG:'试着记一笔',EXPECTED_SAMPLE:'.*练习记录',EXPECTED_REMINDERS:'需要提醒吗？',EXPECTED_READY:'准备好了。'},
 };
-const cases=[['system-light-en','system','light','en',false],['system-dark-es','system','dark','es',false],['journal-es','puppy-journal','light','es',false],['soft-play-zh','soft-play','light','zh-Hans',false],['day-trails-en','day-trails','light','en',false],['largest-text','puppy-journal','light','en',true]];
+const cases=[['system-light-en','system','light','en',false],['system-dark-es','system','dark','es',false],['light-es','light','dark','es',false],['dark-zh','dark','light','zh-Hans',false],['largest-text','light','light','en',true]];
 const selected=process.argv[4];if(selected)assert.ok(cases.some(([name])=>name===selected),'Choose a named appearance case.');
 let invocation=0;
 function run(file,path,values={}){

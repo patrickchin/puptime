@@ -79,9 +79,9 @@ tags:
 - waitForAnimationToEnd:
     timeout: 5000
 - assertVisible:
-    id: appearance.theme.puppy-journal
+    id: appearance.theme.dark
 - tapOn:
-    id: appearance.theme.puppy-journal
+    id: appearance.theme.dark
 - tapOn:
     id: settings.language.open
 - tapOn:
@@ -96,9 +96,9 @@ tags:
 - waitForAnimationToEnd:
     timeout: 5000
 - assertVisible:
-    id: appearance.theme.puppy-journal
+    id: appearance.theme.dark
 - assertVisible:
-    id: appearance.theme.puppy-journal
+    id: appearance.theme.dark
     text: radio button, checked
 - tapOn:
     id: appearance.close
@@ -159,9 +159,9 @@ tags:
 - waitForAnimationToEnd:
     timeout: 5000
 - assertVisible:
-    id: appearance.theme.puppy-journal
+    id: appearance.theme.dark
 - assertVisible:
-    id: appearance.theme.puppy-journal
+    id: appearance.theme.dark
     text: radio button, checked
 - tapOn:
     id: appearance.close
