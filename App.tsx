@@ -1,3 +1,6 @@
+import {BlurTargetView} from 'expo-blur';
+import {OnboardingSpotlight,type SpotlightRect} from './src/components/OnboardingSpotlight';
+import {OnboardingDesignPreview,type OnboardingDraft} from './src/screens/OnboardingDesignPreview';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
@@ -102,7 +105,9 @@ configureReminderHandling();
 
 const nativeApp = Platform.OS !== 'web';
 
-export default function App() {
+export default function App(){return <PuptimeApp/>;}
+
+export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboarding?:boolean}={}) {
   const colorScheme = useColorScheme();
   const [themePreference, setThemePreference] = useState<ThemePreference>('system');
   const [languagePreference, setLanguagePreference] = useState<LanguagePreference>('system');
@@ -111,6 +116,16 @@ export default function App() {
   const [historyVisible,setHistoryVisible]=useState(false);
   const [accountVisible,setAccountVisible]=useState(false);
   const [drawerOpen,setDrawerOpen]=useState(false);
+  const [showSpotlight,setShowSpotlight]=useState(false);
+  const [spotlightTarget,setSpotlightTarget]=useState<SpotlightRect|null>(null);
+  const blurTarget=useRef<View>(null);
+  const spotlightContainer=useRef<View>(null);
+  const measureQuickActions=useCallback((rect:SpotlightRect)=>{
+    spotlightContainer.current?.measureInWindow((x,y)=>{
+      const next={...rect,x:rect.x-x,y:rect.y-y};
+      setSpotlightTarget(current=>current&&current.x===next.x&&current.y===next.y&&current.width===next.width&&current.height===next.height?current:next);
+    });
+  },[]);
   const [onboardingVisible, setOnboardingVisible] = useState<boolean | null>(null);
   const [guideOpenedFromSettings, setGuideOpenedFromSettings] = useState(false);
   const [scheduleOpenedFromSettings, setScheduleOpenedFromSettings] = useState(false);
@@ -189,7 +204,7 @@ export default function App() {
     void Promise.all([
       syncScheduleReminders(
         nextSchedule,
-        nextNotificationPreferences.reminderLeadMinutes,
+        nextNotificationPreferences,
         resolveLanguage(nextLanguagePreference),
       ).catch(() => undefined),
       syncPottyReminders(
@@ -261,6 +276,7 @@ export default function App() {
   useEffect(() => {
     if (onboardingVisible !== false) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if(showSpotlight){setShowSpotlight(false);return true;}
       if(drawerOpen){setDrawerOpen(false);return true;}
       if(accountVisible){setAccountVisible(false);return true;}
       if(historyVisible){setHistoryVisible(false);return true;}
@@ -285,7 +301,7 @@ export default function App() {
       return false;
     });
     return () => subscription.remove();
-  }, [accountVisible,drawerOpen,historyVisible,onboardingVisible, preferencePicker, scheduleOpenedFromSettings, settingsVisible, tab]);
+  }, [showSpotlight,accountVisible,drawerOpen,historyVisible,onboardingVisible, preferencePicker, scheduleOpenedFromSettings, settingsVisible, tab]);
 
   useEffect(() => {
     configureNotificationActions(language).catch(() => undefined);
@@ -397,6 +413,7 @@ export default function App() {
     });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
     await refreshCommittedState();
+    setShowSpotlight(false);
   };
 
   const logEvent = (type: EventType, customLabel?: string) => {
@@ -462,7 +479,7 @@ export default function App() {
     try {
       const synced = await syncScheduleReminders(
         nextSchedule,
-        notificationPreferences.reminderLeadMinutes,
+        notificationPreferences,
         language,
       );
       if (!synced && nextSchedule.some((entry) => entry.reminder)) {
@@ -501,7 +518,7 @@ export default function App() {
           configureNotificationActions(resolveLanguage(preference)),
           syncScheduleReminders(
             schedule,
-            notificationPreferences.reminderLeadMinutes,
+            notificationPreferences,
             resolveLanguage(preference),
           ),
           syncPottyReminders(
@@ -527,7 +544,7 @@ export default function App() {
     await Promise.all([
       syncScheduleReminders(
         schedule,
-        nextPreferences.reminderLeadMinutes,
+        nextPreferences,
         language,
       ),
       syncPottyReminders(events, nextPreferences, language),
@@ -546,7 +563,7 @@ export default function App() {
       await Promise.all([
         syncScheduleReminders(
           schedule,
-          notificationPreferences.reminderLeadMinutes,
+          notificationPreferences,
           language,
         ),
         syncPottyReminders(events, notificationPreferences, language),
@@ -561,7 +578,7 @@ export default function App() {
     await setNotificationDelivery(false);setDelivery(false);
     await Promise.all([
       ...(nativeApp?[cancelCustomTimedRemindersIfDeliveryOff()]:[]),
-      syncScheduleReminders(schedule,notificationPreferences.reminderLeadMinutes,language),
+      syncScheduleReminders(schedule,notificationPreferences,language),
       syncPottyReminders(events,notificationPreferences,language),
     ]);
   };
@@ -583,6 +600,16 @@ export default function App() {
     } catch {
       Alert.alert(translate(language, 'settings.saveErrorTitle'), translate(language, 'settings.saveErrorBody'));
     }
+  };
+
+  const finishConversationalOnboarding=async(draft:OnboardingDraft)=>{
+    // Completion is last: a failed write keeps the draft on screen for retry.
+    await saveSchedule(draft.schedule);
+    await saveNotificationPreferences(draft.notifications);
+    await completeOnboarding({puppyName:draft.puppyName});
+    await refresh();
+    setFirstLaunch(null);setOnboardingVisible(false);setGuideOpenedFromSettings(false);
+    navigateToTab('log');setShowSpotlight(draft.showGuide);
   };
 
   const screen = useMemo(() => {
@@ -623,6 +650,7 @@ export default function App() {
       routineReminderCount={schedule.filter(entry=>entry.reminder).length}
       onNotificationPreferencesChange={changeNotificationPreferences} onRequestNotificationPermission={requestNotifications}
       onNotificationDeliveryChange={changeNotificationDelivery} onOpenSystemSettings={()=>{void Linking.openSettings().catch(()=>undefined);}}
+      schedule={schedule} onScheduleChange={changeSchedule}
       onOpenSchedule={()=>navigateToTab('schedule')}/>;
     if (tab === 'learn') return <LearnScreen theme={theme} />;
     if (tab === 'timeline') return <TimelineScreen events={events} activity={activity} refreshToken={refreshToken} schedule={schedule} onOpenSchedule={()=>navigateToTab('schedule')} theme={theme} />;
@@ -646,6 +674,7 @@ export default function App() {
     return (
       <LogScreen
         showHeader={!nativeApp}
+        onQuickActionsLayout={measureQuickActions}
         events={events}
         activity={activity}
         history={eventHistory}
@@ -692,10 +721,12 @@ export default function App() {
     <SafeAreaProvider>
       <LocalizationProvider language={language} customizations={activityCustomizations}>
         <SafeAreaView
-          style={[styles.container, { backgroundColor: theme.background }]}
-          edges={nativeApp||settingsVisible||onboardingVisible ? ['top', 'bottom', 'left', 'right'] : ['top', 'left', 'right']}
+          style={[styles.container, { backgroundColor: conversationalOnboarding&&onboardingVisible&&!guideOpenedFromSettings?'#176B52':theme.background }]}
+          edges={conversationalOnboarding&&onboardingVisible&&!guideOpenedFromSettings?[]:nativeApp||settingsVisible||onboardingVisible ? ['top', 'bottom', 'left', 'right'] : ['top', 'left', 'right']}
         >
           <StatusBar style={theme.isDark ? 'light' : 'dark'} />
+          <View ref={spotlightContainer} collapsable={false} style={styles.screen}>
+          <BlurTargetView ref={blurTarget} style={styles.screen}>
           <SideNavigation open={drawerOpen} enabled={onboardingVisible===false} tab={tab} settingsVisible={settingsVisible} theme={theme}
             onOpen={()=>setDrawerOpen(true)} onClose={()=>setDrawerOpen(false)} onChange={navigateToTab} onSettings={()=>{setHistoryVisible(false);setSettingsVisible(true);}}>
           {nativeApp&&onboardingVisible===false&&!historyVisible?<View style={styles.navigationHeader}>
@@ -733,7 +764,7 @@ export default function App() {
                   return true;
                 }}
               />
-            ):firstLaunch?<FirstLaunchScreen progress={firstLaunch} cloud={cloud} theme={theme} notificationPermission={notificationPermission} onAllowNotifications={requestNotifications} onDisableNotifications={()=>changeNotificationDelivery(false)} onOpenSystemSettings={()=>{void Linking.openSettings().catch(()=>undefined);}} onFinish={finishOnboarding}/>:null : screen}
+            ):firstLaunch?conversationalOnboarding?<OnboardingDesignPreview onFinish={finishConversationalOnboarding} onAllowNotifications={requestNotifications} onDisableNotifications={()=>changeNotificationDelivery(false)}/>:<FirstLaunchScreen progress={firstLaunch} cloud={cloud} theme={theme} notificationPermission={notificationPermission} onAllowNotifications={requestNotifications} onDisableNotifications={()=>changeNotificationDelivery(false)} onOpenSystemSettings={()=>{void Linking.openSettings().catch(()=>undefined);}} onFinish={finishOnboarding}/>:null : screen}
             {!onboardingVisible && undoState ? (
               <Toast
                 message={undoState.message}
@@ -754,6 +785,9 @@ export default function App() {
             </SafeAreaView>
           ) : null}
           </SideNavigation>
+          </BlurTargetView>
+          {showSpotlight&&spotlightTarget&&onboardingVisible===false?<OnboardingSpotlight target={spotlightTarget} blurTarget={blurTarget} theme={theme} onDismiss={()=>setShowSpotlight(false)}/>:null}
+          </View>
           <ThemePicker
             visible={preferencePicker !== null}
             mode={preferencePicker ?? 'theme'}

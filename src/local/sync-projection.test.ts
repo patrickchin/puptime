@@ -121,6 +121,19 @@ test('partial preference projection merges reminder fields and preserves local-o
   assert.equal(changes.length,0);
 });
 
+test('meal, poop and after-poop timing survive storage, sync capture and partial remote updates',async t=>{
+  const {database,storage,changes}=await setup(t);
+  const current=await storage.loadNotificationPreferences();
+  await storage.saveNotificationPreferences({...current,mealReminderOffsetMinutes:-15,poopReminderOffsetMinutes:30,pottyAfterPoop:{enabled:true,delayMinutes:180}});
+  const captured=changes.pop()![0].after!;
+  assert.equal(captured.mealReminderOffsetMinutes,-15);
+  assert.equal(captured.poopReminderOffsetMinutes,30);
+  assert.equal(captured.pottyAfterPoopEnabled,true);
+  assert.equal(captured.pottyAfterPoopDelayMinutes,180);
+  await database.write(sql=>projection.applyLocalRecords(sql,'pet-1',[{kind:'accountPreferences',localId:'preferences',data:{mealReminderOffsetMinutes:5,pottyAfterPoopEnabled:false}}],[]));
+  assert.deepEqual(await storage.loadNotificationPreferences(),{...current,mealReminderOffsetMinutes:5,poopReminderOffsetMinutes:30,pottyAfterPoop:{enabled:false,delayMinutes:180}});
+});
+
 test('current boundary values remain lossless across change capture and projection', async t => {
   const {database,storage,changes}=await setup(t);
   const local={...event,id:'历史 / '.repeat(40),note:'训练'.repeat(8192)};

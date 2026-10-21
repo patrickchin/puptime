@@ -7,7 +7,7 @@ import {getNotificationDelivery,setNotificationDelivery} from './cloud/notificat
 
 import type { ActivityKey, PuppyEvent, ScheduleEntry } from './domain';
 import { translate, type AppLanguage } from './localization';
-import type { NotificationPreferences, ReminderLeadMinutes } from './notification-config';
+import { scheduleReminderLead, type NotificationPreferences, type ReminderLeadMinutes } from './notification-config';
 import {
   POTTY_REMINDER_IDENTIFIER_PREFIX,
   REMINDER_IDENTIFIER_PREFIX,
@@ -263,7 +263,7 @@ export async function syncPottyReminders(
 
 export async function syncScheduleReminders(
   schedule: ScheduleEntry[],
-  leadMinutes: ReminderLeadMinutes = 0,
+  leadMinutes: ReminderLeadMinutes | NotificationPreferences = 0,
   language: AppLanguage = 'en',
 ): Promise<boolean> {
   return updateReminders(async()=>{
@@ -282,8 +282,9 @@ export async function syncScheduleReminders(
   if (!canDeliver) return false;
 
   await Promise.all(reminders.map(async (entry) => {
-    const content = reminderCopy(entry, language, leadMinutes);
-    const trigger = reminderTrigger(entry, leadMinutes);
+    const lead=typeof leadMinutes==='number'?leadMinutes:scheduleReminderLead(entry.type,leadMinutes);
+    const content = reminderCopy(entry, language, lead);
+    const trigger = reminderTrigger(entry, lead);
     await Notifications.scheduleNotificationAsync({
       identifier: reminderIdentifier(entry),
       content: {

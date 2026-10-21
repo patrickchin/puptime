@@ -4,18 +4,17 @@ import {
   reminderTriggerMinutes,
   type NotificationPreferences,
   type PottyReminderDelayMinutes,
-  type ReminderLeadMinutes,
 } from './notification-config.ts';
 
 export const REMINDER_IDENTIFIER_PREFIX = 'puptime-routine-';
 export const POTTY_REMINDER_IDENTIFIER_PREFIX = 'puptime-activity-';
 
-export type PottyReminderKind = 'afterPee' | 'afterMeal';
+export type PottyReminderKind = 'afterPee' | 'afterMeal' | 'afterPoop';
 
 export type PottyReminderPlan = {
   kind: PottyReminderKind;
   sourceEventId: string;
-  sourceType: 'pee' | 'meal';
+  sourceType: 'pee' | 'meal' | 'poop';
   delayMinutes: PottyReminderDelayMinutes;
   at: number;
 };
@@ -27,18 +26,18 @@ export function reminderIdentifier(entry: ScheduleEntry): string {
 export function reminderCopy(
   entry: ScheduleEntry,
   language: AppLanguage = 'en',
-  leadMinutes: ReminderLeadMinutes = 0,
+  leadMinutes: number = 0,
 ): { title: string; body: string } {
   const activity = entry.customLabel ?? localizedEventLabel(language, entry.type);
   return {
-    title: leadMinutes
+    title: leadMinutes<0 ? translate(language,'notifications.reminderAfter',{activity,minutes:-leadMinutes}) : leadMinutes
       ? translate(language, 'notifications.reminderSoon', { activity, minutes: leadMinutes })
       : translate(language, 'notifications.reminderNow', { activity }),
     body: translate(language, 'notifications.reminderBody', { time: formatMinutes(entry.minutes) }),
   };
 }
 
-export function reminderTrigger(entry: ScheduleEntry, leadMinutes: ReminderLeadMinutes): { hour: number; minute: number } {
+export function reminderTrigger(entry: ScheduleEntry, leadMinutes: number): { hour: number; minute: number } {
   const minutes = reminderTriggerMinutes(entry.minutes, leadMinutes);
   return { hour: Math.floor(minutes / 60), minute: minutes % 60 };
 }
@@ -74,6 +73,7 @@ export function pottyReminderCopy(
   language: AppLanguage = 'en',
 ): { title: string; body: string } {
   const delay = notificationDelay(language, delayMinutes);
+  if(kind==='afterPoop')return {title:translate(language,'notifications.afterPoopTitle'),body:translate(language,'notifications.afterPoopBody',{delay})};
   return kind === 'afterPee'
     ? {
         title: translate(language, 'notifications.afterPeeTitle'),
@@ -92,9 +92,11 @@ export function pottyReminderPlans(
 ): PottyReminderPlan[] {
   let latestPee: PuppyEvent | undefined;
   let latestMeal: PuppyEvent | undefined;
+  let latestPoop: PuppyEvent | undefined;
   for (const event of events) {
     if (event.estimated) continue;
     if (event.type === 'pee' && (!latestPee || event.at > latestPee.at)) latestPee = event;
+    if(event.type==='poop'&&(!latestPoop||event.at>latestPoop.at))latestPoop=event;
     if (event.type === 'meal' && (!latestMeal || event.at > latestMeal.at)) latestMeal = event;
   }
 
@@ -126,6 +128,10 @@ export function pottyReminderPlans(
         at,
       });
     }
+  }
+  if(preferences.pottyAfterPoop?.enabled&&latestPoop){
+    const at=latestPoop.at+preferences.pottyAfterPoop.delayMinutes*60_000;
+    if(at>now)plans.push({kind:'afterPoop',sourceEventId:latestPoop.id,sourceType:'poop',delayMinutes:preferences.pottyAfterPoop.delayMinutes,at});
   }
   return plans;
 }

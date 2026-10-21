@@ -65,6 +65,7 @@ test('new routine and accepted learned suggestions retain their minted IDs after
 test('a timed reminder draft retries with the same OS request identity',async()=>{
  const saved:any[]=[];
  const render=screen('NotificationsScreen',{
+  '../components/NotificationTimingControls':{NotificationTimingControls:'NotificationTimingControls'},
   'expo-notifications':{},'@expo/ui/community/datetime-picker':{default:'DateTimePicker'},
   '../reminders':{CustomTimedReminderLimitError:class extends Error{},createCustomTimedReminder:async(input:unknown)=>{saved.push(input);throw Error('OS acknowledgement lost');}},
  },{petId:'pet-1',notificationPermission:'granted',notificationDelivery:true,notificationPreferences:notificationConfig.DEFAULT_NOTIFICATION_PREFERENCES});

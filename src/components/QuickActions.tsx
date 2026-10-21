@@ -1,3 +1,5 @@
+import {useRef} from 'react';
+import type {SpotlightRect} from './OnboardingSpotlight';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { activityKey, type PuppyEvent } from '../domain';
@@ -7,16 +9,18 @@ import { surfaceTreatment, type Theme } from '../theme';
 
 const actions = ['pee', 'poop', 'meal'] as const;
 
-export function QuickActions({ events, onLog, now, theme }: {
+export function QuickActions({ events, onLog, now, theme, onLayout }: {
   events: PuppyEvent[];
   onLog: (type: (typeof actions)[number]) => Promise<void>;
   now: number;
   theme: Theme;
+  onLayout?:(rect:SpotlightRect)=>void;
 }) {
+  const root=useRef<View>(null);
   const { activityColors, activityLabel, relativeTime, t } = useLocalization();
 
   return (
-    <View style={[styles.grid, { gap: theme.presentation.gridGap }]}>
+    <View ref={root} collapsable={false} onLayout={()=>{if(onLayout)requestAnimationFrame(()=>root.current?.measureInWindow((x,y,width,height)=>onLayout({x,y,width,height})));}} style={[styles.grid, { gap: theme.presentation.gridGap }]}>
       {actions.map((type) => {
         const activity = { type };
         const colors = activityColors(theme, activity);

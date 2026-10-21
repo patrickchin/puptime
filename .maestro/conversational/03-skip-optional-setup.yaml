@@ -1,0 +1,47 @@
+appId: com.patrickchin.puptime
+name: Skipping optional setup and the tour still reaches the normal app
+---
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: deny
+- extendedWaitUntil:
+    visible:
+      id: preview.guest
+    timeout: 90000
+- tapOn:
+    id: preview.guest
+- tapOn:
+    id: preview.skip
+- tapOn:
+    id: preview.skip
+- tapOn:
+    id: preview.skip
+- tapOn:
+    id: preview.choice.still-learning
+- tapOn:
+    id: preview.continue
+- assertNotVisible: Optional
+- tapOn:
+    id: preview.reminders.later
+- tapOn:
+    id: preview.skip
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- assertNotVisible:
+    id: onboarding.spotlight
+- assertVisible:
+    id: nav.open
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.schedule
+- assertVisible:
+    id: screen.schedule
+- assertNotVisible:
+    id: schedule.entry.meal
+- assertNotVisible:
+    id: preview.back
+- takeScreenshot: conversational-skipped-normal-app

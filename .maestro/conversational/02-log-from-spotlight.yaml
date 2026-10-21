@@ -1,0 +1,33 @@
+appId: com.patrickchin.puptime
+name: Spotlight logs through the real button and leaves normal app usable
+---
+- runFlow: ../helpers/conversational-onboarding.yaml
+- tapOn:
+    id: quick.meal
+- assertNotVisible:
+    id: onboarding.spotlight
+- assertVisible:
+    id: screen.today
+- assertVisible:
+    id: event.meal.edit
+- tapOn:
+    id: event.meal.edit
+- assertVisible:
+    id: editor.close
+- tapOn:
+    id: editor.close
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.timeline
+- assertVisible:
+    id: screen.timeline
+- assertNotVisible:
+    id: preview.back
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.log
+- assertVisible:
+    id: event.meal.edit
+- takeScreenshot: conversational-logged-normal-app

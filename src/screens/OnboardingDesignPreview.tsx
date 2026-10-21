@@ -1,22 +1,23 @@
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import {useFonts} from 'expo-font';
 import {StatusBar} from 'expo-status-bar';
-import * as Notifications from 'expo-notifications';
 import {useEffect,useRef,useState} from 'react';
 import {
   AccessibilityInfo,ActivityIndicator,Alert,Image,Keyboard,KeyboardAvoidingView,Platform,Pressable,
   ScrollView,StyleSheet,Text,TextInput,View,useWindowDimensions,
 } from 'react-native';
-import {SafeAreaProvider,SafeAreaView} from 'react-native-safe-area-context';
+import {SafeAreaView} from 'react-native-safe-area-context';
 
-import {STARTER_SCHEDULE,formatMinutes,formatScheduleWindow,type PuppyEvent,type ScheduleEntry} from '../domain';
+import {STARTER_SCHEDULE,formatMinutes,formatScheduleWindow,type ScheduleEntry} from '../domain';
 import {entityId} from '../entity-id';
 import {DateTimeSelector} from '../components/DateTimeSelector';
-import {LocalizationProvider} from '../localization-context';
+import {NotificationTimingControls} from '../components/NotificationTimingControls';
+import {DEFAULT_NOTIFICATION_PREFERENCES,type NotificationPreferences} from '../notification-config';
 import {poopDelays,poopWindowsAfterMeals,previewScheduleToKeep,puppyAges,starterMealTimes,suggestedMealCount,type PuppyAge} from '../onboarding-preview';
 import {lightTheme,type Theme} from '../theme';
 import {ScheduleScreen} from './ScheduleScreen';
-import {OnboardingHomePreview,type PreviewGuide} from './OnboardingHomePreview';
+export type OnboardingDraft={puppyName:string;schedule:ScheduleEntry[];notifications:NotificationPreferences;showGuide:boolean};
+export type ConversationalOnboardingProps={onFinish:(draft:OnboardingDraft)=>Promise<void>;onAllowNotifications:()=>Promise<boolean>;onDisableNotifications:()=>Promise<void>};
 
 const appTheme:Theme={...lightTheme,surface:'#FFFDF7',surfaceRaised:'#FFFDF7',
   text:'#243D2E',textMuted:'#53685A',border:'#CDD8CF',primary:'#176B52',onPrimary:'#FFFDF5',
@@ -29,21 +30,19 @@ const mascots=[require('../../assets/mascots/scruffy-terrier.png'),
   require('../../assets/mascots/onboarding/scruffy-grass.png'),
   require('../../assets/mascots/onboarding/scruffy-bone.png'),
   require('../../assets/mascots/onboarding/scruffy-roll.png')];
-type Step='welcome'|'profile'|'age'|'meals'|'mealTime'|'poop'|'poopDelay'|'poopCount'|'poopTime'|'review'|'schedule'|'reminders'|'ready'|'home';
+type Step='welcome'|'profile'|'age'|'meals'|'mealTime'|'poop'|'poopDelay'|'poopCount'|'poopTime'|'review'|'schedule'|'reminders'|'ready';
 
-// Explicit preview entry: answers and routine drafts stay in memory.
-export function OnboardingDesignPreview(){
+// Draft answers are committed by the real app when setup finishes.
+export function OnboardingDesignPreview(props:ConversationalOnboardingProps){
   const [fontsLoaded,fontError]=useFonts({
     RedHatDisplayBold:require('../../assets/fonts/RedHatDisplay-Bold.ttf'),
     RedHatText:require('../../assets/fonts/RedHatText-Regular.ttf'),
     RedHatTextSemiBold:require('../../assets/fonts/RedHatText-SemiBold.ttf'),
   });
-  return <SafeAreaProvider><LocalizationProvider language="en">
-    {fontsLoaded||fontError?<PreviewFlow/>:<View style={styles.loading}><ActivityIndicator color={theme.primary}/></View>}
-  </LocalizationProvider></SafeAreaProvider>;
+  return fontsLoaded||fontError?<PreviewFlow {...props}/>:<View style={styles.loading}><ActivityIndicator color={theme.primary}/></View>;
 }
 
-function PreviewFlow(){
+function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:ConversationalOnboardingProps){
   const [step,setStep]=useState<Step>('welcome');
   const [name,setName]=useState('');
   const [age,setAge]=useState<PuppyAge|null>(null);
@@ -56,8 +55,9 @@ function PreviewFlow(){
   const [mascot]=useState(()=>mascots[Math.floor(Math.random()*mascots.length)]);
   const [keyboardVisible,setKeyboardVisible]=useState(Keyboard.isVisible());
   const [pickingTime,setPickingTime]=useState(false);
-  const [events,setEvents]=useState<PuppyEvent[]>([]);
-  const [guide,setGuide]=useState<PreviewGuide>('quick');
+  const [preferences,setPreferences]=useState<NotificationPreferences>(()=>({...DEFAULT_NOTIFICATION_PREFERENCES,pottyAfterPee:{enabled:false,delayMinutes:120},pottyAfterMeal:{enabled:false,delayMinutes:30}}));
+  const [finishing,setFinishing]=useState(false),[finishError,setFinishError]=useState(false);
+  const completion=useRef(false);
   const [reminderAnswer,setReminderAnswer]=useState<'later'|'granted'|'declined'>('later');
   const [requestingReminders,setRequestingReminders]=useState(false);
   const [reminderError,setReminderError]=useState<string|null>(null);
@@ -78,7 +78,7 @@ function PreviewFlow(){
   useEffect(()=>{
     const frame=requestAnimationFrame(()=>{if(heading.current)AccessibilityInfo.sendAccessibilityEvent(heading.current,'focus');});
     return()=>cancelAnimationFrame(frame);
-  },[step,mealIndex,poopIndex]);
+  },[step,poopIndex]);
   function go(next:Step){Keyboard.dismiss();setPickingTime(false);setStep(next);}
   function replaceTimes(type:'meal'|'poop',times:{minutes:number;toleranceMinutes?:number}[]){
     setSchedule(current=>{
@@ -88,10 +88,12 @@ function PreviewFlow(){
   }
   function keepGuidedTimes(){setKeepingFullPlan(false);setSchedule(current=>previewScheduleToKeep(current,false));go('reminders');}
   function finish(){setSchedule(current=>previewScheduleToKeep(current,keepingFullPlan));go('reminders');}
-  async function requestReminderPermission(){
-    const current=await Notifications.getPermissionsAsync();
-    const result=current.granted||!current.canAskAgain?current:await Notifications.requestPermissionsAsync({ios:{allowAlert:true,allowBadge:true,allowSound:true}});
-    return result.granted;
+  async function complete(showGuide:boolean){
+    if(completion.current)return;
+    completion.current=true;setFinishing(true);setFinishError(false);
+    try{await onFinish({puppyName:name.trim()||'My puppy',schedule,notifications:preferences,showGuide});}
+    catch{setFinishError(true);}
+    finally{completion.current=false;setFinishing(false);}
   }
   function previewSignIn(provider:string){
     Alert.alert('Sign-in design preview',`${provider} sign-in isn’t connected in this preview. You can explore the whole journey as a guest.`,[
@@ -102,16 +104,22 @@ function PreviewFlow(){
     if(permissionRequest.current)return;
     permissionRequest.current=true;setRequestingReminders(true);setReminderError(null);
     try{
-      const granted=await requestReminderPermission();
+      const granted=await onAllowNotifications();
       setReminderAnswer(granted?'granted':'declined');go('ready');
     }catch{setReminderError('We couldn’t ask your phone just now. We can do this later, or try again.');}
     finally{permissionRequest.current=false;setRequestingReminders(false);}
   }
+  async function deferReminders(){
+    if(permissionRequest.current)return;
+    permissionRequest.current=true;setRequestingReminders(true);setReminderError(null);
+    try{await onDisableNotifications();setReminderAnswer('later');go('ready');}
+    catch{setReminderError('We couldn’t save that choice. Please try again.');}
+    finally{permissionRequest.current=false;setRequestingReminders(false);}
+  }
   function back(){
     if(pickingTime){setPickingTime(false);return;}
-    if(step==='mealTime'&&mealIndex>0){setMealIndex(mealIndex-1);return;}
     if(step==='poopTime'&&poopIndex>0){setPoopIndex(poopIndex-1);return;}
-    const previous:Partial<Record<Step,Step>>={profile:'welcome',age:'profile',meals:'age',mealTime:'meals',poop:meals.length?'mealTime':'meals',poopDelay:'poop',poopCount:'poop',poopTime:'poopCount',review:'poop',schedule:'review',reminders:'review',ready:'reminders',home:'ready'};
+    const previous:Partial<Record<Step,Step>>={profile:'welcome',age:'profile',meals:'age',mealTime:'meals',poop:meals.length?'mealTime':'meals',poopDelay:'poop',poopCount:'poop',poopTime:'poopCount',review:'poop',schedule:'review',reminders:'review',ready:'reminders'};
     go(previous[step]??'profile');
   }
   const header=<View style={styles.header}>
@@ -119,19 +127,19 @@ function PreviewFlow(){
       <MaterialCommunityIcons name="chevron-left" size={18} color={theme.textMuted}/><Text style={styles.backText}>Back</Text>
     </Pressable>:<View style={styles.back}/>}
     <View style={styles.brand}><Image source={require('../../assets/puptime-icon.png')} style={styles.icon}/><Text style={styles.brandName}>Puptime</Text></View>
-    <Text style={styles.optional}>{!['welcome','review','ready','home'].includes(step)?'Optional':''}</Text>
+    <View style={styles.headerSpacer}/>
   </View>;
   const footer=(label:string,onPress:()=>void,skipLabel:string,skip:()=>void)=><View style={styles.footer}>
-    <Pressable testID="preview.continue" accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({pressed})=>[styles.primary,pressed&&styles.pressed]}>
+    <Pressable testID="preview.continue" accessibilityRole="button" accessibilityLabel={label} disabled={finishing} accessibilityState={{disabled:finishing,busy:finishing}} onPress={onPress} style={({pressed})=>[styles.primary,(pressed||finishing)&&styles.pressed]}>
       <Text style={styles.primaryText}>{label}</Text><MaterialCommunityIcons name="arrow-right" size={20} color={theme.onPrimary}/>
     </Pressable>
-    <Pressable testID="preview.skip" accessibilityRole="button" onPress={skip} style={styles.secondary}><Text style={styles.secondaryText}>{skipLabel}</Text></Pressable>
+    <Pressable testID="preview.skip" accessibilityRole="button" disabled={finishing} onPress={skip} style={styles.secondary}><Text style={styles.secondaryText}>{skipLabel}</Text></Pressable>
   </View>;
   const later=(label:string,onPress:()=>void)=><View style={styles.footer}><Pressable testID="preview.skip" accessibilityRole="button" onPress={onPress} style={styles.secondary}><Text style={styles.secondaryText}>{label}</Text></Pressable></View>;
   const choice=(id:string,label:string,onPress:()=>void)=><Pressable key={id} testID={`preview.choice.${id}`} accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({pressed})=>[styles.choice,pressed&&styles.choicePressed]}>
     <Text style={styles.choiceText}>{label}</Text><MaterialCommunityIcons name="chevron-right" size={21} color={appTheme.primary}/>
   </Pressable>;
-  const prompt=(title:string,body?:string)=><View style={styles.prompt}><Text ref={heading} accessibilityRole="header" accessibilityLiveRegion="polite" style={styles.title}>{title}</Text>{body?<Text style={styles.body}>{body}</Text>:null}</View>;
+  const prompt=(title:string,body?:string)=><View style={styles.prompt}><Text ref={heading} testID="preview.prompt" accessibilityRole="header" accessibilityLiveRegion="polite" style={styles.title}>{title}</Text>{body?<Text style={styles.body}>{body}</Text>:null}</View>;
   const smallMascot=<Image accessible={false} source={mascot} resizeMode="contain" style={styles.smallMascot}/>;
   const mealStep=step==='mealTime';
   const timeIndex=mealStep?mealIndex:poopIndex;
@@ -179,21 +187,30 @@ function PreviewFlow(){
     </ScrollView>
     {later('Let’s do this later',()=>{replaceTimes('meal',[]);go('poop');})}
   </>;
-  else if(step==='mealTime'||step==='poopTime')body=<>
-    <ScrollView key={`${step}-${timeIndex}`} contentContainerStyle={styles.conversation}>
-      <Text style={styles.progress}>{mealStep?'Meal':'Poop window'} {timeIndex+1} of {times.length}</Text>
-      {prompt(timeIndex===0?(mealStep?`When’s ${pup}’s\nfirst meal?`:'When’s the first\nusual poop?'):(mealStep?'And the\nnext meal?':'And the next\nusual poop?'),timeIndex===0?(mealStep?'Roughly what time works for you?':'We’ll leave half an hour either side. You can adjust the window later.'):`${formatMinutes(times[timeIndex-1],'en')} for the last one. What time comes next?`)}
-      <View style={styles.timeSpace}>
-        {smallMascot}
-        <Pressable testID="preview.time" accessibilityRole="button" accessibilityLabel={`Change ${mealStep?'meal time':'poop window centre'}, ${formatMinutes(time,'en')}`} onPress={()=>setPickingTime(true)} style={({pressed})=>[styles.timeAnswer,pressed&&styles.choicePressed]}>
+  else if(step==='mealTime')body=<>
+    <ScrollView testID="preview.mealTimes" contentContainerStyle={styles.conversation}>
+      {prompt('When does '+pup+' eat?','Here’s a starting point. Tap a time to change it.')}
+      <View style={styles.answers}>{mealTimes.map((minutes,index)=><Pressable key={index} testID={`preview.mealTime.${index}`} accessibilityRole="button" accessibilityLabel={`Meal ${index+1}, ${formatMinutes(minutes,'en')}`} onPress={()=>{setMealIndex(index);setPickingTime(true);}} style={[styles.choice,styles.mealRow]}>
+        <Text style={styles.choiceText}>Meal {index+1}</Text><Text style={styles.mealTime}>{formatMinutes(minutes,'en')}</Text><MaterialCommunityIcons name="chevron-down" color={appTheme.primary} size={20}/>
+      </Pressable>)}</View>
+      {smallMascot}
+    </ScrollView>
+    {footer('That works for us',()=>{replaceTimes('meal',mealTimes.map(minutes=>({minutes})));go('poop');},'Let’s do this later',()=>{replaceTimes('meal',[]);go('poop');})}
+  </>;
+  else if(step==='poopTime')body=<>
+    <ScrollView key={`${step}-${poopIndex}`} contentContainerStyle={styles.conversation}>
+      <Text style={styles.progress}>Poop window {poopIndex+1} of {poopTimes.length}</Text>
+      {prompt(poopIndex===0?'When’s the first\nusual poop?':'And the next\nusual poop?',poopIndex===0?'We’ll leave half an hour either side. You can adjust the window later.':`${formatMinutes(poopTimes[poopIndex-1],'en')} for the last one. What time comes next?`)}
+      <View style={styles.timeSpace}>{smallMascot}
+        <Pressable testID="preview.time" accessibilityRole="button" accessibilityLabel={`Change poop window centre, ${formatMinutes(time,'en')}`} onPress={()=>setPickingTime(true)} style={styles.timeAnswer}>
           <Text style={styles.timeText}>{formatMinutes(time,'en')}</Text><MaterialCommunityIcons name="chevron-down" size={24} color={appTheme.primary}/>
         </Pressable>
       </View>
     </ScrollView>
-    {footer(timeIndex===times.length-1?(mealStep?'That’s mealtimes sorted':'That’s the last one'):'Next',()=>{
-      if(timeIndex<times.length-1){if(mealStep)setMealIndex(timeIndex+1);else setPoopIndex(timeIndex+1);}
-      else{replaceTimes(mealStep?'meal':'poop',times.map(minutes=>({minutes,...(!mealStep?{toleranceMinutes:30}:{})})));go(mealStep?'poop':'review');}
-    },'Let’s do this later',()=>{replaceTimes(mealStep?'meal':'poop',[]);go(mealStep?'poop':'review');})}
+    {footer(poopIndex===poopTimes.length-1?'That’s the last one':'Next',()=>{
+      if(poopIndex<poopTimes.length-1)setPoopIndex(poopIndex+1);
+      else{replaceTimes('poop',poopTimes.map(minutes=>({minutes,toleranceMinutes:30})));go('review');}
+    },'Let’s do this later',()=>{replaceTimes('poop',[]);go('review');})}
   </>;
   else if(step==='poop')body=<>
     <ScrollView key={step} contentContainerStyle={styles.conversation}>
@@ -243,38 +260,33 @@ function PreviewFlow(){
       onChange={async next=>setSchedule(next)}
       onSaveEntry={async entry=>setSchedule(current=>[...current.filter(item=>item.id!==entry.id),entry].sort((a,b)=>a.minutes-b.minutes))}
       onRemoveEntry={async id=>setSchedule(current=>current.filter(item=>item.id!==id))}
-      onRequestReminderPermission={requestReminderPermission}/></View>
+      onRequestReminderPermission={onAllowNotifications}/></View>
     {footer('Let’s keep this plan',()=>{setKeepingFullPlan(true);go('reminders');},'Keep just our meal & poop times',keepGuidedTimes)}
   </>;
   else if(step==='reminders')body=<>
     <ScrollView key={step} contentContainerStyle={styles.conversation}>
       {prompt('Would a little\nnudge help?','A gentle heads-up at the times you choose. Your phone will ask for permission first.')}
-      <View style={styles.notification}>
-        <Image accessible={false} source={require('../../assets/puptime-icon.png')} style={styles.icon}/>
-        <View style={styles.notificationCopy}><Text style={[styles.choiceText,{flex:0,color:theme.text}]}>A little heads-up from Puptime</Text><Text style={styles.body}>Time for {pup}’s next meal?</Text></View>
-      </View>
-      {smallMascot}
+      <NotificationTimingControls theme={theme} preferences={preferences} schedule={schedule} disabled={requestingReminders}
+        onChange={async next=>setPreferences(next)} onScheduleChange={async next=>setSchedule(next)}/>
       {reminderError?<Text accessibilityRole="alert" style={styles.error}>{reminderError}</Text>:null}
       {requestingReminders?<ActivityIndicator color={theme.primary} accessibilityLabel="Asking your phone about notifications"/>:null}
     </ScrollView>
     <View style={styles.footer}>
       <Pressable testID="preview.reminders.allow" accessibilityRole="button" accessibilityState={{disabled:requestingReminders,busy:requestingReminders}} disabled={requestingReminders} onPress={()=>{void allowReminders();}} style={[styles.primary,requestingReminders&&styles.pressed]}><Text style={styles.primaryText}>Yes, allow notifications</Text></Pressable>
-      <Pressable testID="preview.reminders.later" accessibilityRole="button" disabled={requestingReminders} onPress={()=>{setReminderAnswer('later');go('ready');}} style={styles.secondary}><Text style={styles.secondaryText}>Not now, thanks</Text></Pressable>
+      <Pressable testID="preview.reminders.later" accessibilityRole="button" disabled={requestingReminders} onPress={()=>{void deferReminders();}} style={styles.secondary}><Text style={styles.secondaryText}>Not now, thanks</Text></Pressable>
     </View>
   </>;
   else if(step==='ready')body=<>
     <ScrollView testID="preview.ready" contentContainerStyle={styles.ready}>
-      {smallMascot}{prompt('Let’s see how\ntoday goes.',reminderAnswer==='granted'?`Your phone allows notifications now. We can pick your reminders later. For now, log whenever ${pup} eats or goes potty.`:`Reminders can wait. Whenever ${pup} eats or goes potty, you can log it with a tap.`)}
+      {smallMascot}{prompt('Let’s see how\ntoday goes.',reminderAnswer==='granted'?`Your reminder choices are ready. You can change them in Notifications. For now, log whenever ${pup} eats or goes potty.`:`Reminders can wait. Whenever ${pup} eats or goes potty, you can log it with a tap.`)}
     </ScrollView>
-    {footer('Show me around',()=>{setGuide('quick');go('home');},'I’ll explore on my own',()=>{setGuide(null);go('home');})}
+    {finishError?<Text accessibilityRole="alert" style={[styles.error,{paddingHorizontal:22}]}>We couldn’t save your setup. Your answers are still here—please try again.</Text>:null}
+    {footer(finishing?'Saving…':'Show me around',()=>{void complete(true);},'I’ll explore on my own',()=>{void complete(false);})}
   </>;
-  else body=<OnboardingHomePreview theme={appTheme} pup={pup} events={events} setEvents={setEvents} guide={guide} setGuide={setGuide} onReview={()=>go('review')}/>;
-
-  const background=step==='home'?{backgroundColor:appTheme.background}:undefined;
-  return <SafeAreaView edges={['top','bottom','left','right']} style={[styles.root,background]}>
-    <StatusBar style={step==='home'?'dark':'light'}/>
-    <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':'height'} style={[styles.root,background]}>
-      {step!=='welcome'&&step!=='home'?header:null}{body}
+  return <SafeAreaView edges={['top','bottom','left','right']} style={styles.root}>
+    <StatusBar style="light"/>
+    <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':'height'} style={styles.root}>
+      {step!=='welcome'?header:null}<View style={styles.bodyViewport}>{body}</View>
       {pickingTime?<DateTimeSelector value={new Date(2000,0,1,Math.floor(time/60),time%60)} mode="time" locale="en" theme={theme}
         onChange={date=>{const minutes=date.getHours()*60+date.getMinutes();if(mealStep)setMealTimes(current=>current.map((item,index)=>index===mealIndex?minutes:item));else setPoopTimes(current=>current.map((item,index)=>index===poopIndex?minutes:item));setPickingTime(false);}}
         onCancel={()=>setPickingTime(false)}/>:null}
@@ -286,16 +298,17 @@ const styles=StyleSheet.create({
   welcome:{flexGrow:1,paddingHorizontal:22,paddingTop:28,paddingBottom:12},welcomeBrand:{alignItems:'center',gap:14},welcomeIcon:{width:64,height:64,borderRadius:16},welcomeName:{fontFamily:'RedHatDisplayBold',fontSize:52,lineHeight:60,letterSpacing:-1.5,color:theme.text},welcomeCopy:{fontFamily:'RedHatText',fontSize:15,lineHeight:23,textAlign:'center',color:theme.text,marginTop:14},
   welcomeArt:{flex:1,minHeight:180,alignItems:'center',justifyContent:'center',paddingVertical:22},welcomeActions:{gap:16,paddingTop:18},welcomeQuestion:{fontFamily:'RedHatText',fontSize:16,lineHeight:24,color:theme.text,textAlign:'center'},signInRow:{flexDirection:'row',gap:10},signInButton:{flex:1,minHeight:54,alignItems:'center',justifyContent:'center',flexDirection:'row',gap:7,borderWidth:1,borderColor:theme.border,borderRadius:16,backgroundColor:appTheme.surface},signInText:{fontFamily:'RedHatTextSemiBold',fontSize:14,color:appTheme.text},
   notification:{padding:18,borderRadius:20,borderWidth:1,borderColor:theme.border,backgroundColor:theme.surface,flexDirection:'row',gap:14,alignItems:'center'},notificationCopy:{flex:1,gap:8},error:{fontFamily:'RedHatText',fontSize:15,lineHeight:23,color:theme.danger},
-  root:{flex:1,backgroundColor:theme.background},loading:{flex:1,alignItems:'center',justifyContent:'center',backgroundColor:theme.background},
+  bodyViewport:{flex:1,overflow:'hidden'},root:{flex:1,backgroundColor:theme.background},loading:{flex:1,alignItems:'center',justifyContent:'center',backgroundColor:theme.background},
   header:{minHeight:52,paddingHorizontal:22,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},
   brand:{flexDirection:'row',alignItems:'center',gap:7},icon:{width:28,height:28,borderRadius:7},brandName:{fontFamily:'RedHatDisplayBold',fontSize:20,color:theme.text,letterSpacing:-.5},
-  back:{minWidth:62,minHeight:44,flexDirection:'row',alignItems:'center'},backText:{fontFamily:'RedHatText',fontSize:13,color:theme.textMuted},optional:{fontFamily:'RedHatText',fontSize:13,color:theme.textMuted,minWidth:62,textAlign:'right'},
+  back:{minWidth:62,minHeight:44,flexDirection:'row',alignItems:'center'},backText:{fontFamily:'RedHatText',fontSize:13,color:theme.textMuted},headerSpacer:{width:62},
   profileContent:{flexGrow:1,paddingHorizontal:22,paddingTop:22},title:{fontFamily:'RedHatDisplayBold',fontSize:34,lineHeight:39,letterSpacing:-.8,color:theme.text},
   art:{flex:1,minHeight:140,alignItems:'center',justifyContent:'center',marginTop:12},mascot:{width:'100%',height:'100%',maxHeight:300,minHeight:140},keyboardSpace:{flexGrow:1,minHeight:16},
   nameField:{paddingTop:18,paddingBottom:20},nameInput:{fontFamily:'RedHatText',fontSize:27,minHeight:60,paddingVertical:10,borderBottomWidth:2,borderBottomColor:theme.primary,color:theme.text},
   footer:{paddingHorizontal:22,paddingTop:18,paddingBottom:2,backgroundColor:theme.background},primary:{minHeight:52,paddingHorizontal:16,paddingVertical:12,borderRadius:999,backgroundColor:theme.primary,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:10},
   primaryText:{fontFamily:'RedHatTextSemiBold',fontSize:15,color:theme.onPrimary},pressed:{opacity:.75},secondary:{minHeight:44,alignItems:'center',justifyContent:'center',paddingVertical:8,marginTop:4},secondaryText:{fontFamily:'RedHatText',fontSize:14,color:theme.textMuted},
   conversation:{flexGrow:1,paddingHorizontal:22,paddingTop:28,paddingBottom:20,gap:28},prompt:{gap:18},body:{fontFamily:'RedHatText',fontSize:16,lineHeight:24,color:theme.textMuted},
+  mealRow:{gap:10},mealTime:{fontFamily:'RedHatTextSemiBold',fontSize:20,color:appTheme.primary,fontVariant:['tabular-nums']},
   answers:{gap:12},choice:{minHeight:62,paddingVertical:16,paddingHorizontal:18,borderWidth:1,borderColor:theme.border,borderRadius:18,backgroundColor:appTheme.surface,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12},choicePressed:{backgroundColor:appTheme.primarySoft,borderColor:appTheme.primary},choiceText:{fontFamily:'RedHatTextSemiBold',fontSize:17,lineHeight:24,color:appTheme.text,flex:1},
   smallMascot:{height:150,width:180,alignSelf:'center'},progress:{fontFamily:'RedHatText',fontSize:13,color:theme.textMuted},timeSpace:{flexGrow:1,justifyContent:'center',gap:28,paddingVertical:12},timeAnswer:{minHeight:96,padding:20,borderRadius:24,backgroundColor:appTheme.surface,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:18},timeText:{fontFamily:'RedHatDisplayBold',fontSize:40,lineHeight:52,color:appTheme.primary,fontVariant:['tabular-nums'],flexShrink:1},
   plan:{borderTopWidth:1,borderColor:theme.border,paddingTop:20,gap:12},planHeading:{fontFamily:'RedHatTextSemiBold',fontSize:15,color:theme.textMuted},planTime:{fontFamily:'RedHatTextSemiBold',fontSize:22,lineHeight:30,color:theme.text,fontVariant:['tabular-nums']},schedule:{flex:1},ready:{flexGrow:1,padding:24,justifyContent:'center',gap:28},

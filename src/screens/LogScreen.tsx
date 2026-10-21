@@ -1,7 +1,8 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, FlatList, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import type {SpotlightRect} from '../components/OnboardingSpotlight';
 import { QuickActions } from '../components/QuickActions';
 import { ActivityIcon } from '../components/ActivityIcon';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -101,7 +102,7 @@ export function LogScreen({
   onDelete,
   onOpenSettings,
   showHeader=true,
-  quickActionsHelp,
+  onQuickActionsLayout,
   theme,
 }: {
   events: PuppyEvent[];
@@ -116,7 +117,7 @@ export function LogScreen({
   onDelete: (event: PuppyEvent) => Promise<void>;
   onOpenSettings: () => void;
   showHeader?:boolean;
-  quickActionsHelp?:ReactNode;
+  onQuickActionsLayout?:(rect:SpotlightRect)=>void;
   theme: Theme;
 }&ActivityViewProps) {
   const { activityColors, activityLabel, eventPastLabel, locale, relativeTime, t } = useLocalization();
@@ -498,8 +499,7 @@ export function LogScreen({
                 </Pressable>
               </View>
             </View>:null}
-            <QuickActions events={activity?projectedEvents:events} onLog={onLog} now={now} theme={theme} />
-            {quickActionsHelp}
+            <QuickActions events={activity?projectedEvents:events} onLog={onLog} now={now} theme={theme} onLayout={onQuickActionsLayout} />
             <View style={styles.activityHeading}>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('log.activity')}</Text>
             </View>

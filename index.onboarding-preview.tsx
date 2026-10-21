@@ -1,5 +1,5 @@
-// Explicit simulator-only entry point. The normal app entry remains index.ts.
+// Native design entry with the real app and persistent local storage.
 import {registerRootComponent} from 'expo';
-import {OnboardingDesignPreview} from './src/screens/OnboardingDesignPreview';
-
-registerRootComponent(OnboardingDesignPreview);
+import {PuptimeApp} from './App';
+function OnboardingPreviewApp(){return <PuptimeApp conversationalOnboarding/>;}
+registerRootComponent(OnboardingPreviewApp);

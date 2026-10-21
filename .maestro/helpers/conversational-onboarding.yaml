@@ -1,0 +1,117 @@
+appId: com.patrickchin.puptime
+name: Complete conversational setup into the real app
+---
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: deny
+- extendedWaitUntil:
+    visible:
+      id: preview.guest
+    timeout: 90000
+- tapOn:
+    id: preview.guest
+- tapOn:
+    id: preview.name
+- runFlow:
+    when:
+      visible: Try out your stylus
+    commands:
+      - tapOn: Cancel
+- inputText: Biscuit
+- takeScreenshot: conversational-name-keyboard
+- tapOn:
+    id: preview.continue
+- assertNotVisible: Optional
+- tapOn:
+    id: preview.choice.middle
+- tapOn:
+    id: preview.choice.meals-3
+- assertVisible:
+    id: preview.mealTime.0
+- assertVisible:
+    id: preview.mealTime.1
+- assertVisible:
+    id: preview.mealTime.2
+- assertNotVisible:
+    id: preview.mealTime.3
+- takeScreenshot: conversational-grouped-meals
+- tapOn:
+    id: preview.mealTime.0
+- tapOn:
+    id: time.mode
+- tapOn:
+    id: time.input.hour
+- eraseText
+- inputText: '8'
+- tapOn:
+    id: picker.done
+- tapOn:
+    id: preview.back
+- tapOn:
+    id: preview.choice.meals-3
+- assertVisible:
+    id: preview.mealTime.0
+    text: '.*8:00.*'
+- tapOn:
+    id: preview.continue
+- tapOn:
+    id: preview.choice.after-meals
+- tapOn:
+    id: preview.choice.delay-1
+- tapOn:
+    id: preview.continue
+- assertNotVisible: Optional
+- tapOn:
+    id: notifications.timing.meal.enabled
+- tapOn:
+    id: notifications.timing.meal.time
+- tapOn:
+    id: notifications.timing.option.-15
+- tapOn:
+    id: notifications.timing.poop.enabled
+- tapOn:
+    id: notifications.timing.poop.time
+- tapOn:
+    id: notifications.timing.option.5
+- scrollUntilVisible:
+    element:
+      id: notifications.timing.pottyAfterMeal.enabled
+    direction: DOWN
+- tapOn:
+    id: notifications.timing.pottyAfterMeal.enabled
+- tapOn:
+    id: notifications.timing.pottyAfterMeal.time
+- tapOn:
+    id: notifications.timing.option.45
+- scrollUntilVisible:
+    element:
+      id: notifications.timing.pottyAfterPoop.enabled
+    direction: DOWN
+- tapOn:
+    id: notifications.timing.pottyAfterPoop.enabled
+- tapOn:
+    id: notifications.timing.pottyAfterPoop.time
+- tapOn:
+    id: notifications.timing.option.180
+- scrollUntilVisible:
+    element:
+      id: preview.prompt
+    direction: UP
+    visibilityPercentage: 100
+- takeScreenshot: conversational-reminder-timing
+- tapOn:
+    id: preview.reminders.later
+- tapOn:
+    id: preview.continue
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- assertVisible:
+    id: nav.open
+- assertVisible:
+    id: onboarding.spotlight
+- assertNotVisible:
+    id: preview.review
+- takeScreenshot: conversational-spotlight

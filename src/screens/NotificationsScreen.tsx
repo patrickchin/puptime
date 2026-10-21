@@ -14,6 +14,8 @@ import {
 } from '../notification-config';
 import { cancelCustomTimedReminder, cancelCustomTimedRemindersIfDeliveryOff, countCustomTimedReminders, createCustomTimedReminder, CustomTimedReminderLimitError, CUSTOM_TIMED_REMINDER_NOTIFICATION_KIND, listCustomTimedReminders, type CustomTimedReminder, type NotificationPermissionState } from '../reminders';
 import { spacing, surfaceTreatment, type Theme } from '../theme';
+import {NotificationTimingControls} from '../components/NotificationTimingControls';
+import type {ScheduleEntry} from '../domain';
 import { entityId } from '../entity-id';
 
 export function NotificationsScreen({
@@ -28,8 +30,10 @@ export function NotificationsScreen({
   onNotificationDeliveryChange,
   onOpenSystemSettings,
   onOpenSchedule,
+  schedule=[],onScheduleChange,
 }: {
   theme: Theme;
+  schedule?:ScheduleEntry[];onScheduleChange?:(schedule:ScheduleEntry[])=>Promise<void>;
   petId?: string;
   notificationPreferences: NotificationPreferences;
   notificationPermission: NotificationPermissionState;
@@ -261,6 +265,12 @@ export function NotificationsScreen({
         </View>)}
       </View>
 
+      {onScheduleChange?<View style={cardStyle}>
+        <Text accessibilityRole="header" style={[styles.label,{color:theme.text}]}>{t('notifications.timing')}</Text>
+        <NotificationTimingControls theme={theme} preferences={notificationPreferences} schedule={schedule} disabled={saving}
+          onChange={next=>save(()=>onNotificationPreferencesChange(next))} onScheduleChange={next=>save(()=>onScheduleChange(next))}/>
+      </View>:null}
+
       <View style={cardStyle}>
         <PottyReminderRule
           testID="settings.notifications.pottyAfterPee"
@@ -269,16 +279,6 @@ export function NotificationsScreen({
           disabled={saving}
           onToggle={(enabled) => toggleRule('pottyAfterPee', enabled)}
           onDelayChange={(delay) => chooseDelay('pottyAfterPee', delay)}
-          theme={theme}
-        />
-        <View style={[styles.divider, { backgroundColor: theme.border }]} />
-        <PottyReminderRule
-          testID="settings.notifications.pottyAfterMeal"
-          label={t('notifications.afterMeal')}
-          rule={notificationPreferences.pottyAfterMeal}
-          disabled={saving}
-          onToggle={(enabled) => toggleRule('pottyAfterMeal', enabled)}
-          onDelayChange={(delay) => chooseDelay('pottyAfterMeal', delay)}
           theme={theme}
         />
       </View>

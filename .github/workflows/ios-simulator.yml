@@ -72,6 +72,33 @@ jobs:
             --output build/maestro-report.xml \
             --test-output-dir build/maestro-results \
             .maestro
+      - name: Run conversational onboarding into the real app
+        timeout-minutes: 15
+        env:
+          CI: "1"
+          MAESTRO_CLI_NO_ANALYTICS: "1"
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: "180000"
+        run: |
+          mkdir -p build/onboarding-ci
+          ditto build/ios-simulator/Build/Products/Release-iphonesimulator/Puptime.app build/onboarding-ci/Puptime.app
+          node node_modules/expo/bin/cli export:embed \
+            --entry-file index.onboarding-preview.tsx --platform ios --dev false \
+            --bytecode --max-workers 2 \
+            --bundle-output build/onboarding-ci/Puptime.app/main.jsbundle \
+            --assets-dest build/onboarding-ci/Puptime.app
+          codesign --force --deep --sign - build/onboarding-ci/Puptime.app
+          runtime_id=$(xcrun simctl list runtimes -j | jq -r '[.runtimes[] | select(.isAvailable and (.identifier | contains("iOS-26")))][-1].identifier // empty')
+          test -n "$runtime_id"
+          onboarding_device=$(xcrun simctl create "Puptime Onboarding CI $GITHUB_RUN_ID" com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro "$runtime_id")
+          trap 'xcrun simctl delete "$onboarding_device" >/dev/null 2>&1 || true' EXIT
+          xcrun simctl boot "$onboarding_device"
+          xcrun simctl bootstatus "$onboarding_device" -b
+          xcrun simctl install "$onboarding_device" build/onboarding-ci/Puptime.app
+          maestro test \
+            --platform ios --device "$onboarding_device" \
+            --format JUNIT --output build/onboarding-maestro-report.xml \
+            --test-output-dir build/onboarding-maestro-results \
+            .maestro/conversational
       - name: Upload Maestro results
         if: always()
         uses: actions/upload-artifact@v6
@@ -80,6 +107,8 @@ jobs:
           path: |
             build/maestro-report.xml
             build/maestro-results
+            build/onboarding-maestro-report.xml
+            build/onboarding-maestro-results
           if-no-files-found: warn
           retention-days: 7
       - name: Capture App Store screenshots
