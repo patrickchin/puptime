@@ -71,7 +71,7 @@ export function ActivityBackupSettings({ theme, onRestored }: { theme: Theme; on
           {!busy && !backups.length && !failed ? <Text style={[styles.body, { color: theme.text }]}>{t('backup.empty')}</Text> : null}
           {backups.map((backup, index) => <View key={backup.id} style={[styles.card, { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
             <SettingsRow testID={`backups.entry.${index}`} icon="file-restore-outline" label={timestamp(backup.createdAt)}
-              detail={t('backup.entry', { name: backup.puppyName, count: backup.count, size: Math.max(1, Math.ceil(backup.bytes / 1024)) })}
+              detail={`${t(`backup.reason.${backup.reason}`)} · ${t('backup.entry', { name: backup.puppyName, count: backup.count, size: Math.max(1, Math.ceil(backup.bytes / 1024)) })}`}
               disabled={busy} wrap theme={theme} onPress={() => select(backup)} />
           </View>)}
           <Pressable testID="backups.retry" accessibilityRole="button" disabled={busy} accessibilityState={{ disabled: busy, busy }} onPress={() => void reload()}

@@ -81,3 +81,34 @@ test('SQLite recovery restores exact activity fields, preserves edits, deduplica
   await storage.appendEvents([{ id: 'evt_current_nap', type: 'nap', at: 4000, endedAt: null, source: 'app' }]);
   const before = await storage.loadEvents(); await assert.rejects(service.restore(id)); assert.deepEqual(await storage.loadEvents(), before);
 });
+
+test('safety retention is separate from daily history, protects each trigger and deduplicates retries', async () => {
+  const f = fixture();
+  await f.service.capture('before-update', f.options.read, '1.2.0/12');
+  const update = (await f.service.list()).backups[0];
+  await f.service.capture('account-change');
+  const count = f.disk.size; await f.service.capture('account-change'); assert.equal(f.disk.size, count);
+  // Different installed builds get different checkpoints even when logs are identical.
+  await f.service.capture('before-update', f.options.read, '1.2.0/13');
+  assert.equal(f.disk.size, count + 1);
+  for (let index = 0; index < 40; index++) {
+    f.events([{ id: `evt_${index}`, type: 'meal', at: f.options.now(), source: 'app' }]);
+    await f.service.capture('delete');
+    await f.service.capture(); f.advance();
+  }
+  const { backups } = await f.service.list();
+  assert.equal(backups.filter(item => item.reason === 'daily').length, 30);
+  assert.equal(backups.filter(item => item.reason !== 'daily').length, 10);
+  assert.ok(backups.some(item => item.reason === 'before-update' && item.appVersion === '1.2.0/13'));
+  assert.ok(backups.some(item => item.reason === 'account-change'));
+  assert.ok(f.disk.size <= 40);
+  assert.ok(!backups.some(item => item.id === update.id), 'The newer update checkpoint protects this reason.');
+});
+
+test('existing backup format without safety metadata still reads as a daily snapshot', async () => {
+  const f = fixture(); await f.service.capture();
+  const [id, content] = [...f.disk][0], old = JSON.parse(content);
+  delete old.reason; delete old.appVersion; f.disk.set(id, JSON.stringify(old));
+  assert.equal((await f.service.list()).backups[0].reason, 'daily');
+  assert.equal((await f.service.read(id)).events.length, 1);
+});

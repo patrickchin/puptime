@@ -4,15 +4,16 @@ import {createAuthClient} from 'better-auth/react';
 import { createLocalDatabase,initializeLocalDatabase } from '../local/database.ts';
 import { sqliteTestConnection } from '../local/sqlite-test-adapter.ts';
 import { createLocalRuntime } from '../local/runtime-factory.ts';
+import type { BackupGuard } from '../local/activity-backups.ts';
 import { CloudApiError,createCloudApi,createSdkRequest,type CloudApi,type CloudAccountSummary } from './api.ts';
 import {pushResponseSchema,type Revision} from './protocol.ts';
 import { reconcileMutation } from './reconcile.ts';
 import * as controllerModule from './account-controller.ts';
 const event={id:'one',type:'pee' as const,at:100,source:'app' as const};
-async function fixture(t:TestContext,{pristine=false,exportCloud}:{pristine?:boolean;exportCloud?:controllerModule.CloudExportAction}={}) {
+async function fixture(t:TestContext,{pristine=false,exportCloud,beforeChange}:{pristine?:boolean;exportCloud?:controllerModule.CloudExportAction;beforeChange?:BackupGuard}={}) {
  const database=await createLocalDatabase(sqliteTestConnection(':memory:'));t.after(()=>database.close());
  await initializeLocalDatabase(database,()=> 'pet-1');if(!pristine)await database.write(sql=>sql.runAsync('DELETE FROM routines'));
- const writes=new Set<()=>void>(),runtime=await createLocalRuntime(database,'pet-1',()=>{for(const fn of writes)fn();});
+ const writes=new Set<()=>void>(),runtime=await createLocalRuntime(database,'pet-1',()=>{for(const fn of writes)fn();},beforeChange);
  const summary:CloudAccountSummary={user:{id:'account-1',email:'person@example.com',name:'Person'},cloud:{canSync:true,canExport:true},pets:[]};
  const state={credentials:false,summary,enrollCalls:0,pushCalls:0,pullCalls:0,signOutCalls:0,signOutFails:false,storageFails:false,requested:[] as string[],verifications:0,linkCalls:0,listCalls:0,linkedAccounts:[] as {userId:string;providerId:string}[]};
  const config={protocolVersion:1 as const,providers:{apple:false,google:true,email:true}};
@@ -724,4 +725,25 @@ test('leaving the account screen cancels an export still queued behind refresh',
  f.api.account=async()=>{entered();await waiting;return account();};
  const refresh=f.controller.refresh();await started;const download=f.controller.exportData();f.controller.cancelExport();release();await refresh;
  assert.equal(await download,'cancelled');assert.equal(calls,0);assert.equal(f.controller.read().exporting,false);assert.deepEqual(await localTables(f.runtime),before);
+});
+
+
+test('required account checkpoint precedes credentials and blocks sign-in/sign-out on backup failure',async t=>{
+ let failed=true,calls=0;
+ const f=await fixture(t,{beforeChange:async(_sql,reason)=>{if(reason==='account-change'){calls++;if(failed)throw new Error('Backup unavailable');}}});
+ await f.runtime.storage.appendEvents([event]);
+ await f.controller.refresh();
+ assert.equal(await f.controller.requestEmail('person@example.com'),'ok');
+ assert.equal(await f.controller.verifyEmail('person@example.com','123456'),'error');
+ assert.equal(f.state.verifications,0);assert.equal(f.state.credentials,false);
+ assert.equal(await f.controller.signInSocial('google'),'error');assert.equal(f.state.credentials,false);
+ failed=false;
+ assert.equal(await f.controller.verifyEmail('person@example.com','123456'),'ok');assert.equal(f.state.credentials,true);
+ failed=true;
+ assert.equal(await f.controller.signOut({confirmPending:true}),'error');
+ assert.equal(f.state.signOutCalls,0);assert.equal(f.state.credentials,true);
+ assert.deepEqual(await f.runtime.storage.loadEvents(),[event]);
+ failed=false;
+ assert.equal(await f.controller.signOut({confirmPending:true}),'ok');assert.equal(f.state.signOutCalls,1);
+ assert.ok(calls>=5);
 });

@@ -113,8 +113,9 @@ CREATE TABLE IF NOT EXISTS local_sync_baseline (
 );
 `;
 
-export async function initializeLocalDatabase(database: LocalDatabase, newId?: () => string): Promise<{ petId: string }> {
+export async function initializeLocalDatabase(database: LocalDatabase, newId?: () => string, beforeInitialize?: (sql: SqlExecutor) => Promise<void>): Promise<{ petId: string }> {
   return database.write(async (sql) => {
+    await beforeInitialize?.(sql);
     const metadata = await sql.getFirstAsync("SELECT name FROM sqlite_master WHERE type='table' AND name='metadata'");
     if (metadata) {
       const version = await sql.getFirstAsync<{ value: string }>("SELECT value FROM metadata WHERE key='schema_version'");

@@ -7,9 +7,16 @@ export type LanguagePreference = 'system' | AppLanguage;
 export const languageChoices: readonly LanguagePreference[] = ['system', 'en', 'zh-Hans', 'es'];
 
 const english = {
+  "backup.reason.daily": "Daily snapshot",
+  "backup.reason.before-update": "Before app update",
+  "backup.reason.account-change": "Before account change",
+  "backup.reason.cloud-replace": "Before cloud replacement",
+  "backup.reason.import": "Before import",
+  "backup.reason.recovery": "Before recovery",
+  "backup.reason.delete": "Before deletion",
   "backup.title": "Local log backups",
   "backup.detail": "Automatic daily snapshots · Recover missing logs",
-  "backup.explanation": "Keeps 30 daily snapshots of your logs. A snapshot is saved the first time you use Puptime each day; later logs are included in the next day’s snapshot.",
+  "backup.explanation": "Keeps 30 daily snapshots and 10 safety snapshots. Daily copies are saved on first use each day. Safety copies are saved before account changes, data replacements, imports, recovery or deletion, and on the first launch after an update, before database changes.",
   "backup.deviceOnly": "Stored on this device. Uninstalling Puptime removes these backups. Export a copy to Files for safekeeping. Routines and settings are not included.",
   "backup.done": "Done",
   "backup.working": "Working…",
@@ -19,7 +26,7 @@ const english = {
   "backup.restore": "Recover logs",
   "backup.export": "Export CSV",
   "backup.recovered": "Logs recovered",
-  "backup.result": "Added {imported} logs. Kept {skipped} existing logs.",
+  "backup.result": "Logs added: {imported}. Already saved: {skipped}.",
   "backup.errorTitle": "Backup unavailable",
   "backup.restoreError": "Couldn’t recover this backup. Existing logs are unchanged. Let pending sync finish, or end a running nap, then try again.",
   "backup.exportError": "Couldn’t export this backup. Try again.",
@@ -649,9 +656,16 @@ export type MessageKey = keyof typeof english;
 type Dictionary = Record<MessageKey, string>;
 
 const simplifiedChinese: Dictionary = {
+  "backup.reason.daily": "每日快照",
+  "backup.reason.before-update": "更新前",
+  "backup.reason.account-change": "账号更改前",
+  "backup.reason.cloud-replace": "云端数据替换前",
+  "backup.reason.import": "导入前",
+  "backup.reason.recovery": "恢复前",
+  "backup.reason.delete": "删除前",
   "backup.title": "本地日志备份",
   "backup.detail": "每天自动备份 · 恢复丢失的日志",
-  "backup.explanation": "保留最近 30 次每日快照。每天首次使用 Puptime 时保存一次；之后新增的日志会包含在次日的快照中。",
+  "backup.explanation": "保留 30 份每日快照和 10 份安全快照。每日首次使用时保存一份；更改账号、替换数据、导入、恢复或删除前另存安全快照。更新后的首次启动会在更改数据库之前保存快照。",
   "backup.deviceOnly": "备份保存在此设备上。卸载 Puptime 会删除这些备份。请导出到“文件”妥善保存。不包含日程和设置。",
   "backup.done": "完成",
   "backup.working": "处理中…",
@@ -1288,9 +1302,16 @@ const simplifiedChinese: Dictionary = {
 };
 
 const spanish: Dictionary = {
+  "backup.reason.daily": "Copia diaria",
+  "backup.reason.before-update": "Antes de actualizar",
+  "backup.reason.account-change": "Antes de cambiar de cuenta",
+  "backup.reason.cloud-replace": "Antes de reemplazar desde la nube",
+  "backup.reason.import": "Antes de importar",
+  "backup.reason.recovery": "Antes de recuperar",
+  "backup.reason.delete": "Antes de eliminar",
   "backup.title": "Copias locales",
   "backup.detail": "Copia diaria automática · Recuperar registros",
-  "backup.explanation": "Conserva 30 copias diarias de tus registros. Se guarda una copia al usar Puptime por primera vez cada día; los registros posteriores se incluyen en la copia del día siguiente.",
+  "backup.explanation": "Conserva 30 copias diarias y 10 copias de seguridad adicionales. Las diarias se guardan al primer uso del día. Las adicionales se guardan antes de cambiar de cuenta, reemplazar datos, importar, recuperar o eliminar, y al primer inicio tras una actualización, antes de modificar la base de datos.",
   "backup.deviceOnly": "Se guardan en este dispositivo. Desinstalar Puptime elimina estas copias. Exporta una copia a Archivos para conservarla. No incluyen rutinas ni ajustes.",
   "backup.done": "Listo",
   "backup.working": "Procesando…",
