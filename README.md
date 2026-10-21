@@ -40,6 +40,7 @@ The screenshots, features, and Android installation instructions below describe 
 - Set a daily routine, choose when reminders arrive, and review suggested times before using them.
 - Get customizable potty nudges after the latest pee or meal log.
 - Compare activity timing across 10, 20, or 30 days and view pee and poop frequency summaries.
+- Set expected eating and poop windows while editing a time in Schedule. Choose how many minutes before and after the planned time to highlight on every Timeline day, including dates without logs. Highlights follow the activity filter; accepted learned routine windows appear automatically. Reminders still use the planned time.
 - See possible missing logs, including estimated nap spans, automatically faded on the timeline without adding them to history. Saved estimates stay labeled and do not influence learned routines or recorded statistics.
 - Export and import activity CSV backups with stable IDs, notes, exact timestamps, nap states, and estimate labels. Reimporting preserves existing edits.
 - Choose two to four Home Screen widget actions and optional confirmation notifications.

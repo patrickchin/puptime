@@ -624,7 +624,49 @@ export function ScheduleScreen({
               <MaterialCommunityIcons name="chevron-right" size={22} color={theme.textMuted} />
             </Pressable>
 
-            {draft?.toleranceMinutes !== undefined ? (
+            {draft && (draft.type === 'meal' || draft.type === 'poop') ? (
+              <>
+                <View style={[styles.reminderRow, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                  <View style={[styles.reminderIcon, { backgroundColor: theme.primarySoft }]}>
+                    <MaterialCommunityIcons accessibilityElementsHidden importantForAccessibility="no" name="calendar-clock-outline" size={21} color={theme.primary} />
+                  </View>
+                  <Text style={[styles.reminderCopy, styles.reminderTitle, { color: theme.text }]}>{t('schedule.expectedWindow')}</Text>
+                  <Switch
+                    testID="schedule.editor.window"
+                    accessibilityLabel={t('schedule.expectedWindow')}
+                    ios_backgroundColor={theme.border}
+                    trackColor={{ false: theme.border, true: theme.primary }}
+                    value={Boolean(draft.toleranceMinutes)}
+                    onValueChange={enabled => setDraft({ ...draft, toleranceMinutes: enabled ? 30 : undefined })}
+                  />
+                </View>
+                {draft.toleranceMinutes ? (
+                  <>
+                    <View accessibilityRole="radiogroup" style={styles.windowChoices}>
+                      {[...new Set([15, 30, 60, 90, draft.toleranceMinutes])].sort((a,b)=>a-b).map(minutes => (
+                        <Pressable
+                          key={minutes}
+                          testID={`schedule.editor.window.${minutes}`}
+                          accessibilityRole="radio"
+                          accessibilityLabel={t('schedule.windowSizeA11y', { minutes })}
+                          accessibilityState={{ checked: draft.toleranceMinutes === minutes }}
+                          onPress={() => setDraft({ ...draft, toleranceMinutes: minutes })}
+                          style={({ pressed }) => [styles.windowChoice, {
+                            backgroundColor: draft.toleranceMinutes === minutes ? theme.primarySoft : theme.surface,
+                            borderColor: draft.toleranceMinutes === minutes ? theme.primary : theme.border,
+                            opacity: pressed ? 0.7 : 1,
+                          }]}
+                        >
+                          <Text style={[styles.typeChoiceText, { color: draft.toleranceMinutes === minutes ? theme.primary : theme.text }]}>{t('schedule.windowSize', { minutes })}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                    <Text testID="schedule.editor.window.range" style={[styles.previewSubtitle, { color: theme.text }]}>{formatScheduleWindow(draft, locale)}</Text>
+                  </>
+                ) : null}
+                <Text style={[styles.previewSubtitle, { color: theme.textMuted }]}>{t('schedule.windowHelp')}</Text>
+              </>
+            ) : draft?.toleranceMinutes !== undefined ? (
               <Text style={[styles.previewSubtitle, { color: theme.textMuted }]}>
                 {t('schedule.windowReminder', { range: formatScheduleWindow(draft, locale) })}
               </Text>
@@ -694,6 +736,8 @@ export function ScheduleScreen({
 }
 
 const styles = StyleSheet.create({
+  windowChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+  windowChoice: { minHeight: 48, minWidth: 72, borderWidth: 1, borderRadius: 14, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center' },
   content: {
     width: '100%',
     maxWidth: 720,
