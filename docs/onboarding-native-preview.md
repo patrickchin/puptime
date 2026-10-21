@@ -14,7 +14,10 @@ The welcome and setup screens share the emerald background, warm light text,
 cream controls, real icon, and one randomly chosen approved Scruffy scene.
 The keyboard uses its native dark appearance. Each heading asks its question
 once, with accessible input names. Skip actions replace the redundant Optional
-tag.
+tag. Headings use short, single-line copy at the default phone text size,
+without forced line breaks or truncation. Larger accessibility text and long
+puppy names may wrap. Supporting text is reserved for useful context, such as
+age-based meal guidance, time-window behavior, and what happens to the plan.
 
 1. Ask for a puppy name and approximate age. Either can be skipped.
 2. Offer the usual meal count for the chosen age, while preserving the owner's

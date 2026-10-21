@@ -163,7 +163,7 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
   </ScrollView>;
   else if(step==='profile')body=<>
     <ScrollView ref={scroll} testID="preview.profile" keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={styles.profileContent}>
-      <Text ref={heading} accessibilityRole="header" style={styles.title}>First, what’s your{fontScale<1.5?'\n':' '}pup’s name?</Text>
+      <Text ref={heading} accessibilityRole="header" testID="preview.prompt" style={styles.title}>What’s your pup’s name?</Text>
       {!keyboardVisible&&fontScale<1.5?<View style={styles.art}><Image source={mascot} accessible={false} resizeMode="contain" style={styles.mascot}/></View>:<View style={styles.keyboardSpace}/>}
       <View style={styles.nameField}><TextInput testID="preview.name" accessibilityLabel="Puppy’s name, optional" value={name} onChangeText={setName}
         placeholder="e.g. Milo" placeholderTextColor={theme.textMuted} maxLength={256} autoCapitalize="words" autoCorrect={false}
@@ -174,7 +174,7 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
   </>;
   else if(step==='age')body=<>
     <ScrollView key={step} contentContainerStyle={styles.conversation}>
-      {prompt(`And how old\nis ${pup}?`,'An estimate is fine.')}
+      {prompt(`How old is ${pup}?`)}
       <View style={styles.answers}>{puppyAges.map(item=>choice(item.id,item.label,()=>{setAge(item.id);go('meals');}))}</View>
       {smallMascot}
     </ScrollView>
@@ -182,14 +182,14 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
   </>;
   else if(step==='meals')body=<>
     <ScrollView key={step} contentContainerStyle={styles.conversation}>
-      {prompt('Let’s set up\nmealtimes.',recommendation?`${age==='adult'?'For many adult dogs':`At ${ageLabel}`}, ${recommendation} meals a day is common. Keep your vet’s plan if it’s different. How many does ${pup} have?`:`How many meals does ${pup} usually have each day?`)}
+      {prompt('Let’s plan mealtimes.',recommendation?`${age==='adult'?'For many adult dogs':`At ${ageLabel}`}, ${recommendation} meals a day is common. Keep your vet’s plan if it’s different. How many does ${pup} have?`:`How many meals does ${pup} usually have each day?`)}
       <View style={styles.answers}>{[1,2,3,4].map(count=>choice(`meals-${count}`,`${count} ${count===1?'meal':'meals'} a day`,()=>{if(count!==mealTimes.length)setMealTimes(starterMealTimes(count));setMealIndex(0);go('mealTime');}))}</View>
     </ScrollView>
     {later('Let’s do this later',()=>{replaceTimes('meal',[]);go('poop');})}
   </>;
   else if(step==='mealTime')body=<>
     <ScrollView testID="preview.mealTimes" contentContainerStyle={styles.conversation}>
-      {prompt('When does '+pup+' eat?','Here’s a starting point. Tap a time to change it.')}
+      {prompt('When does '+pup+' eat?')}
       <View style={styles.answers}>{mealTimes.map((minutes,index)=><Pressable key={index} testID={`preview.mealTime.${index}`} accessibilityRole="button" accessibilityLabel={`Meal ${index+1}, ${formatMinutes(minutes,'en')}`} onPress={()=>{setMealIndex(index);setPickingTime(true);}} style={[styles.choice,styles.mealRow]}>
         <Text style={styles.choiceText}>Meal {index+1}</Text><Text style={styles.mealTime}>{formatMinutes(minutes,'en')}</Text><MaterialCommunityIcons name="chevron-down" color={appTheme.primary} size={20}/>
       </Pressable>)}</View>
@@ -200,7 +200,7 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
   else if(step==='poopTime')body=<>
     <ScrollView key={`${step}-${poopIndex}`} contentContainerStyle={styles.conversation}>
       <Text style={styles.progress}>Poop window {poopIndex+1} of {poopTimes.length}</Text>
-      {prompt(poopIndex===0?'When’s the first\nusual poop?':'And the next\nusual poop?',poopIndex===0?'We’ll leave half an hour either side. You can adjust the window later.':`${formatMinutes(poopTimes[poopIndex-1],'en')} for the last one. What time comes next?`)}
+      {prompt(poopIndex===0?'First poop time?':'Next poop time?',poopIndex===0?'We’ll leave half an hour either side. You can adjust the window later.':`${formatMinutes(poopTimes[poopIndex-1],'en')} for the last one. What time comes next?`)}
       <View style={styles.timeSpace}>{smallMascot}
         <Pressable testID="preview.time" accessibilityRole="button" accessibilityLabel={`Change poop window centre, ${formatMinutes(time,'en')}`} onPress={()=>setPickingTime(true)} style={styles.timeAnswer}>
           <Text style={styles.timeText}>{formatMinutes(time,'en')}</Text><MaterialCommunityIcons name="chevron-down" size={24} color={appTheme.primary}/>
@@ -214,7 +214,7 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
   </>;
   else if(step==='poop')body=<>
     <ScrollView key={step} contentContainerStyle={styles.conversation}>
-      {prompt('Now, let’s\ntalk poop.',`A toilet break after meals can help. Have you noticed when ${pup} tends to poop?`)}
+      {prompt(`When does ${pup} poop?`)}
       <View style={styles.answers}>
         {meals.length?choice('after-meals','Usually after meals',()=>go('poopDelay')):null}
         {choice('known-times','I know the usual times',()=>go('poopCount'))}
@@ -226,7 +226,7 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
   </>;
   else if(step==='poopDelay')body=<>
     <ScrollView key={step} contentContainerStyle={styles.conversation}>
-      {prompt('How soon after\na meal?','Roughly is fine. We’ll keep it as a window.')}
+      {prompt('How soon after a meal?','We’ll use a time window, rather than an exact time.')}
       <View style={styles.answers}>{poopDelays.map((delay,index)=>choice(`delay-${index}`,delay.label,()=>{replaceTimes('poop',poopWindowsAfterMeals(meals.map(entry=>entry.minutes),delay));go('review');}))}</View>
       {smallMascot}
     </ScrollView>
@@ -234,14 +234,14 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
   </>;
   else if(step==='poopCount')body=<>
     <ScrollView key={step} contentContainerStyle={styles.conversation}>
-      {prompt('How many times\non a usual day?','Some days will be different. That’s okay.')}
+      {prompt('How many poops a day?')}
       <View style={styles.answers}>{[1,2,3,4,5].map(count=>choice(`poops-${count}`,`${count} ${count===1?'time':'times'}`,()=>{setPoopTimes(current=>count===current.length?current:Array.from({length:count},(_,index)=>Math.round((8+index*10/Math.max(1,count-1))*60)));setPoopIndex(0);go('poopTime');}))}</View>
     </ScrollView>
     {later('I’m not sure yet',()=>{replaceTimes('poop',[]);go('review');})}
   </>;
   else if(step==='review')body=<>
     <ScrollView key={step} contentContainerStyle={styles.conversation}>
-      {prompt(name.trim()?`That’s a start,\n${name.trim()}.`:'That’s a start.',poops.length?'We’ll get to know the rest of the routine as you log.':'No rush on poop times. Log a few days and we can look for a pattern together.')}
+      {prompt('Here’s our starting plan.',poops.length?undefined:'Log a few days to help us suggest poop times.')}
       <View style={styles.plan}>
         <Text style={styles.planHeading}>Mealtimes</Text>
         {meals.length?meals.map(entry=><Text key={entry.id} style={styles.planTime}>{formatMinutes(entry.minutes,'en')}</Text>):<Text style={styles.body}>We’ll set these up later.</Text>}
@@ -256,7 +256,7 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
   </>;
   else if(step==='schedule')body=<>
     <View style={styles.schedule}><ScheduleScreen theme={theme} events={[]} schedule={schedule} customActivities={[]}
-      setupHeader={<View style={styles.prompt}>{prompt('Anything else\nto add?','These extra starter times are optional. Keep just the times we chose if that’s enough for now.')}</View>}
+      setupHeader={<View style={styles.prompt}>{prompt('Anything else to add?','Extra starter times are filled in below. Keep the full plan only if it suits your routine.')}</View>}
       onChange={async next=>setSchedule(next)}
       onSaveEntry={async entry=>setSchedule(current=>[...current.filter(item=>item.id!==entry.id),entry].sort((a,b)=>a.minutes-b.minutes))}
       onRemoveEntry={async id=>setSchedule(current=>current.filter(item=>item.id!==id))}
@@ -265,7 +265,7 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
   </>;
   else if(step==='reminders')body=<>
     <ScrollView key={step} contentContainerStyle={styles.conversation}>
-      {prompt('Would a little\nnudge help?','A gentle heads-up at the times you choose. Your phone will ask for permission first.')}
+      {prompt('Want a reminder?')}
       <NotificationTimingControls theme={theme} preferences={preferences} schedule={schedule} disabled={requestingReminders}
         onChange={async next=>setPreferences(next)} onScheduleChange={async next=>setSchedule(next)}/>
       {reminderError?<Text accessibilityRole="alert" style={styles.error}>{reminderError}</Text>:null}
@@ -278,7 +278,7 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
   </>;
   else if(step==='ready')body=<>
     <ScrollView testID="preview.ready" contentContainerStyle={styles.ready}>
-      {smallMascot}{prompt('Let’s see how\ntoday goes.',reminderAnswer==='granted'?`Your reminder choices are ready. You can change them in Notifications. For now, log whenever ${pup} eats or goes potty.`:`Reminders can wait. Whenever ${pup} eats or goes potty, you can log it with a tap.`)}
+      {smallMascot}{prompt('Ready for today?',reminderAnswer==='granted'?'You can change reminders in Notifications.':undefined)}
     </ScrollView>
     {finishError?<Text accessibilityRole="alert" style={[styles.error,{paddingHorizontal:22}]}>We couldn’t save your setup. Your answers are still here—please try again.</Text>:null}
     {footer(finishing?'Saving…':'Show me around',()=>{void complete(true);},'I’ll explore on my own',()=>{void complete(false);})}
@@ -302,7 +302,7 @@ const styles=StyleSheet.create({
   header:{minHeight:52,paddingHorizontal:22,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},
   brand:{flexDirection:'row',alignItems:'center',gap:7},icon:{width:28,height:28,borderRadius:7},brandName:{fontFamily:'RedHatDisplayBold',fontSize:20,color:theme.text,letterSpacing:-.5},
   back:{minWidth:62,minHeight:44,flexDirection:'row',alignItems:'center'},backText:{fontFamily:'RedHatText',fontSize:13,color:theme.textMuted},headerSpacer:{width:62},
-  profileContent:{flexGrow:1,paddingHorizontal:22,paddingTop:22},title:{fontFamily:'RedHatDisplayBold',fontSize:34,lineHeight:39,letterSpacing:-.8,color:theme.text},
+  profileContent:{flexGrow:1,paddingHorizontal:22,paddingTop:22},title:{fontFamily:'RedHatDisplayBold',fontSize:26,lineHeight:33,letterSpacing:-.5,color:theme.text},
   art:{flex:1,minHeight:140,alignItems:'center',justifyContent:'center',marginTop:12},mascot:{width:'100%',height:'100%',maxHeight:300,minHeight:140},keyboardSpace:{flexGrow:1,minHeight:16},
   nameField:{paddingTop:18,paddingBottom:20},nameInput:{fontFamily:'RedHatText',fontSize:27,minHeight:60,paddingVertical:10,borderBottomWidth:2,borderBottomColor:theme.primary,color:theme.text},
   footer:{paddingHorizontal:22,paddingTop:18,paddingBottom:2,backgroundColor:theme.background},primary:{minHeight:52,paddingHorizontal:16,paddingVertical:12,borderRadius:999,backgroundColor:theme.primary,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:10},

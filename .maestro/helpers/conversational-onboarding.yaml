@@ -23,8 +23,10 @@ name: Complete conversational setup into the real app
 - tapOn:
     id: preview.continue
 - assertNotVisible: Optional
+- takeScreenshot: conversational-age
 - tapOn:
     id: preview.choice.middle
+- takeScreenshot: conversational-meal-count
 - tapOn:
     id: preview.choice.meals-3
 - assertVisible:
