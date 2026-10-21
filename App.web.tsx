@@ -91,10 +91,10 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
             {previews.map((preview, index) => <button type="button" key={preview.name} aria-pressed={selected === index} aria-controls="app-preview" onClick={() => setSelected(index)}>{preview.name}<span aria-hidden="true">↗</span></button>)}
           </div>
           <p className="preview-description" aria-live="polite" aria-atomic="true">{previews[selected].description}</p>
-          <p className="small-copy">Screens from the offline release.</p>
+          <p className="small-copy">From the app, with real puppy logs.</p>
         </div>
         <figure className="app-preview" id="app-preview" data-reveal>
-          <img key={selected} src={previews[selected].image} alt={`Puptime ${previews[selected].name} screen`} width="430" height="932" />
+          <div className="phone-frame"><img key={selected} src={previews[selected].image} alt={`Puptime ${previews[selected].name} screen`} width="1206" height="2622" /></div>
           <figcaption>{previews[selected].name} on Puptime</figcaption>
         </figure>
       </section>
@@ -108,14 +108,14 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
           <article className="rhythm-story">
             <h3 data-reveal>Spot the potty patterns</h3>
             <div className="story-content">
-              <img src={timingImage} alt="Puptime timeline comparing activity times across ten days" width="1206" height="2622" loading="lazy" data-reveal />
-              <p data-reveal>Compare activity across 10, 20, or 30 days. Look for recurring potty times, with estimates kept separate from recorded logs.</p>
+              <div className="phone-frame" data-reveal><img src={timingImage} alt="Puptime timeline showing real puppy activity with varied daily timings" width="1206" height="2622" loading="lazy" /></div>
+              <p data-reveal>Compare activity across recorded days. Look for recurring potty times, with estimates kept separate from recorded logs.</p>
             </div>
           </article>
           <article className="rhythm-story">
             <h3 data-reveal>A routine that fits</h3>
             <div className="story-content reverse">
-              <img src={routineImage} alt="Editable daily routine with activity times and optional reminders" width="430" height="932" loading="lazy" data-reveal />
+              <div className="phone-frame" data-reveal><img src={routineImage} alt="Editable daily routine with activity times and optional reminders" width="1206" height="2622" loading="lazy" /></div>
               <p data-reveal>Review suggested times from your puppy’s history, then adjust each activity. Choose reminders for the routine you want to follow.</p>
             </div>
           </article>
