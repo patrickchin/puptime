@@ -7,7 +7,7 @@ const listeners=new Set<()=>void>();
 let initialized:Promise<Awaited<ReturnType<typeof openRuntime>>>|undefined;
 async function openRuntime() {
   let runtime: Awaited<ReturnType<typeof createLocalRuntime>>;
-  const {database,petId,service,checkpoint}=await openLocalDatabase(events=>runtime.recoverEvents(events));
+  const {database,petId,service,checkpoint}=await openLocalDatabase((events,puppy)=>runtime.recoverBackup(events,puppy));
   try {
     const capture=()=>{void runtime?.checkpoint('daily').catch(()=>{/* Recovery settings exposes failures and retry. */});};
     runtime=await createLocalRuntime(database,petId,()=>{

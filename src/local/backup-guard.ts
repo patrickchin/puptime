@@ -1,6 +1,6 @@
 import { eventDataFromSql, type EventSqlRow } from '../record-sql.ts';
 import { identifierSchema } from '../cloud/protocol.ts';
-import { createActivityBackups, type BackupFiles, type BackupGuard } from './activity-backups.ts';
+import { createActivityBackups, type ActivityBackup, type BackupFiles, type BackupGuard } from './activity-backups.ts';
 import type { SqlExecutor } from './database.ts';
 import type { PuppyEvent } from '../domain.ts';
 
@@ -13,11 +13,14 @@ export async function readBackupData(sql: SqlExecutor, petId: string) {
 
 export function createBackupGuard(options: {
   files: BackupFiles; petId: string; newId: () => string; appVersion: string;
-  restore: (events: PuppyEvent[]) => Promise<{ imported: number; skipped: number }>;
+  restore: (events: PuppyEvent[], puppy: Pick<ActivityBackup, 'petId' | 'puppyName'>) => Promise<{ imported: number; skipped: number }>;
 }) {
   const service = createActivityBackups({ ...options, read: async () => { throw new Error('Native backups require a database snapshot.'); } });
   // Always called inside the DB queue, using its executor directly. Never reenter that queue.
-  const checkpoint: BackupGuard = (sql, reason) => service.capture(reason, () => readBackupData(sql, options.petId), options.appVersion);
+  const checkpoint: BackupGuard = async (sql, reason) => {
+    const puppies = await sql.getAllAsync<{ id: string }>('SELECT id FROM puppies ORDER BY id');
+    for (const { id } of puppies) await service.capture(reason, () => readBackupData(sql, id), options.appVersion, id);
+  };
   return { service, checkpoint };
 }
 

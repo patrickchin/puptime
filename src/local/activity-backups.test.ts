@@ -112,3 +112,25 @@ test('existing backup format without safety metadata still reads as a daily snap
   assert.equal((await f.service.list()).backups[0].reason, 'daily');
   assert.equal((await f.service.read(id)).events.length, 1);
 });
+
+test('daily caching, restart detection and both retention limits are independent per dog', async () => {
+  const f = fixture();
+  const other = () => f.service.capture('daily', f.options.read, undefined, 'pet_other');
+  await other();
+  await f.service.capture('account-change', f.options.read, undefined, 'pet_other');
+  const originals = new Map(f.disk);
+  await f.service.capture();
+  assert.equal((await f.service.list()).backups.filter(item => item.reason === 'daily').length, 2);
+  await other(); assert.equal(f.disk.size, 3);
+  await createActivityBackups(f.options).capture('daily', f.options.read, undefined, 'pet_other');
+  assert.equal(f.disk.size, 3, 'An inactive dog is also protected from duplicate daily copies after restart.');
+  for (let index=0;index<35;index++) {
+    f.advance(); f.events([{id:`evt_${index}`,type:'pee',at:f.options.now(),source:'app'}]);
+    await f.service.capture(); await f.service.capture('delete');
+  }
+  const {backups}=await f.service.list();
+  assert.equal(backups.filter(item=>item.petId==='pet_test'&&item.reason==='daily').length,30);
+  assert.equal(backups.filter(item=>item.petId==='pet_test'&&item.reason!=='daily').length,10);
+  assert.equal(backups.filter(item=>item.petId==='pet_other').length,2);
+  for (const [id,content] of originals) assert.equal(f.disk.get(id),content, 'A busy dog must never rotate another dog’s snapshots out.');
+});

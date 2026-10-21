@@ -11,6 +11,7 @@ import type { CloudRecord } from '../cloud/protocol.ts';
 import * as engine from './sync-engine.ts';
 import { createEvent } from '../domain.ts';
 import { createLocalRepository } from './repository.ts';
+import { createLocalRuntime } from './runtime-factory.ts';
 
 async function setup(t:TestContext,{pristine=false}={}) {
   const directory=await mkdtemp(join(tmpdir(),'puptime-sync-'));
@@ -635,9 +636,14 @@ test('enrollment cancellation cannot discard a baseline that already began or an
 });
 
 
-test('backup recovery explicitly restores synced deletions and rejects pending deletes atomically',async t=>{
+test('inactive dog backup recovery explicitly restores synced deletions and rejects pending deletes atomically',async t=>{
  const {database,sync,storage}=await setup(t),owner=await activate(sync),server=replicaServer();await cycle(sync,owner,server);
- const recover=createLocalRepository(database,'local-pet',sync.changeSink('local-pet',{restoreMissing:true})).importEvents;
+ await database.write(async sql=>{
+  await sql.runAsync("INSERT INTO puppies(id,name) VALUES ('pet_active','Other dog')");
+  await sql.runAsync("UPDATE metadata SET value='pet_active' WHERE key='active_pet_id'");
+ });
+ const active=await createLocalRuntime(database,'pet_active');
+ const recover=(events:Parameters<typeof active.recoverBackup>[0])=>active.recoverBackup(events,{petId:'local-pet',puppyName:'My puppy'});
  const nap={id:'nap-backup',type:'nap' as const,at:200,endedAt:300,source:'widget' as const};
  await storage.appendEvents([event,nap]);await cycle(sync,owner,server);
  await storage.removeEvent(event.id);await storage.removeEvent(nap.id);
@@ -652,6 +658,7 @@ test('backup recovery explicitly restores synced deletions and rejects pending d
  assert.deepEqual((await storage.loadEvents()).map(item=>item.id).sort(),[event.id,nap.id].sort());
  assert.deepEqual(await recover([event,nap]),{imported:0,skipped:2});
  assert.equal((await sync.status('local-pet')).pending,0);
+ assert.deepEqual(await active.storage.loadEvents(),[]);
 });
 
 

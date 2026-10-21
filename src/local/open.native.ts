@@ -5,9 +5,10 @@ import { entityId } from '../entity-id';
 import { localBackupFiles } from './backup-files.native';
 import { checkpointBeforeUpgrade, createBackupGuard, existingBackupPet } from './backup-guard';
 import type { PuppyEvent } from '../domain';
+import type { ActivityBackup } from './activity-backups';
 
 // Both native platforms use this private connection and the same typed schema.
-export async function openLocalDatabase(restore: (events: PuppyEvent[]) => Promise<{ imported: number; skipped: number }> = async () => { throw new Error('Recovery is not ready.'); }) {
+export async function openLocalDatabase(restore: (events: PuppyEvent[], puppy: Pick<ActivityBackup, 'petId' | 'puppyName'>) => Promise<{ imported: number; skipped: number }> = async () => { throw new Error('Recovery is not ready.'); }) {
   const connection = await openDatabaseAsync('puptime-v2.db', { useNewConnection: true, enableChangeListener: true });
   try {
     const database = await createLocalDatabase(connection);

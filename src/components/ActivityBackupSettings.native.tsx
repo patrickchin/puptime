@@ -36,7 +36,7 @@ export function ActivityBackupSettings({ theme, onRestored }: { theme: Theme; on
       else {
         const result = await service.restore(backup.id);
         await onRestored?.();
-        Alert.alert(t('backup.recovered'), t('backup.result', result));
+        Alert.alert(t('backup.recovered'), t('backup.result', { ...result, name: backup.puppyName }));
       }
     } catch { Alert.alert(t('backup.errorTitle'), t(exporting ? 'backup.exportError' : 'backup.restoreError')); }
     finally { locked.current = false; if (mounted.current) setBusy(false); }
