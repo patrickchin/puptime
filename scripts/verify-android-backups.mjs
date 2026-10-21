@@ -1,4 +1,4 @@
-// Destructive synthetic fixture: requires the dedicated a903 backup emulator and a running Metro.
+// Destructive synthetic fixture: requires the dedicated a903 emulator and an installed app with a bundled script or configured Metro.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -19,7 +19,7 @@ const directory = mkdtempSync(join(tmpdir(), 'puptime-android-backups-'));
 const output = resolve('output/daily-backups'); mkdirSync(output, { recursive: true });
 const shell = (...args) => adb('shell', ...args);
 const stop = () => shell('am', 'force-stop', app);
-const launch = () => { adb('reverse', 'tcp:8093', `tcp:${process.env.PUPTIME_METRO_PORT ?? '8093'}`); return shell('am', 'start', '-n', `${app}/.MainActivity`); };
+const launch = () => shell('am', 'start', '-n', `${app}/.MainActivity`);
 const path = join(directory, 'puptime-v2.db');
 const remote = 'files/SQLite/puptime-v2.db';
 function upload() {
