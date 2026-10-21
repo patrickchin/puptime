@@ -18,7 +18,7 @@ name: Skipping optional setup and the tour still reaches the normal app
 - tapOn:
     id: preview.skip
 - tapOn:
-    id: preview.choice.still-learning
+    id: preview.skip
 - tapOn:
     id: preview.continue
 - assertNotVisible: Optional

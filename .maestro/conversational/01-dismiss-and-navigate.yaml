@@ -19,6 +19,9 @@ name: Conversational onboarding dismisses into normal navigation and persists
 - assertVisible:
     id: schedule.entry.meal
     text: '.*8:00.*'
+- assertVisible:
+    id: schedule.entry.poop
+    text: '.*9:30.*10:00.*'
 - assertNotVisible:
     id: preview.back
 - takeScreenshot: conversational-normal-schedule

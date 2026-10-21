@@ -1,9 +1,3 @@
-import type {ScheduleEntry} from './domain.ts';
-
-export function previewScheduleToKeep(schedule:ScheduleEntry[],keepFullPlan:boolean):ScheduleEntry[]{
-  return keepFullPlan?schedule:schedule.filter(entry=>entry.type==='meal'||entry.type==='poop');
-}
-
 // General feeding guidance, not an individual feeding prescription:
 // https://www.merckvetmanual.com/multimedia/table/feeding-schedule-for-puppies
 export const puppyAges = [
@@ -24,12 +18,7 @@ export function starterMealTimes(count:number):number[] {
   return [...times[count]];
 }
 
-// These choices describe the owner's observations, not a predicted digestion time.
-export const poopDelays = [
-  {label:'Within about half an hour',from:0,to:30},
-  {label:'About 15–45 minutes later',from:15,to:45},
-  {label:'About half an hour to an hour',from:30,to:60},
-] as const;
-export function poopWindowsAfterMeals(meals:readonly number[],delay:typeof poopDelays[number]) {
-  return meals.map(minutes=>({minutes:(minutes+(delay.from+delay.to)/2)%1440,toleranceMinutes:(delay.to-delay.from)/2}));
+// Starting windows chosen during setup, not a prediction of a puppy's digestion.
+export function starterPoopWindows(meals:readonly number[]) {
+  return meals.map(minutes=>({minutes:(minutes+45)%1440,toleranceMinutes:15}));
 }

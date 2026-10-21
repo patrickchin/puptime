@@ -1,21 +1,21 @@
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import {useFonts} from 'expo-font';
 import {StatusBar} from 'expo-status-bar';
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useRef,useState,type ReactNode} from 'react';
 import {
-  AccessibilityInfo,ActivityIndicator,Alert,Image,Keyboard,KeyboardAvoidingView,Platform,Pressable,
-  ScrollView,StyleSheet,Text,TextInput,View,useWindowDimensions,
+  AccessibilityInfo,ActivityIndicator,Alert,Animated,Easing,Image,Keyboard,KeyboardAvoidingView,Platform,Pressable,
+  ScrollView,StyleSheet,Text,TextInput,View,useWindowDimensions,type ImageSourcePropType,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
-import {STARTER_SCHEDULE,formatMinutes,formatScheduleWindow,type ScheduleEntry} from '../domain';
+import {formatMinutes,formatScheduleWindow,type ScheduleEntry} from '../domain';
 import {entityId} from '../entity-id';
 import {DateTimeSelector} from '../components/DateTimeSelector';
 import {NotificationTimingControls} from '../components/NotificationTimingControls';
 import {DEFAULT_NOTIFICATION_PREFERENCES,type NotificationPreferences} from '../notification-config';
-import {poopDelays,poopWindowsAfterMeals,previewScheduleToKeep,puppyAges,starterMealTimes,suggestedMealCount,type PuppyAge} from '../onboarding-preview';
+import {starterPoopWindows,puppyAges,starterMealTimes,suggestedMealCount,type PuppyAge} from '../onboarding-preview';
 import {lightTheme,type Theme} from '../theme';
-import {ScheduleScreen} from './ScheduleScreen';
+import {OnboardingPlanTimeline} from '../components/OnboardingPlanTimeline';
 export type OnboardingDraft={puppyName:string;schedule:ScheduleEntry[];notifications:NotificationPreferences;showGuide:boolean};
 export type ConversationalOnboardingProps={onFinish:(draft:OnboardingDraft)=>Promise<void>;onAllowNotifications:()=>Promise<boolean>;onDisableNotifications:()=>Promise<void>};
 
@@ -30,7 +30,7 @@ const mascots=[require('../../assets/mascots/scruffy-terrier.png'),
   require('../../assets/mascots/onboarding/scruffy-grass.png'),
   require('../../assets/mascots/onboarding/scruffy-bone.png'),
   require('../../assets/mascots/onboarding/scruffy-roll.png')];
-type Step='welcome'|'profile'|'age'|'meals'|'mealTime'|'poop'|'poopDelay'|'poopCount'|'poopTime'|'review'|'schedule'|'reminders'|'ready';
+type Step='welcome'|'profile'|'age'|'meals'|'mealTime'|'poop'|'review'|'reminders'|'ready';
 
 // Draft answers are committed by the real app when setup finishes.
 export function OnboardingDesignPreview(props:ConversationalOnboardingProps){
@@ -48,10 +48,10 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
   const [age,setAge]=useState<PuppyAge|null>(null);
   const [mealTimes,setMealTimes]=useState(()=>starterMealTimes(3));
   const [mealIndex,setMealIndex]=useState(0);
-  const [poopTimes,setPoopTimes]=useState([8*60,18*60]);
+  const [poopWindows,setPoopWindows]=useState<{minutes:number;toleranceMinutes:number}[]>([]);
+  const poopMealTimes=useRef<number[]>([]);
   const [poopIndex,setPoopIndex]=useState(0);
-  const [schedule,setSchedule]=useState<ScheduleEntry[]>(()=>STARTER_SCHEDULE.filter(entry=>entry.type!=='meal').map(entry=>({...entry,reminder:false})));
-  const [keepingFullPlan,setKeepingFullPlan]=useState(false);
+  const [schedule,setSchedule]=useState<ScheduleEntry[]>([]);
   const [mascot]=useState(()=>mascots[Math.floor(Math.random()*mascots.length)]);
   const [keyboardVisible,setKeyboardVisible]=useState(Keyboard.isVisible());
   const [pickingTime,setPickingTime]=useState(false);
@@ -64,7 +64,18 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
   const permissionRequest=useRef(false);
   const scroll=useRef<ScrollView>(null);
   const heading=useRef<Text>(null);
-  const {fontScale}=useWindowDimensions();
+  const {fontScale,width,height}=useWindowDimensions();
+  const [reduceMotion,setReduceMotion]=useState(true);
+  const [outgoing,setOutgoing]=useState<ReactNode>(null);
+  const [direction,setDirection]=useState(1);
+  const transition=useRef(new Animated.Value(1)).current;
+  const page=useRef<ReactNode>(null),transitioning=useRef(false);
+  useEffect(()=>{
+    let current=true;
+    void AccessibilityInfo.isReduceMotionEnabled().then(value=>{if(current)setReduceMotion(value);});
+    const subscription=AccessibilityInfo.addEventListener('reduceMotionChanged',setReduceMotion);
+    return()=>{current=false;subscription.remove();transition.stopAnimation();};
+  },[transition]);
   const pup=name.trim()||'your pup';
   const meals=schedule.filter(entry=>entry.type==='meal');
   const poops=schedule.filter(entry=>entry.type==='poop');
@@ -78,16 +89,27 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
   useEffect(()=>{
     const frame=requestAnimationFrame(()=>{if(heading.current)AccessibilityInfo.sendAccessibilityEvent(heading.current,'focus');});
     return()=>cancelAnimationFrame(frame);
-  },[step,poopIndex]);
-  function go(next:Step){Keyboard.dismiss();setPickingTime(false);setStep(next);}
+  },[step]);
+  function go(next:Step,backward=false){
+    if(transitioning.current||next===step)return;
+    Keyboard.dismiss();setPickingTime(false);
+    if(reduceMotion){setStep(next);return;}
+    transitioning.current=true;setOutgoing(page.current);setDirection(backward?-1:1);
+    transition.setValue(0);setStep(next);
+    requestAnimationFrame(()=>Animated.timing(transition,{toValue:1,duration:300,easing:Easing.out(Easing.cubic),useNativeDriver:true}).start(()=>{setOutgoing(null);transitioning.current=false;}));
+  }
+  function preparePoop(times:number[]){
+    if(times.length!==poopMealTimes.current.length||times.some((time,index)=>time!==poopMealTimes.current[index])){
+      setPoopWindows(starterPoopWindows(times));poopMealTimes.current=[...times];
+    }
+    go('poop');
+  }
   function replaceTimes(type:'meal'|'poop',times:{minutes:number;toleranceMinutes?:number}[]){
     setSchedule(current=>{
       const previous=current.filter(entry=>entry.type===type);
-      return [...current.filter(entry=>entry.type!==type),...times.map((time,index)=>({id:previous[index]?.id??entityId('rtn'),type,...time,reminder:false}))].sort((a,b)=>a.minutes-b.minutes);
+      return [...current.filter(entry=>entry.type!==type),...times.map((time,index)=>({id:previous[index]?.id??entityId('rtn'),type,...time,reminder:previous[index]?.reminder??false}))].sort((a,b)=>a.minutes-b.minutes);
     });
   }
-  function keepGuidedTimes(){setKeepingFullPlan(false);setSchedule(current=>previewScheduleToKeep(current,false));go('reminders');}
-  function finish(){setSchedule(current=>previewScheduleToKeep(current,keepingFullPlan));go('reminders');}
   async function complete(showGuide:boolean){
     if(completion.current)return;
     completion.current=true;setFinishing(true);setFinishError(false);
@@ -118,9 +140,8 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
   }
   function back(){
     if(pickingTime){setPickingTime(false);return;}
-    if(step==='poopTime'&&poopIndex>0){setPoopIndex(poopIndex-1);return;}
-    const previous:Partial<Record<Step,Step>>={profile:'welcome',age:'profile',meals:'age',mealTime:'meals',poop:meals.length?'mealTime':'meals',poopDelay:'poop',poopCount:'poop',poopTime:'poopCount',review:'poop',schedule:'review',reminders:'review',ready:'reminders'};
-    go(previous[step]??'profile');
+    const previous:Partial<Record<Step,Step>>={profile:'welcome',age:'profile',meals:'age',mealTime:'meals',poop:meals.length?'mealTime':'meals',review:'poop',reminders:'review',ready:'reminders'};
+    go(previous[step]??'profile',true);
   }
   const header=<View style={styles.header}>
     {step!=='welcome'?<Pressable testID="preview.back" accessibilityRole="button" accessibilityLabel="Go back" disabled={requestingReminders} onPress={back} style={styles.back}>
@@ -143,8 +164,8 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
   const smallMascot=<Image accessible={false} source={mascot} resizeMode="contain" style={styles.smallMascot}/>;
   const mealStep=step==='mealTime';
   const timeIndex=mealStep?mealIndex:poopIndex;
-  const times=mealStep?mealTimes:poopTimes;
-  const time=times[timeIndex]??0;
+  const time=mealStep?mealTimes[timeIndex]??0:((poopWindows[timeIndex]?.minutes??15)-15+1440)%1440;
+  const activityArt=(source:ImageSourcePropType)=><View style={styles.activityArt}><Image accessible={false} source={source} resizeMode="contain" style={[styles.activityImage,{height:Math.min(200,height*.23)}]}/></View>;
 
   let body;
   if(step==='welcome')body=<ScrollView testID="preview.welcome" contentContainerStyle={styles.welcome}>
@@ -185,7 +206,7 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
       {prompt('Let’s plan mealtimes.',recommendation?`${age==='adult'?'For many adult dogs':`At ${ageLabel}`}, ${recommendation} meals a day is common. Keep your vet’s plan if it’s different. How many does ${pup} have?`:`How many meals does ${pup} usually have each day?`)}
       <View style={styles.answers}>{[1,2,3,4].map(count=>choice(`meals-${count}`,`${count} ${count===1?'meal':'meals'} a day`,()=>{if(count!==mealTimes.length)setMealTimes(starterMealTimes(count));setMealIndex(0);go('mealTime');}))}</View>
     </ScrollView>
-    {later('Let’s do this later',()=>{replaceTimes('meal',[]);go('poop');})}
+    {later('Let’s do this later',()=>{replaceTimes('meal',[]);preparePoop(mealTimes);})}
   </>;
   else if(step==='mealTime')body=<>
     <ScrollView testID="preview.mealTimes" contentContainerStyle={styles.conversation}>
@@ -193,55 +214,25 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
       <View style={styles.answers}>{mealTimes.map((minutes,index)=><Pressable key={index} testID={`preview.mealTime.${index}`} accessibilityRole="button" accessibilityLabel={`Meal ${index+1}, ${formatMinutes(minutes,'en')}`} onPress={()=>{setMealIndex(index);setPickingTime(true);}} style={[styles.choice,styles.mealRow]}>
         <Text style={styles.choiceText}>Meal {index+1}</Text><Text style={styles.mealTime}>{formatMinutes(minutes,'en')}</Text><MaterialCommunityIcons name="chevron-down" color={appTheme.primary} size={20}/>
       </Pressable>)}</View>
-      {smallMascot}
+      {activityArt(require('../../assets/mascots/onboarding/scruffy-eating.png'))}
     </ScrollView>
-    {footer('That works for us',()=>{replaceTimes('meal',mealTimes.map(minutes=>({minutes})));go('poop');},'Let’s do this later',()=>{replaceTimes('meal',[]);go('poop');})}
-  </>;
-  else if(step==='poopTime')body=<>
-    <ScrollView key={`${step}-${poopIndex}`} contentContainerStyle={styles.conversation}>
-      <Text style={styles.progress}>Poop window {poopIndex+1} of {poopTimes.length}</Text>
-      {prompt(poopIndex===0?'First poop time?':'Next poop time?',poopIndex===0?'We’ll leave half an hour either side. You can adjust the window later.':`Previous time: ${formatMinutes(poopTimes[poopIndex-1],'en')}.`)}
-      <View style={styles.timeSpace}>{smallMascot}
-        <Pressable testID="preview.time" accessibilityRole="button" accessibilityLabel={`Change poop window centre, ${formatMinutes(time,'en')}`} onPress={()=>setPickingTime(true)} style={styles.timeAnswer}>
-          <Text style={styles.timeText}>{formatMinutes(time,'en')}</Text><MaterialCommunityIcons name="chevron-down" size={24} color={appTheme.primary}/>
-        </Pressable>
-      </View>
-    </ScrollView>
-    {footer(poopIndex===poopTimes.length-1?'That’s the last one':'Next',()=>{
-      if(poopIndex<poopTimes.length-1)setPoopIndex(poopIndex+1);
-      else{replaceTimes('poop',poopTimes.map(minutes=>({minutes,toleranceMinutes:30})));go('review');}
-    },'Let’s do this later',()=>{replaceTimes('poop',[]);go('review');})}
+    {footer('That works for us',()=>{replaceTimes('meal',mealTimes.map(minutes=>({minutes})));preparePoop(mealTimes);},'Let’s do this later',()=>{replaceTimes('meal',[]);preparePoop(mealTimes);})}
   </>;
   else if(step==='poop')body=<>
-    <ScrollView key={step} contentContainerStyle={styles.conversation}>
-      {prompt(`When does ${pup} poop?`)}
-      <View style={styles.answers}>
-        {meals.length?choice('after-meals','Usually after meals',()=>go('poopDelay')):null}
-        {choice('known-times','I know the usual times',()=>go('poopCount'))}
-        {choice('still-learning','We’re still figuring it out',()=>{replaceTimes('poop',[]);go('review');})}
-      </View>
-      {smallMascot}
+    <ScrollView testID="preview.poopTimes" contentContainerStyle={styles.conversation}>
+      {prompt(`When does ${pup} poop?`,meals.length?'We’ve started 30–60 minutes after meals. Move a window to suit your pup.':'Some starting windows to adjust or skip. Each covers 30 minutes.')}
+      <View style={styles.answers}>{poopWindows.map((window,index)=><Pressable key={index} testID={`preview.poopTime.${index}`} accessibilityRole="button"
+        accessibilityLabel={`Poop window ${index+1}, ${formatScheduleWindow(window,'en')}, change start time`} onPress={()=>{setPoopIndex(index);setPickingTime(true);}} style={[styles.choice,styles.mealRow]}>
+        <Text style={styles.windowNumber}>{index+1}</Text><Text style={[styles.windowTime,{flex:1}]}>{formatScheduleWindow(window,'en')}</Text><MaterialCommunityIcons name="chevron-down" color={appTheme.primary} size={20}/>
+      </Pressable>)}</View>
+      {activityArt(require('../../assets/mascots/onboarding/scruffy-pooping.png'))}
     </ScrollView>
-    {later('Skip for now',()=>{replaceTimes('poop',[]);go('review');})}
-  </>;
-  else if(step==='poopDelay')body=<>
-    <ScrollView key={step} contentContainerStyle={styles.conversation}>
-      {prompt('How soon after a meal?','We’ll use a time window, rather than an exact time.')}
-      <View style={styles.answers}>{poopDelays.map((delay,index)=>choice(`delay-${index}`,delay.label,()=>{replaceTimes('poop',poopWindowsAfterMeals(meals.map(entry=>entry.minutes),delay));go('review');}))}</View>
-      {smallMascot}
-    </ScrollView>
-    {later('Actually, let’s work this out later',()=>{replaceTimes('poop',[]);go('review');})}
-  </>;
-  else if(step==='poopCount')body=<>
-    <ScrollView key={step} contentContainerStyle={styles.conversation}>
-      {prompt('How many poops a day?')}
-      <View style={styles.answers}>{[1,2,3,4,5].map(count=>choice(`poops-${count}`,`${count} ${count===1?'time':'times'}`,()=>{setPoopTimes(current=>count===current.length?current:Array.from({length:count},(_,index)=>Math.round((8+index*10/Math.max(1,count-1))*60)));setPoopIndex(0);go('poopTime');}))}</View>
-    </ScrollView>
-    {later('I’m not sure yet',()=>{replaceTimes('poop',[]);go('review');})}
+    {footer('That works for us',()=>{replaceTimes('poop',poopWindows);go('review');},'Skip for now',()=>{replaceTimes('poop',[]);go('review');})}
   </>;
   else if(step==='review')body=<>
     <ScrollView key={step} contentContainerStyle={styles.conversation}>
-      {prompt('Here’s our starting plan.',poops.length?undefined:'Log a few days to help us suggest poop times.')}
+      {prompt('Here’s our starting plan.',!schedule.length?'Log a few days to help us suggest a routine.':undefined)}
+      <OnboardingPlanTimeline schedule={schedule} theme={theme}/>
       <View style={styles.plan}>
         <Text style={styles.planHeading}>Mealtimes</Text>
         {meals.length?meals.map(entry=><Text key={entry.id} style={styles.planTime}>{formatMinutes(entry.minutes,'en')}</Text>):<Text style={styles.body}>We’ll set these up later.</Text>}
@@ -250,23 +241,13 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
         <Text style={styles.planHeading}>Usual poop windows</Text>
         {poops.length?poops.map(entry=><Text key={entry.id} style={styles.planTime}>{formatScheduleWindow(entry,'en')}</Text>):<Text style={styles.body}>Still getting to know {pup}.</Text>}
       </View>
-      {keepingFullPlan&&schedule.length>meals.length+poops.length?<Text style={styles.body}>We’ve kept your other {schedule.length-meals.length-poops.length} routine times, too.</Text>:null}
     </ScrollView>
-    {footer('That looks good to me',finish,'See the full schedule',()=>go('schedule'))}
-  </>;
-  else if(step==='schedule')body=<>
-    <View style={styles.schedule}><ScheduleScreen theme={theme} events={[]} schedule={schedule} customActivities={[]}
-      setupHeader={<View style={styles.prompt}>{prompt('Anything else to add?','Extra starter times are filled in below. Keep the full plan only if it suits your routine.')}</View>}
-      onChange={async next=>setSchedule(next)}
-      onSaveEntry={async entry=>setSchedule(current=>[...current.filter(item=>item.id!==entry.id),entry].sort((a,b)=>a.minutes-b.minutes))}
-      onRemoveEntry={async id=>setSchedule(current=>current.filter(item=>item.id!==id))}
-      onRequestReminderPermission={onAllowNotifications}/></View>
-    {footer('Let’s keep this plan',()=>{setKeepingFullPlan(true);go('reminders');},'Keep just our meal & poop times',keepGuidedTimes)}
+    {footer('That looks good to me',()=>go('reminders'),'Back to poop times',()=>go('poop',true))}
   </>;
   else if(step==='reminders')body=<>
     <ScrollView key={step} contentContainerStyle={styles.conversation}>
-      {prompt('Want a reminder?')}
-      <NotificationTimingControls theme={theme} preferences={preferences} schedule={schedule} disabled={requestingReminders}
+      {prompt('Set up reminders')}
+      <NotificationTimingControls theme={theme} pickerTheme={appTheme} preferences={preferences} schedule={schedule} disabled={requestingReminders}
         onChange={async next=>setPreferences(next)} onScheduleChange={async next=>setSchedule(next)}/>
       {reminderError?<Text accessibilityRole="alert" style={styles.error}>{reminderError}</Text>:null}
       {requestingReminders?<ActivityIndicator color={theme.primary} accessibilityLabel="Asking your phone about notifications"/>:null}
@@ -283,15 +264,21 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
     {finishError?<Text accessibilityRole="alert" style={[styles.error,{paddingHorizontal:22}]}>We couldn’t save your setup. Your answers are still here—please try again.</Text>:null}
     {footer(finishing?'Saving…':'Show me around',()=>{void complete(true);},'I’ll explore on my own',()=>{void complete(false);})}
   </>;
+  const currentPage=<>{step!=='welcome'?header:null}<View style={styles.bodyViewport}>{body}</View></>;
+  page.current=currentPage;
   return <SafeAreaView edges={['top','bottom','left','right']} style={styles.root}>
     <StatusBar style="light"/>
     <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':'height'} style={styles.root}>
-      {step!=='welcome'?header:null}<View style={styles.bodyViewport}>{body}</View>
-      {pickingTime?<DateTimeSelector value={new Date(2000,0,1,Math.floor(time/60),time%60)} mode="time" locale="en" theme={theme}
-        onChange={date=>{const minutes=date.getHours()*60+date.getMinutes();if(mealStep)setMealTimes(current=>current.map((item,index)=>index===mealIndex?minutes:item));else setPoopTimes(current=>current.map((item,index)=>index===poopIndex?minutes:item));setPickingTime(false);}}
+      <View style={styles.bodyViewport}>
+        {outgoing?<Animated.View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[StyleSheet.absoluteFill,{transform:[{translateX:transition.interpolate({inputRange:[0,1],outputRange:[0,-width*direction]})}]}]}>{outgoing}</Animated.View>:null}
+        <Animated.View pointerEvents={outgoing?'none':'auto'} style={[styles.root,{transform:[{translateX:transition.interpolate({inputRange:[0,1],outputRange:[width*direction,0]})}]}]}>{currentPage}</Animated.View>
+      </View>
+      {pickingTime?<DateTimeSelector value={new Date(2000,0,1,Math.floor(time/60),time%60)} mode="time" locale="en" theme={appTheme} label={mealStep?'Meal time':'Poop window starts'}
+        onChange={date=>{const minutes=date.getHours()*60+date.getMinutes();if(mealStep)setMealTimes(current=>current.map((item,index)=>index===mealIndex?minutes:item));else setPoopWindows(current=>current.map((item,index)=>index===poopIndex?{...item,minutes:(minutes+15)%1440}:item));setPickingTime(false);}}
         onCancel={()=>setPickingTime(false)}/>:null}
     </KeyboardAvoidingView>
   </SafeAreaView>;
+
 }
 
 const styles=StyleSheet.create({
@@ -310,6 +297,7 @@ const styles=StyleSheet.create({
   conversation:{flexGrow:1,paddingHorizontal:22,paddingTop:28,paddingBottom:20,gap:28},prompt:{gap:18},body:{fontFamily:'RedHatText',fontSize:16,lineHeight:24,color:theme.textMuted},
   mealRow:{gap:10},mealTime:{fontFamily:'RedHatTextSemiBold',fontSize:20,color:appTheme.primary,fontVariant:['tabular-nums']},
   answers:{gap:12},choice:{minHeight:62,paddingVertical:16,paddingHorizontal:18,borderWidth:1,borderColor:theme.border,borderRadius:18,backgroundColor:appTheme.surface,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12},choicePressed:{backgroundColor:appTheme.primarySoft,borderColor:appTheme.primary},choiceText:{fontFamily:'RedHatTextSemiBold',fontSize:17,lineHeight:24,color:appTheme.text,flex:1},
+  activityArt:{flexGrow:1,justifyContent:'flex-end',alignItems:'center'},activityImage:{width:'100%',maxWidth:320},windowNumber:{fontFamily:'RedHatTextSemiBold',fontSize:14,color:appTheme.textMuted,minWidth:14},windowTime:{fontFamily:'RedHatTextSemiBold',fontSize:18,lineHeight:25,color:appTheme.primary,fontVariant:['tabular-nums']},
   smallMascot:{height:150,width:180,alignSelf:'center'},progress:{fontFamily:'RedHatText',fontSize:13,color:theme.textMuted},timeSpace:{flexGrow:1,justifyContent:'center',gap:28,paddingVertical:12},timeAnswer:{minHeight:96,padding:20,borderRadius:24,backgroundColor:appTheme.surface,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:18},timeText:{fontFamily:'RedHatDisplayBold',fontSize:40,lineHeight:52,color:appTheme.primary,fontVariant:['tabular-nums'],flexShrink:1},
   plan:{borderTopWidth:1,borderColor:theme.border,paddingTop:20,gap:12},planHeading:{fontFamily:'RedHatTextSemiBold',fontSize:15,color:theme.textMuted},planTime:{fontFamily:'RedHatTextSemiBold',fontSize:22,lineHeight:30,color:theme.text,fontVariant:['tabular-nums']},schedule:{flex:1},ready:{flexGrow:1,padding:24,justifyContent:'center',gap:28},
 });

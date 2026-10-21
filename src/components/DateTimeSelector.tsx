@@ -13,8 +13,9 @@ const twentyFourHours = Array.from({ length: 24 }, (_, index) => index);
 const minutes = Array.from({ length: 60 }, (_, index) => index);
 const periods = [0, 1];
 
-export function DateTimeSelector({ mode, value, locale, theme, onChange, onCancel }: {
+export function DateTimeSelector({ mode, value, locale, theme, label, onChange, onCancel }: {
   mode: 'date' | 'time';
+  label?:string;
   value: Date;
   locale: string;
   theme: Theme;
@@ -73,7 +74,7 @@ export function DateTimeSelector({ mode, value, locale, theme, onChange, onCance
     <KeyboardAvoidingView testID={mode === 'date' ? 'date.selector' : 'time.selector'} accessibilityViewIsModal behavior={Platform.OS==='ios'?'padding':'height'} style={styles.overlay}>
       <Pressable style={StyleSheet.absoluteFill} accessibilityLabel={t('app.cancel')} onPress={onCancel} />
       <View style={[styles.card, { backgroundColor: theme.surfaceRaised, borderRadius: theme.presentation.cardRadius }]}>
-        <Text style={[styles.eyebrow, { color: theme.textMuted }]}>{t(mode === 'date' ? 'editor.date' : 'editor.time').toLocaleUpperCase(locale)}</Text>
+        <Text style={[styles.eyebrow, { color: theme.textMuted }]}>{(label??t(mode === 'date' ? 'editor.date' : 'editor.time')).toLocaleUpperCase(locale)}</Text>
 
         {mode === 'date' ? (
           <>

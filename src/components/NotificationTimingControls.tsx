@@ -7,8 +7,8 @@ import {pottyReminderDelayOptions,reminderOffsetOptions,type NotificationPrefere
 import type {Theme} from '../theme';
 import {ActivityIcon} from './ActivityIcon';
 
-export function NotificationTimingControls({theme,preferences,schedule,onChange,onScheduleChange,disabled=false}:{
-  theme:Theme;preferences:NotificationPreferences;schedule:ScheduleEntry[];disabled?:boolean;
+export function NotificationTimingControls({theme,preferences,schedule,onChange,onScheduleChange,pickerTheme=theme,disabled=false}:{
+  theme:Theme;pickerTheme?:Theme;preferences:NotificationPreferences;schedule:ScheduleEntry[];disabled?:boolean;
   onChange:(preferences:NotificationPreferences)=>Promise<void>;
   onScheduleChange:(schedule:ScheduleEntry[])=>Promise<void>;
 }){
@@ -23,7 +23,7 @@ export function NotificationTimingControls({theme,preferences,schedule,onChange,
   const offsetLabel=(value:number)=>t(value===0?'notifications.atTime':value<0?'notifications.before':'notifications.after',{count:Math.abs(value)});
   const rules=[
     ...(['meal','poop'] as const).map(type=>({
-      id:type,activity:{type},label:t(type==='meal'?'notifications.scheduledMeal':'notifications.scheduledPoop'),
+      id:type,description:undefined,activity:{type},label:t(type==='meal'?'notifications.scheduledMeal':'notifications.scheduledPoop'),
       enabled:schedule.some(entry=>entry.type===type&&entry.reminder),available:schedule.some(entry=>entry.type===type),
       value:(type==='meal'?preferences.mealReminderOffsetMinutes:preferences.poopReminderOffsetMinutes)??-preferences.reminderLeadMinutes,
       options:reminderOffsetOptions,labelFor:offsetLabel,
@@ -31,7 +31,7 @@ export function NotificationTimingControls({theme,preferences,schedule,onChange,
       choose:(value:number)=>onChange({...preferences,[type==='meal'?'mealReminderOffsetMinutes':'poopReminderOffsetMinutes']:value as ReminderOffsetMinutes}),
     })),
     ...(['pottyAfterMeal','pottyAfterPee'] as const).map(key=>({
-      id:key,activity:{type:key==='pottyAfterMeal'?'meal' as const:'pee' as const},label:t(key==='pottyAfterMeal'?'notifications.loggedMeal':'notifications.loggedPee'),
+      id:key,description:t(key==='pottyAfterMeal'?'notifications.afterMealHelp':'notifications.afterPeeHelp'),activity:{type:key==='pottyAfterMeal'?'meal' as const:'pee' as const},label:t(key==='pottyAfterMeal'?'notifications.loggedMeal':'notifications.loggedPee'),
       enabled:preferences[key]?.enabled??false,available:true,value:preferences[key]?.delayMinutes??120,
       options:pottyReminderDelayOptions,labelFor:(value:number)=>t(value<60?'time.minutes':'time.hours',{count:value<60?value:value/60}),
       toggle:(enabled:boolean)=>onChange({...preferences,[key]:{enabled,delayMinutes:preferences[key]?.delayMinutes??120}}),
@@ -48,6 +48,7 @@ export function NotificationTimingControls({theme,preferences,schedule,onChange,
           disabled={disabled||busy||!rule.available} onValueChange={enabled=>{void save(()=>rule.toggle(enabled));}}
           trackColor={{false:theme.border,true:theme.isDark?'#73D3AD':theme.primary}} thumbColor={theme.isDark?'#FFFDF5':theme.surfaceRaised}/>
       </View>
+      {rule.description?<Text style={[styles.help,{color:theme.textMuted}]}>{rule.description}</Text>:null}
       {rule.available?<Pressable testID={`notifications.timing.${rule.id}.time`} accessibilityRole="button" accessibilityLabel={`${rule.label}, ${rule.labelFor(rule.value)}`}
         disabled={disabled||busy} onPress={()=>setEditing(rule.id)} style={styles.time}>
         <Text style={[styles.value,{color:theme.primary}]}>{rule.labelFor(rule.value)}  ▾</Text>
@@ -57,13 +58,13 @@ export function NotificationTimingControls({theme,preferences,schedule,onChange,
     <Modal visible={!!active} transparent animationType="none" onRequestClose={()=>{if(!busy)setEditing(null);}}>
       <View style={styles.overlay}>
         <Pressable accessibilityLabel={t('app.cancel')} accessibilityRole="button" disabled={busy} onPress={()=>setEditing(null)} style={StyleSheet.absoluteFill}/>
-        <View accessibilityViewIsModal style={[styles.sheet,{backgroundColor:theme.background,paddingBottom:Math.max(insets.bottom,16)}]}>
-          <Text accessibilityRole="header" style={[styles.heading,{color:theme.text}]}>{active?.label}</Text>
+        <View accessibilityViewIsModal style={[styles.sheet,{backgroundColor:pickerTheme.background,paddingBottom:Math.max(insets.bottom,16)}]}>
+          <Text accessibilityRole="header" style={[styles.heading,{color:pickerTheme.text}]}>{active?.label}</Text>
           <ScrollView>{active?.options.map(value=><Pressable key={value} testID={`notifications.timing.option.${value}`} accessibilityRole="radio" accessibilityState={{checked:active.value===value,disabled:busy}} disabled={busy}
-            onPress={()=>{void save(()=>active.choose(value));}} style={[styles.option,{backgroundColor:active.value===value?theme.primarySoft:undefined}]}>
-            <Text style={[styles.value,{color:theme.text}]}>{active.labelFor(value)}{active.value===value?'  ✓':''}</Text>
+            onPress={()=>{void save(()=>active.choose(value));}} style={[styles.option,{backgroundColor:active.value===value?pickerTheme.primarySoft:undefined}]}>
+            <Text style={[styles.value,{color:pickerTheme.text}]}>{active.labelFor(value)}{active.value===value?'  ✓':''}</Text>
           </Pressable>)}</ScrollView>
-          <Pressable testID="notifications.timing.close" disabled={busy} onPress={()=>setEditing(null)} style={styles.option}><Text style={[styles.value,{color:theme.primary}]}>{t('app.cancel')}</Text></Pressable>
+          <Pressable testID="notifications.timing.close" disabled={busy} onPress={()=>setEditing(null)} style={styles.option}><Text style={[styles.value,{color:pickerTheme.primary}]}>{t('app.cancel')}</Text></Pressable>
         </View>
       </View>
     </Modal>
@@ -72,6 +73,7 @@ export function NotificationTimingControls({theme,preferences,schedule,onChange,
 const styles=StyleSheet.create({
   rules:{gap:8},rule:{borderBottomWidth:StyleSheet.hairlineWidth,paddingVertical:10},row:{flexDirection:'row',alignItems:'center',gap:12},label:{fontSize:16,lineHeight:23,fontWeight:'600',flex:1},
   icon:{width:36,height:36,borderRadius:12,alignItems:'center',justifyContent:'center'},
+  help:{marginLeft:48,marginTop:6,fontSize:14,lineHeight:20},
   time:{marginLeft:48,minHeight:44,justifyContent:'center',alignSelf:'flex-start'},value:{fontSize:16,lineHeight:23},overlay:{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(0,0,0,.4)'},
   sheet:{maxHeight:'85%',padding:20,borderTopLeftRadius:24,borderTopRightRadius:24},heading:{fontSize:24,lineHeight:30,fontWeight:'700',paddingBottom:16},option:{minHeight:48,justifyContent:'center',padding:12,borderRadius:12},
 });
