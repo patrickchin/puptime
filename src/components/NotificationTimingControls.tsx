@@ -5,13 +5,14 @@ import type {ScheduleEntry} from '../domain';
 import {useLocalization} from '../localization-context';
 import {pottyReminderDelayOptions,reminderOffsetOptions,type NotificationPreferences,type ReminderOffsetMinutes,type PottyReminderDelayMinutes} from '../notification-config';
 import type {Theme} from '../theme';
+import {ActivityIcon} from './ActivityIcon';
 
 export function NotificationTimingControls({theme,preferences,schedule,onChange,onScheduleChange,disabled=false}:{
   theme:Theme;preferences:NotificationPreferences;schedule:ScheduleEntry[];disabled?:boolean;
   onChange:(preferences:NotificationPreferences)=>Promise<void>;
   onScheduleChange:(schedule:ScheduleEntry[])=>Promise<void>;
 }){
-  const {t}=useLocalization();
+  const {t,activityColors}=useLocalization();
   const [editing,setEditing]=useState<string|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(false);
   const insets=useSafeAreaInsets(),locked=useRef(false);
   async function save(action:()=>Promise<void>){
@@ -22,15 +23,15 @@ export function NotificationTimingControls({theme,preferences,schedule,onChange,
   const offsetLabel=(value:number)=>t(value===0?'notifications.atTime':value<0?'notifications.before':'notifications.after',{count:Math.abs(value)});
   const rules=[
     ...(['meal','poop'] as const).map(type=>({
-      id:type,label:t(type==='meal'?'notifications.scheduledMeal':'notifications.scheduledPoop'),
+      id:type,activity:{type},label:t(type==='meal'?'notifications.scheduledMeal':'notifications.scheduledPoop'),
       enabled:schedule.some(entry=>entry.type===type&&entry.reminder),available:schedule.some(entry=>entry.type===type),
       value:(type==='meal'?preferences.mealReminderOffsetMinutes:preferences.poopReminderOffsetMinutes)??-preferences.reminderLeadMinutes,
       options:reminderOffsetOptions,labelFor:offsetLabel,
       toggle:(enabled:boolean)=>onScheduleChange(schedule.map(entry=>entry.type===type?{...entry,reminder:enabled}:entry)),
       choose:(value:number)=>onChange({...preferences,[type==='meal'?'mealReminderOffsetMinutes':'poopReminderOffsetMinutes']:value as ReminderOffsetMinutes}),
     })),
-    ...(['pottyAfterMeal','pottyAfterPoop'] as const).map(key=>({
-      id:key,label:t(key==='pottyAfterMeal'?'notifications.loggedMeal':'notifications.loggedPoop'),
+    ...(['pottyAfterMeal','pottyAfterPee'] as const).map(key=>({
+      id:key,activity:{type:key==='pottyAfterMeal'?'meal' as const:'pee' as const},label:t(key==='pottyAfterMeal'?'notifications.loggedMeal':'notifications.loggedPee'),
       enabled:preferences[key]?.enabled??false,available:true,value:preferences[key]?.delayMinutes??120,
       options:pottyReminderDelayOptions,labelFor:(value:number)=>t(value<60?'time.minutes':'time.hours',{count:value<60?value:value/60}),
       toggle:(enabled:boolean)=>onChange({...preferences,[key]:{enabled,delayMinutes:preferences[key]?.delayMinutes??120}}),
@@ -39,8 +40,9 @@ export function NotificationTimingControls({theme,preferences,schedule,onChange,
   ];
   const active=rules.find(rule=>rule.id===editing);
   return <View style={styles.rules}>
-    {rules.map(rule=><View key={rule.id} style={[styles.rule,{borderColor:theme.border}]}>
+    {rules.map(rule=>{const colors=activityColors(theme,rule.activity);return <View key={rule.id} style={[styles.rule,{borderColor:theme.border}]}>
       <View style={styles.row}>
+        <View style={[styles.icon,{backgroundColor:colors.softColor}]}><ActivityIcon activity={rule.activity} theme={theme} color={colors.color} size={24}/></View>
         <Text style={[styles.label,{color:theme.text}]}>{rule.label}</Text>
         <Switch testID={`notifications.timing.${rule.id}.enabled`} accessibilityLabel={rule.label} value={rule.enabled}
           disabled={disabled||busy||!rule.available} onValueChange={enabled=>{void save(()=>rule.toggle(enabled));}}
@@ -49,8 +51,8 @@ export function NotificationTimingControls({theme,preferences,schedule,onChange,
       {rule.available?<Pressable testID={`notifications.timing.${rule.id}.time`} accessibilityRole="button" accessibilityLabel={`${rule.label}, ${rule.labelFor(rule.value)}`}
         disabled={disabled||busy} onPress={()=>setEditing(rule.id)} style={styles.time}>
         <Text style={[styles.value,{color:theme.primary}]}>{rule.labelFor(rule.value)}  ▾</Text>
-      </Pressable>:<Text style={{fontSize:14,lineHeight:20,color:theme.textMuted}}>{t('notifications.noScheduledTimes')}</Text>}
-    </View>)}
+      </Pressable>:<Text style={{marginLeft:48,fontSize:14,lineHeight:20,color:theme.textMuted}}>{t('notifications.noScheduledTimes')}</Text>}
+    </View>;})}
     {error?<Text accessibilityRole="alert" style={{color:theme.danger}}>{t('settings.saveErrorBody')}</Text>:null}
     <Modal visible={!!active} transparent animationType="none" onRequestClose={()=>{if(!busy)setEditing(null);}}>
       <View style={styles.overlay}>
@@ -69,6 +71,7 @@ export function NotificationTimingControls({theme,preferences,schedule,onChange,
 }
 const styles=StyleSheet.create({
   rules:{gap:8},rule:{borderBottomWidth:StyleSheet.hairlineWidth,paddingVertical:10},row:{flexDirection:'row',alignItems:'center',gap:12},label:{fontSize:16,lineHeight:23,fontWeight:'600',flex:1},
-  time:{minHeight:44,justifyContent:'center',alignSelf:'flex-start'},value:{fontSize:16,lineHeight:23},overlay:{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(0,0,0,.4)'},
+  icon:{width:36,height:36,borderRadius:12,alignItems:'center',justifyContent:'center'},
+  time:{marginLeft:48,minHeight:44,justifyContent:'center',alignSelf:'flex-start'},value:{fontSize:16,lineHeight:23},overlay:{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(0,0,0,.4)'},
   sheet:{maxHeight:'85%',padding:20,borderTopLeftRadius:24,borderTopRightRadius:24},heading:{fontSize:24,lineHeight:30,fontWeight:'700',paddingBottom:16},option:{minHeight:48,justifyContent:'center',padding:12,borderRadius:12},
 });

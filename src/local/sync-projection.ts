@@ -68,7 +68,6 @@ export async function readLocalSettingsRecords(sql:SqlExecutor,petId:string):Pro
       language:isLanguagePreference(state.values.get(storageKeys.language)??null)?state.values.get(storageKeys.language):'system',
       ...(n.mealReminderOffsetMinutes!==undefined?{mealReminderOffsetMinutes:n.mealReminderOffsetMinutes}:{}),
       ...(n.poopReminderOffsetMinutes!==undefined?{poopReminderOffsetMinutes:n.poopReminderOffsetMinutes}:{}),
-      ...(n.pottyAfterPoop?{pottyAfterPoopEnabled:n.pottyAfterPoop.enabled,pottyAfterPoopDelayMinutes:n.pottyAfterPoop.delayMinutes}:{}),
       widgetActions:state.widgetActions,reminderLeadMinutes:n.reminderLeadMinutes,widgetConfirmations:n.widgetConfirmations,
       pottyAfterPeeEnabled:n.pottyAfterPee.enabled,pottyAfterPeeDelayMinutes:n.pottyAfterPee.delayMinutes,
       pottyAfterMealEnabled:n.pottyAfterMeal.enabled,pottyAfterMealDelayMinutes:n.pottyAfterMeal.delayMinutes,
@@ -150,7 +149,6 @@ export async function applyLocalRecords(sql:SqlExecutor,petId:string,records:Loc
       const preferences=normalizeNotificationPreferences({
         mealReminderOffsetMinutes:data.mealReminderOffsetMinutes??current.mealReminderOffsetMinutes,
         poopReminderOffsetMinutes:data.poopReminderOffsetMinutes??current.poopReminderOffsetMinutes,
-        ...((data.pottyAfterPoopEnabled!==undefined||data.pottyAfterPoopDelayMinutes!==undefined||current.pottyAfterPoop)?{pottyAfterPoop:{enabled:data.pottyAfterPoopEnabled??current.pottyAfterPoop?.enabled??false,delayMinutes:data.pottyAfterPoopDelayMinutes??current.pottyAfterPoop?.delayMinutes??120}}:{}),
         reminderLeadMinutes:data.reminderLeadMinutes??current.reminderLeadMinutes,widgetConfirmations:data.widgetConfirmations??current.widgetConfirmations,
         pottyAfterPee:{enabled:data.pottyAfterPeeEnabled??current.pottyAfterPee.enabled,delayMinutes:data.pottyAfterPeeDelayMinutes??current.pottyAfterPee.delayMinutes},
         pottyAfterMeal:{enabled:data.pottyAfterMealEnabled??current.pottyAfterMeal.enabled,delayMinutes:data.pottyAfterMealDelayMinutes??current.pottyAfterMeal.delayMinutes},

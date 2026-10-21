@@ -86,12 +86,12 @@ name: Complete conversational setup into the real app
     id: notifications.timing.option.45
 - scrollUntilVisible:
     element:
-      id: notifications.timing.pottyAfterPoop.enabled
+      id: notifications.timing.pottyAfterPee.enabled
     direction: DOWN
 - tapOn:
-    id: notifications.timing.pottyAfterPoop.enabled
+    id: notifications.timing.pottyAfterPee.enabled
 - tapOn:
-    id: notifications.timing.pottyAfterPoop.time
+    id: notifications.timing.pottyAfterPee.time
 - tapOn:
     id: notifications.timing.option.180
 - scrollUntilVisible:

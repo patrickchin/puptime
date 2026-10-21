@@ -25,19 +25,19 @@ test('meal and poop offsets can be before or after, with midnight wrapping',()=>
   assert.match(reminderCopy({id:'rtn_poop',type:'poop',minutes:1430},'en',-30).title,/30 min ago/);
 });
 
-test('after-poop reminders use the latest real log and expire instead of repeating',()=>{
-  const now=1_000_000,real=createEvent('poop','app',now),estimated={...createEvent('poop','app',now+60000),estimated:true};
-  const preferences={...DEFAULT_NOTIFICATION_PREFERENCES,pottyAfterPoop:{enabled:true,delayMinutes:60 as const}};
+test('after-wee reminders use the latest real log and expire instead of repeating',()=>{
+  const now=1_000_000,real=createEvent('pee','app',now),estimated={...createEvent('pee','app',now+60000),estimated:true};
+  const preferences={...DEFAULT_NOTIFICATION_PREFERENCES,pottyAfterPee:{enabled:true,delayMinutes:60 as const}};
   const [plan]=pottyReminderPlans([real,estimated],preferences,now);
-  assert.equal(plan.kind,'afterPoop');assert.equal(plan.sourceEventId,real.id);assert.equal(plan.at,now+3_600_000);
+  assert.equal(plan.kind,'afterPee');assert.equal(plan.sourceEventId,real.id);assert.equal(plan.at,now+3_600_000);
   assert.deepEqual(pottyReminderPlans([real],preferences,now+3_600_000),[]);
-  assert.deepEqual(pottyReminderPlans([real],DEFAULT_NOTIFICATION_PREFERENCES,now),[]);
+  assert.deepEqual(pottyReminderPlans([real],{...preferences,pottyAfterPee:{enabled:false,delayMinutes:60}},now),[]);
 });
 
 test('timing preferences validate at storage and sync boundaries without changing old defaults',()=>{
   assert.deepEqual(normalizeNotificationPreferences({mealReminderOffsetMinutes:999,poopReminderOffsetMinutes:'15'}),DEFAULT_NOTIFICATION_PREFERENCES);
-  const values={mealReminderOffsetMinutes:-15,poopReminderOffsetMinutes:30,pottyAfterPoop:{enabled:true,delayMinutes:180}};
+  const values={mealReminderOffsetMinutes:-15,poopReminderOffsetMinutes:30,pottyAfterPee:{enabled:true,delayMinutes:180}};
   assert.deepEqual(normalizeNotificationPreferences(values),{...DEFAULT_NOTIFICATION_PREFERENCES,...values});
-  assert.ok(recordDataSchema('accountPreferences').safeParse({mealReminderOffsetMinutes:-15,poopReminderOffsetMinutes:30,pottyAfterPoopEnabled:true,pottyAfterPoopDelayMinutes:180}).success);
+  assert.ok(recordDataSchema('accountPreferences').safeParse({mealReminderOffsetMinutes:-15,poopReminderOffsetMinutes:30,pottyAfterPeeEnabled:true,pottyAfterPeeDelayMinutes:180}).success);
   assert.equal(recordDataSchema('accountPreferences').safeParse({poopReminderOffsetMinutes:999}).success,false);
 });

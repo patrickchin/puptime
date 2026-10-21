@@ -38,8 +38,6 @@ const accountPreferences = z.strictObject({
   widgetConfirmations: z.boolean().optional(),
   mealReminderOffsetMinutes:z.number().refine(value=>[-30,-15,-10,-5,0,5,10,15,30,60].includes(value)).optional(),
   poopReminderOffsetMinutes:z.number().refine(value=>[-30,-15,-10,-5,0,5,10,15,30,60].includes(value)).optional(),
-  pottyAfterPoopEnabled:z.boolean().optional(),
-  pottyAfterPoopDelayMinutes:z.union([z.literal(15),z.literal(30),z.literal(45),z.literal(60),z.literal(120),z.literal(180),z.literal(240)]).optional(),
   pottyAfterPeeEnabled: z.boolean().optional(), pottyAfterMealEnabled: z.boolean().optional(),
   pottyAfterPeeDelayMinutes: z.union([z.literal(15), z.literal(30), z.literal(45), z.literal(60), z.literal(120), z.literal(180), z.literal(240)]).optional(),
   pottyAfterMealDelayMinutes: z.union([z.literal(15), z.literal(30), z.literal(45), z.literal(60), z.literal(120), z.literal(180), z.literal(240)]).optional(),

@@ -17,7 +17,6 @@ export type NotificationPreferences = {
   widgetConfirmations: boolean;
   mealReminderOffsetMinutes?: ReminderOffsetMinutes;
   poopReminderOffsetMinutes?: ReminderOffsetMinutes;
-  pottyAfterPoop?: PottyReminderPreference;
   pottyAfterPee: PottyReminderPreference;
   pottyAfterMeal: PottyReminderPreference;
 };
@@ -61,7 +60,6 @@ export function normalizeNotificationPreferences(value: unknown): NotificationPr
     pottyAfterMeal: normalizePottyReminder(candidate.pottyAfterMeal, DEFAULT_NOTIFICATION_PREFERENCES.pottyAfterMeal),
     ...(reminderOffsetOptions.includes(candidate.mealReminderOffsetMinutes as ReminderOffsetMinutes)?{mealReminderOffsetMinutes:candidate.mealReminderOffsetMinutes}:{}),
     ...(reminderOffsetOptions.includes(candidate.poopReminderOffsetMinutes as ReminderOffsetMinutes)?{poopReminderOffsetMinutes:candidate.poopReminderOffsetMinutes}:{}),
-    ...(candidate.pottyAfterPoop?{pottyAfterPoop:normalizePottyReminder(candidate.pottyAfterPoop,{enabled:false,delayMinutes:120})}:{}),
   };
 }
 

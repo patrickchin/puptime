@@ -125,12 +125,12 @@ name: iOS custom timed reminder create remove and restart
     id: notifications.timed.item..*
 - scrollUntilVisible:
     element:
-      id: settings.notifications.pottyAfterPee.enabled
+      id: notifications.timing.pottyAfterPee.enabled
     direction: DOWN
     visibilityPercentage: 100
     centerElement: false
 - assertVisible:
-    id: settings.notifications.pottyAfterPee.enabled
+    id: notifications.timing.pottyAfterPee.enabled
     checked: true
 - takeScreenshot: device-off-removes-only-timed-requests
 - stopApp

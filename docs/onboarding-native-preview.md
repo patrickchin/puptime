@@ -38,11 +38,11 @@ Notifications destination in the app's side navigation. It includes:
 - Scheduled meal and poop-window reminders, with independent before/at/after
   offsets and toggles that update the actual routine reminder flags.
 - A delay after a logged meal, using the existing potty reminder preference.
-- An optional delay after a logged poop, based only on the latest real log.
+- A delay after a logged wee, using the existing after-pee preference.
+- An activity icon beside each reminder.
 
-Other routine reminders retain the existing shared lead time; after-pee reminders
-remain available. New timing fields are optional and validated in storage and
-sync, so old preferences keep their behavior. The shared cloud protocol accepts
+Other routine reminders retain the existing shared lead time. New timing fields
+are optional and validated in storage and sync, so old preferences keep their behavior. The shared cloud protocol accepts
 the additional optional fields; a deployed server must include this protocol
 change before a released client syncs these choices.
 
