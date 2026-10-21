@@ -625,7 +625,7 @@ export default function App() {
       onNotificationDeliveryChange={changeNotificationDelivery} onOpenSystemSettings={()=>{void Linking.openSettings().catch(()=>undefined);}}
       onOpenSchedule={()=>navigateToTab('schedule')}/>;
     if (tab === 'learn') return <LearnScreen theme={theme} />;
-    if (tab === 'timeline') return <TimelineScreen events={events} activity={activity} refreshToken={refreshToken} schedule={schedule} onOpenSchedule={()=>navigateToTab('schedule')} customActivities={customActivities} theme={theme} />;
+    if (tab === 'timeline') return <TimelineScreen events={events} activity={activity} refreshToken={refreshToken} schedule={schedule} onOpenSchedule={()=>navigateToTab('schedule')} theme={theme} />;
     if (tab === 'insights') return <InsightsScreen events={events} activity={activity} refreshToken={refreshToken} customActivities={customActivities} onImport={importActivity} theme={theme} />;
     if (tab === 'schedule') {
       return (
