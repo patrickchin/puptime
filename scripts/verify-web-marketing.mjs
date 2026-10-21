@@ -27,7 +27,7 @@ const passed = [];
 writeFileSync(`${output}/verification.json`, JSON.stringify({ status: 'running' }));
 try {
   browser = await chromium.launch({ headless: true, ...(process.env.PUPTIME_CHROMIUM_EXECUTABLE ? { executablePath: process.env.PUPTIME_CHROMIUM_EXECUTABLE } : {}) });
-  const context = await browser.newContext();
+  const context = await browser.newContext({ deviceScaleFactor: 2 });
   // Observe the real audio instance, including playback rate and seeking.
   await context.addInitScript(() => {
     window.Audio = new Proxy(window.Audio, { construct(Target, args) {
@@ -52,6 +52,9 @@ try {
     await page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished)));
     await page.screenshot({ path: `${output}/${width}-hero.png` });
     assert.equal(await page.locator('.site-brand img').getAttribute('src'), '/brand-icon.svg');
+    const heroBackground = await page.locator('.hero').evaluate(element => getComputedStyle(element).backgroundColor);
+    assert.equal(heroBackground, 'rgb(23, 59, 48)', 'Keep the mascot forest green behind the hero.');
+    assert.equal(await page.locator('.app-chapter').evaluate(element => getComputedStyle(element).backgroundColor), heroBackground, 'The app preview should continue the dark green background.');
 
     await page.mouse.move(width / 2, height / 2);
     await page.mouse.wheel(0, height);
@@ -75,7 +78,12 @@ try {
       await button.click();
       assert.equal(await button.getAttribute('aria-pressed'), 'true');
       await page.getByRole('img', { name: `Puptime ${name} screen`, exact: true }).evaluate(image => image.decode());
+      const size = await page.getByRole('img', { name: `Puptime ${name} screen`, exact: true }).evaluate(image => ({ width: image.naturalWidth, height: image.naturalHeight }));
+      assert.deepEqual(size, { width: 1206, height: 2622 }, 'Use full-resolution native iPhone captures.');
+      assert.ok(await page.locator('.app-preview .phone-frame').evaluate(element => parseFloat(getComputedStyle(element).borderRadius) >= 28), 'Keep rounded phone frames around the captures.');
     }
+    await page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished)));
+    await page.screenshot({ path: `${output}/${width}-app-preview.png` });
     passed.push(`${width}px: wheel, PageDown, footer, back to top, app anchor, and all four previews.`);
     console.log('PASS', passed.at(-1));
   }
