@@ -40,12 +40,29 @@ name: Complete conversational setup into the real app
 - takeScreenshot: conversational-grouped-meals
 - tapOn:
     id: preview.mealTime.0
-- tapOn:
-    id: time.mode
-- tapOn:
-    id: time.input.hour
-- eraseText
-- inputText: '8'
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - assertVisible:
+          id: time.nativeWheel
+      - assertNotVisible:
+          id: time.mode
+      - tapOn:
+          id: time.nativeWheel
+          point: "28%,64%"
+      - assertVisible: "8 o.clock"
+      - takeScreenshot: conversational-native-time-wheel
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          id: time.mode
+      - tapOn:
+          id: time.input.hour
+      - eraseText
+      - inputText: '8'
 - tapOn:
     id: picker.done
 - tapOn:

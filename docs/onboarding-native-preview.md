@@ -12,8 +12,9 @@ design preview and offer the guest route.
 
 The welcome and setup screens share the emerald background, warm light text,
 cream controls, real icon, and one randomly chosen approved Scruffy scene.
-The keyboard uses its native dark appearance. Each heading asks its question
-once, with accessible input names. Skip actions replace the redundant Optional
+Time selection on iOS uses Apple’s native scrolling wheels, with Cancel and Done,
+without a keyboard toggle. The name keyboard uses its native dark appearance.
+Each heading asks its question once, with accessible input names. Skip actions replace the redundant Optional
 tag. Headings use short, single-line copy at the default phone text size,
 without forced line breaks or truncation. Larger accessibility text and long
 puppy names may wrap. Supporting text is reserved for useful context, such as
@@ -114,8 +115,8 @@ personal history.
 - General, iOS, Android, and server TypeScript checks pass. All 461 Node tests
   and 126 server tests pass, including signed notification scheduling across
   midnight, optional preference validation, and storage/sync round trips.
-- The shared time selector now uses a keyboard-aware native modal. Maestro types
-  a meal time, saves with the keyboard open, and confirms it survives Back.
+- The shared time selector uses Apple’s native wheels on iOS. Maestro changes
+  the hour on the wheel, saves with Done, and confirms it survives Back.
 
 ## Guidance sources
 

@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useRef, useState } from 'react';
 import { KeyboardAvoidingView,Modal,Platform,Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -119,6 +120,10 @@ export function DateTimeSelector({ mode, value, locale, theme, onChange, onCance
               })}
             </View>
           </>
+        ) : Platform.OS === 'ios' ? (
+          <DateTimePicker testID="time.nativeWheel" value={selected} mode="time" display="spinner"
+            locale={locale} themeVariant={theme.isDark?'dark':'light'} accentColor={theme.primary}
+            onValueChange={(_event,date)=>selectTime(date.getHours(),date.getMinutes())} style={styles.nativeWheel}/>
         ) : (
           <>
             <Text style={[styles.timeHeadline, { color: theme.text }]}>
@@ -152,7 +157,7 @@ export function DateTimeSelector({ mode, value, locale, theme, onChange, onCance
         )}
 
         <View style={styles.footer}>
-          {mode === 'time' ? <Pressable testID="time.mode" accessibilityRole="button" accessibilityLabel={inputMode ? t('editor.useWheels') : t('editor.useKeyboard')} onPress={() => {
+          {mode === 'time' && Platform.OS !== 'ios' ? <Pressable testID="time.mode" accessibilityRole="button" accessibilityLabel={inputMode ? t('editor.useWheels') : t('editor.useKeyboard')} onPress={() => {
             if (inputMode && validInput) selectTime(inputHour, Number(minuteInput));
             else if (inputMode) {
               setHourInput(twoDigits(uses24Hour ? selectedRef.current.getHours() : selectedRef.current.getHours() % 12 || 12));
@@ -187,6 +192,7 @@ const styles = StyleSheet.create({
   dayButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   dayText: { fontSize: 15, fontWeight: '600', fontVariant: ['tabular-nums'] },
   timeHeadline: { fontSize: 27, lineHeight: 34, fontWeight: '700', marginTop: 6 },
+  nativeWheel: { minHeight:216, marginTop:8, width:'100%' },
   wheels: { height: wheelHeight, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 12 },
   wheelHighlight: { position: 'absolute', left: 0, right: 0, top: (wheelHeight - wheelRowHeight) / 2, height: wheelRowHeight, borderRadius: 14 },
   wheelColon: { width: 18, height: wheelRowHeight, lineHeight: wheelRowHeight, textAlign: 'center', fontSize: 28, fontWeight: '700' },
