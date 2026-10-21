@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { LearnScreen } from './src/screens/LearnScreen';
 import { careArticles } from './src/puppy-care';
-import { lightTheme } from './src/theme';
+import { websiteTheme } from './src/web/brand';
 import { WebsiteMetadata } from './src/web/WebsiteMetadata';
 import { openAnalyticsSettings, WebsiteAnalytics } from './src/web/WebsiteAnalytics';
 import { captureWebsiteEvent } from './src/web/telemetry';
@@ -11,7 +11,7 @@ const sourceUrl = 'https://github.com/patrickchin/puptime';
 const privacyUrl = `${sourceUrl}/blob/main/PRIVACY.md`;
 // Metro supplies web images as URI objects; keep them in the asset pipeline.
 const assetUrl = (asset: string | { uri: string }): string => typeof asset === 'string' ? asset : asset.uri;
-const icon = assetUrl(require('./assets/puptime-icon.png'));
+const icon = '/brand-icon.svg';
 const puppy = assetUrl(require('./assets/mascots/scruffy-terrier.png'));
 const careImage = assetUrl(require('./assets/puppy-care/potty.jpg'));
 const timingImage = assetUrl(require('./assets/screenshots/insights-timeline.png'));
@@ -73,10 +73,10 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
     <WebsiteAnalytics path={path} />
     <a className="skip-link" href="#main">Skip to content</a>
     <Header learning={learning} />
-    {learning ? <main id="main" className="learning-content"><LearnScreen theme={lightTheme} articleId={articleId} onArticleChange={(id) => { window.location.assign(id ? `/puppy-care/${id}` : '/puppy-care/'); }} /></main> : <main id="main">
+    {learning ? <main id="main" className="learning-content"><LearnScreen theme={websiteTheme} articleId={articleId} onArticleChange={(id) => { window.location.assign(id ? `/puppy-care/${id}` : '/puppy-care/'); }} /></main> : <main id="main">
       <section className="hero" aria-labelledby="hero-title">
         <div className="hero-copy">
-          <h1 id="hero-title">Potty training,<br />day by day.</h1>
+          <h1 id="hero-title">A little help with<br />potty training.</h1>
           <p>Log potty breaks, spot your puppy’s patterns, and build a daily routine with Puptime.</p>
           <a className="primary-action" href="#app">See the app <span aria-hidden="true">↘</span></a>
           <p className="hero-note">Free local logging. No account needed.</p>
