@@ -200,7 +200,7 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
   else if(step==='poopTime')body=<>
     <ScrollView key={`${step}-${poopIndex}`} contentContainerStyle={styles.conversation}>
       <Text style={styles.progress}>Poop window {poopIndex+1} of {poopTimes.length}</Text>
-      {prompt(poopIndex===0?'First poop time?':'Next poop time?',poopIndex===0?'We’ll leave half an hour either side. You can adjust the window later.':`${formatMinutes(poopTimes[poopIndex-1],'en')} for the last one. What time comes next?`)}
+      {prompt(poopIndex===0?'First poop time?':'Next poop time?',poopIndex===0?'We’ll leave half an hour either side. You can adjust the window later.':`Previous time: ${formatMinutes(poopTimes[poopIndex-1],'en')}.`)}
       <View style={styles.timeSpace}>{smallMascot}
         <Pressable testID="preview.time" accessibilityRole="button" accessibilityLabel={`Change poop window centre, ${formatMinutes(time,'en')}`} onPress={()=>setPickingTime(true)} style={styles.timeAnswer}>
           <Text style={styles.timeText}>{formatMinutes(time,'en')}</Text><MaterialCommunityIcons name="chevron-down" size={24} color={appTheme.primary}/>
