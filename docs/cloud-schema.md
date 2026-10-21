@@ -7,7 +7,7 @@ databases with separate initialization paths.
 | Database | SQL definition | Runner |
 | --- | --- | --- |
 | D1 `AUTH_DB` | Top-level `server/migrations/*.sql` | Wrangler D1 migrations; Worker tests use `readD1Migrations('server/migrations')` |
-| Per-account SQLite | `server/migrations/account/0003-account-store.sql` | `AccountStore` imports the SQL as a Wrangler Text module and executes it inside its constructor's `transactionSync` |
+| Per-account SQLite | `server/migrations/account/0003-account-store.sql`, then `0004-resource-api.sql` | `AccountStore` imports the SQL as Wrangler Text modules and executes initialization/upgrades inside its constructor's `transactionSync` |
 | Device SQLite | `src/local/database.ts`, with event/routine fields in `src/record-sql.ts` | `initializeLocalDatabase`, through the native SQLite connection |
 
 `wrangler d1 migrations apply AUTH_DB --local` applies only the D1 schema. Its
@@ -15,12 +15,13 @@ default top-level `*.sql` discovery does not apply the nested account SQL. The
 same separation applies to the D1 test helper. Wrangler's `new_sqlite_classes`
 migration creates the Durable Object namespace; it does not execute account DDL.
 
-The account SQL file is the complete current version-3 baseline, extracted from
-the existing constructor. It is not an incremental conversion or a requirement
-to preserve older development layouts. A new account creates it atomically;
-repeat startup validates the version/tables without replaying the DDL. An
-unsupported or incomplete database fails without silently deleting data. Any
-future development reset must be explicit and limited to Puptime-owned fixtures.
+The account store's current schema is version 4. A new account atomically applies
+the version-3 typed baseline and the additive version-4 resource API migration.
+An existing version-3 account applies only `0004-resource-api.sql`, retaining its
+puppies, logs, revisions, enrollment records and operation receipts. Version-4
+startup validates the version/tables without replaying DDL. Unsupported or
+incomplete databases fail without silently deleting data. The API rollout does
+not require a database reset; existing recovered data must remain intact.
 
 ## Generated identifiers
 
@@ -30,7 +31,7 @@ is no second UUID column. The body is opaque and carries no time or sort order.
 
 | Prefix | Entity |
 | --- | --- |
-| `usr`, `ses`, `acc`, `ver`, `rlm` | Better Auth user, session, provider-account row, verification row and rate-limit row |
+| `usr`, `ses`, `acc`, `ver`, `rlm`, `key` | Better Auth user, session, provider-account row, verification row, rate-limit row and API-key row |
 | `prv` | Local development email preview |
 | `pet`, `dev` | Puppy and persisted installation/device |
 | `evt`, `rtn`, `rem` | Logged activity, user-created routine and custom timed OS reminder |
@@ -53,6 +54,11 @@ derived estimates, preference keys and recurring notification identifiers remain
 stable semantic keys. CSV imports retain their validated original event IDs.
 The deferred iOS widget extension still uses its existing timestamp/type pending
 IDs; it has a separate runtime and is not covered by the app entropy adapter.
+
+Custom activities and appearance customizations use stable semantic local IDs:
+`custom:training` for the label "Training", and an activity key such as `pee` or
+`custom:training` for a customization. These identities cannot be changed by a
+resource API patch. This preserves the existing mobile projection contract.
 
 `records.id` and mirrored `record_id` values are protocol identities, not random
 entity IDs: puppy records use the puppy ID; puppy-scoped records encode the
@@ -95,35 +101,53 @@ schema already represents multiple puppies even while setup presents one.
 | `record_routines` | Typed activity/label, minute of day, reminder intent and tolerance; foreign key to `records` with cascade |
 | `revisions` | Ordered immutable accepted history, including merge reason, proposal and before/after snapshots |
 | `operations`, `enrollments` | Saved request/result pairs for duplicate-safe retry and rejection of reused operation IDs with different content |
+| `api_requests` | REST request fingerprint and original successful result, addressed by a credential-scoped idempotency key |
 | `schema_metadata`, `account_state` | Schema version and the existing retired-account fence |
 
 Current event and routine values are real constrained SQL columns. Primary keys
 support payload lookup; `records_by_pet_kind(pet_id,kind,deleted)` supports puppy
 event counts. `revisions.sequence` supports ordered incremental pulls and export;
 `revisions_by_record(record_id,revision DESC)` supports per-record history pages.
-Operation/enrollment primary keys make retries addressable without scanning logs.
-There is no server activity-feed/time-range query yet; add indexes for the actual
-query when that endpoint exists. Device event queries already have puppy/time
-and puppy/activity/time indexes in `src/local/database.ts`.
+Operation/enrollment/API-request primary keys make retries addressable without
+scanning logs. The resource API queries current records directly, with
+`records_by_scope_sequence(kind,pet_id,deleted,sequence)` for scoped keyset pages,
+`record_events_by_at(at,record_id)` for activity-time filters, and
+`record_events_by_type_at(type,at,record_id)` for activity/time filters. Device
+event queries also have puppy/time and puppy/activity/time indexes in
+`src/local/database.ts`. Current-resource pages are not snapshots; revision feeds
+remain a separate endpoint. See the [API contract](api.md).
 
-Profile, customization and account-preference record payloads currently remain
+Profile, customization and account-preference record payloads remain
 in validated `records.data_json`. History and saved protocol request/results also
-remain serialized JSON. Extracting this baseline does not claim those fields are
-normalized, change the wire protocol, or add new nap/widget behavior. The native
+remain serialized JSON. These fields are not used to scan current activity
+values. The resource API adds no nap/widget behavior. The native
 field definitions and explicit account columns must continue to agree; database
 tests exercise constraints, round trips, restart and atomic write failures.
 
 `AccountStore.apply` keeps enrollment and idempotency checks, current-record read,
 JavaScript reconciliation, sequence allocation, typed payload write, history and
 acknowledgment in one synchronous SQLite transaction. WebSockets carry change
-hints after commit. This extraction preserves that boundary; a D1 batch cannot
+hints after commit. REST writes use that same mutation engine, with the current
+revision precondition and API-request receipt in the same transaction. A retry
+returns the original accepted result before evaluating a now-stale precondition.
+Account retirement removes API receipts alongside the other account data. A D1 batch cannot
 directly replace the read/reconcile/write callback. See Cloudflare's
 [SQLite transaction API](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/#transactionsync)
 and [Text module rules](https://developers.cloudflare.com/workers/wrangler/configuration/#bundling).
 
-The fresh D1 baseline is `server/migrations/0001-auth.sql`: Better Auth's tables,
-local-only email previews, and a small deletion-cleanup fence. It has no trial
-or subscription columns. Authenticated development accounts have cloud access;
-explicit device enrollment still controls uploading local puppy data. See the
-[development milestone](cloud-development.md) for the reset and acceptance
-boundary. The account SQL introduces no authentication or migration framework.
+The D1 baseline is `server/migrations/0001-auth.sql`: Better Auth's tables,
+local-only email previews, and a small deletion-cleanup fence. Additive migration
+`0002-api-keys.sql` adds Better Auth's generated `apikey` table and indexes for
+configuration, owner and hashed-key lookup. Its triggers reject creation without
+an active owner, prevent reassignment, and remove keys when the identity is
+deleted. Raw keys are returned once; their stored values are hashed. Scopes,
+expiry and per-key request limits are managed through Better Auth's API-key
+plugin; API keys do not become general account sessions.
+
+Apply the new D1 migration before deploying the resource API. Keep the existing
+D1 database, Durable Object namespace, bindings and secrets. The account upgrade
+runs when each existing object starts; no bulk erasure or re-import is needed.
+There are no trial or subscription columns. Explicit device enrollment still
+controls uploading local puppy data. See the [development milestone](cloud-development.md)
+for the historical baseline checkpoint and [API setup](api.md#local-development-and-deployment)
+for the additive rollout commands.

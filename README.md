@@ -90,6 +90,8 @@ The widgets use native extensions, so they require a development or release buil
 
 For the public website's static pages, analytics configuration, and Google indexing setup, see [Website operations](docs/website-operations.md).
 
+For the standalone backend, scoped integration keys, REST routes and OpenAPI contract, see [Puptime API](docs/api.md).
+
 ```sh
 npm run typecheck
 npm test

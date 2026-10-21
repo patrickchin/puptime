@@ -20,7 +20,7 @@ function edit(original: Mutation, revision: number, patch: object, intent = 'pat
 test('fresh account uses one complete first-release schema baseline',async()=>{
   const account=await store();
   await runInDurableObject(account,(_instance,state)=>{
-    expect(state.storage.sql.exec<{version:number}>('SELECT version FROM schema_metadata').one().version).toBe(3);
+    expect(state.storage.sql.exec<{version:number}>('SELECT version FROM schema_metadata').one().version).toBe(4);
     const names=state.storage.sql.exec<{name:string}>("SELECT name FROM sqlite_master WHERE type='table'").toArray().map(row=>row.name);
     for(const name of ['records','record_events','record_routines','revisions','operations','pets','enrollments','enrolled_devices','account_state'])expect(names).toContain(name);
     expect(state.storage.sql.exec<{name:string}>('PRAGMA index_info(records_by_pet_kind)').toArray().map(row=>row.name)).toEqual(['pet_id','kind','deleted']);

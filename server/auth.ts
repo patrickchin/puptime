@@ -1,4 +1,5 @@
 import { expo } from '@better-auth/expo';
+import { apiKey } from '@better-auth/api-key';
 import { betterAuth } from 'better-auth';
 import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { emailOTP } from 'better-auth/plugins';
@@ -7,7 +8,7 @@ import { z } from 'zod';
 import { retireCloudAccount, type AppleRevocation } from './account-lifecycle';
 import { entityId, type EntityPrefix } from '../src/entity-id';
 
-const authIdPrefixes = new Map<string, EntityPrefix>([['user','usr'],['session','ses'],['account','acc'],['verification','ver'],['rateLimit','rlm']]);
+const authIdPrefixes = new Map<string, EntityPrefix>([['user','usr'],['session','ses'],['account','acc'],['verification','ver'],['rateLimit','rlm'],['apikey','key']]);
 
 function emailSenderAvailable(env: Cloudflare.Env): boolean {
   const sender = z.email().safeParse(env.EMAIL_FROM);
@@ -60,8 +61,17 @@ export function createAuth(env: Cloudflare.Env, options: { disableEmailSignUp?: 
       ...(providers.google ? { google: { clientId: env.GOOGLE_CLIENT_ID!, clientSecret: env.GOOGLE_CLIENT_SECRET! } } : {}),
       ...(providers.apple ? { apple: { clientId: env.APPLE_CLIENT_ID!, clientSecret: env.APPLE_CLIENT_SECRET!, audience: [env.APPLE_CLIENT_ID!, 'com.patrickchin.puptime'] } } : {}),
     },
-    disabledPaths: ['/email-otp/request-password-reset', '/forget-password/email-otp', '/email-otp/reset-password', '/delete-user', '/delete-user/callback'],
-    plugins: [expo(), emailOTP({
+    // Integration credentials are managed only through the versioned, session-only
+    // routes, which enforce explicit scopes and bounded expiry.
+    disabledPaths: ['/email-otp/request-password-reset', '/forget-password/email-otp', '/email-otp/reset-password', '/delete-user', '/delete-user/callback',
+      '/api-key/create', '/api-key/get', '/api-key/list', '/api-key/update', '/api-key/delete', '/api-key/verify', '/api-key/delete-all-expired-api-keys'],
+    plugins: [expo(), apiKey({
+      defaultPrefix: 'puptime_', requireName: true, minimumNameLength: 1, maximumNameLength: 80,
+      enableSessionForAPIKeys: false, disableKeyHashing: false, enableMetadata: false,
+      startingCharactersConfig: { shouldStore: true, charactersLength: 15 },
+      keyExpiration: { defaultExpiresIn: 90 * 86400, minExpiresIn: 1, maxExpiresIn: 365 },
+      rateLimit: { enabled: true, timeWindow: 60000, maxRequests: 60 },
+    }), emailOTP({
       expiresIn: 300, allowedAttempts: 3, disableSignUp: options.disableEmailSignUp ?? false, storeOTP: 'hashed',
       async sendVerificationOTP({ email, otp }) {
         if (env.ENVIRONMENT === 'local') {
