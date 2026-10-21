@@ -58,14 +58,14 @@ test('SQLite recovery restores exact activity fields, preserves edits, deduplica
   const database = await createLocalDatabase(sqliteTestConnection(join(directory, 'data.db')));
   t.after(async () => { await database.close(); await rm(directory, { recursive: true, force: true }); });
   const { petId } = await initializeLocalDatabase(database, () => 'pet_test');
-  const { storage } = await createLocalRuntime(database, petId), f = fixture();
+  const { storage, recoverEvents } = await createLocalRuntime(database, petId), f = fixture();
   const events: PuppyEvent[] = [
     { id: 'evt_pee', type: 'pee', at: 1000, source: 'widget', note: 'Original' },
     { id: 'evt_custom', type: 'custom', customLabel: 'Training', at: 2000, source: 'app', estimated: true, note: '小狗 🐾' },
     { id: 'evt_nap', type: 'nap', at: 3000, endedAt: null, source: 'app' },
   ];
   await storage.appendEvents(events);
-  const service = createActivityBackups({ ...f.options, read: async () => ({ events: await storage.loadEvents(), puppyName: 'Mochi' }), restore: storage.importEvents });
+  const service = createActivityBackups({ ...f.options, read: async () => ({ events: await storage.loadEvents(), puppyName: 'Mochi' }), restore: recoverEvents });
   await service.capture(); const id = (await service.list()).backups[0].id;
   await storage.updateEvent('evt_pee', { note: 'Current edit' }); await storage.removeEvent('evt_custom'); await storage.removeEvent('evt_nap');
   assert.deepEqual(await service.restore(id), { imported: 2, skipped: 1 });

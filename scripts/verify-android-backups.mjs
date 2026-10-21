@@ -9,13 +9,17 @@ import { sqliteTestConnection } from '../src/local/sqlite-test-adapter.ts';
 import { createLocalRuntime } from '../src/local/runtime-factory.ts';
 
 const device = process.argv[2] ?? 'emulator-5590', app = 'com.patrickchin.puptime';
-const adb = (...args) => execFileSync('adb', ['-s', device, ...args]);
+const adb = (...args) => {
+  execFileSync('adb', ['-s', device, 'wait-for-device']);
+  return execFileSync('adb', ['-s', device, ...args]);
+};
 assert.match(adb('emu', 'avd', 'name').toString(), /Puptime_Daily_Backups_a903/);
+assert.equal(process.argv[3], '--replace-synthetic', 'Explicitly authorize reseeding the dedicated synthetic emulator.');
 const directory = mkdtempSync(join(tmpdir(), 'puptime-android-backups-'));
 const output = resolve('output/daily-backups'); mkdirSync(output, { recursive: true });
 const shell = (...args) => adb('shell', ...args);
 const stop = () => shell('am', 'force-stop', app);
-const launch = () => shell('am', 'start', '-n', `${app}/.MainActivity`);
+const launch = () => { adb('reverse', 'tcp:8093', `tcp:${process.env.PUPTIME_METRO_PORT ?? '8093'}`); return shell('am', 'start', '-n', `${app}/.MainActivity`); };
 const path = join(directory, 'puptime-v2.db');
 const remote = 'files/SQLite/puptime-v2.db';
 function upload() {

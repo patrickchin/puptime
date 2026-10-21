@@ -72,7 +72,7 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
   async function retainRevisions(sql:SqlExecutor,petId:string,changes:LocalChange[],source:'local'|'enrollment'|'cloud'|'restore') {
     for (const change of changes) await sql.runAsync('INSERT INTO local_revisions(pet_id,kind,local_id,before_data,after_data,created_at,source) VALUES (?,?,?,?,?,?,?)',petId,change.kind,change.localId,change.before===null?null:JSON.stringify(change.before),change.after===null?null:JSON.stringify(change.after),now(),source);
   }
-  async function enqueue(sql:SqlExecutor,current:Owner,pet:Binding,original:LocalChange):Promise<Mutation|null> {
+  async function enqueue(sql:SqlExecutor,current:Owner,pet:Binding,original:LocalChange,restoreMissing=false):Promise<Mutation|null> {
     let change=localChangeSchema.parse(original);
     const blocked=await sql.getAllAsync<Outbox>('SELECT * FROM local_sync_outbox WHERE generation=? AND local_pet_id=? AND local_kind=? AND local_id=? AND blocked_reason IS NOT NULL ORDER BY sequence',current.generation,pet.pet_id,change.kind,change.localId);
     if (blocked.length) {
@@ -93,7 +93,7 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
     const base=recordId?await mirrored(sql,current.generation,recordId):null;
     const prior=await sql.getAllAsync<Outbox>('SELECT * FROM local_sync_outbox WHERE generation=? AND local_pet_id=? AND local_kind=? AND local_id=? AND mutation_json IS NOT NULL',current.generation,pet.pet_id,change.kind,change.localId);
     const hasCreate=prior.some(row=>mutationSchema.parse(JSON.parse(row.mutation_json!)).intent==='create');
-    const intent=change.after===null?'delete':!base&&!hasCreate?'create':'patch';
+    const intent=change.after===null?'delete':restoreMissing&&change.before===null&&base?.deleted?'restore':!base&&!hasCreate?'create':'patch';
     if (intent==='delete'&&!base&&!hasCreate) {
       for (const row of blocked) await sql.runAsync('DELETE FROM local_sync_outbox WHERE operation_id=?',row.operation_id);
       return null;
@@ -191,15 +191,18 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
     await projectOwner(sql,current,[],'restore');
   }
   return {
-    changeSink(petId:string):LocalChangeSink {
+    changeSink(petId:string,options:{restoreMissing?:boolean}={}):LocalChangeSink {
       return async(sql,changes)=>{
-        await retainRevisions(sql,petId,changes,'local');
         const current=await owner(sql),pet=await binding(sql,petId);
+        if(options.restoreMissing&&pet&&(pet.status!=='active'||current?.pending_pet_id||current?.resyncing))throw new Error('Finish syncing before recovering logs.');
+        await retainRevisions(sql,petId,changes,options.restoreMissing?'restore':'local');
         if (!current||pet?.status!=='active') return;
         for (const change of changes) {
+          if(options.restoreMissing&&change.kind==='event'&&change.before===null
+            &&await sql.getFirstAsync('SELECT operation_id FROM local_sync_outbox WHERE generation=? AND local_pet_id=? AND local_kind=? AND local_id=? LIMIT 1',current.generation,petId,'event',change.localId))throw new Error('Wait for pending log changes before recovering.');
           let target=pet;
           if (change.kind==='accountPreferences') target=(await sql.getFirstAsync<Binding>("SELECT * FROM local_sync_pets WHERE generation=? AND status='active' ORDER BY rowid LIMIT 1",current.generation))!;
-          await enqueue(sql,current,target,change);
+          await enqueue(sql,current,target,change,options.restoreMissing&&change.kind==='event');
         }
       };
     },

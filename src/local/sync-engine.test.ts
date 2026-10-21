@@ -10,6 +10,7 @@ import { cloudRecordId } from '../cloud/record-identity.ts';
 import type { CloudRecord } from '../cloud/protocol.ts';
 import * as engine from './sync-engine.ts';
 import { createEvent } from '../domain.ts';
+import { createLocalRepository } from './repository.ts';
 
 async function setup(t:TestContext,{pristine=false}={}) {
   const directory=await mkdtemp(join(tmpdir(),'puptime-sync-'));
@@ -631,4 +632,24 @@ test('enrollment cancellation cannot discard a baseline that already began or an
  await assert.rejects(sync.cancelEnrollment({...owner,operationId:next.operationId}),/baseline/i);
  assert.ok(await sync.enrollmentState());
  assert.deepEqual(await database.read(async sql=>(await sql.getAllAsync<{mutation_json:string}>('SELECT mutation_json FROM local_sync_outbox ORDER BY sequence')).map(row=>JSON.parse(row.mutation_json))),before);
+});
+
+
+test('backup recovery explicitly restores synced deletions and rejects pending deletes atomically',async t=>{
+ const {database,sync,storage}=await setup(t),owner=await activate(sync),server=replicaServer();await cycle(sync,owner,server);
+ const recover=createLocalRepository(database,'local-pet',sync.changeSink('local-pet',{restoreMissing:true})).importEvents;
+ const nap={id:'nap-backup',type:'nap' as const,at:200,endedAt:300,source:'widget' as const};
+ await storage.appendEvents([event,nap]);await cycle(sync,owner,server);
+ await storage.removeEvent(event.id);await storage.removeEvent(nap.id);
+ const before=await storage.loadEvents(),pending=await sync.nextBatch(owner);
+ await assert.rejects(recover([{...event,id:'new-backup-log'},event,nap]),/pending/);
+ assert.deepEqual(await storage.loadEvents(),before);assert.deepEqual(await sync.nextBatch(owner),pending);
+ await cycle(sync,owner,server);
+ assert.deepEqual(await recover([event,nap]),{imported:2,skipped:0});
+ const restored=(await sync.nextBatch(owner)).filter(mutation=>mutation.kind==='event');
+ assert.equal(restored.length,2);assert.ok(restored.every(mutation=>mutation.intent==='restore'));
+ await cycle(sync,owner,server);
+ assert.deepEqual((await storage.loadEvents()).map(item=>item.id).sort(),[event.id,nap.id].sort());
+ assert.deepEqual(await recover([event,nap]),{imported:0,skipped:2});
+ assert.equal((await sync.status('local-pet')).pending,0);
 });

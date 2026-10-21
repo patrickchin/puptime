@@ -19,7 +19,7 @@ async function openRuntime() {
     });
     backups=createActivityBackups({files:localBackupFiles(),petId,newId:()=>entityId('bkp'),
       read:async()=>({events:await runtime.storage.loadEvents(),puppyName:await runtime.storage.loadPuppyName()}),
-      restore:events=>runtime.storage.importEvents(events)});
+      restore:events=>runtime.recoverEvents(events)});
     capture();
     AppState.addEventListener('change',state=>{if(state==='active')capture();});
     // Covers midnight while the app stays open. Background execution isn't guaranteed by either OS.
