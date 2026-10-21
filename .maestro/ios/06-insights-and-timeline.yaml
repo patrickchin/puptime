@@ -59,6 +59,11 @@ tags:
 - waitForAnimationToEnd:
     timeout: 5000
 - tapOn:
+    id: quick.meal
+    retryTapIfNoChange: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
     id: nav.open
 - tapOn:
     id: nav.insights
@@ -99,15 +104,25 @@ tags:
     id: timeline.zoom.value
     text: .*1\.0×.*
 - assertVisible:
-    id: timeline.filter.all
+    id: timeline.filter.pee
 - assertVisible:
     id: timeline.range
-    text: .*3 entries.*
+    text: .*2 entries.*
 - tapOn:
-    id: timeline.filter.poop
+    id: timeline.filter.poop-meal
 - assertVisible:
     id: timeline.range
-    text: .*1 entries.*
+    text: .*2 entries.*
+- tapOn:
+    id: timeline.mark.point.*
+- assertVisible:
+    id: timeline.details.event.*
+    text: .*Poop.*
+- assertVisible:
+    id: timeline.details.event.*
+    text: .*Eat.*
+- tapOn:
+    id: timeline.details.close
 - tapOn:
     id: timeline.filter.pee
 - assertVisible:
@@ -162,7 +177,7 @@ tags:
 - assertNotVisible:
     id: timeline.details
 - tapOn:
-    id: timeline.filter.all
+    id: timeline.filter.poop-meal
 - assertVisible:
     id: timeline.range
-    text: .*3 entries.*
+    text: .*2 entries.*

@@ -43,7 +43,7 @@ tags:
 - assertVisible:
     id: timeline.zoom.in
 - assertVisible:
-    id: timeline.filter.nap
+    id: timeline.filter.poop-meal
 - tapOn:
     id: nav.open
 - tapOn:
