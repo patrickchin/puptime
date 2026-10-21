@@ -15,6 +15,12 @@ row of Apple/Google/email choices. These provider entry buttons explicitly expla
 that sign-in is not connected in this design preview and offer the guest path;
 they never pretend that authentication succeeded or send an email.
 
+The same emerald background continues through every setup question, plan review,
+the optional full schedule editor, reminders, and the ready page. Warm light text
+and cream answer/action controls keep contrast clear. The name field uses the
+native dark keyboard. Entering the log screen uses the app's usual warm cream
+background and existing log controls.
+
 The guest path asks one question at a time: puppy name, age, meals, and poop
 routine. Replies carry into later prompts and previous times are acknowledged.
 There are no duplicated visible field labels. Screen-reader focus moves to each

@@ -18,9 +18,12 @@ import {lightTheme,type Theme} from '../theme';
 import {ScheduleScreen} from './ScheduleScreen';
 import {OnboardingHomePreview,type PreviewGuide} from './OnboardingHomePreview';
 
-const theme:Theme={...lightTheme,background:'#FCFCF9',surface:'#FFFDF7',surfaceRaised:'#FFFDF7',
+const appTheme:Theme={...lightTheme,surface:'#FFFDF7',surfaceRaised:'#FFFDF7',
   text:'#243D2E',textMuted:'#53685A',border:'#CDD8CF',primary:'#176B52',onPrimary:'#FFFDF5',
   presentation:{...lightTheme.presentation,headingFont:'RedHatDisplayBold',titleWeight:'400',controlRadius:12,cardRadius:18}};
+const theme:Theme={...appTheme,isDark:true,background:appTheme.primary,
+  surface:'#216F59',surfaceRaised:'#2B7C64',text:'#FFFDF5',textMuted:'#DCE9DD',border:'#598E79',
+  primary:'#F7EBD2',onPrimary:'#1B503C',primaryPressed:'#E4D6B8',primarySoft:'#2B7C64',danger:'#FFB7A5'};
 const mascots=[require('../../assets/mascots/scruffy-terrier.png'),
   require('../../assets/mascots/onboarding/scruffy-ball.png'),
   require('../../assets/mascots/onboarding/scruffy-grass.png'),
@@ -126,7 +129,7 @@ function PreviewFlow(){
   </View>;
   const later=(label:string,onPress:()=>void)=><View style={styles.footer}><Pressable testID="preview.skip" accessibilityRole="button" onPress={onPress} style={styles.secondary}><Text style={styles.secondaryText}>{label}</Text></Pressable></View>;
   const choice=(id:string,label:string,onPress:()=>void)=><Pressable key={id} testID={`preview.choice.${id}`} accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({pressed})=>[styles.choice,pressed&&styles.choicePressed]}>
-    <Text style={styles.choiceText}>{label}</Text><MaterialCommunityIcons name="chevron-right" size={21} color={theme.primary}/>
+    <Text style={styles.choiceText}>{label}</Text><MaterialCommunityIcons name="chevron-right" size={21} color={appTheme.primary}/>
   </Pressable>;
   const prompt=(title:string,body?:string)=><View style={styles.prompt}><Text ref={heading} accessibilityRole="header" accessibilityLiveRegion="polite" style={styles.title}>{title}</Text>{body?<Text style={styles.body}>{body}</Text>:null}</View>;
   const smallMascot=<Image accessible={false} source={mascot} resizeMode="contain" style={styles.smallMascot}/>;
@@ -145,9 +148,9 @@ function PreviewFlow(){
       <View style={styles.signInRow}>{([
         {id:'apple',label:'Apple',icon:'apple'}, {id:'google',label:'Google',icon:'google'}, {id:'email',label:'Email',icon:'email-outline'},
       ] as const).map(provider=><Pressable key={provider.id} testID={`preview.auth.${provider.id}`} accessibilityRole="button" accessibilityLabel={`Continue with ${provider.label}`} onPress={()=>previewSignIn(provider.label)} style={({pressed})=>[styles.signInButton,pressed&&styles.choicePressed]}>
-        <MaterialCommunityIcons accessible={false} name={provider.icon} color={theme.text} size={21}/><Text style={styles.signInText}>{provider.label}</Text>
+        <MaterialCommunityIcons accessible={false} name={provider.icon} color={appTheme.text} size={21}/><Text style={styles.signInText}>{provider.label}</Text>
       </Pressable>)}</View>
-      <Pressable testID="preview.guest" accessibilityRole="button" onPress={()=>go('profile')} style={styles.secondary}><Text style={[styles.secondaryText,{color:theme.onPrimary}]}>Let’s start without an account</Text></Pressable>
+      <Pressable testID="preview.guest" accessibilityRole="button" onPress={()=>go('profile')} style={styles.secondary}><Text style={[styles.secondaryText,{color:theme.text}]}>Let’s start without an account</Text></Pressable>
     </View>
   </ScrollView>;
   else if(step==='profile')body=<>
@@ -156,7 +159,7 @@ function PreviewFlow(){
       {!keyboardVisible&&fontScale<1.5?<View style={styles.art}><Image source={mascot} accessible={false} resizeMode="contain" style={styles.mascot}/></View>:<View style={styles.keyboardSpace}/>}
       <View style={styles.nameField}><TextInput testID="preview.name" accessibilityLabel="Puppy’s name, optional" value={name} onChangeText={setName}
         placeholder="e.g. Milo" placeholderTextColor={theme.textMuted} maxLength={256} autoCapitalize="words" autoCorrect={false}
-        selectionColor={theme.primary} autoComplete="off" clearButtonMode="while-editing" returnKeyType="done" onSubmitEditing={Keyboard.dismiss}
+        selectionColor={theme.primary} keyboardAppearance="dark" autoComplete="off" clearButtonMode="while-editing" returnKeyType="done" onSubmitEditing={Keyboard.dismiss}
         onFocus={()=>scroll.current?.scrollToEnd({animated:true})} style={styles.nameInput}/></View>
     </ScrollView>
     {footer('Let’s meet them',()=>go('age'),'I’ll add their name later',()=>{setName('');go('age');})}
@@ -183,7 +186,7 @@ function PreviewFlow(){
       <View style={styles.timeSpace}>
         {smallMascot}
         <Pressable testID="preview.time" accessibilityRole="button" accessibilityLabel={`Change ${mealStep?'meal time':'poop window centre'}, ${formatMinutes(time,'en')}`} onPress={()=>setPickingTime(true)} style={({pressed})=>[styles.timeAnswer,pressed&&styles.choicePressed]}>
-          <Text style={styles.timeText}>{formatMinutes(time,'en')}</Text><MaterialCommunityIcons name="chevron-down" size={24} color={theme.primary}/>
+          <Text style={styles.timeText}>{formatMinutes(time,'en')}</Text><MaterialCommunityIcons name="chevron-down" size={24} color={appTheme.primary}/>
         </Pressable>
       </View>
     </ScrollView>
@@ -248,7 +251,7 @@ function PreviewFlow(){
       {prompt('Would a little\nnudge help?','A gentle heads-up at the times you choose. Your phone will ask for permission first.')}
       <View style={styles.notification}>
         <Image accessible={false} source={require('../../assets/puptime-icon.png')} style={styles.icon}/>
-        <View style={styles.notificationCopy}><Text style={[styles.choiceText,{flex:0}]}>A little heads-up from Puptime</Text><Text style={styles.body}>Time for {pup}’s next meal?</Text></View>
+        <View style={styles.notificationCopy}><Text style={[styles.choiceText,{flex:0,color:theme.text}]}>A little heads-up from Puptime</Text><Text style={styles.body}>Time for {pup}’s next meal?</Text></View>
       </View>
       {smallMascot}
       {reminderError?<Text accessibilityRole="alert" style={styles.error}>{reminderError}</Text>:null}
@@ -265,11 +268,11 @@ function PreviewFlow(){
     </ScrollView>
     {footer('Show me around',()=>{setGuide('quick');go('home');},'I’ll explore on my own',()=>{setGuide(null);go('home');})}
   </>;
-  else body=<OnboardingHomePreview theme={theme} pup={pup} events={events} setEvents={setEvents} guide={guide} setGuide={setGuide} onReview={()=>go('review')}/>;
+  else body=<OnboardingHomePreview theme={appTheme} pup={pup} events={events} setEvents={setEvents} guide={guide} setGuide={setGuide} onReview={()=>go('review')}/>;
 
-  const background=step==='welcome'?{backgroundColor:theme.primary}:undefined;
+  const background=step==='home'?{backgroundColor:appTheme.background}:undefined;
   return <SafeAreaView edges={['top','bottom','left','right']} style={[styles.root,background]}>
-    <StatusBar style={step==='welcome'?'light':'dark'}/>
+    <StatusBar style={step==='home'?'dark':'light'}/>
     <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':'height'} style={[styles.root,background]}>
       {step!=='welcome'&&step!=='home'?header:null}{body}
       {pickingTime?<DateTimeSelector value={new Date(2000,0,1,Math.floor(time/60),time%60)} mode="time" locale="en" theme={theme}
@@ -280,8 +283,8 @@ function PreviewFlow(){
 }
 
 const styles=StyleSheet.create({
-  welcome:{flexGrow:1,paddingHorizontal:22,paddingTop:28,paddingBottom:12},welcomeBrand:{alignItems:'center',gap:14},welcomeIcon:{width:64,height:64,borderRadius:16},welcomeName:{fontFamily:'RedHatDisplayBold',fontSize:52,lineHeight:60,letterSpacing:-1.5,color:theme.onPrimary},welcomeCopy:{fontFamily:'RedHatText',fontSize:15,lineHeight:23,textAlign:'center',color:theme.onPrimary,marginTop:14},
-  welcomeArt:{flex:1,minHeight:180,alignItems:'center',justifyContent:'center',paddingVertical:22},welcomeActions:{gap:16,paddingTop:18},welcomeQuestion:{fontFamily:'RedHatText',fontSize:16,lineHeight:24,color:theme.onPrimary,textAlign:'center'},signInRow:{flexDirection:'row',gap:10},signInButton:{flex:1,minHeight:54,alignItems:'center',justifyContent:'center',flexDirection:'row',gap:7,borderWidth:1,borderColor:theme.border,borderRadius:16,backgroundColor:theme.surface},signInText:{fontFamily:'RedHatTextSemiBold',fontSize:14,color:theme.text},
+  welcome:{flexGrow:1,paddingHorizontal:22,paddingTop:28,paddingBottom:12},welcomeBrand:{alignItems:'center',gap:14},welcomeIcon:{width:64,height:64,borderRadius:16},welcomeName:{fontFamily:'RedHatDisplayBold',fontSize:52,lineHeight:60,letterSpacing:-1.5,color:theme.text},welcomeCopy:{fontFamily:'RedHatText',fontSize:15,lineHeight:23,textAlign:'center',color:theme.text,marginTop:14},
+  welcomeArt:{flex:1,minHeight:180,alignItems:'center',justifyContent:'center',paddingVertical:22},welcomeActions:{gap:16,paddingTop:18},welcomeQuestion:{fontFamily:'RedHatText',fontSize:16,lineHeight:24,color:theme.text,textAlign:'center'},signInRow:{flexDirection:'row',gap:10},signInButton:{flex:1,minHeight:54,alignItems:'center',justifyContent:'center',flexDirection:'row',gap:7,borderWidth:1,borderColor:theme.border,borderRadius:16,backgroundColor:appTheme.surface},signInText:{fontFamily:'RedHatTextSemiBold',fontSize:14,color:appTheme.text},
   notification:{padding:18,borderRadius:20,borderWidth:1,borderColor:theme.border,backgroundColor:theme.surface,flexDirection:'row',gap:14,alignItems:'center'},notificationCopy:{flex:1,gap:8},error:{fontFamily:'RedHatText',fontSize:15,lineHeight:23,color:theme.danger},
   root:{flex:1,backgroundColor:theme.background},loading:{flex:1,alignItems:'center',justifyContent:'center',backgroundColor:theme.background},
   header:{minHeight:52,paddingHorizontal:22,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},
@@ -293,7 +296,7 @@ const styles=StyleSheet.create({
   footer:{paddingHorizontal:22,paddingTop:18,paddingBottom:2,backgroundColor:theme.background},primary:{minHeight:52,paddingHorizontal:16,paddingVertical:12,borderRadius:999,backgroundColor:theme.primary,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:10},
   primaryText:{fontFamily:'RedHatTextSemiBold',fontSize:15,color:theme.onPrimary},pressed:{opacity:.75},secondary:{minHeight:44,alignItems:'center',justifyContent:'center',paddingVertical:8,marginTop:4},secondaryText:{fontFamily:'RedHatText',fontSize:14,color:theme.textMuted},
   conversation:{flexGrow:1,paddingHorizontal:22,paddingTop:28,paddingBottom:20,gap:28},prompt:{gap:18},body:{fontFamily:'RedHatText',fontSize:16,lineHeight:24,color:theme.textMuted},
-  answers:{gap:12},choice:{minHeight:62,paddingVertical:16,paddingHorizontal:18,borderWidth:1,borderColor:theme.border,borderRadius:18,backgroundColor:theme.surface,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12},choicePressed:{backgroundColor:theme.primarySoft,borderColor:theme.primary},choiceText:{fontFamily:'RedHatTextSemiBold',fontSize:17,lineHeight:24,color:theme.text,flex:1},
-  smallMascot:{height:150,width:180,alignSelf:'center'},progress:{fontFamily:'RedHatText',fontSize:13,color:theme.textMuted},timeSpace:{flexGrow:1,justifyContent:'center',gap:28,paddingVertical:12},timeAnswer:{minHeight:96,padding:20,borderRadius:24,backgroundColor:theme.primarySoft,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:18},timeText:{fontFamily:'RedHatDisplayBold',fontSize:40,lineHeight:52,color:theme.primary,fontVariant:['tabular-nums'],flexShrink:1},
+  answers:{gap:12},choice:{minHeight:62,paddingVertical:16,paddingHorizontal:18,borderWidth:1,borderColor:theme.border,borderRadius:18,backgroundColor:appTheme.surface,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12},choicePressed:{backgroundColor:appTheme.primarySoft,borderColor:appTheme.primary},choiceText:{fontFamily:'RedHatTextSemiBold',fontSize:17,lineHeight:24,color:appTheme.text,flex:1},
+  smallMascot:{height:150,width:180,alignSelf:'center'},progress:{fontFamily:'RedHatText',fontSize:13,color:theme.textMuted},timeSpace:{flexGrow:1,justifyContent:'center',gap:28,paddingVertical:12},timeAnswer:{minHeight:96,padding:20,borderRadius:24,backgroundColor:appTheme.surface,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:18},timeText:{fontFamily:'RedHatDisplayBold',fontSize:40,lineHeight:52,color:appTheme.primary,fontVariant:['tabular-nums'],flexShrink:1},
   plan:{borderTopWidth:1,borderColor:theme.border,paddingTop:20,gap:12},planHeading:{fontFamily:'RedHatTextSemiBold',fontSize:15,color:theme.textMuted},planTime:{fontFamily:'RedHatTextSemiBold',fontSize:22,lineHeight:30,color:theme.text,fontVariant:['tabular-nums']},schedule:{flex:1},ready:{flexGrow:1,padding:24,justifyContent:'center',gap:28},
 });
