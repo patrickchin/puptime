@@ -1,5 +1,31 @@
 import type { AppLanguage } from './localization.ts';
+import type { TimelineDay } from './analytics.ts';
 import { dateKey, type PuppyEvent } from './domain.ts';
+
+export type TimelineGap = { key: string; start: Date; end: Date; emptyDays: number };
+
+// Group only truly empty days, independent of filters. Keep today available as a time reference.
+export function collapseEmptyTimelineDays(days: readonly TimelineDay[], todayKey: string): (TimelineDay | TimelineGap)[] {
+  const rows: (TimelineDay | TimelineGap)[] = [];
+  for (let index = 0; index < days.length;) {
+    const day = days[index];
+    if (day.key === todayKey || day.marks.length) {
+      rows.push(day);
+      index += 1;
+      continue;
+    }
+    let end = index + 1;
+    while (end < days.length && days[end].key !== todayKey && !days[end].marks.length) end += 1;
+    rows.push(end - index === 1 ? day : {
+      key: `gap-${day.key}`,
+      start: day.date,
+      end: days[end - 1].date,
+      emptyDays: end - index,
+    });
+    index = end;
+  }
+  return rows;
+}
 
 export function timelineDayEvents(events: readonly PuppyEvent[], day: number, now: number): PuppyEvent[] {
   const start = new Date(day);
