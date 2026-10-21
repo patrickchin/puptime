@@ -86,13 +86,13 @@ function PreviewFlow(){
     <Text style={styles.optional}>{step!=='review'&&step!=='done'?'Optional':''}</Text>
   </View>;
   const footer=(label:string,onPress:()=>void,skipLabel:string,skip:()=>void)=><View style={styles.footer}>
-    <Pressable testID="preview.continue" accessibilityRole="button" onPress={onPress} style={({pressed})=>[styles.primary,pressed&&styles.pressed]}>
+    <Pressable testID="preview.continue" accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({pressed})=>[styles.primary,pressed&&styles.pressed]}>
       <Text style={styles.primaryText}>{label}</Text><MaterialCommunityIcons name="arrow-right" size={20} color={theme.onPrimary}/>
     </Pressable>
     <Pressable testID="preview.skip" accessibilityRole="button" onPress={skip} style={styles.secondary}><Text style={styles.secondaryText}>{skipLabel}</Text></Pressable>
   </View>;
   const later=(label:string,onPress:()=>void)=><View style={styles.footer}><Pressable testID="preview.skip" accessibilityRole="button" onPress={onPress} style={styles.secondary}><Text style={styles.secondaryText}>{label}</Text></Pressable></View>;
-  const choice=(id:string,label:string,onPress:()=>void)=><Pressable key={id} testID={`preview.choice.${id}`} accessibilityRole="button" onPress={onPress} style={({pressed})=>[styles.choice,pressed&&styles.choicePressed]}>
+  const choice=(id:string,label:string,onPress:()=>void)=><Pressable key={id} testID={`preview.choice.${id}`} accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({pressed})=>[styles.choice,pressed&&styles.choicePressed]}>
     <Text style={styles.choiceText}>{label}</Text><MaterialCommunityIcons name="chevron-right" size={21} color={theme.primary}/>
   </Pressable>;
   const prompt=(title:string,body?:string)=><View style={styles.prompt}><Text accessibilityRole="header" accessibilityLiveRegion="polite" style={styles.title}>{title}</Text>{body?<Text style={styles.body}>{body}</Text>:null}</View>;
