@@ -1,0 +1,30 @@
+appId: com.patrickchin.puptime
+name: Sign-in preserves all guest history before explicit sync
+---
+- launchApp:
+    stopApp: false
+- scrollUntilVisible:
+    element:
+      id: account.code.input
+    direction: DOWN
+- tapOn:
+    id: account.code.input
+- inputText: ${MAESTRO_TEST_CODE}
+- tapOn: Sign-in code
+- scrollUntilVisible:
+    element:
+      id: account.verify
+    direction: DOWN
+- tapOn:
+    id: account.verify
+- extendedWaitUntil:
+    visible:
+      id: account.enable
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: account.local.count
+    direction: UP
+- assertVisible:
+    id: account.local.count
+    text: ${MAESTRO_EXPECTED_COUNT} activity logs

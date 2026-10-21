@@ -1,0 +1,37 @@
+appId: com.patrickchin.puptime
+name: Explicit Enable or Combine preserves and uploads guest history
+---
+- launchApp:
+    stopApp: false
+- scrollUntilVisible:
+    element:
+      id: account.enable
+    direction: DOWN
+- runFlow:
+    when:
+      visible:
+        id: account.samePuppy
+    commands:
+      - assertVisible:
+          id: account.enable
+          enabled: false
+      - tapOn:
+          id: account.samePuppy
+- scrollUntilVisible:
+    element:
+      id: account.enable
+    direction: DOWN
+- tapOn:
+    id: account.enable
+- extendedWaitUntil:
+    visible:
+      id: account.status
+      text: Up to date
+    timeout: 90000
+- scrollUntilVisible:
+    element:
+      id: account.local.count
+    direction: UP
+- assertVisible:
+    id: account.local.count
+    text: ${MAESTRO_EXPECTED_COUNT} activity logs

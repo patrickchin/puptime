@@ -1,0 +1,18 @@
+appId: com.patrickchin.puptime
+name: Guest history stays visible before requesting sign-in
+---
+- launchApp
+- runFlow: ../helpers/open-account.yaml
+- assertVisible:
+    id: account.local.count
+    text: ${MAESTRO_EXPECTED_COUNT} activity logs
+- tapOn:
+    id: account.email.input
+- setClipboard: ${TEST_EMAIL}
+- pasteText
+- tapOn:
+    id: account.sendCode
+- extendedWaitUntil:
+    visible:
+      id: account.code.input
+    timeout: 30000
