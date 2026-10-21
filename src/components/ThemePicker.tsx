@@ -86,7 +86,7 @@ export function ThemePicker({
           <View style={styles.heading}>
             <View style={styles.headingCopy}>
               <Text
-                numberOfLines={1}
+                maxFontSizeMultiplier={1.5}
                 style={[
                   styles.title,
                   {
@@ -170,8 +170,8 @@ export function ThemePicker({
                     />
                   </View>
                   <View style={styles.choiceCopy}>
-                    <Text style={[styles.choiceLabel, headingStyle(preview), { color: theme.text }]}>{label}</Text>
-                    <Text style={[styles.choiceDescription, { color: theme.textMuted }]}>{description}</Text>
+                    <Text maxFontSizeMultiplier={2} style={[styles.choiceLabel, headingStyle(preview), { color: theme.text }]}>{label}</Text>
+                    <Text maxFontSizeMultiplier={2} style={[styles.choiceDescription, { color: theme.textMuted }]}>{description}</Text>
                   </View>
                   <View
                     accessibilityElementsHidden
@@ -249,9 +249,9 @@ export function ThemePicker({
                     color={active ? theme.primary : theme.textMuted}
                   />
                   <View style={styles.choiceCopy}>
-                    <Text style={[styles.choiceLabel, { color: theme.text }]}>{label}</Text>
+                    <Text maxFontSizeMultiplier={2} style={[styles.choiceLabel, { color: theme.text }]}>{label}</Text>
                     {preference === 'system' ? (
-                      <Text style={[styles.choiceDescription, { color: theme.textMuted }]}>{detail}</Text>
+                      <Text maxFontSizeMultiplier={2} style={[styles.choiceDescription, { color: theme.textMuted }]}>{detail}</Text>
                     ) : null}
                   </View>
                   <MaterialCommunityIcons
