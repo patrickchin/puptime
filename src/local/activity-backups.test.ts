@@ -50,7 +50,10 @@ test('failed writes, corrupt snapshots and unrelated files preserve prior backup
   assert.equal((await f.service.list()).unreadable, 1);
   await assert.rejects(f.service.restore(damaged));
   await assert.rejects(f.service.read('../data.db'));
+  const read = f.files.read;
+  f.files.read = async id => { if (id === damaged) throw new Error('unreadable file'); return read(id); };
   f.advance(); await f.service.capture(); assert.equal(f.disk.get(damaged), '{broken'); assert.ok(f.disk.has('unrelated.json'));
+  assert.equal((await f.service.list()).unreadable, 1);
 });
 
 test('SQLite recovery restores exact activity fields, preserves edits, deduplicates and rolls back nap conflicts', async t => {

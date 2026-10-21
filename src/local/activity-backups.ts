@@ -35,9 +35,8 @@ export function createActivityBackups(options: {
     const backups: BackupSummary[] = []; let unreadable = 0;
     for (const file of await files.list()) {
       if (!backupFileName.test(file.id)) continue;
-      const content = await files.read(file.id);
       try {
-        const { events, ...metadata } = parse(content);
+        const { events, ...metadata } = parse(await files.read(file.id));
         backups.push({ ...metadata, id: file.id, bytes: file.bytes, count: events.length });
       } catch { unreadable++; } // Preserve damaged files for manual recovery.
     }
