@@ -115,14 +115,16 @@ explicitly adopted full plan.
 Additional iOS checks cover the full guest journey, the explicit provider-preview
 disclosure, the real notification-permission sheet, declining permission, and
 the handoff into the actual log screen with its contextual hint.
-The final interaction pass after the full-plan retention adjustment is pending:
-computer control is blocked while the host Mac is locked. Its filtering behavior
-is covered by the focused test above.
+The final iOS pass verifies that an adopted full plan survives Back navigation,
+notification setup can be skipped, the guide can be dismissed without logging,
+and a real quick action creates an entry and its acknowledgment. The entry opens
+and closes in the native editor. Fresh simulator captures include the keyboard,
+meal question, reminder choice, ready page, contextual guide, and first log.
 
 Android verification uses the dedicated **Puptime_Onboarding_2f17** emulator and
 an ignored native QA fixture with 1,382 synthetic records. The hint and populated
 history render correctly. A temporary EventRow render probe records 58 loaded
-rows: opening the log editor changes none of their counters. The QA entry,
+rows: opening and closing the log editor changes none of their counters. The QA entry,
 instrumentation, APK, and records remain under ignored build output; no fixtures
 or debug entry points are added to production.
 
