@@ -33,7 +33,7 @@ body:has(.marketing-site){overflow-y:auto}
 .hero-copy{position:relative;z-index:1;padding-bottom:30px}
 .hero h1{font-size:var(--display);letter-spacing:-.045em;line-height:.94;max-width:10em}
 .hero-copy>p:first-of-type{font-size:var(--lead);line-height:1.4;max-width:33ch;margin-top:28px}
-.primary-action{background:var(--ochre);color:var(--ink)!important;display:inline-flex;justify-content:space-between;align-items:center;gap:48px;padding:16px 24px;margin-top:32px;min-height:56px;font-weight:700;border-radius:12px}
+.primary-action{background:var(--lime);color:var(--ink)!important;display:inline-flex;justify-content:space-between;align-items:center;gap:48px;padding:16px 24px;margin-top:32px;min-height:56px;font-weight:700;border-radius:0}
 .primary-action:hover{transform:translateY(-3px)}
 .hero-note{margin-top:20px;font-size:var(--small)}
 .hero-art{position:relative;align-self:stretch;display:flex;align-items:center;justify-content:center;min-width:0}
