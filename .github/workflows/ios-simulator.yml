@@ -101,6 +101,9 @@ jobs:
             .maestro/conversational
           node scripts/verify-ios-conversational-failures.mjs \
             "$onboarding_device" --replace-synthetic build/onboarding-failure-results
+          node scripts/verify-ios-guest-account.mjs \
+            "$onboarding_device" build/onboarding-ci/Puptime.app \
+            --replace-synthetic build/guest-account-ios
       - name: Upload Maestro results
         if: always()
         uses: actions/upload-artifact@v6
@@ -112,6 +115,7 @@ jobs:
             build/onboarding-maestro-report.xml
             build/onboarding-maestro-results
             build/onboarding-failure-results
+            build/guest-account-ios
           if-no-files-found: warn
           retention-days: 7
       - name: Capture App Store screenshots

@@ -20,6 +20,14 @@ name: Notification deny reaches the normal app and survives Back
     text: "Set up reminders"
 - tapOn:
     id: "preview.reminders.allow"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      # Android may offer a second request before treating denial as permanent.
+      - tapOn:
+          text: "Don.t [Aa]llow"
+          optional: true
 - assertVisible:
     id: "preview.ready"
 - runFlow: "../helpers/conversational/finish-alone.yaml"

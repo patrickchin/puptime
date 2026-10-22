@@ -89,7 +89,7 @@ name: iOS side navigation and notification preferences
     id: notifications.timing.pottyAfterPee.time
 - assertVisible:
     id: notifications.timing.option.120
-    text: radio button, checked
+    checked: true
 - tapOn:
     id: notifications.timing.option.60
 - assertVisible:

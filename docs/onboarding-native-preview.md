@@ -1,12 +1,14 @@
 # Native conversational onboarding
 
-`index.onboarding-preview.tsx` runs the real `PuptimeApp` with the conversational
-first-run design enabled. The normal entry keeps the existing first-launch UI
-while this draft is reviewed. Both entries use the same native app, SQLite
-storage, schedule, Notifications section, logging, and navigation after setup.
+The normal native entry now enables the conversational first-run design.
+`index.onboarding-preview.tsx` also enables it for isolated design verification.
+Both entries use the same native app, SQLite storage, schedule, Notifications
+section, logging, and navigation after setup. The browser entry retains its
+existing first-launch UI.
 There is no stripped-down home screen or route back into onboarding from a plan
 shortcut. Provider buttons still disclose that sign-in is not connected in this
-design preview and offer the guest route.
+design preview and offer the guest route. Actual email/provider authentication
+remains available through Settings → Backup and sync after setup.
 
 ## Journey
 

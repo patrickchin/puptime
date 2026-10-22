@@ -1,0 +1,54 @@
+appId: com.patrickchin.puptime
+name: Account preservation add-logs
+---
+- assertTrue: ${Number(BATCHES) >= 1 && Number(BATCHES) <= 4}
+- launchApp:
+    stopApp: false
+    permissions: {}
+- scrollUntilVisible:
+    element:
+      id: account.back
+    direction: UP
+- tapOn:
+    id: account.back
+- tapOn:
+    id: settings.back
+- assertVisible:
+    id: screen.today
+- repeat:
+    times: ${BATCHES}
+    commands:
+      - tapOn:
+          id: quick.pee
+      - tapOn:
+          id: quick.poop
+      - tapOn:
+          id: quick.meal
+- runFlow:
+    when:
+      true: ${BATCHES != '1'}
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: event.meal.edit
+          direction: DOWN
+      - tapOn:
+          id: event.meal.edit
+          index: 0
+      - scrollUntilVisible:
+          element:
+            id: editor.note.input
+          direction: DOWN
+      - tapOn:
+          id: editor.note.input
+      - inputText: Saved before and after sign-in
+      - scrollUntilVisible:
+          element:
+            id: editor.close
+          direction: UP
+      - tapOn:
+          id: editor.close
+- runFlow: ../helpers/open-account.yaml
+- assertVisible:
+    id: account.local.count
+    text: ${EXPECTED_COUNT} activity logs

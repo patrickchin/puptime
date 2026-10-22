@@ -15,9 +15,20 @@ name: Native hour minute AM PM and midnight windows
     id: "preview.choice.meals-1"
 - tapOn:
     id: "preview.mealTime.0"
-- tapOn:
-    id: time.nativeWheel
-    point: "76%,36%"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: time.nativeWheel
+          point: "76%,36%"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          id: time.wheel.period
+          point: "50%,30%"
 - tapOn:
     id: "picker.done"
 - assertVisible:
@@ -25,9 +36,20 @@ name: Native hour minute AM PM and midnight windows
     text: ".*12:00.*AM.*"
 - tapOn:
     id: "preview.mealTime.0"
-- tapOn:
-    id: time.nativeWheel
-    point: "50%,64%"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: time.nativeWheel
+          point: "50%,64%"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          id: time.wheel.minute
+          point: "50%,70%"
 - tapOn:
     id: "picker.done"
 - assertVisible:
@@ -40,15 +62,29 @@ name: Native hour minute AM PM and midnight windows
     text: ".*12:31.*AM.*1:01.*AM.*"
 - tapOn:
     id: "preview.poopTime.0"
-- tapOn:
-    id: time.nativeWheel
-    point: "28%,36%"
-- tapOn:
-    id: time.nativeWheel
-    point: "76%,36%"
-- tapOn:
-    id: time.nativeWheel
-    point: "76%,64%"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: time.nativeWheel
+          point: "28%,36%"
+      - tapOn:
+          id: time.nativeWheel
+          point: "76%,36%"
+      - tapOn:
+          id: time.nativeWheel
+          point: "76%,64%"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          id: time.wheel.hour
+          point: "50%,30%"
+      - tapOn:
+          id: time.wheel.period
+          point: "50%,70%"
 - tapOn:
     id: "picker.done"
 - assertVisible:

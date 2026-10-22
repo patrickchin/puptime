@@ -1,0 +1,15 @@
+appId: com.patrickchin.puptime
+name: Account preservation waits for automatic sync
+---
+- launchApp:
+    stopApp: false
+    permissions: {}
+- scrollUntilVisible:
+    element:
+      id: account.status
+    direction: UP
+- extendedWaitUntil:
+    visible:
+      id: account.status
+      text: Up to date
+    timeout: 45000

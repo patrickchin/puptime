@@ -105,7 +105,7 @@ configureReminderHandling();
 
 const nativeApp = Platform.OS !== 'web';
 
-export default function App(){return <PuptimeApp/>;}
+export default function App(){return <PuptimeApp conversationalOnboarding={Platform.OS!=='web'}/>;}
 
 export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboarding?:boolean}={}) {
   const colorScheme = useColorScheme();

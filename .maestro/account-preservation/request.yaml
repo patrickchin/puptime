@@ -1,0 +1,28 @@
+appId: com.patrickchin.puptime
+name: Account preservation request
+---
+- launchApp:
+    stopApp: false
+    permissions: {}
+- runFlow: ../helpers/open-account.yaml
+- tapOn:
+    id: account.refresh
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: account.email.input
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: account.email.input
+    direction: DOWN
+- tapOn:
+    id: account.email.input
+- eraseText: 300
+- inputText: ${TEST_EMAIL}
+- tapOn:
+    id: account.sendCode
+- extendedWaitUntil:
+    visible:
+      id: account.code.input
+    timeout: 30000

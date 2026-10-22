@@ -1,0 +1,30 @@
+appId: com.patrickchin.puptime
+name: Account preservation sign-out
+---
+- launchApp:
+    stopApp: false
+    permissions: {}
+- scrollUntilVisible:
+    element:
+      id: account.status
+    direction: UP
+- extendedWaitUntil:
+    visible:
+      id: account.status
+      text: Up to date
+    timeout: 45000
+- scrollUntilVisible:
+    element:
+      id: account.signOut
+    direction: DOWN
+- tapOn:
+    id: account.signOut
+- assertVisible: ^Sign out on this device\?$
+- tapOn:
+    text: ^Sign out$
+    rightOf:
+      text: ^Cancel$
+- extendedWaitUntil:
+    visible:
+      id: account.email.input
+    timeout: 30000

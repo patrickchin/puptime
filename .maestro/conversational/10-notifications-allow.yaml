@@ -9,7 +9,7 @@ name: Notification allow reaches the normal app and survives Back
 - tapOn:
     id: "preview.reminders.allow"
 - tapOn:
-    text: "^Allow$"
+    text: "(?i)^Allow$"
 - assertVisible:
     id: "preview.ready"
 - assertVisible: You can change reminders in Notifications.
