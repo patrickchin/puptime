@@ -88,7 +88,7 @@ function snapshot(){const db=database();try{return {
 async function remote(){
   assert.ok(cookie,'Use the actual SDK session observed by the local proxy.');
   const page=await new Promise((resolvePage,reject)=>{
-    const req=(android?request:secureRequest)(front+'/api/sync/pull?after=0',{...(certificate?{ca:certificate}:{}),headers:{cookie,origin:front}},response=>{
+    const req=secureRequest(front+'/api/sync/pull?after=0',{...(certificate?{ca:certificate}:{}),headers:{cookie,origin:front}},response=>{
       let body='';response.on('data',data=>{body+=data;});response.on('end',()=>{try{assert.equal(response.statusCode,200);resolvePage(JSON.parse(body));}catch(error){reject(error);}});
     });req.on('error',reject);req.end();
   });assert.equal(page.hasMore,false);
