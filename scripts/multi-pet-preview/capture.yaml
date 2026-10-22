@@ -1,0 +1,77 @@
+appId: com.patrickchin.puptime
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: preview.pets
+    timeout: 30000
+- waitForAnimationToEnd
+- takeScreenshot: 01-log-two-pets
+- tapOn:
+    id: preview.pets
+- waitForAnimationToEnd
+- takeScreenshot: 02-manage-pets
+- tapOn:
+    id: preview.modal.done
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.timeline
+- waitForAnimationToEnd
+- takeScreenshot: 03-timeline-mochi
+- tapOn:
+    id: preview.scope
+- waitForAnimationToEnd
+- takeScreenshot: 04-pet-picker
+- tapOn:
+    id: preview.select.pet_preview_1
+- waitForAnimationToEnd
+- takeScreenshot: 05-timeline-maple
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.insights
+- waitForAnimationToEnd
+- takeScreenshot: 06-insights-maple
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.schedule
+- waitForAnimationToEnd
+- takeScreenshot: 07-routine-maple
+- tapOn:
+    id: preview.scope
+- tapOn:
+    id: preview.select.pet_preview_0
+- waitForAnimationToEnd
+- takeScreenshot: 08-routine-mochi
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.notifications
+- waitForAnimationToEnd
+- takeScreenshot: 09-reminders-mochi
+- tapOn:
+    id: settings.open
+- waitForAnimationToEnd
+- takeScreenshot: 10-settings
+- tapOn:
+    id: preview.widget
+- tapOn:
+    id: preview.select.pet_preview_1
+- waitForAnimationToEnd
+- takeScreenshot: 11-widget-maple
+- tapOn:
+    id: preview.modal.done
+- tapOn:
+    id: preview.dark
+- waitForAnimationToEnd
+- takeScreenshot: 12-dark-settings
+- tapOn:
+    id: settings.open
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.log
+- waitForAnimationToEnd
+- takeScreenshot: 13-dark-log

@@ -1,0 +1,74 @@
+appId: com.patrickchin.puptime
+---
+- launchApp
+- tapOn:
+    id: preview.quick.pet_preview_1.pee
+- assertVisible: Pee logged for Maple
+- waitForAnimationToEnd
+- takeScreenshot: 14-log-maple-confirmation
+- tapOn:
+    id: preview.undo
+- tapOn:
+    id: preview.filter
+- tapOn:
+    id: preview.select.pet_preview_1
+- waitForAnimationToEnd
+- takeScreenshot: 15-maple-history
+- tapOn:
+    id: preview.pets
+- tapOn:
+    id: preview.add
+- tapOn:
+    id: preview.name
+- inputText: Mochi
+- tapOn:
+    id: preview.name.save
+- assertVisible: Another pet uses that name. Add a nickname.
+- waitForAnimationToEnd
+- takeScreenshot: 16-name-error
+- tapOn:
+    id: preview.name
+- eraseText: 30
+- inputText: Sir Waffles Wellington
+- waitForAnimationToEnd
+- takeScreenshot: 17-add-pet
+- tapOn:
+    id: preview.name.save
+- assertVisible: 3 pets
+- scrollUntilVisible:
+    element:
+      text: No logs yet
+    direction: DOWN
+- scrollUntilVisible:
+    element:
+      text: Log an activity for Sir Waffles Wellington above.
+    direction: DOWN
+- waitForAnimationToEnd
+- takeScreenshot: 18-new-pet-empty
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.schedule
+- waitForAnimationToEnd
+- takeScreenshot: 19-new-pet-routine
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.log
+- scrollUntilVisible:
+    element:
+      id: preview.pets
+    direction: UP
+- tapOn:
+    id: preview.pets
+- tapOn:
+    id: preview.select.pet_preview_1
+- tapOn:
+    id: preview.name
+- eraseText: 30
+- inputText: Maple Rose
+- tapOn:
+    id: preview.name.save
+- assertVisible: '.*Maple Rose.*'
+- waitForAnimationToEnd
+- takeScreenshot: 20-renamed-pet
