@@ -152,9 +152,9 @@ function PreviewFlow({cloud,onFinish,onAllowNotifications,onDisableNotifications
   }
   const header=<View style={styles.header}>
     {step!=='welcome'?<Pressable testID="preview.back" accessibilityRole="button" accessibilityLabel="Go back" disabled={requestingReminders||signingIn} accessibilityState={{disabled:requestingReminders||signingIn}} onPress={back} style={styles.back}>
-      <MaterialCommunityIcons name="chevron-left" size={18} color={theme.textMuted}/><Text style={styles.backText}>Back</Text>
+      <MaterialCommunityIcons name="chevron-left" size={18} color={theme.textMuted}/><Text maxFontSizeMultiplier={1.5} style={styles.backText}>Back</Text>
     </Pressable>:<View style={styles.back}/>}
-    <View style={styles.brand}><Image source={require('../../assets/puptime-icon.png')} style={styles.icon}/><Text style={styles.brandName}>Puptime</Text></View>
+    <View style={styles.brand}><Image source={require('../../assets/puptime-icon.png')} style={styles.icon}/><Text maxFontSizeMultiplier={1.3} style={styles.brandName}>Puptime</Text></View>
     <View style={styles.headerSpacer}/>
   </View>;
   const footer=(label:string,onPress:()=>void,skipLabel:string,skip:()=>void)=><View style={styles.footer}>
