@@ -1,0 +1,29 @@
+appId: com.patrickchin.puptime
+name: Welcome sign-in requests a real email code
+---
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: deny
+- extendedWaitUntil:
+    visible:
+      id: account.email.open
+    timeout: 90000
+- assertNotVisible: Sign-in design preview
+- tapOn:
+    id: account.email.open
+- assertVisible:
+    id: preview.account
+- tapOn:
+    id: account.email.input
+- inputText: ${TEST_EMAIL}
+- scrollUntilVisible:
+    element:
+      id: account.sendCode
+    direction: DOWN
+- tapOn:
+    id: account.sendCode
+- extendedWaitUntil:
+    visible:
+      id: account.code.input
+    timeout: 30000

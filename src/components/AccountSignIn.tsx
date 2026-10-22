@@ -27,7 +27,7 @@ export function accountProblemKey(problem:AccountProblem|null):MessageKey|null {
   if(problem==='provider-unavailable'||problem==='server-error'||problem==='invalid-response'||problem==='account-deleted'||problem==='forbidden')return 'account.error.service';
   return 'account.error.signIn';
 }
-export function AccountSignIn({cloud,theme,showError=true,showIntro=true}:{cloud:CloudHandle;theme:Theme;showError?:boolean;showIntro?:boolean}) {
+export function AccountSignIn({cloud,theme,showError=true,showIntro=true,onEmailPress}:{cloud:CloudHandle;theme:Theme;showError?:boolean;showIntro?:boolean;onEmailPress?:()=>void}) {
  const {t}=useLocalization(),state=useAccountSnapshot(cloud.controller);
  const [email,setEmail]=useState(''),[code,setCode]=useState(''),[editingEmail,setEditingEmail]=useState(false);
  const [nativeAppleAvailable,setNativeAppleAvailable]=useState(false);
@@ -56,7 +56,7 @@ export function AccountSignIn({cloud,theme,showError=true,showIntro=true}:{cloud
             onPress={()=>{if(!busy&&state.online)void cloud.controller!.signInSocial('apple');}}/>:null)
             :<AccountButton theme={theme} testID="account.apple" label={t('account.apple')} icon="apple" disabled={busy||!state.online} onPress={()=>{void cloud.controller!.signInSocial('apple');}}/>):null}
           {state.config.providers.google?(Platform.OS==='ios'?<GoogleSigninButton testID="account.google" size={GoogleSigninButton.Size.Wide} color={theme.isDark?GoogleSigninButton.Color.Dark:GoogleSigninButton.Color.Light} disabled={busy||!state.online} accessibilityState={{disabled:busy||!state.online,busy}} style={{height:52,width:'100%'}} onPress={()=>{if(!busy&&state.online)void cloud.controller!.signInSocial('google');}}/>:<AccountButton theme={theme} testID="account.google" label={t('account.google')} icon="google" disabled={busy||!state.online} onPress={()=>{void cloud.controller!.signInSocial('google');}}/>):null}
-          {state.config.providers.email?state.codeSentTo&&!editingEmail?(<View style={styles.stack}>
+          {state.config.providers.email?onEmailPress?<AccountButton theme={theme} testID="account.email.open" label={t('account.continueEmail')} icon="email-outline" disabled={busy||!state.online} onPress={onEmailPress}/>:state.codeSentTo&&!editingEmail?(<View style={styles.stack}>
             <Text style={[styles.body,{color:theme.text}]}>{t('account.codeSent',{email:state.codeSentTo})}</Text>
             <Text style={[styles.label,{color:theme.text}]}>{t('account.code')}</Text>
             <TextInput testID="account.code.input" accessibilityLabel={t('account.code')} style={inputStyle} value={code} onChangeText={text=>setCode(text.replace(/\D/g,'').slice(0,6))} keyboardType="number-pad" textContentType="oneTimeCode" autoComplete="one-time-code" maxLength={6} selectTextOnFocus editable={!busy} />
@@ -68,7 +68,7 @@ export function AccountSignIn({cloud,theme,showError=true,showIntro=true}:{cloud
             <TextInput testID="account.email.input" accessibilityLabel={t('account.email')} style={inputStyle} value={email} onChangeText={setEmail} keyboardType="email-address" textContentType="emailAddress" autoComplete="email" autoCapitalize="none" autoCorrect={false} editable={!busy} returnKeyType="send" onSubmitEditing={()=>{if(!busy)void cloud.controller!.requestEmail(email).then(result=>{if(result==='ok')setEditingEmail(false);});}} />
             <AccountButton theme={theme} testID="account.sendCode" label={t('account.sendCode')} primary disabled={busy||!state.online||!email.trim()} loading={busy} onPress={()=>{void cloud.controller!.requestEmail(email).then(result=>{if(result==='ok')setEditingEmail(false);});}}/>
           </View>):null}
-          <AccountButton theme={theme} testID="account.refresh" label={t('account.refresh')} disabled={busy||!state.online} onPress={()=>{void cloud.controller!.refresh();}}/>
+          {!onEmailPress||state.problem?<AccountButton theme={theme} testID="account.refresh" label={t('account.refresh')} disabled={busy||!state.online} onPress={()=>{void cloud.controller!.refresh();}}/>:null}
 
   </>}
  </View>;

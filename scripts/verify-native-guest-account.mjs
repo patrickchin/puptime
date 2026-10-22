@@ -11,17 +11,18 @@ import {DatabaseSync} from 'node:sqlite';
 import {eventSqlColumns,eventDataFromSql} from '../src/record-sql.ts';
 import {localRecordId} from '../src/cloud/record-identity.ts';
 
-const [platform,device,host,consent,destination='build/guest-account-'+platform]=process.argv.slice(2);
+const [platform,device,host,consent,destination='build/guest-account-'+platform,onboarding]=process.argv.slice(2);
 assert.ok(['ios','android'].includes(platform));
+assert.ok(onboarding===undefined||onboarding==='--onboarding-sign-in');
 const android=platform==='android';
 assert.equal(consent,'--replace-synthetic','Use PLATFORM DEVICE HOST --replace-synthetic [OUTPUT].');
 const app='com.patrickchin.puptime',output=resolve(destination),front='https://127.0.0.1:8797';
 const simctl=(...args)=>execFileSync('xcrun',['simctl',...args],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
 const adb=(...args)=>execFileSync('adb',['-s',device,...args],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
-if(android){assert.match(adb('emu','avd','name'),/^Puptime_Onboarding_2f17/);assert.ok(existsSync(host),'Supply a debuggable native APK.');}
+if(android){assert.match(adb('emu','avd','name'),/^Puptime_(Onboarding_2f17|SignIn_461a)/);assert.ok(existsSync(host),'Supply a debuggable native APK.');}
 else{
   const devices=Object.values(JSON.parse(simctl('list','devices','available','-j')).devices).flat();
-  assert.match(devices.find(item=>item.udid===device)?.name??'',/^Puptime (2f17 Onboarding|Onboarding CI)/);
+  assert.match(devices.find(item=>item.udid===device)?.name??'',/^Puptime (2f17 Onboarding|Onboarding CI|SignIn 461a)/);
   assert.ok(existsSync(join(host,'Info.plist')),'Supply a current native simulator host.');
   assert.ok(execFileSync('otool',['-arch','arm64','-s','__TEXT','__entitlements',join(host,'Puptime')],{encoding:'utf8'}).includes('Contents of (__TEXT,__entitlements)'),
     'Build the simulator host with CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- so SecureStore has its simulator entitlements.');
@@ -178,11 +179,23 @@ try{
     console.log('PASS isolated Android HTTPS native build');
   }else{
   const bundle=join(privateDir,'Puptime.app');cpSync(host,bundle,{recursive:true});
-  await run('node',['node_modules/expo/bin/cli','export:embed','--entry-file','index.ts','--platform','ios','--dev','false','--bytecode','--max-workers','2','--bundle-output',join(bundle,'main.jsbundle'),'--assets-dest',bundle],
+  await run('node',['node_modules/expo/bin/cli','export:embed','--entry-file','index.ts','--platform','ios','--dev','false','--bytecode','--reset-cache','--max-workers','2','--bundle-output',join(bundle,'main.jsbundle'),'--assets-dest',bundle],
     {...process.env,EXPO_PUBLIC_CLOUD_API_URL:front});
+  assert.ok(readFileSync(join(bundle,'main.jsbundle')).includes(Buffer.from(front)),'Embed the fixture HTTPS address, never a cached production API.');
   await run('codesign',['--force','--deep','--sign','-',bundle]);
   simctl('install',device,bundle);
   }
+  if(onboarding){
+    await flow('onboarding-request');
+    code=auth.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(email)?.code;
+    assert.match(code??'',/^\d{6}$/);codes.add(code);
+    await flow('onboarding-verify');code='';
+    assert.ok(cookie,'Welcome sign-in must persist the real SDK session.');
+    assert.equal(snapshot().events.length,0);assert.equal(snapshot().owner.length,0);assert.equal(snapshot().pending,0);
+    assert.ok(!requests.has('/api/cloud/enroll')&&!requests.has('/api/sync/push'),'Sign-in must not enroll or upload.');
+    checks.push('welcome email sign-in uses the real SDK, rejects a wrong code, resumes setup after verification and cold restart, and never enrolls or uploads');
+  }
+  if(!onboarding){
   await flow('prepare');assert.equal(snapshot().events.length,0);
   assert.ok(requests.has('/api/config'),'The real app must reach this isolated backend before any sign-in attempt.');
   await flow('add-logs',{BATCHES:'4',EXPECTED_COUNT:'12'});const guest=snapshot();assert.equal(guest.events.length,12);assert.equal(guest.owner.length,0);
@@ -207,9 +220,10 @@ try{
   assert.deepEqual(await remote(),cloudBefore,'Restoring must not mutate the remote event records.');
   await flow('reopen',{EXPECTED_COUNT:'21'});assert.deepEqual(snapshot().events,combined.events);assert.equal(snapshot().pending,0);
   checks.push('all 21 logs restore into an empty database and survive cold restart, with no remote mutation or outbound backlog');
+  }
   rmSync(join(output,'failure-redacted.log'),{force:true});
   writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',checks,scope:android?'Android Debug native host with normal embedded release JS and isolated local HTTPS Better Auth/D1/SQLite DO; actual native email SDK and Keystore. Its temporary CA is trusted only in the ignored Debug source set, restored after the run. Production onboarding is tested separately in the Release APK. No real email, production account, session injection or mocked sync.':'Release bundle and actual native email SDK with isolated local HTTPS Better Auth/D1/SQLite DO. Simulator trusts the fixture certificate. No real email, production account, session injection or mocked sync.'},null,2)+'\n');
-  console.log('PASS guest account preservation and empty-device recovery: '+output);
+  console.log('PASS '+(onboarding?'welcome sign-in and session recovery':'guest account preservation and empty-device recovery')+': '+output);
 }finally{
   auth?.close();proxy?.close();for(const child of [worker])if(child?.pid)try{process.kill(-child.pid,'SIGTERM');}catch{}
   if(android)try{adb('reverse','--remove','tcp:8797');}catch{}

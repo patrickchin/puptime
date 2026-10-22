@@ -6,9 +6,11 @@ Both entries use the same native app, SQLite storage, schedule, Notifications
 section, logging, and navigation after setup. The browser entry retains its
 existing first-launch UI.
 There is no stripped-down home screen or route back into onboarding from a plan
-shortcut. Provider buttons still disclose that sign-in is not connected in this
-design preview and offer the guest route. Actual email/provider authentication
-remains available through Settings → Backup and sync after setup.
+shortcut. Welcome uses the same configured Apple, Google and email sign-in
+controls as Settings → Backup and sync. Email opens the existing code form;
+successful sign-in continues to puppy setup and survives restart. Signing in
+does not enroll a puppy or upload history. Cloud sync remains an explicit choice
+in Settings → Backup and sync. Guest setup works without signing in.
 
 ## Journey
 
@@ -110,6 +112,20 @@ After installing the conversational build on that device, run the complete flows
 ```sh
 maestro --device DEVICE_ID test .maestro/conversational
 ```
+
+Welcome sign-in has an isolated HTTPS/Better Auth email regression. It rejects
+a wrong code, signs in through the real native SDK, resumes puppy setup after a
+cold restart, and checks that no puppy was enrolled and no history was uploaded:
+
+```sh
+node scripts/verify-native-guest-account.mjs ios DEVICE_ID /path/to/Puptime.app \
+  --replace-synthetic build/welcome-account-ios --onboarding-sign-in
+```
+
+Use only a dedicated synthetic installation. The same mode accepts `android`
+with a debuggable APK; the harness embeds the current app bundle and trusts its
+temporary local CA only in that Debug build. Real Apple/Google credential entry
+and real inbox delivery are separate from this isolated regression.
 
 The iOS Simulator pull-request workflow builds this entry into a separate copy
 of the native host and runs these flows on its own CI simulator, uploading a
