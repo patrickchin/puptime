@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { collapseEmptyTimelineDays, timelineDayEvents, timelineDetailTime, timelineExpectedWindows, timelineFormatters } from './timeline-format.ts';
+import { collapseEmptyTimelineDays, timelineDayEvents, timelineDetailTime, timelineExpectedWindows, timelineFormatters, timelineHistoryDayCount } from './timeline-format.ts';
 import { buildTimelineDays } from './analytics.ts';
 
 test('expected routine bands keep exact minutes, repeat across midnight, and follow activity filters', () => {
@@ -52,13 +52,25 @@ test('collapses consecutive empty days while retaining today, isolated days, and
   assert.deepEqual(collapseEmptyTimelineDays([], '2026-10-21'), []);
   const empty = buildTimelineDays([], 90, now);
   const compact = collapseEmptyTimelineDays(empty, '2026-10-21');
-  assert.equal(compact.length, 2);
-  assert.equal('emptyDays' in compact[0] && compact[0].emptyDays, 89);
-  assert.equal(compact[1], empty[89]);
-  // Loading another page extends the same gap, rather than adding repeated separators.
+  assert.deepEqual(compact, empty);
+  // Empty history stays expanded as earlier days are loaded.
   const longer = collapseEmptyTimelineDays(buildTimelineDays([], 104, now), '2026-10-21');
-  assert.equal(longer.length, 2);
-  assert.equal('emptyDays' in longer[0] && longer[0].emptyDays, 103);
+  assert.equal(longer.length, 104);
+});
+
+test('fills tall empty timelines and pads a first log at either edge of the loaded range', () => {
+  assert.equal(timelineHistoryDayCount(16, 28, null), 28);
+  assert.equal(timelineHistoryDayCount(16, 16, 14), 17);
+  assert.equal(timelineHistoryDayCount(16, 16, 15), 18);
+  assert.equal(timelineHistoryDayCount(16, 16, 90), 16);
+  assert.equal(timelineHistoryDayCount(93, 16, 90), 93);
+  const now = new Date(2026, 9, 21, 12);
+  const days = buildTimelineDays([
+    { id: 'evt_first', type: 'pee', at: new Date(2026, 9, 8, 12).getTime(), source: 'app' },
+  ], 18, new Date(2026, 9, 23, 12), now);
+  assert.deepEqual(collapseEmptyTimelineDays(days, '2026-10-21').map(row => row.key), [
+    '2026-10-06', '2026-10-07', '2026-10-08', 'gap-2026-10-09', '2026-10-21', '2026-10-22', '2026-10-23',
+  ]);
 });
 
 test('reuses timeline formatters across activities and tab mounts in every app language', () => {
