@@ -5,6 +5,10 @@ name: Account preservation enable
     stopApp: false
     permissions: {}
 - runFlow: ../helpers/open-account.yaml
+- scrollUntilVisible:
+    element:
+      id: account.enable
+    direction: DOWN
 - runFlow:
     when:
       visible:
@@ -15,12 +19,12 @@ name: Account preservation enable
       - assertVisible:
           id: account.samePuppy
           checked: true
-- scrollUntilVisible:
-    element:
-      id: account.enable
-    direction: DOWN
 - tapOn:
     id: account.enable
+- scrollUntilVisible:
+    element:
+      id: account.status
+    direction: UP
 - extendedWaitUntil:
     visible:
       id: account.status

@@ -18,8 +18,12 @@ name: Account preservation request
     direction: DOWN
 - tapOn:
     id: account.email.input
-- eraseText: 300
+- eraseText: 80
 - inputText: ${TEST_EMAIL}
+- scrollUntilVisible:
+    element:
+      id: account.sendCode
+    direction: DOWN
 - tapOn:
     id: account.sendCode
 - extendedWaitUntil:

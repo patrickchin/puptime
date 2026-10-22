@@ -63,15 +63,21 @@ The same cases and database/remote assertions also run on the dedicated Android
 emulator:
 
 ```sh
-npm run test:e2e:accounts:android -- emulator-5596 \
+ANDROID_HOME=/path/to/android-sdk npm run test:e2e:accounts:android -- emulator-5596 \
   android/app/build/outputs/apk/debug/app-debug.apk --replace-synthetic
 ```
 
-Android uses the native Debug APK and its own local Metro server on port 8081,
-with localhost HTTP explicitly enabled only in the development bundle. The
-production onboarding suite runs separately against the Release APK. The runner
-stops the disposable app before copying its SQLite/WAL files, then reopens the
-actual account destination for each phase. This ensures consistent snapshots
-and also exercises recovery through repeated native cold starts. Ports 8081,
-8797 and 8799 must be free. All authentication, Keystore storage and sync use
-their real implementations; no provider session is injected.
+Android uses the native Debug host with normal embedded release JavaScript,
+rebuilt against the isolated HTTPS service. Set `ANDROID_HOME` (or
+`ANDROID_SDK_ROOT`) and generate the Android project first. The runner temporarily
+adds its fixture CA to the ignored native Debug source set, rebuilds the Debug
+APK and restores those source files afterward. The Release source set is
+untouched, and its production onboarding suite runs separately against the
+Release APK. No Metro server is required.
+
+The runner stops the disposable app before copying its SQLite/WAL files, then
+reopens the actual account destination for each phase. This ensures consistent
+snapshots and exercises recovery through repeated native cold starts. Ports
+8797 and 8799 must be free. It verifies that the actual app reaches the isolated
+backend before attempting sign-in. All authentication, Keystore storage and
+sync use their real implementations; no provider session is injected.
