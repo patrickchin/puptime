@@ -28,6 +28,7 @@ const appTheme:Theme={...lightTheme,surface:'#FFFDF7',surfaceRaised:'#FFFDF7',
 const theme:Theme={...appTheme,isDark:true,background:appTheme.primary,
   surface:'#216F59',surfaceRaised:'#2B7C64',text:'#FFFDF5',textMuted:'#DCE9DD',border:'#598E79',
   primary:'#F7EBD2',onPrimary:'#1B503C',primaryPressed:'#E4D6B8',primarySoft:'#2B7C64',danger:'#FFB7A5'};
+const welcomeAccountTheme:Theme={...theme,surfaceRaised:appTheme.surface,primarySoft:appTheme.primarySoft};
 const mascots=[require('../../assets/mascots/scruffy-terrier.png'),
   require('../../assets/mascots/onboarding/scruffy-ball.png'),
   require('../../assets/mascots/onboarding/scruffy-grass.png'),
@@ -181,13 +182,13 @@ function PreviewFlow({cloud,onFinish,onAllowNotifications,onDisableNotifications
     <View style={styles.welcomeArt}><Image accessible={false} source={mascot} resizeMode="contain" style={styles.mascot}/></View>
     <View style={styles.welcomeActions}>
       <Text style={styles.welcomeQuestion}>How would you like to begin?</Text>
-      <AccountSignIn cloud={cloud} theme={theme} showIntro={false} onEmailPress={()=>go('account')}/>
+      <AccountSignIn cloud={cloud} theme={welcomeAccountTheme} showIntro={false} onEmailPress={()=>go('account')}/>
       <Pressable testID="preview.guest" accessibilityRole="button" disabled={signingIn} accessibilityState={{disabled:signingIn}} onPress={()=>go('profile')} style={styles.secondary}><Text style={[styles.secondaryText,{color:theme.text}]}>Let’s start without an account</Text></Pressable>
     </View>
   </ScrollView>;
   else if(step==='account')body=<ScrollView testID="preview.account" keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={styles.conversation}>
     {prompt('Sign in')}
-    <AccountSignIn cloud={cloud} theme={theme} showIntro={false}/>
+    <View style={styles.emailCard}><AccountSignIn cloud={cloud} theme={appTheme} showIntro={false} emailOnly/></View>
     <Pressable testID="preview.guest" accessibilityRole="button" disabled={signingIn} accessibilityState={{disabled:signingIn}} onPress={()=>go('profile')} style={styles.secondary}><Text style={styles.secondaryText}>Let’s start without an account</Text></Pressable>
   </ScrollView>;
   else if(step==='profile')body=<>
@@ -293,6 +294,7 @@ function PreviewFlow({cloud,onFinish,onAllowNotifications,onDisableNotifications
 }
 
 const styles=StyleSheet.create({
+  emailCard:{padding:20,borderRadius:18,backgroundColor:appTheme.surface},
   welcome:{flexGrow:1,paddingHorizontal:22,paddingTop:28,paddingBottom:12},welcomeBrand:{alignItems:'center',gap:14},welcomeIcon:{width:64,height:64,borderRadius:16},welcomeName:{fontFamily:'RedHatDisplayBold',fontSize:52,lineHeight:60,letterSpacing:-1.5,color:theme.text},welcomeCopy:{fontFamily:'RedHatText',fontSize:15,lineHeight:23,textAlign:'center',color:theme.text,marginTop:14},
   welcomeArt:{flex:1,minHeight:180,alignItems:'center',justifyContent:'center',paddingVertical:22},welcomeActions:{gap:16,paddingTop:18},welcomeQuestion:{fontFamily:'RedHatText',fontSize:16,lineHeight:24,color:theme.text,textAlign:'center'},
   notification:{padding:18,borderRadius:20,borderWidth:1,borderColor:theme.border,backgroundColor:theme.surface,flexDirection:'row',gap:14,alignItems:'center'},notificationCopy:{flex:1,gap:8},error:{fontFamily:'RedHatText',fontSize:15,lineHeight:23,color:theme.danger},

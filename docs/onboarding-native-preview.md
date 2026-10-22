@@ -6,8 +6,9 @@ Both entries use the same native app, SQLite storage, schedule, Notifications
 section, logging, and navigation after setup. The browser entry retains its
 existing first-launch UI.
 There is no stripped-down home screen or route back into onboarding from a plan
-shortcut. Welcome uses the same configured Apple, Google and email sign-in
-controls as Settings → Backup and sync. Email opens the existing code form;
+shortcut. Welcome keeps a compact cream Apple, Google and email row, connected
+to the same account controller as Settings → Backup and sync. iOS provider
+buttons still open the native authentication flows. Email opens a focused cream code form;
 successful sign-in continues to puppy setup and survives restart. Signing in
 does not enroll a puppy or upload history. Cloud sync remains an explicit choice
 in Settings → Backup and sync. Guest setup works without signing in.
