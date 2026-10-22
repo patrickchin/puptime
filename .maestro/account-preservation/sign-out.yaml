@@ -22,9 +22,9 @@ name: Account preservation sign-out
     id: account.signOut
 - assertVisible: ^Sign out on this device\?$
 - tapOn:
-    text: ^Sign out$
+    text: (?i)^Sign out$
     rightOf:
-      text: ^Cancel$
+      text: (?i)^Cancel$
 - extendedWaitUntil:
     visible:
       id: account.email.input

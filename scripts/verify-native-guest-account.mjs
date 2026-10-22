@@ -57,9 +57,12 @@ async function flow(name,env={}){
     console.log('PASS native account phase: '+name);
   }finally{
     if(existsSync(startup))for(const directory of readdirSync(startup).filter(value=>!before.has(value))){
-      const path=join(startup,directory,'maestro.log');if(!existsSync(path))continue;
-      let text=readFileSync(path,'utf8');if(!text.includes(resolve('.maestro/account-preservation',name+'.yaml')))continue;
-      for(const value of codes)text=text.replaceAll(value,'[REDACTED]');writeFileSync(path,text);
+      const root=join(startup,directory);
+      for(const file of readdirSync(root,{recursive:true}).filter(file=>String(file).endsWith('maestro.log'))){
+        const path=join(root,file);let text=readFileSync(path,'utf8');
+        if(!text.includes(resolve('.maestro/account-preservation',name+'.yaml')))continue;
+        for(const value of codes)text=text.replaceAll(value,'[REDACTED]');writeFileSync(path,text);
+      }
     }
     rmSync(artifacts,{recursive:true,force:true});
   }
