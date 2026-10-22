@@ -4,6 +4,7 @@ name: Account preservation reopen
 - launchApp:
     stopApp: false
     permissions: {}
+- runFlow: ../helpers/open-account.yaml
 - scrollUntilVisible:
     element:
       id: account.back

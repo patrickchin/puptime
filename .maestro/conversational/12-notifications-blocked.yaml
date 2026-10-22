@@ -6,6 +6,29 @@ name: Notification blocked reaches the normal app and survives Back
     env:
       NOTIFICATIONS: "deny"
 - runFlow: "../helpers/conversational/to-reminders.yaml"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      # Android's initial denied state can still ask again. Reach its actual
+      # permanent-denial state before verifying a request cannot reopen it.
+      - tapOn:
+          id: preview.reminders.allow
+      - tapOn:
+          text: "Don.t [Aa]llow"
+      - assertVisible:
+          id: preview.ready
+      - tapOn:
+          id: preview.back
+      - tapOn:
+          id: preview.reminders.allow
+      - tapOn:
+          text: "Don.t [Aa]llow"
+          optional: true
+      - assertVisible:
+          id: preview.ready
+      - tapOn:
+          id: preview.back
 - tapOn:
     id: "preview.reminders.allow"
 - assertVisible:

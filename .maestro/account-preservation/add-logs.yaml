@@ -5,6 +5,7 @@ name: Account preservation add-logs
 - launchApp:
     stopApp: false
     permissions: {}
+- runFlow: ../helpers/open-account.yaml
 - scrollUntilVisible:
     element:
       id: account.back

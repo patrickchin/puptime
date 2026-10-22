@@ -2,9 +2,9 @@
 
 Run the conversational native entry (`index.onboarding-preview.tsx`) on a
 dedicated simulator with synthetic data. These flows clear the installation.
-The current verification target is iOS; the Apple wheel boundary flow and native
-failure runner specifically require iOS. This suite does not establish Android
-coverage.
+The decision suite supports iOS and Android, including platform-specific wheel
+selectors and system permission handling. The SQLite failure runner requires
+iOS. Actual device/run results are recorded in the PR validation evidence.
 
 ```sh
 maestro --device DEVICE_ID test .maestro/conversational

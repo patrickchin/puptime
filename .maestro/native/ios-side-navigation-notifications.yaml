@@ -84,12 +84,18 @@ name: iOS side navigation and notification preferences
     direction: DOWN
 - assertVisible:
     id: notifications.timing.pottyAfterPee.enabled
+    checked: false
+- tapOn:
+    id: notifications.timing.pottyAfterPee.enabled
+- assertVisible:
+    id: notifications.timing.pottyAfterPee.enabled
     checked: true
 - tapOn:
     id: notifications.timing.pottyAfterPee.time
 - assertVisible:
     id: notifications.timing.option.120
-    checked: true
+    # Driver versions expose the selected radio via its value or painted check.
+    text: 'radio button, checked|.*✓.*'
 - tapOn:
     id: notifications.timing.option.60
 - assertVisible:
@@ -196,7 +202,7 @@ name: iOS side navigation and notification preferences
     id: notifications.timing.pottyAfterPee.time
 - assertVisible:
     id: notifications.timing.option.60
-    text: radio button, checked
+    text: 'radio button, checked|.*✓.*'
 - tapOn:
     id: notifications.timing.close
 - scrollUntilVisible:

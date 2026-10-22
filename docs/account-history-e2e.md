@@ -56,3 +56,22 @@ are documented separately in `cloud-development.md`.
 
 The iOS Simulator PR workflow runs this test after the onboarding decision suite
 and failure/retry checks and uploads `build/guest-account-ios` as evidence.
+
+## Android
+
+The same cases and database/remote assertions also run on the dedicated Android
+emulator:
+
+```sh
+npm run test:e2e:accounts:android -- emulator-5596 \
+  android/app/build/outputs/apk/debug/app-debug.apk --replace-synthetic
+```
+
+Android uses the native Debug APK and its own local Metro server on port 8081,
+with localhost HTTP explicitly enabled only in the development bundle. The
+production onboarding suite runs separately against the Release APK. The runner
+stops the disposable app before copying its SQLite/WAL files, then reopens the
+actual account destination for each phase. This ensures consistent snapshots
+and also exercises recovery through repeated native cold starts. Ports 8081,
+8797 and 8799 must be free. All authentication, Keystore storage and sync use
+their real implementations; no provider session is injected.

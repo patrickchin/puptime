@@ -4,6 +4,7 @@ name: Account preservation waits for automatic sync
 - launchApp:
     stopApp: false
     permissions: {}
+- runFlow: ../helpers/open-account.yaml
 - scrollUntilVisible:
     element:
       id: account.status

@@ -4,6 +4,7 @@ name: Account preservation enable
 - launchApp:
     stopApp: false
     permissions: {}
+- runFlow: ../helpers/open-account.yaml
 - runFlow:
     when:
       visible:
