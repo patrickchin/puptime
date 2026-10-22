@@ -1,0 +1,46 @@
+appId: com.patrickchin.puptime
+name: Prepare real drafts before native storage failures
+---
+# A previous interrupted test can leave the system permission alert on screen.
+# Dismiss it before clearing state; the retry below still requires a fresh Allow.
+- tapOn:
+    text: "Don.t [Aa]llow"
+    optional: true
+- runFlow:
+    file: "../start.yaml"
+    env:
+      NOTIFICATIONS: "unset"
+- tapOn:
+    id: "preview.guest"
+- tapOn:
+    id: "preview.name"
+- inputText: "Biscuit"
+- tapOn:
+    id: "preview.continue"
+- tapOn:
+    id: "preview.choice.middle"
+- tapOn:
+    id: "preview.choice.meals-2"
+- tapOn:
+    id: "preview.mealTime.0"
+- runFlow: "../increment-hour.yaml"
+- tapOn:
+    id: "picker.done"
+- tapOn:
+    id: "preview.continue"
+- tapOn:
+    id: "preview.continue"
+- tapOn:
+    id: "preview.continue"
+- scrollUntilVisible:
+    element:
+      id: "notifications.timing.pottyAfterMeal.enabled"
+    direction: DOWN
+- tapOn:
+    id: "notifications.timing.pottyAfterMeal.enabled"
+- runFlow:
+    file: "../select-timing.yaml"
+    env:
+      RULE: "pottyAfterMeal"
+      VALUE: "45"
+      LABEL: "45m"

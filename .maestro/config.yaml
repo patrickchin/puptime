@@ -4,7 +4,7 @@ flows:
 executionOrder:
   continueOnFailure: true
   flowsOrder:
-    - iOS first-open profile account choice practice and replay
+    - iOS first-open completes and replays the guide
     - iOS first-open notification opt in
     - iOS navigation and empty states
     - iOS log CRUD, undo, and persistence

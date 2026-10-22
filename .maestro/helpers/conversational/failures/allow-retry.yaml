@@ -1,0 +1,11 @@
+appId: com.patrickchin.puptime
+name: Permission intent retry succeeds
+---
+- tapOn:
+    id: "preview.reminders.allow"
+- tapOn:
+    text: "^Allow$"
+- assertVisible:
+    id: "preview.ready"
+- tapOn:
+    id: "preview.back"

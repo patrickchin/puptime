@@ -1,0 +1,11 @@
+appId: com.patrickchin.puptime
+name: Recovered completion reaches the real app
+---
+- tapOn:
+    id: "preview.continue"
+- assertVisible:
+    id: "onboarding.spotlight"
+- tapOn:
+    id: "onboarding.spotlight.dismiss"
+- runFlow: "../assert-normal.yaml"
+- takeScreenshot: recovered-completion-normal-app

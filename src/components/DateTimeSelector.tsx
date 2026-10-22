@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView,Modal,Platform,Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { useLocalization } from '../localization-context';
 import { spacing, type Theme } from '../theme';
@@ -12,8 +13,9 @@ const twentyFourHours = Array.from({ length: 24 }, (_, index) => index);
 const minutes = Array.from({ length: 60 }, (_, index) => index);
 const periods = [0, 1];
 
-export function DateTimeSelector({ mode, value, locale, theme, onChange, onCancel }: {
+export function DateTimeSelector({ mode, value, locale, theme, label, onChange, onCancel }: {
   mode: 'date' | 'time';
+  label?:string;
   value: Date;
   locale: string;
   theme: Theme;
@@ -68,10 +70,11 @@ export function DateTimeSelector({ mode, value, locale, theme, onChange, onCance
   const days = Array.from({ length: Math.ceil((offset + daysInMonth) / 7) * 7 }, (_, index) => index - offset + 1);
 
   return (
-    <View testID={mode === 'date' ? 'date.selector' : 'time.selector'} accessibilityViewIsModal style={styles.overlay}>
+    <Modal transparent animationType="none" onRequestClose={onCancel}>
+    <KeyboardAvoidingView testID={mode === 'date' ? 'date.selector' : 'time.selector'} accessibilityViewIsModal behavior={Platform.OS==='ios'?'padding':'height'} style={styles.overlay}>
       <Pressable style={StyleSheet.absoluteFill} accessibilityLabel={t('app.cancel')} onPress={onCancel} />
       <View style={[styles.card, { backgroundColor: theme.surfaceRaised, borderRadius: theme.presentation.cardRadius }]}>
-        <Text style={[styles.eyebrow, { color: theme.textMuted }]}>{t(mode === 'date' ? 'editor.date' : 'editor.time').toLocaleUpperCase(locale)}</Text>
+        <Text style={[styles.eyebrow, { color: theme.textMuted }]}>{(label??t(mode === 'date' ? 'editor.date' : 'editor.time')).toLocaleUpperCase(locale)}</Text>
 
         {mode === 'date' ? (
           <>
@@ -118,6 +121,10 @@ export function DateTimeSelector({ mode, value, locale, theme, onChange, onCance
               })}
             </View>
           </>
+        ) : Platform.OS === 'ios' ? (
+          <DateTimePicker testID="time.nativeWheel" value={selected} mode="time" display="spinner"
+            locale={locale} themeVariant={theme.isDark?'dark':'light'} accentColor={theme.primary}
+            onValueChange={(_event,date)=>selectTime(date.getHours(),date.getMinutes())} style={styles.nativeWheel}/>
         ) : (
           <>
             <Text style={[styles.timeHeadline, { color: theme.text }]}>
@@ -127,12 +134,12 @@ export function DateTimeSelector({ mode, value, locale, theme, onChange, onCance
               <View style={styles.inputRow}>
                 <View style={styles.inputColumn}>
                   <Text style={[styles.inputLabel, { color: theme.textMuted }]}>{t('editor.hour')}</Text>
-                  <TextInput testID="time.input.hour" accessibilityLabel={t('editor.hour')} keyboardType="number-pad" maxLength={2} selectTextOnFocus value={hourInput} onChangeText={setHourInput} style={[styles.timeInput, { backgroundColor: theme.surface, borderColor: validInput ? theme.border : theme.danger, color: theme.text }]} />
+                  <TextInput testID="time.input.hour" accessibilityLabel={t('editor.hour')} keyboardType="number-pad" keyboardAppearance={theme.isDark?'dark':'light'} maxLength={2} selectTextOnFocus value={hourInput} onChangeText={setHourInput} style={[styles.timeInput, { backgroundColor: theme.surface, borderColor: validInput ? theme.border : theme.danger, color: theme.text }]} />
                 </View>
                 <Text style={[styles.inputColon, { color: theme.text }]}>{':'}</Text>
                 <View style={styles.inputColumn}>
                   <Text style={[styles.inputLabel, { color: theme.textMuted }]}>{t('editor.minute')}</Text>
-                  <TextInput testID="time.input.minute" accessibilityLabel={t('editor.minute')} keyboardType="number-pad" maxLength={2} selectTextOnFocus value={minuteInput} onChangeText={setMinuteInput} style={[styles.timeInput, { backgroundColor: theme.surface, borderColor: validInput ? theme.border : theme.danger, color: theme.text }]} />
+                  <TextInput testID="time.input.minute" accessibilityLabel={t('editor.minute')} keyboardType="number-pad" keyboardAppearance={theme.isDark?'dark':'light'} maxLength={2} selectTextOnFocus value={minuteInput} onChangeText={setMinuteInput} style={[styles.timeInput, { backgroundColor: theme.surface, borderColor: validInput ? theme.border : theme.danger, color: theme.text }]} />
                 </View>
                 {!uses24Hour ? <View style={[styles.inputPeriod, { borderColor: theme.border }]}>
                   {(['AM', 'PM'] as const).map((period) => <Pressable key={period} testID={`time.input.period.${period}`} accessibilityRole="button" accessibilityState={{ selected: periodInput === period }} onPress={() => setPeriodInput(period)} style={[styles.inputPeriodButton, { backgroundColor: periodInput === period ? theme.primarySoft : 'transparent' }]}><Text style={[styles.inputPeriodText, { color: periodInput === period ? theme.primary : theme.textMuted }]}>{period}</Text></Pressable>)}
@@ -151,7 +158,7 @@ export function DateTimeSelector({ mode, value, locale, theme, onChange, onCance
         )}
 
         <View style={styles.footer}>
-          {mode === 'time' ? <Pressable testID="time.mode" accessibilityRole="button" accessibilityLabel={inputMode ? t('editor.useWheels') : t('editor.useKeyboard')} onPress={() => {
+          {mode === 'time' && Platform.OS !== 'ios' ? <Pressable testID="time.mode" accessibilityRole="button" accessibilityLabel={inputMode ? t('editor.useWheels') : t('editor.useKeyboard')} onPress={() => {
             if (inputMode && validInput) selectTime(inputHour, Number(minuteInput));
             else if (inputMode) {
               setHourInput(twoDigits(uses24Hour ? selectedRef.current.getHours() : selectedRef.current.getHours() % 12 || 12));
@@ -165,12 +172,13 @@ export function DateTimeSelector({ mode, value, locale, theme, onChange, onCance
           <Pressable testID="picker.done" accessibilityRole="button" disabled={inputMode && !validInput} accessibilityState={{ disabled: inputMode && !validInput }} onPress={confirm} style={({ pressed }) => [styles.action, pressed && { backgroundColor: theme.primarySoft }, inputMode && !validInput && { opacity: 0.4 }]}><Text style={[styles.actionText, { color: theme.primary }]}>{t('common.done')}</Text></Pressable>
         </View>
       </View>
-    </View>
+    </KeyboardAvoidingView>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFill, zIndex: 10, backgroundColor: 'rgba(0, 0, 0, 0.36)', alignItems: 'center', justifyContent: 'center', padding: spacing.md },
+  overlay: { flex:1, zIndex: 10, backgroundColor: 'rgba(0, 0, 0, 0.36)', alignItems: 'center', justifyContent: 'center', padding: spacing.md },
   card: { width: '100%', maxWidth: 360, paddingHorizontal: 20, paddingTop: 24, paddingBottom: 12 },
   eyebrow: { fontSize: 12, fontWeight: '700', letterSpacing: 1 },
   dateHeadline: { fontSize: 27, lineHeight: 34, fontWeight: '700', marginTop: 8, marginBottom: 20 },
@@ -185,6 +193,7 @@ const styles = StyleSheet.create({
   dayButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   dayText: { fontSize: 15, fontWeight: '600', fontVariant: ['tabular-nums'] },
   timeHeadline: { fontSize: 27, lineHeight: 34, fontWeight: '700', marginTop: 6 },
+  nativeWheel: { minHeight:216, marginTop:8, width:'100%' },
   wheels: { height: wheelHeight, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 12 },
   wheelHighlight: { position: 'absolute', left: 0, right: 0, top: (wheelHeight - wheelRowHeight) / 2, height: wheelRowHeight, borderRadius: 14 },
   wheelColon: { width: 18, height: wheelRowHeight, lineHeight: wheelRowHeight, textAlign: 'center', fontSize: 28, fontWeight: '700' },

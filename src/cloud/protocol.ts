@@ -36,6 +36,8 @@ const accountPreferences = z.strictObject({
   widgetActions: z.array(activityKey).min(2).max(4).refine((values) => new Set(values).size === values.length).optional(),
   reminderLeadMinutes: z.union([z.literal(0), z.literal(5), z.literal(10), z.literal(15), z.literal(30)]).optional(),
   widgetConfirmations: z.boolean().optional(),
+  mealReminderOffsetMinutes:z.number().refine(value=>[-30,-15,-10,-5,0,5,10,15,30,60].includes(value)).optional(),
+  poopReminderOffsetMinutes:z.number().refine(value=>[-30,-15,-10,-5,0,5,10,15,30,60].includes(value)).optional(),
   pottyAfterPeeEnabled: z.boolean().optional(), pottyAfterMealEnabled: z.boolean().optional(),
   pottyAfterPeeDelayMinutes: z.union([z.literal(15), z.literal(30), z.literal(45), z.literal(60), z.literal(120), z.literal(180), z.literal(240)]).optional(),
   pottyAfterMealDelayMinutes: z.union([z.literal(15), z.literal(30), z.literal(45), z.literal(60), z.literal(120), z.literal(180), z.literal(240)]).optional(),

@@ -1,0 +1,20 @@
+appId: com.patrickchin.puptime
+name: Skip optional answers to reminder setup
+---
+- tapOn:
+    id: "preview.guest"
+- tapOn:
+    id: "preview.skip"
+- tapOn:
+    id: "preview.skip"
+- tapOn:
+    id: "preview.skip"
+- tapOn:
+    id: "preview.skip"
+- assertVisible:
+    id: "preview.planTimeline"
+- tapOn:
+    id: "preview.continue"
+- assertVisible:
+    id: "preview.prompt"
+    text: "Set up reminders"

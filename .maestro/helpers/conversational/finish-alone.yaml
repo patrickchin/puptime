@@ -1,0 +1,8 @@
+appId: com.patrickchin.puptime
+name: Finish without the spotlight
+---
+- assertVisible:
+    id: "preview.ready"
+- tapOn:
+    id: "preview.skip"
+- runFlow: "assert-normal.yaml"

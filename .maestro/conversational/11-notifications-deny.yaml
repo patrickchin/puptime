@@ -1,0 +1,43 @@
+appId: com.patrickchin.puptime
+name: Notification deny reaches the normal app and survives Back
+---
+- runFlow:
+    file: "../helpers/conversational/start.yaml"
+    env:
+      NOTIFICATIONS: "unset"
+- runFlow: "../helpers/conversational/to-reminders.yaml"
+- tapOn:
+    id: "preview.reminders.allow"
+- tapOn:
+    text: "Don.t [Aa]llow"
+- assertVisible:
+    id: "preview.ready"
+- assertNotVisible: You can change reminders in Notifications.
+- tapOn:
+    id: "preview.back"
+- assertVisible:
+    id: "preview.prompt"
+    text: "Set up reminders"
+- tapOn:
+    id: "preview.reminders.allow"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      # Android may offer a second request before treating denial as permanent.
+      - tapOn:
+          text: "Don.t [Aa]llow"
+          optional: true
+- assertVisible:
+    id: "preview.ready"
+- runFlow: "../helpers/conversational/finish-alone.yaml"
+- tapOn:
+    id: "nav.open"
+- tapOn:
+    id: "nav.notifications"
+- assertVisible:
+    id: "settings.notifications.deviceDelivery"
+    checked: false
+- assertVisible:
+    id: "settings.notifications.permission"
+- takeScreenshot: notification-deny-normal-app

@@ -1,0 +1,23 @@
+appId: com.patrickchin.puptime
+name: Spotlight poop action uses real logging and persists
+---
+- runFlow:
+    file: "../helpers/conversational/start.yaml"
+    env:
+      NOTIFICATIONS: "deny"
+- runFlow: "../helpers/conversational/to-reminders.yaml"
+- tapOn:
+    id: "preview.reminders.later"
+- tapOn:
+    id: "preview.continue"
+- assertVisible:
+    id: "onboarding.spotlight"
+- tapOn:
+    id: "quick.poop"
+- assertNotVisible:
+    id: "onboarding.spotlight"
+- assertVisible:
+    id: "event.poop.edit"
+- runFlow: "../helpers/conversational/assert-normal.yaml"
+- assertVisible:
+    id: "event.poop.edit"

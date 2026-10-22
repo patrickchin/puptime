@@ -39,6 +39,16 @@ const reminders=await import('./reminders.ts');
 const routine={id:'break',type:'pee' as const,minutes:420,reminder:true};
 function reset(){Object.assign(state,{delivery:false,granted:true,canAskAgain:true,answer:true,requests:0,writes:[],scheduled:[],cancelled:[],hold:null,scheduleHold:null,failure:null,nextId:0});}
 
+test('the OS scheduler applies independent signed meal and poop offsets',async()=>{
+ reset();state.delivery=true;
+ const preferences={...DEFAULT_NOTIFICATION_PREFERENCES,mealReminderOffsetMinutes:-15 as const,poopReminderOffsetMinutes:30 as const};
+ await reminders.syncScheduleReminders([{id:'rtn_meal',type:'meal',minutes:5,reminder:true},{id:'rtn_poop',type:'poop',minutes:1430,reminder:true}],preferences);
+ assert.deepEqual(state.scheduled.map(request=>request.trigger),[
+  {type:'daily',hour:23,minute:50,channelId:'puptime-routine'},
+  {type:'daily',hour:0,minute:20,channelId:'puptime-routine'},
+ ]);
+});
+
 test('device delivery off cancels only owned reminders even with granted permission and synced preferences',async()=>{
  reset();state.scheduled=[{identifier:'puptime-routine-old'},{identifier:'puptime-activity-afterPee'},{identifier:'puptime-widget-keep'},{identifier:'another-request'}];
  const now=Date.now();

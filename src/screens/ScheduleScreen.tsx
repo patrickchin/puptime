@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Alert,
   Keyboard,
@@ -40,6 +40,7 @@ export function ScheduleScreen({
   onRemoveEntry,
   onRequestReminderPermission,
   theme,
+  setupHeader,
 }: {
   events: PuppyEvent[];
   schedule: ScheduleEntry[];
@@ -49,6 +50,7 @@ export function ScheduleScreen({
   onRemoveEntry:(id:string)=>Promise<void>;
   onRequestReminderPermission: () => Promise<boolean>;
   theme: Theme;
+  setupHeader?: ReactNode;
 }&ActivityViewProps) {
   const { activityColors, activityLabel, locale, t } = useLocalization();
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -188,6 +190,7 @@ export function ScheduleScreen({
     <>
       <ScrollView testID="screen.schedule" contentContainerStyle={styles.content}>
         <ActivityLoadState loading={window.loading} error={window.error} onRetry={window.retry} theme={theme}/>
+        {setupHeader ?? <>
         <Text
           numberOfLines={1}
           style={[
@@ -273,7 +276,8 @@ export function ScheduleScreen({
           ) : null}
         </View>
 
-        {schedule.length ? (
+        </>}
+        {!setupHeader && schedule.length ? (
           <View
             style={[
               styles.progressCard,
@@ -321,7 +325,7 @@ export function ScheduleScreen({
           </View>
         ) : null}
 
-        {schedule.length ? (
+        {!setupHeader && schedule.length ? (
           <View style={styles.headingRow}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('schedule.todayPlan')}</Text>
           </View>
@@ -355,7 +359,7 @@ export function ScheduleScreen({
                 accessibilityLabel={t('schedule.editA11y', {
                   activity: label,
                   time: entry.toleranceMinutes === undefined ? formatMinutes(entry.minutes, locale) : formatScheduleWindow(entry, locale),
-                  status: presentation.label,
+                  status: setupHeader ? '' : presentation.label,
                   reminder: entry.reminder ? t('schedule.reminderOn') : '',
                 })}
                 onPress={() => { originalDraft.current={...entry,reminder:Boolean(entry.reminder)};setDraft({...originalDraft.current,reminder:Boolean(entry.reminder)}); setShowTimeSelector(false); }}
@@ -380,7 +384,7 @@ export function ScheduleScreen({
                       {t('schedule.usualWindow', { range: formatScheduleWindow(entry, locale) })}
                     </Text>
                   ) : null}
-                  <View
+                  {!setupHeader ? <View
                     style={[
                       styles.statusPill,
                       {
@@ -391,7 +395,7 @@ export function ScheduleScreen({
                   >
                     <View style={[styles.statusDot, { backgroundColor: presentation.color }]} />
                     <Text style={[styles.statusText, { color: presentation.color }]}>{presentation.label}</Text>
-                  </View>
+                  </View> : null}
                 </View>
                 {entry.reminder ? (
                   <View
@@ -569,7 +573,7 @@ export function ScheduleScreen({
           >
             <View style={styles.sheetHeading}>
               <Text style={[styles.sheetTitle, { color: theme.text }]}>
-                {t(draft?.id ? 'schedule.editTime' : 'schedule.addTime')}
+                {t(originalDraft.current ? 'schedule.editTime' : 'schedule.addTime')}
               </Text>
               <Pressable
                 testID="schedule.editor.close"

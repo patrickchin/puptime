@@ -1,5 +1,9 @@
 appId: com.patrickchin.puptime
 ---
+- extendedWaitUntil:
+    visible:
+      id: 'screen\.(today|settings|account)'
+    timeout: 90000
 - runFlow:
     when:
       notVisible:

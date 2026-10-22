@@ -66,6 +66,8 @@ export async function readLocalSettingsRecords(sql:SqlExecutor,petId:string):Pro
     {kind:'accountPreferences',localId:'preferences',data:{
       theme:isThemePreference(state.values.get(storageKeys.theme)??null)?state.values.get(storageKeys.theme):'system',
       language:isLanguagePreference(state.values.get(storageKeys.language)??null)?state.values.get(storageKeys.language):'system',
+      ...(n.mealReminderOffsetMinutes!==undefined?{mealReminderOffsetMinutes:n.mealReminderOffsetMinutes}:{}),
+      ...(n.poopReminderOffsetMinutes!==undefined?{poopReminderOffsetMinutes:n.poopReminderOffsetMinutes}:{}),
       widgetActions:state.widgetActions,reminderLeadMinutes:n.reminderLeadMinutes,widgetConfirmations:n.widgetConfirmations,
       pottyAfterPeeEnabled:n.pottyAfterPee.enabled,pottyAfterPeeDelayMinutes:n.pottyAfterPee.delayMinutes,
       pottyAfterMealEnabled:n.pottyAfterMeal.enabled,pottyAfterMealDelayMinutes:n.pottyAfterMeal.delayMinutes,
@@ -145,6 +147,8 @@ export async function applyLocalRecords(sql:SqlExecutor,petId:string,records:Loc
       if (data.widgetActions!==undefined) await set(sql,petId,storageKeys.widgetActions,JSON.stringify(data.widgetActions));
       const current=state.notification;
       const preferences=normalizeNotificationPreferences({
+        mealReminderOffsetMinutes:data.mealReminderOffsetMinutes??current.mealReminderOffsetMinutes,
+        poopReminderOffsetMinutes:data.poopReminderOffsetMinutes??current.poopReminderOffsetMinutes,
         reminderLeadMinutes:data.reminderLeadMinutes??current.reminderLeadMinutes,widgetConfirmations:data.widgetConfirmations??current.widgetConfirmations,
         pottyAfterPee:{enabled:data.pottyAfterPeeEnabled??current.pottyAfterPee.enabled,delayMinutes:data.pottyAfterPeeDelayMinutes??current.pottyAfterPee.delayMinutes},
         pottyAfterMeal:{enabled:data.pottyAfterMealEnabled??current.pottyAfterMeal.enabled,delayMinutes:data.pottyAfterMealDelayMinutes??current.pottyAfterMeal.delayMinutes},

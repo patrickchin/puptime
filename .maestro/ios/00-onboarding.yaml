@@ -1,36 +1,10 @@
 appId: com.patrickchin.puptime
-name: iOS first-open profile account choice practice and replay
+name: iOS first-open completes and replays the guide
 tags:
   - ios
   - smoke
 ---
-- runFlow: ../native/ios-first-launch-profile-prepare.yaml
-- scrollUntilVisible:
-    element:
-      id: setup.profile.next
-    direction: DOWN
-- tapOn:
-    id: setup.profile.next
-- assertVisible:
-    id: setup.step.account
-- stopApp
-- launchApp:
-    permissions: {}
-- extendedWaitUntil:
-    visible:
-      id: setup.step.account
-    timeout: 90000
-- runFlow: ../native/ios-first-launch-local-walkthrough.yaml
-- scrollUntilVisible:
-    element:
-      id: setup.finish
-    direction: DOWN
-- tapOn:
-    id: setup.finish
-- extendedWaitUntil:
-    visible:
-      id: screen.today
-    timeout: 90000
+- runFlow: ../conversational/03-skip-optional-setup.yaml
 - tapOn:
     id: nav.open
     retryTapIfNoChange: true

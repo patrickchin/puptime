@@ -9,7 +9,7 @@ tags:
 - runFlow:
     when:
       visible:
-        id: 'screen\.(firstLaunch|onboarding)'
+        id: 'screen\.(firstLaunch|onboarding)|preview.guest'
     file: helpers/skip-onboarding.yaml
 - runFlow:
     when:

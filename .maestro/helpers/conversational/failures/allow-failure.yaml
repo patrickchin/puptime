@@ -1,0 +1,15 @@
+appId: com.patrickchin.puptime
+name: Failed permission intent write retains reminder choices
+---
+- tapOn:
+    id: "preview.reminders.allow"
+- assertVisible: We couldn.t ask your phone.*
+- assertVisible:
+    id: "preview.prompt"
+    text: "Set up reminders"
+- assertNotVisible:
+    id: "preview.ready"
+- assertVisible:
+    id: "notifications.timing.pottyAfterMeal.time"
+    text: ".*45m.*"
+- takeScreenshot: allow-failure-retains-draft

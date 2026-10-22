@@ -1,0 +1,39 @@
+appId: com.patrickchin.puptime
+name: Account preservation enable
+---
+- launchApp:
+    stopApp: false
+    permissions: {}
+- runFlow: ../helpers/open-account.yaml
+- scrollUntilVisible:
+    element:
+      id: account.enable
+    direction: DOWN
+- runFlow:
+    when:
+      visible:
+        id: account.samePuppy
+    commands:
+      - tapOn:
+          id: account.samePuppy
+      - assertVisible:
+          id: account.samePuppy
+          checked: true
+- tapOn:
+    id: account.enable
+- scrollUntilVisible:
+    element:
+      id: account.status
+    direction: UP
+- extendedWaitUntil:
+    visible:
+      id: account.status
+      text: Up to date
+    timeout: 45000
+- scrollUntilVisible:
+    element:
+      id: account.local.count
+    direction: UP
+- assertVisible:
+    id: account.local.count
+    text: ${EXPECTED_COUNT} activity logs

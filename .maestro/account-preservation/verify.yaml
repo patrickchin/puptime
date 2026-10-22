@@ -1,0 +1,31 @@
+appId: com.patrickchin.puptime
+name: Account preservation verify
+---
+- launchApp:
+    stopApp: false
+    permissions: {}
+- runFlow: ../helpers/open-account.yaml
+- scrollUntilVisible:
+    element:
+      id: account.code.input
+    direction: DOWN
+- tapOn:
+    id: account.code.input
+- inputText: ${MAESTRO_TEST_CODE}
+- tapOn: Sign-in code
+- scrollUntilVisible:
+    element:
+      id: account.verify
+    direction: DOWN
+- tapOn:
+    id: account.verify
+- extendedWaitUntil:
+    notVisible:
+      id: account.code.input
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: account.enable
+    direction: DOWN
+- assertNotVisible:
+    id: account.email.input

@@ -1,0 +1,18 @@
+appId: com.patrickchin.puptime
+name: Choose and verify one reminder timing
+---
+- scrollUntilVisible:
+    element:
+      id: "notifications.timing.${RULE}.time"
+    direction: DOWN
+- tapOn:
+    id: "notifications.timing.${RULE}.time"
+- scrollUntilVisible:
+    element:
+      id: "notifications.timing.option.${VALUE}"
+    direction: DOWN
+- tapOn:
+    id: "notifications.timing.option.${VALUE}"
+- assertVisible:
+    id: "notifications.timing.${RULE}.time"
+    text: ".*${LABEL}.*"

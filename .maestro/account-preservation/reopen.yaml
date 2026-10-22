@@ -1,0 +1,26 @@
+appId: com.patrickchin.puptime
+name: Account preservation reopen
+---
+- launchApp:
+    stopApp: false
+    permissions: {}
+- runFlow: ../helpers/open-account.yaml
+- scrollUntilVisible:
+    element:
+      id: account.back
+    direction: UP
+- tapOn:
+    id: account.back
+- tapOn:
+    id: settings.back
+- runFlow: ../helpers/conversational/assert-normal.yaml
+- runFlow: ../helpers/open-account.yaml
+- extendedWaitUntil:
+    visible:
+      id: account.status
+      text: Up to date
+    timeout: 45000
+- assertVisible:
+    id: account.local.count
+    text: ${EXPECTED_COUNT} activity logs
+- takeScreenshot: recovered-account-history

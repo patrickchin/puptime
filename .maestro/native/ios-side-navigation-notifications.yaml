@@ -78,43 +78,31 @@ name: iOS side navigation and notification preferences
     checked: true
 - assertNotVisible:
     id: settings.notifications.permission
-- assertVisible:
-    id: settings.notifications.pottyAfterPee.enabled
-    checked: true
-- assertNotVisible:
-    id: settings.notifications.pottyAfterPee.delay.60
-- tapOn:
-    id: settings.notifications.pottyAfterPee.changeDelay
 - scrollUntilVisible:
     element:
-      id: settings.notifications.pottyAfterPee.delay.120
+      id: notifications.timing.pottyAfterPee.enabled
     direction: DOWN
-    visibilityPercentage: 100
-    centerElement: false
 - assertVisible:
-    id: settings.notifications.pottyAfterPee.delay.120
-    text: radio button, checked
-- scrollUntilVisible:
-    element:
-      id: settings.notifications.pottyAfterPee.delay.60
-    direction: UP
-    visibilityPercentage: 100
-    centerElement: false
+    id: notifications.timing.pottyAfterPee.enabled
+    checked: false
 - tapOn:
-    id: settings.notifications.pottyAfterPee.delay.60
+    id: notifications.timing.pottyAfterPee.enabled
 - assertVisible:
-    id: settings.notifications.pottyAfterPee.delay.60
-    text: radio button, checked
-- scrollUntilVisible:
-    element:
-      id: settings.notifications.pottyAfterPee.changeDelay
-    direction: UP
-    visibilityPercentage: 100
-    centerElement: false
+    id: notifications.timing.pottyAfterPee.enabled
+    checked: true
 - tapOn:
-    id: settings.notifications.pottyAfterPee.changeDelay
+    id: notifications.timing.pottyAfterPee.time
+- assertVisible:
+    id: notifications.timing.option.120
+    # Driver versions expose the selected radio via its value or painted check.
+    text: 'radio button, checked|.*✓.*'
+- tapOn:
+    id: notifications.timing.option.60
+- assertVisible:
+    id: notifications.timing.pottyAfterPee.time
+    text: .*1h.*
 - assertNotVisible:
-    id: settings.notifications.pottyAfterPee.delay.60
+    id: notifications.timing.option.60
 - scrollUntilVisible:
     element:
       id: settings.notifications.lead.15
@@ -206,25 +194,17 @@ name: iOS side navigation and notification preferences
 - assertVisible:
     id: settings.notifications.deviceDelivery
     checked: true
-- tapOn:
-    id: settings.notifications.pottyAfterPee.changeDelay
 - scrollUntilVisible:
     element:
-      id: settings.notifications.pottyAfterPee.delay.60
+      id: notifications.timing.pottyAfterPee.time
     direction: DOWN
-    visibilityPercentage: 100
-    centerElement: false
-- assertVisible:
-    id: settings.notifications.pottyAfterPee.delay.60
-    text: radio button, checked
-- scrollUntilVisible:
-    element:
-      id: settings.notifications.pottyAfterPee.changeDelay
-    direction: UP
-    visibilityPercentage: 100
-    centerElement: false
 - tapOn:
-    id: settings.notifications.pottyAfterPee.changeDelay
+    id: notifications.timing.pottyAfterPee.time
+- assertVisible:
+    id: notifications.timing.option.60
+    text: 'radio button, checked|.*✓.*'
+- tapOn:
+    id: notifications.timing.close
 - scrollUntilVisible:
     element:
       id: settings.notifications.lead.15
@@ -268,8 +248,12 @@ name: iOS side navigation and notification preferences
     id: nav.notifications
 - assertVisible:
     id: screen.notifications
+- scrollUntilVisible:
+    element:
+      id: notifications.timing.pottyAfterPee.enabled
+    direction: DOWN
 - assertVisible:
-    id: settings.notifications.pottyAfterPee.enabled
+    id: notifications.timing.pottyAfterPee.enabled
     checked: true
 - scrollUntilVisible:
     element:

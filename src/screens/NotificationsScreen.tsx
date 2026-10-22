@@ -6,14 +6,13 @@ import { ActivityIndicator, Alert, AppState, Modal, Platform, Pressable, ScrollV
 
 import { useLocalization } from '../localization-context';
 import {
-  pottyReminderDelayOptions,
   reminderLeadOptions,
   type NotificationPreferences,
-  type PottyReminderDelayMinutes,
-  type PottyReminderPreference,
 } from '../notification-config';
 import { cancelCustomTimedReminder, cancelCustomTimedRemindersIfDeliveryOff, countCustomTimedReminders, createCustomTimedReminder, CustomTimedReminderLimitError, CUSTOM_TIMED_REMINDER_NOTIFICATION_KIND, listCustomTimedReminders, type CustomTimedReminder, type NotificationPermissionState } from '../reminders';
 import { spacing, surfaceTreatment, type Theme } from '../theme';
+import {NotificationTimingControls} from '../components/NotificationTimingControls';
+import type {ScheduleEntry} from '../domain';
 import { entityId } from '../entity-id';
 
 export function NotificationsScreen({
@@ -28,8 +27,10 @@ export function NotificationsScreen({
   onNotificationDeliveryChange,
   onOpenSystemSettings,
   onOpenSchedule,
+  schedule=[],onScheduleChange,
 }: {
   theme: Theme;
+  schedule?:ScheduleEntry[];onScheduleChange?:(schedule:ScheduleEntry[])=>Promise<void>;
   petId?: string;
   notificationPreferences: NotificationPreferences;
   notificationPermission: NotificationPermissionState;
@@ -163,25 +164,6 @@ export function NotificationsScreen({
     });
   };
 
-  const toggleRule = (key: 'pottyAfterPee' | 'pottyAfterMeal', enabled: boolean) => {
-    void save(async () => {
-      if (enabled && (notificationPermission !== 'granted' || notificationDelivery === false)) {
-        if (!(await requestNotifications())) return;
-      }
-      await onNotificationPreferencesChange({
-        ...notificationPreferences,
-        [key]: { ...notificationPreferences[key], enabled },
-      });
-    });
-  };
-
-  const chooseDelay = (key: 'pottyAfterPee' | 'pottyAfterMeal', delayMinutes: PottyReminderDelayMinutes) => {
-    void save(() => onNotificationPreferencesChange({
-      ...notificationPreferences,
-      [key]: { ...notificationPreferences[key], delayMinutes },
-    }));
-  };
-
   return (
     <>
     <ScrollView testID="screen.notifications" contentContainerStyle={styles.content}>
@@ -261,27 +243,11 @@ export function NotificationsScreen({
         </View>)}
       </View>
 
-      <View style={cardStyle}>
-        <PottyReminderRule
-          testID="settings.notifications.pottyAfterPee"
-          label={t('notifications.afterPee')}
-          rule={notificationPreferences.pottyAfterPee}
-          disabled={saving}
-          onToggle={(enabled) => toggleRule('pottyAfterPee', enabled)}
-          onDelayChange={(delay) => chooseDelay('pottyAfterPee', delay)}
-          theme={theme}
-        />
-        <View style={[styles.divider, { backgroundColor: theme.border }]} />
-        <PottyReminderRule
-          testID="settings.notifications.pottyAfterMeal"
-          label={t('notifications.afterMeal')}
-          rule={notificationPreferences.pottyAfterMeal}
-          disabled={saving}
-          onToggle={(enabled) => toggleRule('pottyAfterMeal', enabled)}
-          onDelayChange={(delay) => chooseDelay('pottyAfterMeal', delay)}
-          theme={theme}
-        />
-      </View>
+      {onScheduleChange?<View style={cardStyle}>
+        <Text accessibilityRole="header" style={[styles.label,{color:theme.text}]}>{t('notifications.timing')}</Text>
+        <NotificationTimingControls theme={theme} preferences={notificationPreferences} schedule={schedule} disabled={saving}
+          onChange={next=>save(()=>onNotificationPreferencesChange(next))} onScheduleChange={next=>save(()=>onScheduleChange(next))}/>
+      </View>:null}
 
       <View style={cardStyle}>
         <Pressable
@@ -376,97 +342,6 @@ export function NotificationsScreen({
   );
 }
 
-function PottyReminderRule({
-  testID,
-  label,
-  rule,
-  disabled,
-  onToggle,
-  onDelayChange,
-  theme,
-}: {
-  testID: string;
-  label: string;
-  rule: PottyReminderPreference;
-  disabled: boolean;
-  onToggle: (enabled: boolean) => void;
-  onDelayChange: (delay: PottyReminderDelayMinutes) => void;
-  theme: Theme;
-}) {
-  const { t } = useLocalization();
-  const [expanded, setExpanded] = useState(false);
-  const delayLabel = (minutes: number) => minutes < 60
-    ? t('time.minutes', { count: minutes })
-    : t('time.hours', { count: minutes / 60 });
-  return (
-    <View style={styles.rule}>
-      <View style={styles.row}>
-        <View style={styles.copy}>
-          <Text style={[styles.label, { color: theme.text }]}>{label}</Text>
-          {rule.enabled ? (
-            <Pressable
-              testID={`${testID}.changeDelay`}
-              accessibilityRole="button"
-              accessibilityLabel={`${label}, ${delayLabel(rule.delayMinutes)}`}
-              accessibilityHint={t('notifications.changeDelay')}
-              accessibilityState={{ expanded, disabled }}
-              disabled={disabled}
-              onPress={() => setExpanded((value) => !value)}
-              style={({ pressed }) => [styles.delayButton, {
-                backgroundColor: pressed ? theme.primarySoft : theme.surface,
-                borderRadius: theme.presentation.controlRadius,
-              }]}
-            >
-              <Text style={[styles.actionLabel, { color: theme.primary }]}>{delayLabel(rule.delayMinutes)}</Text>
-              <MaterialCommunityIcons accessible={false} name={expanded ? 'chevron-up' : 'chevron-down'} size={19} color={theme.primary}
-                accessibilityElementsHidden importantForAccessibility="no" />
-            </Pressable>
-          ) : null}
-        </View>
-        <Switch
-          testID={`${testID}.enabled`}
-          accessibilityLabel={label}
-          disabled={disabled}
-          hitSlop={8}
-          ios_backgroundColor={theme.border}
-          thumbColor={theme.surfaceRaised}
-          trackColor={{ false: theme.border, true: theme.primary }}
-          value={rule.enabled}
-          onValueChange={onToggle}
-        />
-      </View>
-      {rule.enabled && expanded ? (
-        <View style={styles.choices} accessibilityRole="radiogroup">
-          {pottyReminderDelayOptions.map((delay) => {
-            const selected = delay === rule.delayMinutes;
-            return (
-              <Pressable
-                key={delay}
-                testID={`${testID}.delay.${delay}`}
-                accessibilityRole="radio"
-                accessibilityLabel={`${label}, ${delayLabel(delay)}`}
-                accessibilityState={{ checked: selected, disabled }}
-                disabled={disabled}
-                onPress={() => { onDelayChange(delay); }}
-                style={({ pressed }) => [styles.choice, {
-                  backgroundColor: selected || pressed ? theme.primarySoft : theme.surface,
-                  borderColor: selected ? theme.primary : theme.border,
-                  borderRadius: theme.presentation.controlRadius,
-                  opacity: disabled ? 0.55 : 1,
-                }]}
-              >
-                {selected ? <MaterialCommunityIcons accessible={false} name="check" size={16} color={theme.primary}
-                  accessibilityElementsHidden importantForAccessibility="no" /> : null}
-                <Text style={[styles.choiceLabel, { color: selected ? theme.primary : theme.text }]}>{delayLabel(delay)}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   content: { width: '100%', maxWidth: 720, alignSelf: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.xl, gap: spacing.md },
   card: { borderWidth: 1, padding: 12 },
@@ -490,8 +365,6 @@ const styles = StyleSheet.create({
   divider: { height: StyleSheet.hairlineWidth, marginHorizontal: 8, marginVertical: 4 },
   permissionAction: { minHeight: 48, marginTop: 4, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   actionLabel: { fontSize: 15, lineHeight: 21, fontWeight: '700', flexShrink: 1 },
-  rule: { paddingHorizontal: 4, paddingVertical: 2 },
-  delayButton: { minHeight: 44, alignSelf: 'flex-start', marginTop: 4, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 8 },
   leadBlock: { paddingHorizontal: 8, paddingTop: 4, paddingBottom: 8 },
   choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 4, paddingBottom: 4, marginTop: 8 },
   choice: { minWidth: 64, minHeight: 48, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },

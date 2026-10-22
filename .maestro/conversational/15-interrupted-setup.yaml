@@ -1,0 +1,42 @@
+appId: com.patrickchin.puptime
+name: Interrupted setup returns safely to welcome before completion
+---
+- runFlow:
+    file: "../helpers/conversational/start.yaml"
+    env:
+      NOTIFICATIONS: "deny"
+- tapOn:
+    id: "preview.guest"
+- tapOn:
+    id: "preview.name"
+- inputText: "Biscuit"
+- tapOn:
+    id: "preview.continue"
+- tapOn:
+    id: "preview.choice.middle"
+- tapOn:
+    id: "preview.choice.meals-3"
+- tapOn:
+    id: "preview.mealTime.1"
+- runFlow: "../helpers/conversational/increment-hour.yaml"
+- tapOn:
+    id: "picker.done"
+- stopApp
+- launchApp:
+    permissions: {}
+- assertVisible:
+    id: "preview.guest"
+- runFlow: "../helpers/conversational/to-reminders.yaml"
+- tapOn:
+    id: "preview.reminders.later"
+- runFlow: "../helpers/conversational/finish-alone.yaml"
+- tapOn:
+    id: "nav.open"
+- tapOn:
+    id: "nav.schedule"
+- assertVisible:
+    id: "screen.schedule"
+- assertNotVisible:
+    id: "schedule.entry.meal"
+- assertNotVisible:
+    id: "schedule.entry.poop"

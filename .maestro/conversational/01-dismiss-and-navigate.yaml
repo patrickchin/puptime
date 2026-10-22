@@ -1,0 +1,75 @@
+appId: com.patrickchin.puptime
+name: Conversational onboarding dismisses into normal navigation and persists
+---
+- runFlow: ../helpers/conversational-onboarding.yaml
+- tapOn:
+    id: onboarding.spotlight.dismiss
+- assertNotVisible:
+    id: onboarding.spotlight
+- assertVisible:
+    id: history.empty
+- assertNotVisible:
+    id: 'event\..*\.edit'
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.schedule
+- assertVisible:
+    id: screen.schedule
+- assertVisible:
+    id: schedule.entry.meal
+    text: '.*8:00.*'
+- assertVisible:
+    id: schedule.entry.poop
+    text: '.*9:30.*10:00.*'
+- assertNotVisible:
+    id: preview.back
+- takeScreenshot: conversational-normal-schedule
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.notifications
+- assertVisible:
+    id: screen.notifications
+- scrollUntilVisible:
+    element:
+      id: notifications.timing.meal.time
+    direction: DOWN
+- assertVisible:
+    id: notifications.timing.meal.time
+    text: '.*15 min before.*'
+- assertVisible:
+    id: notifications.timing.poop.time
+    text: '.*5 min after.*'
+- scrollUntilVisible:
+    element:
+      id: notifications.timing.pottyAfterPee.time
+    direction: DOWN
+- assertVisible:
+    id: notifications.timing.pottyAfterMeal.time
+    text: '.*45m.*'
+- assertVisible:
+    id: notifications.timing.pottyAfterPee.time
+    text: '.*3h.*'
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.log
+- tapOn:
+    id: quick.pee
+- assertVisible:
+    id: event.pee.edit
+- stopApp
+- launchApp:
+    permissions: {}
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- assertNotVisible:
+    id: preview.guest
+- assertNotVisible:
+    id: onboarding.spotlight
+- assertVisible:
+    id: event.pee.edit
+- takeScreenshot: conversational-normal-app-restarted

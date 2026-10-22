@@ -1,0 +1,16 @@
+appId: com.patrickchin.puptime
+name: Account preservation waits for automatic sync
+---
+- launchApp:
+    stopApp: false
+    permissions: {}
+- runFlow: ../helpers/open-account.yaml
+- scrollUntilVisible:
+    element:
+      id: account.status
+    direction: UP
+- extendedWaitUntil:
+    visible:
+      id: account.status
+      text: Up to date
+    timeout: 45000

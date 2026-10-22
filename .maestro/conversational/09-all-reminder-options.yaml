@@ -1,0 +1,144 @@
+appId: com.patrickchin.puptime
+name: All reminder timing choices toggles dismissal and persistence
+---
+- runFlow:
+    file: "../helpers/conversational/start.yaml"
+    env:
+      NOTIFICATIONS: "deny"
+- tapOn:
+    id: "preview.guest"
+- tapOn:
+    id: "preview.skip"
+- tapOn:
+    id: "preview.choice.adult"
+- tapOn:
+    id: "preview.choice.meals-1"
+- tapOn:
+    id: "preview.continue"
+- tapOn:
+    id: "preview.continue"
+- tapOn:
+    id: "preview.continue"
+- runScript: ../helpers/conversational/reminder-options.js
+- runFlow:
+    file: "../helpers/conversational/exercise-timing-rule.yaml"
+    env:
+      RULE: "meal"
+      LAST_LABEL: "60 min after"
+- runFlow:
+    file: "../helpers/conversational/exercise-timing-rule.yaml"
+    env:
+      RULE: "poop"
+      LAST_LABEL: "60 min after"
+- runFlow:
+    file: "../helpers/conversational/exercise-timing-rule.yaml"
+    env:
+      RULE: "pottyAfterMeal"
+      LAST_LABEL: "4h"
+- runFlow:
+    file: "../helpers/conversational/exercise-timing-rule.yaml"
+    env:
+      RULE: "pottyAfterPee"
+      LAST_LABEL: "4h"
+- tapOn:
+    id: "preview.back"
+- tapOn:
+    id: "preview.skip"
+- tapOn:
+    id: "preview.back"
+- tapOn:
+    id: "preview.continue"
+- tapOn:
+    id: "preview.continue"
+- tapOn:
+    id: "preview.continue"
+- scrollUntilVisible:
+    element:
+      id: "notifications.timing.meal.time"
+    direction: DOWN
+- assertVisible:
+    id: "notifications.timing.meal.time"
+    text: ".*60 min after.*"
+- assertVisible:
+    id: "notifications.timing.meal.enabled"
+    checked: true
+- scrollUntilVisible:
+    element:
+      id: "notifications.timing.poop.time"
+    direction: DOWN
+- assertVisible:
+    id: "notifications.timing.poop.time"
+    text: ".*60 min after.*"
+- assertVisible:
+    id: "notifications.timing.poop.enabled"
+    checked: true
+- scrollUntilVisible:
+    element:
+      id: "notifications.timing.pottyAfterMeal.time"
+    direction: DOWN
+- assertVisible:
+    id: "notifications.timing.pottyAfterMeal.time"
+    text: ".*4h.*"
+- assertVisible:
+    id: "notifications.timing.pottyAfterMeal.enabled"
+    checked: true
+- scrollUntilVisible:
+    element:
+      id: "notifications.timing.pottyAfterPee.time"
+    direction: DOWN
+- assertVisible:
+    id: "notifications.timing.pottyAfterPee.time"
+    text: ".*4h.*"
+- assertVisible:
+    id: "notifications.timing.pottyAfterPee.enabled"
+    checked: true
+- tapOn:
+    id: "preview.reminders.later"
+- runFlow: "../helpers/conversational/finish-alone.yaml"
+- tapOn:
+    id: "nav.open"
+- tapOn:
+    id: "nav.notifications"
+- assertVisible:
+    id: "settings.notifications.deviceDelivery"
+    checked: false
+- scrollUntilVisible:
+    element:
+      id: "notifications.timing.meal.time"
+    direction: DOWN
+- assertVisible:
+    id: "notifications.timing.meal.time"
+    text: ".*60 min after.*"
+- assertVisible:
+    id: "notifications.timing.meal.enabled"
+    checked: true
+- scrollUntilVisible:
+    element:
+      id: "notifications.timing.poop.time"
+    direction: DOWN
+- assertVisible:
+    id: "notifications.timing.poop.time"
+    text: ".*60 min after.*"
+- assertVisible:
+    id: "notifications.timing.poop.enabled"
+    checked: true
+- scrollUntilVisible:
+    element:
+      id: "notifications.timing.pottyAfterMeal.time"
+    direction: DOWN
+- assertVisible:
+    id: "notifications.timing.pottyAfterMeal.time"
+    text: ".*4h.*"
+- assertVisible:
+    id: "notifications.timing.pottyAfterMeal.enabled"
+    checked: true
+- scrollUntilVisible:
+    element:
+      id: "notifications.timing.pottyAfterPee.time"
+    direction: DOWN
+- assertVisible:
+    id: "notifications.timing.pottyAfterPee.time"
+    text: ".*4h.*"
+- assertVisible:
+    id: "notifications.timing.pottyAfterPee.enabled"
+    checked: true

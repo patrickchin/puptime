@@ -1,0 +1,7 @@
+appId: com.patrickchin.puptime
+name: Deferred reminder choice retries successfully
+---
+- tapOn:
+    id: "preview.reminders.later"
+- assertVisible:
+    id: "preview.ready"

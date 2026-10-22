@@ -4,7 +4,6 @@ import {
   reminderTriggerMinutes,
   type NotificationPreferences,
   type PottyReminderDelayMinutes,
-  type ReminderLeadMinutes,
 } from './notification-config.ts';
 
 export const REMINDER_IDENTIFIER_PREFIX = 'puptime-routine-';
@@ -27,18 +26,18 @@ export function reminderIdentifier(entry: ScheduleEntry): string {
 export function reminderCopy(
   entry: ScheduleEntry,
   language: AppLanguage = 'en',
-  leadMinutes: ReminderLeadMinutes = 0,
+  leadMinutes: number = 0,
 ): { title: string; body: string } {
   const activity = entry.customLabel ?? localizedEventLabel(language, entry.type);
   return {
-    title: leadMinutes
+    title: leadMinutes<0 ? translate(language,'notifications.reminderAfter',{activity,minutes:-leadMinutes}) : leadMinutes
       ? translate(language, 'notifications.reminderSoon', { activity, minutes: leadMinutes })
       : translate(language, 'notifications.reminderNow', { activity }),
     body: translate(language, 'notifications.reminderBody', { time: formatMinutes(entry.minutes) }),
   };
 }
 
-export function reminderTrigger(entry: ScheduleEntry, leadMinutes: ReminderLeadMinutes): { hour: number; minute: number } {
+export function reminderTrigger(entry: ScheduleEntry, leadMinutes: number): { hour: number; minute: number } {
   const minutes = reminderTriggerMinutes(entry.minutes, leadMinutes);
   return { hour: Math.floor(minutes / 60), minute: minutes % 60 };
 }

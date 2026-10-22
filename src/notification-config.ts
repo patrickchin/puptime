@@ -1,6 +1,9 @@
 export const reminderLeadOptions = [0, 5, 10, 15, 30] as const;
 export const pottyReminderDelayOptions = [15, 30, 45, 60, 120, 180, 240] as const;
 
+export const reminderOffsetOptions = [-30,-15,-10,-5,0,5,10,15,30,60] as const;
+export type ReminderOffsetMinutes = (typeof reminderOffsetOptions)[number];
+
 export type ReminderLeadMinutes = (typeof reminderLeadOptions)[number];
 export type PottyReminderDelayMinutes = (typeof pottyReminderDelayOptions)[number];
 
@@ -12,6 +15,8 @@ export type PottyReminderPreference = {
 export type NotificationPreferences = {
   reminderLeadMinutes: ReminderLeadMinutes;
   widgetConfirmations: boolean;
+  mealReminderOffsetMinutes?: ReminderOffsetMinutes;
+  poopReminderOffsetMinutes?: ReminderOffsetMinutes;
   pottyAfterPee: PottyReminderPreference;
   pottyAfterMeal: PottyReminderPreference;
 };
@@ -53,9 +58,16 @@ export function normalizeNotificationPreferences(value: unknown): NotificationPr
     widgetConfirmations: candidate.widgetConfirmations === true,
     pottyAfterPee: normalizePottyReminder(candidate.pottyAfterPee, DEFAULT_NOTIFICATION_PREFERENCES.pottyAfterPee),
     pottyAfterMeal: normalizePottyReminder(candidate.pottyAfterMeal, DEFAULT_NOTIFICATION_PREFERENCES.pottyAfterMeal),
+    ...(reminderOffsetOptions.includes(candidate.mealReminderOffsetMinutes as ReminderOffsetMinutes)?{mealReminderOffsetMinutes:candidate.mealReminderOffsetMinutes}:{}),
+    ...(reminderOffsetOptions.includes(candidate.poopReminderOffsetMinutes as ReminderOffsetMinutes)?{poopReminderOffsetMinutes:candidate.poopReminderOffsetMinutes}:{}),
   };
 }
 
-export function reminderTriggerMinutes(minutes: number, leadMinutes: ReminderLeadMinutes): number {
+export function reminderTriggerMinutes(minutes: number, leadMinutes: number): number {
   return (minutes - leadMinutes + 24 * 60) % (24 * 60);
+}
+
+export function scheduleReminderLead(type:string,preferences:NotificationPreferences):number {
+  const offset=type==='meal'?preferences.mealReminderOffsetMinutes:type==='poop'?preferences.poopReminderOffsetMinutes:undefined;
+  return offset===undefined?preferences.reminderLeadMinutes:-offset;
 }
