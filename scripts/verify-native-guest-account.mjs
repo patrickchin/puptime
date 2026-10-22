@@ -222,7 +222,7 @@ try{
   }
   rmSync(join(output,'failure-redacted.log'),{force:true});
   writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',checks,scope:android?'Android Debug native host with normal embedded release JS and isolated local HTTPS Better Auth/D1/SQLite DO; actual native email SDK and Keystore. Its temporary CA is trusted only in the ignored Debug source set, restored after the run. Production onboarding is tested separately in the Release APK. No real email, production account, session injection or mocked sync.':'Release bundle and actual native email SDK with isolated local HTTPS Better Auth/D1/SQLite DO. Simulator trusts the fixture certificate. No real email, production account, session injection or mocked sync.'},null,2)+'\n');
-  console.log('PASS guest account preservation and empty-device recovery: '+output);
+  console.log('PASS '+(onboarding?'welcome sign-in and session recovery':'guest account preservation and empty-device recovery')+': '+output);
 }finally{
   auth?.close();proxy?.close();for(const child of [worker])if(child?.pid)try{process.kill(-child.pid,'SIGTERM');}catch{}
   if(android)try{adb('reverse','--remove','tcp:8797');}catch{}
