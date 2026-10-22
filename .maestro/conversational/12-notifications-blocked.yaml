@@ -1,0 +1,33 @@
+appId: com.patrickchin.puptime
+name: Notification blocked reaches the normal app and survives Back
+---
+- runFlow:
+    file: "../helpers/conversational/start.yaml"
+    env:
+      NOTIFICATIONS: "deny"
+- runFlow: "../helpers/conversational/to-reminders.yaml"
+- tapOn:
+    id: "preview.reminders.allow"
+- assertVisible:
+    id: "preview.ready"
+- assertNotVisible: You can change reminders in Notifications.
+- tapOn:
+    id: "preview.back"
+- assertVisible:
+    id: "preview.prompt"
+    text: "Set up reminders"
+- tapOn:
+    id: "preview.reminders.allow"
+- assertVisible:
+    id: "preview.ready"
+- runFlow: "../helpers/conversational/finish-alone.yaml"
+- tapOn:
+    id: "nav.open"
+- tapOn:
+    id: "nav.notifications"
+- assertVisible:
+    id: "settings.notifications.deviceDelivery"
+    checked: false
+- assertVisible:
+    id: "settings.notifications.permission"
+- takeScreenshot: notification-blocked-normal-app

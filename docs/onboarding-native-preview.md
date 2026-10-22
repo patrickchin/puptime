@@ -111,25 +111,35 @@ maestro --device DEVICE_ID test .maestro/conversational
 
 The iOS Simulator pull-request workflow builds this entry into a separate copy
 of the native host and runs these flows on its own CI simulator, uploading a
-separate report alongside the main app results.
+separate report alongside the main app results. It also runs actual SQLite
+failure/retry checks with `scripts/verify-ios-conversational-failures.mjs`.
 
-The flows edit a default meal time, verify the meal references and resulting poop
-windows, move a window and confirm its meal reference stays fixed, then verify
-both edits survive Back. They check the review timeline,
-select all four notification timings, finish setup, dismiss or act through the spotlight, navigate
-normal Schedule/Notifications/Timeline, and reopen the app with the real log still
-present. They assert the old preview plan route is absent. These flows clear test
-app data and belong only on the dedicated test device, not an installation with
-personal history.
+The 16 flows cover entry choices, name boundaries, all ages and meal counts,
+independent meal/poop skips, edits and cancellation, every reminder timing option,
+permission decisions, tutorial exits, interruption and midnight time boundaries.
+They finish in normal navigation and verify completion survives reopening.
+The failure runner checks permission/defer writes and schedule/preferences/
+completion failures, retained answers and successful retry. See
+[the coverage matrix](onboarding-e2e-coverage.md) for exact cases and limits.
+These flows clear test app data and belong only on the dedicated test device,
+not an installation with personal history.
 
 ## Checked on this branch
 
-- All three committed iPhone Maestro flows pass on **Puptime 2f17 Onboarding
-  Keyboard**: completed setup plus restart, logging through the spotlight, and
-  skipping optional setup plus the tour. All three pass after the meal/poop page,
-  cream picker, timeline and navigation changes.
-- The dedicated **Puptime_Onboarding_2f17** Android emulator passes the onboarding
-  flow with the new activity art, wheel-edited meal/poop times, Back preservation,
+- All 16 iPhone Maestro flows pass on **Puptime 2f17 Onboarding Keyboard**
+  (iPhone 17, iOS 26.5), including all entry choices, name boundaries, age/meal
+  choices, skip and Back routes, all 34 reminder timing values, actual permission
+  decisions, tutorial actions, interrupted setup and midnight wheel boundaries.
+  The meals-only route was rerun after replacing an inaccurate native-driver
+  `enabled` assertion with a check that tapping the unavailable switch leaves
+  it off. The other 15 passed in the full run.
+- All five actual SQLite failure cases pass on the same iPhone: notification
+  intent, deferral, schedule, preferences and completion writes. Retry preserves
+  the name, exact routine IDs and times, reminder delay and delivery opt-out;
+  normal navigation and completion survive restart. No fake event is created.
+- Earlier on this branch, the dedicated **Puptime_Onboarding_2f17** Android
+  emulator passed the onboarding flow with the new activity art, wheel-edited
+  meal/poop times, Back preservation,
   review timeline, reminder choices, spotlight logging and normal navigation,
   with 1,382 synthetic SQLite records. Android tests tap the next wheel row
   directly rather than switching to typing. Earlier render probes confirmed
@@ -137,8 +147,8 @@ personal history.
   observed EventRow render counters unchanged. The real quick-action positions
   stay fixed when the overlay disappears. QA fixtures, native artifacts, and
   render probes remain in ignored build output.
-- General, iOS, Android, and server TypeScript checks pass. All 460 Node tests
-  and 126 server tests pass, including signed notification scheduling across
+- Before this test expansion, general, iOS, Android, and server TypeScript checks
+  passed, along with all 460 Node tests and 126 server tests, including signed notification scheduling across
   midnight, optional preference validation, and storage/sync round trips.
 - The shared time selector uses Apple’s native wheels on iOS. Maestro changes
   the hour on the wheel, saves with Done, and confirms it survives Back.

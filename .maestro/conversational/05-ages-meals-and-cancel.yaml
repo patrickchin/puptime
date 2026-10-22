@@ -1,0 +1,186 @@
+appId: com.patrickchin.puptime
+name: All ages meal counts cancellation and back routes
+---
+- runFlow:
+    file: "../helpers/conversational/start.yaml"
+    env:
+      NOTIFICATIONS: "deny"
+- tapOn:
+    id: "preview.guest"
+- tapOn:
+    id: "preview.skip"
+- tapOn:
+    id: "preview.choice.young"
+- assertVisible: ".*4 meals a day is common.*"
+- tapOn:
+    id: "preview.choice.meals-4"
+- assertVisible:
+    id: "preview.mealTime.0"
+    text: ".*7:00.*AM.*"
+- assertVisible:
+    id: "preview.mealTime.1"
+    text: ".*11:00.*AM.*"
+- assertVisible:
+    id: "preview.mealTime.2"
+    text: ".*3:00.*PM.*"
+- assertVisible:
+    id: "preview.mealTime.3"
+    text: ".*7:00.*PM.*"
+- assertNotVisible:
+    id: "preview.mealTime.4"
+- tapOn:
+    id: "preview.back"
+- tapOn:
+    id: "preview.back"
+- tapOn:
+    id: "preview.choice.middle"
+- assertVisible: ".*3 meals a day is common.*"
+- tapOn:
+    id: "preview.choice.meals-3"
+- assertVisible:
+    id: "preview.mealTime.0"
+    text: ".*7:00.*AM.*"
+- assertVisible:
+    id: "preview.mealTime.1"
+    text: ".*12:00.*PM.*"
+- assertVisible:
+    id: "preview.mealTime.2"
+    text: ".*6:00.*PM.*"
+- assertNotVisible:
+    id: "preview.mealTime.3"
+- tapOn:
+    id: "preview.back"
+- tapOn:
+    id: "preview.back"
+- tapOn:
+    id: "preview.choice.older"
+- assertVisible: ".*2 meals a day is common.*"
+- tapOn:
+    id: "preview.choice.meals-2"
+- assertVisible:
+    id: "preview.mealTime.0"
+    text: ".*7:00.*AM.*"
+- assertVisible:
+    id: "preview.mealTime.1"
+    text: ".*6:00.*PM.*"
+- assertNotVisible:
+    id: "preview.mealTime.2"
+- tapOn:
+    id: "preview.back"
+- tapOn:
+    id: "preview.back"
+- tapOn:
+    id: "preview.choice.adult"
+- assertVisible: ".*2 meals a day is common.*"
+- tapOn:
+    id: "preview.choice.meals-1"
+- assertVisible:
+    id: "preview.mealTime.0"
+    text: ".*12:00.*PM.*"
+- assertNotVisible:
+    id: "preview.mealTime.1"
+- tapOn:
+    id: "preview.mealTime.0"
+- runFlow: "../helpers/conversational/increment-hour.yaml"
+- tapOn:
+    id: "picker.cancel"
+- assertVisible:
+    id: "preview.mealTime.0"
+    text: ".*12:00.*PM.*"
+- tapOn:
+    id: "preview.mealTime.0"
+- runFlow: "../helpers/conversational/increment-hour.yaml"
+- tapOn:
+    point: "5%,15%"
+- assertVisible:
+    id: "preview.mealTime.0"
+    text: ".*12:00.*PM.*"
+- tapOn:
+    id: "preview.continue"
+- assertVisible:
+    id: "preview.poopTime.0"
+    text: ".*12:30.*1:00.*"
+- tapOn:
+    id: "preview.poopTime.0"
+- runFlow: "../helpers/conversational/increment-hour.yaml"
+- tapOn:
+    id: "picker.cancel"
+- assertVisible:
+    id: "preview.poopTime.0"
+    text: ".*12:30.*1:00.*"
+- tapOn:
+    id: "preview.back"
+- tapOn:
+    id: "preview.back"
+- tapOn:
+    id: "preview.choice.meals-4"
+- assertVisible:
+    id: "preview.mealTime.3"
+    text: ".*7:00.*PM.*"
+- tapOn:
+    id: "preview.continue"
+- assertVisible:
+    id: "preview.poopTime.3"
+    text: ".*7:30.*8:00.*"
+- tapOn:
+    id: "preview.poopTime.1"
+- runFlow: "../helpers/conversational/increment-hour.yaml"
+- tapOn:
+    id: "picker.done"
+- assertVisible:
+    id: "preview.poopTime.1"
+    text: ".*12:30.*1:00.*"
+- tapOn:
+    id: "preview.back"
+- tapOn:
+    id: "preview.mealTime.0"
+- runFlow: "../helpers/conversational/increment-hour.yaml"
+- tapOn:
+    id: "picker.done"
+- tapOn:
+    id: "preview.continue"
+- assertVisible:
+    id: "preview.poopTime.0"
+    text: ".*8:30.*9:00.*"
+- assertVisible:
+    id: "preview.poopTime.1"
+    text: ".*11:30.*12:00.*"
+- tapOn:
+    id: "preview.continue"
+- tapOn:
+    id: "preview.skip"
+- assertVisible:
+    id: "preview.poopTimes"
+- tapOn:
+    id: "preview.continue"
+- tapOn:
+    id: "preview.continue"
+- tapOn:
+    id: "preview.back"
+- assertVisible:
+    id: "preview.planTimeline"
+- tapOn:
+    id: "preview.continue"
+- tapOn:
+    id: "preview.reminders.later"
+- tapOn:
+    id: "preview.back"
+- assertVisible:
+    id: "preview.prompt"
+    text: "Set up reminders"
+- tapOn:
+    id: "preview.reminders.later"
+- runFlow: "../helpers/conversational/finish-alone.yaml"
+- tapOn:
+    id: "nav.open"
+- tapOn:
+    id: "nav.schedule"
+- assertVisible:
+    id: "screen.schedule"
+- assertVisible:
+    id: "schedule.entry.meal"
+    text: ".*8:00.*"
+- assertVisible:
+    id: "schedule.entry.poop"
+    text: ".*11:30.*12:00.*"
+- takeScreenshot: all-age-and-meal-choices-finished

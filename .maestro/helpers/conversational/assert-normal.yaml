@@ -1,0 +1,34 @@
+appId: com.patrickchin.puptime
+name: Completion reaches normal navigation and survives restart
+---
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- assertNotVisible:
+    id: "preview.back"
+- assertNotVisible:
+    id: "onboarding.spotlight"
+- tapOn:
+    id: "nav.open"
+- tapOn:
+    id: "nav.timeline"
+- assertVisible:
+    id: "screen.timeline"
+- tapOn:
+    id: "nav.open"
+- tapOn:
+    id: "nav.log"
+- assertVisible:
+    id: "screen.today"
+- stopApp
+- launchApp:
+    permissions: {}
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- assertNotVisible:
+    id: "preview.guest"
+- assertNotVisible:
+    id: "onboarding.spotlight"

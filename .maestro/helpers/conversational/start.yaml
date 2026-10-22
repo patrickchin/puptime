@@ -1,0 +1,11 @@
+appId: com.patrickchin.puptime
+name: Start isolated conversational onboarding
+---
+- launchApp:
+    clearState: true
+    permissions:
+      notifications: ${NOTIFICATIONS}
+- extendedWaitUntil:
+    visible:
+      id: preview.guest
+    timeout: 90000

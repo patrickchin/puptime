@@ -1,0 +1,45 @@
+appId: com.patrickchin.puptime
+name: Skip grouped meal times and recover using Back
+---
+- runFlow:
+    file: "../helpers/conversational/start.yaml"
+    env:
+      NOTIFICATIONS: "deny"
+- tapOn:
+    id: "preview.guest"
+- tapOn:
+    id: "preview.skip"
+- tapOn:
+    id: "preview.choice.middle"
+- tapOn:
+    id: "preview.choice.meals-2"
+- tapOn:
+    id: "preview.skip"
+- assertNotVisible:
+    id: "preview.poopMealTime.0"
+- tapOn:
+    id: "preview.back"
+- assertVisible:
+    id: "preview.choice.meals-2"
+- tapOn:
+    id: "preview.choice.meals-2"
+- tapOn:
+    id: "preview.skip"
+- tapOn:
+    id: "preview.continue"
+- tapOn:
+    id: "preview.continue"
+- tapOn:
+    id: "preview.reminders.later"
+- runFlow: "../helpers/conversational/finish-alone.yaml"
+- tapOn:
+    id: "nav.open"
+- tapOn:
+    id: "nav.schedule"
+- assertVisible:
+    id: "screen.schedule"
+- assertNotVisible:
+    id: "schedule.entry.meal"
+- assertVisible:
+    id: "schedule.entry.poop"
+    text: ".*6:30.*7:00.*"

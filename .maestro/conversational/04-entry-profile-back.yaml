@@ -1,0 +1,137 @@
+appId: com.patrickchin.puptime
+name: All entry choices and profile edits reach the real app
+---
+- runFlow:
+    file: "../helpers/conversational/start.yaml"
+    env:
+      NOTIFICATIONS: "deny"
+- tapOn:
+    id: "preview.auth.apple"
+- assertVisible: Sign-in design preview
+- tapOn:
+    text: "(?i)^Back$"
+- assertVisible:
+    id: "preview.guest"
+- tapOn:
+    id: "preview.auth.apple"
+- tapOn:
+    text: "(?i)^Explore as a guest$"
+- assertVisible:
+    id: "preview.name"
+- tapOn:
+    id: "preview.back"
+- assertVisible:
+    id: "preview.guest"
+- tapOn:
+    id: "preview.auth.google"
+- assertVisible: Sign-in design preview
+- tapOn:
+    text: "(?i)^Back$"
+- assertVisible:
+    id: "preview.guest"
+- tapOn:
+    id: "preview.auth.google"
+- tapOn:
+    text: "(?i)^Explore as a guest$"
+- assertVisible:
+    id: "preview.name"
+- tapOn:
+    id: "preview.back"
+- assertVisible:
+    id: "preview.guest"
+- tapOn:
+    id: "preview.auth.email"
+- assertVisible: Sign-in design preview
+- tapOn:
+    text: "(?i)^Back$"
+- assertVisible:
+    id: "preview.guest"
+- tapOn:
+    id: "preview.auth.email"
+- tapOn:
+    text: "(?i)^Explore as a guest$"
+- assertVisible:
+    id: "preview.name"
+- tapOn:
+    id: "preview.back"
+- assertVisible:
+    id: "preview.guest"
+- tapOn:
+    id: "preview.guest"
+- tapOn:
+    id: "preview.name"
+- inputText: "  Biscuit  "
+- tapOn:
+    id: "preview.continue"
+- assertVisible:
+    id: "preview.prompt"
+    text: "How old is Biscuit\\?"
+- tapOn:
+    id: "preview.back"
+- assertVisible:
+    id: "preview.name"
+    text: "  Biscuit  "
+- tapOn:
+    id: "preview.back"
+- tapOn:
+    id: "preview.guest"
+- assertVisible:
+    id: "preview.name"
+    text: "  Biscuit  "
+- tapOn:
+    id: "preview.name"
+- eraseText: 300
+- inputText: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+- assertVisible:
+    id: "preview.name"
+    text: "a{256}"
+- eraseText: 300
+- inputText: "   "
+- tapOn:
+    id: "preview.continue"
+- assertVisible:
+    id: "preview.prompt"
+    text: "How old is your pup\\?"
+- tapOn:
+    id: "preview.back"
+- tapOn:
+    id: "preview.name"
+- eraseText: 300
+- inputText: "Toffee"
+- tapOn:
+    id: "preview.skip"
+- tapOn:
+    id: "preview.back"
+- assertVisible:
+    id: "preview.name"
+- assertNotVisible:
+    id: "preview.name"
+    text: ".*Toffee.*"
+- tapOn:
+    id: "preview.name"
+- inputText: "  Biscuit  "
+- tapOn:
+    id: "preview.continue"
+- tapOn:
+    id: "preview.choice.adult"
+- tapOn:
+    id: "preview.choice.meals-1"
+- assertVisible:
+    id: "preview.mealTime.0"
+    text: ".*12:00.*PM.*"
+- tapOn:
+    id: "preview.continue"
+- tapOn:
+    id: "preview.skip"
+- tapOn:
+    id: "preview.continue"
+- tapOn:
+    id: "preview.reminders.later"
+- runFlow: "../helpers/conversational/finish-alone.yaml"
+- tapOn:
+    id: "nav.open"
+- tapOn:
+    id: "nav.settings"
+- assertVisible:
+    id: "settings.puppy.name"
+    text: ".*Biscuit.*"

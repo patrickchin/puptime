@@ -1,0 +1,44 @@
+appId: com.patrickchin.puptime
+name: Keep meals and skip poop windows
+---
+- runFlow:
+    file: "../helpers/conversational/start.yaml"
+    env:
+      NOTIFICATIONS: "deny"
+- tapOn:
+    id: "preview.guest"
+- tapOn:
+    id: "preview.skip"
+- tapOn:
+    id: "preview.choice.older"
+- tapOn:
+    id: "preview.choice.meals-2"
+- tapOn:
+    id: "preview.continue"
+- tapOn:
+    id: "preview.skip"
+- tapOn:
+    id: "preview.continue"
+- assertVisible:
+    id: "notifications.timing.meal.time"
+- assertNotVisible:
+    id: "notifications.timing.poop.time"
+# iOS's driver reports disabled Switches as enabled; assert their inert behavior.
+- tapOn:
+    id: "notifications.timing.poop.enabled"
+- assertVisible:
+    id: "notifications.timing.poop.enabled"
+    checked: false
+- tapOn:
+    id: "preview.reminders.later"
+- runFlow: "../helpers/conversational/finish-alone.yaml"
+- tapOn:
+    id: "nav.open"
+- tapOn:
+    id: "nav.schedule"
+- assertVisible:
+    id: "screen.schedule"
+- assertVisible:
+    id: "schedule.entry.meal"
+- assertNotVisible:
+    id: "schedule.entry.poop"

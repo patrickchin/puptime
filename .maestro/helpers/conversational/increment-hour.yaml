@@ -1,0 +1,17 @@
+appId: com.patrickchin.puptime
+name: Move one hour using the platform time wheels
+---
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: time.nativeWheel
+          point: "28%,64%"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          id: time.wheel.hour
+          point: "50%,70%"

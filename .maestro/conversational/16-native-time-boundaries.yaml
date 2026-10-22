@@ -1,0 +1,76 @@
+appId: com.patrickchin.puptime
+name: Native hour minute AM PM and midnight windows
+---
+- runFlow:
+    file: "../helpers/conversational/start.yaml"
+    env:
+      NOTIFICATIONS: "deny"
+- tapOn:
+    id: "preview.guest"
+- tapOn:
+    id: "preview.skip"
+- tapOn:
+    id: "preview.choice.adult"
+- tapOn:
+    id: "preview.choice.meals-1"
+- tapOn:
+    id: "preview.mealTime.0"
+- tapOn:
+    id: time.nativeWheel
+    point: "76%,36%"
+- tapOn:
+    id: "picker.done"
+- assertVisible:
+    id: "preview.mealTime.0"
+    text: ".*12:00.*AM.*"
+- tapOn:
+    id: "preview.mealTime.0"
+- tapOn:
+    id: time.nativeWheel
+    point: "50%,64%"
+- tapOn:
+    id: "picker.done"
+- assertVisible:
+    id: "preview.mealTime.0"
+    text: ".*12:01.*AM.*"
+- tapOn:
+    id: "preview.continue"
+- assertVisible:
+    id: "preview.poopTime.0"
+    text: ".*12:31.*AM.*1:01.*AM.*"
+- tapOn:
+    id: "preview.poopTime.0"
+- tapOn:
+    id: time.nativeWheel
+    point: "28%,36%"
+- tapOn:
+    id: time.nativeWheel
+    point: "76%,36%"
+- tapOn:
+    id: time.nativeWheel
+    point: "76%,64%"
+- tapOn:
+    id: "picker.done"
+- assertVisible:
+    id: "preview.poopTime.0"
+    text: ".*11:31.*PM.*12:01.*AM.*"
+- tapOn:
+    id: "preview.continue"
+- tapOn:
+    id: "preview.continue"
+- tapOn:
+    id: "preview.reminders.later"
+- runFlow: "../helpers/conversational/finish-alone.yaml"
+- tapOn:
+    id: "nav.open"
+- tapOn:
+    id: "nav.schedule"
+- assertVisible:
+    id: "screen.schedule"
+- assertVisible:
+    id: "schedule.entry.meal"
+    text: ".*12:01.*AM.*"
+- assertVisible:
+    id: "schedule.entry.poop"
+    text: ".*11:31.*PM.*12:01.*AM.*"
+- takeScreenshot: midnight-window-saved

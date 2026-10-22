@@ -73,7 +73,7 @@ jobs:
             --test-output-dir build/maestro-results \
             .maestro
       - name: Run conversational onboarding into the real app
-        timeout-minutes: 15
+        timeout-minutes: 35
         env:
           CI: "1"
           MAESTRO_CLI_NO_ANALYTICS: "1"
@@ -99,6 +99,8 @@ jobs:
             --format JUNIT --output build/onboarding-maestro-report.xml \
             --test-output-dir build/onboarding-maestro-results \
             .maestro/conversational
+          node scripts/verify-ios-conversational-failures.mjs \
+            "$onboarding_device" --replace-synthetic build/onboarding-failure-results
       - name: Upload Maestro results
         if: always()
         uses: actions/upload-artifact@v6
@@ -109,6 +111,7 @@ jobs:
             build/maestro-results
             build/onboarding-maestro-report.xml
             build/onboarding-maestro-results
+            build/onboarding-failure-results
           if-no-files-found: warn
           retention-days: 7
       - name: Capture App Store screenshots

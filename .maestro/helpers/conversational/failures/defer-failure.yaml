@@ -1,0 +1,12 @@
+appId: com.patrickchin.puptime
+name: Failed defer write stays in reminder setup
+---
+- tapOn:
+    id: "preview.reminders.later"
+- assertVisible: We couldn.t save that choice.*
+- assertVisible:
+    id: "preview.prompt"
+    text: "Set up reminders"
+- assertNotVisible:
+    id: "preview.ready"
+- takeScreenshot: defer-failure-retains-draft

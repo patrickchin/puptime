@@ -1,0 +1,44 @@
+appId: com.patrickchin.puptime
+name: Exercise every value and both toggle states for a reminder
+---
+- scrollUntilVisible:
+    element:
+      id: notifications.timing.${RULE}.enabled
+    direction: DOWN
+- tapOn:
+    id: notifications.timing.${RULE}.enabled
+- assertVisible:
+    id: notifications.timing.${RULE}.enabled
+    checked: true
+- tapOn:
+    id: notifications.timing.${RULE}.enabled
+- assertVisible:
+    id: notifications.timing.${RULE}.enabled
+    checked: false
+- tapOn:
+    id: notifications.timing.${RULE}.enabled
+- evalScript: ${output.optionIndex = 0}
+- repeat:
+    times: ${output.reminderCases[RULE].length}
+    commands:
+      - runFlow:
+          file: select-timing.yaml
+          env:
+            RULE: ${RULE}
+            VALUE: ${output.reminderCases[RULE][output.optionIndex].value}
+            LABEL: ${output.reminderCases[RULE][output.optionIndex].label}
+      - evalScript: ${output.optionIndex = output.optionIndex + 1}
+- tapOn:
+    id: notifications.timing.${RULE}.time
+- tapOn:
+    id: notifications.timing.close
+- assertVisible:
+    id: notifications.timing.${RULE}.time
+    text: .*${LAST_LABEL}.*
+- tapOn:
+    id: notifications.timing.${RULE}.time
+- tapOn:
+    point: "50%,10%"
+- assertVisible:
+    id: notifications.timing.${RULE}.time
+    text: .*${LAST_LABEL}.*
