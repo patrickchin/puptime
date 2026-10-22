@@ -179,8 +179,9 @@ try{
     console.log('PASS isolated Android HTTPS native build');
   }else{
   const bundle=join(privateDir,'Puptime.app');cpSync(host,bundle,{recursive:true});
-  await run('node',['node_modules/expo/bin/cli','export:embed','--entry-file','index.ts','--platform','ios','--dev','false','--bytecode','--max-workers','2','--bundle-output',join(bundle,'main.jsbundle'),'--assets-dest',bundle],
+  await run('node',['node_modules/expo/bin/cli','export:embed','--entry-file','index.ts','--platform','ios','--dev','false','--bytecode','--reset-cache','--max-workers','2','--bundle-output',join(bundle,'main.jsbundle'),'--assets-dest',bundle],
     {...process.env,EXPO_PUBLIC_CLOUD_API_URL:front});
+  assert.ok(readFileSync(join(bundle,'main.jsbundle')).includes(Buffer.from(front)),'Embed the fixture HTTPS address, never a cached production API.');
   await run('codesign',['--force','--deep','--sign','-',bundle]);
   simctl('install',device,bundle);
   }
