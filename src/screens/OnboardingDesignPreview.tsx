@@ -3,7 +3,7 @@ import {useFonts} from 'expo-font';
 import {StatusBar} from 'expo-status-bar';
 import {useEffect,useRef,useState,type ReactNode} from 'react';
 import {
-  AccessibilityInfo,ActivityIndicator,Alert,Animated,Easing,Image,Keyboard,KeyboardAvoidingView,Platform,Pressable,
+  AccessibilityInfo,ActivityIndicator,Animated,BackHandler,Easing,Image,Keyboard,KeyboardAvoidingView,Platform,Pressable,
   ScrollView,StyleSheet,Text,TextInput,View,useWindowDimensions,type ImageSourcePropType,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -16,8 +16,11 @@ import {DEFAULT_NOTIFICATION_PREFERENCES,type NotificationPreferences} from '../
 import {starterPoopWindows,puppyAges,starterMealTimes,suggestedMealCount,type PuppyAge} from '../onboarding-preview';
 import {lightTheme,type Theme} from '../theme';
 import {OnboardingPlanTimeline} from '../components/OnboardingPlanTimeline';
+import {AccountSignIn} from '../components/AccountSignIn';
+import {useAccountSnapshot} from '../cloud/use-account-snapshot';
+import type {CloudHandle} from '../cloud/handle';
 export type OnboardingDraft={puppyName:string;schedule:ScheduleEntry[];notifications:NotificationPreferences;showGuide:boolean};
-export type ConversationalOnboardingProps={onFinish:(draft:OnboardingDraft)=>Promise<void>;onAllowNotifications:()=>Promise<boolean>;onDisableNotifications:()=>Promise<void>};
+export type ConversationalOnboardingProps={cloud:CloudHandle;onFinish:(draft:OnboardingDraft)=>Promise<void>;onAllowNotifications:()=>Promise<boolean>;onDisableNotifications:()=>Promise<void>};
 
 const appTheme:Theme={...lightTheme,surface:'#FFFDF7',surfaceRaised:'#FFFDF7',
   text:'#243D2E',textMuted:'#53685A',border:'#CDD8CF',primary:'#176B52',onPrimary:'#FFFDF5',
@@ -30,7 +33,7 @@ const mascots=[require('../../assets/mascots/scruffy-terrier.png'),
   require('../../assets/mascots/onboarding/scruffy-grass.png'),
   require('../../assets/mascots/onboarding/scruffy-bone.png'),
   require('../../assets/mascots/onboarding/scruffy-roll.png')];
-type Step='welcome'|'profile'|'age'|'meals'|'mealTime'|'poop'|'review'|'reminders'|'ready';
+type Step='welcome'|'account'|'profile'|'age'|'meals'|'mealTime'|'poop'|'review'|'reminders'|'ready';
 
 // Draft answers are committed by the real app when setup finishes.
 export function OnboardingDesignPreview(props:ConversationalOnboardingProps){
@@ -42,8 +45,9 @@ export function OnboardingDesignPreview(props:ConversationalOnboardingProps){
   return fontsLoaded||fontError?<PreviewFlow {...props}/>:<View style={styles.loading}><ActivityIndicator color={theme.primary}/></View>;
 }
 
-function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:ConversationalOnboardingProps){
+function PreviewFlow({cloud,onFinish,onAllowNotifications,onDisableNotifications}:ConversationalOnboardingProps){
   const [step,setStep]=useState<Step>('welcome');
+  const accountState=useAccountSnapshot(cloud.controller),signingIn=accountState?.busy??false;
   const [name,setName]=useState('');
   const [age,setAge]=useState<PuppyAge|null>(null);
   const [mealTimes,setMealTimes]=useState(()=>starterMealTimes(3));
@@ -90,6 +94,14 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
     const frame=requestAnimationFrame(()=>{if(heading.current)AccessibilityInfo.sendAccessibilityEvent(heading.current,'focus');});
     return()=>cancelAnimationFrame(frame);
   },[step]);
+  useEffect(()=>{
+    if(accountState?.account&&!signingIn&&(step==='welcome'||step==='account'))go('profile');
+  },[accountState?.account?.user.id,signingIn,step]);
+  useEffect(()=>{
+    if(step!=='account')return;
+    const subscription=BackHandler.addEventListener('hardwareBackPress',()=>{if(!signingIn)go('welcome',true);return true;});
+    return()=>subscription.remove();
+  },[step,signingIn]);
   function go(next:Step,backward=false){
     if(transitioning.current||next===step)return;
     Keyboard.dismiss();setPickingTime(false);
@@ -117,11 +129,6 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
     catch{setFinishError(true);}
     finally{completion.current=false;setFinishing(false);}
   }
-  function previewSignIn(provider:string){
-    Alert.alert('Sign-in design preview',`${provider} sign-in isn’t connected in this preview. You can explore the whole journey as a guest.`,[
-      {text:'Back',style:'cancel'}, {text:'Explore as a guest',onPress:()=>go('profile')},
-    ]);
-  }
   async function allowReminders(){
     if(permissionRequest.current)return;
     permissionRequest.current=true;setRequestingReminders(true);setReminderError(null);
@@ -140,11 +147,11 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
   }
   function back(){
     if(pickingTime){setPickingTime(false);return;}
-    const previous:Partial<Record<Step,Step>>={profile:'welcome',age:'profile',meals:'age',mealTime:'meals',poop:meals.length?'mealTime':'meals',review:'poop',reminders:'review',ready:'reminders'};
+    const previous:Partial<Record<Step,Step>>={account:'welcome',profile:'welcome',age:'profile',meals:'age',mealTime:'meals',poop:meals.length?'mealTime':'meals',review:'poop',reminders:'review',ready:'reminders'};
     go(previous[step]??'profile',true);
   }
   const header=<View style={styles.header}>
-    {step!=='welcome'?<Pressable testID="preview.back" accessibilityRole="button" accessibilityLabel="Go back" disabled={requestingReminders} onPress={back} style={styles.back}>
+    {step!=='welcome'?<Pressable testID="preview.back" accessibilityRole="button" accessibilityLabel="Go back" disabled={requestingReminders||signingIn} accessibilityState={{disabled:requestingReminders||signingIn}} onPress={back} style={styles.back}>
       <MaterialCommunityIcons name="chevron-left" size={18} color={theme.textMuted}/><Text style={styles.backText}>Back</Text>
     </Pressable>:<View style={styles.back}/>}
     <View style={styles.brand}><Image source={require('../../assets/puptime-icon.png')} style={styles.icon}/><Text style={styles.brandName}>Puptime</Text></View>
@@ -174,13 +181,14 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
     <View style={styles.welcomeArt}><Image accessible={false} source={mascot} resizeMode="contain" style={styles.mascot}/></View>
     <View style={styles.welcomeActions}>
       <Text style={styles.welcomeQuestion}>How would you like to begin?</Text>
-      <View style={styles.signInRow}>{([
-        {id:'apple',label:'Apple',icon:'apple'}, {id:'google',label:'Google',icon:'google'}, {id:'email',label:'Email',icon:'email-outline'},
-      ] as const).map(provider=><Pressable key={provider.id} testID={`preview.auth.${provider.id}`} accessibilityRole="button" accessibilityLabel={`Continue with ${provider.label}`} onPress={()=>previewSignIn(provider.label)} style={({pressed})=>[styles.signInButton,pressed&&styles.choicePressed]}>
-        <MaterialCommunityIcons accessible={false} name={provider.icon} color={appTheme.text} size={21}/><Text style={styles.signInText}>{provider.label}</Text>
-      </Pressable>)}</View>
-      <Pressable testID="preview.guest" accessibilityRole="button" onPress={()=>go('profile')} style={styles.secondary}><Text style={[styles.secondaryText,{color:theme.text}]}>Let’s start without an account</Text></Pressable>
+      <AccountSignIn cloud={cloud} theme={theme} showIntro={false} onEmailPress={()=>go('account')}/>
+      <Pressable testID="preview.guest" accessibilityRole="button" disabled={signingIn} accessibilityState={{disabled:signingIn}} onPress={()=>go('profile')} style={styles.secondary}><Text style={[styles.secondaryText,{color:theme.text}]}>Let’s start without an account</Text></Pressable>
     </View>
+  </ScrollView>;
+  else if(step==='account')body=<ScrollView testID="preview.account" keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={styles.conversation}>
+    {prompt('Sign in')}
+    <AccountSignIn cloud={cloud} theme={theme} showIntro={false}/>
+    <Pressable testID="preview.guest" accessibilityRole="button" disabled={signingIn} accessibilityState={{disabled:signingIn}} onPress={()=>go('profile')} style={styles.secondary}><Text style={styles.secondaryText}>Let’s start without an account</Text></Pressable>
   </ScrollView>;
   else if(step==='profile')body=<>
     <ScrollView ref={scroll} testID="preview.profile" keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={styles.profileContent}>
@@ -286,7 +294,7 @@ function PreviewFlow({onFinish,onAllowNotifications,onDisableNotifications}:Conv
 
 const styles=StyleSheet.create({
   welcome:{flexGrow:1,paddingHorizontal:22,paddingTop:28,paddingBottom:12},welcomeBrand:{alignItems:'center',gap:14},welcomeIcon:{width:64,height:64,borderRadius:16},welcomeName:{fontFamily:'RedHatDisplayBold',fontSize:52,lineHeight:60,letterSpacing:-1.5,color:theme.text},welcomeCopy:{fontFamily:'RedHatText',fontSize:15,lineHeight:23,textAlign:'center',color:theme.text,marginTop:14},
-  welcomeArt:{flex:1,minHeight:180,alignItems:'center',justifyContent:'center',paddingVertical:22},welcomeActions:{gap:16,paddingTop:18},welcomeQuestion:{fontFamily:'RedHatText',fontSize:16,lineHeight:24,color:theme.text,textAlign:'center'},signInRow:{flexDirection:'row',gap:10},signInButton:{flex:1,minHeight:54,alignItems:'center',justifyContent:'center',flexDirection:'row',gap:7,borderWidth:1,borderColor:theme.border,borderRadius:16,backgroundColor:appTheme.surface},signInText:{fontFamily:'RedHatTextSemiBold',fontSize:14,color:appTheme.text},
+  welcomeArt:{flex:1,minHeight:180,alignItems:'center',justifyContent:'center',paddingVertical:22},welcomeActions:{gap:16,paddingTop:18},welcomeQuestion:{fontFamily:'RedHatText',fontSize:16,lineHeight:24,color:theme.text,textAlign:'center'},
   notification:{padding:18,borderRadius:20,borderWidth:1,borderColor:theme.border,backgroundColor:theme.surface,flexDirection:'row',gap:14,alignItems:'center'},notificationCopy:{flex:1,gap:8},error:{fontFamily:'RedHatText',fontSize:15,lineHeight:23,color:theme.danger},
   bodyViewport:{flex:1,overflow:'hidden'},root:{flex:1,backgroundColor:theme.background},loading:{flex:1,alignItems:'center',justifyContent:'center',backgroundColor:theme.background},
   header:{minHeight:52,paddingHorizontal:22,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8},

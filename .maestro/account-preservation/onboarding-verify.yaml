@@ -1,0 +1,43 @@
+appId: com.patrickchin.puptime
+name: Welcome sign-in verifies the code and resumes real setup
+---
+- tapOn:
+    id: account.code.input
+- inputText: "${MAESTRO_TEST_CODE === '000000' ? '111111' : '000000'}"
+- tapOn: Sign-in code
+- scrollUntilVisible:
+    element:
+      id: account.verify
+    direction: DOWN
+- tapOn:
+    id: account.verify
+- extendedWaitUntil:
+    visible:
+      id: account.error
+    timeout: 30000
+- assertVisible:
+    id: account.code.input
+- tapOn:
+    id: account.code.input
+- eraseText: 6
+- inputText: ${MAESTRO_TEST_CODE}
+- tapOn: Sign-in code
+- scrollUntilVisible:
+    element:
+      id: account.verify
+    direction: DOWN
+- tapOn:
+    id: account.verify
+- extendedWaitUntil:
+    visible:
+      id: preview.name
+    timeout: 30000
+- assertNotVisible:
+    id: account.code.input
+- stopApp
+- launchApp:
+    permissions: {}
+- extendedWaitUntil:
+    visible:
+      id: preview.name
+    timeout: 90000

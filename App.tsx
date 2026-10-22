@@ -764,7 +764,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
                   return true;
                 }}
               />
-            ):firstLaunch?conversationalOnboarding?<OnboardingDesignPreview onFinish={finishConversationalOnboarding} onAllowNotifications={requestNotifications} onDisableNotifications={()=>changeNotificationDelivery(false)}/>:<FirstLaunchScreen progress={firstLaunch} cloud={cloud} theme={theme} notificationPermission={notificationPermission} onAllowNotifications={requestNotifications} onDisableNotifications={()=>changeNotificationDelivery(false)} onOpenSystemSettings={()=>{void Linking.openSettings().catch(()=>undefined);}} onFinish={finishOnboarding}/>:null : screen}
+            ):firstLaunch?conversationalOnboarding?<OnboardingDesignPreview cloud={cloud} onFinish={finishConversationalOnboarding} onAllowNotifications={requestNotifications} onDisableNotifications={()=>changeNotificationDelivery(false)}/>:<FirstLaunchScreen progress={firstLaunch} cloud={cloud} theme={theme} notificationPermission={notificationPermission} onAllowNotifications={requestNotifications} onDisableNotifications={()=>changeNotificationDelivery(false)} onOpenSystemSettings={()=>{void Linking.openSettings().catch(()=>undefined);}} onFinish={finishOnboarding}/>:null : screen}
             {!onboardingVisible && undoState ? (
               <Toast
                 message={undoState.message}

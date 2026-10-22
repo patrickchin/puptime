@@ -6,9 +6,11 @@ Both entries use the same native app, SQLite storage, schedule, Notifications
 section, logging, and navigation after setup. The browser entry retains its
 existing first-launch UI.
 There is no stripped-down home screen or route back into onboarding from a plan
-shortcut. Provider buttons still disclose that sign-in is not connected in this
-design preview and offer the guest route. Actual email/provider authentication
-remains available through Settings → Backup and sync after setup.
+shortcut. Welcome uses the same configured Apple, Google and email sign-in
+controls as Settings → Backup and sync. Email opens the existing code form;
+successful sign-in continues to puppy setup and survives restart. Signing in
+does not enroll a puppy or upload history. Cloud sync remains an explicit choice
+in Settings → Backup and sync. Guest setup works without signing in.
 
 ## Journey
 
