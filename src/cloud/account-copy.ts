@@ -1,4 +1,5 @@
 export const accountEnglish={
+ 'account.emailShort':'Email',
  'account.continueEmail':'Continue with email',
  'account.export':'Export cloud data','account.exporting':'Preparing export…','account.exportPending':'Changes waiting on this device aren’t included.','account.error.export':'Couldn’t prepare the cloud export. Try again. Your puppy history is unchanged.',
  'account.connectApple':'Connect Apple','account.connectGoogle':'Connect Google','account.connectedApple':'Apple connected','account.connectedGoogle':'Google connected','account.methodsLoading':'Checking sign-in methods…','account.refreshMethods':'Refresh sign-in methods',
@@ -15,6 +16,7 @@ export const accountEnglish={
  'account.error.email':'Enter a valid email address.','account.error.code':'That code didn’t work. Check the code or request a new one.','account.error.expiredCode':'This code has expired. Request a new one.','account.error.attempts':'Too many attempts. Wait a moment, then try again.','account.error.network':'Cloud isn’t responding. Your logs are saved on this device. Try again when connected.','account.error.service':'Cloud is unavailable right now. Your local logs are kept. Try again later.','account.error.mismatch':'This device is connected to another account. Sign out to keep the history locally before connecting a different account.','account.error.signOut':'Couldn’t finish signing out on this device. Sync is paused. Try signing out again.','account.error.remoteSignOut':'Signed out on this device. The server could not confirm ending the session.','account.error.storage':'Couldn’t read the local history. Your existing data has been kept. Try reopening Puptime.','account.error.signIn':'Couldn’t sign in. Try again or choose another sign-in method.',
 } as const;
 export const accountChinese:Record<keyof typeof accountEnglish,string>={
+ 'account.emailShort':'邮箱',
  'account.continueEmail':'使用电子邮箱继续',
  'account.export':'导出云端数据','account.exporting':'正在准备导出…','account.exportPending':'此设备上等待上传的更改不会包含在导出文件中。','account.error.export':'未能准备云端导出文件，请重试。幼犬记录未发生变化。',
  'account.connectApple':'关联 Apple','account.connectGoogle':'关联 Google','account.connectedApple':'已关联 Apple','account.connectedGoogle':'已关联 Google','account.methodsLoading':'正在检查登录方式…','account.refreshMethods':'刷新登录方式',
@@ -31,6 +33,7 @@ export const accountChinese:Record<keyof typeof accountEnglish,string>={
  'account.error.email':'请输入有效的电子邮箱。','account.error.code':'验证码不正确，请检查或重新获取。','account.error.expiredCode':'验证码已过期，请重新获取。','account.error.attempts':'尝试次数过多，请稍后重试。','account.error.network':'暂时无法连接云端。记录已保存在这台设备上，请联网后重试。','account.error.service':'云服务暂时不可用。本地记录会保留，请稍后重试。','account.error.mismatch':'这台设备已连接到另一个账户。请先退出登录，将记录保留在本机，再连接其他账户。','account.error.signOut':'未能完成退出登录，同步已暂停。请再次尝试退出。','account.error.remoteSignOut':'已在这台设备上退出登录，但服务器尚未确认结束会话。','account.error.storage':'无法读取本地记录，原有数据已保留。请尝试重新打开 Puptime。','account.error.signIn':'无法登录，请重试或选择其他登录方式。',
 };
 export const accountSpanish:Record<keyof typeof accountEnglish,string>={
+ 'account.emailShort':'Correo',
  'account.continueEmail':'Continuar con correo electrónico',
  'account.export':'Exportar datos de la nube','account.exporting':'Preparando exportación…','account.exportPending':'No se incluyen los cambios pendientes en este dispositivo.','account.error.export':'No se pudo preparar la exportación. Inténtalo de nuevo. El historial de tu cachorro no ha cambiado.',
  'account.connectApple':'Conectar Apple','account.connectGoogle':'Conectar Google','account.connectedApple':'Apple conectado','account.connectedGoogle':'Google conectado','account.methodsLoading':'Comprobando métodos de acceso…','account.refreshMethods':'Actualizar métodos de acceso',

@@ -27,7 +27,7 @@ export function accountProblemKey(problem:AccountProblem|null):MessageKey|null {
   if(problem==='provider-unavailable'||problem==='server-error'||problem==='invalid-response'||problem==='account-deleted'||problem==='forbidden')return 'account.error.service';
   return 'account.error.signIn';
 }
-export function AccountSignIn({cloud,theme,showError=true,showIntro=true,onEmailPress}:{cloud:CloudHandle;theme:Theme;showError?:boolean;showIntro?:boolean;onEmailPress?:()=>void}) {
+export function AccountSignIn({cloud,theme,showError=true,showIntro=true,onEmailPress,emailOnly=false}:{cloud:CloudHandle;theme:Theme;showError?:boolean;showIntro?:boolean;onEmailPress?:()=>void;emailOnly?:boolean}) {
  const {t}=useLocalization(),state=useAccountSnapshot(cloud.controller);
  const [email,setEmail]=useState(''),[code,setCode]=useState(''),[editingEmail,setEditingEmail]=useState(false);
  const [nativeAppleAvailable,setNativeAppleAvailable]=useState(false);
@@ -37,6 +37,9 @@ export function AccountSignIn({cloud,theme,showError=true,showIntro=true,onEmail
  const inputStyle=[styles.input,{color:theme.text,backgroundColor:theme.surface,borderColor:theme.border,borderRadius:theme.presentation.controlRadius}];
  useEffect(()=>{if(state?.codeSentTo)setEmail(state.codeSentTo);if(account){setCode('');Keyboard.dismiss();}},[state?.codeSentTo,account?.user.id]);
  useEffect(()=>{let mounted=true;if(Platform.OS==='ios')void AppleAuthentication.isAvailableAsync().then(available=>{if(mounted)setNativeAppleAvailable(available);}).catch(()=>{});return()=>{mounted=false;};},[]);
+ const compactButton=(id:string,label:string,accessibleLabel:string,icon:keyof typeof MaterialCommunityIcons.glyphMap,onPress:()=>void)=><Pressable key={id} testID={id} accessibilityRole="button" accessibilityLabel={accessibleLabel} disabled={busy||!state?.online} accessibilityState={{disabled:busy||!state?.online,busy}} onPress={onPress} style={({pressed})=>[styles.compactButton,{backgroundColor:pressed?theme.primarySoft:theme.surfaceRaised,borderColor:theme.border,opacity:busy||!state?.online?0.5:1}]}>
+  <MaterialCommunityIcons accessible={false} name={icon} size={21} color={theme.onPrimary}/><Text style={[styles.compactText,{color:theme.onPrimary}]}>{label}</Text>
+ </Pressable>;
  if(account)return null;
  return <View style={styles.stack}>
   {showError&&errorKey?<Text testID="account.error" accessibilityRole="alert" style={[styles.body,{color:theme.danger}]}>{t(errorKey)}</Text>:null}
@@ -48,15 +51,20 @@ export function AccountSignIn({cloud,theme,showError=true,showIntro=true,onEmail
    <AccountButton theme={theme} testID="account.refresh" label={t('account.refresh')} disabled={busy||!state?.online} onPress={()=>{void cloud.controller!.refresh();}}/>
   </>:<>
           {showIntro||!configured?<Text style={[styles.body,bodyStyle]}>{t(configured?'account.intro':'account.unavailable')}</Text>:null}
-          {state.config.providers.apple?(Platform.OS==='ios'?(nativeAppleAvailable?<AppleAuthentication.AppleAuthenticationButton
+          {onEmailPress?<View style={styles.compactRow}>
+            {state.config.providers.apple&&(Platform.OS!=='ios'||nativeAppleAvailable)?compactButton('account.apple','Apple',t('account.apple'),'apple',()=>{void cloud.controller!.signInSocial('apple');}):null}
+            {state.config.providers.google?compactButton('account.google','Google',t('account.google'),'google',()=>{void cloud.controller!.signInSocial('google');}):null}
+            {state.config.providers.email?compactButton('account.email.open',t('account.emailShort'),t('account.continueEmail'),'email-outline',onEmailPress):null}
+          </View>:null}
+          {!onEmailPress&&!emailOnly&&state.config.providers.apple?(Platform.OS==='ios'?(nativeAppleAvailable?<AppleAuthentication.AppleAuthenticationButton
             testID="account.apple" buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
             buttonStyle={theme.isDark?AppleAuthentication.AppleAuthenticationButtonStyle.WHITE:AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
             cornerRadius={theme.presentation.controlRadius} accessibilityState={{disabled:busy||!state.online,busy}}
             pointerEvents={busy||!state.online?'none':'auto'} style={{height:52,width:'100%',opacity:busy||!state.online?0.5:1}}
             onPress={()=>{if(!busy&&state.online)void cloud.controller!.signInSocial('apple');}}/>:null)
             :<AccountButton theme={theme} testID="account.apple" label={t('account.apple')} icon="apple" disabled={busy||!state.online} onPress={()=>{void cloud.controller!.signInSocial('apple');}}/>):null}
-          {state.config.providers.google?(Platform.OS==='ios'?<GoogleSigninButton testID="account.google" size={GoogleSigninButton.Size.Wide} color={theme.isDark?GoogleSigninButton.Color.Dark:GoogleSigninButton.Color.Light} disabled={busy||!state.online} accessibilityState={{disabled:busy||!state.online,busy}} style={{height:52,width:'100%'}} onPress={()=>{if(!busy&&state.online)void cloud.controller!.signInSocial('google');}}/>:<AccountButton theme={theme} testID="account.google" label={t('account.google')} icon="google" disabled={busy||!state.online} onPress={()=>{void cloud.controller!.signInSocial('google');}}/>):null}
-          {state.config.providers.email?onEmailPress?<AccountButton theme={theme} testID="account.email.open" label={t('account.continueEmail')} icon="email-outline" disabled={busy||!state.online} onPress={onEmailPress}/>:state.codeSentTo&&!editingEmail?(<View style={styles.stack}>
+          {!onEmailPress&&!emailOnly&&state.config.providers.google?(Platform.OS==='ios'?<GoogleSigninButton testID="account.google" size={GoogleSigninButton.Size.Wide} color={theme.isDark?GoogleSigninButton.Color.Dark:GoogleSigninButton.Color.Light} disabled={busy||!state.online} accessibilityState={{disabled:busy||!state.online,busy}} style={{height:52,width:'100%'}} onPress={()=>{if(!busy&&state.online)void cloud.controller!.signInSocial('google');}}/>:<AccountButton theme={theme} testID="account.google" label={t('account.google')} icon="google" disabled={busy||!state.online} onPress={()=>{void cloud.controller!.signInSocial('google');}}/>):null}
+          {!onEmailPress&&state.config.providers.email?state.codeSentTo&&!editingEmail?(<View style={styles.stack}>
             <Text style={[styles.body,{color:theme.text}]}>{t('account.codeSent',{email:state.codeSentTo})}</Text>
             <Text style={[styles.label,{color:theme.text}]}>{t('account.code')}</Text>
             <TextInput testID="account.code.input" accessibilityLabel={t('account.code')} style={inputStyle} value={code} onChangeText={text=>setCode(text.replace(/\D/g,'').slice(0,6))} keyboardType="number-pad" textContentType="oneTimeCode" autoComplete="one-time-code" maxLength={6} selectTextOnFocus editable={!busy} />
@@ -68,7 +76,7 @@ export function AccountSignIn({cloud,theme,showError=true,showIntro=true,onEmail
             <TextInput testID="account.email.input" accessibilityLabel={t('account.email')} style={inputStyle} value={email} onChangeText={setEmail} keyboardType="email-address" textContentType="emailAddress" autoComplete="email" autoCapitalize="none" autoCorrect={false} editable={!busy} returnKeyType="send" onSubmitEditing={()=>{if(!busy)void cloud.controller!.requestEmail(email).then(result=>{if(result==='ok')setEditingEmail(false);});}} />
             <AccountButton theme={theme} testID="account.sendCode" label={t('account.sendCode')} primary disabled={busy||!state.online||!email.trim()} loading={busy} onPress={()=>{void cloud.controller!.requestEmail(email).then(result=>{if(result==='ok')setEditingEmail(false);});}}/>
           </View>):null}
-          {!onEmailPress||state.problem?<AccountButton theme={theme} testID="account.refresh" label={t('account.refresh')} disabled={busy||!state.online} onPress={()=>{void cloud.controller!.refresh();}}/>:null}
+          {(!onEmailPress&&!emailOnly)||state.problem?<AccountButton theme={theme} testID="account.refresh" label={t('account.refresh')} disabled={busy||!state.online} onPress={()=>{void cloud.controller!.refresh();}}/>:null}
 
   </>}
  </View>;
@@ -80,4 +88,4 @@ export function AccountButton({theme,label,onPress,testID,primary=false,disabled
     <Text style={[styles.buttonText,{color}]}>{label}</Text>
   </Pressable>;
 }
-const styles=StyleSheet.create({stack:{gap:12},body:{fontSize:16,lineHeight:24},label:{fontSize:16,lineHeight:23,fontWeight:'700'},input:{minHeight:52,borderWidth:1,paddingHorizontal:14,paddingVertical:12,fontSize:18},button:{minHeight:52,borderWidth:1,paddingHorizontal:16,paddingVertical:12,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:10},buttonText:{fontSize:16,lineHeight:22,fontWeight:'700',flexShrink:1,textAlign:'center'},loading:{flexDirection:'row',gap:12,alignItems:'center'}});
+const styles=StyleSheet.create({compactRow:{flexDirection:'row',gap:10},compactButton:{flex:1,minHeight:54,paddingHorizontal:6,paddingVertical:12,alignItems:'center',justifyContent:'center',flexDirection:'row',gap:7,borderWidth:1,borderRadius:16},compactText:{fontFamily:'RedHatTextSemiBold',fontSize:14,flexShrink:1},stack:{gap:12},body:{fontSize:16,lineHeight:24},label:{fontSize:16,lineHeight:23,fontWeight:'700'},input:{minHeight:52,borderWidth:1,paddingHorizontal:14,paddingVertical:12,fontSize:18},button:{minHeight:52,borderWidth:1,paddingHorizontal:16,paddingVertical:12,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:10},buttonText:{fontSize:16,lineHeight:22,fontWeight:'700',flexShrink:1,textAlign:'center'},loading:{flexDirection:'row',gap:12,alignItems:'center'}});
