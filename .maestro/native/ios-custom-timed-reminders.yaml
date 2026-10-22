@@ -22,6 +22,22 @@ name: iOS custom timed reminder create remove and restart
     timeout: 30000
 - assertNotVisible:
     id: notifications.timed.item..*
+- scrollUntilVisible:
+    element:
+      id: notifications.timing.pottyAfterPee.enabled
+    direction: DOWN
+- assertVisible:
+    id: notifications.timing.pottyAfterPee.enabled
+    checked: false
+- tapOn:
+    id: notifications.timing.pottyAfterPee.enabled
+- assertVisible:
+    id: notifications.timing.pottyAfterPee.enabled
+    checked: true
+- scrollUntilVisible:
+    element:
+      id: notifications.timed.add
+    direction: UP
 - tapOn:
     id: notifications.timed.add
 - assertVisible:
