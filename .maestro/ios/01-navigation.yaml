@@ -48,14 +48,18 @@ tags:
     id: nav.insights
 - assertVisible:
     id: screen.insights
+- tapOn:
+    id: settings.open
 - scrollUntilVisible:
     element:
-      id: insights.export
+      id: settings.export
     direction: DOWN
     visibilityPercentage: 50
 - assertVisible:
-    id: insights.export
+    id: settings.export
     enabled: false
+- tapOn:
+    id: settings.back
 - tapOn:
     id: nav.open
 - assertVisible:

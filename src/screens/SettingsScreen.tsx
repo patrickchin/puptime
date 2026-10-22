@@ -4,6 +4,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 're
 
 import { customActivityKey, quickEventTypes, type ActivityKey, type EventType } from '../domain';
 import { ActivityIcon } from '../components/ActivityIcon';
+import { ActivityCsvSettings } from '../components/ActivityCsvSettings';
 import { SettingsRow } from '../components/SettingsRow';
 import { PuppyNameSetting } from '../components/PuppyNameSetting';
 import type { CloudHandle } from '../cloud/use-cloud';
@@ -54,6 +55,8 @@ export function SettingsScreen({
   onOpenGuide,
   cloudHandle,
   onOpenAccount,
+  onImport,
+  eventCount,
 }: {
   theme: Theme;
   themePreference: ThemePreference;
@@ -75,6 +78,8 @@ export function SettingsScreen({
   onOpenGuide: () => void;
   cloudHandle?: CloudHandle;
   onOpenAccount?: () => void;
+  onImport: () => Promise<void>;
+  eventCount: number;
 }) {
   const { activityColors, activityLabel, t } = useLocalization();
   const [savingWidget, setSavingWidget] = useState(false);
@@ -255,6 +260,9 @@ export function SettingsScreen({
           theme={theme}
         />
       </View>
+
+      <SectionLabel label={t('settings.data')} theme={theme} />
+      <ActivityCsvSettings theme={theme} eventCount={eventCount} onImport={onImport}/>
 
       <SectionLabel label={t('settings.widget')} theme={theme} />
       <View style={[styles.card, surfaceTreatment(theme), { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>

@@ -439,8 +439,8 @@ const MemoTimelineDateLabel = memo(TimelineDateLabel);
 const MemoTimelineTrack = memo(TimelineTrack);
 const MemoTimelineAxis = memo(TimelineAxis);
 
-type TimelineProps={events:PuppyEvent[];schedule:ScheduleEntry[];onOpenSchedule:()=>void;theme:Theme}&ActivityViewProps;
-export function TimelineScreen({ events:projectedEvents,activity,refreshToken,schedule,onOpenSchedule,theme }:TimelineProps) {
+type TimelineProps={showHeader?:boolean;events:PuppyEvent[];schedule:ScheduleEntry[];onOpenSchedule:()=>void;theme:Theme}&ActivityViewProps;
+export function TimelineScreen({ events:projectedEvents,activity,refreshToken,schedule,onOpenSchedule,theme,showHeader=true }:TimelineProps) {
   const { activityColors, activityLabel, language, locale, t } = useLocalization();
   const { fontScale, height, width } = useWindowDimensions();
   const rowHeight = Math.round(52 * Math.min(fontScale, 1.5));
@@ -668,7 +668,8 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
       >
         <View style={[styles.headingRow,fontScale>=1.5&&!isCompactHeight&&styles.headingRowStacked]}>
           <View style={[styles.headingCopy,fontScale>=1.5&&!isCompactHeight&&styles.headingCopyStacked]}>
-            <Text
+            {showHeader?<Text
+              accessibilityRole="header"
               maxFontSizeMultiplier={2}
               style={[
                 styles.title,
@@ -683,8 +684,8 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
               ]}
             >
               {t('timeline.title')}
-            </Text>
-            {isCompactHeight ? (
+            </Text>:null}
+            {isCompactHeight || !showHeader ? (
               <Text testID="timeline.range" maxFontSizeMultiplier={2} style={[styles.rangeText, { flex: 0, color: theme.text }]}>
                 {rangeDescription}
               </Text>
@@ -739,7 +740,7 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
           </View>
         </View>
 
-        {!isCompactHeight ? (
+        {!isCompactHeight && showHeader ? (
           <View style={styles.timelineMeta}>
             <Text testID="timeline.range" maxFontSizeMultiplier={2} style={[styles.rangeText, { color: theme.text }]}>
               {rangeDescription}

@@ -197,18 +197,20 @@ try{
  assert.ok(!trace().reads.some(read=>/^SELECT \* FROM events WHERE pet_id=\? ORDER BY at DESC,id DESC$/.test(read.sql)));
  console.log('PASS '+count+': comparison/routine/frequency read only requested date windows; monthly summaries stay SQL aggregates. Windows rows/ms:',windows().map(read=>[read.rows,read.ms]));
  flow('explicit-full-export',`
+- tapOn:
+    id: settings.open
 - scrollUntilVisible:
     element:
-      id: insights.export
+      id: settings.export
     direction: DOWN
     visibilityPercentage: 50
 - extendedWaitUntil:
     visible:
-      id: insights.export
+      id: settings.export
       enabled: true
     timeout: 30000
 - tapOn:
-    id: insights.export
+    id: settings.export
 `);
  const csvs=readdirSync(root,{recursive:true}).filter(file=>/puptime-activity-.*\.csv$/.test(file)).map(file=>join(root,file)).sort((a,b)=>statSync(b).mtimeMs-statSync(a).mtimeMs);
  assert.ok(csvs.length);const exported=csvToEvents(readFileSync(csvs[0],'utf8'));

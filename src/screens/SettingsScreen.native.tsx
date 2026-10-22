@@ -4,6 +4,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 're
 
 import { customActivityKey, quickEventTypes, type ActivityKey, type EventType } from '../domain';
 import { ActivityIcon } from '../components/ActivityIcon';
+import { ActivityCsvSettings } from '../components/ActivityCsvSettings';
 import { SettingsRow } from '../components/SettingsRow';
 import { PuppyNameSetting } from '../components/PuppyNameSetting';
 import { ActivityBackupSettings } from '../components/ActivityBackupSettings.native';
@@ -46,6 +47,9 @@ export function SettingsScreen({
   onOpenAccount,
   onOpenHistory,
   onBackupsRestored,
+  onOpenNotifications,
+  onImport,
+  eventCount,
   showHeader=true,
 }: {
   theme: Theme;
@@ -66,6 +70,9 @@ export function SettingsScreen({
   onOpenAccount?: () => void;
   onOpenHistory?: () => void;
   onBackupsRestored?: () => Promise<void>;
+  onOpenNotifications: () => void;
+  onImport: () => Promise<void>;
+  eventCount: number;
   showHeader?:boolean;
 }) {
   const { activityColors, activityLabel, t } = useLocalization();
@@ -182,10 +189,10 @@ export function SettingsScreen({
         </Text>
       </View>:null}
 
+      <SectionLabel label={t('settings.profile')} theme={theme} />
       {cloudHandle?.available&&onOpenAccount?<AccountSettingsRow cloud={cloudHandle} theme={theme} onOpen={onOpenAccount}/>:null}
       <PuppyNameSetting theme={theme} cloud={cloudHandle}/>
-      <ActivityBackupSettings theme={theme} onRestored={onBackupsRestored}/>
-      {onOpenHistory?<View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}><SettingsRow testID="settings.history.open" icon="history" label={t('history.recentTitle')} detail={t('history.recentDetail')} onPress={onOpenHistory} theme={theme} wrap/></View>:null}
+      <SectionLabel label={t('settings.preferences')} theme={theme} />
       <View style={[styles.card, surfaceTreatment(theme), { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
         <SettingsRow
           testID="settings.theme.open"
@@ -216,6 +223,14 @@ export function SettingsScreen({
         />
       </View>
 
+      <View style={[styles.card, surfaceTreatment(theme), {backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}>
+        <SettingsRow testID="settings.notifications.open" icon="bell-outline" label={t('notifications.title')} detail={t('settings.notificationsDetail')} onPress={onOpenNotifications} theme={theme} wrap />
+      </View>
+
+      <SectionLabel label={t('settings.data')} theme={theme} />
+      <ActivityCsvSettings theme={theme} eventCount={eventCount} onImport={onImport}/>
+      <ActivityBackupSettings theme={theme} onRestored={onBackupsRestored}/>
+      {onOpenHistory?<View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}><SettingsRow testID="settings.history.open" icon="history" label={t('history.recentTitle')} detail={t('history.recentDetail')} onPress={onOpenHistory} theme={theme} wrap/></View>:null}
       <SectionLabel label={t('settings.widget')} theme={theme} />
       <View style={[styles.card, surfaceTreatment(theme), { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
         <Text

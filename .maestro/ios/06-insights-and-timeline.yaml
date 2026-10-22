@@ -83,14 +83,18 @@ tags:
 - assertVisible:
     id: insights.frequency.poop
     text: .*1\.0.*
+- tapOn:
+    id: settings.open
 - scrollUntilVisible:
     element:
-      id: insights.export
+      id: settings.export
     direction: DOWN
     visibilityPercentage: 50
 - assertVisible:
-    id: insights.export
+    id: settings.export
     enabled: true
+- tapOn:
+    id: settings.back
 - tapOn:
     id: nav.open
 - tapOn:
