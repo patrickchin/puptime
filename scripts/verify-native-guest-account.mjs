@@ -76,7 +76,7 @@ function sqliteDirectory(){
   // Every subsequent UI phase reopens the actual account destination.
   adb('shell','am','force-stop',app);rmSync(androidSnapshot,{recursive:true,force:true});mkdirSync(androidSnapshot);
   try{adb('shell','run-as',app,'test','-f','files/SQLite/puptime-v2.db');}catch{return join(androidSnapshot,'files/SQLite');}
-  const archive=execFileSync('adb',['-s',device,'exec-out','run-as',app,'tar','-cf','-','files/SQLite'],{stdio:['ignore','pipe','pipe']});
+  const archive=execFileSync('adb',['-s',device,'exec-out','run-as',app,'tar','-cf','-','files/SQLite'],{stdio:['ignore','pipe','pipe'],maxBuffer:64*1024*1024});
   execFileSync('tar',['-xf','-','-C',androidSnapshot],{input:archive,stdio:['pipe','ignore','pipe']});
   return join(androidSnapshot,'files/SQLite');
 }
