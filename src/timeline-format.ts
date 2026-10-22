@@ -6,6 +6,13 @@ export type TimelineGap = { key: string; start: Date; end: Date; emptyDays: numb
 
 export type ExpectedWindow = { id: string; type: 'meal' | 'poop'; start: number; end: number };
 
+export function timelineHistoryDayCount(loadedDays: number, minimumDays: number, earliestDayDistance: number | null): number {
+  const days = Math.max(loadedDays, minimumDays);
+  return earliestDayDistance !== null && earliestDayDistance < days
+    ? Math.max(days, earliestDayDistance + 1 + 2)
+    : days;
+}
+
 // Daily wall-clock minutes, split at midnight so the same bands repeat on every date.
 export function timelineExpectedWindows(schedule: readonly ScheduleEntry[], selectedTypes: readonly ActivityKey[]): ExpectedWindow[] {
   return schedule.flatMap((entry): ExpectedWindow[] => {
@@ -20,18 +27,26 @@ export function timelineExpectedWindows(schedule: readonly ScheduleEntry[], sele
   });
 }
 
-// Group only truly empty days, independent of filters. Keep today available as a time reference.
+// Group long empty gaps, but keep the empty state and log-boundary padding visible.
 export function collapseEmptyTimelineDays(days: readonly TimelineDay[], todayKey: string): (TimelineDay | TimelineGap)[] {
+  const firstLoggedDay = days.findIndex((day) => day.marks.length > 0);
+  if (firstLoggedDay < 0) return [...days];
+  const visibleEmptyDays = new Set([
+    firstLoggedDay - 2,
+    firstLoggedDay - 1,
+    days.length - 2,
+    days.length - 1,
+  ]);
   const rows: (TimelineDay | TimelineGap)[] = [];
   for (let index = 0; index < days.length;) {
     const day = days[index];
-    if (day.key === todayKey || day.marks.length) {
+    if (day.key === todayKey || day.marks.length || visibleEmptyDays.has(index)) {
       rows.push(day);
       index += 1;
       continue;
     }
     let end = index + 1;
-    while (end < days.length && days[end].key !== todayKey && !days[end].marks.length) end += 1;
+    while (end < days.length && days[end].key !== todayKey && !days[end].marks.length && !visibleEmptyDays.has(end)) end += 1;
     rows.push(end - index === 1 ? day : {
       key: `gap-${day.key}`,
       start: day.date,

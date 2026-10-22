@@ -35,9 +35,11 @@ import { ActivityIcon } from '../components/ActivityIcon';
 import { useLocalization } from '../localization-context';
 import { translate, type AppLanguage } from '../localization';
 import { headingStyle, spacing, type Theme } from '../theme';
-import { collapseEmptyTimelineDays, timelineDetailTime, timelineExpectedWindows, timelineFormatters, type ExpectedWindow, type TimelineGap } from '../timeline-format';
+import { collapseEmptyTimelineDays, timelineDetailTime, timelineExpectedWindows, timelineFormatters, timelineHistoryDayCount, type ExpectedWindow, type TimelineGap } from '../timeline-format';
 
 const INITIAL_DAYS = 14;
+const FUTURE_DAYS = 2;
+const BEFORE_FIRST_LOG_DAYS = 2;
 const LOAD_DAYS = 14;
 const DATE_COLUMN_WIDTH = 56;
 const LOAD_ROW_HEIGHT = 48;
@@ -441,17 +443,19 @@ type TimelineProps={events:PuppyEvent[];schedule:ScheduleEntry[];onOpenSchedule:
 export function TimelineScreen({ events:projectedEvents,activity,refreshToken,schedule,onOpenSchedule,theme }:TimelineProps) {
   const { activityColors, activityLabel, language, locale, t } = useLocalization();
   const { fontScale, height, width } = useWindowDimensions();
+  const rowHeight = Math.round(52 * Math.min(fontScale, 1.5));
+  const minimumHistoryDays = Math.max(INITIAL_DAYS + BEFORE_FIRST_LOG_DAYS, Math.ceil(height / rowHeight));
   const insets = useSafeAreaInsets();
   const [selectedView, setSelectedView] = useState<(typeof TIMELINE_VIEWS)[number]>(TIMELINE_VIEWS[0]);
   const selectedTypes: readonly ActivityKey[] = selectedView.types;
   const expectedWindows = useMemo(() => timelineExpectedWindows(schedule, selectedTypes), [schedule, selectedTypes]);
   const expectedDescription = schedule.filter(entry => expectedWindows.some(window => window.id === entry.id))
     .map(entry => `${activityLabel(entry)}: ${formatScheduleWindow(entry, locale)}`).join('. ');
-  const [loadedDayCount, setLoadedDayCount] = useState(INITIAL_DAYS);
+  const [loadedDayCount, setLoadedDayCount] = useState(INITIAL_DAYS + BEFORE_FIRST_LOG_DAYS);
   const [timeScale, setTimeScale] = useState(1);
   const timeScaleLabel = timeScale.toFixed(2).replace(/0$/, '');
   const [nowTime, setNowTime] = useState(Date.now());
-  const bounds=activityWindowBounds(nowTime,Math.max(loadedDayCount-1,INITIAL_DAYS));
+  const bounds=activityWindowBounds(nowTime,Math.max(loadedDayCount,minimumHistoryDays)+BEFORE_FIRST_LOG_DAYS-1);
   const window=useActivityWindow(activity,projectedEvents,bounds.from,bounds.until,refreshToken);
   const events=window.events;
   const [summary,setSummary]=useState<{eventCount:number;earliestAt:number|null}|null>(null);
@@ -463,7 +467,6 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
   },[activity,refreshToken,summaryAttempt]);
   const [selection, setSelection] = useState<string[]>([]);
   const [isLoadingEarlier, startLoadingEarlier] = useTransition();
-  const rowHeight = Math.round(52 * Math.min(fontScale, 1.5));
   const viewportWidth = width - insets.left - insets.right;
   const baseTrackWidth = Math.max(1, viewportWidth - DATE_COLUMN_WIDTH);
   const trackWidth = baseTrackWidth * timeScale;
@@ -471,12 +474,17 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
   const now = useMemo(() => new Date(nowTime), [nowTime]);
   const estimates = useMemo(() => estimateMissingLogs(events, INITIAL_DAYS, now).estimates, [events, now]);
   const earliestEventAt = activity?summary?.earliestAt??nowTime:events.reduce((earliest, event) => Math.min(earliest, event.at), nowTime);
-  const maxHistoryDays = (activity?summary?.eventCount:events.length)
-    ? Math.max(INITIAL_DAYS, calendarDayDistance(new Date(earliestEventAt), now) + 1)
-    : INITIAL_DAYS;
+  const earliestDayDistance = (activity?summary?.eventCount:events.length) ? calendarDayDistance(new Date(earliestEventAt), now) : null;
+  const maxHistoryDays = Math.max(minimumHistoryDays, earliestDayDistance === null ? 0 : earliestDayDistance + 1 + BEFORE_FIRST_LOG_DAYS);
+  const historyDayCount = timelineHistoryDayCount(Math.min(loadedDayCount, maxHistoryDays), minimumHistoryDays, earliestDayDistance);
+  const timelineEnd = useMemo(() => {
+    const end = new Date(now);
+    end.setDate(end.getDate() + FUTURE_DAYS);
+    return end;
+  }, [now]);
   const days = useMemo(
-    () => buildTimelineDays(events, Math.min(loadedDayCount, maxHistoryDays), now, now, estimates),
-    [events, estimates, loadedDayCount, maxHistoryDays, now],
+    () => buildTimelineDays(events, historyDayCount + FUTURE_DAYS, timelineEnd, now, estimates),
+    [events, estimates, historyDayCount, now, timelineEnd],
   );
   const todayKey = dateKey(now);
   const rows = useMemo(() => expectedWindows.length ? days : collapseEmptyTimelineDays(days, todayKey), [days, todayKey, expectedWindows]);
@@ -493,7 +501,7 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
   const rangeDescription = visibleEstimateCount
     ? t('timeline.rangeWithEstimates', { range: rangeLabel, recorded: visibleEventCount, estimated: visibleEstimateCount })
     : t('timeline.range', { range: rangeLabel, count: visibleEventCount });
-  const hasEarlierDays = loadedDayCount < maxHistoryDays;
+  const hasEarlierDays = historyDayCount < maxHistoryDays;
   const isCompactHeight = height < 500;
   const selectedEvents = events.filter((event) => selection.includes(event.id)).sort((a, b) => a.at - b.at);
   const sharedDetailDay = selectedEvents.length && selectedEvents.every((event) => dateKey(new Date(event.at)) === dateKey(new Date(selectedEvents[0].at)))
@@ -594,7 +602,7 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
     // Consume the gesture once; more top-edge scroll events must not queue pages.
     didUserScroll.current = false;
     startLoadingEarlier(() => {
-      setLoadedDayCount((current) => Math.min(maxHistoryDays, current + LOAD_DAYS));
+      setLoadedDayCount((current) => Math.min(maxHistoryDays, Math.max(current, historyDayCount) + LOAD_DAYS));
     });
   }
 
