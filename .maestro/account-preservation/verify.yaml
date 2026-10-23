@@ -29,3 +29,28 @@ name: Account preservation verify
     direction: DOWN
 - assertNotVisible:
     id: account.email.input
+- scrollUntilVisible:
+    element:
+      id: account.back
+    direction: UP
+- assertVisible: My account
+- assertVisible: Signed in as
+- assertVisible:
+    id: account.email
+    text: ${TEST_EMAIL}
+- takeScreenshot: my-account-signed-in
+- tapOn:
+    id: account.back
+- assertVisible:
+    id: settings.account.open
+    text: ${'My account. ' + TEST_EMAIL}
+- takeScreenshot: my-account-settings
+- tapOn:
+    id: settings.account.open
+- assertVisible:
+    id: account.email
+    text: ${TEST_EMAIL}
+- scrollUntilVisible:
+    element:
+      id: account.enable
+    direction: DOWN

@@ -50,6 +50,10 @@ name: Account preservation add-logs
       - tapOn:
           id: editor.close
 - runFlow: ../helpers/open-account.yaml
+- scrollUntilVisible:
+    element:
+      id: account.local.count
+    direction: DOWN
 - assertVisible:
     id: account.local.count
     text: ${EXPECTED_COUNT} activity logs
