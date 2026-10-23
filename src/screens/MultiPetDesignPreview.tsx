@@ -44,10 +44,10 @@ const PetHistoryRow=memo(function PetHistoryRow({petId,petName,event,theme,onEdi
   return <Pressable testID={`preview.event.${petId}.${event.id}`} accessibilityRole="button" accessibilityLabel={`Edit ${petName}, ${activity}, ${timestamp}${note?`, ${note}`:''}`} onPress={()=>onEdit(petId,event)}
     style={({pressed})=>[s.historyRow,{borderBottomColor:theme.border,backgroundColor:pressed?theme.primarySoft:theme.surfaceRaised}]}>
     <View style={[s.historyIcon,{backgroundColor:colors.softColor}]}><ActivityIcon activity={event} theme={theme} color={colors.color} size={20}/></View>
-    <View style={s.flex}>
+    <View style={s.historyCopy}>
       <Text style={[s.historyTitle,{color:theme.text}]}><Text style={[s.petLabel,{color:theme.primary}]}>{petName}</Text> · {activity}</Text>
       <Text numberOfLines={2} style={[s.small,{color:theme.textMuted}]}>{timestamp}{note?` · ${note}`:''}</Text>
-    </View><Icon name="pencil-outline" theme={theme} size={18}/>
+    </View><Icon name="pencil-outline" theme={theme} size={20}/>
   </Pressable>;
 });
 
@@ -163,7 +163,7 @@ function Preview({onRowRender}:{onRowRender?:(key:string)=>void}){
         <Icon name="paw-outline" theme={theme} size={20}/><Text style={[s.petLabel,s.flex,{color:theme.primary}]}>{pet.name}</Text><Icon name="chevron-down" theme={theme} size={22}/>
       </Pressable>:null}
       <View style={s.flex}>
-        {settings?settingsContent():tab==='log'?<FlatList testID="preview.history" data={logs} keyExtractor={item=>`${item.petId}:${item.event.id}`} renderItem={renderRow} ListHeaderComponent={logHeader} contentContainerStyle={[s.content,s.historyContent]} initialNumToRender={12}/>
+        {settings?settingsContent():tab==='log'?<FlatList testID="preview.history" data={logs} keyExtractor={item=>`${item.petId}:${item.event.id}`} renderItem={renderRow} ListHeaderComponent={logHeader} contentContainerStyle={s.content} initialNumToRender={12}/>
           :tab==='timeline'?<TimelineScreen showHeader={false} key={pet.id} events={pet.events} schedule={pet.schedule} onOpenSchedule={()=>openTab('schedule')} theme={theme}/>
           :tab==='insights'?<InsightsScreen showHeader={false} key={pet.id} events={pet.events} customActivities={emptyActivities} theme={theme}/>
           :tab==='schedule'?<ScheduleScreen showHeader={false} key={pet.id} events={pet.events} schedule={pet.schedule} customActivities={emptyActivities} theme={theme} onChange={changeSchedule} onSaveEntry={async entry=>{await changeSchedule([...pet.schedule.filter(item=>item.id!==entry.id),entry].sort((a,b)=>a.minutes-b.minutes));}} onRemoveEntry={async id=>{await changeSchedule(pet.schedule.filter(item=>item.id!==id));}} onRequestReminderPermission={async()=>true}/>
@@ -215,8 +215,8 @@ const s=StyleSheet.create({
   petName:{fontSize:20,lineHeight:28,fontWeight:'700'},petLabel:{fontSize:15,lineHeight:22,fontWeight:'700'},avatar:{width:44,height:44,borderRadius:16,alignItems:'center',justifyContent:'center'},initial:{fontSize:18,fontWeight:'700'},
   petCard:{borderWidth:1,borderRadius:20,padding:16,gap:12},quick:{flex:1,minWidth:0,minHeight:76,borderRadius:14,borderWidth:1,paddingVertical:12,paddingHorizontal:4,alignItems:'center',justifyContent:'center',gap:5},quickLabel:{flexDirection:'row',alignItems:'center',gap:6},
   action:{minHeight:48,borderWidth:1,borderRadius:14,paddingHorizontal:12,paddingVertical:10,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,flexShrink:1},actionText:{fontSize:15,lineHeight:22,fontWeight:'600',flexShrink:1},
-  historyContent:{gap:0},historyRow:{flexDirection:'row',gap:10,alignItems:'center',paddingVertical:8,paddingHorizontal:10,borderBottomWidth:StyleSheet.hairlineWidth,minHeight:56},
-  historyTitle:{fontSize:15,lineHeight:22},historyIcon:{width:32,height:32,borderRadius:10,alignItems:'center',justifyContent:'center'},
+  historyRow:{flexDirection:'row',gap:12,alignItems:'center',padding:16,borderBottomWidth:StyleSheet.hairlineWidth,borderRadius:12,minHeight:72},historyCopy:{flex:1,gap:4},
+  historyTitle:{fontSize:15,lineHeight:22},historyIcon:{width:40,height:40,borderRadius:14,alignItems:'center',justifyContent:'center'},
   settingRow:{minHeight:56,flexDirection:'row',alignItems:'center',gap:12},scope:{marginHorizontal:20,marginTop:4,marginBottom:12,paddingHorizontal:14,paddingVertical:12,borderRadius:16,flexDirection:'row',alignItems:'center',gap:10,minHeight:48},
   input:{borderWidth:1,borderRadius:14,padding:14,fontSize:17,lineHeight:25,minHeight:52},toast:{margin:16,borderRadius:16,padding:12,flexDirection:'row',alignItems:'center',gap:8},
 });
