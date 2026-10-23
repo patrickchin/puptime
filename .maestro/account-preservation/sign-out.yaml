@@ -18,8 +18,10 @@ name: Account preservation sign-out
     element:
       id: account.signOut
     direction: DOWN
+- waitForAnimationToEnd
 - tapOn:
     id: account.signOut
+    retryTapIfNoChange: true
 - assertVisible: ^Sign out on this device\?$
 - tapOn:
     text: (?i)^Sign out$
