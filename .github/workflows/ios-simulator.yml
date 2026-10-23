@@ -51,6 +51,23 @@ jobs:
         run: |
           curl -fsSL "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Verify native welcome email sign-in
+        timeout-minutes: 15
+        env:
+          CI: "1"
+          MAESTRO_CLI_NO_ANALYTICS: "1"
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: "180000"
+        run: |
+          runtime_id=$(xcrun simctl list runtimes -j | jq -r '[.runtimes[] | select(.isAvailable and (.identifier | contains("iOS-26")))][-1].identifier // empty')
+          test -n "$runtime_id"
+          signin_device=$(xcrun simctl create "Puptime Onboarding CI SignIn $GITHUB_RUN_ID" com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro "$runtime_id")
+          trap 'xcrun simctl delete "$signin_device" >/dev/null 2>&1 || true' EXIT
+          xcrun simctl boot "$signin_device"
+          xcrun simctl bootstatus "$signin_device" -b
+          xcrun simctl install "$signin_device" build/ios-simulator/Build/Products/Release-iphonesimulator/Puptime.app
+          node scripts/verify-ios-guest-account.mjs \
+            "$signin_device" build/ios-simulator/Build/Products/Release-iphonesimulator/Puptime.app \
+            --replace-synthetic build/welcome-account-ios --onboarding-sign-in
       - name: Run Maestro end-to-end tests
         timeout-minutes: 45
         env:
@@ -101,9 +118,6 @@ jobs:
             .maestro/conversational
           node scripts/verify-ios-conversational-failures.mjs \
             "$onboarding_device" --replace-synthetic build/onboarding-failure-results
-          node scripts/verify-ios-guest-account.mjs \
-            "$onboarding_device" build/onboarding-ci/Puptime.app \
-            --replace-synthetic build/welcome-account-ios --onboarding-sign-in
           node scripts/verify-ios-guest-account.mjs \
             "$onboarding_device" build/onboarding-ci/Puptime.app \
             --replace-synthetic build/guest-account-ios
