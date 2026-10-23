@@ -63,6 +63,19 @@ Run and screenshot instructions, automated flows, and the Android row-render obs
 
 ## Screenshots
 
+### Large-text follow-up
+
+The revised phone layout uses full-width activity rows once enlarged text has less than 300 points of effective horizontal room. Times stay beside their activity rather than wrapping down narrow tiles. The Log title and pet-management control move into the navigation header. Decorative avatars give way to full pet names; large-text history notes have no two-line limit. Wide tablet and landscape layouts retain the grid.
+
+Pet sheets use an accessible close control beside a flexible heading. The shared reminder controls give their label a full row and align timing choices with native switches below it. Reminder body text scales up to 2× and sheet headings to 1.5×, matching the preview's existing type hierarchy. The shared navigation drawer uses the same limits and pins its heading/close control while its destinations scroll. Inputs also retain 2× scaling.
+
+Validation includes the largest iPhone accessibility text category, Android at 375 dp with 2× text, long names, light/dark, landscape, reminder selection, logging/undo, and note editing against populated history. The opt-in multi-pet preview remains separate from the production entry point; reminder-control and drawer refinements apply to the native app too.
+
+Follow-up checks passed all 462 Node tests and all three TypeScript configurations. The enlarged Android history probe observed 55 rows: opening and typing redrew none, and saving redrew only the edited row. It also verified that the complete multi-line note remains visible after saving.
+
+![Large text before and after](multi-pet-ui/06-large-text-log.png)
+![Large-text sheets and controls](multi-pet-ui/07-large-text-details.png)
+
 ![Current and proposed Log](multi-pet-ui/01-log.png)
 ![Per-pet analysis and routines](multi-pet-ui/02-individual-views.png)
 ![Pet management, reminders and widget proposal](multi-pet-ui/03-management.png)
