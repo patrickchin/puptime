@@ -37,3 +37,13 @@ node scripts/multi-pet-preview/verify-row-renders.mjs emulator-5582
 This drives native UIAutomator and ADB, verifies populated history, opens a real note editor, replaces its text and saves. Opening and typing must redraw zero unchanged history rows. Saving must redraw exactly the edited row, preserving every other row's counter. Results and a screenshot are written to `output/multi-pet-audit/row-check/`.
 
 The fixture check runs in the existing `npm test` suite and covers combined ordering, filtered ownership and composite identity when different pets share an event ID. It is not a production persistence or sync qualification.
+
+## Navigation integration check
+
+With the preview installed on `Puptime_Multi_Pet_622c` or `Puptime_Navigation_d859`, run:
+
+```sh
+node scripts/multi-pet-preview/verify-navigation.mjs DEVICE_ID
+```
+
+This checks compact titles, Log/Timeline switching, retained pet selection, CSV controls in Settings, separate sample exports for Maple and Mochi, sample-only import, contextual Back, and unchanged production SQLite files.

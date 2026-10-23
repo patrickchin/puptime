@@ -6,7 +6,7 @@ import {resolve,join} from 'node:path';
 const device=process.argv[2],output=resolve(process.argv[3]??'output/multi-pet-audit/row-check');
 assert.ok(device,'Pass a dedicated emulator serial with the render-probe bundle installed.');
 const adb=(...args)=>execFileSync('adb',['-s',device,...args],{encoding:'utf8'}).trim();
-assert.match(adb('emu','avd','name'),/^Puptime_Multi_Pet_622c\b/,'Only use this worktree’s synthetic emulator.');
+assert.match(adb('emu','avd','name'),/^Puptime_(Multi_Pet_622c|Navigation_d859)\b/,'Only use this worktree’s synthetic emulator.');
 mkdirSync(output,{recursive:true});
 function hierarchy(){adb('shell','uiautomator','dump','/sdcard/puptime-622c.xml');return adb('shell','cat','/sdcard/puptime-622c.xml');}
 function node(id){

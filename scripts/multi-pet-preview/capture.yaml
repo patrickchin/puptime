@@ -68,7 +68,7 @@ appId: com.patrickchin.puptime
 - waitForAnimationToEnd
 - takeScreenshot: 12-dark-settings
 - tapOn:
-    id: settings.open
+    id: settings.back
 - tapOn:
     id: nav.open
 - tapOn:

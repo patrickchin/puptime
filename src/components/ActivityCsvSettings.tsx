@@ -1,15 +1,17 @@
 import {useRef, useState} from 'react';
 import {Alert, StyleSheet, Text, View} from 'react-native';
+import type {PuppyEvent} from '../domain';
 import {useLocalization} from '../localization-context';
 import {loadEvents} from '../storage';
 import {shareEventsCsv} from '../share-export';
 import {surfaceTreatment, type Theme} from '../theme';
 import {SettingsRow} from './SettingsRow';
 
-export function ActivityCsvSettings({theme, eventCount, onImport}: {
+export function ActivityCsvSettings({theme, eventCount, onImport, loadExportEvents=loadEvents}: {
   theme: Theme;
   eventCount: number;
   onImport: () => Promise<void>;
+  loadExportEvents?: () => Promise<PuppyEvent[]>;
 }) {
   const {t} = useLocalization();
   const [busy, setBusy] = useState<'export' | 'import' | null>(null);
@@ -19,7 +21,7 @@ export function ActivityCsvSettings({theme, eventCount, onImport}: {
     locked.current = true;
     setBusy(kind);
     try {
-      if (kind === 'export') await shareEventsCsv(await loadEvents());
+      if (kind === 'export') await shareEventsCsv(await loadExportEvents());
       else await onImport();
     } catch {
       Alert.alert(t(`insights.${kind}ErrorTitle`), t(`insights.${kind}ErrorBody`));

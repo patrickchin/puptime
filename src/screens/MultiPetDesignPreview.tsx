@@ -1,8 +1,9 @@
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import {StatusBar} from 'expo-status-bar';
-import {memo,useCallback,useMemo,useState} from 'react';
-import {Alert,FlatList,KeyboardAvoidingView,Modal,Platform,Pressable,ScrollView,StyleSheet,Switch,Text as NativeText,TextInput,View,useWindowDimensions,type TextProps} from 'react-native';
+import {memo,useCallback,useEffect,useMemo,useState} from 'react';
+import {Alert,BackHandler,FlatList,KeyboardAvoidingView,Modal,Platform,Pressable,ScrollView,StyleSheet,Switch,Text as NativeText,TextInput,View,useWindowDimensions,type TextProps} from 'react-native';
 import {SafeAreaProvider,SafeAreaView} from 'react-native-safe-area-context';
+import {ActivityCsvSettings} from '../components/ActivityCsvSettings';
 import {ActivityIcon} from '../components/ActivityIcon';
 import {SideNavigation,type AppTab} from '../components/SideNavigation';
 import {NotificationTimingControls} from '../components/NotificationTimingControls';
@@ -73,6 +74,7 @@ export function MultiPetDesignPreview({onRowRender}:{onRowRender?:(key:string)=>
 function Preview({onRowRender}:{onRowRender?:(key:string)=>void}){
   const [pets,setPets]=useState(multiPetFixtures),[selected,setSelected]=useState('pet_preview_0');
   const [tab,setTab]=useState<AppTab>('log'),[settings,setSettings]=useState(false),[drawer,setDrawer]=useState(false);
+  const [navigationHistory,setNavigationHistory]=useState<Array<AppTab|'settings'>>([]);
   const [picker,setPicker]=useState(false),[manage,setManage]=useState(false),[dark,setDark]=useState(false);
   const [naming,setNaming]=useState<{id?:string;value:string}|null>(null),[nameError,setNameError]=useState<string|null>(null);
   const [filter,setFilter]=useState<string>(),[editor,setEditor]=useState<{petId:string;event:PuppyEvent}|null>(null);
@@ -80,12 +82,24 @@ function Preview({onRowRender}:{onRowRender?:(key:string)=>void}){
   const [preferences,setPreferences]=useState<Record<string,NotificationPreferences>>({});
   const [delivery,setDelivery]=useState(true),[widget,setWidget]=useState(false),[widgetPet,setWidgetPet]=useState('pet_preview_0');
   const theme=dark?darkTheme:lightTheme,pet=pets.find(item=>item.id===selected)??pets[0];
-  const {activityLabel,activityColors,relativeTime}=useLocalization(),{width,fontScale}=useWindowDimensions();
+  const {activityLabel,activityColors,relativeTime,t}=useLocalization(),{width,fontScale}=useWindowDimensions();
   const narrow=width<380||fontScale>1.3;
   const logs=useMemo(()=>householdLogs(pets,filter),[pets,filter]);
   const openEditor=useCallback((petId:string,event:PuppyEvent)=>setEditor({petId,event}),[]);
   const renderRow=useCallback(({item}:{item:PetLog})=><PetHistoryRow {...item} theme={theme} onEdit={openEditor} onRowRender={onRowRender}/>,[theme,openEditor,onRowRender]);
-  function navigate(next:AppTab){setTab(next);setSettings(false);setDrawer(false);setToast(null);}
+  function navigate(next:AppTab){setTab(next);setSettings(false);setDrawer(false);setToast(null);setNavigationHistory([]);}
+  function openSettings(){setNavigationHistory(history=>[...history,tab]);setSettings(true);setDrawer(false);}
+  function openTab(next:AppTab){setNavigationHistory(history=>[...history,settings?'settings':tab]);setTab(next);setSettings(false);setDrawer(false);}
+  function goBack(){const previous=navigationHistory.at(-1);setNavigationHistory(history=>history.slice(0,-1));setSettings(previous==='settings');if(previous!=='settings')setTab(previous??'log');}
+  useEffect(()=>{
+    const subscription=BackHandler.addEventListener('hardwareBackPress',()=>{
+      if(drawer){setDrawer(false);return true;}
+      if(settings||navigationHistory.length){goBack();return true;}
+      if(tab!=='log'){navigate('log');return true;}
+      return false;
+    });
+    return()=>subscription.remove();
+  },[drawer,settings,navigationHistory,tab]);
   function updatePet(id:string,change:Partial<PreviewPet>){setPets(current=>current.map(item=>item.id===id?{...item,...change}:item));}
   async function changeSchedule(schedule:ScheduleEntry[]){updatePet(pet.id,{schedule});}
   function logFor(target:PreviewPet,type:EventType){
@@ -110,22 +124,26 @@ function Preview({onRowRender}:{onRowRender?:(key:string)=>void}){
   </View>;
 
   const logHeader=<View style={s.stack}>
-    <View style={s.line}>{title('Log')}<View style={s.flex}/><Action label={`${pets.length} pets`} icon="paw-outline" theme={theme} onPress={()=>setManage(true)} testID="preview.pets"/></View>
+    <View style={s.line}><View style={s.flex}/><Action label={`${pets.length} pets`} icon="paw-outline" theme={theme} onPress={()=>setManage(true)} testID="preview.pets"/></View>
     {pets.map(petActions)}
     <View style={s.line}>{section('History')}<View style={s.flex}/><Action testID="preview.filter" label={pets.find(item=>item.id===filter)?.name??'All pets'} icon="filter-variant" theme={theme} onPress={()=>setPicker(true)}/></View>
     {!logs.length?<View style={[s.petCard,card]}>{section('No logs yet')}<Text style={[s.body,{color:theme.textMuted}]}>Log an activity for {pets.find(item=>item.id===filter)?.name??'your pets'} above.</Text></View>:null}
   </View>;
 
   function settingsContent(){return <ScrollView contentContainerStyle={s.content}>
-    {title('Settings')}{section('Your pets')}
+    {section('Your pets')}
     <View style={[s.petCard,card]}>{pets.map(item=><Pressable key={item.id} testID={`preview.rename.${item.id}`} accessibilityRole="button" accessibilityLabel={`Edit ${item.name}`} onPress={()=>{setManage(true);setNameError(null);setNaming({id:item.id,value:item.name});}} style={s.settingRow}><Avatar pet={item} theme={theme}/><Text style={[s.body,s.flex,{color:theme.text}]}>{item.name}</Text><Icon name="pencil-outline" theme={theme} size={20}/></Pressable>)}
       <Action label="Manage pets" icon="paw-outline" theme={theme} onPress={()=>setManage(true)}/></View>
     {section('On this device')}
     <View style={[s.petCard,card]}>
       <View style={s.settingRow}><Icon name="theme-light-dark" theme={theme}/><Text style={[s.body,s.flex,{color:theme.text}]}>Dark appearance</Text><Switch testID="preview.dark" accessibilityLabel="Dark appearance" value={dark} onValueChange={setDark}/></View>
       <Action label="Home Screen widget" icon="widgets-outline" theme={theme} onPress={()=>setWidget(true)} testID="preview.widget"/>
-      <Action label="Notifications" icon="bell-outline" theme={theme} onPress={()=>navigate('notifications')}/>
+      <Action testID="preview.notifications" label="Notifications" icon="bell-outline" theme={theme} onPress={()=>openTab('notifications')}/>
     </View>
+    {section('Activity data')}
+    <Action label={pet.name} icon="paw-outline" theme={theme} onPress={()=>setPicker(true)} testID="preview.data.pet"/>
+    <ActivityCsvSettings theme={theme} eventCount={pet.events.length} loadExportEvents={async()=>pet.events}
+      onImport={async()=>{Alert.alert('Import for '+pet.name,'The preview uses sample logs. Production imports must confirm the destination pet.');}}/>
     {section('Backup & account')}
     <View style={[s.petCard,card]}><Text style={[s.body,{color:theme.text}]}>Local log backups</Text><Text style={[s.small,{color:theme.textMuted}]}>All pets · Separate recovery history for each pet</Text><Text style={[s.body,{color:theme.text}]}>One account for your pets</Text><Text style={[s.small,{color:theme.textMuted}]}>Cloud backup and sync need multi-pet qualification.</Text></View>
     <Text style={[s.small,{color:theme.textMuted}]}>Design preview · Sample data. Changes reset when the app restarts. System notifications, cloud sync and widget installation are not connected.</Text>
@@ -133,22 +151,24 @@ function Preview({onRowRender}:{onRowRender?:(key:string)=>void}){
 
   return <SafeAreaView style={[s.flex,{backgroundColor:theme.background}]} edges={['top','bottom']}>
     <StatusBar style={dark?'light':'dark'}/>
-    <SideNavigation open={drawer} enabled tab={tab} settingsVisible={settings} theme={theme} onOpen={()=>setDrawer(true)} onClose={()=>setDrawer(false)} onChange={navigate} onSettings={()=>{setDrawer(false);setSettings(true);}}>
+    <SideNavigation open={drawer} enabled tab={tab} settingsVisible={settings} theme={theme} onOpen={()=>setDrawer(true)} onClose={()=>setDrawer(false)} onChange={navigate} onSettings={()=>{setNavigationHistory([tab]);setDrawer(false);setSettings(true);}}>
       <View style={s.header}>
-        <Pressable testID="nav.open" accessibilityRole="button" accessibilityLabel="Open navigation" onPress={()=>setDrawer(true)} style={s.iconButton}><Icon name="menu" theme={theme}/></Pressable>
-        <Text maxFontSizeMultiplier={1.25} style={[s.brand,s.flex,{color:theme.text}]}>Puptime <Text maxFontSizeMultiplier={1.25} style={[s.small,{color:theme.textMuted}]}>Preview</Text></Text>
-        <Pressable testID="settings.open" accessibilityRole="button" accessibilityLabel="Settings" onPress={()=>setSettings(value=>!value)} style={s.iconButton}><Icon name={settings?'close':'cog-outline'} theme={theme}/></Pressable>
+        <Pressable testID={settings?'settings.back':navigationHistory.length?'nav.back':'nav.open'} accessibilityRole="button"
+          accessibilityLabel={settings||navigationHistory.length?'Back':'Open navigation'} onPress={()=>settings||navigationHistory.length?goBack():setDrawer(true)} style={({pressed})=>[s.iconButton,{opacity:pressed?0.6:1}]}><Icon name={settings||navigationHistory.length?'arrow-left':'menu'} theme={theme}/></Pressable>
+        <Text testID="nav.title" accessibilityRole="header" style={[s.brand,s.flex,{color:theme.text,minWidth:fontScale>1.1?'70%':70}]}>{t(settings?'settings.title':tab==='notifications'?'notifications.title':tab==='learn'?'learn.title':`nav.${tab}`)}</Text>
+        {!settings&&(tab==='log'||tab==='timeline')?<Action testID="nav.switch" label={t(tab==='log'?'nav.timeline':'nav.log')} icon="swap-horizontal" theme={theme} onPress={()=>navigate(tab==='log'?'timeline':'log')}/>:null}
+        {!settings?<Pressable testID="settings.open" accessibilityRole="button" accessibilityLabel="Settings" onPress={openSettings} style={({pressed})=>[s.iconButton,{opacity:pressed?0.6:1}]}><Icon name="cog-outline" theme={theme}/></Pressable>:null}
       </View>
       {!settings&&tab!=='log'&&tab!=='learn'?<Pressable testID="preview.scope" accessibilityRole="button" accessibilityLabel={`Selected pet, ${pet.name}. Change pet`} onPress={()=>setPicker(true)} style={[s.scope,{backgroundColor:theme.primarySoft}]}>
         <Icon name="paw-outline" theme={theme} size={20}/><Text style={[s.petLabel,s.flex,{color:theme.primary}]}>{pet.name}</Text><Icon name="chevron-down" theme={theme} size={22}/>
       </Pressable>:null}
       <View style={s.flex}>
         {settings?settingsContent():tab==='log'?<FlatList testID="preview.history" data={logs} keyExtractor={item=>`${item.petId}:${item.event.id}`} renderItem={renderRow} ListHeaderComponent={logHeader} contentContainerStyle={s.content} initialNumToRender={12}/>
-          :tab==='timeline'?<TimelineScreen key={pet.id} events={pet.events} schedule={pet.schedule} onOpenSchedule={()=>navigate('schedule')} theme={theme}/>
-          :tab==='insights'?<InsightsScreen key={pet.id} events={pet.events} customActivities={emptyActivities} onImport={async()=>{Alert.alert('Import for '+pet.name,'The preview uses sample logs. Production imports must confirm the destination pet.');}} theme={theme}/>
-          :tab==='schedule'?<ScheduleScreen key={pet.id} events={pet.events} schedule={pet.schedule} customActivities={emptyActivities} theme={theme} onChange={changeSchedule} onSaveEntry={async entry=>{await changeSchedule([...pet.schedule.filter(item=>item.id!==entry.id),entry].sort((a,b)=>a.minutes-b.minutes));}} onRemoveEntry={async id=>{await changeSchedule(pet.schedule.filter(item=>item.id!==id));}} onRequestReminderPermission={async()=>true}/>
-          :tab==='learn'?<LearnScreen theme={theme}/>
-          :<ScrollView contentContainerStyle={s.content}>{title('Notifications')}
+          :tab==='timeline'?<TimelineScreen showHeader={false} key={pet.id} events={pet.events} schedule={pet.schedule} onOpenSchedule={()=>openTab('schedule')} theme={theme}/>
+          :tab==='insights'?<InsightsScreen showHeader={false} key={pet.id} events={pet.events} customActivities={emptyActivities} theme={theme}/>
+          :tab==='schedule'?<ScheduleScreen showHeader={false} key={pet.id} events={pet.events} schedule={pet.schedule} customActivities={emptyActivities} theme={theme} onChange={changeSchedule} onSaveEntry={async entry=>{await changeSchedule([...pet.schedule.filter(item=>item.id!==entry.id),entry].sort((a,b)=>a.minutes-b.minutes));}} onRemoveEntry={async id=>{await changeSchedule(pet.schedule.filter(item=>item.id!==id));}} onRequestReminderPermission={async()=>true}/>
+          :tab==='learn'?<LearnScreen showHeader={false} theme={theme}/>
+          :<ScrollView contentContainerStyle={s.content}>
             <View style={[s.petCard,card]}><View style={s.line}><Text style={[s.body,s.flex,{color:theme.text}]}>On this device · All pets</Text><Switch accessibilityLabel="Notifications on this device for all pets" value={delivery} onValueChange={setDelivery}/></View></View>
             {section(`${pet.name}’s reminders`)}<View style={[s.petCard,card]}><NotificationTimingControls theme={theme} preferences={preferences[pet.id]??DEFAULT_NOTIFICATION_PREFERENCES} schedule={pet.schedule} onScheduleChange={changeSchedule} onChange={async value=>setPreferences(current=>({...current,[pet.id]:value}))}/></View>
             <View style={[s.petCard,card]}>{section('Notification preview')}<Text style={[s.body,{color:theme.text}]}>{pet.name} · Time for a potty break</Text><Text style={[s.small,{color:theme.textMuted}]}>Names stay visible even with reminders for several pets.</Text></View>
@@ -160,12 +180,12 @@ function Preview({onRowRender}:{onRowRender?:(key:string)=>void}){
     <Modal visible={picker||manage||widget} animationType="none" presentationStyle="pageSheet" onRequestClose={()=>{if(naming)setNaming(null);else{setPicker(false);setManage(false);setWidget(false);}}}>
       <SafeAreaView style={[s.flex,{backgroundColor:theme.background}]}>
       {!naming?<ScrollView contentContainerStyle={s.content}>
-        <View style={s.line}>{title(widget?'Home Screen widget':manage?'Your pets':tab==='log'?'History for':'Choose a pet')}<View style={s.flex}/><Action label="Done" testID="preview.modal.done" theme={theme} onPress={()=>{setPicker(false);setManage(false);setWidget(false);}}/></View>
-        {picker&&tab==='log'?<Action label="All pets" theme={theme} onPress={()=>{setFilter(undefined);setPicker(false);}}/>:null}
+        <View style={s.line}>{title(widget?'Home Screen widget':manage?'Your pets':tab==='log'&&!settings?'History for':'Choose a pet')}<View style={s.flex}/><Action label="Done" testID="preview.modal.done" theme={theme} onPress={()=>{setPicker(false);setManage(false);setWidget(false);}}/></View>
+        {picker&&tab==='log'&&!settings?<Action label="All pets" theme={theme} onPress={()=>{setFilter(undefined);setPicker(false);}}/>:null}
         {widget?<Text style={[s.body,{color:theme.textMuted}]}>Choose the pet for this widget. Its name stays above the logging buttons.</Text>:null}
-        {pets.map(item=><Pressable testID={`preview.select.${item.id}`} key={item.id} accessibilityRole={manage?'button':'radio'} accessibilityState={manage?undefined:{checked:item.id===(widget?widgetPet:tab==='log'?filter:selected)}} accessibilityLabel={manage?`Edit ${item.name}`:item.name}
-          onPress={()=>{if(manage){setNaming({id:item.id,value:item.name});setNameError(null);}else if(widget)setWidgetPet(item.id);else{if(tab==='log')setFilter(item.id);else setSelected(item.id);setPicker(false);}}} style={({pressed})=>[s.petCard,s.line,card,{backgroundColor:pressed?theme.primarySoft:theme.surfaceRaised}]}>
-          <Avatar pet={item} theme={theme}/><View style={s.flex}><Text style={[s.petName,{color:theme.text}]}>{item.name}</Text><Text style={[s.small,{color:theme.textMuted}]}>{item.events.length} logs · {item.detail||'New pet'}</Text></View><Icon name={manage?'pencil-outline':item.id===(widget?widgetPet:tab==='log'?filter:selected)?'check-circle':'circle-outline'} theme={theme}/>
+        {pets.map(item=><Pressable testID={`preview.select.${item.id}`} key={item.id} accessibilityRole={manage?'button':'radio'} accessibilityState={manage?undefined:{checked:item.id===(widget?widgetPet:tab==='log'&&!settings?filter:selected)}} accessibilityLabel={manage?`Edit ${item.name}`:item.name}
+          onPress={()=>{if(manage){setNaming({id:item.id,value:item.name});setNameError(null);}else if(widget)setWidgetPet(item.id);else{if(tab==='log'&&!settings)setFilter(item.id);else setSelected(item.id);setPicker(false);}}} style={({pressed})=>[s.petCard,s.line,card,{backgroundColor:pressed?theme.primarySoft:theme.surfaceRaised}]}>
+          <Avatar pet={item} theme={theme}/><View style={s.flex}><Text style={[s.petName,{color:theme.text}]}>{item.name}</Text><Text style={[s.small,{color:theme.textMuted}]}>{item.events.length} logs · {item.detail||'New pet'}</Text></View><Icon name={manage?'pencil-outline':item.id===(widget?widgetPet:tab==='log'&&!settings?filter:selected)?'check-circle':'circle-outline'} theme={theme}/>
         </Pressable>)}
         {!widget?<Action testID="preview.add" label="Add a pet" icon="plus" theme={theme} onPress={()=>{setNaming({value:''});setNameError(null);}}/>:null}
         {widget?<View style={[s.petCard,card]}><Text style={[s.petName,{color:theme.text}]}>{pets.find(item=>item.id===widgetPet)?.name}</Text><View style={s.line}>{(['pee','poop','meal'] as const).map(type=><View key={type} style={[s.quick,{borderColor:theme.border,backgroundColor:theme.surface}]}><ActivityIcon activity={{type}} theme={theme} color={activityColors(theme,{type}).color} size={24}/><Text style={[s.actionText,{color:theme.text}]}>{activityLabel({type})}</Text></View>)}</View><Text style={[s.small,{color:theme.textMuted}]}>Widget layout proposal · Installation is not connected</Text></View>:null}
@@ -190,8 +210,8 @@ function Preview({onRowRender}:{onRowRender?:(key:string)=>void}){
 
 const s=StyleSheet.create({
   flex:{flex:1},content:{padding:20,paddingBottom:32,gap:16},stack:{gap:16,marginBottom:12},line:{flexDirection:'row',alignItems:'center',gap:12},column:{flexDirection:'column'},
-  header:{paddingHorizontal:16,minHeight:60,flexDirection:'row',alignItems:'center',gap:12},brand:{fontSize:20,lineHeight:28,fontWeight:'700'},iconButton:{minWidth:48,minHeight:48,alignItems:'center',justifyContent:'center'},
-  title:{fontSize:29,lineHeight:36,fontWeight:'800',flexShrink:1},heading:{fontSize:20,lineHeight:28,fontWeight:'700',flexShrink:1},body:{fontSize:16,lineHeight:24},small:{fontSize:13,lineHeight:19},
+  header:{paddingHorizontal:16,minHeight:60,flexDirection:'row',alignItems:'center',gap:8,flexWrap:'wrap'},brand:{fontSize:20,lineHeight:28,fontWeight:'700'},iconButton:{minWidth:48,minHeight:48,alignItems:'center',justifyContent:'center'},
+  title:{fontSize:20,lineHeight:28,fontWeight:'700',flexShrink:1},heading:{fontSize:20,lineHeight:28,fontWeight:'700',flexShrink:1},body:{fontSize:16,lineHeight:24},small:{fontSize:13,lineHeight:19},
   petName:{fontSize:20,lineHeight:28,fontWeight:'700'},petLabel:{fontSize:15,lineHeight:22,fontWeight:'700'},avatar:{width:44,height:44,borderRadius:16,alignItems:'center',justifyContent:'center'},initial:{fontSize:18,fontWeight:'700'},
   petCard:{borderWidth:1,borderRadius:20,padding:16,gap:12},quick:{flex:1,minWidth:0,minHeight:76,borderRadius:14,borderWidth:1,paddingVertical:12,paddingHorizontal:4,alignItems:'center',justifyContent:'center',gap:5},quickLabel:{flexDirection:'row',alignItems:'center',gap:6},
   action:{minHeight:48,borderWidth:1,borderRadius:14,paddingHorizontal:12,paddingVertical:10,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,flexShrink:1},actionText:{fontSize:15,lineHeight:22,fontWeight:'600',flexShrink:1},

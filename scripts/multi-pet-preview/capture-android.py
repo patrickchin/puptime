@@ -12,7 +12,7 @@ output.mkdir(parents=True, exist_ok=True)
 def adb(*args):
     return subprocess.check_output(['adb', '-s', serial, *args])
 
-assert adb('emu', 'avd', 'name').decode().startswith('Puptime_Multi_Pet_622c')
+assert re.match(r'^Puptime_(Multi_Pet_622c|Navigation_d859)\b', adb('emu', 'avd', 'name').decode())
 
 def hierarchy():
     adb('shell', 'uiautomator', 'dump', '/sdcard/puptime-622c.xml')
@@ -60,12 +60,12 @@ tap('preview.select.pet_preview_1')
 shot('10-widget-maple')
 tap('preview.modal.done')
 tap('preview.dark')
-tap('settings.open')
+tap('settings.back')
 navigate('log')
 shot('11-dark-log')
 tap('settings.open')
 tap('preview.dark')
-tap('settings.open')
+tap('settings.back')
 
 try:
     adb('shell', 'wm', 'size', '984x2100')  # 375 dp wide at the emulator's 420 dpi.

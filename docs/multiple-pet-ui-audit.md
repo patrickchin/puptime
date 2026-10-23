@@ -31,7 +31,7 @@ The direction follows `RELEASE_PLAN.md`: both pets' actions together on Log; one
 | Pet settings | Rename the current puppy | Manage several names; long names wrap. This proposal requires distinct display names/nicknames to keep logs unambiguous. No destructive pet removal is proposed. |
 | Device settings | Appearance, language, widget actions | Appearance and language remain shared. Widget target/action preferences need instance/pet ownership. Preview demonstrates shared appearance. |
 | Local backups | Already retain/recover all dogs by original ID | Preserve all-pet recovery and per-pet limits; present names when choosing a snapshot. Existing recovery is not exercised by the preview. |
-| CSV export/import | Active pet; CSV has event IDs but no pet mapping | Confirm destination pet before import; name source pet in export UI/file. Define an explicit multi-pet archive format before offering household export. Preview import explains its sample-only behavior; existing Insights export shares only selected synthetic history. |
+| CSV export/import | Active pet; CSV has event IDs but no pet mapping | Confirm destination pet before import; name source pet in export UI/file. Define an explicit multi-pet archive format before offering household export. Preview import explains its sample-only behavior; Settings names the selected pet and exports only its synthetic history. |
 | Cloud / account | One runtime; first cloud pet association | One account, multiple explicit local-to-cloud associations. Show the chosen dog's summary before combining/restoring. Requires backend/client qualification; the preview does not simulate a successful cloud connection. |
 | Revision history | Repository-scoped events | Keep pet context visible in recent changes and restores; preserve composite identity even when event IDs collide. Not wired into the preview. |
 | Learn / care guides | Shared content | Keep shared. No pet picker that implies advice has been personalized. Existing screen is reused. |
@@ -46,6 +46,10 @@ The direction follows `RELEASE_PLAN.md`: both pets' actions together on Log; one
 - Replaced nested name-entry modals with one native sheet after iOS verification exposed a blank sheet when adding a pet dismissed both levels together.
 - Kept editor draft state inside the editor and memoized history rows, with stable callbacks and composite pet/event keys.
 - At the largest iPhone system text setting, the first preview wrapped the brand into several lines and clipped avatar initials. Bounded decorative branding and compact controls separately from body text; body copy still grows to twice its base size. The revised native Log was captured at that setting. Full accessibility qualification of the reused analysis/routine screens remains production work.
+
+## Navigation integration after #151
+
+The preview now follows the production navigation revision: compact screen titles in the top bar, one-tap Log/Timeline switching, contextual Back, and CSV controls in Settings with an explicit pet selector. Export reads only the selected in-memory sample history. The production entry point remains unchanged.
 
 ## Production implementation boundary
 
