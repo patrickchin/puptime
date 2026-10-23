@@ -11,6 +11,7 @@ import { recordDataSchema } from '../cloud/protocol.ts';
 import type { FinishOnboardingOptions } from '../onboarding.ts';
 import {firstLaunchStepSchema,type FirstLaunchStep,type FirstLaunchProgress} from '../first-launch.ts';
 import type { BackupGuard } from './activity-backups.ts';
+import { puppyPhotoSchema, type PuppyProfile } from '../puppy-photo.ts';
 
 export function createNativeStorage(database: LocalDatabase, petId: string, onChange?: LocalChangeSink, afterCommit?:()=>void, beforeChange?:BackupGuard) {
   const repository = createLocalRepository(database, petId, onChange,afterCommit,beforeChange);
@@ -81,6 +82,16 @@ export function createNativeStorage(database: LocalDatabase, petId: string, onCh
     loadSchedule: repository.loadSchedule, saveSchedule: repository.saveSchedule,
     saveScheduleEntry:repository.saveScheduleEntry,removeScheduleEntry:repository.removeScheduleEntry,
     loadPuppyName:()=>database.read(async sql=>{const pet=await sql.getFirstAsync<{name:string}>('SELECT name FROM puppies WHERE id=?',petId);if (!pet) throw new Error('The local puppy could not be found.');return pet.name;}),
+    loadPuppyProfile:()=>database.read(async (sql):Promise<PuppyProfile>=>{
+      const pet=await sql.getFirstAsync<{name:string}>('SELECT name FROM puppies WHERE id=?',petId);
+      if(!pet)throw new Error('The local puppy could not be found.');
+      const photo=await get(sql,storageKeys.puppyPhoto);
+      return {...pet,...(photo===null?{}:{photo:puppyPhotoSchema.parse(photo)})};
+    }),
+    savePuppyPhoto:(photo:string|null)=>settingsWrite(async sql=>{
+      if(photo===null)await sql.runAsync('DELETE FROM pet_settings WHERE pet_id=? AND key=?',petId,storageKeys.puppyPhoto);
+      else await set(sql,storageKeys.puppyPhoto,puppyPhotoSchema.parse(photo));
+    }),
     savePuppyName:(name:string)=>settingsWrite(async sql=>{const value=recordDataSchema('puppy').parse({name});if (!('name' in value)) throw new Error('Invalid puppy name.');await sql.runAsync('UPDATE puppies SET name=? WHERE id=?',value.name,petId);}),
     async shouldShowOnboarding() {
       return database.read(async (sql) => (await sql.getFirstAsync<{ value: string }>("SELECT value FROM metadata WHERE key='show_onboarding'"))?.value === 'true');

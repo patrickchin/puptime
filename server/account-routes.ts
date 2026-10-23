@@ -7,6 +7,7 @@ import { getAccountStore, type AccountStore } from './account-store';
 import { createAuth } from './auth';
 import type { AppleRevocation } from './account-lifecycle';
 import { cloudAccess, getCloudAccount, type CloudAccess } from './cloud-access';
+import {legacyProfile,legacyProfileRevision} from './profile-compat';
 
 type AccountEnv = { Bindings: Cloudflare.Env; Variables: {
   user: { id: string; email: string; name: string }; sessionCreatedAt: number; sessionId: string;
@@ -52,7 +53,8 @@ accountRoutes.post('/cloud/enroll', authenticated, syncAccess, validator('json',
   return 'error' in result ? context.json(result, 409) : context.json(result);
 });
 accountRoutes.post('/sync/push', authenticated, syncAccess, validator('json', (value) => pushSchema.parse(value)), async (context) => {
-  return context.json(await context.get('store').push(context.req.valid('json').mutations));
+  const result=await context.get('store').push(context.req.valid('json').mutations);
+  return context.json(context.req.header('x-puptime-profile-photos')==='1'?result:{...result,accepted:result.accepted.map(value=>({...value,record:legacyProfile(value.record)}))});
 });
 accountRoutes.get('/sync/changes', authenticated, syncAccess, async (context) => {
   const origin=context.req.header('origin');
@@ -65,20 +67,22 @@ accountRoutes.get('/sync/changes', authenticated, syncAccess, async (context) =>
 accountRoutes.get('/sync/pull', authenticated, syncAccess, async (context) => {
   const after = afterSchema.parse(context.req.query('after') ?? 0);
   const limit = z.coerce.number().int().min(1).max(100).parse(context.req.query('limit') ?? 100);
-  return context.json(await context.get('store').pullForClient(after, limit));
+  const page=await context.get('store').pullForClient(after, limit);
+  return context.json(context.req.header('x-puptime-profile-photos')==='1'?page:{...page,changes:page.changes.map(legacyProfile)});
 });
 accountRoutes.get('/records/:id/history', authenticated, syncAccess, async (context) => {
   const id = recordIdSchema.parse(context.req.param('id'));
   const before = afterSchema.parse(context.req.query('beforeRevision') ?? Number.MAX_SAFE_INTEGER);
-  return context.json({ revisions: await context.get('store').history(id, before) });
+  const revisions=await context.get('store').history(id, before);
+  return context.json({revisions:context.req.header('x-puptime-profile-photos')==='1'?revisions:revisions.map(legacyProfileRevision)});
 });
-async function exportAccount(context: Context<AccountEnv>) {
-  return context.get('store').exportStream();
+async function exportAccount(context: Context<AccountEnv>,photos=context.req.header('x-puptime-profile-photos')==='1') {
+  return context.get('store').exportStream(photos);
 }
-accountRoutes.get('/account/export', authenticated, exportAccount);
-accountRoutes.post('/account/export', authenticated, validator('form', value => z.strictObject({expectedAccount:z.string().min(1).max(256)}).parse(value)), context => {
+accountRoutes.get('/account/export', authenticated, context=>exportAccount(context));
+accountRoutes.post('/account/export', authenticated, validator('form', value => z.strictObject({expectedAccount:z.string().min(1).max(256),profilePhotos:z.literal('1').optional()}).parse(value)), context => {
   if(context.req.valid('form').expectedAccount!==context.get('user').id)return context.html('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="robots" content="noindex"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Account changed | Puptime</title><style>body{margin:0;background:#f6f4ed;color:#17231e;font:17px/1.5 system-ui,sans-serif}main{max-width:540px;margin:72px auto;padding:24px}h1{font-size:36px;letter-spacing:-1px}a{display:inline-block;color:#176b52;padding:12px 0;text-underline-offset:4px}</style><main><h1>Account changed</h1><p>Return to your account before downloading cloud data.</p><a href="/account">Back to account</a></main></html>',409);
-  return exportAccount(context);
+  return exportAccount(context,context.req.valid('form').profilePhotos==='1'||context.req.header('x-puptime-profile-photos')==='1');
 });
 accountRoutes.post('/account/reauth', authenticated, validator('json', value => z.strictObject({otp:z.string().regex(/^\d{6}$/)}).parse(value)), context => {
   const expected=context.req.header('x-puptime-account');

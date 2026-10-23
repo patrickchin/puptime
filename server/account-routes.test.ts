@@ -8,10 +8,10 @@ beforeAll(() => applyD1Migrations(env.AUTH_DB, inject('migrations')));
 const settings = { ...env, ENVIRONMENT: 'local' as const, AUTH_BASE_URL: 'https://puptime.test', WEB_ORIGINS: 'https://puptime.test', AUTH_SECRET: 'local-test-secret-with-at-least-32-characters' };
 let clientNumber = 10;
 type Owner = { cookie: string; id: string; ip: string };
-async function call(owner: Owner | null, path: string, body?: object) {
+async function call(owner: Owner | null, path: string, body?: object,headers:Record<string,string>={}) {
   return worker.fetch(new Request(`https://puptime.test/api/${path}`, {
     method: body ? 'POST' : 'GET', headers: { origin: 'https://puptime.test', 'cf-connecting-ip': owner?.ip ?? '192.0.2.254',
-      ...(owner ? { cookie: owner.cookie } : {}), ...(body ? { 'content-type': 'application/json' } : {}) },
+      ...(owner ? { cookie: owner.cookie } : {}), ...(body ? { 'content-type': 'application/json' } : {}),...headers },
     ...(body ? { body: JSON.stringify(body) } : {}),
   }), settings);
 }
@@ -292,4 +292,28 @@ test('authenticated cloud history validates for the client across merge delete r
  expect((await call(null,`records/${encodeURIComponent(recordId)}/history`)).status).toBe(401);
  await env.AUTH_DB.prepare('UPDATE session SET expiresAt=? WHERE userId=?').bind(new Date(Date.now()-1000).toISOString(),user.id).run();
  expect((await call(user,`records/${encodeURIComponent(recordId)}/history`)).status).toBe(401);
+});
+
+test('photo capability keeps legacy sync, name edits, history and exports compatible',async()=>{
+ const user=await owner();await enroll(user);
+ const photos={'x-puptime-profile-photos':'1'},photo='data:image/jpeg;base64,/9j/AAAA';
+ const mutation:Mutation={protocolVersion:1,operationId:'op_photo_create',deviceId:'test-device',recordId:'pet-1',petId:'pet-1',kind:'puppy',baseRevision:0,intent:'create',patch:{name:'Pip',photo}};
+ const created=await call(user,'sync/push',{mutations:[mutation]},photos);
+ expect(created.status).toBe(200);
+ expect(await created.json()).toMatchObject({accepted:[{record:{data:{name:'Pip',photo}}}]});
+ const legacy=await (await call(user,'sync/pull?after=0')).json<{changes:{data:object}[];cursor:number}>();
+ expect(legacy.changes[0].data).toEqual({name:'Pip'});expect(legacy.cursor).toBe(1);
+ const renamed=await call(user,'sync/push',{mutations:[{...mutation,operationId:'op_old_rename',baseRevision:1,intent:'patch',patch:{name:'Biscuit'}}]});
+ expect(await renamed.json()).toMatchObject({accepted:[{record:{data:{name:'Biscuit'}}}]});
+ const modern=await (await call(user,'sync/pull?after=0',undefined,photos)).json<{changes:{data:object}[]}>();
+ expect(modern.changes.at(-1)?.data).toEqual({name:'Biscuit',photo});
+ await call(user,'sync/push',{mutations:[{...mutation,operationId:'op_photo_remove',baseRevision:2,intent:'patch',patch:{photo:null}}]},photos);
+ const history=await (await call(user,'records/pet-1/history')).json<{revisions:unknown[]}>();
+ expect(JSON.stringify(history)).not.toContain('"photo"');
+ const {revisionSchema}=await import('../src/cloud/protocol');
+ history.revisions.forEach(revision=>expect(revisionSchema.safeParse(revision).success).toBe(true));
+ const oldExport=await (await call(user,'account/export')).text();
+ expect(oldExport).not.toContain('"photo"');
+ const fullExport=await (await call(user,'account/export',undefined,photos)).text();
+ expect(fullExport).toContain(photo);
 });

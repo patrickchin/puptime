@@ -47,6 +47,7 @@ import type {FirstLaunchProgress} from './src/first-launch';
 import type { FinishOnboardingOptions } from './src/onboarding';
 import { ScheduleScreen } from './src/screens/ScheduleScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
+import { PuppyIdentity } from './src/components/PuppyIdentity';
 import {NotificationsScreen} from './src/screens/NotificationsScreen';
 import { AccountScreen } from './src/screens/AccountScreen';
 import { useCloud } from './src/cloud/use-cloud';
@@ -735,6 +736,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
               <MaterialCommunityIcons accessible={false} name="menu" size={25} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
             </Pressable>
             <Text accessibilityRole={settingsVisible||tab==='notifications'?'header':undefined} maxFontSizeMultiplier={1.5} style={[styles.navigationTitle,{color:theme.text}]}>{settingsVisible?translate(language,'settings.title'):tab==='notifications'?translate(language,'notifications.title'):'Puptime'}</Text>
+            {!settingsVisible?<PuppyIdentity theme={theme} onPress={()=>setSettingsVisible(true)}/>:null}
             {settingsVisible?<Pressable testID="settings.back" accessibilityRole="button" accessibilityLabel={translate(language,'settings.back')} onPress={()=>setSettingsVisible(false)} style={styles.menuButton}>
               <MaterialCommunityIcons accessible={false} name="close" size={24} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
             </Pressable>:null}

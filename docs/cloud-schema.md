@@ -151,3 +151,27 @@ There are no trial or subscription columns. Explicit device enrollment still
 controls uploading local puppy data. See the [development milestone](cloud-development.md)
 for the historical baseline checkpoint and [API setup](api.md#local-development-and-deployment)
 for the additive rollout commands.
+
+## Optional dog profile photo
+
+Puppy records accept an optional `photo` field containing a JPEG data URI of at most
+32,768 characters. Native selection crops to a square and resizes to 256 pixels
+(or 128 pixels when necessary to meet the limit). The device stores the URI in
+the existing puppy-scoped `pet_settings` table under `puptime.puppyPhoto.v1`; no
+SQL migration is needed. Profile changes use the existing atomic revision/outbox
+path. `photo: null` in a puppy patch removes the field. Changing a name preserves
+the photo, and photo changes preserve the name. The existing byte-aware batcher
+keeps profile uploads within the API’s 64 KiB request limit.
+
+Deploy the backend before releasing the photo-enabled client. Clients opt in
+with `x-puptime-profile-photos: 1` (browser exports use the `profilePhotos=1` form
+field). Sync responses, history and exports omit photos for older clients while
+retaining revision identities and cursor order. Photo-only history proposals
+become name-preserving no-ops in that legacy representation. Legacy name edits
+still preserve the server’s photo; no stored history is rewritten. On the first
+upgrade from a client without photo support, a persisted capability checkpoint
+restarts any staged baseline or requests the existing resumable full baseline,
+so photos already passed by the legacy cursor are received. Pending local edits
+and operation identities are retained. Photos use the same private account storage and
+revision retention as other profile fields. Activity-only CSV and automatic
+recovery backups do not contain photos.

@@ -31,7 +31,7 @@ test('the installed SDK POST is fixed-origin, account-bound and streaming, with 
  const external=new AbortController();
  const client=fixture(async(input,init)=>{
   assert.equal(String(input),origin+'/api/account/export');assert.equal(init?.method,'POST');assert.equal(init?.credentials,'omit');assert.equal(init?.redirect,'error');
-  assert.equal(new Headers(init?.headers).get('content-type'),'application/x-www-form-urlencoded');assert.equal(String(init?.body),'expectedAccount=owner-1');
+  assert.equal(new Headers(init?.headers).get('x-puptime-profile-photos'),'1');assert.equal(new Headers(init?.headers).get('content-type'),'application/x-www-form-urlencoded');assert.equal(String(init?.body),'expectedAccount=owner-1');
   signal=init?.signal??undefined;assert.ok(signal);assert.notEqual(signal,external.signal);
   const response=exportResponse();response.headers.append('set-cookie','better-auth.other=synthetic-second; Secure');return response;
  },output,100);

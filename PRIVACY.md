@@ -1,6 +1,6 @@
 # Puptime Privacy Policy
 
-Last updated: October 20, 2026
+Last updated: October 23, 2026
 
 Puptime is a puppy routine tracker developed by Patrick Chin. Local logging works without an account. This policy explains optional cloud accounts, the native app, and the public website.
 
@@ -12,9 +12,13 @@ Without cloud sync, activity logs, notes, and routine settings stay on your devi
 
 Where configured, you can sign in with an email code, Google, or Apple. Puptime stores your email address, name, provider identity, and authentication/session records to operate your account. Email codes are delivered through Resend; Google and Apple handle their own sign-in and consent screens. Puptime requests basic identity/profile and email access, not access to your mailbox or files.
 
-Signing in does not upload puppy history or activate cloud sync. In account-enabled iPhone builds, choosing cloud sync uploads your puppy's activity, notes, routines, and supported preferences. Cloudflare D1 stores account/authentication records, and Cloudflare Durable Objects store synchronized puppy data and version history. Different sign-in methods are connected only through an explicit authenticated action; they are not silently joined by matching email addresses.
+Signing in does not upload puppy history or activate cloud sync. In account-enabled iPhone builds, choosing cloud sync uploads your puppy's profile (including an optional profile photo), activity, notes, routines, and supported preferences. Cloudflare D1 stores account/authentication records, and Cloudflare Durable Objects store synchronized puppy data and version history. Different sign-in methods are connected only through an explicit authenticated action; they are not silently joined by matching email addresses.
 
 The account website lets you manage sign-in methods, sign out, download cloud data, and delete the cloud account. It does not record puppy activity. Authentication uses server-managed HttpOnly cookies. Temporary session storage records an account-return check for provider linking or reauthentication; it contains no password, email code, or session token and is cleared when used or the browser session ends. A necessary deletion guard in browser local storage keeps the original account identifier and attempt time until deletion is confirmed. This survives interrupted requests and closed tabs and is separate from optional analytics.
+
+## Dog profile photos
+
+You can choose a profile photo using the system photo picker in Settings. Puptime crops and resizes the selected image and stores a small JPEG with your dog’s profile, so it remains available offline. The app does not need camera access for this feature. With cloud sync enabled, the photo is included in synchronized profile data and version history. Removing a photo clears the current profile photo; earlier synchronized revisions remain subject to the cloud history and deletion rules below. Activity CSV exports and automatic activity recovery backups contain activity data and do not include profile photos.
 
 ## Public website
 
