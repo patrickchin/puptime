@@ -24,11 +24,12 @@ const before=counts();assert.ok(Object.keys(before).length>=10,'Use populated hi
 tap('preview.event.pet_preview_0.evt_preview_0_recent');node('preview.editor.note');
 assert.deepEqual(counts(),before,'Opening the detail must not redraw unchanged history rows.');
 tap('preview.editor.note');adb('shell','input','keyevent','123');adb('shell','input','keyevent',...Array(100).fill('67'));
-adb('shell','input','text','At%sthe%sgarden%sdoor%swith%sa%sfriend');node('preview.editor.save');
+// Avoid the debug build's double-R reload shortcut during hardware key injection.
+adb('shell','input','text','Outside%sin%sthe%sback%syard');node('preview.editor.save');
 writeFileSync(join(output,'populated-history-editor.png'),execFileSync('adb',['-s',device,'exec-out','screencap','-p']));
 assert.deepEqual(counts(),before,'Typing in the editor must not redraw history rows.');
 tap('preview.editor.save');node('preview.event.pet_preview_0.evt_preview_0_recent');
-assert.match(hierarchy(),/At the garden door with a friend/);
+assert.match(hierarchy(),/Outside in the back yard/);
 const after=counts(),edited='pet_preview_0:evt_preview_0_recent';
 assert.equal(after[edited],before[edited]+1,'Only the edited row should redraw after saving.');
 for(const key of Object.keys(before).filter(key=>key!==edited))assert.equal(after[key],before[key],key+' unnecessarily redrew');
