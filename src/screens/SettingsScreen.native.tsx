@@ -9,7 +9,6 @@ import { PuppyNameSetting } from '../components/PuppyNameSetting';
 import { ActivityBackupSettings } from '../components/ActivityBackupSettings.native';
 import type { CloudHandle } from '../cloud/use-cloud';
 import { useAccountSnapshot } from '../cloud/use-account-snapshot';
-import { accountStatus } from '../cloud/account-status';
 import { useLocalization } from '../localization-context';
 import type { LanguagePreference } from '../localization';
 import type { NotificationPreferences } from '../notification-config';
@@ -321,7 +320,7 @@ function SectionLabel({ label, theme }: { label: string; theme: Theme }) {
 function AccountSettingsRow({cloud,theme,onOpen}:{cloud:CloudHandle;theme:Theme;onOpen:()=>void}) {
   const {t}=useLocalization(),state=useAccountSnapshot(cloud.controller);
   return <View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}>
-    <SettingsRow testID="settings.account.open" wrap icon="cloud-outline" label={t('account.title')} detail={t(`account.status.${accountStatus(state)}`)} onPress={onOpen} theme={theme}/>
+    <SettingsRow testID="settings.account.open" wrap icon="account-circle-outline" label={t('account.title')} detail={state?.account?.user.email??t(state?.sync?.accountId?'account.status.auth':'account.signIn')} onPress={onOpen} theme={theme}/>
   </View>;
 }
 

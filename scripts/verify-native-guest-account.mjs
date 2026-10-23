@@ -22,7 +22,7 @@ const adb=(...args)=>execFileSync('adb',['-s',device,...args],{encoding:'utf8',s
 if(android){assert.match(adb('emu','avd','name'),/^Puptime_(Onboarding_2f17|SignIn_461a)/);assert.ok(existsSync(host),'Supply a debuggable native APK.');}
 else{
   const devices=Object.values(JSON.parse(simctl('list','devices','available','-j')).devices).flat();
-  assert.match(devices.find(item=>item.udid===device)?.name??'',/^Puptime (2f17 Onboarding|Onboarding CI|SignIn 461a)/);
+  assert.match(devices.find(item=>item.udid===device)?.name??'',/^Puptime (2f17 Onboarding|Onboarding CI|SignIn 461a|Account )/);
   assert.ok(existsSync(join(host,'Info.plist')),'Supply a current native simulator host.');
   assert.ok(execFileSync('otool',['-arch','arm64','-s','__TEXT','__entitlements',join(host,'Puptime')],{encoding:'utf8'}).includes('Contents of (__TEXT,__entitlements)'),
     'Build the simulator host with CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- so SecureStore has its simulator entitlements.');
@@ -54,8 +54,9 @@ async function flow(name,env={}){
   try{
     await run('maestro',['--device',device,'test',...Object.entries({TEST_EMAIL:email,...env}).flatMap(([key,value])=>['-e',`${key}=${value}`]),resolve('.maestro/account-preservation',name+'.yaml'),'--test-output-dir',artifacts],
       {...process.env,MAESTRO_CLI_NO_ANALYTICS:'1',TEST_EMAIL:email,MAESTRO_TEST_CODE:code,...env});
-    if(name==='reopen')for(const path of readdirSync(artifacts,{recursive:true}).filter(path=>String(path).endsWith('recovered-account-history.png')))
-      cpSync(join(artifacts,path),join(output,'recovered-account-history.png'));
+    const screenshots=['recovered-account-history.png','my-account-settings.png','my-account-signed-in.png','my-account-guest.png'];
+    for(const path of readdirSync(artifacts,{recursive:true}).filter(path=>screenshots.some(name=>String(path).endsWith(name))))
+      cpSync(join(artifacts,path),join(output,String(path).split('/').at(-1)));
     console.log('PASS native account phase: '+name);
   }finally{
     if(existsSync(startup))for(const directory of readdirSync(startup).filter(value=>!before.has(value))){

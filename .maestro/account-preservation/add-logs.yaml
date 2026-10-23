@@ -10,8 +10,10 @@ name: Account preservation add-logs
     element:
       id: account.back
     direction: UP
+- waitForAnimationToEnd
 - tapOn:
     id: account.back
+    retryTapIfNoChange: true
 - tapOn:
     id: settings.back
 - assertVisible:
@@ -50,6 +52,10 @@ name: Account preservation add-logs
       - tapOn:
           id: editor.close
 - runFlow: ../helpers/open-account.yaml
+- scrollUntilVisible:
+    element:
+      id: account.local.count
+    direction: DOWN
 - assertVisible:
     id: account.local.count
     text: ${EXPECTED_COUNT} activity logs

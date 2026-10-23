@@ -39,15 +39,32 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
           </Pressable>
           <Text accessibilityRole="header" maxFontSizeMultiplier={2} style={[styles.title,titleStyle]}>{t('account.title')}</Text>
         </View>
+        {errorKey&&errorKey!=='account.error.export'?<Text testID="account.error" accessibilityRole="alert" style={[styles.notice,{color:theme.danger,backgroundColor:theme.dangerSoft,borderRadius:theme.presentation.controlRadius}]}>{t(errorKey)}</Text>:null}
+        {!account?<AccountSignIn cloud={cloud} theme={theme} showError={false}/>:<>
+          <View testID="account.identity" style={cardStyle}>
+            <View style={styles.summaryHeader}>
+              <MaterialCommunityIcons name="account-circle-outline" size={31} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
+              <Text style={[styles.eyebrow,{color:theme.primary}]}>{t('account.signedInAs')}</Text>
+            </View>
+            {account.user.name.trim()&&account.user.name.trim()!==account.user.email?<Text testID="account.name" selectable style={[styles.puppy,{color:theme.text,fontFamily:theme.presentation.headingFont}]}>{account.user.name}</Text>:null}
+            <Text testID="account.email" selectable style={[styles.body,{color:theme.text}]}>{account.user.email}</Text>
+          </View>
+          {state?.config&&(state.config.providers.apple||state.config.providers.google)?<View style={cardStyle}>
+            <Text accessibilityRole="header" style={[styles.label,{color:theme.text}]}>{t('account.signInMethods')}</Text>
+            {state.linkedProviders===null?<AccountButton theme={theme} testID="account.methods.refresh" label={t(busy?'account.methodsLoading':'account.refreshMethods')} disabled={busy||!state.online} loading={busy} onPress={()=>{void cloud.controller!.refresh();}}/>:(['apple','google'] as const).filter(provider=>state.config!.providers[provider]).map(provider=>state.linkedProviders!.includes(provider)?<View key={provider} testID={`account.${provider}.connected`} style={styles.summaryHeader}>
+              <MaterialCommunityIcons name="check-circle-outline" size={22} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
+              <Text style={[styles.body,styles.grow,{color:theme.text}]}>{t(provider==='apple'?'account.connectedApple':'account.connectedGoogle')}</Text>
+            </View>:<AccountButton key={provider} theme={theme} testID={`account.${provider}.connect`} label={t(provider==='apple'?'account.connectApple':'account.connectGoogle')} icon={provider} disabled={busy||!state.online} loading={state.linkingProvider===provider} onPress={()=>{void cloud.controller!.connectProvider(provider);}}/>)}
+          </View>:null}
+        </>}
+        <Text accessibilityRole="header" style={[styles.sectionTitle,{color:theme.text,fontFamily:theme.presentation.headingFont}]}>{t('account.backupTitle')}</Text>
         <View testID="account.local.summary" style={cardStyle}>
           <View style={styles.summaryHeader}><MaterialCommunityIcons name="dog-side" size={31} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no" /><Text maxFontSizeMultiplier={2} style={[styles.eyebrow,{color:theme.primary}]}>{t('account.onDevice')}</Text></View>
           <Text maxFontSizeMultiplier={2} style={[styles.puppy,{color:theme.text,fontFamily:theme.presentation.headingFont}]}>{shownName}</Text>
           <Text testID="account.local.count" style={[styles.body,bodyStyle]}>{readFailed?t('account.error.storage'):countLabel(count)}</Text>
           <Text testID="account.status" accessibilityLiveRegion="polite" style={[styles.status,{color:theme.primary}]}>{t(`account.status.${status}`)}</Text>
         </View>
-        {errorKey&&errorKey!=='account.error.export'?<Text testID="account.error" accessibilityRole="alert" style={[styles.notice,{color:theme.danger,backgroundColor:theme.dangerSoft,borderRadius:theme.presentation.controlRadius}]}>{t(errorKey)}</Text>:null}
-        {!account?<AccountSignIn cloud={cloud} theme={theme} showError={false}/>:(<View style={styles.stack}>
-          <Text selectable style={[styles.body,{color:theme.text}]}>{account.user.email}</Text>
+        {account?(<View style={styles.stack}>
           {!enrolled?(<View style={cardStyle}>
             <Text style={[styles.body,bodyStyle]}>{t('account.enrollBody')}</Text>
             {!account.cloud.canSync?<Text style={[styles.body,bodyStyle]}>{t('account.pausedBody')}</Text>:null}
@@ -64,19 +81,13 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
             {status==='offline'||status==='paused'?<Text style={[styles.body,bodyStyle]}>{t('account.pausedBody')}</Text>:null}
             <AccountButton theme={theme} testID="account.retry" label={t('account.retry')} disabled={busy||state!.running||!state!.online} onPress={()=>{void cloud.controller!.retry();}}/>
           </View>)}
-          {state?.config&&(state.config.providers.apple||state.config.providers.google)?<View style={cardStyle}>
-            {state.linkedProviders===null?<AccountButton theme={theme} testID="account.methods.refresh" label={t(busy?'account.methodsLoading':'account.refreshMethods')} disabled={busy||!state.online} loading={busy} onPress={()=>{void cloud.controller!.refresh();}}/>:(['apple','google'] as const).filter(provider=>state.config!.providers[provider]).map(provider=>state.linkedProviders!.includes(provider)?<View key={provider} testID={`account.${provider}.connected`} style={styles.summaryHeader}>
-              <MaterialCommunityIcons name="check-circle-outline" size={22} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
-              <Text style={[styles.body,styles.grow,{color:theme.text}]}>{t(provider==='apple'?'account.connectedApple':'account.connectedGoogle')}</Text>
-            </View>:<AccountButton key={provider} theme={theme} testID={`account.${provider}.connect`} label={t(provider==='apple'?'account.connectApple':'account.connectGoogle')} icon={provider} disabled={busy||!state.online} loading={state.linkingProvider===provider} onPress={()=>{void cloud.controller!.connectProvider(provider);}}/>)}
-          </View>:null}
           <View style={cardStyle}>
             {errorKey==='account.error.export'?<Text testID="account.error" accessibilityRole="alert" style={[styles.notice,{color:theme.danger,backgroundColor:theme.dangerSoft,borderRadius:theme.presentation.controlRadius}]}>{t(errorKey)}</Text>:null}
             <AccountButton theme={theme} testID="account.export" label={t(state?.exporting?'account.exporting':'account.export')} icon="download-outline" disabled={busy||!state!.online||!account.cloud.canExport} loading={state?.exporting} onPress={()=>{void cloud.controller!.exportData();}}/>
             {state?.exporting?<AccountButton theme={theme} testID="account.export.cancel" label={t('account.cancel')} onPress={()=>cloud.controller!.cancelExport()}/>:state?.sync?.pending?<Text style={[styles.body,bodyStyle]}>{t('account.exportPending')}</Text>:null}
           </View>
           <AccountButton theme={theme} testID="account.signOut" label={t('account.signOut')} disabled={busy} onPress={signOut}/>
-        </View>)}
+        </View>):null}
         {!account&&state?.sync?.accountId?<AccountButton theme={theme} testID="account.signOut" label={t('account.signOut')} disabled={busy} onPress={signOut}/>:null}
         <Pressable accessibilityRole="link" accessibilityLabel={t('account.privacy')} onPress={()=>{void Linking.openURL('https://github.com/patrickchin/puptime/blob/main/PRIVACY.md').catch(()=>Alert.alert(t('learn.linkError'),t('learn.linkErrorBody')));}} style={styles.privacy}><Text style={[styles.body,{color:theme.primary,textDecorationLine:'underline'}]}>{t('account.privacy')}</Text></Pressable>
       </ScrollView>
@@ -84,5 +95,5 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
   </SafeAreaView>;
 }
 const styles=StyleSheet.create({
- root:{flex:1},content:{width:'100%',maxWidth:720,alignSelf:'center',padding:spacing.md,gap:spacing.md,paddingBottom:spacing.xl},header:{flexDirection:'row',alignItems:'flex-start',gap:12},back:{width:48,height:48,alignItems:'center',justifyContent:'center'},title:{flex:1},card:{borderWidth:1,padding:spacing.md,gap:12},summaryHeader:{flexDirection:'row',alignItems:'center',gap:12},eyebrow:{fontSize:14,fontWeight:'700',flex:1},puppy:{fontSize:25,lineHeight:32,fontWeight:'700'},status:{fontSize:16,lineHeight:23,fontWeight:'700'},body:{fontSize:16,lineHeight:24},label:{fontSize:16,lineHeight:23,fontWeight:'700'},stack:{gap:12},notice:{fontSize:16,lineHeight:24,padding:14},confirm:{flexDirection:'row',alignItems:'center',gap:12},grow:{flex:1},privacy:{minHeight:48,justifyContent:'center',alignSelf:'flex-start'},
+ root:{flex:1},content:{width:'100%',maxWidth:720,alignSelf:'center',padding:spacing.md,gap:spacing.md,paddingBottom:spacing.xl},sectionTitle:{fontSize:20,lineHeight:28,fontWeight:'700',marginTop:8},header:{flexDirection:'row',alignItems:'flex-start',gap:12},back:{width:48,height:48,alignItems:'center',justifyContent:'center'},title:{flex:1},card:{borderWidth:1,padding:spacing.md,gap:12},summaryHeader:{flexDirection:'row',alignItems:'center',gap:12},eyebrow:{fontSize:14,fontWeight:'700',flex:1},puppy:{fontSize:25,lineHeight:32,fontWeight:'700'},status:{fontSize:16,lineHeight:23,fontWeight:'700'},body:{fontSize:16,lineHeight:24},label:{fontSize:16,lineHeight:23,fontWeight:'700'},stack:{gap:12},notice:{fontSize:16,lineHeight:24,padding:14},confirm:{flexDirection:'row',alignItems:'center',gap:12},grow:{flex:1},privacy:{minHeight:48,justifyContent:'center',alignSelf:'flex-start'},
 });
