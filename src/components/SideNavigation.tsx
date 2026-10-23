@@ -33,16 +33,16 @@ export function SideNavigation({open,enabled,tab,settingsVisible,theme,onOpen,on
    accessibilityState={{selected}} onPress={()=>{onClose();if(key==='settings')onSettings();else onChange(key);}}
    style={({pressed})=>[styles.item,{backgroundColor:selected?theme.primarySoft:pressed?theme.surface:undefined,borderRadius:theme.presentation.controlRadius}]}>
    <MaterialCommunityIcons accessible={false} name={icon as keyof typeof MaterialCommunityIcons.glyphMap} size={24} color={selected?theme.primary:theme.textMuted} accessibilityElementsHidden importantForAccessibility="no"/>
-   <Text style={[styles.itemText,{color:selected?theme.primary:theme.text,fontWeight:selected?'700':'500'}]}>{label}</Text>
+   <Text maxFontSizeMultiplier={2} style={[styles.itemText,{color:selected?theme.primary:theme.text,fontWeight:selected?'700':'500'}]}>{label}</Text>
   </Pressable>;
  };
  const drawerWidth=Math.min(340,width*0.84);
- const content=()=><ScrollView testID="nav.drawer" contentContainerStyle={styles.content} onAccessibilityEscape={onClose}>
-   <View style={styles.brandRow}><Text style={[styles.brand,headingStyle(theme),{color:theme.text}]}>Puptime</Text>
+ const content=()=><ScrollView testID="nav.drawer" stickyHeaderIndices={[0]} contentContainerStyle={styles.content} onAccessibilityEscape={onClose}>
+   <View style={{backgroundColor:theme.background}}><View style={styles.brandRow}><Text maxFontSizeMultiplier={1.5} style={[styles.brand,headingStyle(theme),{color:theme.text}]}>Puptime</Text>
     <Pressable testID="nav.close" accessibilityRole="button" accessibilityLabel={t('nav.close')} onPress={onClose} style={styles.close}>
      <MaterialCommunityIcons accessible={false} name="close" size={24} color={theme.text} accessibilityElementsHidden importantForAccessibility="no"/>
     </Pressable>
-   </View>
+   </View></View>
    <View style={styles.items}>{destinations.map(item)}</View>
    <View style={[styles.settings,{borderTopColor:theme.border}]}>{item('settings')}</View>
   </ScrollView>;
