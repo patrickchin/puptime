@@ -2,6 +2,11 @@ name: Android APK
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: Release version (for example 1.12.0); leave blank for the next patch
+        required: false
+        type: string
   push:
     tags:
       - "v*"
@@ -22,17 +27,23 @@ jobs:
       - name: Choose release version
         id: release
         shell: bash
+        env:
+          PUPTIME_REQUESTED_VERSION: ${{ inputs.version }}
         run: |
           if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
             tag="$GITHUB_REF_NAME"
             base_tag=""
           else
-            base_tag=$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' HEAD^)
+            base_tag=$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' HEAD)
             if [[ ! "$base_tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
               echo "Unsupported release tag: $base_tag" >&2
               exit 1
             fi
-            tag="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.$((BASH_REMATCH[3] + 1))"
+            if [[ -n "$PUPTIME_REQUESTED_VERSION" ]]; then
+              tag="v$PUPTIME_REQUESTED_VERSION"
+            else
+              tag="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.$((BASH_REMATCH[3] + 1))"
+            fi
           fi
           if [[ ! "$tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
             echo "Unsupported release tag: $tag" >&2
