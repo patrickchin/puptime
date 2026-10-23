@@ -147,8 +147,7 @@ try{
     retryTapIfNoChange: true
 - extendedWaitUntil:
     visible:
-      id: timeline.range
-      text: .*[1-9][0-9]* entries.*
+      id: timeline.filter.pee
     timeout: 60000
 - extendedWaitUntil:
     notVisible:
@@ -198,7 +197,9 @@ try{
  console.log('PASS '+count+': comparison/routine/frequency read only requested date windows; monthly summaries stay SQL aggregates. Windows rows/ms:',windows().map(read=>[read.rows,read.ms]));
  flow('explicit-full-export',`
 - tapOn:
-    id: settings.open
+    id: nav.open
+- tapOn:
+    id: nav.settings
 - scrollUntilVisible:
     element:
       id: settings.export

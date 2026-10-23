@@ -29,12 +29,15 @@ const before=snapshot();
 flow('maple',`- launchApp
 - assertVisible: {id: nav.title, text: Log}
 - assertNotVisible: Puptime
+- assertNotVisible: {id: settings.open}
 - takeScreenshot: preview-log
 - tapOn: {id: nav.switch}
 - assertVisible: {id: nav.title, text: Timeline}
 - tapOn: {id: preview.scope}
 - tapOn: {id: preview.select.pet_preview_1}
 - assertVisible: {id: preview.scope, text: .*Maple.*}
+- assertNotVisible: {id: timeline.range}
+- assertNotVisible: {id: timeline.zoom.value}
 - takeScreenshot: preview-timeline-maple
 - tapOn: {id: nav.switch}
 - assertVisible: {id: preview.quick.pet_preview_0.pee}
@@ -46,7 +49,8 @@ flow('maple',`- launchApp
 - assertVisible: {id: nav.title, text: Insights}
 - assertNotVisible: {id: insights.export}
 - takeScreenshot: preview-insights
-- tapOn: {id: settings.open}
+- tapOn: {id: nav.open}
+- tapOn: {id: nav.settings}
 - scrollUntilVisible:
     element: {id: preview.data.pet}
     direction: DOWN
@@ -88,7 +92,8 @@ flow('back',`- pressKey: Back
 - takeScreenshot: preview-schedule
 - pressKey: Back
 - assertVisible: {id: nav.title, text: Timeline}
-- tapOn: {id: settings.open}
+- tapOn: {id: nav.open}
+- tapOn: {id: nav.settings}
 - scrollUntilVisible:
     element: {id: preview.notifications}
     direction: DOWN
@@ -101,7 +106,8 @@ flow('back',`- pressKey: Back
 - assertVisible: {id: nav.title, text: Timeline}
 - tapOn: {id: nav.open}
 - tapOn: {id: nav.log}
-- tapOn: {id: settings.open}
+- tapOn: {id: nav.open}
+- tapOn: {id: nav.settings}
 - scrollUntilVisible:
     element: {id: preview.data.pet}
     direction: DOWN

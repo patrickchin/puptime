@@ -7,7 +7,9 @@ name: Open saved puppy settings on populated history
       id: screen.today
     timeout: 90000
 - tapOn:
-    id: settings.open
+    id: nav.open
+- tapOn:
+    id: nav.settings
 - assertVisible:
     id: settings.puppy.name
     text: .*Mochi.*

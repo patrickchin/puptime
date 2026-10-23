@@ -761,9 +761,6 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
               <MaterialCommunityIcons accessible={false} name="swap-horizontal" size={22} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
               <Text style={[styles.switchLabel,{color:theme.primary}]}>{translate(language,tab==='log'?'nav.timeline':'nav.log')}</Text>
             </Pressable>:null}
-            {!settingsVisible?<Pressable testID="settings.open" accessibilityRole="button" accessibilityLabel={translate(language,'log.openSettingsA11y')} onPress={openSettings} style={({pressed})=>[styles.menuButton,{opacity:pressed?0.6:1}]}>
-              <MaterialCommunityIcons accessible={false} name="cog-outline" size={24} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
-            </Pressable>:null}
           </View>:null}
           <View style={styles.screen}>
             {onboardingVisible === null ? nativeApp?<View testID="setup.loading" style={styles.startup}>

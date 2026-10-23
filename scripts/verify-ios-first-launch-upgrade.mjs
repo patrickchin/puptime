@@ -41,7 +41,7 @@ try{
  assert.deepEqual(snapshot(),before);assert.equal(remoteCount(),count);
  console.log('PASS standalone update skips first-open setup for a completed pre-checkpoint installation; every local table, SDK-owned binding,1000+events and cloud count are unchanged.');
  const file=join(output,'replay.yaml');
- writeFileSync(file,'appId: '+app+'\n---\n- launchApp:\n    stopApp: false\n    permissions: {}\n- waitForAnimationToEnd\n- assertNotVisible:\n    id: screen.firstLaunch\n- tapOn:\n    id: settings.open\n- runFlow: '+resolve('.maestro/native/ios-onboarding-replay-populated.yaml')+'\n');
+ writeFileSync(file,'appId: '+app+'\n---\n- launchApp:\n    stopApp: false\n    permissions: {}\n- waitForAnimationToEnd\n- assertNotVisible:\n    id: screen.firstLaunch\n- tapOn:\n    id: nav.open\n- tapOn:\n    id: nav.settings\n- runFlow: '+resolve('.maestro/native/ios-onboarding-replay-populated.yaml')+'\n');
  run(file,'populated-replay');assert.deepEqual(snapshot(),before);assert.equal(remoteCount(),count);
  console.log('PASS standalone walkthrough practice, complete and Skip preserve every populated SQL table, completion, account ownership, cursor/outbox and actual service count.');
  console.log('Standalone completed-upgrade/replay evidence and recovery backup:',output);

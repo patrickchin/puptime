@@ -7,7 +7,9 @@ name: Normal installed client acknowledges populated cloud history
       id: screen.today
     timeout: 90000
 - tapOn:
-    id: settings.open
+    id: nav.open
+- tapOn:
+    id: nav.settings
 - assertVisible:
     id: settings.puppy.name
     text: .*Mochi.*

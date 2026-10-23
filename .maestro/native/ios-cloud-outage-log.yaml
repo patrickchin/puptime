@@ -17,7 +17,9 @@ name: iOS logs locally while the cloud service is unavailable
 - assertVisible:
     id: toast
 - tapOn:
-    id: settings.open
+    id: nav.open
+- tapOn:
+    id: nav.settings
 - tapOn:
     id: settings.account.open
 - assertVisible:

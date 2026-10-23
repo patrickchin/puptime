@@ -13,8 +13,9 @@ name: iOS optional account entry preserves free logging
 - assertVisible:
     id: toast
 - tapOn:
-    id: settings.open
-    retryTapIfNoChange: true
+    id: nav.open
+- tapOn:
+    id: nav.settings
 - extendedWaitUntil:
     visible:
       id: screen.settings

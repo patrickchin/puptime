@@ -16,11 +16,13 @@ appId: com.patrickchin.puptime
           commands:
             - scrollUntilVisible:
                 element:
-                  id: settings.open
+                  id: nav.open
                 direction: UP
                 visibilityPercentage: 100
             - tapOn:
-                id: settings.open
+                id: nav.open
+            - tapOn:
+                id: nav.settings
       - runFlow:
           when:
             visible:

@@ -88,7 +88,6 @@ function Preview({onRowRender}:{onRowRender?:(key:string)=>void}){
   const openEditor=useCallback((petId:string,event:PuppyEvent)=>setEditor({petId,event}),[]);
   const renderRow=useCallback(({item}:{item:PetLog})=><PetHistoryRow {...item} theme={theme} onEdit={openEditor} onRowRender={onRowRender}/>,[theme,openEditor,onRowRender]);
   function navigate(next:AppTab){setTab(next);setSettings(false);setDrawer(false);setToast(null);setNavigationHistory([]);}
-  function openSettings(){setNavigationHistory(history=>[...history,tab]);setSettings(true);setDrawer(false);}
   function openTab(next:AppTab){setNavigationHistory(history=>[...history,settings?'settings':tab]);setTab(next);setSettings(false);setDrawer(false);}
   function goBack(){const previous=navigationHistory.at(-1);setNavigationHistory(history=>history.slice(0,-1));setSettings(previous==='settings');if(previous!=='settings')setTab(previous??'log');}
   useEffect(()=>{
@@ -157,7 +156,6 @@ function Preview({onRowRender}:{onRowRender?:(key:string)=>void}){
           accessibilityLabel={settings||navigationHistory.length?'Back':'Open navigation'} onPress={()=>settings||navigationHistory.length?goBack():setDrawer(true)} style={({pressed})=>[s.iconButton,{opacity:pressed?0.6:1}]}><Icon name={settings||navigationHistory.length?'arrow-left':'menu'} theme={theme}/></Pressable>
         <Text testID="nav.title" accessibilityRole="header" style={[s.brand,s.flex,{color:theme.text,minWidth:fontScale>1.1?'70%':70}]}>{t(settings?'settings.title':tab==='notifications'?'notifications.title':tab==='learn'?'learn.title':`nav.${tab}`)}</Text>
         {!settings&&(tab==='log'||tab==='timeline')?<Action testID="nav.switch" label={t(tab==='log'?'nav.timeline':'nav.log')} icon="swap-horizontal" theme={theme} onPress={()=>navigate(tab==='log'?'timeline':'log')}/>:null}
-        {!settings?<Pressable testID="settings.open" accessibilityRole="button" accessibilityLabel="Settings" onPress={openSettings} style={({pressed})=>[s.iconButton,{opacity:pressed?0.6:1}]}><Icon name="cog-outline" theme={theme}/></Pressable>:null}
       </View>
       {!settings&&tab!=='log'&&tab!=='learn'?<Pressable testID="preview.scope" accessibilityRole="button" accessibilityLabel={`Selected pet, ${pet.name}. Change pet`} onPress={()=>setPicker(true)} style={[s.scope,{backgroundColor:theme.primarySoft}]}>
         <Icon name="paw-outline" theme={theme} size={20}/><Text style={[s.petLabel,s.flex,{color:theme.primary}]}>{pet.name}</Text><Icon name="chevron-down" theme={theme} size={22}/>

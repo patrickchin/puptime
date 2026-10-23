@@ -28,7 +28,9 @@ tags:
 - assertNotVisible:
     id: toast
 - tapOn:
-    id: settings.open
+    id: nav.open
+- tapOn:
+    id: nav.settings
 - scrollUntilVisible:
     element:
       id: settings.import

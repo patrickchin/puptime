@@ -55,9 +55,9 @@ The starter routine is only an editable example, not veterinary guidance. Change
 
 Download the APK from the [latest GitHub release](https://github.com/patrickchin/puptime/releases/latest), open it on your phone, and allow installation from that source if Android asks.
 
-The top bar shows the current screen title. Use the labeled switch in Log and Timeline to move between them in one tap; the menu opens Insights, Schedule, Notifications, and Puppy care. Settings opens from every main screen and returns to the screen you came from.
+The top bar shows the current screen title. Use the labeled switch in Log and Timeline to move between them in one tap; the menu opens Insights, Schedule, Notifications, Puppy care, and Settings. Settings returns to the screen you came from.
 
-Open Settings from the gear in any main screen’s top bar to choose the two to four actions shown on your home screen. Pee, poop, and meals are the default; an active nap temporarily appears so it can always be ended from the widget.
+Open Settings from the navigation menu to choose the two to four actions shown on your home screen. Pee, poop, and meals are the default; an active nap temporarily appears so it can always be ended from the widget.
 
 The Android widget uses the available height for its action buttons. Long-press it to resize it. In the app, tap the pencil beside a log to change its activity, custom name, date, time, or note. Edits save automatically, even if you close the editor. Nap logs have separate start and end times.
 

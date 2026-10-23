@@ -9,6 +9,8 @@ name: Android screen hierarchy and settings placement
 - assertVisible:
     id: nav.title
     text: Log
+- assertNotVisible:
+    id: settings.open
 - takeScreenshot: android-log
 - tapOn:
     id: event.pee.edit
@@ -23,6 +25,10 @@ name: Android screen hierarchy and settings placement
 - assertVisible:
     id: nav.title
     text: Timeline
+- assertNotVisible:
+    id: timeline.range
+- assertNotVisible:
+    id: timeline.zoom.value
 - takeScreenshot: android-timeline
 - tapOn:
     id: timeline.mark.point.*
@@ -47,7 +53,10 @@ name: Android screen hierarchy and settings placement
     id: insights.export
 - takeScreenshot: android-insights
 - tapOn:
-    id: settings.open
+    id: nav.open
+- takeScreenshot: android-menu
+- tapOn:
+    id: nav.settings
 - assertVisible:
     id: nav.title
     text: Settings

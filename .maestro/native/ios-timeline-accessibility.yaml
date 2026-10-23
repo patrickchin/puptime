@@ -16,7 +16,7 @@ name: Timeline remains usable at maximum text size
     retryTapIfNoChange: true
 - extendedWaitUntil:
     visible:
-      id: timeline.range
+      id: timeline.filter.pee
     timeout: 30000
 - assertVisible:
     id: timeline.mark.point.*
@@ -33,11 +33,5 @@ name: Timeline remains usable at maximum text size
           duration: 400
 - assertVisible:
     id: timeline.mark.point.*
-- tapOn:
-    id: timeline.zoom.in
-    retryTapIfNoChange: true
-- assertVisible:
-    id: timeline.zoom.value
-    text: .*1.5×
 - takeScreenshot: timeline-largest-landscape
 - setOrientation: PORTRAIT

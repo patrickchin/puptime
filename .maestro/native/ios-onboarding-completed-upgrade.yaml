@@ -9,7 +9,9 @@ name: Completed onboarding remains complete after installing the Release update
 - assertNotVisible:
     id: screen.onboarding
 - tapOn:
-    id: settings.open
+    id: nav.open
+- tapOn:
+    id: nav.settings
 - assertVisible:
     id: settings.puppy.name
     text: ${EXPECTED_PUPPY_NAME}

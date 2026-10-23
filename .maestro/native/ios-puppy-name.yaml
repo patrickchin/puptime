@@ -16,7 +16,9 @@ name: iOS puppy rename saves explicitly and survives restart
       - tapOn:
           id: settings.back
 - tapOn:
-    id: settings.open
+    id: nav.open
+- tapOn:
+    id: nav.settings
 - assertVisible:
     id: settings.puppy.name
 - tapOn:
@@ -31,7 +33,9 @@ name: iOS puppy rename saves explicitly and survives restart
 - takeScreenshot: puppy-name-saved
 - launchApp
 - tapOn:
-    id: settings.open
+    id: nav.open
+- tapOn:
+    id: nav.settings
 - assertVisible:
     id: settings.puppy.name
     text: .*Mochi.*

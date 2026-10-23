@@ -19,7 +19,9 @@ tags:
 - tapOn:
     id: quick.meal
 - tapOn:
-    id: settings.open
+    id: nav.open
+- tapOn:
+    id: nav.settings
 - tapOn:
     id: settings.theme.open
 - assertVisible:
@@ -41,15 +43,15 @@ tags:
 - tapOn:
     id: nav.timeline
 - assertVisible:
-    id: timeline.zoom.in
-- assertVisible:
     id: timeline.filter.poop-meal
 - tapOn:
     id: nav.open
 - tapOn:
     id: nav.log
 - tapOn:
-    id: settings.open
+    id: nav.open
+- tapOn:
+    id: nav.settings
 - tapOn:
     id: settings.theme.open
 - assertVisible:
@@ -62,10 +64,12 @@ tags:
     permissions: {}
 - extendedWaitUntil:
     visible:
-      id: settings.open
+      id: nav.open
     timeout: 90000
 - tapOn:
-    id: settings.open
+    id: nav.open
+- tapOn:
+    id: nav.settings
 - tapOn:
     id: settings.theme.open
 - assertVisible:

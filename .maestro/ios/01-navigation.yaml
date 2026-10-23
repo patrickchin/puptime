@@ -33,12 +33,6 @@ tags:
     id: nav.timeline
 - assertVisible:
     id: screen.timeline
-- assertVisible:
-    id: timeline.zoom.out
-    enabled: false
-- assertVisible:
-    id: timeline.zoom.in
-    enabled: true
 - tapOn:
     id: nav.open
 - assertVisible:
@@ -49,7 +43,9 @@ tags:
 - assertVisible:
     id: screen.insights
 - tapOn:
-    id: settings.open
+    id: nav.open
+- tapOn:
+    id: nav.settings
 - scrollUntilVisible:
     element:
       id: settings.export
