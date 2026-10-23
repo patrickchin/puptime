@@ -5,6 +5,7 @@ import {Alert,BackHandler,FlatList,KeyboardAvoidingView,Modal,Platform,Pressable
 import {SafeAreaProvider,SafeAreaView} from 'react-native-safe-area-context';
 import {ActivityCsvSettings} from '../components/ActivityCsvSettings';
 import {ActivityIcon} from '../components/ActivityIcon';
+import {ConfirmDialog} from '../components/ConfirmDialog';
 import {SideNavigation,type AppTab} from '../components/SideNavigation';
 import {NotificationTimingControls} from '../components/NotificationTimingControls';
 import {LocalizationProvider,useLocalization} from '../localization-context';
@@ -36,19 +37,25 @@ function Avatar({pet,theme}:{pet:Pick<PreviewPet,'name'>;theme:Theme}){
 
 // This row never receives the editor's draft state. The probe-only entry point
 // observes its renders on Android without changing production components.
-const PetHistoryRow=memo(function PetHistoryRow({petId,petName,event,theme,onEdit,onRowRender}:{petId:string;petName:string;event:PuppyEvent;theme:Theme;onEdit:(petId:string,event:PuppyEvent)=>void;onRowRender?:(key:string)=>void}){
+const PetHistoryRow=memo(function PetHistoryRow({petId,petName,event,theme,onEdit,onDelete,onRowRender}:{petId:string;petName:string;event:PuppyEvent;theme:Theme;onEdit:(petId:string,event:PuppyEvent)=>void;onDelete:(petId:string,event:PuppyEvent)=>void;onRowRender?:(key:string)=>void}){
   onRowRender?.(`${petId}:${event.id}`);
-  const {eventPastLabel,activityColors}=useLocalization(),colors=activityColors(theme,event);
+  const {eventPastLabel,activityColors,t}=useLocalization(),colors=activityColors(theme,event);
   const activity=eventPastLabel(event),note=event.note?.trim();
   const timestamp=`${new Intl.DateTimeFormat('en',{month:'short',day:'numeric'}).format(event.at)} · ${formatTime(event.at)}`;
-  return <Pressable testID={`preview.event.${petId}.${event.id}`} accessibilityRole="button" accessibilityLabel={`Edit ${petName}, ${activity}, ${timestamp}${note?`, ${note}`:''}`} onPress={()=>onEdit(petId,event)}
-    style={({pressed})=>[s.historyRow,{borderBottomColor:theme.border,backgroundColor:pressed?theme.primarySoft:theme.surfaceRaised}]}>
-    <View style={[s.historyIcon,{backgroundColor:colors.softColor}]}><ActivityIcon activity={event} theme={theme} color={colors.color} size={20}/></View>
-    <View style={s.historyCopy}>
-      <Text style={[s.historyTitle,{color:theme.text}]}><Text style={[s.petLabel,{color:theme.primary}]}>{petName}</Text> · {activity}</Text>
-      <Text numberOfLines={2} style={[s.small,{color:theme.textMuted}]}>{timestamp}{note?` · ${note}`:''}</Text>
-    </View><Icon name="pencil-outline" theme={theme} size={20}/>
-  </Pressable>;
+  return <View testID={`preview.event.${petId}.${event.id}`} style={[s.historyRow,{borderBottomColor:theme.border,backgroundColor:theme.surfaceRaised}]}>
+    <Pressable testID={`preview.edit.${petId}.${event.id}`} accessibilityRole="button" accessibilityLabel={`Edit ${petName}, ${activity}, ${timestamp}${note?`, ${note}`:''}`} onPress={()=>onEdit(petId,event)}
+      style={({pressed})=>[s.historyEdit,{backgroundColor:pressed?theme.primarySoft:undefined}]}>
+      <View style={[s.historyIcon,{backgroundColor:colors.softColor}]}><ActivityIcon activity={event} theme={theme} color={colors.color} size={20}/></View>
+      <View style={s.historyCopy}>
+        <Text style={[s.historyTitle,{color:theme.text}]}><Text style={[s.petLabel,{color:theme.primary}]}>{petName}</Text> · {activity}</Text>
+        <Text numberOfLines={2} style={[s.small,{color:theme.textMuted}]}>{timestamp}{note?` · ${note}`:''}</Text>
+      </View><Icon name="pencil-outline" theme={theme} size={20}/>
+    </Pressable>
+    <Pressable testID={`preview.delete.${petId}.${event.id}`} accessibilityRole="button" accessibilityLabel={`${petName}: ${t('eventRow.delete',{activity,time:formatTime(event.at)})}`} onPress={()=>onDelete(petId,event)}
+      style={({pressed})=>[s.iconButton,{borderRadius:12,backgroundColor:pressed?theme.dangerSoft:undefined}]}>
+      <MaterialCommunityIcons accessible={false} accessibilityElementsHidden importantForAccessibility="no" name="trash-can-outline" color={theme.danger} size={20}/>
+    </Pressable>
+  </View>;
 });
 
 function EventEditor({pet,event,theme,onClose,onSave}:{pet:PreviewPet;event:PuppyEvent;theme:Theme;onClose:()=>void;onSave:(note:string)=>void}){
@@ -80,15 +87,17 @@ function Preview({onRowRender}:{onRowRender?:(key:string)=>void}){
   const [picker,setPicker]=useState(false),[manage,setManage]=useState(false),[dark,setDark]=useState(false);
   const [naming,setNaming]=useState<{id?:string;value:string}|null>(null),[nameError,setNameError]=useState<string|null>(null);
   const [filter,setFilter]=useState<string>(),[editor,setEditor]=useState<{petId:string;event:PuppyEvent}|null>(null);
+  const [pendingDelete,setPendingDelete]=useState<{petId:string;event:PuppyEvent}|null>(null);
   const [toast,setToast]=useState<{petId:string;event:PuppyEvent;label:string}|null>(null);
   const [preferences,setPreferences]=useState<Record<string,NotificationPreferences>>({});
   const [delivery,setDelivery]=useState(true),[widget,setWidget]=useState(false),[widgetPet,setWidgetPet]=useState('pet_preview_0');
   const theme=dark?darkTheme:lightTheme,pet=pets.find(item=>item.id===selected)??pets[0];
-  const {activityLabel,activityColors,relativeTime,t}=useLocalization(),{width,fontScale}=useWindowDimensions();
+  const {activityLabel,activityColors,eventPastLabel,relativeTime,t}=useLocalization(),{width,fontScale}=useWindowDimensions();
   const narrow=width<380||fontScale>1.3;
   const logs=useMemo(()=>householdLogs(pets,filter),[pets,filter]);
   const openEditor=useCallback((petId:string,event:PuppyEvent)=>setEditor({petId,event}),[]);
-  const renderRow=useCallback(({item}:{item:PetLog})=><PetHistoryRow {...item} theme={theme} onEdit={openEditor} onRowRender={onRowRender}/>,[theme,openEditor,onRowRender]);
+  const requestDelete=useCallback((petId:string,event:PuppyEvent)=>setPendingDelete({petId,event}),[]);
+  const renderRow=useCallback(({item}:{item:PetLog})=><PetHistoryRow {...item} theme={theme} onEdit={openEditor} onDelete={requestDelete} onRowRender={onRowRender}/>,[theme,openEditor,requestDelete,onRowRender]);
   function navigate(next:AppTab){setTab(next);setSettings(false);setDrawer(false);setToast(null);setNavigationHistory([]);}
   function openTab(next:AppTab){setNavigationHistory(history=>[...history,settings?'settings':tab]);setTab(next);setSettings(false);setDrawer(false);}
   function goBack(){const previous=navigationHistory.at(-1);setNavigationHistory(history=>history.slice(0,-1));setSettings(previous==='settings');if(previous!=='settings')setTab(previous??'log');}
@@ -204,6 +213,13 @@ function Preview({onRowRender}:{onRowRender?:(key:string)=>void}){
         </ScrollView></KeyboardAvoidingView>}
       </SafeAreaView>
     </Modal>
+    <ConfirmDialog visible={pendingDelete!==null} theme={theme} title={t('app.deleteTitle')} confirmLabel={t('app.delete')}
+      message={pendingDelete?`${pets.find(item=>item.id===pendingDelete.petId)?.name} · ${t('app.deleteMessage',{activity:eventPastLabel(pendingDelete.event),time:formatTime(pendingDelete.event.at)})}`:''}
+      onCancel={()=>setPendingDelete(null)} onConfirm={()=>{
+        if(!pendingDelete)return;
+        setPets(current=>current.map(item=>item.id===pendingDelete.petId?{...item,events:item.events.filter(event=>event.id!==pendingDelete.event.id)}:item));
+        setPendingDelete(null);setToast(null);
+      }}/>
     {editor?<EventEditor pet={pets.find(item=>item.id===editor.petId)!} event={editor.event} theme={theme} onClose={()=>setEditor(null)} onSave={note=>{const target=pets.find(item=>item.id===editor.petId)!;updatePet(target.id,{events:target.events.map(event=>event.id===editor.event.id?{...event,note}:event)});setEditor(null);}}/>:null}
   </SafeAreaView>;
 }
@@ -215,7 +231,7 @@ const s=StyleSheet.create({
   petName:{fontSize:20,lineHeight:28,fontWeight:'700'},petLabel:{fontSize:15,lineHeight:22,fontWeight:'700'},avatar:{width:44,height:44,borderRadius:16,alignItems:'center',justifyContent:'center'},initial:{fontSize:18,fontWeight:'700'},
   petCard:{borderWidth:1,borderRadius:20,padding:16,gap:12},quick:{flex:1,minWidth:0,minHeight:76,borderRadius:14,borderWidth:1,paddingVertical:12,paddingHorizontal:4,alignItems:'center',justifyContent:'center',gap:5},quickLabel:{flexDirection:'row',alignItems:'center',gap:6},
   action:{minHeight:48,borderWidth:1,borderRadius:14,paddingHorizontal:12,paddingVertical:10,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,flexShrink:1},actionText:{fontSize:15,lineHeight:22,fontWeight:'600',flexShrink:1},
-  historyRow:{flexDirection:'row',gap:12,alignItems:'center',padding:16,borderBottomWidth:StyleSheet.hairlineWidth,borderRadius:12,minHeight:72},historyCopy:{flex:1,gap:4},
+  historyRow:{flexDirection:'row',gap:12,alignItems:'center',padding:16,borderBottomWidth:StyleSheet.hairlineWidth,borderRadius:12,minHeight:72},historyEdit:{flex:1,minHeight:48,flexDirection:'row',alignItems:'center',gap:12,borderRadius:12},historyCopy:{flex:1,gap:4},
   historyTitle:{fontSize:15,lineHeight:22},historyIcon:{width:40,height:40,borderRadius:14,alignItems:'center',justifyContent:'center'},
   settingRow:{minHeight:56,flexDirection:'row',alignItems:'center',gap:12},scope:{marginHorizontal:20,marginTop:4,marginBottom:12,paddingHorizontal:14,paddingVertical:12,borderRadius:16,flexDirection:'row',alignItems:'center',gap:10,minHeight:48},
   input:{borderWidth:1,borderRadius:14,padding:14,fontSize:17,lineHeight:25,minHeight:52},toast:{margin:16,borderRadius:16,padding:12,flexDirection:'row',alignItems:'center',gap:8},
