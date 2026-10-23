@@ -34,7 +34,11 @@ appId: com.patrickchin.puptime
 - takeScreenshot: 17-add-pet
 - tapOn:
     id: preview.name.save
+- assertVisible: {id: nav.title, text: Pets}
 - assertVisible: 3 pets
+- tapOn: {id: nav.back}
+- tapOn: {id: preview.filter}
+- tapOn: Sir Waffles Wellington
 - scrollUntilVisible:
     element:
       text: No logs yet
@@ -49,6 +53,8 @@ appId: com.patrickchin.puptime
     id: nav.open
 - tapOn:
     id: nav.schedule
+- tapOn: {id: preview.scope}
+- tapOn: Sir Waffles Wellington
 - waitForAnimationToEnd
 - takeScreenshot: 19-new-pet-routine
 - tapOn:
@@ -62,7 +68,7 @@ appId: com.patrickchin.puptime
 - tapOn:
     id: preview.pets
 - tapOn:
-    id: preview.select.pet_preview_1
+    id: preview.rename.pet_preview_1
 - tapOn:
     id: preview.name
 - eraseText: 30
@@ -72,3 +78,5 @@ appId: com.patrickchin.puptime
 - assertVisible: '.*Maple Rose.*'
 - waitForAnimationToEnd
 - takeScreenshot: 20-renamed-pet
+
+- assertVisible: {id: nav.title, text: Pets}

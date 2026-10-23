@@ -12,7 +12,7 @@ output.mkdir(parents=True, exist_ok=True)
 def adb(*args):
     return subprocess.check_output(['adb', '-s', serial, *args])
 
-assert re.match(r'^Puptime_(Multi_Pet_622c|Navigation_d859)\b', adb('emu', 'avd', 'name').decode())
+assert re.match(r'^Puptime_(Multi_Pet_622c|Navigation_d859|History_Spacing_d859)\b', adb('emu', 'avd', 'name').decode())
 
 def hierarchy():
     adb('shell', 'uiautomator', 'dump', '/sdcard/puptime-622c.xml')
@@ -40,7 +40,7 @@ adb('shell', 'am', 'start', '-n', 'com.patrickchin.puptime/.MainActivity')
 shot('01-log-two-pets')
 tap('preview.pets')
 shot('02-manage-pets')
-tap('preview.modal.done')
+tap('nav.back')
 navigate('timeline')
 shot('03-timeline-mochi')
 tap('preview.scope')

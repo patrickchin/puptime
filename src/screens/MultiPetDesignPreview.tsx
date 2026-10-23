@@ -1,7 +1,7 @@
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import {StatusBar} from 'expo-status-bar';
 import {memo,useCallback,useEffect,useMemo,useState} from 'react';
-import {Alert,BackHandler,FlatList,KeyboardAvoidingView,Modal,Platform,Pressable,ScrollView,StyleSheet,Switch,Text as NativeText,TextInput,View,useWindowDimensions,type TextProps} from 'react-native';
+import {Alert,BackHandler,FlatList,Keyboard,KeyboardAvoidingView,Modal,Platform,Pressable,ScrollView,StyleSheet,Switch,Text as NativeText,TextInput,View,useWindowDimensions,type TextProps} from 'react-native';
 import {SafeAreaProvider,SafeAreaView} from 'react-native-safe-area-context';
 import {ActivityCsvSettings} from '../components/ActivityCsvSettings';
 import {ActivityIcon} from '../components/ActivityIcon';
@@ -20,6 +20,7 @@ import {ScheduleScreen} from './ScheduleScreen';
 import {LearnScreen} from './LearnScreen';
 import {LogScreen,type LogEditRequest} from './LogScreen';
 
+type PreviewTab=AppTab|'pets';
 type IconName=keyof typeof MaterialCommunityIcons.glyphMap;
 const emptyActivities:string[]=[];
 // Keep large system text useful in compact controls; body copy still doubles.
@@ -74,9 +75,9 @@ export function MultiPetDesignPreview({onRowRender}:{onRowRender?:(key:string)=>
 }
 function Preview({onRowRender}:{onRowRender?:(key:string)=>void}){
   const [pets,setPets]=useState(multiPetFixtures),[selected,setSelected]=useState('pet_preview_0');
-  const [tab,setTab]=useState<AppTab>('log'),[settings,setSettings]=useState(false),[drawer,setDrawer]=useState(false);
-  const [navigationHistory,setNavigationHistory]=useState<Array<AppTab|'settings'>>([]);
-  const [picker,setPicker]=useState(false),[manage,setManage]=useState(false),[dark,setDark]=useState(false);
+  const [tab,setTab]=useState<PreviewTab>('log'),[settings,setSettings]=useState(false),[drawer,setDrawer]=useState(false);
+  const [navigationHistory,setNavigationHistory]=useState<Array<PreviewTab|'settings'>>([]);
+  const [picker,setPicker]=useState(false),[dark,setDark]=useState(false);
   const [naming,setNaming]=useState<{id?:string;value:string}|null>(null),[nameError,setNameError]=useState<string|null>(null);
   const [filter,setFilter]=useState<string>(),[editor,setEditor]=useState<{petId:string;event:PuppyEvent}|null>(null);
   const [pendingDelete,setPendingDelete]=useState<{petId:string;event:PuppyEvent}|null>(null);
@@ -93,18 +94,19 @@ function Preview({onRowRender}:{onRowRender?:(key:string)=>void}){
   },[]);
   const requestDelete=useCallback((petId:string,event:PuppyEvent)=>setPendingDelete({petId,event}),[]);
   const renderRow=useCallback(({item}:{item:PetLog})=><PetHistoryRow {...item} theme={theme} onEdit={openEditor} onDelete={requestDelete} onRowRender={onRowRender}/>,[theme,openEditor,requestDelete,onRowRender]);
-  function navigate(next:AppTab){setTab(next);setSettings(false);setDrawer(false);setToast(null);setNavigationHistory([]);}
-  function openTab(next:AppTab){setNavigationHistory(history=>[...history,settings?'settings':tab]);setTab(next);setSettings(false);setDrawer(false);}
-  function goBack(){const previous=navigationHistory.at(-1);setNavigationHistory(history=>history.slice(0,-1));setSettings(previous==='settings');if(previous!=='settings')setTab(previous??'log');}
+  function navigate(next:PreviewTab){Keyboard.dismiss();setTab(next);setSettings(false);setDrawer(false);setToast(null);setNaming(null);setNavigationHistory([]);}
+  function openTab(next:PreviewTab){setNavigationHistory(history=>[...history,settings?'settings':tab]);setTab(next);setSettings(false);setDrawer(false);}
+  function goBack(){if(naming){Keyboard.dismiss();setNaming(null);setNameError(null);return;}const previous=navigationHistory.at(-1);setNavigationHistory(history=>history.slice(0,-1));setSettings(previous==='settings');if(previous!=='settings')setTab(previous??'log');}
   useEffect(()=>{
     const subscription=BackHandler.addEventListener('hardwareBackPress',()=>{
       if(drawer){setDrawer(false);return true;}
+      if(naming){goBack();return true;}
       if(settings||navigationHistory.length){goBack();return true;}
       if(tab!=='log'){navigate('log');return true;}
       return false;
     });
     return()=>subscription.remove();
-  },[drawer,settings,navigationHistory,tab]);
+  },[drawer,settings,navigationHistory,tab,naming]);
   function updatePet(id:string,change:Partial<PreviewPet>){setPets(current=>current.map(item=>item.id===id?{...item,...change}:item));}
   async function changeSchedule(schedule:ScheduleEntry[]){updatePet(pet.id,{schedule});}
   function logFor(target:PreviewPet,type:EventType){
@@ -129,16 +131,38 @@ function Preview({onRowRender}:{onRowRender?:(key:string)=>void}){
   </View>;
 
   const logHeader=<View style={s.stack}>
-    <View style={s.line}><View style={s.flex}/><Action label={`${pets.length} pets`} icon="paw-outline" theme={theme} onPress={()=>setManage(true)} testID="preview.pets"/></View>
+    <View style={s.line}><View style={s.flex}/><Action label={`${pets.length} pets`} icon="paw-outline" theme={theme} onPress={()=>openTab('pets')} testID="preview.pets"/></View>
     {pets.map(petActions)}
     <View style={s.line}>{section('History')}<View style={s.flex}/><Action testID="preview.filter" label={pets.find(item=>item.id===filter)?.name??'All pets'} icon="filter-variant" theme={theme} onPress={()=>setPicker(true)}/></View>
     {!logs.length?<View style={[s.petCard,card]}>{section('No logs yet')}<Text style={[s.body,{color:theme.textMuted}]}>Log an activity for {pets.find(item=>item.id===filter)?.name??'your pets'} above.</Text></View>:null}
   </View>;
 
+  function savePet(){
+    if(!naming)return;
+    const name=naming.value.trim();
+    if(!name){setNameError('Enter a name.');return;}
+    if(pets.some(item=>item.id!==naming.id&&item.name.toLocaleLowerCase()===name.toLocaleLowerCase())){setNameError('Another pet uses that name. Add a nickname.');return;}
+    if(naming.id)updatePet(naming.id,{name});
+    else setPets(current=>[...current,{id:entityId('pet'),name,detail:'',events:[],schedule:[]}]);
+    Keyboard.dismiss();setNaming(null);setNameError(null);
+  }
+  function petsContent(){return <ScrollView testID="preview.pets.page" contentContainerStyle={s.content}>
+    <View style={s.line}><Text style={[s.small,s.flex,{color:theme.textMuted}]}>{pets.length} pets</Text><Action testID="preview.add" label="Add a pet" icon="plus" theme={theme} onPress={()=>{setNaming({value:''});setNameError(null);}}/></View>
+    {pets.map(item=><Pressable key={item.id} testID={`preview.rename.${item.id}`} accessibilityRole="button" accessibilityLabel={`Edit ${item.name}`}
+      onPress={()=>{setNaming({id:item.id,value:item.name});setNameError(null);}} style={({pressed})=>[s.petCard,s.line,card,{backgroundColor:pressed?theme.primarySoft:theme.surfaceRaised}]}>
+      <Avatar pet={item} theme={theme}/><View style={s.flex}><Text style={[s.petName,{color:theme.text}]}>{item.name}</Text><Text style={[s.small,{color:theme.textMuted}]}>{[item.detail,`${item.events.length} logs`].filter(Boolean).join(' · ')}</Text></View><Icon name="chevron-right" theme={theme}/>
+    </Pressable>)}
+  </ScrollView>;}
+  function petForm(){return <KeyboardAvoidingView testID="preview.pet.form" style={s.flex} behavior={Platform.OS==='ios'?'padding':'height'}>
+    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.content}>
+      <Text style={[s.body,{color:theme.text}]}>Name</Text>
+      <TextInput testID="preview.name" accessibilityLabel="Pet name" autoFocus value={naming?.value??''} onChangeText={value=>{setNaming(current=>current?{...current,value}:null);setNameError(null);}} maxLength={256} style={[s.input,{color:theme.text,borderColor:theme.border,backgroundColor:theme.surfaceRaised}]}/>
+      {nameError?<Text accessibilityRole="alert" style={[s.body,{color:theme.danger}]}>{nameError}</Text>:null}
+      {!naming?.id?<Text style={[s.small,{color:theme.textMuted}]}>This pet starts with an empty log and routine.</Text>:null}
+    </ScrollView>
+  </KeyboardAvoidingView>;}
+
   function settingsContent(){return <ScrollView contentContainerStyle={s.content}>
-    {section('Your pets')}
-    <View style={[s.petCard,card]}>{pets.map(item=><Pressable key={item.id} testID={`preview.rename.${item.id}`} accessibilityRole="button" accessibilityLabel={`Edit ${item.name}`} onPress={()=>{setManage(true);setNameError(null);setNaming({id:item.id,value:item.name});}} style={s.settingRow}><Avatar pet={item} theme={theme}/><Text style={[s.body,s.flex,{color:theme.text}]}>{item.name}</Text><Icon name="pencil-outline" theme={theme} size={20}/></Pressable>)}
-      <Action label="Manage pets" icon="paw-outline" theme={theme} onPress={()=>setManage(true)}/></View>
     {section('On this device')}
     <View style={[s.petCard,card]}>
       <View style={s.settingRow}><Icon name="theme-light-dark" theme={theme}/><Text style={[s.body,s.flex,{color:theme.text}]}>Dark appearance</Text><Switch testID="preview.dark" accessibilityLabel="Dark appearance" value={dark} onValueChange={setDark}/></View>
@@ -156,18 +180,19 @@ function Preview({onRowRender}:{onRowRender?:(key:string)=>void}){
 
   return <SafeAreaView style={[s.flex,{backgroundColor:theme.background}]} edges={['top','bottom']}>
     <StatusBar style={dark?'light':'dark'}/>
-    <SideNavigation open={drawer} enabled tab={tab} settingsVisible={settings} theme={theme} onOpen={()=>setDrawer(true)} onClose={()=>setDrawer(false)} onChange={navigate} onSettings={()=>{setNavigationHistory([tab]);setDrawer(false);setSettings(true);}}>
+    <SideNavigation open={drawer} enabled={!naming} tab={tab} settingsVisible={settings} theme={theme} onOpen={()=>setDrawer(true)} onClose={()=>setDrawer(false)} onChange={navigate} onPets={()=>navigate('pets')} onSettings={()=>{setNavigationHistory([tab]);setDrawer(false);setSettings(true);}}>
       <View style={s.header}>
-        <Pressable testID={settings?'settings.back':navigationHistory.length?'nav.back':'nav.open'} accessibilityRole="button"
-          accessibilityLabel={settings||navigationHistory.length?'Back':'Open navigation'} onPress={()=>settings||navigationHistory.length?goBack():setDrawer(true)} style={({pressed})=>[s.iconButton,{opacity:pressed?0.6:1}]}><Icon name={settings||navigationHistory.length?'arrow-left':'menu'} theme={theme}/></Pressable>
-        <Text testID="nav.title" accessibilityRole="header" style={[s.brand,s.flex,{color:theme.text,minWidth:fontScale>1.1?'70%':70}]}>{t(settings?'settings.title':tab==='notifications'?'notifications.title':tab==='learn'?'learn.title':`nav.${tab}`)}</Text>
-        {!settings&&(tab==='log'||tab==='timeline')?<Action testID="nav.switch" label={t(tab==='log'?'nav.timeline':'nav.log')} icon="swap-horizontal" theme={theme} onPress={()=>navigate(tab==='log'?'timeline':'log')}/>:null}
+        <Pressable testID={naming?'nav.back':settings?'settings.back':navigationHistory.length?'nav.back':'nav.open'} accessibilityRole="button"
+          accessibilityLabel={naming||settings||navigationHistory.length?'Back':'Open navigation'} onPress={()=>naming||settings||navigationHistory.length?goBack():setDrawer(true)} style={({pressed})=>[s.iconButton,{opacity:pressed?0.6:1}]}><Icon name={naming||settings||navigationHistory.length?'arrow-left':'menu'} theme={theme}/></Pressable>
+        <Text testID="nav.title" accessibilityRole="header" style={[s.brand,s.flex,{color:theme.text,minWidth:!naming&&fontScale>1.1?'70%':70}]}>{naming?(naming.id?'Edit pet':'Add a pet'):t(settings?'settings.title':tab==='notifications'?'notifications.title':tab==='learn'?'learn.title':`nav.${tab}`)}</Text>
+        {naming?<Action testID="preview.name.save" label={naming.id?'Save':'Add pet'} theme={theme} onPress={savePet}/>:null}
+        {!naming&&!settings&&(tab==='log'||tab==='timeline')?<Action testID="nav.switch" label={t(tab==='log'?'nav.timeline':'nav.log')} icon="swap-horizontal" theme={theme} onPress={()=>navigate(tab==='log'?'timeline':'log')}/>:null}
       </View>
-      {!settings&&tab!=='log'&&tab!=='learn'?<Pressable testID="preview.scope" accessibilityRole="button" accessibilityLabel={`Selected pet, ${pet.name}. Change pet`} onPress={()=>setPicker(true)} style={[s.scope,{backgroundColor:theme.primarySoft}]}>
+      {!naming&&!settings&&tab!=='pets'&&tab!=='log'&&tab!=='learn'?<Pressable testID="preview.scope" accessibilityRole="button" accessibilityLabel={`Selected pet, ${pet.name}. Change pet`} onPress={()=>setPicker(true)} style={[s.scope,{backgroundColor:theme.primarySoft}]}>
         <Icon name="paw-outline" theme={theme} size={20}/><Text style={[s.petLabel,s.flex,{color:theme.primary}]}>{pet.name}</Text><Icon name="chevron-down" theme={theme} size={22}/>
       </Pressable>:null}
       <View style={s.flex}>
-        {settings?settingsContent():tab==='log'?<FlatList testID="preview.history" data={logs} keyExtractor={item=>`${item.petId}:${item.event.id}`} renderItem={renderRow} ListHeaderComponent={logHeader} contentContainerStyle={s.content} initialNumToRender={12}/>
+        {naming?petForm():settings?settingsContent():tab==='pets'?petsContent():tab==='log'?<FlatList testID="preview.history" data={logs} keyExtractor={item=>`${item.petId}:${item.event.id}`} renderItem={renderRow} ListHeaderComponent={logHeader} contentContainerStyle={s.content} initialNumToRender={12}/>
           :tab==='timeline'?<TimelineScreen showHeader={false} key={pet.id} events={pet.events} schedule={pet.schedule} onOpenSchedule={()=>openTab('schedule')} theme={theme}/>
           :tab==='insights'?<InsightsScreen showHeader={false} key={pet.id} events={pet.events} customActivities={emptyActivities} theme={theme}/>
           :tab==='schedule'?<ScheduleScreen showHeader={false} key={pet.id} events={pet.events} schedule={pet.schedule} customActivities={emptyActivities} theme={theme} onChange={changeSchedule} onSaveEntry={async entry=>{await changeSchedule([...pet.schedule.filter(item=>item.id!==entry.id),entry].sort((a,b)=>a.minutes-b.minutes));}} onRemoveEntry={async id=>{await changeSchedule(pet.schedule.filter(item=>item.id!==id));}} onRequestReminderPermission={async()=>true}/>
@@ -178,34 +203,22 @@ function Preview({onRowRender}:{onRowRender?:(key:string)=>void}){
             <View style={[s.petCard,card]}>{section('Notification preview')}<Text style={[s.body,{color:theme.text}]}>{pet.name} · Time for a potty break</Text><Text style={[s.small,{color:theme.textMuted}]}>Names stay visible even with reminders for several pets.</Text></View>
           </ScrollView>}
       </View>
-      {toast&&!settings&&tab==='log'?<View style={[s.toast,{backgroundColor:theme.primary}]}><Text accessibilityLiveRegion="polite" style={[s.body,s.flex,{color:theme.onPrimary}]}>{toast.label}</Text><Pressable testID="preview.edit" accessibilityRole="button" accessibilityLabel={t('common.editLogA11y')} style={s.iconButton} onPress={()=>{openEditor(toast.petId,toast.event);setToast(null);}}><Text style={[s.actionText,{color:theme.onPrimary}]}>{t('common.edit')}</Text></Pressable><Pressable testID="preview.undo" accessibilityRole="button" accessibilityLabel={"Undo "+toast.label} style={s.iconButton} onPress={()=>{const target=pets.find(item=>item.id===toast.petId)!;updatePet(target.id,{events:target.events.filter(item=>item.id!==toast.event.id)});setToast(null);}}><Text style={[s.actionText,{color:theme.onPrimary}]}>Undo</Text></Pressable></View>:null}
+      {toast&&!naming&&!settings&&tab==='log'?<View style={[s.toast,{backgroundColor:theme.primary}]}><Text accessibilityLiveRegion="polite" style={[s.body,s.flex,{color:theme.onPrimary}]}>{toast.label}</Text><Pressable testID="preview.edit" accessibilityRole="button" accessibilityLabel={t('common.editLogA11y')} style={s.iconButton} onPress={()=>{openEditor(toast.petId,toast.event);setToast(null);}}><Text style={[s.actionText,{color:theme.onPrimary}]}>{t('common.edit')}</Text></Pressable><Pressable testID="preview.undo" accessibilityRole="button" accessibilityLabel={"Undo "+toast.label} style={s.iconButton} onPress={()=>{const target=pets.find(item=>item.id===toast.petId)!;updatePet(target.id,{events:target.events.filter(item=>item.id!==toast.event.id)});setToast(null);}}><Text style={[s.actionText,{color:theme.onPrimary}]}>Undo</Text></Pressable></View>:null}
     </SideNavigation>
 
-    <Modal visible={picker||manage||widget} animationType="none" presentationStyle="pageSheet" onRequestClose={()=>{if(naming)setNaming(null);else{setPicker(false);setManage(false);setWidget(false);}}}>
+    <Modal visible={picker||widget} animationType="none" presentationStyle="pageSheet" onRequestClose={()=>{setPicker(false);setWidget(false);}}>
       <SafeAreaView style={[s.flex,{backgroundColor:theme.background}]}>
-      {!naming?<ScrollView contentContainerStyle={s.content}>
-        <View style={s.line}>{title(widget?'Home Screen widget':manage?'Your pets':tab==='log'&&!settings?'History for':'Choose a pet')}<View style={s.flex}/><Action label="Done" testID="preview.modal.done" theme={theme} onPress={()=>{setPicker(false);setManage(false);setWidget(false);}}/></View>
-        {picker&&tab==='log'&&!settings?<Action label="All pets" theme={theme} onPress={()=>{setFilter(undefined);setPicker(false);}}/>:null}
-        {widget?<Text style={[s.body,{color:theme.textMuted}]}>Choose the pet for this widget. Its name stays above the logging buttons.</Text>:null}
-        {pets.map(item=><Pressable testID={`preview.select.${item.id}`} key={item.id} accessibilityRole={manage?'button':'radio'} accessibilityState={manage?undefined:{checked:item.id===(widget?widgetPet:tab==='log'&&!settings?filter:selected)}} accessibilityLabel={manage?`Edit ${item.name}`:item.name}
-          onPress={()=>{if(manage){setNaming({id:item.id,value:item.name});setNameError(null);}else if(widget)setWidgetPet(item.id);else{if(tab==='log'&&!settings)setFilter(item.id);else setSelected(item.id);setPicker(false);}}} style={({pressed})=>[s.petCard,s.line,card,{backgroundColor:pressed?theme.primarySoft:theme.surfaceRaised}]}>
-          <Avatar pet={item} theme={theme}/><View style={s.flex}><Text style={[s.petName,{color:theme.text}]}>{item.name}</Text><Text style={[s.small,{color:theme.textMuted}]}>{item.events.length} logs · {item.detail||'New pet'}</Text></View><Icon name={manage?'pencil-outline':item.id===(widget?widgetPet:tab==='log'&&!settings?filter:selected)?'check-circle':'circle-outline'} theme={theme}/>
-        </Pressable>)}
-        {!widget?<Action testID="preview.add" label="Add a pet" icon="plus" theme={theme} onPress={()=>{setNaming({value:''});setNameError(null);}}/>:null}
-        {widget?<View style={[s.petCard,card]}><Text style={[s.petName,{color:theme.text}]}>{pets.find(item=>item.id===widgetPet)?.name}</Text><View style={s.line}>{(['pee','poop','meal'] as const).map(type=><View key={type} style={[s.quick,{borderColor:theme.border,backgroundColor:theme.surface}]}><ActivityIcon activity={{type}} theme={theme} color={activityColors(theme,{type}).color} size={24}/><Text style={[s.actionText,{color:theme.text}]}>{activityLabel({type})}</Text></View>)}</View><Text style={[s.small,{color:theme.textMuted}]}>Widget layout proposal · Installation is not connected</Text></View>:null}
-      </ScrollView>:<KeyboardAvoidingView style={s.flex} behavior={Platform.OS==='ios'?'padding':'height'}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.content}>
-          {title(naming.id?'Pet’s name':'Add a pet')}
-          <TextInput testID="preview.name" accessibilityLabel={naming?.id?'Pet’s name':'Pet name'} autoFocus value={naming?.value??''} onChangeText={value=>{setNaming(current=>current?{...current,value}:null);setNameError(null);}} placeholder="Name" placeholderTextColor={theme.textMuted} maxLength={256} style={[s.input,{color:theme.text,borderColor:theme.border,backgroundColor:theme.surfaceRaised}]}/>
-          {nameError?<Text accessibilityRole="alert" style={[s.body,{color:theme.danger}]}>{nameError}</Text>:null}
-          {!naming?.id?<Text style={[s.small,{color:theme.textMuted}]}>This pet starts with an empty log and routine.</Text>:null}
-          <View style={s.line}><Action label="Cancel" theme={theme} onPress={()=>setNaming(null)}/><View style={s.flex}/><Action testID="preview.name.save" label={naming?.id?'Save':'Add pet'} theme={theme} onPress={()=>{
-            if(!naming?.value.trim()){setNameError('Enter a name.');return;}
-            if(pets.some(item=>item.id!==naming.id&&item.name.toLocaleLowerCase()===naming.value.trim().toLocaleLowerCase())){setNameError('Another pet uses that name. Add a nickname.');return;}
-            if(naming.id)updatePet(naming.id,{name:naming.value.trim()});
-            else{const id=entityId('pet');setPets(current=>[...current,{id,name:naming.value.trim(),detail:'',events:[],schedule:[]}]);setSelected(id);setFilter(id);setTab('log');setSettings(false);setPicker(false);setManage(false);}
-            setNaming(null);
-          }}/></View>
-        </ScrollView></KeyboardAvoidingView>}
+        <ScrollView contentContainerStyle={s.content}>
+          <View style={s.line}>{title(widget?'Home Screen widget':tab==='log'&&!settings?'History for':'Choose a pet')}<View style={s.flex}/><Action label="Done" testID="preview.modal.done" theme={theme} onPress={()=>{setPicker(false);setWidget(false);}}/></View>
+          {picker&&tab==='log'&&!settings?<Action label="All pets" theme={theme} onPress={()=>{setFilter(undefined);setPicker(false);}}/>:null}
+          {widget?<Text style={[s.body,{color:theme.textMuted}]}>Choose the pet for this widget. Its name stays above the logging buttons.</Text>:null}
+          {pets.map(item=><Pressable testID={`preview.select.${item.id}`} key={item.id} accessibilityRole="radio" accessibilityState={{checked:item.id===(widget?widgetPet:tab==='log'&&!settings?filter:selected)}} accessibilityLabel={item.name}
+            onPress={()=>{if(widget)setWidgetPet(item.id);else{if(tab==='log'&&!settings)setFilter(item.id);else setSelected(item.id);setPicker(false);}}} style={({pressed})=>[s.petCard,s.line,card,{backgroundColor:pressed?theme.primarySoft:theme.surfaceRaised}]}>
+            <Avatar pet={item} theme={theme}/><View style={s.flex}><Text style={[s.petName,{color:theme.text}]}>{item.name}</Text><Text style={[s.small,{color:theme.textMuted}]}>{item.events.length} logs · {item.detail||'New pet'}</Text></View><Icon name={item.id===(widget?widgetPet:tab==='log'&&!settings?filter:selected)?'check-circle':'circle-outline'} theme={theme}/>
+          </Pressable>)}
+          {!widget?<Action testID="preview.manage" label="Manage pets" icon="paw-outline" theme={theme} onPress={()=>{setPicker(false);openTab('pets');}}/>:null}
+          {widget?<View style={[s.petCard,card]}><Text style={[s.petName,{color:theme.text}]}>{pets.find(item=>item.id===widgetPet)?.name}</Text><View style={s.line}>{(['pee','poop','meal'] as const).map(type=><View key={type} style={[s.quick,{borderColor:theme.border,backgroundColor:theme.surface}]}><ActivityIcon activity={{type}} theme={theme} color={activityColors(theme,{type}).color} size={24}/><Text style={[s.actionText,{color:theme.text}]}>{activityLabel({type})}</Text></View>)}</View><Text style={[s.small,{color:theme.textMuted}]}>Widget layout proposal · Installation is not connected</Text></View>:null}
+        </ScrollView>
       </SafeAreaView>
     </Modal>
     <ConfirmDialog visible={pendingDelete!==null} theme={theme} title={t('app.deleteTitle')} confirmLabel={t('app.delete')}
