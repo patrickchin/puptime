@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { getLocalRuntime, subscribeLocalWrites } from './local/runtime.native';
+import { localPuppyPhotoUri } from './photo-files.native';
 import type { PuppyProfile } from './puppy-photo';
 
 export function usePuppyProfile() {
@@ -10,7 +11,7 @@ export function usePuppyProfile() {
     const read=++sequence.current;
     try {
       const next=await (await getLocalRuntime()).storage.loadPuppyProfile();
-      if(mounted.current&&read===sequence.current){setProfile(previous=>previous?.name===next.name&&previous?.photo===next.photo?previous:next);setFailed(false);}
+      if(mounted.current&&read===sequence.current){setProfile(previous=>previous?.name===next.name&&previous?.photoId===next.photoId?previous:next);setFailed(false);}
     } catch {if(mounted.current&&read===sequence.current)setFailed(true);}
   },[]);
   useEffect(()=>{
@@ -19,5 +20,5 @@ export function usePuppyProfile() {
     const foreground=AppState.addEventListener('change',state=>{if(state==='active')void reload();});
     return()=>{mounted.current=false;sequence.current++;unsubscribe();foreground.remove();};
   },[reload]);
-  return {profile,failed,reload};
+  return {profile,photoUri:localPuppyPhotoUri(profile?.photoId),failed,reload};
 }

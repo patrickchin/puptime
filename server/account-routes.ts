@@ -1,8 +1,10 @@
+import {assertPuppyPhotoBytes,puppyPhotoSchema} from '../src/puppy-photo';
+import {accountPhotoKey} from './photo-storage';
 import { Hono, type Context } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import { validator } from 'hono/validator';
 import { z } from 'zod';
-import { enrollmentSchema, mutationSchema, recordIdSchema } from '../src/cloud/protocol';
+import { enrollmentSchema, mutationSchema, recordIdSchema, identifierSchema } from '../src/cloud/protocol';
 import { getAccountStore, type AccountStore } from './account-store';
 import { createAuth } from './auth';
 import type { AppleRevocation } from './account-lifecycle';
@@ -100,4 +102,38 @@ accountRoutes.delete('/account', authenticated, validator('json', (value) => z.s
   if (!response.ok) return response;
   const result = await response.json();
   return Response.json({ ...result, appleRevocation }, { status: response.status, headers: response.headers });
+});
+
+
+accountRoutes.post('/photos/:petId/:photoId',authenticated,syncAccess,async context=>{
+  const accountId=context.get('user').id;
+  if(context.req.header('x-puptime-account')!==accountId)return context.json({error:'account_mismatch'},409);
+  const petId=identifierSchema.parse(context.req.param('petId')),photoId=puppyPhotoSchema.parse(context.req.param('photoId'));
+  if(!(await context.get('store').summary()).pets.some(pet=>pet.id===petId))return context.json({error:'not_found'},404);
+  const bucket=context.env.PUPPY_PHOTOS;if(!bucket)return context.json({error:'photos_unavailable'},503);
+  if(context.req.header('content-type')?.split(';')[0]!=='image/jpeg')return context.json({error:'invalid_photo'},400);
+  const bytes=new Uint8Array(await context.req.arrayBuffer());
+  try{assertPuppyPhotoBytes(bytes);}catch{return context.json({error:'invalid_photo'},400);}
+  const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(value=>value.toString(16).padStart(2,'0')).join('');
+  const key=accountPhotoKey(accountId,photoId),existing=await bucket.head(key);
+  if(existing&&(existing.customMetadata?.sha256!==digest||existing.customMetadata.petId!==petId))return context.json({error:'photo_id_conflict'},409);
+  let created=false;
+  if(!existing){
+    const saved=await bucket.put(key,bytes,{onlyIf:{etagDoesNotMatch:'*'},httpMetadata:{contentType:'image/jpeg'},customMetadata:{sha256:digest,petId}});
+    if(!saved){const winner=await bucket.head(key);if(winner?.customMetadata?.sha256!==digest||winner.customMetadata.petId!==petId)return context.json({error:'photo_id_conflict'},409);}
+    else created=true;
+  }
+  // A deletion can finish its object listing while this upload is in flight.
+  const active=await context.env.AUTH_DB.prepare("SELECT u.id FROM user u LEFT JOIN cloud_accounts c ON c.account_id=u.id WHERE u.id=? AND COALESCE(c.state,'')!='deleting'").bind(accountId).first();
+  if(!active){if(created)await bucket.delete(key);return context.json({error:'account_deleting'},410);}
+  return context.json({photoId});
+});
+accountRoutes.get('/photos/:photoId',authenticated,syncAccess,async context=>{
+  const accountId=context.get('user').id;
+  if(context.req.header('x-puptime-account')!==accountId)return context.json({error:'account_mismatch'},409);
+  const photoId=puppyPhotoSchema.parse(context.req.param('photoId')),bucket=context.env.PUPPY_PHOTOS;
+  if(!bucket)return context.json({error:'photos_unavailable'},503);
+  const photo=await bucket.get(accountPhotoKey(accountId,photoId));
+  if(!photo)return context.json({error:'not_found'},404);
+  return context.body(photo.body,200,{'Content-Type':'image/jpeg','Content-Length':String(photo.size),'X-Content-Type-Options':'nosniff'});
 });

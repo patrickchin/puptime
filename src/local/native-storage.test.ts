@@ -326,27 +326,27 @@ test('failed multi-key activity deletion rolls back its marker, labels and custo
 
 test('profile photos persist per dog, project to another device and roll back failed saves',async t=>{
  const {database,path}=await setup(t),{storage}=await createLocalRuntime(database,'pet-1');
- const photo='data:image/jpeg;base64,/9j/AAAA';
+ const photo='img_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
  assert.deepEqual(await storage.loadPuppyProfile(),{name:'My puppy'});
  const events=[createEvent('pee','app',100)];await storage.appendEvents(events);
  await storage.savePuppyPhoto(photo);await storage.savePuppyName('Biscuit');
- assert.deepEqual(await storage.loadPuppyProfile(),{name:'Biscuit',photo});
+ assert.deepEqual(await storage.loadPuppyProfile(),{name:'Biscuit',photoId:photo});
  const records=await database.read(sql=>readLocalRecords(sql,'pet-1'));
- assert.deepEqual(records.find(record=>record.kind==='puppy')?.data,{name:'Biscuit',photo});
+ assert.deepEqual(records.find(record=>record.kind==='puppy')?.data,{name:'Biscuit',photoId:photo});
  await database.write(sql=>sql.runAsync('INSERT INTO puppies(id,name) VALUES (?,?)','pet-2','Maple'));
  const other=createNativeStorage(database,'pet-2');
  assert.deepEqual(await other.loadPuppyProfile(),{name:'Maple'});
  const second=await setup(t);
  await second.database.write(sql=>applyLocalRecords(sql,'pet-1',records,[]));
- assert.deepEqual(await second.storage.loadPuppyProfile(),{name:'Biscuit',photo});
+ assert.deepEqual(await second.storage.loadPuppyProfile(),{name:'Biscuit',photoId:photo});
  const reopened=await createLocalDatabase(sqliteTestConnection(path));
- try{assert.deepEqual(await createNativeStorage(reopened,'pet-1').loadPuppyProfile(),{name:'Biscuit',photo});}finally{await reopened.close();}
+ try{assert.deepEqual(await createNativeStorage(reopened,'pet-1').loadPuppyProfile(),{name:'Biscuit',photoId:photo});}finally{await reopened.close();}
  const snapshot=()=>database.read(async sql=>Promise.all(['puppies','pet_settings','events','local_revisions','local_sync_outbox'].map(table=>sql.getAllAsync(`SELECT * FROM ${table} ORDER BY rowid`))));
  const before=await snapshot();
  for(const invalid of ['file:///cache/photo.jpg','https://example.com/photo.jpg','data:image/svg+xml;base64,AAAA','data:image/jpeg;base64,/9j/A','data:image/jpeg;base64,/9j/'+ 'A'.repeat(32768)])await assert.rejects(storage.savePuppyPhoto(invalid));
  assert.deepEqual(await snapshot(),before);
  await database.write(sql=>sql.execAsync("CREATE TRIGGER fail_photo_update BEFORE UPDATE ON pet_settings BEGIN SELECT RAISE(ABORT,'photo update failure'); END;"));
- await assert.rejects(storage.savePuppyPhoto('data:image/jpeg;base64,/9j/BBBB'),/photo update failure/);
+ await assert.rejects(storage.savePuppyPhoto('img_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'),/photo update failure/);
  assert.deepEqual(await snapshot(),before);
  await database.write(sql=>sql.execAsync('DROP TRIGGER fail_photo_update'));
  await database.write(sql=>sql.execAsync("CREATE TRIGGER fail_photo BEFORE DELETE ON pet_settings BEGIN SELECT RAISE(ABORT,'photo failure'); END;"));

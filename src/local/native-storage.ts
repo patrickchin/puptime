@@ -86,7 +86,7 @@ export function createNativeStorage(database: LocalDatabase, petId: string, onCh
       const pet=await sql.getFirstAsync<{name:string}>('SELECT name FROM puppies WHERE id=?',petId);
       if(!pet)throw new Error('The local puppy could not be found.');
       const photo=await get(sql,storageKeys.puppyPhoto);
-      return {...pet,...(photo===null?{}:{photo:puppyPhotoSchema.parse(photo)})};
+      return {...pet,...(photo===null?{}:{photoId:puppyPhotoSchema.parse(photo)})};
     }),
     savePuppyPhoto:(photo:string|null)=>settingsWrite(async sql=>{
       if(photo===null)await sql.runAsync('DELETE FROM pet_settings WHERE pet_id=? AND key=?',petId,storageKeys.puppyPhoto);

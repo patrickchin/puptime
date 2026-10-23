@@ -34,6 +34,7 @@ is no second UUID column. The body is opaque and carries no time or sort order.
 | `usr`, `ses`, `acc`, `ver`, `rlm`, `key` | Better Auth user, session, provider-account row, verification row, rate-limit row and API-key row |
 | `prv` | Local development email preview |
 | `pet`, `dev` | Puppy and persisted installation/device |
+| `img` | Dog profile image asset |
 | `evt`, `rtn`, `rem` | Logged activity, user-created routine and custom timed OS reminder |
 | `op`, `gen` | Sync/enrollment operation and local sync-owner generation |
 
@@ -154,24 +155,35 @@ for the additive rollout commands.
 
 ## Optional dog profile photo
 
-Puppy records accept an optional `photo` field containing a JPEG data URI of at most
-32,768 characters. Native selection crops to a square and resizes to 256 pixels
-(or 128 pixels when necessary to meet the limit). The device stores the URI in
-the existing puppy-scoped `pet_settings` table under `puptime.puppyPhoto.v1`; no
-SQL migration is needed. Profile changes use the existing atomic revision/outbox
-path. `photo: null` in a puppy patch removes the field. Changing a name preserves
-the photo, and photo changes preserve the name. The existing byte-aware batcher
-keeps profile uploads within the API’s 64 KiB request limit.
+Puppy records contain an optional `photoId`, an opaque `img_` identifier with a
+32-character random body. SQLite stores that reference in puppy-scoped settings;
+sync payloads, revisions and exports contain references only. JPEG bytes never
+enter these records. `photoId: null` removes the current avatar reference.
 
-Deploy the backend before releasing the photo-enabled client. Clients opt in
-with `x-puptime-profile-photos: 1` (browser exports use the `profilePhotos=1` form
-field). Sync responses, history and exports omit photos for older clients while
-retaining revision identities and cursor order. Photo-only history proposals
-become name-preserving no-ops in that legacy representation. Legacy name edits
-still preserve the server’s photo; no stored history is rewritten. On the first
-upgrade from a client without photo support, a persisted capability checkpoint
-restarts any staged baseline or requests the existing resumable full baseline,
-so photos already passed by the legacy cursor are received. Pending local edits
-and operation identities are retained. Photos use the same private account storage and
-revision retention as other profile fields. Activity-only CSV and automatic
-recovery backups do not contain photos.
+Native selection crops and resizes to a 512-pixel JPEG (256 pixels if needed),
+with a 256 KiB file limit. Images are written atomically under the app’s private
+Documents/dog-photos directory before the SQLite reference is committed. Failed
+profile saves remove the new unreferenced file and preserve the old photo. Files
+referenced by history or pending uploads remain available after replacement.
+
+Cloud images use the private `PUPPY_PHOTOS` R2 bucket. Authenticated binary POST
+`/api/photos/:petId/:photoId` uploads an immutable image before its profile
+reference is synced. GET `/api/photos/:photoId` downloads to the private local
+file directory. Both require the expected account header and the existing
+session/cloud authorization. Object keys include the authenticated account,
+never a client-selected owner. There are no public image URLs. Upload retries
+are content-checked and cannot overwrite a different image under the same ID.
+Account deletion fences in-flight uploads and removes all account photo objects.
+Old objects remain with profile history until account deletion; activity-only
+CSV and automatic recovery backups do not contain images.
+
+Deploy the backend with the R2 binding before releasing the client. Create the
+staging bucket with `npx wrangler r2 bucket create puptime-photos-staging --jurisdiction eu`;
+keep public bucket access disabled. Local Wrangler/Vitest uses emulated R2 and
+does not create remote resources. Photo endpoints return 503 without a binding.
+
+Clients opt in to `photoId` with `x-puptime-profile-photos: 1` (browser exports use
+`profilePhotos=1`). Older clients receive name-only profile projections with the
+same revision identities and cursors. The persisted capability checkpoint
+refreshes a legacy baseline on upgrade without losing pending edits. No SQL
+schema migration is required.

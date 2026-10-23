@@ -18,7 +18,9 @@ The account website lets you manage sign-in methods, sign out, download cloud da
 
 ## Dog profile photos
 
-You can choose a profile photo using the system photo picker in Settings. Puptime crops and resizes the selected image and stores a small JPEG with your dog’s profile, so it remains available offline. The app does not need camera access for this feature. With cloud sync enabled, the photo is included in synchronized profile data and version history. Removing a photo clears the current profile photo; earlier synchronized revisions remain subject to the cloud history and deletion rules below. Activity CSV exports and automatic activity recovery backups contain activity data and do not include profile photos.
+You can choose a profile photo using the system photo picker in Settings. Puptime crops and resizes it and saves a JPEG file in the app’s private storage. SQLite stores only the photo’s identifier. The app does not need camera access for this feature.
+
+With cloud sync enabled, JPEG files are uploaded separately to private Cloudflare R2 object storage. Profile data and version history contain image references. Downloads require an authenticated session for the owning account. Previous photos remain available with profile history until cloud account deletion, which also removes the account’s image objects. Removing the current photo clears its profile reference. Activity CSV exports, automatic activity recovery backups and cloud history exports do not embed image files.
 
 ## Public website
 

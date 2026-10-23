@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { CloudApiError,cloudErrorCategory,retryDelay,throwIfAborted,type CloudApi,type CloudAccountSummary,type CloudConfig,type CloudErrorCategory } from './api.ts';
-import { createSyncRunner,type RunResult } from './runner.ts';
+import { createSyncRunner,type RunResult,type PhotoSync } from './runner.ts';
 import type { createLocalRuntime } from '../local/runtime-factory.ts';
 import type { AppleIdToken } from './apple-native.ts';
 import type { GoogleIdToken } from './google-native.ts';
@@ -59,7 +59,7 @@ export async function continueFirstLaunchLocally(runtime:Runtime,confirmPending=
   if(status.generation&&status.accountId)await runtime.sync.detach({generation:status.generation,accountId:status.accountId});
   return 'ok';
 }
-export function createAccountController({runtime,api,identity,subscribeLocalWrites,defer=defaultDefer,changed,exportCloud}:{runtime:Runtime;exportCloud?:CloudExportAction;api:CloudApi;identity:IdentityAdapter;subscribeLocalWrites:(fn:()=>void)=>()=>void;defer?:(fn:()=>void,delay:number)=>()=>void;changed:()=>void}) {
+export function createAccountController({runtime,api,identity,subscribeLocalWrites,defer=defaultDefer,changed,exportCloud,photos}:{runtime:Runtime;photos?:PhotoSync;exportCloud?:CloudExportAction;api:CloudApi;identity:IdentityAdapter;subscribeLocalWrites:(fn:()=>void)=>()=>void;defer?:(fn:()=>void,delay:number)=>()=>void;changed:()=>void}) {
   let snapshot:AccountSnapshot={config:null,account:null,linkedProviders:null,linkingProvider:null,local:null,sync:null,run:null,problem:null,codeSentTo:null,busy:false,exporting:false,running:false,active:false,online:true,lastSyncedAt:null};
   const listeners=new Set<()=>void>();
   let disposed=false,suspended=false,signOutUnfinished=false,rerun=false,associationConfirmationNeeded=false;
@@ -67,7 +67,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
   let identityPending:Promise<AccountActionResult>|null=null,exportPending:Promise<AccountActionResult>|null=null;
   let exportAborter:AbortController|null=null;
   let refreshGeneration=0,refreshFailures=0,cancelRefreshScheduled:(()=>void)|null=null;
-  const runner=createSyncRunner({sync:runtime.sync,api,petId:runtime.petId,deviceId:runtime.deviceId,sessionAccountId:()=>snapshot.account?.user.id??null,changed});
+  const runner=createSyncRunner({sync:runtime.sync,api,photos,petId:runtime.petId,deviceId:runtime.deviceId,sessionAccountId:()=>snapshot.account?.user.id??null,changed});
   function emit(patch:Partial<AccountSnapshot>) {
     if (disposed) return;snapshot={...snapshot,...patch};
     for(const listener of listeners)try{listener();}catch{/* A view cannot undo an account operation. */}

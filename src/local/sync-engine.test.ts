@@ -696,11 +696,11 @@ test('checkpoints protect account association, destructive cloud projections, re
 
 test('profile photo uploads fit request limits and retry with their original identity',async t=>{
  const {database,path,sync,storage}=await setup(t);
- const photo='data:image/jpeg;base64,/9j/'+ 'A'.repeat(32740);
+ const photo='img_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
  await storage.savePuppyPhoto(photo);
  const fence=await activate(sync),batch=await sync.nextBatch(fence);
  const profile=batch.find(mutation=>mutation.kind==='puppy');
- assert.equal(profile?.patch.photo,photo);
+ assert.equal(profile?.patch.photoId,photo);
  assert.ok(new TextEncoder().encode(JSON.stringify({mutations:batch})).byteLength<65536);
  const reopened=await createLocalDatabase(sqliteTestConnection(path));
  try{assert.deepEqual(await engine.createLocalSync(reopened).nextBatch(fence),batch);}finally{await reopened.close();}
@@ -709,12 +709,12 @@ test('profile photo uploads fit request limits and retry with their original ide
 
 test('combining an unnamed local dog keeps its photo and the existing cloud name',async t=>{
  const {sync,storage}=await setup(t);
- const photo='data:image/jpeg;base64,/9j/AAAA';await storage.savePuppyPhoto(photo);
+ const photo='img_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';await storage.savePuppyPhoto(photo);
  const {generation}=await sync.prepareAssociation(input),fence={generation,accountId:input.accountId};
  await sync.stageBaseline({...fence,page:{changes:[{id:'local-pet',petId:'local-pet',kind:'puppy',data:{name:'Biscuit'},revision:1,sequence:1,deleted:false,updatedAt:1}],cursor:1,hasMore:false}});
  await sync.completeAssociation({...fence,cloudPetId:'local-pet'});
- assert.deepEqual(await storage.loadPuppyProfile(),{name:'Biscuit',photo});
- assert.deepEqual((await sync.nextBatch(fence)).find(mutation=>mutation.kind==='puppy')?.patch,{photo});
+ assert.deepEqual(await storage.loadPuppyProfile(),{name:'Biscuit',photoId:photo});
+ assert.deepEqual((await sync.nextBatch(fence)).find(mutation=>mutation.kind==='puppy')?.patch,{photoId:photo});
 });
 
 test('upgrading a legacy sync cursor refreshes profile fields without losing pending work',async t=>{
@@ -725,10 +725,10 @@ test('upgrading a legacy sync cursor refreshes profile fields without losing pen
  const upgraded=await createLocalRuntime(database,'local-pet');
  assert.deepEqual(await upgraded.sync.resyncState(),{...fence,stagingCursor:0,baselineComplete:false});
  assert.deepEqual(await storage.loadEvents(),[event]);
- const photo='data:image/jpeg;base64,/9j/AAAA';
- await upgraded.sync.stageBaseline({...fence,page:{changes:[{id:'local-pet',petId:'local-pet',kind:'puppy',data:{name:'My puppy',photo},revision:1,sequence:1,deleted:false,updatedAt:1}],cursor:1,hasMore:false}});
+ const photo='img_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+ await upgraded.sync.stageBaseline({...fence,page:{changes:[{id:'local-pet',petId:'local-pet',kind:'puppy',data:{name:'My puppy',photoId:photo},revision:1,sequence:1,deleted:false,updatedAt:1}],cursor:1,hasMore:false}});
  await upgraded.sync.finishResync(fence);
- assert.equal((await storage.loadPuppyProfile()).photo,photo);
+ assert.equal((await storage.loadPuppyProfile()).photoId,photo);
  assert.deepEqual(await storage.loadEvents(),[event]);
  assert.deepEqual(await upgraded.sync.nextBatch(fence),pending);
  const reopened=await createLocalRuntime(database,'local-pet');assert.equal(await reopened.sync.resyncState(),null);

@@ -296,24 +296,56 @@ test('authenticated cloud history validates for the client across merge delete r
 
 test('photo capability keeps legacy sync, name edits, history and exports compatible',async()=>{
  const user=await owner();await enroll(user);
- const photos={'x-puptime-profile-photos':'1'},photo='data:image/jpeg;base64,/9j/AAAA';
- const mutation:Mutation={protocolVersion:1,operationId:'op_photo_create',deviceId:'test-device',recordId:'pet-1',petId:'pet-1',kind:'puppy',baseRevision:0,intent:'create',patch:{name:'Pip',photo}};
+ const photos={'x-puptime-profile-photos':'1'},photo='img_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+ const mutation:Mutation={protocolVersion:1,operationId:'op_photo_create',deviceId:'test-device',recordId:'pet-1',petId:'pet-1',kind:'puppy',baseRevision:0,intent:'create',patch:{name:'Pip',photoId:photo}};
  const created=await call(user,'sync/push',{mutations:[mutation]},photos);
  expect(created.status).toBe(200);
- expect(await created.json()).toMatchObject({accepted:[{record:{data:{name:'Pip',photo}}}]});
+ expect(await created.json()).toMatchObject({accepted:[{record:{data:{name:'Pip',photoId:photo}}}]});
  const legacy=await (await call(user,'sync/pull?after=0')).json<{changes:{data:object}[];cursor:number}>();
  expect(legacy.changes[0].data).toEqual({name:'Pip'});expect(legacy.cursor).toBe(1);
  const renamed=await call(user,'sync/push',{mutations:[{...mutation,operationId:'op_old_rename',baseRevision:1,intent:'patch',patch:{name:'Biscuit'}}]});
  expect(await renamed.json()).toMatchObject({accepted:[{record:{data:{name:'Biscuit'}}}]});
  const modern=await (await call(user,'sync/pull?after=0',undefined,photos)).json<{changes:{data:object}[]}>();
- expect(modern.changes.at(-1)?.data).toEqual({name:'Biscuit',photo});
- await call(user,'sync/push',{mutations:[{...mutation,operationId:'op_photo_remove',baseRevision:2,intent:'patch',patch:{photo:null}}]},photos);
+ expect(modern.changes.at(-1)?.data).toEqual({name:'Biscuit',photoId:photo});
+ await call(user,'sync/push',{mutations:[{...mutation,operationId:'op_photo_remove',baseRevision:2,intent:'patch',patch:{photoId:null}}]},photos);
  const history=await (await call(user,'records/pet-1/history')).json<{revisions:unknown[]}>();
- expect(JSON.stringify(history)).not.toContain('"photo"');
+ expect(JSON.stringify(history)).not.toContain('"photoId"');
  const {revisionSchema}=await import('../src/cloud/protocol');
  history.revisions.forEach(revision=>expect(revisionSchema.safeParse(revision).success).toBe(true));
  const oldExport=await (await call(user,'account/export')).text();
- expect(oldExport).not.toContain('"photo"');
+ expect(oldExport).not.toContain('"photoId"');
  const fullExport=await (await call(user,'account/export',undefined,photos)).text();
  expect(fullExport).toContain(photo);
+});
+
+test('private photo objects are binary, immutable, account-scoped and deleted with the account',async()=>{
+ const user=await owner(),other=await owner();await enroll(user);await enroll(other);
+ const photoId='img_11111111111111111111111111111111',jpeg=new Uint8Array([255,216,255,219,0,255,217]);
+ const photoCall=(who:Owner|null,path:string,body?:Uint8Array,expected=who?.id)=>worker.fetch(new Request('https://puptime.test/api/'+path,{method:body?'POST':'GET',headers:{origin:'https://puptime.test','cf-connecting-ip':who?.ip??'192.0.2.254',...(who?{cookie:who.cookie}:{}),'x-puptime-account':expected??'',...(body?{'content-type':'image/jpeg'}:{})},...(body?{body}: {})}),settings);
+ expect((await photoCall(null,`photos/${photoId}`)).status).toBe(401);
+ expect((await photoCall(user,`photos/pet-1/${photoId}`,jpeg,other.id)).status).toBe(409);
+ expect((await photoCall(user,`photos/foreign-pet/${photoId}`,jpeg)).status).toBe(404);
+ expect((await photoCall(user,`photos/pet-1/${photoId}`,jpeg)).status).toBe(200);
+ expect((await photoCall(user,`photos/pet-1/${photoId}`,jpeg)).status).toBe(200);
+ expect((await photoCall(user,`photos/pet-1/${photoId}`,new Uint8Array([255,216,255,220,0,255,217]))).status).toBe(409);
+ const stored=await photoCall(user,`photos/${photoId}`);
+ expect(stored.headers.get('content-type')).toBe('image/jpeg');expect(stored.headers.get('cache-control')).toBe('no-store');
+ expect(new Uint8Array(await stored.arrayBuffer())).toEqual(jpeg);
+ expect((await photoCall(other,`photos/${photoId}`)).status).toBe(404);
+ expect((await photoCall(user,`photos/pet-1/img_22222222222222222222222222222222`,new TextEncoder().encode('not a JPEG'))).status).toBe(400);
+ expect((await photoCall(user,`photos/pet-1/img_22222222222222222222222222222222`,new Uint8Array(256*1024+1))).status).toBe(413);
+ const deleted=await worker.fetch(new Request('https://puptime.test/api/account',{method:'DELETE',headers:{cookie:user.cookie,origin:'https://puptime.test','content-type':'application/json','x-puptime-account':user.id},body:JSON.stringify({confirm:true})}),settings);
+ expect(deleted.status).toBe(200);
+ expect((await env.PUPPY_PHOTOS!.list({prefix:`accounts/${user.id}/`})).objects).toEqual([]);
+});
+
+
+test('account deletion fences a photo upload that finishes after object cleanup began',async()=>{
+ const user=await owner();await enroll(user);const bucket=env.PUPPY_PHOTOS!,photoId='img_33333333333333333333333333333333';
+ const settingsDuringDeletion={...settings,PUPPY_PHOTOS:{head:bucket.head.bind(bucket),delete:bucket.delete.bind(bucket),put:async(...args:Parameters<R2Bucket['put']>)=>{
+  const result=await bucket.put(...args);
+  await env.AUTH_DB.prepare("INSERT INTO cloud_accounts(account_id,state) VALUES (?,'deleting') ON CONFLICT(account_id) DO UPDATE SET state='deleting'").bind(user.id).run();return result;
+ }} as unknown as R2Bucket};
+ const response=await worker.fetch(new Request(`https://puptime.test/api/photos/pet-1/${photoId}`,{method:'POST',headers:{cookie:user.cookie,origin:'https://puptime.test','x-puptime-account':user.id,'content-type':'image/jpeg'},body:new Uint8Array([255,216,255,219,0,255,217])}),settingsDuringDeletion);
+ expect(response.status).toBe(410);expect((await bucket.list({prefix:`accounts/${user.id}/`})).objects).toEqual([]);
 });
