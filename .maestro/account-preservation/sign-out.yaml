@@ -23,11 +23,21 @@ name: Account preservation sign-out
     id: account.signOut
     retryTapIfNoChange: true
 - assertVisible: ^Sign out on this device\?$
+- waitForAnimationToEnd
 - tapOn:
+    retryTapIfNoChange: true
     text: (?i)^Sign out$
+    above:
+      id: account.signOut
     rightOf:
       text: (?i)^Cancel$
 - extendedWaitUntil:
-    visible:
-      id: account.email.input
+    notVisible:
+      id: account.identity
     timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: account.email.input
+    direction: UP
+- assertVisible:
+    id: account.email.input
