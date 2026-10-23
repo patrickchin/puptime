@@ -10,8 +10,10 @@ name: Account preservation add-logs
     element:
       id: account.back
     direction: UP
+- waitForAnimationToEnd
 - tapOn:
     id: account.back
+    retryTapIfNoChange: true
 - tapOn:
     id: settings.back
 - assertVisible:

@@ -39,8 +39,10 @@ name: Account preservation verify
     id: account.email
     text: ${TEST_EMAIL}
 - takeScreenshot: my-account-signed-in
+- waitForAnimationToEnd
 - tapOn:
     id: account.back
+    retryTapIfNoChange: true
 - assertVisible:
     id: settings.account.open
     text: ${'My account. ' + TEST_EMAIL}
