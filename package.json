@@ -1,6 +1,6 @@
 {
   "name": "puptime",
-  "version": "1.11.30",
+  "version": "1.12.0",
   "main": "index",
   "imports": {
     "#entity-id-entropy": {
