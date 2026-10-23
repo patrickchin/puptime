@@ -5,12 +5,12 @@ import { type Theme } from '../theme';
 
 export function Toast({
   message,
-  onNote,
+  onEdit,
   onUndo,
   theme,
 }: {
   message: string;
-  onNote?: () => void;
+  onEdit?: () => void;
   onUndo: () => void;
   theme: Theme;
 }) {
@@ -26,15 +26,15 @@ export function Toast({
       ]}
     >
       <Text style={[styles.message, { color: theme.background }]}>{message}</Text>
-      {onNote ? (
+      {onEdit ? (
         <Pressable
-          testID="toast.note"
+          testID="toast.edit"
           accessibilityRole="button"
-          accessibilityLabel={t('common.addNoteA11y')}
-          onPress={onNote}
+          accessibilityLabel={t('common.editLogA11y')}
+          onPress={onEdit}
           style={({ pressed }) => [styles.action, pressed && { opacity: 0.6 }]}
         >
-          <Text style={[styles.actionText, { color: theme.primarySoft }]}>{t('common.addNote')}</Text>
+          <Text style={[styles.actionText, { color: theme.primarySoft }]}>{t('common.edit')}</Text>
         </Pressable>
       ) : null}
       <Pressable

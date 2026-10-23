@@ -788,11 +788,11 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
             {!onboardingVisible && undoState ? (
               <Toast
                 message={undoState.message}
-                onNote={() => {
+                onEdit={() => {
                   setSettingsVisible(false);
                   setNavigationHistory([]);
                   setTab('log');
-                  setEditRequest({ eventId: undoState.event.id, focusNote: true });
+                  setEditRequest({ eventId: undoState.event.id });
                   setUndoState(null);
                 }}
                 onUndo={undo}

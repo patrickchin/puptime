@@ -2,7 +2,7 @@
 
 This is an opt-in UI proposal with synthetic, in-memory data. The production entry point does not import it. Do not replace production routing with this preview.
 
-`index.multi-pet-preview.tsx` registers the sample app. Existing Timeline, Insights, Schedule and Learn components are reused with pet-specific sample data. Logging, undo, history filtering, note editing, confirmed log deletion, add/rename, routine editing, per-pet timing controls and shared appearance work in memory. Notification delivery, account sync, backups and installed widgets are not connected. The widget screen is an in-app layout proposal. Extra activity buttons create point samples; they do not implement running naps.
+`index.multi-pet-preview.tsx` registers the sample app. Existing Timeline, Insights, Schedule and Learn components are reused with pet-specific sample data. Logging, undo, history filtering, full event editing, confirmed log deletion, add/rename, routine editing, per-pet timing controls and shared appearance work in memory. Notification delivery, account sync, backups and installed widgets are not connected. The widget screen is an in-app layout proposal. Extra activity buttons create point samples; they do not implement running naps.
 
 ## Native bundles
 
@@ -34,7 +34,7 @@ Bundle `scripts/multi-pet-preview/render-probe.tsx` instead of the normal previe
 node scripts/multi-pet-preview/verify-row-renders.mjs emulator-5582
 ```
 
-This drives native UIAutomator and ADB, verifies populated history, opens a real note editor, replaces its text and saves. Opening and typing must redraw zero unchanged history rows. Saving must redraw exactly the edited row, preserving every other row's counter. Delete confirmation and cancellation must redraw no history rows; confirmation removes only the chosen pet's event and keeps the other pet's history visible. Results and a screenshot are written to `output/multi-pet-audit/row-check/`.
+This drives native UIAutomator and ADB, verifies populated history, opens the shared production editor, replaces its note and closes after autosaving. Opening must redraw zero history rows. Autosaving must redraw only the edited row, preserving every unchanged row's counter. Delete confirmation and cancellation must redraw no history rows; confirmation removes only the chosen pet's event and keeps the other pet's history visible. Results and a screenshot are written to `output/multi-pet-audit/row-check/`.
 
 The fixture check runs in the existing `npm test` suite and covers combined ordering, filtered ownership and composite identity when different pets share an event ID. It is not a production persistence or sync qualification.
 

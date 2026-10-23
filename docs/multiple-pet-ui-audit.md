@@ -20,7 +20,7 @@ The direction follows `RELEASE_PLAN.md`: both pets' actions together on Log; one
 | Navigation | No pet context | Log is household-wide. Individual views retain a visible pet selector across navigation. Learn remains shared. |
 | Log quick actions | Three actions for the active puppy | Two named pet rows, each with its own latest timestamps; extra activities remain attached to that row. |
 | History | One pet's day groups | Combined chronological list with a pet name on every entry; All pets / individual filtering. Production should preserve day grouping and paged queries. Preview uses a virtualized list. |
-| Add, edit, undo | Implicit active puppy | Pet ID remains attached to the original action. Editor names the pet. Only the affected pet's event changes. Preview demonstrates note editing and undo; full date/type/delete/revision interactions still need production wiring. |
+| Add, edit, undo | Implicit active puppy | Pet ID remains attached to the original action. Only the affected pet's event changes. The preview reuses the production activity/time/note editor and demonstrates undo and confirmed deletion; revision history and production persistence still need multi-pet wiring. |
 | Timeline | One history and routine | Existing native chart receives only the selected pet's events/windows. Switching resets transient chart detail state. |
 | Insights | One pet's statistics | Existing native analytics receives only selected-pet history. No household average that combines different animals. |
 | Schedule / learning | One routine and history | Existing routine editor and suggestions use selected-pet data. Mochi has three meals; Maple has two. New pet has no example routine silently applied. |
@@ -59,9 +59,10 @@ Run and screenshot instructions, automated flows, and the Android row-render obs
 
 ## Verification
 
-- All 461 existing and new Node unit tests passed. General, iOS and Android TypeScript checks passed.
+- All 462 existing and new Node unit tests passed. General, iOS and Android TypeScript checks passed.
 - Native iPhone flows covered all main views, pet selection, pet-specific logging and undo, filtering, add/rename, duplicate-name validation, empty history and empty routine. A separate check exercised rename from Settings and cancellation.
-- The Android UI rendered with 30 days of distinct history for two pets. The render observer tracked 72 history rows: opening and typing in the note editor redrew zero rows; saving redrew exactly the edited row.
+- The preview now reuses the full production editor for activity, time, and notes. The post-log action is labeled Edit. Fresh Android checks cover reopening saved edits and confirmed deletion; the main app check preserves all 1,000 original fixture entries. These editor changes were not rerun on iOS.
+- The Android UI rendered with 30 days of distinct history for two pets. The render observer tracked 83 history rows: opening the editor redrew zero rows; autosaving changed only the edited row.
 - Captured iPhone light/dark, iPad portrait, Android light/dark, a 375 dp Android viewport, 2× Android text, the largest iPhone accessibility text category, and a landscape Android viewport. These are targeted preview checks, not full accessibility certification of the existing app.
 - System notification delivery, installed widget interactions, cloud sync, persistent pet creation/switching, and recovery across multiple pets were not verified by this UI proposal.
 

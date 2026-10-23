@@ -21,17 +21,19 @@ function counts(){return JSON.parse(adb('shell','su','0','cat','/data/user/0/com
 adb('shell','am','force-stop','com.patrickchin.puptime');adb('shell','am','start','-n','com.patrickchin.puptime/.MainActivity');
 node('preview.event.pet_preview_0.evt_preview_0_recent');
 const before=counts();assert.ok(Object.keys(before).length>=10,'Use populated history, not an empty screen.');
-tap('preview.edit.pet_preview_0.evt_preview_0_recent');node('preview.editor.note');
+tap('preview.edit.pet_preview_0.evt_preview_0_recent');node('editor.type.pee');
 assert.deepEqual(counts(),before,'Opening the detail must not redraw unchanged history rows.');
-tap('preview.editor.note');adb('shell','input','keyevent','123');adb('shell','input','keyevent',...Array(100).fill('67'));
+writeFileSync(join(output,'full-editor.png'),execFileSync('adb',['-s',device,'exec-out','screencap','-p']));
+tap('editor.note.input');adb('shell','input','keyevent','123');adb('shell','input','keyevent',...Array(100).fill('67'));
 // Avoid the debug build's double-R reload shortcut during hardware key injection.
-adb('shell','input','text','Outside%sin%sthe%sback%syard');node('preview.editor.save');
+adb('shell','input','text','Outside%sin%sthe%sback%syard');
 writeFileSync(join(output,'populated-history-editor.png'),execFileSync('adb',['-s',device,'exec-out','screencap','-p']));
-assert.deepEqual(counts(),before,'Typing in the editor must not redraw history rows.');
-tap('preview.editor.save');node('preview.event.pet_preview_0.evt_preview_0_recent');
+adb('shell','input','keyevent','4');
+adb('shell','input','swipe','540','500','540','1600','400');
+tap('editor.close');node('preview.event.pet_preview_0.evt_preview_0_recent');
 assert.match(hierarchy(),/Outside in the back yard/);
 const after=counts(),edited='pet_preview_0:evt_preview_0_recent';
-assert.equal(after[edited],before[edited]+1,'Only the edited row should redraw after saving.');
+assert.ok(after[edited]>before[edited],'The edited row should update after autosaving.');
 for(const key of Object.keys(before).filter(key=>key!==edited))assert.equal(after[key],before[key],key+' unnecessarily redrew');
 tap('preview.delete.pet_preview_0.evt_preview_0_recent');node('confirm.dialog');
 assert.deepEqual(counts(),after,'Opening delete confirmation must not redraw history.');
@@ -45,4 +47,4 @@ assert.match(remaining,/resource-id="preview.edit.pet_preview_1\./,'The other pe
 const afterDelete=counts();
 for(const key of Object.keys(after))assert.equal(afterDelete[key],after[key],key+' unnecessarily redrew after deletion');
 writeFileSync(join(output,'result.json'),JSON.stringify({observedRows:Object.keys(before).length,before,after,afterDelete,deleteConfirmationPassed:true,passed:true},null,2));
-console.log('PASS: open/type redraw zero rows; save redraws only the edited row; delete confirmation/cancel preserve rows and confirmed deletion removes only the chosen log.');
+console.log('PASS: opening redraws zero rows; autosaving redraws only the edited row; delete confirmation/cancel preserve rows and confirmed deletion removes only the chosen log.');

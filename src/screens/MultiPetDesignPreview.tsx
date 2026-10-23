@@ -9,7 +9,7 @@ import {ConfirmDialog} from '../components/ConfirmDialog';
 import {SideNavigation,type AppTab} from '../components/SideNavigation';
 import {NotificationTimingControls} from '../components/NotificationTimingControls';
 import {LocalizationProvider,useLocalization} from '../localization-context';
-import {createEvent,formatTime,type EventType,type PuppyEvent,type ScheduleEntry} from '../domain';
+import {createEvent,formatTime,type EventType,type PuppyEvent,type PuppyEventChanges,type ScheduleEntry} from '../domain';
 import {entityId} from '../entity-id';
 import {DEFAULT_NOTIFICATION_PREFERENCES,type NotificationPreferences} from '../notification-config';
 import {householdLogs,multiPetFixtures,type PetLog,type PreviewPet} from '../multi-pet-preview';
@@ -18,6 +18,7 @@ import {TimelineScreen} from './TimelineScreen';
 import {InsightsScreen} from './InsightsScreen';
 import {ScheduleScreen} from './ScheduleScreen';
 import {LearnScreen} from './LearnScreen';
+import {LogScreen,type LogEditRequest} from './LogScreen';
 
 type IconName=keyof typeof MaterialCommunityIcons.glyphMap;
 const emptyActivities:string[]=[];
@@ -58,23 +59,14 @@ const PetHistoryRow=memo(function PetHistoryRow({petId,petName,event,theme,onEdi
   </View>;
 });
 
-function EventEditor({pet,event,theme,onClose,onSave}:{pet:PreviewPet;event:PuppyEvent;theme:Theme;onClose:()=>void;onSave:(note:string)=>void}){
-  const [note,setNote]=useState(event.note??'');
-  const {eventPastLabel}=useLocalization();
-  return <Modal visible animationType="none" onRequestClose={onClose} presentationStyle="pageSheet">
-    <SafeAreaView style={[s.flex,{backgroundColor:theme.background}]}>
-      <KeyboardAvoidingView style={s.flex} behavior={Platform.OS==='ios'?'padding':'height'}>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.content}>
-          <View style={s.line}><Action label="Cancel" onPress={onClose} theme={theme}/><View style={s.flex}/><Action testID="preview.editor.save" label="Save" onPress={()=>onSave(note)} theme={theme}/></View>
-          <View style={s.line}><Avatar pet={pet} theme={theme}/><Text style={[s.heading,{color:theme.text}]}>{pet.name}</Text></View>
-          <Text accessibilityRole="header" style={[s.title,{color:theme.text}]}>{eventPastLabel(event)}</Text>
-          <Text style={[s.body,{color:theme.textMuted}]}>{new Intl.DateTimeFormat('en',{dateStyle:'medium',timeStyle:'short'}).format(event.at)}</Text>
-          <Text accessibilityRole="header" style={[s.heading,{color:theme.text}]}>Note</Text>
-          <TextInput testID="preview.editor.note" accessibilityLabel="Note" multiline value={note} onChangeText={setNote} style={[s.input,{minHeight:140,textAlignVertical:'top',color:theme.text,backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}/>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
-  </Modal>;
+// Reuse the production editor and consume the request once so autosaving does
+// not reopen it or replace the draft when the pet's event list changes.
+function PreviewEventEditor({pet,event,theme,onClose,onSave}:{pet:PreviewPet;event:PuppyEvent;theme:Theme;onClose:()=>void;onSave:(petId:string,event:PuppyEvent,changes:PuppyEventChanges)=>Promise<void>}){
+  const [request,setRequest]=useState<LogEditRequest|null>({eventId:event.id});
+  return <LogScreen editorOnly events={pet.events} customActivities={emptyActivities} theme={theme}
+    editRequest={request} onEditRequestHandled={()=>setRequest(null)} onEditorClosed={onClose}
+    onSave={(current,changes)=>onSave(pet.id,current,changes)}
+    onLog={async()=>{}} onDelete={async()=>{}} onOpenSettings={()=>{}}/>;
 }
 
 export function MultiPetDesignPreview({onRowRender}:{onRowRender?:(key:string)=>void}={}){
@@ -96,6 +88,9 @@ function Preview({onRowRender}:{onRowRender?:(key:string)=>void}){
   const narrow=width<380||fontScale>1.3;
   const logs=useMemo(()=>householdLogs(pets,filter),[pets,filter]);
   const openEditor=useCallback((petId:string,event:PuppyEvent)=>setEditor({petId,event}),[]);
+  const saveEvent=useCallback(async(petId:string,event:PuppyEvent,changes:PuppyEventChanges)=>{
+    setPets(current=>current.map(pet=>pet.id===petId?{...pet,events:pet.events.map(item=>item.id===event.id?{...item,...changes}:item)}:pet));
+  },[]);
   const requestDelete=useCallback((petId:string,event:PuppyEvent)=>setPendingDelete({petId,event}),[]);
   const renderRow=useCallback(({item}:{item:PetLog})=><PetHistoryRow {...item} theme={theme} onEdit={openEditor} onDelete={requestDelete} onRowRender={onRowRender}/>,[theme,openEditor,requestDelete,onRowRender]);
   function navigate(next:AppTab){setTab(next);setSettings(false);setDrawer(false);setToast(null);setNavigationHistory([]);}
@@ -183,7 +178,7 @@ function Preview({onRowRender}:{onRowRender?:(key:string)=>void}){
             <View style={[s.petCard,card]}>{section('Notification preview')}<Text style={[s.body,{color:theme.text}]}>{pet.name} · Time for a potty break</Text><Text style={[s.small,{color:theme.textMuted}]}>Names stay visible even with reminders for several pets.</Text></View>
           </ScrollView>}
       </View>
-      {toast&&!settings&&tab==='log'?<View style={[s.toast,{backgroundColor:theme.primary}]}><Text accessibilityLiveRegion="polite" style={[s.body,s.flex,{color:theme.onPrimary}]}>{toast.label}</Text><Pressable testID="preview.undo" accessibilityRole="button" accessibilityLabel={"Undo "+toast.label} style={s.iconButton} onPress={()=>{const target=pets.find(item=>item.id===toast.petId)!;updatePet(target.id,{events:target.events.filter(item=>item.id!==toast.event.id)});setToast(null);}}><Text style={[s.actionText,{color:theme.onPrimary}]}>Undo</Text></Pressable></View>:null}
+      {toast&&!settings&&tab==='log'?<View style={[s.toast,{backgroundColor:theme.primary}]}><Text accessibilityLiveRegion="polite" style={[s.body,s.flex,{color:theme.onPrimary}]}>{toast.label}</Text><Pressable testID="preview.edit" accessibilityRole="button" accessibilityLabel={t('common.editLogA11y')} style={s.iconButton} onPress={()=>{openEditor(toast.petId,toast.event);setToast(null);}}><Text style={[s.actionText,{color:theme.onPrimary}]}>{t('common.edit')}</Text></Pressable><Pressable testID="preview.undo" accessibilityRole="button" accessibilityLabel={"Undo "+toast.label} style={s.iconButton} onPress={()=>{const target=pets.find(item=>item.id===toast.petId)!;updatePet(target.id,{events:target.events.filter(item=>item.id!==toast.event.id)});setToast(null);}}><Text style={[s.actionText,{color:theme.onPrimary}]}>Undo</Text></Pressable></View>:null}
     </SideNavigation>
 
     <Modal visible={picker||manage||widget} animationType="none" presentationStyle="pageSheet" onRequestClose={()=>{if(naming)setNaming(null);else{setPicker(false);setManage(false);setWidget(false);}}}>
@@ -220,7 +215,7 @@ function Preview({onRowRender}:{onRowRender?:(key:string)=>void}){
         setPets(current=>current.map(item=>item.id===pendingDelete.petId?{...item,events:item.events.filter(event=>event.id!==pendingDelete.event.id)}:item));
         setPendingDelete(null);setToast(null);
       }}/>
-    {editor?<EventEditor pet={pets.find(item=>item.id===editor.petId)!} event={editor.event} theme={theme} onClose={()=>setEditor(null)} onSave={note=>{const target=pets.find(item=>item.id===editor.petId)!;updatePet(target.id,{events:target.events.map(event=>event.id===editor.event.id?{...event,note}:event)});setEditor(null);}}/>:null}
+    {editor?<PreviewEventEditor key={`${editor.petId}:${editor.event.id}`} pet={pets.find(item=>item.id===editor.petId)!} event={editor.event} theme={theme} onClose={()=>setEditor(null)} onSave={saveEvent}/>:null}
   </SafeAreaView>;
 }
 

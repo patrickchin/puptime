@@ -97,6 +97,8 @@ export function LogScreen({
   customActivities,
   editRequest,
   onEditRequestHandled,
+  editorOnly=false,
+  onEditorClosed,
   onLog,
   onSave,
   onDelete,
@@ -112,6 +114,8 @@ export function LogScreen({
   customActivities: string[];
   editRequest?: LogEditRequest | null;
   onEditRequestHandled?: () => void;
+  editorOnly?: boolean;
+  onEditorClosed?: () => void;
   onLog: (type: EventType, customLabel?: string) => Promise<void>;
   onSave: (event: PuppyEvent, changes: PuppyEventChanges) => Promise<void>;
   onDelete: (event: PuppyEvent) => Promise<void>;
@@ -343,6 +347,7 @@ export function LogScreen({
     setClosing(false);
     setDraft(null);
     setHistoryOpen(false);
+    onEditorClosed?.();
   };
 
   const requestHistory = async () => {
@@ -433,7 +438,7 @@ export function LogScreen({
 
   return (
     <>
-      <FlatList
+      {!editorOnly ? <FlatList
         testID="screen.today"
         data={sections}
         keyExtractor={(section) => section.key}
@@ -569,7 +574,7 @@ export function LogScreen({
             <Text style={[styles.loadMoreText, { color: theme.primary }]}>{t('log.loadMore')}</Text>
           </Pressable>
         ) : null}</>}
-      />
+      /> : null}
 
       <Modal visible={draft !== null} transparent animationType="none" onRequestClose={handleSystemClose}>
         <KeyboardAvoidingView

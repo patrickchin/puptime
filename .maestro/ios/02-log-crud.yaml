@@ -33,7 +33,7 @@ tags:
 - tapOn:
     id: quick.meal
 - tapOn:
-    id: toast.note
+    id: toast.edit
 - assertVisible:
     id: editor
 - scrollUntilVisible:
