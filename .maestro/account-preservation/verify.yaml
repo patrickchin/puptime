@@ -9,16 +9,24 @@ name: Account preservation verify
     element:
       id: account.code.input
     direction: DOWN
+- waitForAnimationToEnd
 - tapOn:
     id: account.code.input
+    retryTapIfNoChange: true
+- waitForAnimationToEnd
 - inputText: ${MAESTRO_TEST_CODE}
+- assertVisible:
+    id: account.code.input
+    text: ^[0-9]{6}$
 - tapOn: Sign-in code
 - scrollUntilVisible:
     element:
       id: account.verify
     direction: DOWN
+- waitForAnimationToEnd
 - tapOn:
     id: account.verify
+    retryTapIfNoChange: true
 - extendedWaitUntil:
     notVisible:
       id: account.code.input
@@ -29,3 +37,30 @@ name: Account preservation verify
     direction: DOWN
 - assertNotVisible:
     id: account.email.input
+- scrollUntilVisible:
+    element:
+      id: account.back
+    direction: UP
+- assertVisible: My account
+- assertVisible: Signed in as
+- assertVisible:
+    id: account.email
+    text: ${TEST_EMAIL}
+- takeScreenshot: my-account-signed-in
+- waitForAnimationToEnd
+- tapOn:
+    id: account.back
+    retryTapIfNoChange: true
+- assertVisible:
+    id: settings.account.open
+    text: ${'My account. ' + TEST_EMAIL}
+- takeScreenshot: my-account-settings
+- tapOn:
+    id: settings.account.open
+- assertVisible:
+    id: account.email
+    text: ${TEST_EMAIL}
+- scrollUntilVisible:
+    element:
+      id: account.enable
+    direction: DOWN

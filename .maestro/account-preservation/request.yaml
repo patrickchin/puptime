@@ -16,16 +16,20 @@ name: Account preservation request
     element:
       id: account.email.input
     direction: DOWN
+- waitForAnimationToEnd
 - tapOn:
     id: account.email.input
+    retryTapIfNoChange: true
 - eraseText: 80
 - inputText: ${TEST_EMAIL}
 - scrollUntilVisible:
     element:
       id: account.sendCode
     direction: DOWN
+- waitForAnimationToEnd
 - tapOn:
     id: account.sendCode
+    retryTapIfNoChange: true
 - extendedWaitUntil:
     visible:
       id: account.code.input

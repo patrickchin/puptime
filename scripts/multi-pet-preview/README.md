@@ -37,3 +37,15 @@ node scripts/multi-pet-preview/verify-row-renders.mjs emulator-5582
 This drives native UIAutomator and ADB, verifies populated history, opens a real note editor, replaces its text and saves. Opening and typing must redraw zero unchanged history rows. Saving must redraw exactly the edited row, preserving every other row's counter. Results and a screenshot are written to `output/multi-pet-audit/row-check/`.
 
 The fixture check runs in the existing `npm test` suite and covers combined ordering, filtered ownership and composite identity when different pets share an event ID. It is not a production persistence or sync qualification.
+
+## Large text
+
+The preview switches from tiles to full-width action rows when enlarged text has less than 300 points of effective horizontal room. Wide tablet/landscape layouts keep the grid. Body text and inputs grow up to 2×, sheet headings up to 1.5×, and decorative branding/initials use their own limits. Large-text history notes are not restricted to two lines. The shared reminder controls and navigation use the same readable body/heading limits.
+
+```sh
+xcrun simctl ui DEVICE_ID content_size accessibility-extra-extra-extra-large
+maestro --device DEVICE_ID test scripts/multi-pet-preview/large-text.yaml --test-output-dir output/large-text/ios-final
+python3 scripts/multi-pet-preview/capture-large-text.py emulator-5582
+```
+
+Use the render-probe bundle and set Android `font_scale` to `2.0` before running `verify-row-renders.mjs` for the enlarged-history check. The probe scrolls to the first event, enters a multi-line note and verifies that unchanged rows retain their render counts. Restore the simulator text category after review. The Android capture flow restores its prior text/display settings itself.
