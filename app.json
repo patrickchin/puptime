@@ -12,7 +12,7 @@
       "usesAppleSignIn": true,
       "bundleIdentifier": "com.patrickchin.puptime",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "Allow Puptime to access your photo library only when you choose to save or share content there."
+        "NSPhotoLibraryUsageDescription": "Choose a photo for your dog’s profile."
       },
       "config": {
         "usesNonExemptEncryption": false
@@ -119,6 +119,14 @@
         "expo-router",
         {
           "root": "./web"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Choose a photo for your dog’s profile.",
+          "cameraPermission": false,
+          "microphonePermission": "Allow Puptime to use the microphone when you dictate a log note."
         }
       ]
     ],

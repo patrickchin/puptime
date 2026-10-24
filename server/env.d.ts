@@ -4,6 +4,7 @@ declare global {
     interface Env {
       ACCOUNTS: DurableObjectNamespace<AccountStore>;
       AUTH_DB: D1Database;
+      PUPPY_PHOTOS?: R2Bucket;
       ENVIRONMENT?: 'local' | 'staging' | 'production';
       AUTH_BASE_URL?: string;
       WEB_ORIGINS?: string;

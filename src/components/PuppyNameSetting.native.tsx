@@ -7,6 +7,7 @@ import { useLocalization } from '../localization-context';
 import { spacing, surfaceTreatment } from '../theme';
 import type { PuppyNameSettingProps } from './puppy-name-setting-props';
 import { SettingsRow } from './SettingsRow';
+import { PuppyPhotoSetting } from './PuppyPhotoSetting.native';
 
 export function PuppyNameSetting({theme,cloud}:PuppyNameSettingProps) {
   const {t}=useLocalization();
@@ -48,6 +49,7 @@ export function PuppyNameSetting({theme,cloud}:PuppyNameSettingProps) {
     finally {locked.current=false;if(mounted.current)setSaving(false);}
   }
   return <><View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}>
+    <PuppyPhotoSetting theme={theme}/>
     <SettingsRow testID="settings.puppy.name" icon="paw-outline" label={t('puppy.name')} detail={name??t(failed?'puppy.loadError':'puppy.loading')} disabled={saving||(!name&&!failed)} onPress={()=>name?edit(name):void reload()} theme={theme}/>
   </View>
   <Modal visible={draft!==null} transparent animationType="fade" statusBarTranslucent onRequestClose={closeEditor}>

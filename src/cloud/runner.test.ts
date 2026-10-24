@@ -194,3 +194,46 @@ test('the actual installed native AbortController can enroll, sync and fence a c
  assert.equal((await make(sync,remote.api).run(signal)).state,'synced');assert.ok(remote.changes.some(record=>record.kind==='event'));
  native.abort();const before=remote.calls.length;await assert.rejects(make(sync,remote.api).run(signal),error=>error instanceof Error&&error.name==='AbortError');assert.equal(remote.calls.length,before);
 });
+
+test('photo uploads precede profile references and failed transfers retry without losing logs or operation IDs',async t=>{
+ const {sync,storage}=await fixture(t);await active(sync);
+ const id='img_cccccccccccccccccccccccccccccccc';await storage.savePuppyPhoto(id);await storage.appendEvents([event]);
+ const owner=(await sync.status('local-pet')),fence={generation:owner.generation!,accountId:owner.accountId!},pending=await sync.nextBatch(fence),remote=server();
+ let fail=true,uploaded=false;
+ const api={...remote.api,push:async(...args:Parameters<CloudApi['push']>)=>{assert.equal(uploaded,true);return remote.api.push(...args);}};
+ const photos:runner.PhotoSync={has:()=>true,current:async()=>id,download:async()=>{assert.fail('Local photos do not need downloading.');},upload:async(photoId,petId,accountId)=>{assert.equal(photoId,id);assert.equal(petId,'local-pet');assert.equal(accountId,'account-1');if(fail)throw new CloudApiError('network');uploaded=true;}};
+ const running=runner.createSyncRunner({sync,api,photos,petId:'local-pet',deviceId:'device-1',sessionAccountId:()=> 'account-1',changed:()=>{}});
+ assert.equal((await running.run(signal())).state,'retry');assert.deepEqual(await sync.nextBatch(fence),pending);assert.deepEqual(await storage.loadEvents(),[event]);
+ fail=false;assert.equal((await running.run(signal())).state,'synced');
+ assert.equal((remote.records.get('local-pet')!.data as {photoId:string}).photoId,id);
+ assert.ok(!JSON.stringify(remote.changes).includes('data:image'));
+});
+
+test('remote profile images download before projection and account changes fence the reference upload',async t=>{
+ const {sync,storage}=await fixture(t);await active(sync);const remote=server(),id='img_dddddddddddddddddddddddddddddddd';
+ remote.commit({protocolVersion:1,operationId:'op_remote_photo',deviceId:'device-1',petId:'local-pet',recordId:'local-pet',kind:'puppy',baseRevision:0,intent:'create',patch:{name:'My puppy',photoId:id}});
+ const files=new Set<string>();let owner='account-1';
+ const photos:runner.PhotoSync={has:id=>files.has(id),current:async()=> (await storage.loadPuppyProfile()).photoId,download:async(id,accountId)=>{assert.equal(accountId,'account-1');files.add(id);return true;},upload:async()=>{owner='another-account';}};
+ const running=runner.createSyncRunner({sync,api:remote.api,photos,petId:'local-pet',deviceId:'device-1',sessionAccountId:()=>owner,changed:()=>{}});
+ assert.equal((await running.run(signal())).state,'synced');assert.equal(files.has(id),true);assert.equal((await storage.loadPuppyProfile()).photoId,id);
+ await storage.savePuppyPhoto('img_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee');
+ const before=remote.changes.length;assert.equal((await running.run(signal())).problem,'account-mismatch');assert.equal(remote.changes.length,before);
+});
+
+test('many offline photo replacements make progress within each request budget',async t=>{
+ const {sync,storage}=await fixture(t);await active(sync);const remote=server();
+ for(let i=0;i<30;i++)await storage.savePuppyPhoto(`img_${i.toString(16).padStart(32,'0')}`);
+ let uploads=0;
+ const photos:runner.PhotoSync={has:()=>true,current:async()=>undefined,download:async()=>false,upload:async()=>{uploads++;}};
+ const running=runner.createSyncRunner({sync,api:remote.api,photos,petId:'local-pet',deviceId:'device-1',sessionAccountId:()=> 'account-1',changed:()=>{}});
+ let remaining=(await sync.status('local-pet')).pending;
+ for(let i=0;i<10&&remaining;i++){
+  const beforeCalls=remote.calls.length,beforeUploads=uploads;
+  const result=await running.run(signal());
+  assert.ok(['pending','synced'].includes(result.state));
+  assert.ok(remote.calls.length-beforeCalls+uploads-beforeUploads<=20);
+  assert.ok(result.pending<remaining,'Each run must commit some queued references.');remaining=result.pending;
+ }
+ assert.equal(remaining,0);assert.equal(uploads,30);
+ assert.equal((remote.records.get('local-pet')!.data as {photoId:string}).photoId,'img_0000000000000000000000000000001d');
+});

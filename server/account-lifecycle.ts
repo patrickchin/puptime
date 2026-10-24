@@ -1,3 +1,4 @@
+import { deleteAccountPhotos } from './photo-storage';
 import { getAccountStore } from './account-store';
 
 export type AppleRevocation = 'not-linked' | 'revoked' | 'manual';
@@ -36,6 +37,7 @@ export async function retireCloudAccount(env: Cloudflare.Env, user: { id: string
   // before this snapshot, including writes that try to change the owner.
   const appleRevocation = await revokeApple(env, user.id);
   await getAccountStore(env, user.id).retire();
+  if(env.PUPPY_PHOTOS)await deleteAccountPhotos(env.PUPPY_PHOTOS,user.id);
   const email = user.email.toLowerCase();
   const identifiers = ['sign-in', 'email-verification', 'forget-password', 'change-email'].map((type) => `${type}-otp-${email}`);
   await env.AUTH_DB.batch([

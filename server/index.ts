@@ -16,9 +16,11 @@ app.use('/api/v1/*', async (context, next) => {
   context.header('Cache-Control', 'no-store');
   await next();
 });
-app.use('/api/*', bodyLimit({ maxSize: 65536, onError: context => context.req.path.startsWith('/api/v1/')
+const jsonBodyLimit=bodyLimit({ maxSize: 65536, onError: context => context.req.path.startsWith('/api/v1/')
   ? context.json({ error: { code: 'payload_too_large', message: 'Request exceeds 64 KiB.', requestId: context.get('requestId') } }, 413)
-  : context.text('Payload Too Large', 413) }));
+  : context.text('Payload Too Large', 413) });
+const photoBodyLimit=bodyLimit({maxSize:256*1024,onError:context=>context.json({error:'photo_too_large'},413)});
+app.use('/api/*',(context,next)=>context.req.path.startsWith('/api/photos/')?photoBodyLimit(context,next):jsonBodyLimit(context,next));
 app.use('/api/*', cors({
   origin: (origin, context) => {
     const allowed = [context.env.AUTH_BASE_URL, ...(context.env.WEB_ORIGINS ?? '').split(',')].filter(Boolean);

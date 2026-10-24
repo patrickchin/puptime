@@ -19,7 +19,7 @@ export function createCloudExportRequest(fetchClient:ExportFetch,origin:string,t
   const timer=setTimeout(abort,timeoutMs);let complete=false;
   try {
    const result=await fetchClient(base+'/api/account/export',{
-    method:'POST',body:{expectedAccount},headers:{'content-type':'application/x-www-form-urlencoded'},credentials:'omit',redirect:'error',retry:0,signal:aborter.signal,
+    method:'POST',body:{expectedAccount},headers:{'content-type':'application/x-www-form-urlencoded','x-puptime-profile-photos':'1'},credentials:'omit',redirect:'error',retry:0,signal:aborter.signal,
     async onResponse({response}){
      if(!response.ok){void response.body?.cancel().catch(()=>{});throw new CloudApiError(cloudErrorCategory(response.status),response.status);}
      await writeCloudExport(response,destination,aborter.signal);complete=true;

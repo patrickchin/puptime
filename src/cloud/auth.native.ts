@@ -13,6 +13,7 @@ import { cloudBaseUrl, createCloudApi, createSdkRequest } from './api';
 import { createChangeOpener } from './change-subscription';
 import { createIdentityAdapter } from './account-controller';
 import { createCloudExportRequest } from './export-request';
+import { createPhotoTransfer } from './photo-transfer';
 import { clearCloudExportCache, createNativeCloudExport } from './export.native';
 
 // One SDK/storage adapter instance coordinates native secure credential access.
@@ -33,5 +34,5 @@ export function createNativeCloudClient() {
   }):undefined;
   const googleIdToken=Platform.OS==='ios'?createGoogleIdTokenRequest(GoogleSignin):undefined;
   const nativeSignOut=Platform.OS==='ios'?async()=>{await GoogleSignin.signOut();if(GoogleSignin.hasPreviousSignIn())throw new Error('Google sign-out did not complete.');}:undefined;
-  return {identity:createIdentityAdapter(auth,{appleIdToken,googleIdToken,nativeSignOut}),api,origin,exportCloud:createNativeCloudExport(createCloudExportRequest((url,options)=>auth.$fetch<unknown>(url,options),origin)),openChanges:createChangeOpener({origin,getCookie:async()=>auth.getCookie(),createSocket:(url,options)=>new NativeSocket(url,[],options)})};
+  return {identity:createIdentityAdapter(auth,{appleIdToken,googleIdToken,nativeSignOut}),api,origin,photoTransfer:createPhotoTransfer((url,options)=>auth.$fetch<unknown>(url,options),origin),exportCloud:createNativeCloudExport(createCloudExportRequest((url,options)=>auth.$fetch<unknown>(url,options),origin)),openChanges:createChangeOpener({origin,getCookie:async()=>auth.getCookie(),createSocket:(url,options)=>new NativeSocket(url,[],options)})};
 }

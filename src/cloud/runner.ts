@@ -3,13 +3,15 @@ import { RestoreNeedsConfirmationError,type createLocalSync } from '../local/syn
 import type { pushResponseSchema } from './protocol.ts';
 import type { z } from 'zod';
 
+export type PhotoSync={has:(id:string)=>boolean;current:()=>Promise<string|undefined>;upload:(id:string,petId:string,accountId:string,signal:AbortSignal)=>Promise<void>;download:(id:string,accountId:string,signal:AbortSignal)=>Promise<boolean>};
+
 type Sync=ReturnType<typeof createLocalSync>;
 type PushResult=z.infer<typeof pushResponseSchema>;
 export type RunResult={state:'idle'|'synced'|'pending'|'blocked'|'auth-required'|'retry'|'error';pending:number;blocked:number;retryAfterMs:number|null;problem:CloudErrorCategory|'local-storage'|'account-mismatch'|'confirmation-required'|null};
 class BudgetReached extends Error {}
 class OwnerChanged extends Error {}
 class EnrollmentRejected extends Error {}
-export function createSyncRunner({sync,api,petId,deviceId,sessionAccountId,changed,random=Math.random}:{sync:Sync;api:Pick<CloudApi,'account'|'enroll'|'push'|'pull'>;petId:string;deviceId:string;sessionAccountId:()=>string|null;changed:()=>void;random?:()=>number}) {
+export function createSyncRunner({sync,api,petId,deviceId,sessionAccountId,changed,photos,random=Math.random}:{sync:Sync;api:Pick<CloudApi,'account'|'enroll'|'push'|'pull'>;photos?:PhotoSync;petId:string;deviceId:string;sessionAccountId:()=>string|null;changed:()=>void;random?:()=>number}) {
   let failures=0;
   return {
     async run(signal:AbortSignal):Promise<RunResult> {
@@ -29,12 +31,18 @@ export function createSyncRunner({sync,api,petId,deviceId,sessionAccountId,chang
         await guard();if (requests>=20) throw new BudgetReached();requests++;
         const value=await action();await guard();return value;
       }
+      async function hydrate(records:import('./protocol.ts').CloudRecord[]) {
+        if(!photos)return;
+        const latest=new Map<string,string>();
+        for(const record of records)if(record.kind==='puppy'&&!record.deleted){const id=(record.data as {photoId?:string}).photoId;if(id)latest.set(record.id,id);else latest.delete(record.id);}
+        for(const id of latest.values())if(!photos.has(id))await invoke(()=>photos.download(id,accountId!,signal));
+      }
       async function resumeBaseline() {
         let state=await sync.resyncState();if (!state) throw new Error('Missing resync state.');
         while (!state.baselineComplete) {
           const page=await invoke(()=>api.pull(state!.stagingCursor,signal));
           if (page.resyncRequired) throw new CloudApiError('invalid-response');
-          await sync.stageBaseline({...fence,page});state=(await sync.resyncState())!;
+          await hydrate(page.changes);await sync.stageBaseline({...fence,page});state=(await sync.resyncState())!;
         }
         await guard();await sync.finishResync(fence);changed();
       }
@@ -52,7 +60,7 @@ export function createSyncRunner({sync,api,petId,deviceId,sessionAccountId,chang
         while (!state.baselineComplete) {
           const page=await invoke(()=>api.pull(state!.stagingCursor,signal));
           if (page.resyncRequired) throw new CloudApiError('invalid-response');
-          await sync.stageBaseline({...fence,page});state=(await sync.enrollmentState())!;
+          await hydrate(page.changes);await sync.stageBaseline({...fence,page});state=(await sync.enrollmentState())!;
         }
         await guard();await sync.completeAssociation({...fence,cloudPetId:enrolled.petId});changed();
       }
@@ -64,6 +72,7 @@ export function createSyncRunner({sync,api,petId,deviceId,sessionAccountId,chang
             if (results) {await guard();await sync.applySync({...fence,...results,page:{changes:[],cursor:(await sync.status(petId)).cursor,hasMore:false}});}
             return;
           }
+          await hydrate(page.changes);
           // A conflict's current record may be on a later page. Persist every
           // page first, then recover rejections only after reaching the head.
           await guard();await sync.applySync({...fence,...(!page.hasMore&&results?results:{accepted:[],rejected:[]}),page});
@@ -79,10 +88,18 @@ export function createSyncRunner({sync,api,petId,deviceId,sessionAccountId,chang
         await pull();
         for (;;) {
           await guard();
-          const batch=await sync.nextBatch(fence);
+          let batch=await sync.nextBatch(fence);
           if (!batch.length) {
+            if(photos){const id=await photos.current();if(id&&!photos.has(id)&&await invoke(()=>photos.download(id,accountId,signal)))changed();}
             failures=0;const status=await sync.status(petId);
             return result(status.blocked?'blocked':status.pending?'pending':'synced',status.pending>status.blocked?0:null);
+          }
+          if(photos){
+            if(requests>=18)throw new BudgetReached();
+            let uploads=0;
+            const stop=batch.findIndex(mutation=>mutation.kind==='puppy'&&!!(mutation.patch as {photoId?:string}).photoId&&++uploads>20-requests-2);
+            if(stop>=0)batch=batch.slice(0,stop);
+            for(const mutation of batch){const id=(mutation.patch as {photoId?:string}).photoId;if(mutation.kind==='puppy'&&id)await invoke(()=>photos.upload(id,mutation.petId!,accountId,signal));}
           }
           const pushed=await invoke(()=>api.push(batch,signal));
           await pull(pushed);
