@@ -1,0 +1,92 @@
+appId: com.patrickchin.puptime
+---
+- launchApp
+- assertVisible:
+    id: preview.quick.pet_preview_0.pee
+- waitForAnimationToEnd
+- takeScreenshot: 01-ios-log
+- tapOn:
+    id: preview.quick.pet_preview_0.pee
+- assertVisible: Pee logged for Mochi
+- tapOn:
+    id: preview.undo
+- tapOn:
+    id: preview.pets
+- waitForAnimationToEnd
+- takeScreenshot: 02-ios-pets
+- tapOn:
+    id: preview.rename.pet_preview_1
+- tapOn:
+    id: preview.name
+- eraseText: 30
+- inputText: Sir Waffles Wellington
+- tapOn:
+    id: preview.name.save
+- assertVisible: '.*Sir Waffles Wellington.*'
+- waitForAnimationToEnd
+- takeScreenshot: 03-ios-long-name
+- tapOn:
+    id: nav.back
+    retryTapIfNoChange: true
+- assertNotVisible:
+    id: nav.back
+- scrollUntilVisible:
+    element:
+      id: preview.quick.pet_preview_1.pee
+    direction: DOWN
+- waitForAnimationToEnd
+- takeScreenshot: 04-ios-long-name-log
+- tapOn:
+    id: nav.open
+- scrollUntilVisible:
+    element: {id: nav.settings}
+    direction: DOWN
+- tapOn: {id: nav.settings}
+- waitForAnimationToEnd
+- takeScreenshot: 05-ios-settings
+- tapOn:
+    id: preview.dark
+- waitForAnimationToEnd
+- takeScreenshot: 06-ios-dark-settings
+- tapOn:
+    id: preview.dark
+- tapOn: {id: settings.back}
+- tapOn:
+    id: nav.open
+- scrollUntilVisible:
+    element:
+      id: nav.notifications
+    direction: DOWN
+- tapOn:
+    id: nav.notifications
+- waitForAnimationToEnd
+- takeScreenshot: 07-ios-reminders
+- scrollUntilVisible:
+    element:
+      id: notifications.timing.meal.time
+    direction: DOWN
+- tapOn:
+    id: notifications.timing.meal.time
+- waitForAnimationToEnd
+- takeScreenshot: 08-ios-timing-picker
+- scrollUntilVisible:
+    element:
+      id: notifications.timing.option.0
+    direction: DOWN
+- tapOn:
+    id: notifications.timing.option.0
+- assertVisible: '.*At the scheduled time.*'
+- tapOn:
+    id: nav.open
+- scrollUntilVisible:
+    element:
+      id: nav.settings
+    direction: DOWN
+- assertVisible:
+    id: nav.close
+- waitForAnimationToEnd
+- takeScreenshot: 11-ios-menu
+- tapOn:
+    id: nav.close
+- assertNotVisible:
+    id: nav.drawer

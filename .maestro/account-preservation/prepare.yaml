@@ -9,3 +9,7 @@ name: Account preservation prepare
 - assertVisible:
     id: screen.today
 - runFlow: ../helpers/open-account.yaml
+- assertVisible: My account
+- assertVisible:
+    id: account.email.input
+- takeScreenshot: my-account-guest

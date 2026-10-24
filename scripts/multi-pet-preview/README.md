@@ -59,3 +59,15 @@ python3 scripts/multi-pet-preview/verify-pets-page.py emulator-5596 output/pets-
 ```
 
 This exercises menu navigation, blank/duplicate names, rename/save/cancel, adding an empty pet, contextual and Android Back, retained selection, dark mode, 375 dp at 2× text with Save beside the form title, and landscape. It captures fresh screenshots and checks that the production SQLite journal is unchanged.
+
+## Large text
+
+The preview switches from tiles to full-width action rows when enlarged text has less than 300 points of effective horizontal room. Wide tablet/landscape layouts keep the grid. Body text and inputs grow up to 2×, sheet headings up to 1.5×, and decorative branding/initials use their own limits. Large-text history notes are not restricted to two lines. The shared reminder controls and navigation use the same readable body/heading limits.
+
+```sh
+xcrun simctl ui DEVICE_ID content_size accessibility-extra-extra-extra-large
+maestro --device DEVICE_ID test scripts/multi-pet-preview/large-text.yaml --test-output-dir output/large-text/ios-final
+python3 scripts/multi-pet-preview/capture-large-text.py emulator-5582
+```
+
+Use the render-probe bundle and set Android `font_scale` to `2.0` before running `verify-row-renders.mjs` for the enlarged-history check. The probe scrolls to the first event, enters a multi-line note and verifies that unchanged rows retain their render counts. Restore the simulator text category after review. The Android capture flow restores its prior text/display settings itself.

@@ -23,14 +23,14 @@ import {LogScreen,type LogEditRequest} from './LogScreen';
 type PreviewTab=AppTab|'pets';
 type IconName=keyof typeof MaterialCommunityIcons.glyphMap;
 const emptyActivities:string[]=[];
-// Keep large system text useful in compact controls; body copy still doubles.
+// Body copy retains the existing 2× scale; large-text layouts reflow around it.
 function Text(props:TextProps){return <NativeText maxFontSizeMultiplier={2} {...props}/>;}
 function Icon({name,theme,size=24}:{name:IconName;theme:Theme;size?:number}){
   return <MaterialCommunityIcons accessible={false} accessibilityElementsHidden importantForAccessibility="no" name={name} color={theme.primary} size={size}/>;
 }
 function Action({label,onPress,theme,icon,testID}:{label:string;onPress:()=>void;theme:Theme;icon?:IconName;testID?:string}){
   return <Pressable testID={testID} accessibilityRole="button" onPress={onPress} style={({pressed})=>[s.action,label==='Done'&&{minWidth:76,flexShrink:0},{backgroundColor:pressed?theme.primarySoft:theme.surfaceRaised,borderColor:theme.border}]}>
-    {icon?<Icon name={icon} theme={theme}/>:null}<Text maxFontSizeMultiplier={1.5} style={[s.actionText,{color:theme.primary}]}>{label}</Text>
+    {icon?<Icon name={icon} theme={theme}/>:null}<Text style={[s.actionText,{color:theme.primary}]}>{label}</Text>
   </Pressable>;
 }
 function Avatar({pet,theme}:{pet:Pick<PreviewPet,'name'>;theme:Theme}){
@@ -42,15 +42,17 @@ function Avatar({pet,theme}:{pet:Pick<PreviewPet,'name'>;theme:Theme}){
 const PetHistoryRow=memo(function PetHistoryRow({petId,petName,event,theme,onEdit,onDelete,onRowRender}:{petId:string;petName:string;event:PuppyEvent;theme:Theme;onEdit:(petId:string,event:PuppyEvent)=>void;onDelete:(petId:string,event:PuppyEvent)=>void;onRowRender?:(key:string)=>void}){
   onRowRender?.(`${petId}:${event.id}`);
   const {eventPastLabel,activityColors,t}=useLocalization(),colors=activityColors(theme,event);
+  const {width,fontScale}=useWindowDimensions();
+  const largeText=fontScale>=1.4&&width/Math.min(fontScale,2)<300;
   const activity=eventPastLabel(event),note=event.note?.trim();
   const timestamp=`${new Intl.DateTimeFormat('en',{month:'short',day:'numeric'}).format(event.at)} · ${formatTime(event.at)}`;
-  return <View testID={`preview.event.${petId}.${event.id}`} style={[s.historyRow,{borderBottomColor:theme.border,backgroundColor:theme.surfaceRaised}]}>
+  return <View testID={`preview.event.${petId}.${event.id}`} style={[s.historyRow,largeText&&s.alignTop,{borderBottomColor:theme.border,backgroundColor:theme.surfaceRaised}]}>
     <Pressable testID={`preview.edit.${petId}.${event.id}`} accessibilityRole="button" accessibilityLabel={`Edit ${petName}, ${activity}, ${timestamp}${note?`, ${note}`:''}`} onPress={()=>onEdit(petId,event)}
-      style={({pressed})=>[s.historyEdit,{backgroundColor:pressed?theme.primarySoft:undefined}]}>
-      <View style={[s.historyIcon,{backgroundColor:colors.softColor}]}><ActivityIcon activity={event} theme={theme} color={colors.color} size={20}/></View>
+      style={({pressed})=>[s.historyEdit,largeText&&s.alignTop,{backgroundColor:pressed?theme.primarySoft:undefined}]}>
+      {!largeText?<View style={[s.historyIcon,{backgroundColor:colors.softColor}]}><ActivityIcon activity={event} theme={theme} color={colors.color} size={20}/></View>:null}
       <View style={s.historyCopy}>
         <Text style={[s.historyTitle,{color:theme.text}]}><Text style={[s.petLabel,{color:theme.primary}]}>{petName}</Text> · {activity}</Text>
-        <Text numberOfLines={2} style={[s.small,{color:theme.textMuted}]}>{timestamp}{note?` · ${note}`:''}</Text>
+        <Text numberOfLines={largeText?undefined:2} style={[s.small,{color:theme.textMuted}]}>{timestamp}{note?` · ${note}`:''}</Text>
       </View><Icon name="pencil-outline" theme={theme} size={20}/>
     </Pressable>
     <Pressable testID={`preview.delete.${petId}.${event.id}`} accessibilityRole="button" accessibilityLabel={`${petName}: ${t('eventRow.delete',{activity,time:formatTime(event.at)})}`} onPress={()=>onDelete(petId,event)}
@@ -86,7 +88,8 @@ function Preview({onRowRender}:{onRowRender?:(key:string)=>void}){
   const [delivery,setDelivery]=useState(true),[widget,setWidget]=useState(false),[widgetPet,setWidgetPet]=useState('pet_preview_0');
   const theme=dark?darkTheme:lightTheme,pet=pets.find(item=>item.id===selected)??pets[0];
   const {activityLabel,activityColors,eventPastLabel,relativeTime,t}=useLocalization(),{width,fontScale}=useWindowDimensions();
-  const narrow=width<380||fontScale>1.3;
+  const largeText=fontScale>=1.4&&width/Math.min(fontScale,2)<300,narrow=width<380;
+
   const logs=useMemo(()=>householdLogs(pets,filter),[pets,filter]);
   const openEditor=useCallback((petId:string,event:PuppyEvent)=>setEditor({petId,event}),[]);
   const saveEvent=useCallback(async(petId:string,event:PuppyEvent,changes:PuppyEventChanges)=>{
@@ -117,15 +120,15 @@ function Preview({onRowRender}:{onRowRender?:(key:string)=>void}){
   const title=(text:string)=><Text maxFontSizeMultiplier={1.5} accessibilityRole="header" style={[s.title,{color:theme.text}]}>{text}</Text>;
   const section=(text:string)=><Text accessibilityRole="header" style={[s.heading,{color:theme.text}]}>{text}</Text>;
   const petActions=(target:PreviewPet)=><View key={target.id} style={[s.petCard,card]}>
-    <View style={s.line}><Avatar pet={target} theme={theme}/><View style={s.flex}><Text style={[s.petName,{color:theme.text}]}>{target.name}</Text><Text style={[s.small,{color:theme.textMuted}]}>{target.detail||'No logs yet'}</Text></View>
+    <View style={[s.line,largeText&&s.alignTop]}>{!largeText?<Avatar pet={target} theme={theme}/>:null}<View style={s.flex}><Text style={[s.petName,{color:theme.text}]}>{target.name}</Text><Text style={[s.small,{color:theme.textMuted}]}>{target.detail||'No logs yet'}</Text></View>
       <Pressable accessibilityRole="button" accessibilityLabel={`More activities for ${target.name}`} style={s.iconButton} onPress={()=>Alert.alert(target.name,'Sample activities',(['walk','nap'] as const).map(type=>({text:activityLabel({type}),onPress:()=>logFor(target,type)})).concat([{text:'Cancel',onPress:()=>{}}]))}><Icon name="plus" theme={theme}/></Pressable>
     </View>
-    <View style={[s.line,{alignItems:'stretch'}]}>{(['pee','poop','meal'] as const).map(type=>{
+    <View style={[s.line,{alignItems:'stretch'},largeText&&s.actionList]}>{(['pee','poop','meal'] as const).map(type=>{
       const colors=activityColors(theme,{type}),latest=target.events.find(event=>event.type===type);
       return <Pressable key={type} testID={`preview.quick.${target.id}.${type}`} accessibilityRole="button" accessibilityLabel={`Log ${activityLabel({type})} for ${target.name}`} onPress={()=>logFor(target,type)}
-        style={({pressed})=>[s.quick,{backgroundColor:pressed?theme.primarySoft:theme.surface,borderColor:theme.border}]}>
-        <View style={[s.quickLabel,narrow&&s.column]}><ActivityIcon activity={{type}} theme={theme} color={colors.color} size={21}/><Text style={[s.actionText,{color:theme.text}]}>{activityLabel({type})}</Text></View>
-        <Text style={[s.small,{color:theme.textMuted}]}>{latest?relativeTime(latest.at):'No logs yet'}</Text>
+        style={({pressed})=>[s.quick,largeText&&s.quickRow,{backgroundColor:pressed?theme.primarySoft:theme.surface,borderColor:theme.border}]}>
+        <View style={[s.quickLabel,narrow&&!largeText&&s.column,largeText&&s.flex]}><ActivityIcon activity={{type}} theme={theme} color={colors.color} size={largeText?24:21}/><Text style={[s.actionText,{color:theme.text}]}>{activityLabel({type})}</Text></View>
+        <Text style={[s.small,largeText&&s.lastLogged,{color:theme.textMuted}]}>{latest?relativeTime(latest.at):'No logs yet'}</Text>
       </Pressable>;
     })}</View>
   </View>;
@@ -133,7 +136,7 @@ function Preview({onRowRender}:{onRowRender?:(key:string)=>void}){
   const logHeader=<View style={s.stack}>
     <View style={s.line}><View style={s.flex}/><Action label={`${pets.length} pets`} icon="paw-outline" theme={theme} onPress={()=>openTab('pets')} testID="preview.pets"/></View>
     {pets.map(petActions)}
-    <View style={s.line}>{section('History')}<View style={s.flex}/><Action testID="preview.filter" label={pets.find(item=>item.id===filter)?.name??'All pets'} icon="filter-variant" theme={theme} onPress={()=>setPicker(true)}/></View>
+    <View style={largeText?s.stack:s.line}>{section('History')}{!largeText?<View style={s.flex}/>:null}<Action testID="preview.filter" label={pets.find(item=>item.id===filter)?.name??'All pets'} icon="filter-variant" theme={theme} onPress={()=>setPicker(true)}/></View>
     {!logs.length?<View style={[s.petCard,card]}>{section('No logs yet')}<Text style={[s.body,{color:theme.textMuted}]}>Log an activity for {pets.find(item=>item.id===filter)?.name??'your pets'} above.</Text></View>:null}
   </View>;
 
@@ -149,14 +152,14 @@ function Preview({onRowRender}:{onRowRender?:(key:string)=>void}){
   function petsContent(){return <ScrollView testID="preview.pets.page" contentContainerStyle={s.content}>
     <View style={s.line}><Text style={[s.small,s.flex,{color:theme.textMuted}]}>{pets.length} pets</Text><Action testID="preview.add" label="Add a pet" icon="plus" theme={theme} onPress={()=>{setNaming({value:''});setNameError(null);}}/></View>
     {pets.map(item=><Pressable key={item.id} testID={`preview.rename.${item.id}`} accessibilityRole="button" accessibilityLabel={`Edit ${item.name}`}
-      onPress={()=>{setNaming({id:item.id,value:item.name});setNameError(null);}} style={({pressed})=>[s.petCard,s.line,card,{backgroundColor:pressed?theme.primarySoft:theme.surfaceRaised}]}>
-      <Avatar pet={item} theme={theme}/><View style={s.flex}><Text style={[s.petName,{color:theme.text}]}>{item.name}</Text><Text style={[s.small,{color:theme.textMuted}]}>{[item.detail,`${item.events.length} logs`].filter(Boolean).join(' · ')}</Text></View><Icon name="chevron-right" theme={theme}/>
+      onPress={()=>{setNaming({id:item.id,value:item.name});setNameError(null);}} style={({pressed})=>[s.petCard,s.line,largeText&&s.alignTop,card,{backgroundColor:pressed?theme.primarySoft:theme.surfaceRaised}]}>
+      {!largeText?<Avatar pet={item} theme={theme}/>:null}<View style={s.flex}><Text style={[s.petName,{color:theme.text}]}>{item.name}</Text><Text style={[s.small,{color:theme.textMuted}]}>{[item.detail,`${item.events.length} logs`].filter(Boolean).join(' · ')}</Text></View><Icon name="chevron-right" theme={theme}/>
     </Pressable>)}
   </ScrollView>;}
   function petForm(){return <KeyboardAvoidingView testID="preview.pet.form" style={s.flex} behavior={Platform.OS==='ios'?'padding':'height'}>
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.content}>
       <Text style={[s.body,{color:theme.text}]}>Name</Text>
-      <TextInput testID="preview.name" accessibilityLabel="Pet name" autoFocus value={naming?.value??''} onChangeText={value=>{setNaming(current=>current?{...current,value}:null);setNameError(null);}} maxLength={256} style={[s.input,{color:theme.text,borderColor:theme.border,backgroundColor:theme.surfaceRaised}]}/>
+      <TextInput maxFontSizeMultiplier={2} testID="preview.name" accessibilityLabel="Pet name" autoFocus value={naming?.value??''} onChangeText={value=>{setNaming(current=>current?{...current,value}:null);setNameError(null);}} maxLength={256} style={[s.input,{color:theme.text,borderColor:theme.border,backgroundColor:theme.surfaceRaised}]}/>
       {nameError?<Text accessibilityRole="alert" style={[s.body,{color:theme.danger}]}>{nameError}</Text>:null}
       {!naming?.id?<Text style={[s.small,{color:theme.textMuted}]}>This pet starts with an empty log and routine.</Text>:null}
     </ScrollView>
@@ -165,7 +168,7 @@ function Preview({onRowRender}:{onRowRender?:(key:string)=>void}){
   function settingsContent(){return <ScrollView contentContainerStyle={s.content}>
     {section('On this device')}
     <View style={[s.petCard,card]}>
-      <View style={s.settingRow}><Icon name="theme-light-dark" theme={theme}/><Text style={[s.body,s.flex,{color:theme.text}]}>Dark appearance</Text><Switch testID="preview.dark" accessibilityLabel="Dark appearance" value={dark} onValueChange={setDark}/></View>
+      <View style={[s.settingRow,largeText&&s.alignTop]}><Icon name="theme-light-dark" theme={theme}/><Text style={[s.body,s.flex,{color:theme.text}]}>Dark appearance</Text><Switch testID="preview.dark" accessibilityLabel="Dark appearance" value={dark} onValueChange={setDark}/></View>
       <Action label="Home Screen widget" icon="widgets-outline" theme={theme} onPress={()=>setWidget(true)} testID="preview.widget"/>
       <Action testID="preview.notifications" label="Notifications" icon="bell-outline" theme={theme} onPress={()=>openTab('notifications')}/>
     </View>
@@ -187,6 +190,7 @@ function Preview({onRowRender}:{onRowRender?:(key:string)=>void}){
         <Text testID="nav.title" accessibilityRole="header" style={[s.brand,s.flex,{color:theme.text,minWidth:!naming&&fontScale>1.1?'70%':70}]}>{naming?(naming.id?'Edit pet':'Add a pet'):t(settings?'settings.title':tab==='notifications'?'notifications.title':tab==='learn'?'learn.title':`nav.${tab}`)}</Text>
         {naming?<Action testID="preview.name.save" label={naming.id?'Save':'Add pet'} theme={theme} onPress={savePet}/>:null}
         {!naming&&!settings&&(tab==='log'||tab==='timeline')?<Action testID="nav.switch" label={t(tab==='log'?'nav.timeline':'nav.log')} icon="swap-horizontal" theme={theme} onPress={()=>navigate(tab==='log'?'timeline':'log')}/>:null}
+
       </View>
       {!naming&&!settings&&tab!=='pets'&&tab!=='log'&&tab!=='learn'?<Pressable testID="preview.scope" accessibilityRole="button" accessibilityLabel={`Selected pet, ${pet.name}. Change pet`} onPress={()=>setPicker(true)} style={[s.scope,{backgroundColor:theme.primarySoft}]}>
         <Icon name="paw-outline" theme={theme} size={20}/><Text style={[s.petLabel,s.flex,{color:theme.primary}]}>{pet.name}</Text><Icon name="chevron-down" theme={theme} size={22}/>
@@ -198,27 +202,30 @@ function Preview({onRowRender}:{onRowRender?:(key:string)=>void}){
           :tab==='schedule'?<ScheduleScreen showHeader={false} key={pet.id} events={pet.events} schedule={pet.schedule} customActivities={emptyActivities} theme={theme} onChange={changeSchedule} onSaveEntry={async entry=>{await changeSchedule([...pet.schedule.filter(item=>item.id!==entry.id),entry].sort((a,b)=>a.minutes-b.minutes));}} onRemoveEntry={async id=>{await changeSchedule(pet.schedule.filter(item=>item.id!==id));}} onRequestReminderPermission={async()=>true}/>
           :tab==='learn'?<LearnScreen showHeader={false} theme={theme}/>
           :<ScrollView contentContainerStyle={s.content}>
-            <View style={[s.petCard,card]}><View style={s.line}><Text style={[s.body,s.flex,{color:theme.text}]}>On this device · All pets</Text><Switch accessibilityLabel="Notifications on this device for all pets" value={delivery} onValueChange={setDelivery}/></View></View>
+            <View style={[s.petCard,card]}><View style={largeText?s.stack:s.line}><Text style={[s.body,!largeText&&s.flex,{color:theme.text}]}>On this device · All pets</Text><Switch accessibilityLabel="Notifications on this device for all pets" value={delivery} onValueChange={setDelivery}/></View></View>
+
             {section(`${pet.name}’s reminders`)}<View style={[s.petCard,card]}><NotificationTimingControls theme={theme} preferences={preferences[pet.id]??DEFAULT_NOTIFICATION_PREFERENCES} schedule={pet.schedule} onScheduleChange={changeSchedule} onChange={async value=>setPreferences(current=>({...current,[pet.id]:value}))}/></View>
             <View style={[s.petCard,card]}>{section('Notification preview')}<Text style={[s.body,{color:theme.text}]}>{pet.name} · Time for a potty break</Text><Text style={[s.small,{color:theme.textMuted}]}>Names stay visible even with reminders for several pets.</Text></View>
           </ScrollView>}
       </View>
-      {toast&&!naming&&!settings&&tab==='log'?<View style={[s.toast,{backgroundColor:theme.primary}]}><Text accessibilityLiveRegion="polite" style={[s.body,s.flex,{color:theme.onPrimary}]}>{toast.label}</Text><Pressable testID="preview.edit" accessibilityRole="button" accessibilityLabel={t('common.editLogA11y')} style={s.iconButton} onPress={()=>{openEditor(toast.petId,toast.event);setToast(null);}}><Text style={[s.actionText,{color:theme.onPrimary}]}>{t('common.edit')}</Text></Pressable><Pressable testID="preview.undo" accessibilityRole="button" accessibilityLabel={"Undo "+toast.label} style={s.iconButton} onPress={()=>{const target=pets.find(item=>item.id===toast.petId)!;updatePet(target.id,{events:target.events.filter(item=>item.id!==toast.event.id)});setToast(null);}}><Text style={[s.actionText,{color:theme.onPrimary}]}>Undo</Text></Pressable></View>:null}
+      {toast&&!naming&&!settings&&tab==='log'?<View style={[s.toast,largeText&&s.toastStack,{backgroundColor:theme.primary}]}><Text accessibilityLiveRegion="polite" style={[s.body,!largeText&&s.flex,{color:theme.onPrimary}]}>{toast.label}</Text><View style={s.line}><Pressable testID="preview.edit" accessibilityRole="button" accessibilityLabel={t('common.editLogA11y')} style={s.iconButton} onPress={()=>{openEditor(toast.petId,toast.event);setToast(null);}}><Text style={[s.actionText,{color:theme.onPrimary}]}>{t('common.edit')}</Text></Pressable><Pressable testID="preview.undo" accessibilityRole="button" accessibilityLabel={"Undo "+toast.label} style={s.iconButton} onPress={()=>{const target=pets.find(item=>item.id===toast.petId)!;updatePet(target.id,{events:target.events.filter(item=>item.id!==toast.event.id)});setToast(null);}}><Text style={[s.actionText,{color:theme.onPrimary}]}>Undo</Text></Pressable></View></View>:null}
+
     </SideNavigation>
 
     <Modal visible={picker||widget} animationType="none" presentationStyle="pageSheet" onRequestClose={()=>{setPicker(false);setWidget(false);}}>
       <SafeAreaView style={[s.flex,{backgroundColor:theme.background}]}>
         <ScrollView contentContainerStyle={s.content}>
-          <View style={s.line}>{title(widget?'Home Screen widget':tab==='log'&&!settings?'History for':'Choose a pet')}<View style={s.flex}/><Action label="Done" testID="preview.modal.done" theme={theme} onPress={()=>{setPicker(false);setWidget(false);}}/></View>
+          <View style={[s.line,largeText&&s.alignTop]}><View style={s.flex}>{title(widget?'Home Screen widget':tab==='log'&&!settings?'History for':'Choose a pet')}</View>{largeText?<Pressable testID="preview.modal.done" accessibilityRole="button" accessibilityLabel="Done" onPress={()=>{setPicker(false);setWidget(false);}} style={s.iconButton}><Icon name="close" theme={theme}/></Pressable>:<Action label="Done" testID="preview.modal.done" theme={theme} onPress={()=>{setPicker(false);setWidget(false);}}/>}</View>
           {picker&&tab==='log'&&!settings?<Action label="All pets" theme={theme} onPress={()=>{setFilter(undefined);setPicker(false);}}/>:null}
           {widget?<Text style={[s.body,{color:theme.textMuted}]}>Choose the pet for this widget. Its name stays above the logging buttons.</Text>:null}
           {pets.map(item=><Pressable testID={`preview.select.${item.id}`} key={item.id} accessibilityRole="radio" accessibilityState={{checked:item.id===(widget?widgetPet:tab==='log'&&!settings?filter:selected)}} accessibilityLabel={item.name}
-            onPress={()=>{if(widget)setWidgetPet(item.id);else{if(tab==='log'&&!settings)setFilter(item.id);else setSelected(item.id);setPicker(false);}}} style={({pressed})=>[s.petCard,s.line,card,{backgroundColor:pressed?theme.primarySoft:theme.surfaceRaised}]}>
-            <Avatar pet={item} theme={theme}/><View style={s.flex}><Text style={[s.petName,{color:theme.text}]}>{item.name}</Text><Text style={[s.small,{color:theme.textMuted}]}>{item.events.length} logs · {item.detail||'New pet'}</Text></View><Icon name={item.id===(widget?widgetPet:tab==='log'&&!settings?filter:selected)?'check-circle':'circle-outline'} theme={theme}/>
+            onPress={()=>{if(widget)setWidgetPet(item.id);else{if(tab==='log'&&!settings)setFilter(item.id);else setSelected(item.id);setPicker(false);}}} style={({pressed})=>[s.petCard,s.line,largeText&&s.alignTop,card,{backgroundColor:pressed?theme.primarySoft:theme.surfaceRaised}]}>
+            {!largeText?<Avatar pet={item} theme={theme}/>:null}<View style={s.flex}><Text style={[s.petName,{color:theme.text}]}>{item.name}</Text><Text style={[s.small,{color:theme.textMuted}]}>{item.events.length} logs · {item.detail||'New pet'}</Text></View><Icon name={item.id===(widget?widgetPet:tab==='log'&&!settings?filter:selected)?'check-circle':'circle-outline'} theme={theme}/>
           </Pressable>)}
           {!widget?<Action testID="preview.manage" label="Manage pets" icon="paw-outline" theme={theme} onPress={()=>{setPicker(false);openTab('pets');}}/>:null}
-          {widget?<View style={[s.petCard,card]}><Text style={[s.petName,{color:theme.text}]}>{pets.find(item=>item.id===widgetPet)?.name}</Text><View style={s.line}>{(['pee','poop','meal'] as const).map(type=><View key={type} style={[s.quick,{borderColor:theme.border,backgroundColor:theme.surface}]}><ActivityIcon activity={{type}} theme={theme} color={activityColors(theme,{type}).color} size={24}/><Text style={[s.actionText,{color:theme.text}]}>{activityLabel({type})}</Text></View>)}</View><Text style={[s.small,{color:theme.textMuted}]}>Widget layout proposal · Installation is not connected</Text></View>:null}
+          {widget?<View style={[s.petCard,card]}><Text style={[s.petName,{color:theme.text}]}>{pets.find(item=>item.id===widgetPet)?.name}</Text><View style={largeText?s.actionList:s.line}>{(['pee','poop','meal'] as const).map(type=><View key={type} style={[s.quick,largeText&&s.quickRow,{borderColor:theme.border,backgroundColor:theme.surface}]}><ActivityIcon activity={{type}} theme={theme} color={activityColors(theme,{type}).color} size={24}/><Text style={[s.actionText,{color:theme.text}]}>{activityLabel({type})}</Text></View>)}</View><Text style={[s.small,{color:theme.textMuted}]}>Widget layout proposal · Installation is not connected</Text></View>:null}
         </ScrollView>
+
       </SafeAreaView>
     </Modal>
     <ConfirmDialog visible={pendingDelete!==null} theme={theme} title={t('app.deleteTitle')} confirmLabel={t('app.delete')}
@@ -243,4 +250,5 @@ const s=StyleSheet.create({
   historyTitle:{fontSize:15,lineHeight:22},historyIcon:{width:40,height:40,borderRadius:14,alignItems:'center',justifyContent:'center'},
   settingRow:{minHeight:56,flexDirection:'row',alignItems:'center',gap:12},scope:{marginHorizontal:20,marginTop:4,marginBottom:12,paddingHorizontal:14,paddingVertical:12,borderRadius:16,flexDirection:'row',alignItems:'center',gap:10,minHeight:48},
   input:{borderWidth:1,borderRadius:14,padding:14,fontSize:17,lineHeight:25,minHeight:52},toast:{margin:16,borderRadius:16,padding:12,flexDirection:'row',alignItems:'center',gap:8},
+  alignTop:{alignItems:'flex-start'},actionList:{flexDirection:'column',gap:8},quickRow:{flex:0,flexDirection:'row',minHeight:68,paddingHorizontal:12,justifyContent:'flex-start',gap:12},lastLogged:{flexShrink:1,maxWidth:'58%',textAlign:'right'},toastStack:{flexDirection:'column',alignItems:'stretch'},
 });
