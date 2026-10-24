@@ -35,7 +35,8 @@ tap('preview.edit.pet_preview_0.evt_preview_0_recent');node('editor.type.pee');
 assert.deepEqual(counts(),before,'Opening the detail must not redraw unchanged history rows.');
 writeFileSync(join(output,'full-editor.png'),execFileSync('adb',['-s',device,'exec-out','screencap','-p']));
 reveal('editor.note.input');tap('editor.note.input');adb('shell','input','keycombination','113','29');adb('shell','input','keyevent','67');
-assert.match(node('editor.note.input'),/text=""/,'Clear the existing note before typing.');
+const cleared=node('editor.note.input'),clearedText=cleared.match(/ text="([^"]*)"/)?.[1],placeholder=cleared.match(/ hint="([^"]*)"/)?.[1];
+assert.ok(clearedText===''||clearedText===placeholder,'Clear the existing note before typing; Android may expose its placeholder as text.');
 const note='At the garden door with a friend. Waited quietly outside and came back in for breakfast.';
 // Pace native key injection so a busy emulator can deliver every edit to React.
 for(const character of note){adb('shell','input','text',character===' '?'%s':character);Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,60);}

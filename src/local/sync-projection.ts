@@ -60,7 +60,7 @@ export async function readLocalDeletedActivities(sql:SqlExecutor,petId:string):P
 export async function readLocalSettingsRecords(sql:SqlExecutor,petId:string):Promise<LocalRecord[]> {
   const state=await settings(sql,petId), n=state.notification;
   return [
-    {kind:'puppy',localId:petId,data:{name:state.pet.name}},
+    {kind:'puppy',localId:petId,data:recordDataSchema('puppy').parse({name:state.pet.name,...(state.values.has(storageKeys.puppyPhoto)?{photoId:state.values.get(storageKeys.puppyPhoto)}:{})})},
     ...state.labels.map(label=>({kind:'customActivity' as const,localId:customActivityKey(label),data:{label}})),
     ...Object.entries(state.customizations).map(([activityKey,value])=>({kind:'customization' as const,localId:activityKey,data:{activityKey,...value}})),
     {kind:'accountPreferences',localId:'preferences',data:{
@@ -132,6 +132,8 @@ export async function applyLocalRecords(sql:SqlExecutor,petId:string,records:Loc
       const data=recordDataSchema('puppy').parse(record.data);
       if (!('name' in data)) throw new Error('Invalid puppy profile.');
       await sql.runAsync('UPDATE puppies SET name=? WHERE id=?',data.name,petId);
+      if(data.photoId)await set(sql,petId,storageKeys.puppyPhoto,data.photoId);
+      else await sql.runAsync('DELETE FROM pet_settings WHERE pet_id=? AND key=?',petId,storageKeys.puppyPhoto);
     } else if (record.kind==='customActivity') {
       const data=recordDataSchema('customActivity').parse(record.data);
       if (!('label' in data)||customActivityKey(data.label)!==record.localId) throw new Error('Invalid custom activity identity.');

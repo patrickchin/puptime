@@ -317,8 +317,8 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
           }
           if (record.kind==='accountPreferences'&&(hadActive||old.has(key(record)))) continue;
           const remote=old.get(key(record));
-          if (record.kind==='puppy'&&remote&&record.data.name==='My puppy') continue;
-          const data={...remote?.data,...record.data};
+          if (record.kind==='puppy'&&remote&&record.data.name==='My puppy'&&!record.data.photoId) continue;
+          const data:Record<string,unknown>={...remote?.data,...record.data,...(record.kind==='puppy'&&remote&&record.data.name==='My puppy'?{name:remote.data.name}:{})};
           if (record.kind==='event'&&remote?.data.estimated) data.estimated=true;
           desired.set(key(record),{...record,data});
         }

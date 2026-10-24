@@ -1,3 +1,4 @@
+import {legacyProfileRevision} from './profile-compat';
 import { DurableObject } from 'cloudflare:workers';
 import { z } from 'zod';
 import { cloudRecordSchema,eventDataSchema,routineDataSchema,enrollmentSchema, identifierSchema, mutationSchema, recordIdSchema, type Enrollment, type CloudRecord, type Mutation, type MutationResult, type PullPage, type Revision } from '../src/cloud/protocol';
@@ -315,7 +316,7 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
     }
   }
 
-  exportStream(): Response {
+  exportStream(includeProfilePhotos=true): Response {
     // Capture both synchronously before returning. Later writes cannot enter this
     // history, and the HTTP Worker does not spend one RPC/JSON parse per page.
     const snapshot = { cursor: this.#cursor(), ...this.summary() }, encoder = new TextEncoder();
@@ -335,8 +336,10 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
             if (!row || row.sequence !== cursor + 1 || !row.body.startsWith('{') || !row.body.endsWith('}')) throw new Error('Incomplete snapshot.');
             cursor = row.sequence;
             // Stored bodies are validated Revision objects serialized at commit.
-            // Preserve their JSON bytes instead of parsing/restringifying notes.
-            controller.enqueue(encoder.encode('{"type":"revision",' + row.body.slice(1) + '\n'));
+            // Preserve their JSON bytes for current clients. Older clients need
+            // profile-only projection without modifying the stored history.
+            const body=includeProfilePhotos?row.body:JSON.stringify(legacyProfileRevision(JSON.parse(row.body)));
+            controller.enqueue(encoder.encode('{"type":"revision",' + body.slice(1) + '\n'));
           } else {
             controller.enqueue(encoder.encode(JSON.stringify({ type: 'complete', cursor }) + '\n'));
             controller.close();

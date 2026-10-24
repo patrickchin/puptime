@@ -27,7 +27,7 @@ export class CloudApiError extends Error {
   readonly retryAfterMs:number|null;
   constructor(category:CloudErrorCategory,status=0,retryAfterMs:number|null=null) {super(category);this.name='CloudApiError';this.category=category;this.status=status;this.retryAfterMs=retryAfterMs;}
 }
-type RequestOptions={method:'GET'|'POST';body?:object;signal?:AbortSignal};
+type RequestOptions={method:'GET'|'POST';body?:object;signal?:AbortSignal;headers?:Record<string,string>};
 type RequestResult={data:unknown;error:{status:number}|null;retryAfter?:string|null};
 export type CloudRequest=(path:string,options:RequestOptions)=>Promise<RequestResult>;
 type SdkOptions=RequestOptions&{params?:{recordId:string};redirect:'error';credentials:'omit';retry:0;timeout:number;onResponse:(context:{response:Response})=>void};
@@ -71,7 +71,7 @@ export function createCloudApi(request:CloudRequest) {
   async function call<Schema extends z.ZodType>(path:string,schema:Schema,body?:object,signal?:AbortSignal):Promise<z.infer<Schema>> {
     throwIfAborted(signal);
     let result:RequestResult;
-    try {result=await request(path,{method:body?'POST':'GET',...(body?{body}:{}),signal});}
+    try {result=await request(path,{method:body?'POST':'GET',...(body?{body}:{}),signal,headers:{'x-puptime-profile-photos':'1'}});}
     catch {throwIfAborted(signal);throw new CloudApiError('network');}
     throwIfAborted(signal);
     if (result.error) throw new CloudApiError(cloudErrorCategory(result.error.status),result.error.status,retryDelay(result.retryAfter));

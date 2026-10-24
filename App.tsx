@@ -47,6 +47,7 @@ import type {FirstLaunchProgress} from './src/first-launch';
 import type { FinishOnboardingOptions } from './src/onboarding';
 import { ScheduleScreen } from './src/screens/ScheduleScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
+import { PuppyIdentity } from './src/components/PuppyIdentity';
 import {NotificationsScreen} from './src/screens/NotificationsScreen';
 import { AccountScreen } from './src/screens/AccountScreen';
 import { useCloud } from './src/cloud/use-cloud';
@@ -755,11 +756,13 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
               <MaterialCommunityIcons accessible={false} name={settingsVisible||navigationHistory.length>0?'arrow-left':'menu'} size={25} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
             </Pressable>
             <Text testID="nav.title" accessibilityRole="header" style={[styles.navigationTitle,{color:theme.text,minWidth:fontScale>1.1?'70%':70}]}>{translate(language,settingsVisible?'settings.title':tab==='notifications'?'notifications.title':tab==='learn'?'learn.title':`nav.${tab}`)}</Text>
+            {!settingsVisible?<PuppyIdentity theme={theme} onPress={openSettings}/>:null}
             {!settingsVisible&&(tab==='log'||tab==='timeline')?<Pressable testID="nav.switch" accessibilityRole="button"
               accessibilityLabel={translate(language,tab==='log'?'nav.timeline':'nav.log')} onPress={()=>navigateToTab(tab==='log'?'timeline':'log')}
               style={({pressed})=>[styles.switchButton,{backgroundColor:pressed?theme.primarySoft:theme.surface,borderColor:theme.border,borderRadius:theme.presentation.controlRadius}]}>
               <MaterialCommunityIcons accessible={false} name="swap-horizontal" size={22} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
               <Text style={[styles.switchLabel,{color:theme.primary}]}>{translate(language,tab==='log'?'nav.timeline':'nav.log')}</Text>
+
             </Pressable>:null}
           </View>:null}
           <View style={styles.screen}>

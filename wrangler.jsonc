@@ -57,7 +57,20 @@
           "database_id": "7b196976-caa3-4328-938f-822163ff9e06",
           "migrations_dir": "server/migrations"
         }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "PUPPY_PHOTOS",
+          "bucket_name": "puptime-photos-staging",
+          "jurisdiction": "eu"
+        }
       ]
     }
-  }
+  },
+  "r2_buckets": [
+    {
+      "binding": "PUPPY_PHOTOS",
+      "bucket_name": "puptime-photos-local"
+    }
+  ]
 }

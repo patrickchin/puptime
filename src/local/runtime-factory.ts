@@ -12,6 +12,17 @@ import { parseEvents } from '../storage-validation.ts';
 import { notifyLocalCommit } from './sync-projection.ts';
 
 export async function createLocalRuntime(database:LocalDatabase,petId:string,afterCommit?:()=>void,beforeChange?:BackupGuard) {
+  await database.write(async sql=>{
+    if(await sql.getFirstAsync("SELECT value FROM metadata WHERE key='profile_photos_v1'"))return;
+    // Older clients may already have consumed photo revisions as name-only
+    // records. Reuse the resumable baseline path to fill in the new field.
+    const owner=await sql.getFirstAsync<{generation:string}>('SELECT generation FROM local_sync_owner WHERE singleton=1');
+    if(owner){
+      await sql.runAsync('DELETE FROM local_sync_baseline WHERE generation=?',owner.generation);
+      await sql.runAsync('UPDATE local_sync_owner SET resyncing=CASE WHEN pending_pet_id IS NULL THEN 1 ELSE resyncing END,staging_cursor=0,staging_complete=0 WHERE singleton=1');
+    }
+    await sql.runAsync("INSERT INTO metadata(key,value) VALUES ('profile_photos_v1','1')");
+  });
   const deviceId=await database.write(async sql=>{
     await sql.runAsync("INSERT OR IGNORE INTO metadata(key,value) VALUES ('cloud_device_id','dev_' || lower(hex(randomblob(16))))");
     return identifierSchema.parse((await sql.getFirstAsync<{value:string}>("SELECT value FROM metadata WHERE key='cloud_device_id'"))!.value);

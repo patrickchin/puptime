@@ -5,6 +5,9 @@
     "allowImportingTsExtensions": true
   },
   "exclude": [
-    "server"
+    "server",
+    "ios",
+    "android",
+    "output"
   ]
 }

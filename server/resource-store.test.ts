@@ -204,3 +204,21 @@ test('invalid RPC inputs, missing pets and failed commits cannot leave partial r
     for (const table of ['pets', 'enrolled_devices', 'records', 'revisions', 'operations', 'api_requests']) expect(state.storage.sql.exec<{ n: number }>(`SELECT COUNT(*) AS n FROM ${table}`).one().n).toBe(0);
   });
 });
+
+
+test('profile photo patches survive restart, preserve concurrent names and support removal',async()=>{
+ const store=account(),original=await puppy(store);
+ await store.enroll({operationId:'op_photo_enroll',deviceId:'dev_phone',localPetId:'pet_test',confirmedPetId:'pet_test',name:'Pip'});
+ const photo='img_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+ const withPhoto=saved(await store.resourceWrite(write({kind:'puppy',localId:'pet_test',intent:'patch',expectedRevision:original.revision,patch:{photoId:photo}})));
+ expect(withPhoto.data).toEqual({name:'Pip',photoId:photo});
+ await runInDurableObject(store,(_instance,state)=>{
+  const reopened=new AccountStore(state,env);
+  expect(reopened.resourceGet('puppy','pet_test','pet_test')?.data).toEqual({name:'Pip',photoId:photo});
+ });
+ const renamed=await store.apply({protocolVersion:1,operationId:'op_rename',deviceId:'dev_phone',recordId:'pet_test',petId:'pet_test',kind:'puppy',baseRevision:original.revision,intent:'patch',patch:{name:'Pippa'}});
+ expect(renamed.record.data).toEqual({name:'Pippa',photoId:photo});
+ const removed=saved(await store.resourceWrite(write({kind:'puppy',localId:'pet_test',intent:'patch',expectedRevision:renamed.record.revision,patch:{photoId:null}})));
+ expect(removed.data).toEqual({name:'Pippa'});
+ expect((await store.pull(0)).changes.at(-1)?.data).toEqual({name:'Pippa'});
+});

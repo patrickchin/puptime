@@ -34,6 +34,7 @@ is no second UUID column. The body is opaque and carries no time or sort order.
 | `usr`, `ses`, `acc`, `ver`, `rlm`, `key` | Better Auth user, session, provider-account row, verification row, rate-limit row and API-key row |
 | `prv` | Local development email preview |
 | `pet`, `dev` | Puppy and persisted installation/device |
+| `img` | Dog profile image asset |
 | `evt`, `rtn`, `rem` | Logged activity, user-created routine and custom timed OS reminder |
 | `op`, `gen` | Sync/enrollment operation and local sync-owner generation |
 
@@ -151,3 +152,38 @@ There are no trial or subscription columns. Explicit device enrollment still
 controls uploading local puppy data. See the [development milestone](cloud-development.md)
 for the historical baseline checkpoint and [API setup](api.md#local-development-and-deployment)
 for the additive rollout commands.
+
+## Optional dog profile photo
+
+Puppy records contain an optional `photoId`, an opaque `img_` identifier with a
+32-character random body. SQLite stores that reference in puppy-scoped settings;
+sync payloads, revisions and exports contain references only. JPEG bytes never
+enter these records. `photoId: null` removes the current avatar reference.
+
+Native selection crops and resizes to a 512-pixel JPEG (256 pixels if needed),
+with a 256 KiB file limit. Images are written atomically under the app’s private
+Documents/dog-photos directory before the SQLite reference is committed. Failed
+profile saves remove the new unreferenced file and preserve the old photo. Files
+referenced by history or pending uploads remain available after replacement.
+
+Cloud images use the private `PUPPY_PHOTOS` R2 bucket. Authenticated binary POST
+`/api/photos/:petId/:photoId` uploads an immutable image before its profile
+reference is synced. GET `/api/photos/:photoId` downloads to the private local
+file directory. Both require the expected account header and the existing
+session/cloud authorization. Object keys include the authenticated account,
+never a client-selected owner. There are no public image URLs. Upload retries
+are content-checked and cannot overwrite a different image under the same ID.
+Account deletion fences in-flight uploads and removes all account photo objects.
+Old objects remain with profile history until account deletion; activity-only
+CSV and automatic recovery backups do not contain images.
+
+Deploy the backend with the R2 binding before releasing the client. Create the
+staging bucket with `npx wrangler r2 bucket create puptime-photos-staging --jurisdiction eu`;
+keep public bucket access disabled. Local Wrangler/Vitest uses emulated R2 and
+does not create remote resources. Photo endpoints return 503 without a binding.
+
+Clients opt in to `photoId` with `x-puptime-profile-photos: 1` (browser exports use
+`profilePhotos=1`). Older clients receive name-only profile projections with the
+same revision identities and cursors. The persisted capability checkpoint
+refreshes a legacy baseline on upgrade without losing pending edits. No SQL
+schema migration is required.

@@ -6,6 +6,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useLocalization} from '../localization-context';
 import {headingStyle,navigationIcon,type Theme} from '../theme';
 import type {Tab} from './BottomNav';
+import {PuppyIdentity} from './PuppyIdentity';
 
 export type AppTab=Tab|'notifications';
 const destinations:AppTab[]=['log','timeline','insights','schedule','notifications','learn'];
@@ -43,7 +44,9 @@ export function SideNavigation({open,enabled,tab,settingsVisible,theme,onOpen,on
      <MaterialCommunityIcons accessible={false} name="close" size={24} color={theme.text} accessibilityElementsHidden importantForAccessibility="no"/>
     </Pressable>
    </View></View>
+   {!onPets?<PuppyIdentity theme={theme} showName onPress={()=>{onClose();onSettings();}}/>:null}
    <View style={styles.items}>{destinations.map(item)}{onPets?item('pets'):null}</View>
+
 
    <View style={[styles.settings,{borderTopColor:theme.border}]}>{item('settings')}</View>
   </ScrollView>;
