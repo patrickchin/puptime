@@ -27,12 +27,14 @@ function reveal(id,direction='down'){
   }
   assert.fail('Could not scroll to '+id);
 }
-function counts(){return JSON.parse(adb('shell','su','0','cat','/data/user/0/com.patrickchin.puptime/files/multi-pet-row-renders.json'));}
+function observation(){return JSON.parse(adb('shell','su','0','cat','/data/user/0/com.patrickchin.puptime/files/multi-pet-row-renders.json'));}
+function counts(){return observation().updates;}
+function unchanged(before,after,message){for(const key of Object.keys(before))assert.equal(after[key],before[key],`${message}: ${key}`);}
 adb('shell','am','force-stop','com.patrickchin.puptime');adb('shell','am','start','-n','com.patrickchin.puptime/.MainActivity');
 reveal('preview.event.pet_preview_0.evt_preview_0_recent');
 const before=counts();assert.ok(Object.keys(before).length>=10,'Use populated history, not an empty screen.');
 tap('preview.edit.pet_preview_0.evt_preview_0_recent');node('editor.type.pee');
-assert.deepEqual(counts(),before,'Opening the detail must not redraw unchanged history rows.');
+unchanged(before,counts(),'Opening the detail must not redraw unchanged history rows');
 writeFileSync(join(output,'full-editor.png'),execFileSync('adb',['-s',device,'exec-out','screencap','-p']));
 reveal('editor.note.input');tap('editor.note.input');adb('shell','input','keycombination','113','29');adb('shell','input','keyevent','67');
 const cleared=node('editor.note.input'),clearedText=cleared.match(/ text="([^"]*)"/)?.[1],placeholder=cleared.match(/ hint="([^"]*)"/)?.[1];
@@ -51,15 +53,15 @@ const after=counts(),edited='pet_preview_0:evt_preview_0_recent';
 assert.ok(after[edited]>before[edited],'The edited row should update after autosaving.');
 for(const key of Object.keys(before).filter(key=>key!==edited))assert.equal(after[key],before[key],key+' unnecessarily redrew');
 tap('preview.delete.pet_preview_0.evt_preview_0_recent');node('confirm.dialog');
-assert.deepEqual(counts(),after,'Opening delete confirmation must not redraw history.');
+unchanged(after,counts(),'Opening delete confirmation must not redraw history');
 writeFileSync(join(output,'delete-confirmation.png'),execFileSync('adb',['-s',device,'exec-out','screencap','-p']));
 tap('confirm.cancel');node('preview.event.pet_preview_0.evt_preview_0_recent');
-assert.deepEqual(counts(),after,'Cancelling deletion keeps history unchanged.');
+unchanged(after,counts(),'Cancelling deletion keeps history unchanged');
 tap('preview.delete.pet_preview_0.evt_preview_0_recent');tap('confirm.delete');
 const remaining=hierarchy();
 assert.ok(!remaining.includes('resource-id="preview.event.pet_preview_0.evt_preview_0_recent"'),'Confirmed deletion removes the chosen log.');
 assert.match(remaining,/resource-id="preview.edit.pet_preview_1\./,'The other pet’s history stays visible.');
 const afterDelete=counts();
 for(const key of Object.keys(after))assert.equal(afterDelete[key],after[key],key+' unnecessarily redrew after deletion');
-writeFileSync(join(output,'result.json'),JSON.stringify({observedRows:Object.keys(before).length,before,after,afterDelete,deleteConfirmationPassed:true,passed:true},null,2));
+writeFileSync(join(output,'result.json'),JSON.stringify({observedRows:Object.keys(before).length,before,after,afterDelete,observation:observation(),deleteConfirmationPassed:true,passed:true},null,2));
 console.log('PASS: opening redraws zero rows; autosaving redraws only the edited row; delete confirmation/cancel preserve rows and confirmed deletion removes only the chosen log.');

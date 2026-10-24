@@ -1,6 +1,6 @@
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import {StatusBar} from 'expo-status-bar';
-import {memo,useCallback,useEffect,useMemo,useState} from 'react';
+import {memo,useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {Alert,BackHandler,FlatList,Keyboard,KeyboardAvoidingView,Modal,Platform,Pressable,ScrollView,StyleSheet,Switch,Text as NativeText,TextInput,View,useWindowDimensions,type TextProps} from 'react-native';
 import {SafeAreaProvider,SafeAreaView} from 'react-native-safe-area-context';
 import {ActivityCsvSettings} from '../components/ActivityCsvSettings';
@@ -39,8 +39,10 @@ function Avatar({pet,theme}:{pet:Pick<PreviewPet,'name'>;theme:Theme}){
 
 // This row never receives the editor's draft state. The probe-only entry point
 // observes its renders on Android without changing production components.
-const PetHistoryRow=memo(function PetHistoryRow({petId,petName,event,theme,onEdit,onDelete,onRowRender}:{petId:string;petName:string;event:PuppyEvent;theme:Theme;onEdit:(petId:string,event:PuppyEvent)=>void;onDelete:(petId:string,event:PuppyEvent)=>void;onRowRender?:(key:string)=>void}){
-  onRowRender?.(`${petId}:${event.id}`);
+const PetHistoryRow=memo(function PetHistoryRow({petId,petName,event,theme,onEdit,onDelete,onRowRender}:{petId:string;petName:string;event:PuppyEvent;theme:Theme;onEdit:(petId:string,event:PuppyEvent)=>void;onDelete:(petId:string,event:PuppyEvent)=>void;onRowRender?:(key:string,phase:'mount'|'update')=>void}){
+  const observed=useRef(false);
+  onRowRender?.(`${petId}:${event.id}`,observed.current?'update':'mount');
+  observed.current=true;
   const {eventPastLabel,activityColors,t}=useLocalization(),colors=activityColors(theme,event);
   const {width,fontScale}=useWindowDimensions();
   const largeText=fontScale>=1.4&&width/Math.min(fontScale,2)<300;
@@ -72,10 +74,10 @@ function PreviewEventEditor({pet,event,theme,onClose,onSave}:{pet:PreviewPet;eve
     onLog={async()=>{}} onDelete={async()=>{}} onOpenSettings={()=>{}}/>;
 }
 
-export function MultiPetDesignPreview({onRowRender}:{onRowRender?:(key:string)=>void}={}){
+export function MultiPetDesignPreview({onRowRender}:{onRowRender?:(key:string,phase:'mount'|'update')=>void}={}){
   return <SafeAreaProvider><LocalizationProvider language="en"><Preview onRowRender={onRowRender}/></LocalizationProvider></SafeAreaProvider>;
 }
-function Preview({onRowRender}:{onRowRender?:(key:string)=>void}){
+function Preview({onRowRender}:{onRowRender?:(key:string,phase:'mount'|'update')=>void}){
   const [pets,setPets]=useState(multiPetFixtures),[selected,setSelected]=useState('pet_preview_0');
   const [tab,setTab]=useState<PreviewTab>('log'),[settings,setSettings]=useState(false),[drawer,setDrawer]=useState(false);
   const [navigationHistory,setNavigationHistory]=useState<Array<PreviewTab|'settings'>>([]);

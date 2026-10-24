@@ -28,13 +28,13 @@ The Maestro flows cold-start the preview, so sample changes reset. `states.yaml`
 
 ## Android row-render check
 
-Bundle `scripts/multi-pet-preview/render-probe.tsx` instead of the normal preview entry and embed/install it in the disposable Android host. The probe writes per-row render counts only in the sample app's Documents directory. A root-capable Google APIs emulator image is needed to read that private test file with `su 0`; leave adbd in its normal shell mode.
+Bundle `scripts/multi-pet-preview/render-probe.tsx` instead of the normal preview entry and embed/install it in the disposable Android host. The probe distinguishes first mounts from updates to already-mounted rows and writes per-row counters only in the sample app's Documents directory. A root-capable Google APIs emulator image is needed to read that private test file with `su 0`; leave adbd in its normal shell mode.
 
 ```sh
 node scripts/multi-pet-preview/verify-row-renders.mjs emulator-5582
 ```
 
-This drives native UIAutomator and ADB, verifies populated history, opens the shared production editor, replaces its note and closes after autosaving. Opening must redraw zero history rows. Autosaving must redraw only the edited row, preserving every unchanged row's counter. Delete confirmation and cancellation must redraw no history rows; confirmation removes only the chosen pet's event and keeps the other pet's history visible. Results and a screenshot are written to `output/multi-pet-audit/row-check/`.
+This drives native UIAutomator and ADB, verifies populated history, opens the shared production editor, replaces its note and closes after autosaving. Opening must redraw zero history rows. Autosaving must update only the edited row, preserving every unchanged row's update counter. Expanding long notes may mount different rows as the virtualized window changes; those mounts are reported separately. Delete confirmation and cancellation must redraw no history rows; confirmation removes only the chosen pet's event and keeps the other pet's history visible. Results and a screenshot are written to `output/multi-pet-audit/row-check/`.
 
 The fixture check runs in the existing `npm test` suite and covers combined ordering, filtered ownership and composite identity when different pets share an event ID. It is not a production persistence or sync qualification.
 
