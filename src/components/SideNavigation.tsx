@@ -6,14 +6,13 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useLocalization} from '../localization-context';
 import {headingStyle,navigationIcon,type Theme} from '../theme';
 import type {Tab} from './BottomNav';
-import {PuppyIdentity} from './PuppyIdentity';
 
-export type AppTab=Tab|'notifications';
-const destinations:AppTab[]=['log','timeline','insights','schedule','notifications','learn'];
+export type AppTab=Tab|'notifications'|'pets';
+const destinations:AppTab[]=['log','pets','timeline','insights','schedule','notifications','learn'];
 
-export function SideNavigation({open,enabled,tab,settingsVisible,theme,onOpen,onClose,onChange,onSettings,onPets,children}:{
- open:boolean;enabled:boolean;tab:AppTab|'pets';settingsVisible:boolean;theme:Theme;
- onOpen:()=>void;onClose:()=>void;onChange:(tab:AppTab)=>void;onSettings:()=>void;onPets?:()=>void;children:ReactNode;
+export function SideNavigation({open,enabled,tab,settingsVisible,theme,onOpen,onClose,onChange,onSettings,onAccount,children}:{
+ open:boolean;enabled:boolean;tab:AppTab|'account';settingsVisible:boolean;theme:Theme;
+ onOpen:()=>void;onClose:()=>void;onChange:(tab:AppTab)=>void;onSettings:()=>void;onAccount?:()=>void;children:ReactNode;
 }){
  const {t}=useLocalization(),{width}=useWindowDimensions(),insets=useSafeAreaInsets();
  const [reduceMotion,setReduceMotion]=useState(true);
@@ -26,12 +25,12 @@ export function SideNavigation({open,enabled,tab,settingsVisible,theme,onOpen,on
   return()=>{active=false;subscription.remove();foreground.remove();};
  },[]);
  if(Platform.OS==='web')return children;
- const item=(key:AppTab|'settings'|'pets')=>{
-  const selected=key==='settings'?settingsVisible:!settingsVisible&&tab===key;
-  const label=key==='settings'?t('settings.title'):key==='notifications'?t('notifications.title'):t(`nav.${key}`);
-  const icon=key==='settings'?'cog-outline':key==='notifications'?'bell-outline':key==='pets'?'paw-outline':navigationIcon(theme,key);
+ const item=(key:AppTab|'settings'|'account')=>{
+  const selected=key==='settings'?settingsVisible:key==='account'?!settingsVisible&&tab==='account':!settingsVisible&&tab===key;
+  const label=key==='settings'?t('settings.title'):key==='account'?t('account.title'):key==='notifications'?t('notifications.title'):t(`nav.${key}`);
+  const icon=key==='settings'?'cog-outline':key==='account'?'account-circle-outline':key==='notifications'?'bell-outline':key==='pets'?'paw-outline':navigationIcon(theme,key);
   return <Pressable key={key} testID={`nav.${key}`} accessibilityRole="button" accessibilityLabel={label}
-   accessibilityState={{selected}} onPress={()=>{onClose();if(key==='settings')onSettings();else if(key==='pets')onPets?.();else onChange(key);}}
+   accessibilityState={{selected}} onPress={()=>{onClose();if(key==='settings')onSettings();else if(key==='account')onAccount?.();else onChange(key);}}
    style={({pressed})=>[styles.item,{backgroundColor:selected?theme.primarySoft:pressed?theme.surface:undefined,borderRadius:theme.presentation.controlRadius}]}>
    <MaterialCommunityIcons accessible={false} name={icon as keyof typeof MaterialCommunityIcons.glyphMap} size={24} color={selected?theme.primary:theme.textMuted} accessibilityElementsHidden importantForAccessibility="no"/>
    <Text maxFontSizeMultiplier={2} style={[styles.itemText,{color:selected?theme.primary:theme.text,fontWeight:selected?'700':'500'}]}>{label}</Text>
@@ -44,11 +43,10 @@ export function SideNavigation({open,enabled,tab,settingsVisible,theme,onOpen,on
      <MaterialCommunityIcons accessible={false} name="close" size={24} color={theme.text} accessibilityElementsHidden importantForAccessibility="no"/>
     </Pressable>
    </View></View>
-   {!onPets?<PuppyIdentity theme={theme} showName onPress={()=>{onClose();onSettings();}}/>:null}
-   <View style={styles.items}>{destinations.map(item)}{onPets?item('pets'):null}</View>
+   <View style={styles.items}>{destinations.map(item)}</View>
 
 
-   <View style={[styles.settings,{borderTopColor:theme.border}]}>{item('settings')}</View>
+   <View style={[styles.settings,{borderTopColor:theme.border}]}>{onAccount?item('account'):null}{item('settings')}</View>
   </ScrollView>;
  return <><Drawer open={!reduceMotion&&enabled&&open} onOpen={onOpen} onClose={onClose} drawerPosition="left" drawerType="front"
   swipeEnabled={!reduceMotion&&enabled} drawerStyle={{width:drawerWidth,backgroundColor:theme.background}}

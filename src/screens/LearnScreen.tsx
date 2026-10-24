@@ -181,9 +181,9 @@ export function LearnScreen({ theme, articleId, onArticleChange, showHeader=true
         ) : !invalidArticle ? (
           <>
             <Text style={[styles.meta, { color: theme.textMuted }]}>{t('learn.counts', { guides: careArticles.length, sources: sourceCount, videos: videos.length })}</Text>
-            {!query.trim() && <ArticleRow article={careArticles[0]} theme={theme} onOpen={open} featured />}
             <Text style={[styles.searchLabel, { color: theme.text }]}>{t('learn.search')}</Text>
             <TextInput testID="learn.search" value={query} onChangeText={setQuery} accessibilityLabel={t('learn.search')} placeholder={t('learn.searchHint')} placeholderTextColor={theme.textMuted} autoCorrect={false} clearButtonMode="while-editing" style={[styles.search, { color: theme.text, backgroundColor: theme.surface, borderColor: theme.border, borderRadius: theme.presentation.controlRadius }]} />
+            {!query.trim() && <ArticleRow article={careArticles[0]} theme={theme} onOpen={open} featured />}
             {results.filter((item) => item.id !== 'getting-started' || query.trim()).length === 0 ? (
               <View style={styles.section}>
                 <Text accessibilityRole="header" aria-level={2} style={[styles.sectionTitle, { color: theme.text }]}>{t('learn.noResults')}</Text>

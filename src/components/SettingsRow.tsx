@@ -44,8 +44,8 @@ export function SettingsRow({
         />
       </View>
       <View style={styles.rowCopy}>
-        <Text numberOfLines={wrap?undefined:1} style={[styles.rowLabel, { color: theme.text }]}>{label}</Text>
-        <Text numberOfLines={wrap?undefined:1} adjustsFontSizeToFit={!wrap&&Platform.OS!=='ios'} minimumFontScale={0.85} style={[styles.rowHint, { color: theme.textMuted }]}>{detail}</Text>
+        <Text maxFontSizeMultiplier={2} numberOfLines={wrap?undefined:1} style={[styles.rowLabel, { color: theme.text }]}>{label}</Text>
+        <Text maxFontSizeMultiplier={2} numberOfLines={wrap?undefined:1} adjustsFontSizeToFit={!wrap&&Platform.OS!=='ios'} minimumFontScale={0.85} style={[styles.rowHint, { color: theme.textMuted }]}>{detail}</Text>
       </View>
       <MaterialCommunityIcons
         accessibilityElementsHidden

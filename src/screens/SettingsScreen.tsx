@@ -6,7 +6,6 @@ import { customActivityKey, quickEventTypes, type ActivityKey, type EventType } 
 import { ActivityIcon } from '../components/ActivityIcon';
 import { ActivityCsvSettings } from '../components/ActivityCsvSettings';
 import { SettingsRow } from '../components/SettingsRow';
-import { PuppyNameSetting } from '../components/PuppyNameSetting';
 import type { CloudHandle } from '../cloud/use-cloud';
 import { useAccountSnapshot } from '../cloud/use-account-snapshot';
 import { useLocalization } from '../localization-context';
@@ -228,7 +227,6 @@ export function SettingsScreen({
       </View>
 
       {cloudHandle?.available&&onOpenAccount?<AccountSettingsRow cloud={cloudHandle} theme={theme} onOpen={onOpenAccount}/>:null}
-      <PuppyNameSetting theme={theme} cloud={cloudHandle}/>
       <SectionLabel label={t('settings.personalization')} theme={theme} />
       <View style={[styles.card, surfaceTreatment(theme), { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
         <SettingsRow
@@ -249,19 +247,7 @@ export function SettingsScreen({
           onPress={() => onOpenPicker('language')}
           theme={theme}
         />
-        <View style={[styles.divider, { backgroundColor: theme.border }]} />
-        <SettingsRow
-          testID="settings.guide.open"
-          icon="compass-outline"
-          label={t('settings.guide')}
-          detail={t('settings.guideDetail')}
-          onPress={onOpenGuide}
-          theme={theme}
-        />
       </View>
-
-      <SectionLabel label={t('settings.data')} theme={theme} />
-      <ActivityCsvSettings theme={theme} eventCount={eventCount} onImport={onImport}/>
 
       <SectionLabel label={t('settings.widget')} theme={theme} />
       <View style={[styles.card, surfaceTreatment(theme), { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
@@ -518,6 +504,20 @@ export function SettingsScreen({
             })}
           </View>
         </View>
+      </View>
+      <SectionLabel label={t('settings.data')} theme={theme} />
+      <ActivityCsvSettings theme={theme} eventCount={eventCount} onImport={onImport}/>
+
+      <SectionLabel label={t('settings.helpPrivacy')} theme={theme}/>
+      <View style={[styles.card,{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}>
+        <SettingsRow
+          testID="settings.guide.open"
+          icon="compass-outline"
+          label={t('settings.guide')}
+          detail={t('settings.guideDetail')}
+          onPress={onOpenGuide}
+          theme={theme}
+        />
       </View>
     </ScrollView>
   );

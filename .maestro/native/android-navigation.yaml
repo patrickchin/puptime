@@ -27,7 +27,7 @@ name: Android screen hierarchy and settings placement
     text: Timeline
 - assertNotVisible:
     id: timeline.range
-- assertNotVisible:
+- assertVisible:
     id: timeline.zoom.value
 - takeScreenshot: android-timeline
 - tapOn:
@@ -122,7 +122,7 @@ name: Android screen hierarchy and settings placement
 - scrollUntilVisible:
     element:
       id: settings.backups.open
-    direction: DOWN
+    direction: UP
 - tapOn:
     id: settings.backups.open
 - assertVisible:
@@ -152,7 +152,7 @@ name: Android screen hierarchy and settings placement
     id: nav.schedule
 - assertVisible:
     id: nav.title
-    text: Schedule
+    text: Routine
 - takeScreenshot: android-schedule
 - tapOn:
     id: nav.open
@@ -162,3 +162,34 @@ name: Android screen hierarchy and settings placement
     id: nav.title
     text: Puppy care
 - takeScreenshot: android-learn
+
+- tapOn: {id: nav.open}
+- tapOn: {id: nav.pets}
+- assertVisible: {id: screen.pets}
+- assertVisible: {id: settings.puppy.name}
+- tapOn: {id: settings.puppy.name}
+- assertVisible: {id: settings.puppy.name.input}
+- tapOn: {id: settings.puppy.name.cancel}
+- tapOn: {id: account.open}
+- assertVisible: {id: screen.account}
+- tapOn: {id: account.back}
+- assertVisible: {id: screen.pets}
+- tapOn: {id: nav.open}
+- tapOn: {id: nav.account}
+- assertVisible: {id: screen.account}
+- tapOn: {id: account.back}
+- assertVisible: {id: screen.pets}
+- tapOn: {id: nav.open}
+- tapOn: {id: nav.timeline}
+- tapOn: {id: timeline.zoom.in}
+- assertVisible: {id: timeline.zoom.value, text: 150%}
+- tapOn: {id: timeline.zoom.reset}
+- assertVisible: {id: timeline.zoom.value, text: 100%}
+- tapOn: {id: nav.open}
+- tapOn: {id: nav.settings}
+- tapOn: {id: settings.widget.open}
+- assertVisible: {id: settings.widget.action.walk}
+- tapOn: {id: settings.widget.action.walk}
+- tapOn: {id: settings.widget.close}
+- assertVisible: {id: screen.settings}
+- assertNotVisible: {id: settings.puppy.name}

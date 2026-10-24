@@ -13,7 +13,7 @@ name: Save a real offline log before replaying onboarding
 - tapOn:
     id: nav.open
 - tapOn:
-    id: nav.settings
+    id: nav.pets
 - assertVisible:
     id: settings.puppy.name
     text: .*Mochi.*

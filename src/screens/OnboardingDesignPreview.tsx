@@ -182,8 +182,8 @@ function PreviewFlow({cloud,onFinish,onAllowNotifications,onDisableNotifications
     <View style={styles.welcomeArt}><Image accessible={false} source={mascot} resizeMode="contain" style={styles.mascot}/></View>
     <View style={styles.welcomeActions}>
       <Text style={styles.welcomeQuestion}>How would you like to begin?</Text>
+      <Pressable testID="preview.guest" accessibilityRole="button" disabled={signingIn} accessibilityState={{disabled:signingIn}} onPress={()=>go('profile')} style={[styles.secondary,{backgroundColor:theme.primary}]}><Text style={[styles.secondaryText,{color:theme.onPrimary}]}>Let’s start without an account</Text></Pressable>
       <AccountSignIn cloud={cloud} theme={welcomeAccountTheme} showIntro={false} onEmailPress={()=>go('account')}/>
-      <Pressable testID="preview.guest" accessibilityRole="button" disabled={signingIn} accessibilityState={{disabled:signingIn}} onPress={()=>go('profile')} style={styles.secondary}><Text style={[styles.secondaryText,{color:theme.text}]}>Let’s start without an account</Text></Pressable>
     </View>
   </ScrollView>;
   else if(step==='account')body=<ScrollView testID="preview.account" keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={styles.conversation}>

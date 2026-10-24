@@ -13,6 +13,7 @@ import { cancelCustomTimedReminder, cancelCustomTimedRemindersIfDeliveryOff, cou
 import { spacing, surfaceTreatment, type Theme } from '../theme';
 import {NotificationTimingControls} from '../components/NotificationTimingControls';
 import type {ScheduleEntry} from '../domain';
+import {PuppyIdentity} from '../components/PuppyIdentity';
 import { entityId } from '../entity-id';
 
 export function NotificationsScreen({
@@ -26,7 +27,7 @@ export function NotificationsScreen({
   onRequestNotificationPermission,
   onNotificationDeliveryChange,
   onOpenSystemSettings,
-  onOpenSchedule,
+  onOpenSchedule,onOpenPet,
   schedule=[],onScheduleChange,
 }: {
   theme: Theme;
@@ -41,6 +42,7 @@ export function NotificationsScreen({
   onNotificationDeliveryChange?: (enabled: boolean) => Promise<void>;
   onOpenSystemSettings: () => void;
   onOpenSchedule: () => void;
+  onOpenPet?:()=>void;
 }) {
   const { t, language, locale } = useLocalization();
   const [timed, setTimed] = useState<CustomTimedReminder[]>([]);
@@ -216,39 +218,10 @@ export function NotificationsScreen({
         ) : null}
       </View>
 
-      <View style={cardStyle}>
-        <Pressable testID="notifications.timed.add" accessibilityRole="button" accessibilityState={{ disabled: saving || !petId }}
-          disabled={saving || !petId} onPress={addTimed}
-          style={({ pressed }) => [styles.row, { backgroundColor: pressed ? theme.primarySoft : undefined, borderRadius: theme.presentation.controlRadius, opacity: saving || !petId ? 0.55 : 1 }]}>
-          <MaterialCommunityIcons accessible={false} name="plus" size={24} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no" />
-          <Text style={[styles.actionLabel, { color: theme.primary }]}>{t('notifications.addTimed')}</Text>
-        </Pressable>
-        {timedLoading ? <View style={styles.loadingRow}><ActivityIndicator color={theme.primary} /><Text style={[styles.detail, { color: theme.textMuted }]}>{t('notifications.timedLoading')}</Text></View> : null}
-        {timedLoadFailed ? <View style={styles.loadError}>
-          <Text accessibilityRole="alert" style={[styles.detail, { color: theme.danger }]}>{t('notifications.timedLoadError')}</Text>
-          <Pressable testID="notifications.timed.retry" accessibilityRole="button" onPress={() => { void reloadTimed(); }} style={styles.retryButton}>
-            <Text style={[styles.actionLabel, { color: theme.primary }]}>{t('notifications.timedRetry')}</Text>
-          </Pressable>
-        </View> : null}
-        {timed.map((reminder) => <View key={reminder.id} testID={`notifications.timed.item.${reminder.id}`} style={[styles.timedRow, { borderTopColor: theme.border }]}>
-          <View style={styles.copy}>
-            <Text style={[styles.label, { color: theme.text }]}>{reminder.label}</Text>
-            <Text testID={`notifications.timed.at.${reminder.id}`} style={[styles.detail, { color: theme.textMuted }]}>{new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }).format(reminder.at)}</Text>
-          </View>
-          <Pressable testID={`notifications.timed.remove.${reminder.id}`} accessibilityRole="button" accessibilityLabel={t('notifications.timedRemove', { label: reminder.label })}
-            disabled={saving} accessibilityState={{ disabled: saving }} onPress={() => removeTimed(reminder)}
-            style={({ pressed }) => [styles.removeButton, { backgroundColor: pressed ? theme.dangerSoft : undefined, opacity: saving ? 0.55 : 1, borderRadius: theme.presentation.controlRadius }]}>
-            <MaterialCommunityIcons accessible={false} name="close" size={22} color={theme.textMuted} accessibilityElementsHidden importantForAccessibility="no" />
-          </Pressable>
-        </View>)}
-      </View>
 
-      {onScheduleChange?<View style={cardStyle}>
-        <Text accessibilityRole="header" style={[styles.label,{color:theme.text}]}>{t('notifications.timing')}</Text>
-        <NotificationTimingControls theme={theme} preferences={notificationPreferences} schedule={schedule} disabled={saving}
-          onChange={next=>save(()=>onNotificationPreferencesChange(next))} onScheduleChange={next=>save(()=>onScheduleChange(next))}/>
-      </View>:null}
 
+      <Text accessibilityRole="header" style={[styles.label,{color:theme.text}]}>{t('notifications.petReminders')}</Text>
+      {onOpenPet?<PuppyIdentity showName theme={theme} onPress={onOpenPet}/>:null}
       <View style={cardStyle}>
         <Pressable
           testID="settings.notifications.routines"
@@ -306,6 +279,39 @@ export function NotificationsScreen({
           </View>
         </View>
       </View>
+      {onScheduleChange?<View style={cardStyle}>
+        <Text accessibilityRole="header" style={[styles.label,{color:theme.text}]}>{t('notifications.timing')}</Text>
+        <NotificationTimingControls theme={theme} preferences={notificationPreferences} schedule={schedule} disabled={saving}
+          onChange={next=>save(()=>onNotificationPreferencesChange(next))} onScheduleChange={next=>save(()=>onScheduleChange(next))}/>
+      </View>:null}
+
+      <View style={cardStyle}>
+        <Pressable testID="notifications.timed.add" accessibilityRole="button" accessibilityState={{ disabled: saving || !petId }}
+          disabled={saving || !petId} onPress={addTimed}
+          style={({ pressed }) => [styles.row, { backgroundColor: pressed ? theme.primarySoft : undefined, borderRadius: theme.presentation.controlRadius, opacity: saving || !petId ? 0.55 : 1 }]}>
+          <MaterialCommunityIcons accessible={false} name="plus" size={24} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no" />
+          <Text style={[styles.actionLabel, { color: theme.primary }]}>{t('notifications.addTimed')}</Text>
+        </Pressable>
+        {timedLoading ? <View style={styles.loadingRow}><ActivityIndicator color={theme.primary} /><Text style={[styles.detail, { color: theme.textMuted }]}>{t('notifications.timedLoading')}</Text></View> : null}
+        {timedLoadFailed ? <View style={styles.loadError}>
+          <Text accessibilityRole="alert" style={[styles.detail, { color: theme.danger }]}>{t('notifications.timedLoadError')}</Text>
+          <Pressable testID="notifications.timed.retry" accessibilityRole="button" onPress={() => { void reloadTimed(); }} style={styles.retryButton}>
+            <Text style={[styles.actionLabel, { color: theme.primary }]}>{t('notifications.timedRetry')}</Text>
+          </Pressable>
+        </View> : null}
+        {timed.map((reminder) => <View key={reminder.id} testID={`notifications.timed.item.${reminder.id}`} style={[styles.timedRow, { borderTopColor: theme.border }]}>
+          <View style={styles.copy}>
+            <Text style={[styles.label, { color: theme.text }]}>{reminder.label}</Text>
+            <Text testID={`notifications.timed.at.${reminder.id}`} style={[styles.detail, { color: theme.textMuted }]}>{new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }).format(reminder.at)}</Text>
+          </View>
+          <Pressable testID={`notifications.timed.remove.${reminder.id}`} accessibilityRole="button" accessibilityLabel={t('notifications.timedRemove', { label: reminder.label })}
+            disabled={saving} accessibilityState={{ disabled: saving }} onPress={() => removeTimed(reminder)}
+            style={({ pressed }) => [styles.removeButton, { backgroundColor: pressed ? theme.dangerSoft : undefined, opacity: saving ? 0.55 : 1, borderRadius: theme.presentation.controlRadius }]}>
+            <MaterialCommunityIcons accessible={false} name="close" size={22} color={theme.textMuted} accessibilityElementsHidden importantForAccessibility="no" />
+          </Pressable>
+        </View>)}
+      </View>
+
     </ScrollView>
     <Modal visible={draft !== null} presentationStyle="pageSheet" animationType="none" onRequestClose={() => { if (!saving) setDraft(null); }}>
       <View testID="notifications.timed.editor" style={[styles.editorRoot, { backgroundColor: theme.background }]}>

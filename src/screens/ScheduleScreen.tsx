@@ -188,30 +188,7 @@ export function ScheduleScreen({
     }
   };
 
-  return (
-    <>
-      <ScrollView testID="screen.schedule" contentContainerStyle={styles.content}>
-        <ActivityLoadState loading={window.loading} error={window.error} onRetry={window.retry} theme={theme}/>
-        {setupHeader ?? <>
-        {showHeader?<Text
-          accessibilityRole="header"
-          numberOfLines={1}
-          style={[
-            styles.title,
-            {
-              color: theme.text,
-              fontSize: theme.presentation.titleSize,
-              lineHeight: theme.presentation.titleLineHeight,
-              fontWeight: theme.presentation.titleWeight,
-              fontFamily: theme.presentation.headingFont,
-              letterSpacing: theme.presentation.titleTracking,
-            },
-          ]}
-        >
-          {t('schedule.title')}
-        </Text>:null}
-
-        <View
+  const suggestionCard=<View testID="schedule.suggestions"
           style={[
             styles.learnCard,
             surfaceTreatment(theme),
@@ -257,7 +234,7 @@ export function ScheduleScreen({
               style={({ pressed }) => [
                 styles.learnButton,
                 {
-                  backgroundColor: theme.primary,
+                  backgroundColor: schedule.length ? theme.primarySoft : theme.primary,
                   borderColor: theme.primary,
                   borderRadius: theme.presentation.controlRadius,
                   borderWidth: theme.presentation.borderWidth,
@@ -269,15 +246,40 @@ export function ScheduleScreen({
                 accessibilityElementsHidden
                 importantForAccessibility="no"
                 name="eye-outline"
-                color={theme.onPrimary}
+                color={schedule.length?theme.primary:theme.onPrimary}
                 size={20}
               />
-              <Text style={[styles.learnButtonText, { color: theme.onPrimary }]}>
+              <Text style={[styles.learnButtonText, { color: schedule.length?theme.primary:theme.onPrimary }]}>
                 {t('schedule.previewButton')}
               </Text>
             </Pressable>
           ) : null}
-        </View>
+        </View>;
+
+  return (
+    <>
+      <ScrollView testID="screen.schedule" contentContainerStyle={styles.content}>
+        <ActivityLoadState loading={window.loading} error={window.error} onRetry={window.retry} theme={theme}/>
+        {setupHeader ?? <>
+        {showHeader?<Text
+          accessibilityRole="header"
+          numberOfLines={1}
+          style={[
+            styles.title,
+            {
+              color: theme.text,
+              fontSize: theme.presentation.titleSize,
+              lineHeight: theme.presentation.titleLineHeight,
+              fontWeight: theme.presentation.titleWeight,
+              fontFamily: theme.presentation.headingFont,
+              letterSpacing: theme.presentation.titleTracking,
+            },
+          ]}
+        >
+          {t('schedule.title')}
+        </Text>:null}
+
+        {!schedule.length?suggestionCard:null}
 
         </>}
         {!setupHeader && schedule.length ? (
@@ -329,7 +331,7 @@ export function ScheduleScreen({
         ) : null}
 
         {!setupHeader && schedule.length ? (
-          <View style={styles.headingRow}>
+          <View testID="schedule.plan" style={styles.headingRow}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('schedule.todayPlan')}</Text>
           </View>
         ) : null}
@@ -453,6 +455,7 @@ export function ScheduleScreen({
           <MaterialCommunityIcons name="plus" color={theme.onPrimary} size={22} />
           <Text style={[styles.addButtonText, { color: theme.onPrimary }]}>{t('schedule.addTime')}</Text>
         </Pressable>
+        {!setupHeader&&schedule.length?suggestionCard:null}
       </ScrollView>
 
       <Modal
@@ -759,7 +762,7 @@ const styles = StyleSheet.create({
   learnStatusText: { flex: 1, fontSize: 12, lineHeight: 17, fontWeight: '600' },
   learnButton: { minHeight: 50, borderRadius: 16, borderWidth: 1, marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 14 },
   learnButtonText: { fontSize: 15, lineHeight: 20, fontWeight: '800', textAlign: 'center' },
-  progressCard: { borderWidth: 1, borderRadius: 22, padding: spacing.md, marginTop: spacing.lg },
+  progressCard: { borderWidth: 1, borderRadius: 22, padding: spacing.md },
   progressHeading: { flexDirection: 'row', alignItems: 'center' },
   progressTitle: { flex: 1, fontSize: 20, lineHeight: 26, fontWeight: '800' },
   progressIcon: { marginLeft: 'auto', width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },

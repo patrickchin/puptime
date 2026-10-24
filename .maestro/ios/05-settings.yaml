@@ -18,6 +18,8 @@ tags:
     id: nav.settings
 - assertVisible:
     id: screen.settings
+- tapOn:
+    id: settings.widget.open
 - scrollUntilVisible:
     element:
       id: settings.widget.action.walk
@@ -54,6 +56,8 @@ tags:
     id: nav.open
 - tapOn:
     id: nav.settings
+- tapOn:
+    id: settings.widget.open
 - scrollUntilVisible:
     element:
       id: settings.widget.action.walk
@@ -65,6 +69,8 @@ tags:
 - assertVisible:
     id: settings.widget.action.walk
     text: checkbox, checked
+- tapOn:
+    id: settings.widget.close
 - scrollUntilVisible:
     element:
       id: settings.theme.open
@@ -175,6 +181,8 @@ tags:
     text: radio button, checked
 - tapOn:
     id: appearance.close
+- tapOn:
+    id: settings.widget.open
 - scrollUntilVisible:
     element:
       id: settings.widget.action.walk

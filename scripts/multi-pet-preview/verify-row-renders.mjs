@@ -6,7 +6,7 @@ import {resolve,join} from 'node:path';
 const device=process.argv[2],output=resolve(process.argv[3]??'output/multi-pet-audit/row-check');
 assert.ok(device,'Pass a dedicated emulator serial with the render-probe bundle installed.');
 const adb=(...args)=>execFileSync('adb',['-s',device,...args],{encoding:'utf8'}).trim();
-assert.match(adb('emu','avd','name'),/^Puptime_(Multi_Pet_622c|Navigation_d859|History_Spacing_d859)\b/,'Only use this worktree’s synthetic emulator.');
+assert.match(adb('emu','avd','name'),/^Puptime_(Multi_Pet_622c|Navigation_d859|History_Spacing_d859|UI_Hierarchy_a9f2)\b/,'Only use this worktree’s synthetic emulator.');
 mkdirSync(output,{recursive:true});
 function hierarchy(){adb('shell','uiautomator','dump','/sdcard/puptime-622c.xml');return adb('shell','cat','/sdcard/puptime-622c.xml');}
 function node(id){
@@ -31,6 +31,7 @@ function observation(){return JSON.parse(adb('shell','su','0','cat','/data/user/
 function counts(){return observation().updates;}
 function unchanged(before,after,message){for(const key of Object.keys(before))assert.equal(after[key],before[key],`${message}: ${key}`);}
 adb('shell','am','force-stop','com.patrickchin.puptime');adb('shell','am','start','-n','com.patrickchin.puptime/.MainActivity');
+node('preview.quick.pet_preview_0.pee');
 reveal('preview.event.pet_preview_0.evt_preview_0_recent');
 const before=counts();assert.ok(Object.keys(before).length>=10,'Use populated history, not an empty screen.');
 tap('preview.edit.pet_preview_0.evt_preview_0_recent');node('editor.type.pee');

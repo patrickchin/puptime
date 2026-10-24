@@ -16,7 +16,7 @@ app = 'com.patrickchin.puptime'
 def adb(*args):
     return subprocess.check_output(['adb', '-s', serial, *args], stderr=subprocess.PIPE, timeout=35)
 
-assert re.match(r'^Puptime_(Multi_Pet_622c|Navigation_d859|History_Spacing_d859)\b', adb('emu', 'avd', 'name').decode())
+assert re.match(r'^Puptime_(Multi_Pet_622c|Navigation_d859|History_Spacing_d859|UI_Hierarchy_a9f2)\b', adb('emu', 'avd', 'name').decode())
 
 def journal():
     hashes = {}
