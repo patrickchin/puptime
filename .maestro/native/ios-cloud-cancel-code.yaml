@@ -16,7 +16,9 @@ name: iOS sign-in challenge can be left without affecting local use
 - assertVisible:
     id: quick.pee
 - tapOn:
-    id: settings.open
+    id: nav.open
+- tapOn:
+    id: nav.settings
 - tapOn:
     id: settings.account.open
 - extendedWaitUntil:

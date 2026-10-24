@@ -38,7 +38,7 @@ function flow(name, commands) {
   writeFileSync(file, `appId: ${app}\n---\n${commands}\n`);
   execFileSync('maestro', ['--device', device, 'test', file, '--test-output-dir', join(directory, name)], { stdio: 'inherit', env: { ...process.env, MAESTRO_CLI_NO_ANALYTICS: '1' } });
 }
-const open = `- launchApp\n- extendedWaitUntil:\n    visible:\n      id: screen.today\n    timeout: 90000\n- tapOn:\n    id: settings.open\n- tapOn:\n    id: settings.backups.open\n- extendedWaitUntil:\n    visible:\n      id: backups.entry.0\n    timeout: 30000`;
+const open = `- launchApp\n- extendedWaitUntil:\n    visible:\n      id: screen.today\n    timeout: 90000\n- tapOn:\n    id: nav.open\n- tapOn:\n    id: nav.settings\n- scrollUntilVisible:\n    element:\n      id: settings.backups.open\n    direction: DOWN\n- tapOn:\n    id: settings.backups.open\n- extendedWaitUntil:\n    visible:\n      id: backups.entry.0\n    timeout: 30000`;
 stop();
 let database = await createLocalDatabase(sqliteTestConnection(path));
 const { petId } = await initializeLocalDatabase(database, () => 'pet_backup_fixture');

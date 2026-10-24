@@ -11,7 +11,7 @@ const device=Object.values(JSON.parse(simctl('list','devices','available','-j'))
 assert.ok(device?.name.startsWith('Puptime Native Storage '));
 assert.equal(device.deviceTypeIdentifier,'com.apple.CoreSimulator.SimDeviceType.iPhone-17');
 const output=mkdtempSync(join(tmpdir(),'puptime-timeline-heading-')),flow=join(output,'heading.yaml');
-writeFileSync(flow,'appId: '+app+'\n---\n- launchApp\n- extendedWaitUntil:\n    visible:\n      id: event.pee.edit\n    timeout: 30000\n- tapOn:\n    id: nav.open\n- tapOn:\n    id: nav.timeline\n    retryTapIfNoChange: true\n- extendedWaitUntil:\n    visible:\n      id: timeline.range\n    timeout: 30000\n- extendedWaitUntil:\n    notVisible:\n      id: activity.loading\n    timeout: 30000\n');
+writeFileSync(flow,'appId: '+app+'\n---\n- launchApp\n- extendedWaitUntil:\n    visible:\n      id: event.pee.edit\n    timeout: 30000\n- tapOn:\n    id: nav.open\n- tapOn:\n    id: nav.timeline\n    retryTapIfNoChange: true\n- extendedWaitUntil:\n    visible:\n      id: timeline.filter.pee\n    timeout: 30000\n- extendedWaitUntil:\n    notVisible:\n      id: activity.loading\n    timeout: 30000\n');
 simctl('ui',udid,'appearance','light');simctl('ui',udid,'content_size',size);
 execFileSync(process.env.MAESTRO_BIN??'maestro',['--device',udid,'test',flow,'--test-output-dir',join(output,'ui')],{stdio:'inherit',env:{...process.env,MAESTRO_CLI_NO_ANALYTICS:'1'}});
 const screenshot=join(output,'timeline-heading.png');simctl('io',udid,'screenshot',screenshot);
@@ -31,7 +31,7 @@ execFileSync(process.env.PUPTIME_REVIEW_PYTHON??'python3',['-c',[
 ].join('\n'),screenshot],{stdio:'inherit'});
 if(size!=='large'){
  const checks=join(output,'accessibility-layout.yaml');
- writeFileSync(checks,'appId: '+app+'\n---\n- launchApp:\n    stopApp: false\n    permissions: {}\n- waitForAnimationToEnd\n- assertVisible:\n    id: timeline.mark.point.*\n- setOrientation: LANDSCAPE_LEFT\n- waitForAnimationToEnd:\n    timeout: 5000\n- repeat:\n    times: 6\n    commands:\n      - swipe:\n          start: 70%,72%\n          end: 70%,55%\n          duration: 400\n- assertVisible:\n    id: timeline.mark.point.*\n- tapOn:\n    id: timeline.zoom.in\n    retryTapIfNoChange: true\n- assertVisible:\n    id: timeline.zoom.value\n    text: .*1.5×\n- takeScreenshot: timeline-largest-landscape\n- setOrientation: PORTRAIT\n');
+ writeFileSync(checks,'appId: '+app+'\n---\n- launchApp:\n    stopApp: false\n    permissions: {}\n- waitForAnimationToEnd\n- assertVisible:\n    id: timeline.mark.point.*\n- setOrientation: LANDSCAPE_LEFT\n- waitForAnimationToEnd:\n    timeout: 5000\n- repeat:\n    times: 6\n    commands:\n      - swipe:\n          start: 70%,72%\n          end: 70%,55%\n          duration: 400\n- assertVisible:\n    id: timeline.mark.point.*\n- takeScreenshot: timeline-largest-landscape\n- setOrientation: PORTRAIT\n');
  try{execFileSync(process.env.MAESTRO_BIN??'maestro',['--device',udid,'test',checks,'--test-output-dir',join(output,'accessibility-layout')],{stdio:'inherit',env:{...process.env,MAESTRO_CLI_NO_ANALYTICS:'1'}});}
  finally{
   const restore=join(output,'restore.yaml');writeFileSync(restore,'appId: '+app+'\n---\n- setOrientation: PORTRAIT\n');

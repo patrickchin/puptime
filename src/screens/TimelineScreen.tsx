@@ -45,7 +45,6 @@ const DATE_COLUMN_WIDTH = 56;
 const LOAD_ROW_HEIGHT = 48;
 const MIN_TIME_SCALE = 1;
 const MAX_TIME_SCALE = 4;
-const ZOOM_STEP = 0.5;
 const ESTIMATE_OPACITY = 0.35;
 const AXIS_HOURS = Array.from({ length: 25 }, (_, index) => index);
 const GRID_HOURS = Array.from({ length: 23 }, (_, index) => index + 1);
@@ -439,8 +438,8 @@ const MemoTimelineDateLabel = memo(TimelineDateLabel);
 const MemoTimelineTrack = memo(TimelineTrack);
 const MemoTimelineAxis = memo(TimelineAxis);
 
-type TimelineProps={events:PuppyEvent[];schedule:ScheduleEntry[];onOpenSchedule:()=>void;theme:Theme}&ActivityViewProps;
-export function TimelineScreen({ events:projectedEvents,activity,refreshToken,schedule,onOpenSchedule,theme }:TimelineProps) {
+type TimelineProps={showHeader?:boolean;events:PuppyEvent[];schedule:ScheduleEntry[];onOpenSchedule:()=>void;theme:Theme}&ActivityViewProps;
+export function TimelineScreen({ events:projectedEvents,activity,refreshToken,schedule,onOpenSchedule,theme,showHeader=true }:TimelineProps) {
   const { activityColors, activityLabel, language, locale, t } = useLocalization();
   const { fontScale, height, width } = useWindowDimensions();
   const rowHeight = Math.round(52 * Math.min(fontScale, 1.5));
@@ -453,7 +452,6 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
     .map(entry => `${activityLabel(entry)}: ${formatScheduleWindow(entry, locale)}`).join('. ');
   const [loadedDayCount, setLoadedDayCount] = useState(INITIAL_DAYS + BEFORE_FIRST_LOG_DAYS);
   const [timeScale, setTimeScale] = useState(1);
-  const timeScaleLabel = timeScale.toFixed(2).replace(/0$/, '');
   const [nowTime, setNowTime] = useState(Date.now());
   const bounds=activityWindowBounds(nowTime,Math.max(loadedDayCount,minimumHistoryDays)+BEFORE_FIRST_LOG_DAYS-1);
   const window=useActivityWindow(activity,projectedEvents,bounds.from,bounds.until,refreshToken);
@@ -489,18 +487,11 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
   const todayKey = dateKey(now);
   const rows = useMemo(() => expectedWindows.length ? days : collapseEmptyTimelineDays(days, todayKey), [days, todayKey, expectedWindows]);
   const savedEstimateIds = useMemo(() => new Set(events.filter((event) => event.estimated).map((event) => event.id)), [events]);
-  const visibleEventCount = new Set(
-    days.flatMap((day) => day.marks.filter((mark) => !mark.estimated && selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label }))).map((mark) => mark.id)),
-  ).size;
   const visibleMarkCount = days.flatMap((day) => day.marks.filter((mark) => selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label })))).length;
   const visibleEstimateCount = new Set(
     days.flatMap((day) => day.marks.filter((mark) => savedEstimateIds.has(mark.id) && selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label }))).map((mark) => mark.id)),
   ).size;
   const hasVisibleGaps = days.some((day) => day.marks.some((mark) => mark.estimated && !savedEstimateIds.has(mark.id) && selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label }))));
-  const rangeLabel = days.length ? formatDateRange(days[0].date, days[days.length - 1].date, language) : '';
-  const rangeDescription = visibleEstimateCount
-    ? t('timeline.rangeWithEstimates', { range: rangeLabel, recorded: visibleEventCount, estimated: visibleEstimateCount })
-    : t('timeline.range', { range: rangeLabel, count: visibleEventCount });
   const hasEarlierDays = historyDayCount < maxHistoryDays;
   const isCompactHeight = height < 500;
   const selectedEvents = events.filter((event) => selection.includes(event.id)).sort((a, b) => a.at - b.at);
@@ -606,30 +597,6 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
     });
   }
 
-  function changeTimeScale(change: number) {
-    const nextScale = clamp(
-      Math.round((timeScaleValue.current + change) / ZOOM_STEP) * ZOOM_STEP,
-      MIN_TIME_SCALE,
-      MAX_TIME_SCALE,
-    );
-    if (nextScale === timeScaleValue.current) return;
-    const { baseTrackWidth: baseWidth, viewportWidth: viewport, gutter } = zoomMetrics.current;
-    const focalX = viewport / 2;
-    const timeAtFocal = clamp(
-      (horizontalOffsetValue.current + focalX - DATE_COLUMN_WIDTH - gutter) / Math.max(1, baseWidth * timeScaleValue.current - gutter * 2),
-      0,
-      1,
-    );
-    const nextTrackWidth = baseWidth * nextScale;
-    pendingHorizontalOffset.current = clamp(
-      gutter + timeAtFocal * Math.max(1, nextTrackWidth - gutter * 2) - focalX + DATE_COLUMN_WIDTH,
-      0,
-      Math.max(0, DATE_COLUMN_WIDTH + nextTrackWidth - viewport),
-    );
-    timeScaleValue.current = nextScale;
-    setTimeScale(nextScale);
-  }
-
   function handleVerticalScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
     const offset = event.nativeEvent.contentOffset.y;
     verticalOffsetValue.current = offset;
@@ -666,86 +633,20 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
           { backgroundColor: theme.background, borderColor: theme.border },
         ]}
       >
-        <View style={[styles.headingRow,fontScale>=1.5&&!isCompactHeight&&styles.headingRowStacked]}>
-          <View style={[styles.headingCopy,fontScale>=1.5&&!isCompactHeight&&styles.headingCopyStacked]}>
-            <Text
-              maxFontSizeMultiplier={2}
-              style={[
-                styles.title,
-                {
-                  color: theme.text,
-                  fontSize: theme.presentation.titleSize,
-                  lineHeight: theme.presentation.titleLineHeight,
-                  fontWeight: theme.presentation.titleWeight,
-                  fontFamily: theme.presentation.headingFont,
-                  letterSpacing: theme.presentation.titleTracking,
-                },
-              ]}
-            >
-              {t('timeline.title')}
-            </Text>
-            {isCompactHeight ? (
-              <Text testID="timeline.range" maxFontSizeMultiplier={2} style={[styles.rangeText, { flex: 0, color: theme.text }]}>
-                {rangeDescription}
-              </Text>
-            ) : null}
-          </View>
-          <View
-            style={[
-              styles.zoomControl,
-              fontScale>=1.5&&!isCompactHeight&&{alignSelf:'flex-start'},
-              {
-                backgroundColor: theme.surface,
-                borderColor: theme.border,
-                borderRadius: theme.presentation.controlRadius,
-              },
-            ]}
-          >
-            <Pressable
-              testID="timeline.zoom.out"
-              accessibilityRole="button"
-              accessibilityLabel={t('timeline.zoomOut')}
-              accessibilityState={{ disabled: timeScale <= MIN_TIME_SCALE }}
-              disabled={timeScale <= MIN_TIME_SCALE}
-              onPress={() => changeTimeScale(-ZOOM_STEP)}
-              style={({ pressed }) => [
-                styles.zoomButton,
-                { opacity: timeScale <= MIN_TIME_SCALE ? 0.3 : pressed ? 0.6 : 1 },
-              ]}
-            >
-              <MaterialCommunityIcons name="minus" size={20} color={theme.text} />
-            </Pressable>
-            <Text
-              testID="timeline.zoom.value"
-              accessibilityLabel={`${t('insights.timeWidth')}: ${timeScaleLabel}×`}
-              style={[styles.zoomValue, { color: theme.text }]}
-            >
-              {timeScaleLabel}×
-            </Text>
-            <Pressable
-              testID="timeline.zoom.in"
-              accessibilityRole="button"
-              accessibilityLabel={t('timeline.zoomIn')}
-              accessibilityState={{ disabled: timeScale >= MAX_TIME_SCALE }}
-              disabled={timeScale >= MAX_TIME_SCALE}
-              onPress={() => changeTimeScale(ZOOM_STEP)}
-              style={({ pressed }) => [
-                styles.zoomButton,
-                { opacity: timeScale >= MAX_TIME_SCALE ? 0.3 : pressed ? 0.6 : 1 },
-              ]}
-            >
-              <MaterialCommunityIcons name="plus" size={20} color={theme.text} />
-            </Pressable>
-          </View>
-        </View>
-
-        {!isCompactHeight ? (
-          <View style={styles.timelineMeta}>
-            <Text testID="timeline.range" maxFontSizeMultiplier={2} style={[styles.rangeText, { color: theme.text }]}>
-              {rangeDescription}
-            </Text>
-          </View>
-        ) : null}
+        {showHeader ? <Text
+          accessibilityRole="header"
+          maxFontSizeMultiplier={2}
+          style={[styles.title, {
+            color: theme.text,
+            fontSize: theme.presentation.titleSize,
+            lineHeight: theme.presentation.titleLineHeight,
+            fontWeight: theme.presentation.titleWeight,
+            fontFamily: theme.presentation.headingFont,
+            letterSpacing: theme.presentation.titleTracking,
+          }]}
+        >
+          {t('timeline.title')}
+        </Text> : null}
         {hasVisibleGaps ? (
           <View style={styles.estimateLegend}>
             <View style={[styles.estimateLegendMark, { backgroundColor: theme.textMuted, opacity: ESTIMATE_OPACITY }]} />
@@ -1059,22 +960,7 @@ const styles = StyleSheet.create({
     zIndex: 5,
   },
   headerCompact: { paddingTop: spacing.xs, paddingBottom: spacing.xs, gap: spacing.xs },
-  headingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  headingRowStacked: { flexDirection: 'column', alignItems: 'stretch' },
-  headingCopy: { flex: 1, minWidth: 0 },
-  headingCopyStacked: { flex: 0, width: '100%' },
   title: { fontSize: 28, lineHeight: 34, fontWeight: '800' },
-  zoomControl: {
-    minWidth: 140,
-    height: 48,
-    borderWidth: StyleSheet.hairlineWidth,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  zoomButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
-  zoomValue: { minWidth: 44, textAlign: 'center', fontSize: 12, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  timelineMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  rangeText: { flex: 1, minWidth: 0, fontSize: 11, lineHeight: 15, fontWeight: '700', fontVariant: ['tabular-nums'] },
   filters: { flexDirection: 'row', gap: spacing.sm },
   filterChip: {
     flex: 1,

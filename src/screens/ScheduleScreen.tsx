@@ -41,6 +41,7 @@ export function ScheduleScreen({
   onRequestReminderPermission,
   theme,
   setupHeader,
+  showHeader=true,
 }: {
   events: PuppyEvent[];
   schedule: ScheduleEntry[];
@@ -51,6 +52,7 @@ export function ScheduleScreen({
   onRequestReminderPermission: () => Promise<boolean>;
   theme: Theme;
   setupHeader?: ReactNode;
+  showHeader?: boolean;
 }&ActivityViewProps) {
   const { activityColors, activityLabel, locale, t } = useLocalization();
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -191,7 +193,8 @@ export function ScheduleScreen({
       <ScrollView testID="screen.schedule" contentContainerStyle={styles.content}>
         <ActivityLoadState loading={window.loading} error={window.error} onRetry={window.retry} theme={theme}/>
         {setupHeader ?? <>
-        <Text
+        {showHeader?<Text
+          accessibilityRole="header"
           numberOfLines={1}
           style={[
             styles.title,
@@ -206,7 +209,7 @@ export function ScheduleScreen({
           ]}
         >
           {t('schedule.title')}
-        </Text>
+        </Text>:null}
 
         <View
           style={[

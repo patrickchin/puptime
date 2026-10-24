@@ -8,7 +8,9 @@ name: Recovered service keeps explicit local choice and SDK credentials
       id: screen.today
     timeout: 90000
 - tapOn:
-    id: settings.open
+    id: nav.open
+- tapOn:
+    id: nav.settings
 - tapOn:
     id: settings.account.open
 - extendedWaitUntil:

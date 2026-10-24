@@ -5,7 +5,9 @@ name: iOS tour replay returns to Settings
     clearState: true
 - runFlow: ../helpers/skip-onboarding.yaml
 - tapOn:
-    id: settings.open
+    id: nav.open
+- tapOn:
+    id: nav.settings
 - scrollUntilVisible:
     element:
       id: settings.guide.open

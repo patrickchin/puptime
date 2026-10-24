@@ -102,8 +102,9 @@ function GuideReferences({ article, theme }: { article: CareArticle; theme: Them
   </View>;
 }
 
-export function LearnScreen({ theme, articleId, onArticleChange }: {
+export function LearnScreen({ theme, articleId, onArticleChange, showHeader=true }: {
   theme: Theme;
+  showHeader?: boolean;
   articleId?: string | null;
   onArticleChange?: (id: string | null) => void;
 }) {
@@ -155,8 +156,8 @@ export function LearnScreen({ theme, articleId, onArticleChange }: {
         )}
         <View style={[styles.headingRow, fontScale > 1.5 && styles.headingLargeText, Platform.OS === 'web' && article && webStyles.articleHeading]}>
           <View style={[styles.rowCopy, fontScale > 1.5 && styles.columnCopy]}>
-            {!article && <Text style={[styles.eyebrow, { color: theme.primary }]}>{t('learn.eyebrow')}</Text>}
-            <Text ref={heading} accessibilityRole="header" aria-level={1} style={[styles.title, { color: theme.text, fontSize: theme.presentation.titleSize, lineHeight: theme.presentation.titleLineHeight, fontWeight: theme.presentation.titleWeight }, Platform.OS === 'web' && webStyles.title]}>{title}</Text>
+            {showHeader && !article && <Text style={[styles.eyebrow, { color: theme.primary }]}>{t('learn.eyebrow')}</Text>}
+            {(showHeader||selectedId!==null)&&<Text ref={heading} accessibilityRole="header" aria-level={1} style={[styles.title, { color: theme.text, fontSize: theme.presentation.titleSize, lineHeight: theme.presentation.titleLineHeight, fontWeight: theme.presentation.titleWeight }, !showHeader && {fontSize:22,lineHeight:28}, Platform.OS === 'web' && webStyles.title]}>{title}</Text>}
             {!article && <Text style={[styles.intro, { color: theme.textMuted }]}>{invalidArticle ? t('learn.notFoundBody') : t('learn.intro')}</Text>}
           </View>
           {article && <GuideImage article={article} style={[styles.heroImage, width < 360 && styles.smallFeaturedImage, wide && styles.heroImageWide, Platform.OS === 'web' && webStyles.heroImage]} />}

@@ -5,7 +5,7 @@ import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator,Alert, Appearance, AppState, BackHandler, Linking, Modal, Platform, Pressable,StyleSheet,Text,useColorScheme, View } from 'react-native';
+import { ActivityIndicator,Alert, Appearance, AppState, BackHandler, Linking, Modal, Platform, Pressable,StyleSheet,Text,useColorScheme,useWindowDimensions, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { BottomNav } from './src/components/BottomNav';
@@ -110,6 +110,7 @@ export default function App(){return <PuptimeApp conversationalOnboarding={Platf
 
 export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboarding?:boolean}={}) {
   const colorScheme = useColorScheme();
+  const {fontScale} = useWindowDimensions();
   const [themePreference, setThemePreference] = useState<ThemePreference>('system');
   const [languagePreference, setLanguagePreference] = useState<LanguagePreference>('system');
   const [preferencePicker, setPreferencePicker] = useState<'theme' | 'language' | null>(null);
@@ -129,7 +130,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
   },[]);
   const [onboardingVisible, setOnboardingVisible] = useState<boolean | null>(null);
   const [guideOpenedFromSettings, setGuideOpenedFromSettings] = useState(false);
-  const [scheduleOpenedFromSettings, setScheduleOpenedFromSettings] = useState(false);
+  const [navigationHistory, setNavigationHistory] = useState<Array<AppTab | 'settings'>>([]);
   const [firstLaunch,setFirstLaunch]=useState<FirstLaunchProgress|null>(null);
   const [startupFailed,setStartupFailed]=useState(false);
   const startupLoading=useRef(false);
@@ -270,8 +271,24 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     setDrawerOpen(false);
     setHistoryVisible(false);
     setSettingsVisible(false);
-    setScheduleOpenedFromSettings(false);
+    setNavigationHistory([]);
     setTab(nextTab);
+  };
+
+  const openSettings = () => {
+    setNavigationHistory(history => [...history, tab]);
+    setSettingsVisible(true);
+  };
+  const openTab = (nextTab: AppTab) => {
+    setNavigationHistory(history => [...history, settingsVisible ? 'settings' : tab]);
+    setSettingsVisible(false);
+    setTab(nextTab);
+  };
+  const goBack = () => {
+    const destination = navigationHistory.at(-1);
+    setNavigationHistory(history => history.slice(0, -1));
+    setSettingsVisible(destination === 'settings');
+    if (destination !== 'settings') setTab(destination ?? 'log');
   };
 
   useEffect(() => {
@@ -285,14 +302,8 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
         setPreferencePicker(null);
         return true;
       }
-      if (settingsVisible) {
-        setSettingsVisible(false);
-        return true;
-      }
-      if (tab === 'schedule' && scheduleOpenedFromSettings) {
-        setScheduleOpenedFromSettings(false);
-        setTab('log');
-        setSettingsVisible(true);
+      if (settingsVisible || navigationHistory.length) {
+        goBack();
         return true;
       }
       if (tab !== 'log') {
@@ -302,7 +313,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
       return false;
     });
     return () => subscription.remove();
-  }, [showSpotlight,accountVisible,drawerOpen,historyVisible,onboardingVisible, preferencePicker, scheduleOpenedFromSettings, settingsVisible, tab]);
+  }, [showSpotlight,accountVisible,drawerOpen,historyVisible,onboardingVisible, preferencePicker, navigationHistory, settingsVisible, tab]);
 
   useEffect(() => {
     configureNotificationActions(language).catch(() => undefined);
@@ -311,12 +322,13 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
   const handleNotificationResponse = useCallback(async (response: Notifications.NotificationResponse) => {
     const data = response.notification.request.content.data;
     if(nativeApp&&data?.kind===CUSTOM_TIMED_REMINDER_NOTIFICATION_KIND){
-      setDrawerOpen(false);setAccountVisible(false);setHistoryVisible(false);setSettingsVisible(false);setTab('notifications');return;
+      setNavigationHistory([]);setDrawerOpen(false);setAccountVisible(false);setHistoryVisible(false);setSettingsVisible(false);setTab('notifications');return;
     }
     if (data?.kind === POTTY_REMINDER_NOTIFICATION_KIND) {
       setAccountVisible(false);
       setHistoryVisible(false);
       setSettingsVisible(false);
+      setNavigationHistory([]);
       setTab('log');
       return;
     }
@@ -359,6 +371,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     setAccountVisible(false);
     setHistoryVisible(false);
     setSettingsVisible(false);
+    setNavigationHistory([]);
     setTab('log');
     setEditRequest({
       eventId: event.id,
@@ -620,7 +633,9 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
         <SettingsScreen
           {...{showHeader:!nativeApp,onBackupsRestored:refreshCommittedState,onOpenHistory:eventHistory?()=>setHistoryVisible(true):undefined,notificationDelivery:nativeApp?notificationDelivery:undefined,
             onNotificationDeliveryChange:changeNotificationDelivery,routineReminderCount:schedule.filter(entry=>entry.reminder).length,
-            onOpenSchedule:()=>{setSettingsVisible(false);setScheduleOpenedFromSettings(true);setTab('schedule');}}}
+            onOpenSchedule:()=>openTab('schedule'),
+            onOpenNotifications:()=>openTab('notifications'),
+            onImport:importActivity,eventCount}}
           theme={theme}
           themePreference={themePreference}
           languagePreference={languagePreference}
@@ -628,7 +643,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
           customActivities={customActivities}
           notificationPreferences={notificationPreferences}
           notificationPermission={notificationPermission}
-          onBack={() => setSettingsVisible(false)}
+          onBack={goBack}
           cloudHandle={cloud}
           onOpenAccount={()=>setAccountVisible(true)}
           onOpenPicker={setPreferencePicker}
@@ -652,13 +667,14 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
       onNotificationPreferencesChange={changeNotificationPreferences} onRequestNotificationPermission={requestNotifications}
       onNotificationDeliveryChange={changeNotificationDelivery} onOpenSystemSettings={()=>{void Linking.openSettings().catch(()=>undefined);}}
       schedule={schedule} onScheduleChange={changeSchedule}
-      onOpenSchedule={()=>navigateToTab('schedule')}/>;
-    if (tab === 'learn') return <LearnScreen theme={theme} />;
-    if (tab === 'timeline') return <TimelineScreen events={events} activity={activity} refreshToken={refreshToken} schedule={schedule} onOpenSchedule={()=>navigateToTab('schedule')} theme={theme} />;
-    if (tab === 'insights') return <InsightsScreen events={events} activity={activity} refreshToken={refreshToken} customActivities={customActivities} onImport={importActivity} theme={theme} />;
+      onOpenSchedule={()=>openTab('schedule')}/>;
+    if (tab === 'learn') return <LearnScreen showHeader={!nativeApp} theme={theme} />;
+    if (tab === 'timeline') return <TimelineScreen showHeader={!nativeApp} events={events} activity={activity} refreshToken={refreshToken} schedule={schedule} onOpenSchedule={()=>openTab('schedule')} theme={theme} />;
+    if (tab === 'insights') return <InsightsScreen showHeader={!nativeApp} events={events} activity={activity} refreshToken={refreshToken} customActivities={customActivities} theme={theme} />;
     if (tab === 'schedule') {
       return (
         <ScheduleScreen
+          showHeader={!nativeApp}
           events={events}
           activity={activity}
           refreshToken={refreshToken}
@@ -688,7 +704,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
         onLog={logEvent}
         onSave={saveEventDetails}
         onDelete={deleteEvent}
-        onOpenSettings={() => setSettingsVisible(true)}
+        onOpenSettings={openSettings}
         theme={theme}
       />
     );
@@ -712,6 +728,8 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     notificationPreferences,
     schedule,
     settingsVisible,
+    navigationHistory,
+    eventCount,
     tab,
     theme,
     themePreference,
@@ -729,19 +747,22 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
           <View ref={spotlightContainer} collapsable={false} style={styles.screen}>
           <BlurTargetView ref={blurTarget} style={styles.screen}>
           <SideNavigation open={drawerOpen} enabled={onboardingVisible===false} tab={tab} settingsVisible={settingsVisible} theme={theme}
-            onOpen={()=>setDrawerOpen(true)} onClose={()=>setDrawerOpen(false)} onChange={navigateToTab} onSettings={()=>{setHistoryVisible(false);setSettingsVisible(true);}}>
+            onOpen={()=>setDrawerOpen(true)} onClose={()=>setDrawerOpen(false)} onChange={navigateToTab} onSettings={()=>{setHistoryVisible(false);setNavigationHistory([tab]);setSettingsVisible(true);}}>
           {nativeApp&&onboardingVisible===false&&!historyVisible?<View style={styles.navigationHeader}>
-            <Pressable testID="nav.open" accessibilityRole="button" accessibilityLabel={translate(language,'nav.open')} onPress={()=>setDrawerOpen(true)}
+            <Pressable testID={settingsVisible?'settings.back':navigationHistory.length?'nav.back':'nav.open'} accessibilityRole="button"
+              accessibilityLabel={translate(language,settingsVisible||navigationHistory.length>0?'settings.back':'nav.open')}
+              onPress={()=>{if(settingsVisible||navigationHistory.length)goBack();else setDrawerOpen(true);}}
               style={({pressed})=>[styles.menuButton,{backgroundColor:pressed?theme.primarySoft:theme.surface,borderRadius:theme.presentation.controlRadius}]}>
-              <MaterialCommunityIcons accessible={false} name="menu" size={25} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
+              <MaterialCommunityIcons accessible={false} name={settingsVisible||navigationHistory.length>0?'arrow-left':'menu'} size={25} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
             </Pressable>
-            <Text accessibilityRole={settingsVisible||tab==='notifications'?'header':undefined} maxFontSizeMultiplier={1.5} style={[styles.navigationTitle,{color:theme.text}]}>{settingsVisible?translate(language,'settings.title'):tab==='notifications'?translate(language,'notifications.title'):'Puptime'}</Text>
-            {!settingsVisible?<PuppyIdentity theme={theme} onPress={()=>setSettingsVisible(true)}/>:null}
-            {settingsVisible?<Pressable testID="settings.back" accessibilityRole="button" accessibilityLabel={translate(language,'settings.back')} onPress={()=>setSettingsVisible(false)} style={styles.menuButton}>
-              <MaterialCommunityIcons accessible={false} name="close" size={24} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
-            </Pressable>:null}
-            {!settingsVisible&&tab==='log'?<Pressable testID="settings.open" accessibilityRole="button" accessibilityLabel={translate(language,'log.openSettingsA11y')} onPress={()=>setSettingsVisible(true)} style={styles.menuButton}>
-              <MaterialCommunityIcons accessible={false} name="cog-outline" size={24} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
+            <Text testID="nav.title" accessibilityRole="header" style={[styles.navigationTitle,{color:theme.text,minWidth:fontScale>1.1?'70%':70}]}>{translate(language,settingsVisible?'settings.title':tab==='notifications'?'notifications.title':tab==='learn'?'learn.title':`nav.${tab}`)}</Text>
+            {!settingsVisible?<PuppyIdentity theme={theme} onPress={openSettings}/>:null}
+            {!settingsVisible&&(tab==='log'||tab==='timeline')?<Pressable testID="nav.switch" accessibilityRole="button"
+              accessibilityLabel={translate(language,tab==='log'?'nav.timeline':'nav.log')} onPress={()=>navigateToTab(tab==='log'?'timeline':'log')}
+              style={({pressed})=>[styles.switchButton,{backgroundColor:pressed?theme.primarySoft:theme.surface,borderColor:theme.border,borderRadius:theme.presentation.controlRadius}]}>
+              <MaterialCommunityIcons accessible={false} name="swap-horizontal" size={22} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
+              <Text style={[styles.switchLabel,{color:theme.primary}]}>{translate(language,tab==='log'?'nav.timeline':'nav.log')}</Text>
+
             </Pressable>:null}
           </View>:null}
           <View style={styles.screen}>
@@ -770,10 +791,11 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
             {!onboardingVisible && undoState ? (
               <Toast
                 message={undoState.message}
-                onNote={() => {
+                onEdit={() => {
                   setSettingsVisible(false);
+                  setNavigationHistory([]);
                   setTab('log');
-                  setEditRequest({ eventId: undoState.event.id, focusNote: true });
+                  setEditRequest({ eventId: undoState.event.id });
                   setUndoState(null);
                 }}
                 onUndo={undo}
@@ -802,7 +824,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
             onClose={() => setPreferencePicker(null)}
           />
           <Modal visible={accountVisible&&cloud.available} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={()=>setAccountVisible(false)}>
-            {accountVisible?<SafeAreaProvider><AccountScreen cloud={cloud} theme={theme} eventCount={eventCount} onBack={()=>setAccountVisible(false)} onOpenActivity={()=>{setAccountVisible(false);setSettingsVisible(false);setTab('log');}}/></SafeAreaProvider>:null}
+            {accountVisible?<SafeAreaProvider><AccountScreen cloud={cloud} theme={theme} eventCount={eventCount} onBack={()=>setAccountVisible(false)} onOpenActivity={()=>{setAccountVisible(false);navigateToTab('log');}}/></SafeAreaProvider>:null}
           </Modal>
         </SafeAreaView>
       </LocalizationProvider>
@@ -813,9 +835,11 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
 const styles = StyleSheet.create({
   container: { flex: 1 },
   screen: { flex: 1 },
-  navigationHeader:{minHeight:60,paddingHorizontal:20,paddingVertical:6,flexDirection:'row',alignItems:'center',gap:14},
+  navigationHeader:{minHeight:60,paddingHorizontal:20,paddingVertical:6,flexDirection:'row',alignItems:'center',gap:8,flexWrap:'wrap'},
   menuButton:{minHeight:48,minWidth:48,alignItems:'center',justifyContent:'center'},
-  navigationTitle:{fontSize:20,lineHeight:28,fontWeight:'700',flex:1},
+  navigationTitle:{fontSize:20,lineHeight:28,fontWeight:'700',flex:1,minWidth:70},
+  switchButton:{minHeight:48,paddingHorizontal:10,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5,borderWidth:1},
+  switchLabel:{fontSize:14,lineHeight:20,fontWeight:'700'},
   startup:{flex:1,alignItems:'center',justifyContent:'center',padding:24,gap:16},
   startupText:{fontSize:16,lineHeight:24,textAlign:'center'},
   startupRetry:{minHeight:48,paddingHorizontal:24,paddingVertical:12,borderRadius:12},

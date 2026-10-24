@@ -33,12 +33,6 @@ tags:
     id: nav.timeline
 - assertVisible:
     id: screen.timeline
-- assertVisible:
-    id: timeline.zoom.out
-    enabled: false
-- assertVisible:
-    id: timeline.zoom.in
-    enabled: true
 - tapOn:
     id: nav.open
 - assertVisible:
@@ -48,14 +42,20 @@ tags:
     id: nav.insights
 - assertVisible:
     id: screen.insights
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.settings
 - scrollUntilVisible:
     element:
-      id: insights.export
+      id: settings.export
     direction: DOWN
     visibilityPercentage: 50
 - assertVisible:
-    id: insights.export
+    id: settings.export
     enabled: false
+- tapOn:
+    id: settings.back
 - tapOn:
     id: nav.open
 - assertVisible:

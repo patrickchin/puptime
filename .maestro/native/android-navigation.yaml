@@ -1,0 +1,164 @@
+appId: com.patrickchin.puptime
+name: Android screen hierarchy and settings placement
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- assertVisible:
+    id: nav.title
+    text: Log
+- assertNotVisible:
+    id: settings.open
+- takeScreenshot: android-log
+- tapOn:
+    id: event.pee.edit
+    index: 0
+- assertVisible:
+    id: editor
+- takeScreenshot: android-editor
+- tapOn:
+    id: editor.close
+- tapOn:
+    id: nav.switch
+- assertVisible:
+    id: nav.title
+    text: Timeline
+- assertNotVisible:
+    id: timeline.range
+- assertNotVisible:
+    id: timeline.zoom.value
+- takeScreenshot: android-timeline
+- tapOn:
+    id: timeline.mark.point.*
+    index: 0
+- assertVisible:
+    id: timeline.details
+- takeScreenshot: android-timeline-detail
+- tapOn:
+    id: timeline.details.close
+- tapOn:
+    id: nav.switch
+- assertVisible:
+    id: screen.today
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.insights
+- assertVisible:
+    id: nav.title
+    text: Insights
+- assertNotVisible:
+    id: insights.export
+- takeScreenshot: android-insights
+- tapOn:
+    id: nav.open
+- takeScreenshot: android-menu
+- tapOn:
+    id: nav.settings
+- assertVisible:
+    id: nav.title
+    text: Settings
+- takeScreenshot: android-settings
+- tapOn:
+    id: settings.account.open
+- assertVisible:
+    id: screen.account
+- takeScreenshot: android-account
+- tapOn:
+    id: account.back
+- scrollUntilVisible:
+    element:
+      id: settings.notifications.open
+    direction: DOWN
+- tapOn:
+    id: settings.notifications.open
+- assertVisible:
+    id: screen.notifications
+- assertVisible:
+    id: nav.back
+- takeScreenshot: android-notifications
+- scrollUntilVisible:
+    element:
+      id: settings.notifications.routines
+    direction: DOWN
+- tapOn:
+    id: settings.notifications.routines
+- assertVisible:
+    id: screen.schedule
+- pressKey: Back
+- assertVisible:
+    id: screen.notifications
+- tapOn:
+    id: nav.back
+- assertVisible:
+    id: screen.settings
+- scrollUntilVisible:
+    element:
+      id: settings.import
+    direction: DOWN
+    centerElement: true
+- assertVisible:
+    id: settings.export
+    enabled: true
+- takeScreenshot: android-data-settings
+- tapOn:
+    id: settings.import
+- extendedWaitUntil:
+    visible: ^(Recent|Downloads|Documents)$
+    timeout: 30000
+- pressKey: Back
+- assertVisible:
+    id: settings.import
+    enabled: true
+- tapOn:
+    id: settings.export
+- extendedWaitUntil:
+    visible: .*CSV.*
+    timeout: 30000
+- takeScreenshot: android-csv-share
+- pressKey: Back
+- scrollUntilVisible:
+    element:
+      id: settings.backups.open
+    direction: DOWN
+- tapOn:
+    id: settings.backups.open
+- assertVisible:
+    id: backups.close
+- takeScreenshot: android-backups
+- tapOn:
+    id: backups.close
+- scrollUntilVisible:
+    element:
+      id: settings.history.open
+    direction: DOWN
+- tapOn:
+    id: settings.history.open
+- assertVisible:
+    id: screen.eventHistory
+- takeScreenshot: android-history
+- tapOn:
+    id: history.recent.back
+- tapOn:
+    id: settings.back
+- assertVisible:
+    id: nav.title
+    text: Insights
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.schedule
+- assertVisible:
+    id: nav.title
+    text: Schedule
+- takeScreenshot: android-schedule
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.learn
+- assertVisible:
+    id: nav.title
+    text: Puppy care
+- takeScreenshot: android-learn

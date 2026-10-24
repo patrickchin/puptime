@@ -10,11 +10,12 @@ tags:
 - runFlow: ../helpers/skip-onboarding.yaml
 - extendedWaitUntil:
     visible:
-      id: settings.open
+      id: nav.open
     timeout: 90000
 - tapOn:
-    id: settings.open
-    retryTapIfNoChange: true
+    id: nav.open
+- tapOn:
+    id: nav.settings
 - assertVisible:
     id: screen.settings
 - scrollUntilVisible:
@@ -47,11 +48,12 @@ tags:
     permissions: {}
 - extendedWaitUntil:
     visible:
-      id: settings.open
+      id: nav.open
     timeout: 90000
 - tapOn:
-    id: settings.open
-    retryTapIfNoChange: true
+    id: nav.open
+- tapOn:
+    id: nav.settings
 - scrollUntilVisible:
     element:
       id: settings.widget.action.walk
@@ -149,8 +151,9 @@ tags:
 - tapOn:
     id: nav.close
 - tapOn:
-    id: settings.open
-    retryTapIfNoChange: true
+    id: nav.open
+- tapOn:
+    id: nav.settings
 - tapOn:
     id: settings.theme.open
     retryTapIfNoChange: true

@@ -8,7 +8,9 @@ name: iOS optional email sign-in preserves local history
 - tapOn:
     id: quick.pee
 - tapOn:
-    id: settings.open
+    id: nav.open
+- tapOn:
+    id: nav.settings
 - tapOn:
     id: settings.account.open
 - extendedWaitUntil:

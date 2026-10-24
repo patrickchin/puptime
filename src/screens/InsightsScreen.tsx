@@ -1,8 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect,useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -24,9 +22,7 @@ import {
 import { ActivityIcon } from '../components/ActivityIcon';
 import {ActivityLoadState} from '../components/ActivityLoadState';
 import {activityWindowBounds,useActivityWindow,type ActivityViewProps} from '../activity-view';
-import {loadEvents} from '../storage';
 import { useLocalization } from '../localization-context';
-import { shareEventsCsv } from '../share-export';
 import { spacing, type Theme } from '../theme';
 
 const FREQUENCY_DAYS = 10;
@@ -160,17 +156,15 @@ export function InsightsScreen({
   activity,
   refreshToken,
   customActivities,
-  onImport,
+  showHeader=true,
   theme,
 }: {
   events: PuppyEvent[];
   customActivities: string[];
-  onImport: () => Promise<void>;
+  showHeader?: boolean;
   theme: Theme;
 }&ActivityViewProps) {
   const { activityColors, activityLabel, language, t } = useLocalization();
-  const [exporting, setExporting] = useState(false);
-  const [importing, setImporting] = useState(false);
   const [showAllMonths, setShowAllMonths] = useState(false);
   const now = new Date();
   const bounds=activityWindowBounds(now.getTime(),FREQUENCY_DAYS-1);
@@ -188,37 +182,11 @@ export function InsightsScreen({
   const visibleMonths = showAllMonths ? monthly : monthly.slice(0, MONTH_PREVIEW_COUNT);
   const maxMonthlyAverage = Math.max(1, ...monthly.map((stat) => stat.averagePerRecordedDay));
   const currentMonthKey = dateKey(now).slice(0, 7);
-  const hasRecords=activity?monthly.some(month=>month.total+month.estimatedTotal>0):events.length>0;
-  const exportDisabled = exporting || importing || !hasRecords;
-
-  async function importActivity() {
-    if (importing || exporting) return;
-    setImporting(true);
-    try {
-      await onImport();
-    } catch {
-      Alert.alert(t('insights.importErrorTitle'), t('insights.importErrorBody'));
-    } finally {
-      setImporting(false);
-    }
-  }
-
-  async function exportActivity() {
-    if (exportDisabled) return;
-    setExporting(true);
-    try {
-      await shareEventsCsv(activity?await loadEvents():events);
-    } catch {
-      Alert.alert(t('insights.exportErrorTitle'), t('insights.exportErrorBody'));
-    } finally {
-      setExporting(false);
-    }
-  }
-
   return (
     <ScrollView testID="screen.insights" contentContainerStyle={styles.content}>
       <ActivityLoadState loading={window.loading||monthLoading} error={window.error||monthError} onRetry={()=>{window.retry();setMonthAttempt(value=>value+1);}} theme={theme}/>
-      <Text
+      {showHeader?<Text
+        accessibilityRole="header"
         numberOfLines={1}
         style={[
           styles.title,
@@ -233,7 +201,7 @@ export function InsightsScreen({
         ]}
       >
         {t('insights.title')}
-      </Text>
+      </Text>:null}
 
       <View style={[styles.section, { borderColor: theme.border }]}>
         <View style={styles.sectionHeading}>
@@ -321,64 +289,6 @@ export function InsightsScreen({
         </View>
       ) : null}
 
-      <View style={[styles.section, { borderColor: theme.border }]}>
-        <Text style={[styles.panelTitle, { color: theme.text }]}>{t('insights.dataTitle')}</Text>
-        <Text style={[styles.dataCaption, { color: theme.textMuted }]}>{t('insights.dataCaption')}</Text>
-        <Pressable
-          testID="insights.export"
-          accessibilityRole="button"
-          accessibilityLabel={t(events.length ? 'insights.exportA11y' : 'insights.noExport')}
-          accessibilityHint={events.length ? t('insights.exportHint') : undefined}
-          accessibilityState={{ busy: exporting, disabled: exportDisabled }}
-          disabled={exportDisabled}
-          onPress={exportActivity}
-          style={({ pressed }) => [
-            styles.exportButton,
-            {
-              backgroundColor: theme.primary,
-              borderRadius: theme.presentation.controlRadius,
-              opacity: exportDisabled ? 0.45 : pressed ? 0.82 : 1,
-            },
-          ]}
-        >
-          {exporting ? (
-            <ActivityIndicator color={theme.onPrimary} size="small" />
-          ) : (
-            <MaterialCommunityIcons accessibilityElementsHidden importantForAccessibility="no" name="share-variant-outline" size={20} color={theme.onPrimary} />
-          )}
-          <Text style={[styles.exportButtonText, { color: theme.onPrimary }]}>
-            {t(events.length ? 'insights.exportButton' : 'insights.noExport')}
-          </Text>
-        </Pressable>
-        <Pressable
-          testID="insights.import"
-          accessibilityRole="button"
-          accessibilityLabel={t('insights.importA11y')}
-          accessibilityHint={t('insights.importHint')}
-          accessibilityState={{ busy: importing, disabled: importing || exporting }}
-          disabled={importing || exporting}
-          onPress={() => void importActivity()}
-          style={({ pressed }) => [
-            styles.exportButton,
-            styles.importButton,
-            {
-              backgroundColor: pressed ? theme.primarySoft : theme.surfaceRaised,
-              borderColor: theme.primary,
-              borderRadius: theme.presentation.controlRadius,
-              opacity: importing || exporting ? 0.45 : 1,
-            },
-          ]}
-        >
-          {importing ? (
-            <ActivityIndicator color={theme.primary} size="small" />
-          ) : (
-            <MaterialCommunityIcons accessibilityElementsHidden importantForAccessibility="no" name="file-import-outline" size={20} color={theme.primary} />
-          )}
-          <Text style={[styles.exportButtonText, { color: theme.primary }]}>
-            {t(importing ? 'insights.importing' : 'insights.importButton')}
-          </Text>
-        </Pressable>
-      </View>
     </ScrollView>
   );
 }
@@ -435,15 +345,4 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   historyToggleText: { fontSize: 14, lineHeight: 19, fontWeight: '700' },
-  exportButton: {
-    minHeight: 52,
-    paddingHorizontal: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-  },
-  dataCaption: { fontSize: 14, lineHeight: 20, marginTop: spacing.xs, marginBottom: spacing.md },
-  importButton: { borderWidth: 1, marginTop: spacing.sm },
-  exportButtonText: { fontSize: 15, lineHeight: 20, fontWeight: '700', textAlign: 'center' },
 });

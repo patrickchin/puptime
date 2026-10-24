@@ -19,7 +19,7 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
   useEffect(()=>{let mounted=true;cloud.getLocalName().then(name=>{if(mounted)setLocalName(name);}).catch(()=>{if(mounted)setReadFailed(true);});return()=>{mounted=false;};},[cloud.getLocalName]);
   useEffect(()=>{setSamePuppy(false);},[account?.user.id,existing?.id]);
   useEffect(()=>()=>cloud.controller?.cancelExport(),[cloud.controller]);
-  const titleStyle={color:theme.text,fontFamily:theme.presentation.headingFont,fontSize:theme.presentation.titleSize,lineHeight:theme.presentation.titleLineHeight,fontWeight:theme.presentation.titleWeight};
+  const titleStyle={color:theme.text,fontFamily:theme.presentation.headingFont,fontSize:20,lineHeight:28,fontWeight:theme.presentation.titleWeight};
   const bodyStyle={color:theme.textMuted};
   const cardStyle=[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border,borderRadius:theme.presentation.cardRadius}];
   const name=state?.local?.name??localName;
@@ -96,4 +96,5 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
 }
 const styles=StyleSheet.create({
  root:{flex:1},content:{width:'100%',maxWidth:720,alignSelf:'center',padding:spacing.md,gap:spacing.md,paddingBottom:spacing.xl},sectionTitle:{fontSize:20,lineHeight:28,fontWeight:'700',marginTop:8},header:{flexDirection:'row',alignItems:'flex-start',gap:12},back:{width:48,height:48,alignItems:'center',justifyContent:'center'},title:{flex:1},card:{borderWidth:1,padding:spacing.md,gap:12},summaryHeader:{flexDirection:'row',alignItems:'center',gap:12},eyebrow:{fontSize:14,fontWeight:'700',flex:1},puppy:{fontSize:25,lineHeight:32,fontWeight:'700'},status:{fontSize:16,lineHeight:23,fontWeight:'700'},body:{fontSize:16,lineHeight:24},label:{fontSize:16,lineHeight:23,fontWeight:'700'},stack:{gap:12},notice:{fontSize:16,lineHeight:24,padding:14},confirm:{flexDirection:'row',alignItems:'center',gap:12},grow:{flex:1},privacy:{minHeight:48,justifyContent:'center',alignSelf:'flex-start'},
+
 });

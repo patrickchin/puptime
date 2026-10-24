@@ -4,10 +4,12 @@ name: iOS restarts authenticated cloud setup without losing local history
 - launchApp
 - extendedWaitUntil:
     visible:
-      id: settings.open
+      id: nav.open
     timeout: 90000
 - tapOn:
-    id: settings.open
+    id: nav.open
+- tapOn:
+    id: nav.settings
 - tapOn:
     id: settings.account.open
 - extendedWaitUntil:

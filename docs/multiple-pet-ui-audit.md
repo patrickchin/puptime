@@ -17,10 +17,10 @@ The direction follows `RELEASE_PLAN.md`: both pets' actions together on Log; one
 | Surface | Current implementation | Preview / required behavior |
 |---|---|---|
 | Initial setup | One puppy profile | Keep first-pet setup short; expose Add a pet afterward. Additional pets start with an empty log and routine. Existing onboarding is unchanged. |
-| Navigation | No pet context | Log is household-wide. Individual views retain a visible pet selector across navigation. Learn remains shared. |
+| Navigation | No pet context | Pets is a main navigation destination with a full pet list and add/edit screens. Log is household-wide. Individual views retain a visible pet selector across navigation. Learn remains shared. |
 | Log quick actions | Three actions for the active puppy | Two named pet rows, each with its own latest timestamps; extra activities remain attached to that row. |
 | History | One pet's day groups | Combined chronological list with a pet name on every entry; All pets / individual filtering. Production should preserve day grouping and paged queries. Preview uses a virtualized list. |
-| Add, edit, undo | Implicit active puppy | Pet ID remains attached to the original action. Editor names the pet. Only the affected pet's event changes. Preview demonstrates note editing and undo; full date/type/delete/revision interactions still need production wiring. |
+| Add, edit, undo | Implicit active puppy | Pet ID remains attached to the original action. Only the affected pet's event changes. The preview reuses the production activity/time/note editor and demonstrates undo and confirmed deletion; revision history and production persistence still need multi-pet wiring. |
 | Timeline | One history and routine | Existing native chart receives only the selected pet's events/windows. Switching resets transient chart detail state. |
 | Insights | One pet's statistics | Existing native analytics receives only selected-pet history. No household average that combines different animals. |
 | Schedule / learning | One routine and history | Existing routine editor and suggestions use selected-pet data. Mochi has three meals; Maple has two. New pet has no example routine silently applied. |
@@ -28,10 +28,10 @@ The direction follows `RELEASE_PLAN.md`: both pets' actions together on Log; one
 | One-off reminders | Pet ID exists in payload | Preserve pet-specific list/cancel behavior; add pet name to delivery and route opening to that pet. Existing production implementation still needs multi-pet UI qualification. |
 | Widgets | One unlabelled target | Bind each widget instance to a fixed pet ID; show its name. Changing the app's selected pet must not retarget a widget. Screenshot is an in-app layout proposal, not an installed widget. |
 | Active naps | Scoped by current repository | Preserve one running nap per pet, allow different pets to nap simultaneously, and route widget completion to the correct pet. Not implemented by this preview's extra-activity sample buttons. |
-| Pet settings | Rename the current puppy | Manage several names; long names wrap. This proposal requires distinct display names/nicknames to keep logs unambiguous. No destructive pet removal is proposed. |
+| Pet settings | Rename the current puppy | Manage names on the dedicated Pets page. Full-page forms return to that list after save or cancel; long names wrap. This proposal requires distinct display names/nicknames to keep logs unambiguous. No destructive pet removal is proposed. |
 | Device settings | Appearance, language, widget actions | Appearance and language remain shared. Widget target/action preferences need instance/pet ownership. Preview demonstrates shared appearance. |
 | Local backups | Already retain/recover all dogs by original ID | Preserve all-pet recovery and per-pet limits; present names when choosing a snapshot. Existing recovery is not exercised by the preview. |
-| CSV export/import | Active pet; CSV has event IDs but no pet mapping | Confirm destination pet before import; name source pet in export UI/file. Define an explicit multi-pet archive format before offering household export. Preview import explains its sample-only behavior; existing Insights export shares only selected synthetic history. |
+| CSV export/import | Active pet; CSV has event IDs but no pet mapping | Confirm destination pet before import; name source pet in export UI/file. Define an explicit multi-pet archive format before offering household export. Preview import explains its sample-only behavior; Settings names the selected pet and exports only its synthetic history. |
 | Cloud / account | One runtime; first cloud pet association | One account, multiple explicit local-to-cloud associations. Show the chosen dog's summary before combining/restoring. Requires backend/client qualification; the preview does not simulate a successful cloud connection. |
 | Revision history | Repository-scoped events | Keep pet context visible in recent changes and restores; preserve composite identity even when event IDs collide. Not wired into the preview. |
 | Learn / care guides | Shared content | Keep shared. No pet picker that implies advice has been personalized. Existing screen is reused. |
@@ -42,10 +42,13 @@ The direction follows `RELEASE_PLAN.md`: both pets' actions together on Log; one
 
 - Kept each pet's name directly beside its actions; compact action rows leave room for history on a phone.
 - Used two-letter monograms after the first render showed identical M avatars for Mochi and Maple.
-- Fixed the Settings rename entry point and added a duplicate-name error with a nickname suggestion.
-- Replaced nested name-entry modals with one native sheet after iOS verification exposed a blank sheet when adding a pet dismissed both levels together.
+- Moved management out of the selector sheet and Settings into a dedicated Pets destination. The quick selector links to that page. Add/edit forms use the app header and Back navigation, with blank/duplicate-name errors. Saving stays on the pet list and preserves the selected pet and history filter.
 - Kept editor draft state inside the editor and memoized history rows, with stable callbacks and composite pet/event keys.
 - At the largest iPhone system text setting, the first preview wrapped the brand into several lines and clipped avatar initials. Bounded decorative branding and compact controls separately from body text; body copy still grows to twice its base size. The revised native Log was captured at that setting. Full accessibility qualification of the reused analysis/routine screens remains production work.
+
+## Navigation integration after #151
+
+The preview now follows the production navigation revision: compact screen titles in the top bar, one-tap Log/Timeline switching, contextual Back, and CSV controls in Settings with an explicit pet selector. Export reads only the selected in-memory sample history. The production entry point remains unchanged.
 
 ## Production implementation boundary
 
@@ -55,9 +58,11 @@ Run and screenshot instructions, automated flows, and the Android row-render obs
 
 ## Verification
 
-- All 461 existing and new Node unit tests passed. General, iOS and Android TypeScript checks passed.
+- All 462 existing and new Node unit tests passed. General, iOS and Android TypeScript checks passed.
 - Native iPhone flows covered all main views, pet selection, pet-specific logging and undo, filtering, add/rename, duplicate-name validation, empty history and empty routine. A separate check exercised rename from Settings and cancellation.
-- The Android UI rendered with 30 days of distinct history for two pets. The render observer tracked 72 history rows: opening and typing in the note editor redrew zero rows; saving redrew exactly the edited row.
+- The preview now reuses the full production editor for activity, time, and notes. The post-log action is labeled Edit. Fresh Android checks cover reopening saved edits and confirmed deletion; the main app check preserves all 1,000 original fixture entries. These editor changes were not rerun on iOS.
+- Fresh Android Pets checks cover full-page add/edit, validation, cancellation, contextual and system Back, retained selection, dark mode, 375 dp at 2× text and landscape. The production SQLite files remain unchanged. iOS pet-management screens were not rerun after replacing the sheet.
+- The Android UI rendered with 30 days of distinct history for two pets. The render observer tracked 83 history rows: opening the editor redrew zero rows; autosaving changed only the edited row.
 - Captured iPhone light/dark, iPad portrait, Android light/dark, a 375 dp Android viewport, 2× Android text, the largest iPhone accessibility text category, and a landscape Android viewport. These are targeted preview checks, not full accessibility certification of the existing app.
 - System notification delivery, installed widget interactions, cloud sync, persistent pet creation/switching, and recovery across multiple pets were not verified by this UI proposal.
 

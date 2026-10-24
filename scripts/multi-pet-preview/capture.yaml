@@ -12,7 +12,7 @@ appId: com.patrickchin.puptime
 - waitForAnimationToEnd
 - takeScreenshot: 02-manage-pets
 - tapOn:
-    id: preview.modal.done
+    id: nav.back
 - tapOn:
     id: nav.open
 - tapOn:
@@ -52,7 +52,9 @@ appId: com.patrickchin.puptime
 - waitForAnimationToEnd
 - takeScreenshot: 09-reminders-mochi
 - tapOn:
-    id: settings.open
+    id: nav.open
+- tapOn:
+    id: nav.settings
 - waitForAnimationToEnd
 - takeScreenshot: 10-settings
 - tapOn:
@@ -68,7 +70,7 @@ appId: com.patrickchin.puptime
 - waitForAnimationToEnd
 - takeScreenshot: 12-dark-settings
 - tapOn:
-    id: settings.open
+    id: settings.back
 - tapOn:
     id: nav.open
 - tapOn:

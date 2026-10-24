@@ -15,7 +15,7 @@ appId: com.patrickchin.puptime
 - waitForAnimationToEnd
 - takeScreenshot: 02-ios-pets
 - tapOn:
-    id: preview.select.pet_preview_1
+    id: preview.rename.pet_preview_1
 - tapOn:
     id: preview.name
 - eraseText: 30
@@ -26,10 +26,10 @@ appId: com.patrickchin.puptime
 - waitForAnimationToEnd
 - takeScreenshot: 03-ios-long-name
 - tapOn:
-    id: preview.modal.done
+    id: nav.back
     retryTapIfNoChange: true
 - assertNotVisible:
-    id: preview.modal.done
+    id: nav.back
 - scrollUntilVisible:
     element:
       id: preview.quick.pet_preview_1.pee
@@ -37,7 +37,11 @@ appId: com.patrickchin.puptime
 - waitForAnimationToEnd
 - takeScreenshot: 04-ios-long-name-log
 - tapOn:
-    id: settings.open
+    id: nav.open
+- scrollUntilVisible:
+    element: {id: nav.settings}
+    direction: DOWN
+- tapOn: {id: nav.settings}
 - waitForAnimationToEnd
 - takeScreenshot: 05-ios-settings
 - tapOn:
@@ -46,6 +50,7 @@ appId: com.patrickchin.puptime
 - takeScreenshot: 06-ios-dark-settings
 - tapOn:
     id: preview.dark
+- tapOn: {id: settings.back}
 - tapOn:
     id: nav.open
 - scrollUntilVisible:

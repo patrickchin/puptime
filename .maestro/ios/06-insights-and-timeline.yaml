@@ -83,14 +83,20 @@ tags:
 - assertVisible:
     id: insights.frequency.poop
     text: .*1\.0.*
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.settings
 - scrollUntilVisible:
     element:
-      id: insights.export
+      id: settings.export
     direction: DOWN
     visibilityPercentage: 50
 - assertVisible:
-    id: insights.export
+    id: settings.export
     enabled: true
+- tapOn:
+    id: settings.back
 - tapOn:
     id: nav.open
 - tapOn:
@@ -101,18 +107,9 @@ tags:
       id: screen.timeline
     timeout: 30000
 - assertVisible:
-    id: timeline.zoom.value
-    text: .*1\.0×.*
-- assertVisible:
     id: timeline.filter.pee
-- assertVisible:
-    id: timeline.range
-    text: .*2 entries.*
 - tapOn:
     id: timeline.filter.poop-meal
-- assertVisible:
-    id: timeline.range
-    text: .*2 entries.*
 - tapOn:
     id: timeline.mark.point.*
 - assertVisible:
@@ -125,9 +122,6 @@ tags:
     id: timeline.details.close
 - tapOn:
     id: timeline.filter.pee
-- assertVisible:
-    id: timeline.range
-    text: .*2 entries.*
 - assertNotVisible:
     id: timeline.empty
 - tapOn:
@@ -165,12 +159,6 @@ tags:
     point: 50%, 25%
 - assertNotVisible:
     id: timeline.details
-- tapOn:
-    id: timeline.zoom.in
-    retryTapIfNoChange: true
-- assertVisible:
-    id: timeline.zoom.value
-    text: .*1\.5×.*
 - swipe:
     start: 50%, 65%
     end: 50%, 85%
@@ -178,6 +166,3 @@ tags:
     id: timeline.details
 - tapOn:
     id: timeline.filter.poop-meal
-- assertVisible:
-    id: timeline.range
-    text: .*2 entries.*

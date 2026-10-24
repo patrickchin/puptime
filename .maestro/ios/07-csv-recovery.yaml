@@ -27,13 +27,17 @@ tags:
     timeout: 30000
 - assertNotVisible:
     id: toast
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.settings
 - scrollUntilVisible:
     element:
-      id: insights.import
+      id: settings.import
     direction: DOWN
     visibilityPercentage: 100
 - tapOn:
-    id: insights.import
+    id: settings.import
 - runFlow:
     when:
       platform: iOS
@@ -58,17 +62,14 @@ tags:
       - pressKey: Back
 - extendedWaitUntil:
     visible:
-      id: insights.import
+      id: settings.import
       enabled: true
     timeout: 30000
 - assertVisible:
-    id: insights.export
+    id: settings.export
     enabled: true
-- scrollUntilVisible:
-    element:
-      id: insights.frequency.pee
-    direction: UP
-    visibilityPercentage: 50
+- tapOn:
+    id: settings.back
 - assertVisible:
     id: insights.frequency.pee
     text: .*1\.0.*

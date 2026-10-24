@@ -32,7 +32,7 @@ export function SettingsRow({
       disabled={disabled}
       accessibilityState={{disabled}}
       onPress={onPress}
-      style={({ pressed }) => [styles.settingsRow, pressed && { backgroundColor: theme.primarySoft }]}
+      style={({ pressed }) => [styles.settingsRow, disabled && {opacity:0.45}, pressed && { backgroundColor: theme.primarySoft }]}
     >
       <View style={[styles.rowIcon, { backgroundColor: theme.primarySoft, borderRadius: theme.presentation.iconRadius }]}>
         <MaterialCommunityIcons

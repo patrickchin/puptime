@@ -11,7 +11,9 @@ name: Save a real offline log before replaying onboarding
 - assertVisible:
     id: toast
 - tapOn:
-    id: settings.open
+    id: nav.open
+- tapOn:
+    id: nav.settings
 - assertVisible:
     id: settings.puppy.name
     text: .*Mochi.*
