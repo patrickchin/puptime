@@ -131,7 +131,6 @@ export function LogScreen({
   const requestHandled=useRef(onEditRequestHandled);requestHandled.current=onEditRequestHandled;
   const [requestAttempt,setRequestAttempt]=useState(0);
   const [nativePicker,setNativePicker]=useState<'date'|'time'|null>(null);
-  const [showAdjustments,setShowAdjustments]=useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PuppyEvent | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -178,7 +177,6 @@ export function LogScreen({
     setHistoryOpen(false);
     setFocusNote(shouldFocusNote);
     setCustomTouched(false);
-    setShowAdjustments(false);
     setNativePicker(null);
     const next = createDraft(event);
     draftSaverRef.current=createEventEditor(event,changes=>onSaveRef.current(event,changes));
@@ -827,20 +825,6 @@ export function LogScreen({
               {Platform.OS==='android'&&nativePicker?<DateTimePicker value={new Date(activeValue)} mode={nativePicker} presentation="dialog" style={{width:1,height:1}} minimumDate={draft.field==='end'?new Date(draft.at):undefined} maximumDate={new Date(draft.field==='end'?Date.now():typeof draft.endedAt==='number'?draft.endedAt:Date.now())} onDismiss={()=>setNativePicker(null)} onValueChange={(_event,date)=>{setNativePicker(null);if(!closing&&date.getTime()!==activeValue)setDraftTime(date.getTime());}}/>:null}
             </View>:null}
 
-            <Text style={[styles.fieldLabel, styles.noteLabel, { color: theme.textMuted }]}>{t('editor.note')}</Text>
-            {draft ? (
-              <NoteInput
-                key={draft.event.id}
-                autoFocus={focusNote}
-                active={!historyOpen&&!closing}
-                value={draft.note}
-                onBlur={() => void flushAutoSave()}
-                onChangeText={(note) => updateDraft((current) => ({ ...current, note }))}
-                theme={theme}
-              />
-            ) : null}
-            <Pressable testID="editor.adjustments.toggle" accessibilityRole="button" accessibilityLabel={t('editor.adjustTime')} accessibilityState={{expanded:showAdjustments}} onPress={()=>setShowAdjustments(value=>!value)} style={({pressed})=>[styles.historyAction,{borderColor:theme.border,backgroundColor:pressed?theme.primarySoft:theme.surface,borderRadius:theme.presentation.controlRadius}]}><Text style={[styles.historyLabel,{color:theme.primary}]}>{t('editor.adjustTime')}</Text><MaterialCommunityIcons accessible={false} name={showAdjustments?'chevron-up':'chevron-down'} size={22} color={theme.primary}/></Pressable>
-            {showAdjustments||Platform.OS==='web'?<>
             <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>
               {timedNap
                 ? t('editor.adjustField', { field: t(draft?.field === 'end' ? 'editor.end' : 'editor.start') })
@@ -934,7 +918,18 @@ export function LogScreen({
               </View>
             </View>
 
-            </>:null}
+            <Text style={[styles.fieldLabel, styles.noteLabel, { color: theme.textMuted }]}>{t('editor.note')}</Text>
+            {draft ? (
+              <NoteInput
+                key={draft.event.id}
+                autoFocus={focusNote}
+                active={!historyOpen&&!closing}
+                value={draft.note}
+                onBlur={() => void flushAutoSave()}
+                onChangeText={(note) => updateDraft((current) => ({ ...current, note }))}
+                theme={theme}
+              />
+            ) : null}
             {history?<Pressable testID="editor.history" accessibilityRole="button" disabled={closing} accessibilityState={{disabled:closing,busy:closing}} onPress={()=>{void requestHistory();}} style={({pressed})=>[styles.historyAction,{borderColor:theme.border,backgroundColor:pressed?theme.primarySoft:theme.surface,borderRadius:theme.presentation.controlRadius,opacity:closing?0.5:1}]}><MaterialCommunityIcons accessible={false} name="history" size={21} color={theme.primary}/><Text style={[styles.historyLabel,{color:theme.primary}]}>{t('history.open')}</Text><MaterialCommunityIcons accessible={false} name="chevron-right" size={20} color={theme.textMuted}/></Pressable>:null}
           </ScrollView>
           {historyOpen&&history&&draft?<View style={[styles.sheet,styles.historySheet,{backgroundColor:theme.surfaceRaised,borderTopLeftRadius:theme.presentation.cardRadius+6,borderTopRightRadius:theme.presentation.cardRadius+6}]}><EventHistoryPanel data={history} eventId={draft.event.id} cloud={cloud} theme={theme} refreshToken={refreshToken} onBack={()=>{void returnFromHistory();}} onRestored={restoredHistory} onBusyChange={value=>{historyBusy.current=value;}}/></View>:null}

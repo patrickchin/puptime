@@ -9,7 +9,7 @@ The baseline is `main` at `55d6f64`, after the navigation, pet-photo and account
 | Drawer | Log → Pets → Timeline → Insights → Routine → Notifications → Puppy care. Account and Settings form a separate footer. |
 | Header | Account is the top-right person icon. The pet photo/name appears with pet-specific content and opens Pets. Log/Timeline use a labeled switch below the header. |
 | Pets | Name and photo belong in the pet profile, together with its log count. |
-| Log editor | Native date/time controls and the note come before optional relative-time adjustments. Existing quick adjustments remain available. |
+| Log editor | Native date/time controls and the expanded Adjust time shortcuts appear above Note. Relative-time adjustments remain immediately available. |
 | Timeline | Visible minus, reset and plus controls complement gestures; landscape places them beside the filters. |
 | Insights | Existing summary-to-detail order retained; pet context remains visible. |
 | Routine | With a saved routine, progress and today's plan precede suggestions. An empty routine still leads with suggestions. |
@@ -35,6 +35,7 @@ Production continues to persist one pet. The existing opt-in multi-pet preview f
 - General, Android and iOS TypeScript checks passed; 474 unit tests and 9 web tests passed.
 - Dedicated Android navigation flow passed with 1,000 synthetic events, preserving event fields and exporting all rows to CSV.
 - Production render instrumentation observed 135 event rows: opening the editor caused no row updates; saving a note updated only the edited event. Timeline details preserved unchanged date rows and tracks.
+- Restored Adjust time check: the expanded shortcuts appear above Note; −15m persisted exactly 15 minutes earlier and updated only the edited event among 79 observed rows.
 - Multi-pet preview render checks passed at 375dp with 2× text, including editor opening, autosave and deletion confirmation/cancellation.
 - Dedicated iPhone flow passed across navigation, pet profile, Account, Settings, widget, Routine, Notifications and the native editor. Settings/widget also passed at maximum Dynamic Type.
 - Reviewed narrow layouts, large text, dark appearance, reduced motion and landscape. Native date/time dialogs were checked separately on Android.
