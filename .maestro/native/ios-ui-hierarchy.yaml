@@ -41,7 +41,7 @@ name: UI hierarchy on iPhone
 - tapOn: {id: nav.open, retryTapIfNoChange: true}
 - tapOn: {id: nav.log}
 - tapOn: {id: event.pee.edit, index: 0}
-- assertVisible: {id: editor.datetime}
+- assertNotVisible: {id: editor.datetime}
 - assertVisible: {id: editor.note.input}
 - assertVisible: {id: editor.adjust.back.60}
 - assertVisible: {id: editor.adjust.back.15}

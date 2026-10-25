@@ -1,4 +1,3 @@
-import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, FlatList, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -130,7 +129,6 @@ export function LogScreen({
   const events=page.events;
   const requestHandled=useRef(onEditRequestHandled);requestHandled.current=onEditRequestHandled;
   const [requestAttempt,setRequestAttempt]=useState(0);
-  const [nativePicker,setNativePicker]=useState<'date'|'time'|null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PuppyEvent | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -177,7 +175,6 @@ export function LogScreen({
     setHistoryOpen(false);
     setFocusNote(shouldFocusNote);
     setCustomTouched(false);
-    setNativePicker(null);
     const next = createDraft(event);
     draftSaverRef.current=createEventEditor(event,changes=>onSaveRef.current(event,changes));
     draftRef.current = next;
@@ -818,12 +815,6 @@ export function LogScreen({
                 })}
               </View>
             ) : null}
-
-            {draft&&Platform.OS!=='web'?<View testID="editor.datetime" style={{minHeight:48,width:'100%'}}>
-              {Platform.OS==='ios'?<DateTimePicker value={new Date(activeValue)} mode="datetime" display="compact" locale={locale} style={{width:'100%',minHeight:48}} themeVariant={theme.isDark?'dark':'light'} accentColor={theme.primary} disabled={closing} minimumDate={draft.field==='end'?new Date(draft.at):undefined} maximumDate={new Date(draft.field==='end'?Date.now():typeof draft.endedAt==='number'?draft.endedAt:Date.now())} onValueChange={(_event,date)=>{if(!closing&&date.getTime()!==activeValue)setDraftTime(date.getTime());}}/>
-                :<View style={{flexDirection:'row',gap:8}}>{(['date','time'] as const).map(mode=><Pressable key={mode} testID={`editor.datetime.${mode}`} accessibilityRole="button" accessibilityLabel={`${t(mode==='date'?'editor.date':'editor.time')}: ${mode==='date'?dateLabel(activeValue,locale):formatTime(activeValue)}`} disabled={closing} onPress={()=>{Keyboard.dismiss();setNativePicker(mode);}} style={({pressed})=>({flex:1,minHeight:48,padding:12,alignItems:'center',justifyContent:'center',borderRadius:theme.presentation.controlRadius,backgroundColor:pressed?theme.primarySoft:theme.surface})}><Text style={{fontSize:15,color:theme.primary}}>{mode==='date'?new Intl.DateTimeFormat(locale,{dateStyle:'medium'}).format(activeValue):formatTime(activeValue)}</Text></Pressable>)}</View>}
-              {Platform.OS==='android'&&nativePicker?<DateTimePicker value={new Date(activeValue)} mode={nativePicker} presentation="dialog" style={{width:1,height:1}} minimumDate={draft.field==='end'?new Date(draft.at):undefined} maximumDate={new Date(draft.field==='end'?Date.now():typeof draft.endedAt==='number'?draft.endedAt:Date.now())} onDismiss={()=>setNativePicker(null)} onValueChange={(_event,date)=>{setNativePicker(null);if(!closing&&date.getTime()!==activeValue)setDraftTime(date.getTime());}}/>:null}
-            </View>:null}
 
             <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>
               {timedNap
