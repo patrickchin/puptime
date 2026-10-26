@@ -1,20 +1,40 @@
 appId: com.patrickchin.puptime
 name: Skip optional answers to reminder setup
 ---
+- waitForAnimationToEnd
 - tapOn:
-    id: "preview.guest"
-- tapOn:
-    id: "preview.skip"
-- tapOn:
-    id: "preview.skip"
-- tapOn:
-    id: "preview.skip"
-- tapOn:
-    id: "preview.skip"
+    id: preview.guest
+    retryTapIfNoChange: true
 - assertVisible:
-    id: "preview.planTimeline"
+    id: preview.profile
+- waitForAnimationToEnd
 - tapOn:
-    id: "preview.continue"
+    id: preview.skip
 - assertVisible:
-    id: "preview.prompt"
-    text: "Set up reminders"
+    id: preview.prompt
+    text: How old is your pup?
+- waitForAnimationToEnd
+- tapOn:
+    id: preview.skip
+- assertVisible:
+    id: preview.prompt
+    text: Let’s plan mealtimes.
+- waitForAnimationToEnd
+- tapOn:
+    id: preview.skip
+- assertVisible:
+    id: preview.poopTimes
+- assertNotVisible:
+    id: preview.poopMealTime.0
+- waitForAnimationToEnd
+- tapOn:
+    id: preview.skip
+- assertVisible:
+    id: preview.planTimeline
+- waitForAnimationToEnd
+- tapOn:
+    id: preview.continue
+- assertVisible:
+    id: preview.prompt
+    text: Set up reminders
+- waitForAnimationToEnd

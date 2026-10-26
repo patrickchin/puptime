@@ -15,17 +15,24 @@ name: iOS custom timed reminder create remove and restart
     id: nav.open
 - tapOn:
     id: nav.notifications
-- extendedWaitUntil:
-    visible:
+- assertVisible:
+    id: settings.notifications.deviceDelivery
+    checked: false
+- scrollUntilVisible:
+    element:
       id: notifications.timed.add
-      enabled: true
-    timeout: 30000
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    id: notifications.timed.add
+    enabled: true
 - assertNotVisible:
     id: notifications.timed.item..*
 - scrollUntilVisible:
     element:
       id: notifications.timing.pottyAfterPee.enabled
-    direction: DOWN
+    direction: UP
 - assertVisible:
     id: notifications.timing.pottyAfterPee.enabled
     checked: false
@@ -37,7 +44,7 @@ name: iOS custom timed reminder create remove and restart
 - scrollUntilVisible:
     element:
       id: notifications.timed.add
-    direction: UP
+    direction: DOWN
 - tapOn:
     id: notifications.timed.add
 - assertVisible:
@@ -85,10 +92,12 @@ name: iOS custom timed reminder create remove and restart
     id: nav.open
 - tapOn:
     id: nav.notifications
-- extendedWaitUntil:
-    visible:
+- scrollUntilVisible:
+    element:
       id: notifications.timed.item..*
-    timeout: 30000
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
 - assertVisible: Flea treatment
 - assertNotVisible:
     id: notifications.timed.item..*
@@ -119,7 +128,7 @@ name: iOS custom timed reminder create remove and restart
       id: settings.notifications.deviceDelivery
     direction: UP
     visibilityPercentage: 100
-    centerElement: false
+    centerElement: true
 - tapOn:
     id: settings.notifications.deviceDelivery
 - assertVisible: Turn off notifications?
@@ -127,7 +136,15 @@ name: iOS custom timed reminder create remove and restart
 - assertVisible:
     id: settings.notifications.deviceDelivery
     checked: true
+- scrollUntilVisible:
+    element:
+      text: Call the vet
+    direction: DOWN
 - assertVisible: Call the vet
+- scrollUntilVisible:
+    element:
+      id: settings.notifications.deviceDelivery
+    direction: UP
 - tapOn:
     id: settings.notifications.deviceDelivery
 - assertVisible: Turn off notifications?
@@ -137,14 +154,18 @@ name: iOS custom timed reminder create remove and restart
       id: settings.notifications.deviceDelivery
       checked: false
     timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: notifications.timed.add
+    direction: DOWN
 - assertNotVisible:
     id: notifications.timed.item..*
 - scrollUntilVisible:
     element:
       id: notifications.timing.pottyAfterPee.enabled
-    direction: DOWN
+    direction: UP
     visibilityPercentage: 100
-    centerElement: false
+    centerElement: true
 - assertVisible:
     id: notifications.timing.pottyAfterPee.enabled
     checked: true
@@ -160,13 +181,17 @@ name: iOS custom timed reminder create remove and restart
     id: nav.open
 - tapOn:
     id: nav.notifications
-- extendedWaitUntil:
-    visible:
-      id: notifications.timed.add
-      enabled: true
-    timeout: 30000
-- assertNotVisible:
-    id: notifications.timed.item..*
 - assertVisible:
     id: settings.notifications.deviceDelivery
     checked: false
+- scrollUntilVisible:
+    element:
+      id: notifications.timed.add
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    id: notifications.timed.add
+    enabled: true
+- assertNotVisible:
+    id: notifications.timed.item..*
