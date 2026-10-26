@@ -1,9 +1,16 @@
 appId: com.patrickchin.puptime
 name: Skip optional answers to reminder setup
 ---
+# Startup account recovery temporarily disables all welcome actions.
+- extendedWaitUntil:
+    visible:
+      id: preview.guest
+      enabled: true
+    timeout: 30000
 - waitForAnimationToEnd
 - tapOn:
     id: preview.guest
+    enabled: true
     retryTapIfNoChange: true
 - assertVisible:
     id: preview.profile
