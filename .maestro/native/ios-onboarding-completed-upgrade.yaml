@@ -11,7 +11,7 @@ name: Completed onboarding remains complete after installing the Release update
 - tapOn:
     id: nav.open
 - tapOn:
-    id: nav.settings
+    id: nav.pets
 - assertVisible:
     id: settings.puppy.name
     text: ${EXPECTED_PUPPY_NAME}

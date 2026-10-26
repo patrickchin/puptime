@@ -1,15 +1,15 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Linking, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
 
+import {SafeAreaView} from 'react-native-safe-area-context';
 import { customActivityKey, quickEventTypes, type ActivityKey, type EventType } from '../domain';
+import {PuppyIdentity} from '../components/PuppyIdentity';
 import { ActivityIcon } from '../components/ActivityIcon';
 import { ActivityCsvSettings } from '../components/ActivityCsvSettings';
 import { SettingsRow } from '../components/SettingsRow';
-import { PuppyNameSetting } from '../components/PuppyNameSetting';
 import { ActivityBackupSettings } from '../components/ActivityBackupSettings.native';
 import type { CloudHandle } from '../cloud/use-cloud';
-import { useAccountSnapshot } from '../cloud/use-account-snapshot';
 import { useLocalization } from '../localization-context';
 import type { LanguagePreference } from '../localization';
 import type { NotificationPreferences } from '../notification-config';
@@ -75,6 +75,9 @@ export function SettingsScreen({
   showHeader?:boolean;
 }) {
   const { activityColors, activityLabel, t } = useLocalization();
+  const {width,fontScale}=useWindowDimensions();
+  const largeWidgetText=width/Math.min(fontScale,2)<300;
+  const [widgetVisible,setWidgetVisible]=useState(false);
   const [savingWidget, setSavingWidget] = useState(false);
   const [savingNotifications, setSavingNotifications] = useState(false);
 
@@ -134,6 +137,7 @@ export function SettingsScreen({
   };
 
   return (
+    <>
     <ScrollView testID="screen.settings" keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
       {showHeader?<View style={styles.header}>
         <Pressable
@@ -188,9 +192,6 @@ export function SettingsScreen({
         </Text>
       </View>:null}
 
-      <SectionLabel label={t('settings.profile')} theme={theme} />
-      {cloudHandle?.available&&onOpenAccount?<AccountSettingsRow cloud={cloudHandle} theme={theme} onOpen={onOpenAccount}/>:null}
-      <PuppyNameSetting theme={theme} cloud={cloudHandle}/>
       <SectionLabel label={t('settings.preferences')} theme={theme} />
       <View style={[styles.card, surfaceTreatment(theme), { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
         <SettingsRow
@@ -211,26 +212,33 @@ export function SettingsScreen({
           onPress={() => onOpenPicker('language')}
           theme={theme}
         />
-        <View style={[styles.divider, { backgroundColor: theme.border }]} />
-        <SettingsRow
-          testID="settings.guide.open"
-          icon="compass-outline"
-          label={t('settings.guide')}
-          detail={t('settings.guideDetail')}
-          onPress={onOpenGuide}
-          theme={theme}
-        />
       </View>
 
+      <SectionLabel label={t('settings.notificationsWidgets')} theme={theme} />
       <View style={[styles.card, surfaceTreatment(theme), {backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}>
         <SettingsRow testID="settings.notifications.open" icon="bell-outline" label={t('notifications.title')} detail={t('settings.notificationsDetail')} onPress={onOpenNotifications} theme={theme} wrap />
       </View>
 
+      <View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}>
+        <SettingsRow testID="settings.widget.open" icon="widgets-outline" label={t('settings.widgetTitle')} detail={t('settings.widgetDetail')} onPress={()=>setWidgetVisible(true)} theme={theme} wrap/>
+      </View>
+
       <SectionLabel label={t('settings.data')} theme={theme} />
-      <ActivityCsvSettings theme={theme} eventCount={eventCount} onImport={onImport}/>
       <ActivityBackupSettings theme={theme} onRestored={onBackupsRestored}/>
+      <ActivityCsvSettings theme={theme} eventCount={eventCount} onImport={onImport}/>
       {onOpenHistory?<View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}><SettingsRow testID="settings.history.open" icon="history" label={t('history.recentTitle')} detail={t('history.recentDetail')} onPress={onOpenHistory} theme={theme} wrap/></View>:null}
-      <SectionLabel label={t('settings.widget')} theme={theme} />
+      <SectionLabel label={t('settings.helpPrivacy')} theme={theme}/>
+      <View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}>
+        <SettingsRow testID="settings.guide.open" icon="compass-outline" label={t('settings.guide')} detail={t('settings.guideDetail')} onPress={onOpenGuide} theme={theme} wrap/>
+        <View style={[styles.divider,{backgroundColor:theme.border}]}/>
+        <SettingsRow testID="settings.privacy.open" icon="shield-outline" label={t('account.privacy')} detail={t('settings.privacyDetail')} onPress={()=>{void Linking.openURL('https://github.com/patrickchin/puptime/blob/main/PRIVACY.md').catch(()=>Alert.alert(t('learn.linkError'),t('learn.linkErrorBody')));}} theme={theme} wrap/>
+      </View>
+    </ScrollView>
+    <Modal visible={widgetVisible} presentationStyle="pageSheet" animationType="slide" onRequestClose={()=>setWidgetVisible(false)}>
+      <SafeAreaView style={{flex:1,backgroundColor:theme.background}}>
+        <View style={[styles.header,{paddingHorizontal:spacing.md,paddingTop:spacing.sm}]}><Text accessibilityRole="header" maxFontSizeMultiplier={1.5} style={[styles.title,{color:theme.text}]}>{t('settings.widgetTitle')}</Text><Pressable testID="settings.widget.close" accessibilityRole="button" accessibilityLabel={t('settings.closePicker')} onPress={()=>setWidgetVisible(false)} style={styles.backButton}><MaterialCommunityIcons accessible={false} name="close" color={theme.primary} size={24}/></Pressable></View>
+        <ScrollView contentContainerStyle={styles.content}>
+          <PuppyIdentity theme={theme} showName/>
       <View style={[styles.card, surfaceTreatment(theme), { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
         <Text
           adjustsFontSizeToFit
@@ -262,6 +270,7 @@ export function SettingsScreen({
                 style={({ pressed }) => [
                   styles.widgetAction,
                   {
+                    flexBasis:largeWidgetText?'100%':'47%',
                     backgroundColor: selected ? softColor : theme.surface,
                     borderColor: selected || pressed ? color : theme.border,
                     borderRadius: theme.presentation.controlRadius,
@@ -271,7 +280,7 @@ export function SettingsScreen({
                 ]}
               >
                 <ActivityIcon activity={activity} theme={theme} color={color} size={20} />
-                <Text numberOfLines={1} style={[styles.widgetActionText, { color: theme.text }]}>{label}</Text>
+                <Text numberOfLines={largeWidgetText?undefined:1} style={[styles.widgetActionText, { color: theme.text }]}>{label}</Text>
                 <MaterialCommunityIcons
                   accessibilityElementsHidden
                   importantForAccessibility="no"
@@ -320,23 +329,19 @@ export function SettingsScreen({
           />
         </View>
       </View>
-    </ScrollView>
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+    </>
   );
 }
 
 function SectionLabel({ label, theme }: { label: string; theme: Theme }) {
   return (
-    <Text numberOfLines={1} style={[styles.sectionLabel, { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking }]}>
+    <Text accessibilityRole="header" maxFontSizeMultiplier={2} style={[styles.sectionLabel, { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking }]}>
       {label}
     </Text>
   );
-}
-
-function AccountSettingsRow({cloud,theme,onOpen}:{cloud:CloudHandle;theme:Theme;onOpen:()=>void}) {
-  const {t}=useLocalization(),state=useAccountSnapshot(cloud.controller);
-  return <View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}>
-    <SettingsRow testID="settings.account.open" wrap icon="account-circle-outline" label={t('account.title')} detail={state?.account?.user.email??t(state?.sync?.accountId?'account.status.auth':'account.signIn')} onPress={onOpen} theme={theme}/>
-  </View>;
 }
 
 const styles = StyleSheet.create({

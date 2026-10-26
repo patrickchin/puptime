@@ -3,6 +3,7 @@ name: Finish without the spotlight
 ---
 - assertVisible:
     id: "preview.ready"
+- waitForAnimationToEnd
 - tapOn:
     id: "preview.skip"
 - runFlow: "assert-normal.yaml"

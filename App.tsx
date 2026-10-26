@@ -5,7 +5,7 @@ import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator,Alert, Appearance, AppState, BackHandler, Linking, Modal, Platform, Pressable,StyleSheet,Text,useColorScheme,useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator,Alert, Appearance, AppState, BackHandler, Linking, Modal, Platform, Pressable,StyleSheet,Text,useColorScheme, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { BottomNav } from './src/components/BottomNav';
@@ -48,6 +48,8 @@ import type { FinishOnboardingOptions } from './src/onboarding';
 import { ScheduleScreen } from './src/screens/ScheduleScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { PuppyIdentity } from './src/components/PuppyIdentity';
+import {PetsScreen} from './src/screens/PetsScreen';
+import {LogViewSwitch} from './src/components/LogViewSwitch';
 import {NotificationsScreen} from './src/screens/NotificationsScreen';
 import { AccountScreen } from './src/screens/AccountScreen';
 import { useCloud } from './src/cloud/use-cloud';
@@ -110,7 +112,6 @@ export default function App(){return <PuptimeApp conversationalOnboarding={Platf
 
 export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboarding?:boolean}={}) {
   const colorScheme = useColorScheme();
-  const {fontScale} = useWindowDimensions();
   const [themePreference, setThemePreference] = useState<ThemePreference>('system');
   const [languagePreference, setLanguagePreference] = useState<LanguagePreference>('system');
   const [preferencePicker, setPreferencePicker] = useState<'theme' | 'language' | null>(null);
@@ -661,13 +662,14 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
         />
       );
     }
+    if(tab==='pets')return <PetsScreen theme={theme} cloud={cloud} eventCount={eventCount}/>;
     if(tab==='notifications')return <NotificationsScreen theme={theme} petId={petId} notificationPreferences={notificationPreferences}
       notificationPermission={notificationPermission} notificationDelivery={notificationDelivery}
       routineReminderCount={schedule.filter(entry=>entry.reminder).length}
       onNotificationPreferencesChange={changeNotificationPreferences} onRequestNotificationPermission={requestNotifications}
       onNotificationDeliveryChange={changeNotificationDelivery} onOpenSystemSettings={()=>{void Linking.openSettings().catch(()=>undefined);}}
       schedule={schedule} onScheduleChange={changeSchedule}
-      onOpenSchedule={()=>openTab('schedule')}/>;
+      onOpenSchedule={()=>openTab('schedule')} onOpenPet={()=>openTab('pets')}/>;
     if (tab === 'learn') return <LearnScreen showHeader={!nativeApp} theme={theme} />;
     if (tab === 'timeline') return <TimelineScreen showHeader={!nativeApp} events={events} activity={activity} refreshToken={refreshToken} schedule={schedule} onOpenSchedule={()=>openTab('schedule')} theme={theme} />;
     if (tab === 'insights') return <InsightsScreen showHeader={!nativeApp} events={events} activity={activity} refreshToken={refreshToken} customActivities={customActivities} theme={theme} />;
@@ -747,7 +749,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
           <View ref={spotlightContainer} collapsable={false} style={styles.screen}>
           <BlurTargetView ref={blurTarget} style={styles.screen}>
           <SideNavigation open={drawerOpen} enabled={onboardingVisible===false} tab={tab} settingsVisible={settingsVisible} theme={theme}
-            onOpen={()=>setDrawerOpen(true)} onClose={()=>setDrawerOpen(false)} onChange={navigateToTab} onSettings={()=>{setHistoryVisible(false);setNavigationHistory([tab]);setSettingsVisible(true);}}>
+            onOpen={()=>setDrawerOpen(true)} onClose={()=>setDrawerOpen(false)} onChange={navigateToTab} onSettings={()=>{setHistoryVisible(false);setNavigationHistory([tab]);setSettingsVisible(true);}} onAccount={()=>setAccountVisible(true)}>
           {nativeApp&&onboardingVisible===false&&!historyVisible?<View style={styles.navigationHeader}>
             <Pressable testID={settingsVisible?'settings.back':navigationHistory.length?'nav.back':'nav.open'} accessibilityRole="button"
               accessibilityLabel={translate(language,settingsVisible||navigationHistory.length>0?'settings.back':'nav.open')}
@@ -755,16 +757,13 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
               style={({pressed})=>[styles.menuButton,{backgroundColor:pressed?theme.primarySoft:theme.surface,borderRadius:theme.presentation.controlRadius}]}>
               <MaterialCommunityIcons accessible={false} name={settingsVisible||navigationHistory.length>0?'arrow-left':'menu'} size={25} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
             </Pressable>
-            <Text testID="nav.title" accessibilityRole="header" style={[styles.navigationTitle,{color:theme.text,minWidth:fontScale>1.1?'70%':70}]}>{translate(language,settingsVisible?'settings.title':tab==='notifications'?'notifications.title':tab==='learn'?'learn.title':`nav.${tab}`)}</Text>
-            {!settingsVisible?<PuppyIdentity theme={theme} onPress={openSettings}/>:null}
-            {!settingsVisible&&(tab==='log'||tab==='timeline')?<Pressable testID="nav.switch" accessibilityRole="button"
-              accessibilityLabel={translate(language,tab==='log'?'nav.timeline':'nav.log')} onPress={()=>navigateToTab(tab==='log'?'timeline':'log')}
-              style={({pressed})=>[styles.switchButton,{backgroundColor:pressed?theme.primarySoft:theme.surface,borderColor:theme.border,borderRadius:theme.presentation.controlRadius}]}>
-              <MaterialCommunityIcons accessible={false} name="swap-horizontal" size={22} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
-              <Text style={[styles.switchLabel,{color:theme.primary}]}>{translate(language,tab==='log'?'nav.timeline':'nav.log')}</Text>
-
-            </Pressable>:null}
+            <Text testID="nav.title" accessibilityRole="header" maxFontSizeMultiplier={1.5} style={[styles.navigationTitle,{color:theme.text,minWidth:70}]}>{translate(language,settingsVisible?'settings.title':tab==='notifications'?'notifications.title':tab==='learn'?'learn.title':`nav.${tab}`)}</Text>
+            <Pressable testID={settingsVisible?"settings.account.open":"account.open"} accessibilityRole="button" accessibilityLabel={translate(language,'account.title')} onPress={()=>setAccountVisible(true)} style={({pressed})=>[styles.menuButton,{borderRadius:theme.presentation.controlRadius,backgroundColor:pressed?theme.primarySoft:undefined}]}>
+              <MaterialCommunityIcons accessible={false} name="account-circle-outline" size={28} color={theme.primary}/>
+            </Pressable>
           </View>:null}
+          {nativeApp&&onboardingVisible===false&&!historyVisible&&!settingsVisible&&(tab==='log'||tab==='timeline')?<LogViewSwitch tab={tab} theme={theme} onChange={navigateToTab}/>:null}
+          {nativeApp&&onboardingVisible===false&&!historyVisible&&!settingsVisible&&tab!=='pets'&&tab!=='learn'&&tab!=='notifications'?<View style={{marginHorizontal:20,marginBottom:8}}><PuppyIdentity showName theme={theme} onPress={()=>openTab('pets')}/></View>:null}
           <View style={styles.screen}>
             {onboardingVisible === null ? nativeApp?<View testID="setup.loading" style={styles.startup}>
               {startupFailed?<>
@@ -805,7 +804,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
           </View>
           {!nativeApp&&onboardingVisible === false && !settingsVisible ? (
             <SafeAreaView edges={['bottom']} style={{ backgroundColor: theme.nav }}>
-              <BottomNav tab={tab==='notifications'?'log':tab} onChange={navigateToTab} theme={theme} />
+              <BottomNav tab={tab==='notifications'||tab==='pets'?'log':tab} onChange={navigateToTab} theme={theme} />
             </SafeAreaView>
           ) : null}
           </SideNavigation>
@@ -838,8 +837,6 @@ const styles = StyleSheet.create({
   navigationHeader:{minHeight:60,paddingHorizontal:20,paddingVertical:6,flexDirection:'row',alignItems:'center',gap:8,flexWrap:'wrap'},
   menuButton:{minHeight:48,minWidth:48,alignItems:'center',justifyContent:'center'},
   navigationTitle:{fontSize:20,lineHeight:28,fontWeight:'700',flex:1,minWidth:70},
-  switchButton:{minHeight:48,paddingHorizontal:10,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5,borderWidth:1},
-  switchLabel:{fontSize:14,lineHeight:20,fontWeight:'700'},
   startup:{flex:1,alignItems:'center',justifyContent:'center',padding:24,gap:16},
   startupText:{fontSize:16,lineHeight:24,textAlign:'center'},
   startupRetry:{minHeight:48,paddingHorizontal:24,paddingVertical:12,borderRadius:12},

@@ -1,7 +1,7 @@
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import {StatusBar} from 'expo-status-bar';
 import {memo,useCallback,useEffect,useMemo,useRef,useState} from 'react';
-import {Alert,BackHandler,FlatList,Keyboard,KeyboardAvoidingView,Modal,Platform,Pressable,ScrollView,StyleSheet,Switch,Text as NativeText,TextInput,View,useWindowDimensions,type TextProps} from 'react-native';
+import {Alert,BackHandler,FlatList,Keyboard,Linking,KeyboardAvoidingView,Modal,Platform,Pressable,ScrollView,StyleSheet,Switch,Text as NativeText,TextInput,View,useWindowDimensions,type TextProps} from 'react-native';
 import {SafeAreaProvider,SafeAreaView} from 'react-native-safe-area-context';
 import {ActivityCsvSettings} from '../components/ActivityCsvSettings';
 import {ActivityIcon} from '../components/ActivityIcon';
@@ -18,9 +18,10 @@ import {TimelineScreen} from './TimelineScreen';
 import {InsightsScreen} from './InsightsScreen';
 import {ScheduleScreen} from './ScheduleScreen';
 import {LearnScreen} from './LearnScreen';
+import {LogViewSwitch} from '../components/LogViewSwitch';
 import {LogScreen,type LogEditRequest} from './LogScreen';
 
-type PreviewTab=AppTab|'pets';
+type PreviewTab=AppTab|'account';
 type IconName=keyof typeof MaterialCommunityIcons.glyphMap;
 const emptyActivities:string[]=[];
 // Body copy retains the existing 2× scale; large-text layouts reflow around it.
@@ -122,7 +123,7 @@ function Preview({onRowRender}:{onRowRender?:(key:string,phase:'mount'|'update')
   const title=(text:string)=><Text maxFontSizeMultiplier={1.5} accessibilityRole="header" style={[s.title,{color:theme.text}]}>{text}</Text>;
   const section=(text:string)=><Text accessibilityRole="header" style={[s.heading,{color:theme.text}]}>{text}</Text>;
   const petActions=(target:PreviewPet)=><View key={target.id} style={[s.petCard,card]}>
-    <View style={[s.line,largeText&&s.alignTop]}>{!largeText?<Avatar pet={target} theme={theme}/>:null}<View style={s.flex}><Text style={[s.petName,{color:theme.text}]}>{target.name}</Text><Text style={[s.small,{color:theme.textMuted}]}>{target.detail||'No logs yet'}</Text></View>
+    <View style={[s.line,largeText&&s.alignTop]}>{!largeText?<Pressable accessibilityRole="button" accessibilityLabel={`Edit ${target.name}`} onPress={()=>{openTab('pets');setNaming({id:target.id,value:target.name});setNameError(null);}} style={s.iconButton}><Avatar pet={target} theme={theme}/></Pressable>:null}<View style={s.flex}><Text style={[s.petName,{color:theme.text}]}>{target.name}</Text><Text style={[s.small,{color:theme.textMuted}]}>{target.detail||'No logs yet'}</Text></View>
       <Pressable accessibilityRole="button" accessibilityLabel={`More activities for ${target.name}`} style={s.iconButton} onPress={()=>Alert.alert(target.name,'Sample activities',(['walk','nap'] as const).map(type=>({text:activityLabel({type}),onPress:()=>logFor(target,type)})).concat([{text:'Cancel',onPress:()=>{}}]))}><Icon name="plus" theme={theme}/></Pressable>
     </View>
     <View style={[s.line,{alignItems:'stretch'},largeText&&s.actionList]}>{(['pee','poop','meal'] as const).map(type=>{
@@ -167,46 +168,53 @@ function Preview({onRowRender}:{onRowRender?:(key:string,phase:'mount'|'update')
     </ScrollView>
   </KeyboardAvoidingView>;}
 
-  function settingsContent(){return <ScrollView contentContainerStyle={s.content}>
-    {section('On this device')}
-    <View style={[s.petCard,card]}>
-      <View style={[s.settingRow,largeText&&s.alignTop]}><Icon name="theme-light-dark" theme={theme}/><Text style={[s.body,s.flex,{color:theme.text}]}>Dark appearance</Text><Switch testID="preview.dark" accessibilityLabel="Dark appearance" value={dark} onValueChange={setDark}/></View>
-      <Action label="Home Screen widget" icon="widgets-outline" theme={theme} onPress={()=>setWidget(true)} testID="preview.widget"/>
-      <Action testID="preview.notifications" label="Notifications" icon="bell-outline" theme={theme} onPress={()=>openTab('notifications')}/>
-    </View>
+  function settingsContent(){return <ScrollView testID="preview.settings" contentContainerStyle={s.content}>
+    {section('Preferences')}
+    <View style={[s.petCard,card]}><View style={[s.settingRow,largeText&&s.alignTop]}><Icon name="theme-light-dark" theme={theme}/><Text style={[s.body,s.flex,{color:theme.text}]}>Dark appearance</Text><Switch testID="preview.dark" accessibilityLabel="Dark appearance" value={dark} onValueChange={setDark}/></View></View>
+    {section('Notifications & widgets')}
+    <View style={[s.petCard,card]}><Action testID="preview.notifications" label="Notifications" icon="bell-outline" theme={theme} onPress={()=>openTab('notifications')}/><Action label="Home Screen widget" icon="widgets-outline" theme={theme} onPress={()=>setWidget(true)} testID="preview.widget"/></View>
     {section('Activity data')}
+    <View style={[s.petCard,card]}><Text style={[s.body,{color:theme.text}]}>Local log backups</Text><Text style={[s.small,{color:theme.textMuted}]}>All pets · Separate recovery history for each pet</Text></View>
     <Action label={pet.name} icon="paw-outline" theme={theme} onPress={()=>setPicker(true)} testID="preview.data.pet"/>
     <ActivityCsvSettings theme={theme} eventCount={pet.events.length} loadExportEvents={async()=>pet.events}
       onImport={async()=>{Alert.alert('Import for '+pet.name,'The preview uses sample logs. Production imports must confirm the destination pet.');}}/>
-    {section('Backup & account')}
-    <View style={[s.petCard,card]}><Text style={[s.body,{color:theme.text}]}>Local log backups</Text><Text style={[s.small,{color:theme.textMuted}]}>All pets · Separate recovery history for each pet</Text><Text style={[s.body,{color:theme.text}]}>One account for your pets</Text><Text style={[s.small,{color:theme.textMuted}]}>Cloud backup and sync need multi-pet qualification.</Text></View>
+    {section('Help & privacy')}
+    <Action testID="preview.guide" label="Puppy care" icon="book-open-outline" theme={theme} onPress={()=>openTab('learn')}/>
+    <Action label="Privacy policy" icon="shield-outline" theme={theme} onPress={()=>{void Linking.openURL('https://github.com/patrickchin/puptime/blob/main/PRIVACY.md').catch(()=>Alert.alert(t('learn.linkError'),t('learn.linkErrorBody')));}}/>
     <Text style={[s.small,{color:theme.textMuted}]}>Design preview · Sample data. Changes reset when the app restarts. System notifications, cloud sync and widget installation are not connected.</Text>
   </ScrollView>;}
 
   return <SafeAreaView style={[s.flex,{backgroundColor:theme.background}]} edges={['top','bottom']}>
     <StatusBar style={dark?'light':'dark'}/>
-    <SideNavigation open={drawer} enabled={!naming} tab={tab} settingsVisible={settings} theme={theme} onOpen={()=>setDrawer(true)} onClose={()=>setDrawer(false)} onChange={navigate} onPets={()=>navigate('pets')} onSettings={()=>{setNavigationHistory([tab]);setDrawer(false);setSettings(true);}}>
+    <SideNavigation open={drawer} enabled={!naming} tab={tab} settingsVisible={settings} theme={theme} onOpen={()=>setDrawer(true)} onClose={()=>setDrawer(false)} onChange={navigate} onAccount={()=>navigate('account')} onSettings={()=>{setNavigationHistory([tab]);setDrawer(false);setSettings(true);}}>
       <View style={s.header}>
         <Pressable testID={naming?'nav.back':settings?'settings.back':navigationHistory.length?'nav.back':'nav.open'} accessibilityRole="button"
           accessibilityLabel={naming||settings||navigationHistory.length?'Back':'Open navigation'} onPress={()=>naming||settings||navigationHistory.length?goBack():setDrawer(true)} style={({pressed})=>[s.iconButton,{opacity:pressed?0.6:1}]}><Icon name={naming||settings||navigationHistory.length?'arrow-left':'menu'} theme={theme}/></Pressable>
-        <Text testID="nav.title" accessibilityRole="header" style={[s.brand,s.flex,{color:theme.text,minWidth:!naming&&fontScale>1.1?'70%':70}]}>{naming?(naming.id?'Edit pet':'Add a pet'):t(settings?'settings.title':tab==='notifications'?'notifications.title':tab==='learn'?'learn.title':`nav.${tab}`)}</Text>
+        <Text testID="nav.title" accessibilityRole="header" maxFontSizeMultiplier={1.5} style={[s.brand,s.flex,{color:theme.text,minWidth:70}]}>{naming?(naming.id?'Edit pet':'Add a pet'):t(settings?'settings.title':tab==='notifications'?'notifications.title':tab==='account'?'account.title':tab==='learn'?'learn.title':`nav.${tab}`)}</Text>
         {naming?<Action testID="preview.name.save" label={naming.id?'Save':'Add pet'} theme={theme} onPress={savePet}/>:null}
-        {!naming&&!settings&&(tab==='log'||tab==='timeline')?<Action testID="nav.switch" label={t(tab==='log'?'nav.timeline':'nav.log')} icon="swap-horizontal" theme={theme} onPress={()=>navigate(tab==='log'?'timeline':'log')}/>:null}
+        {!naming&&(settings||tab!=='account')?<Pressable testID={settings?"settings.account.open":"account.open"} accessibilityRole="button" accessibilityLabel={t('account.title')} onPress={()=>openTab('account')} style={s.iconButton}><Icon name="account-circle-outline" theme={theme} size={28}/></Pressable>:null}
 
       </View>
-      {!naming&&!settings&&tab!=='pets'&&tab!=='log'&&tab!=='learn'?<Pressable testID="preview.scope" accessibilityRole="button" accessibilityLabel={`Selected pet, ${pet.name}. Change pet`} onPress={()=>setPicker(true)} style={[s.scope,{backgroundColor:theme.primarySoft}]}>
+      {!naming&&!settings&&(tab==='log'||tab==='timeline')?<LogViewSwitch tab={tab} theme={theme} onChange={navigate}/>:null}
+      {!naming&&!settings&&tab!=='pets'&&tab!=='log'&&tab!=='learn'&&tab!=='account'&&tab!=='notifications'?<Pressable testID="preview.scope" accessibilityRole="button" accessibilityLabel={`Selected pet, ${pet.name}. Change pet`} onPress={()=>setPicker(true)} style={[s.scope,{backgroundColor:theme.primarySoft}]}>
         <Icon name="paw-outline" theme={theme} size={20}/><Text style={[s.petLabel,s.flex,{color:theme.primary}]}>{pet.name}</Text><Icon name="chevron-down" theme={theme} size={22}/>
       </Pressable>:null}
+
       <View style={s.flex}>
         {naming?petForm():settings?settingsContent():tab==='pets'?petsContent():tab==='log'?<FlatList testID="preview.history" data={logs} keyExtractor={item=>`${item.petId}:${item.event.id}`} renderItem={renderRow} ListHeaderComponent={logHeader} contentContainerStyle={s.content} initialNumToRender={12}/>
           :tab==='timeline'?<TimelineScreen showHeader={false} key={pet.id} events={pet.events} schedule={pet.schedule} onOpenSchedule={()=>openTab('schedule')} theme={theme}/>
           :tab==='insights'?<InsightsScreen showHeader={false} key={pet.id} events={pet.events} customActivities={emptyActivities} theme={theme}/>
           :tab==='schedule'?<ScheduleScreen showHeader={false} key={pet.id} events={pet.events} schedule={pet.schedule} customActivities={emptyActivities} theme={theme} onChange={changeSchedule} onSaveEntry={async entry=>{await changeSchedule([...pet.schedule.filter(item=>item.id!==entry.id),entry].sort((a,b)=>a.minutes-b.minutes));}} onRemoveEntry={async id=>{await changeSchedule(pet.schedule.filter(item=>item.id!==id));}} onRequestReminderPermission={async()=>true}/>
           :tab==='learn'?<LearnScreen showHeader={false} theme={theme}/>
+          :tab==='account'?<ScrollView testID="preview.account" contentContainerStyle={s.content}>
+            <View style={[s.petCard,card]}><Text style={[s.body,{color:theme.textMuted}]}>Design preview · Account sign-in is not connected.</Text></View>
+            {section('Backup and sync')}{pets.map(item=><View key={item.id} style={[s.petCard,s.line,card]}><Avatar pet={item} theme={theme}/><View style={s.flex}><Text style={[s.petName,{color:theme.text}]}>{item.name}</Text><Text style={[s.small,{color:theme.textMuted}]}>{item.events.length} sample logs · On this device</Text></View></View>)}
+          </ScrollView>
           :<ScrollView contentContainerStyle={s.content}>
             <View style={[s.petCard,card]}><View style={largeText?s.stack:s.line}><Text style={[s.body,!largeText&&s.flex,{color:theme.text}]}>On this device · All pets</Text><Switch accessibilityLabel="Notifications on this device for all pets" value={delivery} onValueChange={setDelivery}/></View></View>
 
-            {section(`${pet.name}’s reminders`)}<View style={[s.petCard,card]}><NotificationTimingControls theme={theme} preferences={preferences[pet.id]??DEFAULT_NOTIFICATION_PREFERENCES} schedule={pet.schedule} onScheduleChange={changeSchedule} onChange={async value=>setPreferences(current=>({...current,[pet.id]:value}))}/></View>
+            {section('Pet reminders')}
+            <Pressable testID="preview.scope" accessibilityRole="button" accessibilityLabel={`Selected pet, ${pet.name}. Change pet`} onPress={()=>setPicker(true)} style={[s.scope,{marginHorizontal:0,backgroundColor:theme.primarySoft}]}><Avatar pet={pet} theme={theme}/><Text style={[s.petLabel,s.flex,{color:theme.primary}]}>{pet.name}</Text><Icon name="chevron-down" theme={theme}/></Pressable><View style={[s.petCard,card]}><NotificationTimingControls theme={theme} preferences={preferences[pet.id]??DEFAULT_NOTIFICATION_PREFERENCES} schedule={pet.schedule} onScheduleChange={changeSchedule} onChange={async value=>setPreferences(current=>({...current,[pet.id]:value}))}/></View>
             <View style={[s.petCard,card]}>{section('Notification preview')}<Text style={[s.body,{color:theme.text}]}>{pet.name} · Time for a potty break</Text><Text style={[s.small,{color:theme.textMuted}]}>Names stay visible even with reminders for several pets.</Text></View>
           </ScrollView>}
       </View>

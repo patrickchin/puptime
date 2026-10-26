@@ -1,17 +1,18 @@
 appId: com.patrickchin.puptime
 name: Complete conversational setup into the real app
 ---
-- launchApp:
-    clearState: true
-    permissions:
-      notifications: deny
-- extendedWaitUntil:
-    visible:
-      id: preview.guest
-    timeout: 90000
+- runFlow:
+    file: conversational/start.yaml
+    env:
+      NOTIFICATIONS: deny
 - takeScreenshot: conversational-welcome
 - tapOn:
     id: preview.guest
+    enabled: true
+    retryTapIfNoChange: true
+- assertVisible:
+    id: preview.profile
+- waitForAnimationToEnd
 - takeScreenshot: conversational-profile
 - tapOn:
     id: preview.name

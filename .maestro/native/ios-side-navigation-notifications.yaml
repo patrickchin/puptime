@@ -106,9 +106,9 @@ name: iOS side navigation and notification preferences
 - scrollUntilVisible:
     element:
       id: settings.notifications.lead.15
-    direction: DOWN
+    direction: UP
     visibilityPercentage: 100
-    centerElement: false
+    centerElement: true
 - waitForAnimationToEnd
 - extendedWaitUntil:
     visible:
@@ -129,9 +129,19 @@ name: iOS side navigation and notification preferences
       id: settings.notifications.routines
     direction: UP
     visibilityPercentage: 100
-    centerElement: false
+    centerElement: true
 - tapOn:
     id: settings.notifications.routines
+- assertVisible:
+    id: screen.schedule
+- tapOn:
+    id: nav.back
+- assertVisible:
+    id: screen.notifications
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.schedule
 - assertVisible:
     id: screen.schedule
 - tapOn:
@@ -208,9 +218,9 @@ name: iOS side navigation and notification preferences
 - scrollUntilVisible:
     element:
       id: settings.notifications.lead.15
-    direction: DOWN
+    direction: UP
     visibilityPercentage: 100
-    centerElement: false
+    centerElement: true
 - assertVisible:
     id: settings.notifications.lead.15
     text: radio button, checked
@@ -258,9 +268,9 @@ name: iOS side navigation and notification preferences
 - scrollUntilVisible:
     element:
       id: settings.notifications.lead.15
-    direction: DOWN
+    direction: UP
     visibilityPercentage: 100
-    centerElement: false
+    centerElement: true
 - assertVisible:
     id: settings.notifications.lead.15
     text: radio button, checked

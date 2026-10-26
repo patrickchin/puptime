@@ -9,12 +9,12 @@ name: Normal installed client acknowledges populated cloud history
 - tapOn:
     id: nav.open
 - tapOn:
-    id: nav.settings
+    id: nav.pets
 - assertVisible:
     id: settings.puppy.name
     text: .*Mochi.*
 - tapOn:
-    id: settings.account.open
+    id: account.open
 - extendedWaitUntil:
     visible:
       id: account.status

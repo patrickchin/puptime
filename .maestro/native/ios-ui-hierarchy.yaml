@@ -1,0 +1,49 @@
+appId: com.patrickchin.puptime
+name: UI hierarchy on iPhone
+---
+- launchApp
+# Requires a populated synthetic journal on a dedicated worktree simulator.
+- extendedWaitUntil:
+    visible: {id: screen.today}
+    timeout: 90000
+- assertVisible: {id: account.open}
+- assertNotVisible: {id: settings.open}
+- takeScreenshot: ios-log
+- tapOn: {id: nav.open, retryTapIfNoChange: true}
+- takeScreenshot: ios-menu
+- tapOn: {id: nav.pets}
+- assertVisible: {id: screen.pets}
+- assertVisible: {id: settings.puppy.name}
+- takeScreenshot: ios-pet-profile
+- tapOn: {id: account.open}
+- assertVisible: {id: screen.account}
+- takeScreenshot: ios-account
+- tapOn: {id: account.back}
+- tapOn: {id: nav.open, retryTapIfNoChange: true}
+- tapOn: {id: nav.settings}
+- assertVisible: {id: settings.theme.open}
+- assertNotVisible: {id: settings.puppy.name}
+- takeScreenshot: ios-settings
+- tapOn: {id: settings.widget.open}
+- assertVisible: {id: settings.widget.action.pee}
+- takeScreenshot: ios-widget
+- tapOn: {id: settings.widget.close}
+- waitForAnimationToEnd
+- tapOn: {id: settings.back}
+- waitForAnimationToEnd
+- tapOn: {id: nav.open, retryTapIfNoChange: true}
+- tapOn: {id: nav.schedule}
+- assertVisible: {id: schedule.plan}
+- takeScreenshot: ios-routine
+- tapOn: {id: nav.open, retryTapIfNoChange: true}
+- tapOn: {id: nav.notifications}
+- takeScreenshot: ios-notifications
+- tapOn: {id: nav.open, retryTapIfNoChange: true}
+- tapOn: {id: nav.log}
+- tapOn: {id: event.pee.edit, index: 0}
+- assertNotVisible: {id: editor.datetime}
+- assertVisible: {id: editor.note.input}
+- assertVisible: {id: editor.adjust.back.60}
+- assertVisible: {id: editor.adjust.back.15}
+- takeScreenshot: ios-editor
+- tapOn: {id: editor.close}

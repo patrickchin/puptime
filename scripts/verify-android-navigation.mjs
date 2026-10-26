@@ -11,7 +11,7 @@ import {createLocalRuntime} from '../src/local/runtime-factory.ts';
 
 const device=process.argv[2], app='com.patrickchin.puptime';
 const adb=(...args)=>execFileSync('adb',['-s',device,...args]);
-assert.equal(adb('emu','avd','name').toString().trim().split('\n')[0].trim(),'Puptime_Navigation_d859');
+assert.match(adb('emu','avd','name').toString().trim().split('\n')[0].trim(),/^Puptime_(Navigation_d859|UI_Hierarchy_a9f2)$/);
 const output=resolve('output/navigation');mkdirSync(output,{recursive:true});
 let expectedEvents;
 function eventsAt(path){const db=new DatabaseSync(path,{readOnly:true});try{return db.prepare('SELECT * FROM events ORDER BY pet_id,id').all();}finally{db.close();}}

@@ -9,7 +9,7 @@ import {csvToEvents} from '../../src/export.ts';
 const device=process.argv[2],app='com.patrickchin.puptime',output=resolve(process.argv[3]??'output/navigation-151/preview');
 assert.ok(device,'Pass a dedicated emulator with the preview installed.');
 const adb=(...args)=>execFileSync('adb',['-s',device,...args],{stdio:['ignore','pipe','pipe']});
-assert.match(adb('emu','avd','name').toString(),/^Puptime_(Multi_Pet_622c|Navigation_d859|History_Spacing_d859)\b/);
+assert.match(adb('emu','avd','name').toString(),/^Puptime_(Multi_Pet_622c|Navigation_d859|History_Spacing_d859|UI_Hierarchy_a9f2)\b/);
 mkdirSync(output,{recursive:true});
 function snapshot(){return Object.fromEntries(['','-wal'].flatMap(suffix=>{
   try{return [[suffix,createHash('sha256').update(adb('exec-out','run-as',app,'cat',`files/SQLite/puptime-v2.db${suffix}`)).digest('hex')]];}
@@ -37,7 +37,7 @@ flow('maple',`- launchApp
 - tapOn: {id: preview.select.pet_preview_1}
 - assertVisible: {id: preview.scope, text: .*Maple.*}
 - assertNotVisible: {id: timeline.range}
-- assertNotVisible: {id: timeline.zoom.value}
+- assertVisible: {id: timeline.zoom.value}
 - takeScreenshot: preview-timeline-maple
 - tapOn: {id: nav.switch}
 - assertVisible: {id: preview.quick.pet_preview_0.pee}
@@ -88,7 +88,7 @@ flow('back',`- pressKey: Back
 - tapOn: {id: nav.timeline}
 - tapOn: {id: timeline.filter.poop-meal}
 - tapOn: {id: timeline.windows.edit}
-- assertVisible: {id: nav.title, text: Schedule}
+- assertVisible: {id: nav.title, text: Routine}
 - takeScreenshot: preview-schedule
 - pressKey: Back
 - assertVisible: {id: nav.title, text: Timeline}

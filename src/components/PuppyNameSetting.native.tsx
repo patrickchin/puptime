@@ -50,14 +50,14 @@ export function PuppyNameSetting({theme,cloud}:PuppyNameSettingProps) {
   }
   return <><View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}>
     <PuppyPhotoSetting theme={theme}/>
-    <SettingsRow testID="settings.puppy.name" icon="paw-outline" label={t('puppy.name')} detail={name??t(failed?'puppy.loadError':'puppy.loading')} disabled={saving||(!name&&!failed)} onPress={()=>name?edit(name):void reload()} theme={theme}/>
+    <SettingsRow testID="settings.puppy.name" icon="paw-outline" label={t('puppy.name')} detail={name??t(failed?'puppy.loadError':'puppy.loading')} disabled={saving||(!name&&!failed)} onPress={()=>name?edit(name):void reload()} theme={theme} wrap/>
   </View>
   <Modal visible={draft!==null} transparent animationType="fade" statusBarTranslucent onRequestClose={closeEditor}>
     <KeyboardAvoidingView testID="settings.puppy.name.editor" behavior={Platform.OS==='ios'?'padding':'height'} style={styles.scrim} accessibilityViewIsModal>
       <Pressable style={StyleSheet.absoluteFill} onPress={closeEditor}/>
       <View style={[styles.editor,{backgroundColor:theme.surfaceRaised,borderRadius:theme.presentation.cardRadius}]}>
-        <Text accessibilityRole="header" style={[styles.title,{color:theme.text}]}>{t('puppy.name')}</Text>
-        <TextInput testID="settings.puppy.name.input" accessibilityLabel={t('puppy.name')} autoFocus
+        <Text accessibilityRole="header" maxFontSizeMultiplier={1.5} style={[styles.title,{color:theme.text}]}>{t('puppy.name')}</Text>
+        <TextInput maxFontSizeMultiplier={2} testID="settings.puppy.name.input" accessibilityLabel={t('puppy.name')} autoFocus
           value={draft??''} onChangeText={value=>{setDraft(value);setError(null);}} editable={!saving} maxLength={256} autoCapitalize="words" autoCorrect={false}
           returnKeyType="done" onSubmitEditing={()=>void save()}
           style={[styles.input,{color:theme.text,borderColor:theme.border,borderRadius:theme.presentation.controlRadius}]}/>

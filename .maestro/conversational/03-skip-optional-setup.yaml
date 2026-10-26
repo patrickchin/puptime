@@ -9,23 +9,13 @@ name: Skipping optional setup and the tour still reaches the normal app
     visible:
       id: preview.guest
     timeout: 90000
-- tapOn:
-    id: preview.guest
-- tapOn:
-    id: preview.skip
-- tapOn:
-    id: preview.skip
-- tapOn:
-    id: preview.skip
-- assertNotVisible:
-    id: preview.poopMealTime.0
-- tapOn:
-    id: preview.skip
-- tapOn:
-    id: preview.continue
+- runFlow: ../helpers/conversational/to-reminders.yaml
 - assertNotVisible: Optional
 - tapOn:
     id: preview.reminders.later
+- assertVisible:
+    id: preview.ready
+- waitForAnimationToEnd
 - tapOn:
     id: preview.skip
 - extendedWaitUntil:

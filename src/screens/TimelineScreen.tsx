@@ -588,6 +588,13 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
     onPanResponderTerminationRequest: () => false,
   }), []);
 
+  function changeZoom(next:number){
+    const scale=clamp(next,MIN_TIME_SCALE,MAX_TIME_SCALE);
+    const center=horizontalOffsetValue.current+Math.max(0,viewportWidth-DATE_COLUMN_WIDTH)/2;
+    pendingHorizontalOffset.current=clamp(center*scale/timeScaleValue.current-Math.max(0,viewportWidth-DATE_COLUMN_WIDTH)/2,0,Math.max(0,DATE_COLUMN_WIDTH+baseTrackWidth*scale-viewportWidth));
+    timeScaleValue.current=scale;setTimeScale(scale);
+  }
+
   function loadEarlierDays() {
     if (!hasEarlierDays || isLoadingEarlier || window.loading || window.error) return;
     // Consume the gesture once; more top-edge scroll events must not queue pages.
@@ -619,6 +626,11 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
   }
 
   const selectMarks = useCallback((ids: string[]) => setSelection(ids), []);
+  const zoomControls=<View style={{flexDirection:'row',alignItems:'center',justifyContent:'flex-end',gap:4}}>
+          <Pressable testID="timeline.zoom.out" accessibilityRole="button" accessibilityLabel={t('timeline.zoomOut')} disabled={timeScale<=MIN_TIME_SCALE} accessibilityState={{disabled:timeScale<=MIN_TIME_SCALE}} onPress={()=>changeZoom(timeScale-0.5)} style={({pressed})=>({minWidth:48,minHeight:48,alignItems:'center',justifyContent:'center',borderRadius:theme.presentation.controlRadius,backgroundColor:pressed?theme.primarySoft:undefined,opacity:timeScale<=MIN_TIME_SCALE?0.4:1})}><MaterialCommunityIcons accessible={false} name="minus" size={22} color={theme.primary}/></Pressable>
+          <Pressable testID="timeline.zoom.reset" accessibilityRole="button" accessibilityLabel={t('timeline.resetZoom')} onPress={()=>changeZoom(1)} style={({pressed})=>({minWidth:64,minHeight:48,alignItems:'center',justifyContent:'center',borderRadius:theme.presentation.controlRadius,backgroundColor:pressed?theme.primarySoft:undefined})}><Text testID="timeline.zoom.value" style={{color:theme.primary,fontSize:14,fontWeight:'600'}}>{Math.round(timeScale*100)}%</Text></Pressable>
+          <Pressable testID="timeline.zoom.in" accessibilityRole="button" accessibilityLabel={t('timeline.zoomIn')} disabled={timeScale>=MAX_TIME_SCALE} accessibilityState={{disabled:timeScale>=MAX_TIME_SCALE}} onPress={()=>changeZoom(timeScale+0.5)} style={({pressed})=>({minWidth:48,minHeight:48,alignItems:'center',justifyContent:'center',borderRadius:theme.presentation.controlRadius,backgroundColor:pressed?theme.primarySoft:undefined,opacity:timeScale>=MAX_TIME_SCALE?0.4:1})}><MaterialCommunityIcons accessible={false} name="plus" size={22} color={theme.primary}/></Pressable>
+        </View>;
 
   return (
     <View
@@ -658,6 +670,7 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
           <Text style={[styles.estimateLegendText, { color: theme.text }]}>{t('timeline.estimatedLegend')}</Text>
         ) : null}
 
+        {!isCompactHeight?zoomControls:null}
         <View style={[styles.timelineControls, isCompactHeight && styles.compactControls]}>
         <View accessibilityRole="radiogroup" style={[styles.filters, isCompactHeight && styles.compactFilters]}>
           {TIMELINE_VIEWS.map((view) => {
@@ -703,6 +716,7 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
           })}
         </View>
 
+        {isCompactHeight?zoomControls:null}
         {selectedView.id === 'poop-meal' ? <Pressable
           testID="timeline.windows.edit"
           accessibilityRole="button"

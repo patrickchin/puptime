@@ -86,6 +86,7 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
             <AccountButton theme={theme} testID="account.export" label={t(state?.exporting?'account.exporting':'account.export')} icon="download-outline" disabled={busy||!state!.online||!account.cloud.canExport} loading={state?.exporting} onPress={()=>{void cloud.controller!.exportData();}}/>
             {state?.exporting?<AccountButton theme={theme} testID="account.export.cancel" label={t('account.cancel')} onPress={()=>cloud.controller!.cancelExport()}/>:state?.sync?.pending?<Text style={[styles.body,bodyStyle]}>{t('account.exportPending')}</Text>:null}
           </View>
+          <AccountButton theme={theme} testID="account.manage" label={t('account.manage')} icon="open-in-new" onPress={()=>{void Linking.openURL('https://puptime.pages.dev/account').catch(()=>Alert.alert(t('learn.linkError'),t('learn.linkErrorBody')));}}/>
           <AccountButton theme={theme} testID="account.signOut" label={t('account.signOut')} disabled={busy} onPress={signOut}/>
         </View>):null}
         {!account&&state?.sync?.accountId?<AccountButton theme={theme} testID="account.signOut" label={t('account.signOut')} disabled={busy} onPress={signOut}/>:null}
