@@ -8,4 +8,6 @@ name: Start isolated conversational onboarding
 - extendedWaitUntil:
     visible:
       id: preview.guest
+      enabled: true
     timeout: 90000
+- waitForAnimationToEnd

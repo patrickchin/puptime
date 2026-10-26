@@ -1,55 +1,30 @@
 appId: com.patrickchin.puptime
-name: All entry choices and profile edits reach the real app
+name: Email entry and profile edits reach the real app
 ---
 - runFlow:
     file: "../helpers/conversational/start.yaml"
     env:
       NOTIFICATIONS: "deny"
+- extendedWaitUntil:
+    visible:
+      id: account.email.open
+      enabled: true
+    timeout: 90000
+- assertNotVisible: Sign-in design preview
 - tapOn:
-    id: "preview.auth.apple"
-- assertVisible: Sign-in design preview
+    id: account.email.open
+- assertVisible:
+    id: account.email.input
 - tapOn:
-    text: "(?i)^Back$"
+    id: preview.back
 - assertVisible:
     id: "preview.guest"
 - tapOn:
-    id: "preview.auth.apple"
-- tapOn:
-    text: "(?i)^Explore as a guest$"
+    id: account.email.open
 - assertVisible:
-    id: "preview.name"
+    id: account.email.input
 - tapOn:
-    id: "preview.back"
-- assertVisible:
-    id: "preview.guest"
-- tapOn:
-    id: "preview.auth.google"
-- assertVisible: Sign-in design preview
-- tapOn:
-    text: "(?i)^Back$"
-- assertVisible:
-    id: "preview.guest"
-- tapOn:
-    id: "preview.auth.google"
-- tapOn:
-    text: "(?i)^Explore as a guest$"
-- assertVisible:
-    id: "preview.name"
-- tapOn:
-    id: "preview.back"
-- assertVisible:
-    id: "preview.guest"
-- tapOn:
-    id: "preview.auth.email"
-- assertVisible: Sign-in design preview
-- tapOn:
-    text: "(?i)^Back$"
-- assertVisible:
-    id: "preview.guest"
-- tapOn:
-    id: "preview.auth.email"
-- tapOn:
-    text: "(?i)^Explore as a guest$"
+    id: preview.guest
 - assertVisible:
     id: "preview.name"
 - tapOn:
@@ -131,7 +106,7 @@ name: All entry choices and profile edits reach the real app
 - tapOn:
     id: "nav.open"
 - tapOn:
-    id: "nav.settings"
+    id: "nav.pets"
 - assertVisible:
     id: "settings.puppy.name"
     text: ".*Biscuit.*"
