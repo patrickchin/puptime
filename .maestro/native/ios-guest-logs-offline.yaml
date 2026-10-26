@@ -1,0 +1,15 @@
+appId: com.patrickchin.puptime
+name: Record guest logs while the cloud service is unavailable
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: quick.pee
+    timeout: 90000
+- tapOn:
+    id: quick.pee
+- tapOn:
+    id: quick.meal
+- tapOn:
+    id: quick.poop
+- stopApp
