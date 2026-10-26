@@ -38,16 +38,27 @@ name: Conversational onboarding dismisses into normal navigation and persists
 - assertVisible:
     id: notifications.timing.meal.time
     text: '.*15 min before.*'
+- scrollUntilVisible:
+    element:
+      id: notifications.timing.poop.time
+    direction: DOWN
+    centerElement: true
 - assertVisible:
     id: notifications.timing.poop.time
     text: '.*5 min after.*'
 - scrollUntilVisible:
     element:
-      id: notifications.timing.pottyAfterPee.time
+      id: notifications.timing.pottyAfterMeal.time
     direction: DOWN
+    centerElement: true
 - assertVisible:
     id: notifications.timing.pottyAfterMeal.time
     text: '.*45m.*'
+- scrollUntilVisible:
+    element:
+      id: notifications.timing.pottyAfterPee.time
+    direction: DOWN
+    centerElement: true
 - assertVisible:
     id: notifications.timing.pottyAfterPee.time
     text: '.*3h.*'
