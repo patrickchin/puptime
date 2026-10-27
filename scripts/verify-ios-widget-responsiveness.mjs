@@ -100,7 +100,18 @@ for (const stream of [driver.stdout, driver.stderr]) stream.on('data', chunk => 
   driverOutput += chunk.toString();
   writeFileSync(join(directory, 'driver-output.log'), driverOutput);
 });
-process.on('exit', () => { if (driver.exitCode === null) driver.kill('SIGTERM'); });
+const stopDriver = () => {
+  if (driver.exitCode === null) driver.kill('SIGTERM');
+  // Maestro's subprocess can outlive an interrupted CLI. Stop only XCTest
+  // processes belonging to this dedicated simulator, leaving other work alone.
+  for (const line of execFileSync('ps', ['-axo', 'pid=,command='], { encoding: 'utf8' }).split('\n')) {
+    const [pid, executable, ...args] = line.trim().split(/\s+/);
+    const runner = executable?.includes(`/CoreSimulator/Devices/${device}/`) && executable.endsWith('/maestro-driver-iosUITests-Runner');
+    const test = executable?.endsWith('/xcodebuild') && args.includes('test-without-building') && args.includes(`id=${device}`);
+    if (runner || test) { try { process.kill(Number(pid), 'SIGTERM'); } catch {} }
+  }
+};
+process.on('exit', stopDriver);
 let runner;
 for (let attempt = 0; attempt < 200; attempt++) {
   const line = runnerLines().find(line => !previousRunners.has(Number(line.trim().split(/\s+/)[0])));
@@ -166,7 +177,7 @@ for (const cold of [false, true]) {
   const persistenceLatencyMs = added.map(event => Math.round(event.persistedAt - event.at));
   assert.ok(persistenceLatencyMs.every(ms => ms >= 0 && ms < 1000));
   results.push({ cold, taps: added.length, injectedTapSpacingMs: 120, measurementStart: 'AppIntent.perform', persistenceLatencyMs, notificationLatencyMs,
-    actionSpacingMs: added.slice(1).map((event, index) => event.at - added[index].at) });
+    intentStartSpacingMs: added.slice(1).map((event, index) => event.at - added[index].at) });
   allAdded.push(...added);
 }
 const output = join(homedir(), 'Pictures/Screenshots/Codex/puptime-widget-responsiveness');
@@ -191,6 +202,6 @@ for (let attempt = 0; attempt < 100; attempt++) {
 assert.ok(recovery.every(event => database.prepare('SELECT id FROM events WHERE id=?').get(event.id)), 'All 250 recovery records must import beyond the 100-record presentation cap.');
 assert.equal(operations().length, 0);
 database.close();
-if (driver.exitCode === null) driver.kill('SIGINT');
+stopDriver();
 writeFileSync(join(output, 'ios-verification.json'), JSON.stringify({ device, results, imported: allAdded.length, recovered: recovery.length }, null, 2));
 console.log(JSON.stringify({ device, results, imported: allAdded.length, recovered: recovery.length, screenshot: join(output, 'ios-widget.png') }, null, 2));
