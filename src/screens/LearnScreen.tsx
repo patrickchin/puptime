@@ -1,6 +1,8 @@
+import { useTelemetryOverlay } from '../telemetry';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { type ComponentProps, type ComponentType, useEffect, useRef, useState } from 'react';
-import { Alert, BackHandler, Image, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, BackHandler, Image, Linking, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable } from '../components/TelemetryPressable';
 
 import { useScreenDimensions } from '../use-screen-dimensions';
 import { useLocalization } from '../localization-context';
@@ -115,6 +117,7 @@ export function LearnScreen({ theme, articleId, onArticleChange, showHeader=true
   const [audioReady, setAudioReady] = useState(Platform.OS !== 'web');
   useEffect(() => { setAudioReady(true); }, []);
   const selectedId = articleId === undefined ? localArticleId : articleId;
+  useTelemetryOverlay('guide', selectedId !== null);
   const article = careArticles.find((item) => item.id === selectedId);
   const invalidArticle = selectedId !== null && !article;
   const open = (id: string | null) => onArticleChange ? onArticleChange(id) : setLocalArticleId(id);

@@ -1,5 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable } from './TelemetryPressable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useLocalization } from '../localization-context';

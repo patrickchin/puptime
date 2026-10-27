@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Text, View } from 'react-native';
+import { Pressable } from './TelemetryPressable';
 import { removePuppyPhotoFile } from '../photo-files.native';
 import { choosePuppyPhoto } from '../choose-puppy-photo.native';
 import { getLocalRuntime } from '../local/runtime.native';

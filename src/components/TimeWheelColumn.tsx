@@ -1,5 +1,6 @@
 import { useRef } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+import { ScrollView, StyleSheet, Text } from 'react-native';
+import { Pressable } from './TelemetryPressable';
 
 import type { Theme } from '../theme';
 

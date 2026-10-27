@@ -1,4 +1,5 @@
-import {ActivityIndicator,Pressable,Text,View} from 'react-native';
+import {ActivityIndicator,Text,View} from 'react-native';
+import { Pressable } from './TelemetryPressable';
 import {useLocalization} from '../localization-context';
 import type {Theme} from '../theme';
 

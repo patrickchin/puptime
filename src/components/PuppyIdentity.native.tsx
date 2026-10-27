@@ -1,4 +1,5 @@
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
+import { Pressable } from './TelemetryPressable';
 import { useLocalization } from '../localization-context';
 import { usePuppyProfile } from '../use-puppy-profile.native';
 import type { Theme } from '../theme';

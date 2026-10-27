@@ -1,6 +1,7 @@
 import {useRef} from 'react';
 import type {SpotlightRect} from './OnboardingSpotlight';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Pressable } from './TelemetryPressable';
 
 import { activityKey, type PuppyEvent } from '../domain';
 import { ActivityIcon } from './ActivityIcon';

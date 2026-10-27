@@ -8,13 +8,13 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   PanResponder,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
 } from 'react-native';
+import { Pressable } from '../components/TelemetryPressable';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
