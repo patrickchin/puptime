@@ -1,1 +1,1 @@
-dog,routine,training,housebreaking,toilet,feeding,schedule,reminder,history,offline,log
+dog,housebreaking,toilet,feeding,schedule,log,history,offline,walk,pee,poop,journal,care,pet
