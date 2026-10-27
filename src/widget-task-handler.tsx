@@ -13,7 +13,8 @@ import {
   type PuppyEvent,
   type ActivityKey,
 } from './domain';
-import { resolveLanguage } from './localization';
+import { resolveLanguage, type AppLanguage } from './localization';
+import type { NotificationPreferences } from './notification-config';
 import { getLocalRuntime } from './local/runtime.native';
 import { configureReminderHandling, showWidgetLogConfirmation, syncPottyReminders } from './reminders';
 import {
@@ -53,6 +54,29 @@ function saveLog(key: ActivityKey, at: number, customActivities: string[]) {
   return result;
 }
 
+let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+let refreshWaiters: { resolve: () => void; reject: (error: unknown) => void }[] = [];
+function refreshAfterTaps(preferences: NotificationPreferences, language: AppLanguage): Promise<void> {
+  // Logging and confirmations are immediate. Refresh once after a tap burst so
+  // launcher reapplication cannot interrupt the next press/release gesture.
+  if (refreshTimer) clearTimeout(refreshTimer);
+  const result = new Promise<void>((resolve, reject) => { refreshWaiters.push({ resolve, reject }); });
+  refreshTimer = setTimeout(async () => {
+    const waiters = refreshWaiters;
+    refreshWaiters = [];
+    refreshTimer = undefined;
+    try {
+      const events = await latestEvents();
+      await Promise.all([
+        updateHomeWidget(events).catch(() => undefined),
+        syncPottyReminders(events, preferences, language).catch(() => false),
+      ]);
+      waiters.forEach(({ resolve }) => resolve());
+    } catch (error) { waiters.forEach(({ reject }) => reject(error)); }
+  }, 200);
+  return result;
+}
+
 async function render(props: WidgetTaskHandlerProps, events: PuppyEvent[]) {
   const compact = props.widgetInfo.height < 90;
   const activeNap = events.some(isOpenNap);
@@ -88,11 +112,9 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
             language,
           ).catch(() => false)
         : Promise.resolve(false);
-      const nextEvents = await latestEvents();
       await Promise.all([
         confirmation,
-        updateHomeWidget(nextEvents).catch(() => undefined),
-        syncPottyReminders(nextEvents, preferences, language).catch(() => false),
+        refreshAfterTaps(preferences, language),
       ]);
       return;
     }

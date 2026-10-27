@@ -9,7 +9,7 @@ import { join } from 'node:path';
 const device = process.argv[2];
 assert.ok(device, 'Pass the dedicated emulator serial.');
 const app = 'com.patrickchin.puptime';
-const adb = (...args) => execFileSync('adb', ['-s', device, ...args], { timeout: 30000 });
+const adb = (...args) => execFileSync('adb', ['-s', device, ...args], { timeout: 30000, maxBuffer: 16 * 1024 * 1024 });
 assert.match(adb('emu', 'avd', 'name').toString(), /^Puptime_Widget_Responsiveness_20f7/m);
 adb('root'); adb('wait-for-device');
 adb('shell', 'am', 'start', '-W', '-n', `${app}/.MainActivity`);
@@ -44,7 +44,8 @@ for (const cold of [false, true]) {
   const started = Date.now();
   // One shell connection keeps taps close together and exercises real launcher
   // PendingIntents, including targets updated while subsequent taps arrive.
-  adb('shell', actions.map(type => `input tap ${targets[type].join(' ')}`).join('; '));
+  // About ten taps per second, including repeated actions during the burst.
+  adb('shell', actions.map(type => `input tap ${targets[type].join(' ')}; sleep 0.08`).join('; '));
   let added;
   do {
     added = rows().filter(row => !before.has(row.id));

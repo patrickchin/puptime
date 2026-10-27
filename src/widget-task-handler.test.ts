@@ -90,10 +90,12 @@ test('rapid different taps persist and confirm before slow reminders finish, wit
     ]);
     assert.equal(new Set(state.events.map(e => e.id)).size, 1003);
     assert.equal(state.confirmations.length, 3);
-    assert.equal(state.redraws, 3);
+    assert.equal(state.redraws, 0);
     assert.equal(state.customReads, 0);
-    assert.equal(state.reads, 3);
+    assert.equal(state.reads, 0);
   } finally { release(); await Promise.all([first, second, third]); }
+  assert.equal(state.redraws, 1);
+  assert.equal(state.reads, 1);
 });
 
 test('rapid nap taps start then end one nap', async () => {
