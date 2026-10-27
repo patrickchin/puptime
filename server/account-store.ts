@@ -18,6 +18,16 @@ type JsonRow = { body: string };
 type RecordRow={id:string;pet_id:string|null;kind:CloudRecord['kind'];revision:number;sequence:number;deleted:number;updated_at:number;data_json:string|null};
 
 export class AccountStore extends DurableObject<Cloudflare.Env> {
+  // Account-scoped budget survives isolate eviction; only counters are stored.
+  async allowAssistantRequest():Promise<boolean>{
+    return this.ctx.storage.transaction(async transaction=>{
+      const now=Date.now(),previous=await transaction.get<{minute:number;minuteCount:number;day:number;dayCount:number}>('assistant_budget');
+      const minute=Math.floor(now/60000),day=Math.floor(now/86400000);
+      const minuteCount=previous?.minute===minute?previous.minuteCount:0,dayCount=previous?.day===day?previous.dayCount:0;
+      if(minuteCount>=10||dayCount>=200)return false;
+      await transaction.put('assistant_budget',{minute,minuteCount:minuteCount+1,day,dayCount:dayCount+1});return true;
+    });
+  }
   constructor(ctx: DurableObjectState, env: Cloudflare.Env) {
     super(ctx, env);
     ctx.storage.transactionSync(() => {

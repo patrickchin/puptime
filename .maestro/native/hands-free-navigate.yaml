@@ -1,0 +1,15 @@
+appId: com.patrickchin.puptime
+name: Hands-free opens settings
+---
+- tapOn:
+    id: assistant.input
+- setClipboard: open my settings
+- pasteText
+- tapOn:
+    id: assistant.send
+- assertVisible:
+    id: settings.back
+- assertVisible:
+    id: nav.title
+    text: Settings
+- takeScreenshot: settings

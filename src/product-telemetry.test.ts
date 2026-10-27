@@ -78,3 +78,16 @@ test('an analytics failure never breaks the UI action', () => {
   const t = createProductTelemetry(() => { throw new Error('offline'); });
   assert.doesNotThrow(() => { t.setEnabled(true); t.setForeground(true); t.setScreen('schedule'); });
 });
+
+test('assistant analytics describe the overlay and static controls without chat or log content',()=>{
+  const {telemetry:t,events,at}=fixture();t.setForeground(true);t.setEnabled(true);
+  const close=t.overlay('assistant');at(100);
+  t.capture('app_press',{control:'assistant.send',text:'Ellie has a private note',puppyId:'pet_private',conversation:'private conversation'});
+  close();
+  const press=events.find(event=>event.event==='app_press');
+  assert.deepEqual(press?.properties,{screen:'assistant',schema_version:1,control:'assistant.send'});
+  assert.equal(events.at(-1)?.properties.screen,'log');
+  assert.equal(telemetryControl('assistant.example.0'),'assistant.example.0');
+  assert.equal(telemetryControl('assistant.example.private note'),undefined);
+  assert.equal(JSON.stringify(events).includes('private'),false);
+});

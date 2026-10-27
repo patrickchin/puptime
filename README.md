@@ -95,6 +95,8 @@ For the public website's static pages, analytics configuration, and Google index
 
 For the standalone backend, scoped integration keys, REST routes and OpenAPI contract, see [Puptime API](docs/api.md).
 
+The first native **Hands-free** assistant supports voice and text requests for activity logging, recent log times and notes, page navigation, and a selectable review-before-saving preference. It executes validated proposals through local SQLite transactions, with grouped undo and normal optional sync. The model service needs server configuration and sign-in; it does not enable cloud backup. See [Hands-free setup and verification](docs/hands-free.md) for supported actions, provider setup, and qualification limits.
+
 ```sh
 npm run typecheck
 npm test

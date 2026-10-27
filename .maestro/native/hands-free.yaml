@@ -1,0 +1,8 @@
+appId: com.patrickchin.puptime
+name: Hands-free complete synthetic conversation
+---
+- runFlow: hands-free-review.yaml
+- runFlow: hands-free-confirm.yaml
+- runFlow: hands-free-undo.yaml
+- runFlow: hands-free-automatic.yaml
+- runFlow: hands-free-navigate.yaml

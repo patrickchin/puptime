@@ -1,0 +1,20 @@
+appId: com.patrickchin.puptime
+name: Hands-free changes confirmation mode and saves immediately
+---
+- tapOn:
+    id: assistant.input
+- setClipboard: turn off confirmations
+- pasteText
+- tapOn:
+    id: assistant.send
+- assertVisible: '.*Review before saving: off.*'
+- tapOn:
+    id: assistant.input
+- setClipboard: Ellie ate an hour ago
+- pasteText
+- tapOn:
+    id: assistant.send
+- assertVisible: 'Saved.*Meal.*'
+- assertNotVisible:
+    id: assistant.review
+- takeScreenshot: automatic

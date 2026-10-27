@@ -10,6 +10,7 @@ import type { ActivityBackup, BackupGuard, BackupReason } from './activity-backu
 import type { PuppyEvent } from '../domain.ts';
 import { parseEvents } from '../storage-validation.ts';
 import { notifyLocalCommit } from './sync-projection.ts';
+import {createAssistantStore} from './assistant.ts';
 
 export async function createLocalRuntime(database:LocalDatabase,petId:string,afterCommit?:()=>void,beforeChange?:BackupGuard) {
   await database.write(async sql=>{
@@ -46,5 +47,5 @@ export async function createLocalRuntime(database:LocalDatabase,petId:string,aft
     return result;
   }
   const checkpoint=(reason:BackupReason)=>database.read(async sql=>{await beforeChange?.(sql,reason);});
-  return {database,petId,deviceId,sync,storage,recoverEvents,recoverBackup,checkpoint,activity:createActivityQueries(database,petId),history};
+  return {database,petId,deviceId,sync,storage,recoverEvents,recoverBackup,checkpoint,activity:createActivityQueries(database,petId),history,assistant:createAssistantStore(database,petId,sync.changeSink(petId),afterCommit,beforeChange)};
 }

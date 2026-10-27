@@ -1,12 +1,12 @@
 # Puptime Privacy Policy
 
-Last updated: October 23, 2026
+Last updated: October 28, 2026
 
 Puptime is a puppy routine tracker developed by Patrick Chin. Local logging works without an account. This policy explains optional cloud accounts, the native app, and the public website.
 
 ## Information handling
 
-Without cloud sync, activity logs, notes, and routine settings stay on your device. The native app does not include advertising. Optional usage analytics are off until you enable them in Settings. Earlier offline-only releases do not have the optional account features described below.
+When optional cloud sync and the hands-free assistant are not used, activity logs, notes, and routine settings stay on your device. The native app does not include advertising. Optional usage analytics are off until you enable them in Settings. Earlier offline-only releases do not have the optional account features described below.
 
 ## Optional accounts and cloud data
 
@@ -42,9 +42,19 @@ Website analytics do not receive your puppy activity history from the native app
 
 ## Speech recognition
 
-If you choose to dictate a note, Puptime asks for the relevant microphone and speech-recognition permissions. It uses Apple's speech-recognition service on iOS and your device's configured speech-recognition service on Android, which may be provided by Google or another provider.
+If you choose to dictate a note or use voice requests in Hands-free, Puptime asks for the relevant microphone and speech-recognition permissions. It uses Apple's speech-recognition service on iOS and your device's configured speech-recognition service on Android, which may be provided by Google or another provider.
 
-Depending on your device, language models, and recognition service, speech may be processed on your device or sent to the speech provider for processing, and a network connection may be needed. The provider handles that processing under its own privacy practices. Puptime does not save the audio recording or send it to the developer. The resulting text is stored locally as part of your note.
+Depending on your device, language models, and recognition service, speech may be processed on your device or sent to the speech provider for processing, and a network connection may be needed. The provider handles that processing under its own privacy practices. Puptime does not save the audio recording or send it to the developer. Dictated notes are stored locally as part of the selected log. Hands-free transcripts follow the additional processing described below.
+
+## Optional hands-free assistant
+
+Where configured, Hands-free lets you type or speak requests to log activities, edit recent log times and notes, navigate the app, and choose whether to review proposed logs before saving. It needs a signed-in account and an internet connection. Before the first request in each session, the app explains this processing and asks you to choose **Use assistant**.
+
+Requests are sent through Puptime's Cloudflare backend to OpenAI. Each request includes your text, the current dog's identifier and name, current time, timezone and language, custom activity names, confirmation preference, up to 30 recent activity records (including notes), and bounded recent conversation context. This context can include local-only logs even when cloud sync is off. Using the assistant does not enable cloud sync or enroll a puppy for backup. Account credentials, email addresses and profile photos are not included in model input.
+
+The backend requests that OpenAI not store the response as application conversation state (`store: false`). Provider processing and retention follow the applicable OpenAI service settings and policies; this flag does not establish zero retention. Puptime does not persist prompts or chat transcripts on its backend. It stores account-scoped request counters to limit usage.
+
+Chat text remains in memory while the assistant is open and clears when it closes. The device keeps the last saved assistant operation, including affected log values, for retry protection and undo. Saved activities and notes follow your normal local backup and optional sync settings. Spoken replies use your device's text-to-speech service. Voice listening stops when you end the conversation, close the assistant, or put the app in the background.
 
 ## Notifications
 

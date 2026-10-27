@@ -15,6 +15,9 @@ import {SideNavigation,type AppTab} from './src/components/SideNavigation';
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import { ThemePicker } from './src/components/ThemePicker';
 import { Toast } from './src/components/Toast';
+import {AssistantPanel} from './src/components/AssistantPanel';
+import {assistantCopy} from './src/assistant-copy';
+import type {AssistantScreen} from './src/assistant';
 import type { ActivityCustomizations } from './src/activity-customization';
 import { CsvImportError } from './src/export';
 import { pickEventsCsv } from './src/share-export';
@@ -120,6 +123,8 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [historyVisible,setHistoryVisible]=useState(false);
   const [accountVisible,setAccountVisible]=useState(false);
+  const [assistantVisible,setAssistantVisible]=useState(false);
+  const assistantDestination=useRef<AssistantScreen|null>(null);
   const [drawerOpen,setDrawerOpen]=useState(false);
   const [showSpotlight,setShowSpotlight]=useState(false);
   const [spotlightTarget,setSpotlightTarget]=useState<SpotlightRect|null>(null);
@@ -292,6 +297,19 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     setSettingsVisible(false);
     setNavigationHistory([]);
     setTab(nextTab);
+  };
+
+  const finishAssistantNavigation=()=>{
+    const screen=assistantDestination.current;assistantDestination.current=null;
+    if(!screen)return;
+    setDrawerOpen(false);setHistoryVisible(false);setAccountVisible(false);
+    if(screen==='settings'){setNavigationHistory([tab]);setSettingsVisible(true);}
+    else if(screen==='account')setAccountVisible(true);
+    else navigateToTab(screen);
+  };
+  const navigateFromAssistant=(screen:AssistantScreen)=>{
+    assistantDestination.current=screen;setAssistantVisible(false);
+    if(Platform.OS!=='ios')finishAssistantNavigation();
   };
 
   const openSettings = () => {
@@ -779,7 +797,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
           <View ref={spotlightContainer} collapsable={false} style={styles.screen}>
           <BlurTargetView ref={blurTarget} style={styles.screen}>
           <SideNavigation open={drawerOpen} enabled={onboardingVisible===false} tab={tab} settingsVisible={settingsVisible} theme={theme}
-            onOpen={()=>setDrawerOpen(true)} onClose={()=>setDrawerOpen(false)} onChange={navigateToTab} onSettings={()=>{setHistoryVisible(false);setNavigationHistory([tab]);setSettingsVisible(true);}} onAccount={()=>setAccountVisible(true)}>
+            onOpen={()=>setDrawerOpen(true)} onClose={()=>setDrawerOpen(false)} onChange={navigateToTab} onSettings={()=>{setHistoryVisible(false);setNavigationHistory([tab]);setSettingsVisible(true);}} onAccount={()=>setAccountVisible(true)} onAssistant={()=>{setDrawerOpen(false);setAssistantVisible(true);}}>
           {nativeApp&&onboardingVisible===false&&!historyVisible?<View style={styles.navigationHeader}>
             <Pressable testID={settingsVisible?'settings.back':navigationHistory.length?'nav.back':'nav.open'} accessibilityRole="button"
               accessibilityLabel={translate(language,settingsVisible||navigationHistory.length>0?'settings.back':'nav.open')}
@@ -788,6 +806,9 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
               <MaterialCommunityIcons accessible={false} name={settingsVisible||navigationHistory.length>0?'arrow-left':'menu'} size={25} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
             </Pressable>
             <Text testID="nav.title" accessibilityRole="header" maxFontSizeMultiplier={1.5} style={[styles.navigationTitle,{color:theme.text,minWidth:70}]}>{translate(language,settingsVisible?'settings.title':tab==='notifications'?'notifications.title':tab==='learn'?'learn.title':`nav.${tab}`)}</Text>
+            <Pressable testID="assistant.open" accessibilityRole="button" accessibilityLabel={assistantCopy[language].title} onPress={()=>setAssistantVisible(true)} style={({pressed})=>[styles.menuButton,{borderRadius:theme.presentation.controlRadius,backgroundColor:pressed?theme.primarySoft:undefined}]}>
+              <MaterialCommunityIcons accessible={false} name="microphone-outline" size={25} color={theme.primary}/>
+            </Pressable>
             <Pressable testID={settingsVisible?"settings.account.open":"account.open"} accessibilityRole="button" accessibilityLabel={translate(language,'account.title')} onPress={()=>setAccountVisible(true)} style={({pressed})=>[styles.menuButton,{borderRadius:theme.presentation.controlRadius,backgroundColor:pressed?theme.primarySoft:undefined}]}>
               <MaterialCommunityIcons accessible={false} name="account-circle-outline" size={28} color={theme.primary}/>
             </Pressable>
@@ -854,6 +875,9 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
           />
           <Modal visible={accountVisible&&cloud.available} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={()=>setAccountVisible(false)}>
             {accountVisible?<SafeAreaProvider><AccountScreen cloud={cloud} theme={theme} eventCount={eventCount} onBack={()=>setAccountVisible(false)} onOpenActivity={()=>{setAccountVisible(false);navigateToTab('log');}}/></SafeAreaProvider>:null}
+          </Modal>
+          <Modal visible={assistantVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setAssistantVisible(false)} onDismiss={finishAssistantNavigation}>
+            {assistantVisible?<SafeAreaProvider><AssistantPanel theme={theme} cloud={cloud} onClose={()=>setAssistantVisible(false)} onCommitted={refreshCommittedState} onNavigate={navigateFromAssistant}/></SafeAreaProvider>:null}
           </Modal>
         </SafeAreaView>
       </LocalizationProvider>

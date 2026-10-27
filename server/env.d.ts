@@ -12,6 +12,8 @@ declare global {
       ACCOUNT_JURISDICTION?: 'eu';
       RESEND_API_KEY?: string;
       EMAIL_FROM?: string;
+      OPENAI_API_KEY?: string;
+      OPENAI_MODEL?: string;
       GOOGLE_CLIENT_ID?: string;
       GOOGLE_CLIENT_SECRET?: string;
       APPLE_CLIENT_ID?: string;

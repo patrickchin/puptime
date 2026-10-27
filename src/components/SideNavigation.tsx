@@ -7,15 +7,16 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useLocalization} from '../localization-context';
 import {headingStyle,navigationIcon,type Theme} from '../theme';
 import type {Tab} from './BottomNav';
+import {assistantCopy} from '../assistant-copy';
 
 export type AppTab=Tab|'notifications'|'pets';
 const destinations:AppTab[]=['log','pets','timeline','insights','schedule','notifications','learn'];
 
-export function SideNavigation({open,enabled,tab,settingsVisible,theme,onOpen,onClose,onChange,onSettings,onAccount,children}:{
+export function SideNavigation({open,enabled,tab,settingsVisible,theme,onOpen,onClose,onChange,onSettings,onAccount,onAssistant,children}:{
  open:boolean;enabled:boolean;tab:AppTab|'account';settingsVisible:boolean;theme:Theme;
- onOpen:()=>void;onClose:()=>void;onChange:(tab:AppTab)=>void;onSettings:()=>void;onAccount?:()=>void;children:ReactNode;
+ onOpen:()=>void;onClose:()=>void;onChange:(tab:AppTab)=>void;onSettings:()=>void;onAccount?:()=>void;onAssistant?:()=>void;children:ReactNode;
 }){
- const {t}=useLocalization(),{width}=useWindowDimensions(),insets=useSafeAreaInsets();
+ const {t,language}=useLocalization(),{width}=useWindowDimensions(),insets=useSafeAreaInsets();
  const [reduceMotion,setReduceMotion]=useState(true);
  useEffect(()=>{
   let active=true;
@@ -47,7 +48,7 @@ export function SideNavigation({open,enabled,tab,settingsVisible,theme,onOpen,on
    <View style={styles.items}>{destinations.map(item)}</View>
 
 
-   <View style={[styles.settings,{borderTopColor:theme.border}]}>{onAccount?item('account'):null}{item('settings')}</View>
+   <View style={[styles.settings,{borderTopColor:theme.border}]}>{onAssistant?<Pressable testID="nav.assistant" accessibilityRole="button" onPress={()=>{onClose();onAssistant();}} style={styles.item}><MaterialCommunityIcons accessible={false} name="microphone-outline" size={24} color={theme.primary}/><Text style={[styles.itemText,{color:theme.text}]}>{assistantCopy[language].title}</Text></Pressable>:null}{onAccount?item('account'):null}{item('settings')}</View>
   </ScrollView>;
  return <><Drawer open={!reduceMotion&&enabled&&open} onOpen={onOpen} onClose={onClose} drawerPosition="left" drawerType="front"
   swipeEnabled={!reduceMotion&&enabled} drawerStyle={{width:drawerWidth,backgroundColor:theme.background}}
