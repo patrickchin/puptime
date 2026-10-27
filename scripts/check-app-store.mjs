@@ -39,4 +39,10 @@ for(const [file,size] of [['header',[3840,1646]],['search',[1920,1280]]]){
 }
 const video=read('fastlane/previews/en-US/iPhone-6.3-preview.mp4');
 assert.ok(video.length>0&&video.length<500_000_000);
-console.log('PASS metadata parity, field limits, keywords, 12 opaque screenshots and 2 creative asset dimensions.');
+const edit=JSON.parse(read('fastlane/previews/en-US/edit.json'));
+assert.equal(createHash('sha256').update(video).digest('hex'),edit.sha256,'Preview differs from the verified export');
+assert.ok(edit.seconds>=15&&edit.seconds<=30);
+assert.equal(edit.playback_speed,1);
+assert.equal(edit.frozen_padding_seconds,0);
+for(const scene of edit.scenes)assert.ok(Math.abs(scene.edited_seconds-(scene.raw_end-scene.raw_start))<.1,'A preview cut inherited idle time');
+console.log('PASS metadata, 12 opaque screenshots, 2 creative assets and the verified preview without padded holds.');
