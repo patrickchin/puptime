@@ -12,8 +12,9 @@ export async function updateHomeWidget(events: PuppyEvent[]): Promise<void> {
   const activeNap = events.some(isOpenNap);
   const lastEventAt = latestQuickEventTimes(events);
   const customActivities = await loadCustomActivities(events);
-  const actions = await loadWidgetActions(customActivities);
-  const themePreference = await loadThemePreference();
+  const [actions, themePreference] = await Promise.all([
+    loadWidgetActions(customActivities), loadThemePreference(),
+  ]);
   await requestWidgetUpdate({
     widgetName: 'PuptimeQuickLog',
     renderWidget: ({ height }) => ({

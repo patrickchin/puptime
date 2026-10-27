@@ -326,11 +326,7 @@ export async function showWidgetLogConfirmation(
       },
     },
     trigger: Platform.OS === 'android'
-      ? {
-          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-          seconds: 1,
-          channelId: WIDGET_CHANNEL_ID,
-        }
+      ? { channelId: WIDGET_CHANNEL_ID }
       : null,
   });
   return true;

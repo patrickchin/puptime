@@ -23,9 +23,49 @@ module.exports = function withAndroidWidgetChronometer(config) {
     let source = fs.readFileSync(widgetPath, 'utf8').replace(/\r\n/g, '\n');
     source = insertOnce(source, '        if (dark != null) {', '        View darkRoot = null;\n        if (dark != null) {');
     source = insertOnce(source, '            Bitmap darkBitmap =', '            darkRoot = darkWidgetWithViews.getRootView();\n            Bitmap darkBitmap =');
-    source = insertOnce(source, '        AppWidgetManager.getInstance(appContext)',
-      '        PuptimeWidgetChronometers.add(appContext, remoteWidgetView, widgetWithViews.getRootView(), darkRoot);\n\n        AppWidgetManager.getInstance(appContext)');
+    if (!source.includes('PuptimeWidgetChronometers.add(appContext,')) {
+      source = insertOnce(source, '        AppWidgetManager.getInstance(appContext)',
+        '        PuptimeWidgetChronometers.add(appContext, remoteWidgetView, widgetWithViews.getRootView(), darkRoot);\n\n        AppWidgetManager.getInstance(appContext)');
+    }
+    // Extras do not distinguish PendingIntents. Millisecond request codes can
+    // collide between buttons, and CANCEL_CURRENT invalidates launcher targets.
+    source = insertOnce(source, '        PendingIntent pendingIntent = PendingIntent.getBroadcast(',
+      `        intent.setData(new android.net.Uri.Builder()
+            .scheme("puptime-widget").authority(widgetName)
+            .appendPath(String.valueOf(id)).appendPath(clickableView.getId()).build());
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(`);
+    source = source.replace('(int) System.currentTimeMillis(),', 'id,')
+      .replace('PendingIntent.FLAG_CANCEL_CURRENT\n                | PendingIntent.FLAG_MUTABLE',
+        'PendingIntent.FLAG_UPDATE_CURRENT\n                | PendingIntent.FLAG_IMMUTABLE');
+    source = insertOnce(source, '        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {',
+      '        boolean reuseClicks = PuptimeWidgetUpdates.canReuse(appContext, widgetId, widgetWithViews);\n        if (!reuseClicks && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {');
+    source = insertOnce(source,
+      '        AppWidgetManager.getInstance(appContext)\n            .updateAppWidget(widgetId, remoteWidgetView);',
+      '        PuptimeWidgetUpdates.update(appContext, widgetId, remoteWidgetView, widgetWithViews, reuseClicks);');
+    source = source.replace('addClickableArea(remoteWidgetView, rootView, clickableView, widgetId);',
+      'addClickableArea(remoteWidgetView, rootView, clickableView, widgetId, i);')
+      .replace('ClickableView clickableView, int widgetId) {', 'ClickableView clickableView, int widgetId, int slot) {');
+    const areaStart = source.indexOf('    private void addClickableArea(');
+    const areaEnd = source.indexOf('    private void registerClickTask(', areaStart);
+    source = source.slice(0, areaStart) + source.slice(areaStart, areaEnd)
+      .replaceAll('R.layout.rn_widget_clickable', 'PuptimeWidgetUpdates.layout(slot)')
+      .replaceAll('R.id.rn_widget_clickable_area', 'PuptimeWidgetUpdates.area(slot)') + source.slice(areaEnd);
     fs.writeFileSync(widgetPath, source);
+    fs.copyFileSync(path.join(__dirname, 'android-widget/PuptimeWidgetUpdates.java'),
+      path.join(javaRoot, 'PuptimeWidgetUpdates.java'));
+    const clickableLayout = fs.readFileSync(path.join(nativeRoot, 'res/layout/rn_widget_clickable.xml'), 'utf8');
+    for (let slot = 0; slot < 4; slot++) {
+      fs.writeFileSync(path.join(nativeRoot, `res/layout/puptime_widget_clickable_${slot}.xml`),
+        clickableLayout.replaceAll('rn_widget_clickable_area', `puptime_widget_clickable_${slot}`));
+    }
+
+    const providerPath = path.join(javaRoot, 'RNWidgetProvider.java');
+    source = fs.readFileSync(providerPath, 'utf8').replace(/\r\n/g, '\n');
+    source = insertOnce(source, '            additionalData = new Data.Builder()',
+      '            clickActionData.putDouble("tapAt", System.currentTimeMillis());\n            additionalData = new Data.Builder()');
+    source = insertOnce(source, '    private void storeWidgetSize(Context context, int widgetId) {',
+      '    private void storeWidgetSize(Context context, int widgetId) {\n        PuptimeWidgetUpdates.invalidate(context, widgetId);');
+    fs.writeFileSync(providerPath, source);
 
     const textPath = path.join(javaRoot, 'builder/widget/TextWidget.java');
     source = fs.readFileSync(textPath, 'utf8').replace(/\r\n/g, '\n');
