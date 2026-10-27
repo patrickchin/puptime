@@ -1,0 +1,38 @@
+{
+  "seconds": 27,
+  "poster_seconds": 5,
+  "source": "Native simulator recording of the current app; synthetic history",
+  "audio": "Silent stereo AAC",
+  "scenes": [
+    {
+      "screen": "01-log",
+      "raw_start": 20.599,
+      "raw_end": 26.6,
+      "edited_seconds": 7
+    },
+    {
+      "screen": "02-timeline",
+      "raw_start": 26.6,
+      "raw_end": 28.2,
+      "edited_seconds": 5
+    },
+    {
+      "screen": "03-insights",
+      "raw_start": 28.2,
+      "raw_end": 31.0,
+      "edited_seconds": 5
+    },
+    {
+      "screen": "04-routine",
+      "raw_start": 31.0,
+      "raw_end": 33.6,
+      "edited_seconds": 5
+    },
+    {
+      "screen": "05-details",
+      "raw_start": 33.6,
+      "raw_end": 37.2,
+      "edited_seconds": 5
+    }
+  ]
+}

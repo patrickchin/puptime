@@ -8,25 +8,28 @@
     },
     "info": {
       "en-US": {
-        "description": "Keep track of potty breaks and meals while you learn your puppy's routine. Tap Pee, Poop, or Eat, then adjust the time or add a note when you need to.\n\nBuild an editable routine and choose reminders that suit your day. Timeline helps you spot patterns. Estimated entries stay labelled and count separately from recorded activity.\n\nLocal logging is free and works offline without an account. Optional cloud backup and device sync let you keep the same puppy history across your devices. Sign in and choose to enable cloud access before any puppy data is uploaded. Cloud access is a separate service; the available plan and any trial are shown before you choose it.\n\nExport an activity CSV from Insights, or import a backup to recover missing entries while keeping your current edits. CSV backups include activity times, notes, custom activity names, and estimate labels. Routines and settings are not included in the activity CSV.\n\nVoice dictation uses your device's speech-recognition service and may need an internet connection. The starter routine is an editable example. Adjust it with your veterinarian's guidance.",
+        "description": "Know when your puppy last peed, pooped, or ate. Puptime keeps the little details in one place while you learn your puppy’s routine.\n\nLOG IT WHILE IT HAPPENS\nTap Pee, Poop, or Eat to save an activity. Adjust the time if you’re catching up later, and add a note when the details matter. Use the Home Screen widget for quick logging.\n\nFIND YOUR PUPPY’S PATTERN\nLook back through your history and compare activity on the timeline. Insights helps you see how often your puppy goes and when. Estimated entries stay labelled and count separately from recorded activity.\n\nMAKE THE ROUTINE YOURS\nEdit your puppy’s routine and choose reminders that suit your day. Track walks and custom activities alongside potty breaks and meals.\n\nSTART WITH LOCAL LOGGING\nLocal features are free and work offline without an account. Optional cloud backup and device sync require sign-in and cloud access. Puppy data is uploaded only after you choose to enable cloud access. Available plans and any trial are shown before you choose one.\n\nKEEP A COPY OF YOUR HISTORY\nExport your activities as a CSV, or import a backup to recover missing entries while keeping your current edits. Activity CSVs include times, notes, custom activity names, and estimate labels. Routines and settings are not included.\n\nVoice dictation uses your device’s speech-recognition service and may need an internet connection. The starter routine is an editable example. Adjust it with your veterinarian’s guidance.",
         "keywords": [
           "dog",
-          "routine",
-          "training",
           "housebreaking",
           "toilet",
           "feeding",
           "schedule",
-          "reminder",
+          "log",
           "history",
           "offline",
-          "log"
+          "walk",
+          "pee",
+          "poop",
+          "journal",
+          "care",
+          "pet"
         ],
         "marketingUrl": "https://puptime.pages.dev",
-        "promoText": "Log potty breaks and meals, spot timing patterns, and choose reminders for your puppy. Start with free offline logging; add cloud backup when you need it.",
+        "promoText": "Know when your puppy last went. Log potty breaks and meals in a tap, then use your history to build a routine that fits your day.",
         "supportUrl": "https://github.com/patrickchin/puptime/issues",
-        "title": "Puptime: Puppy Tracker",
-        "subtitle": "Potty, meals & puppy routines",
+        "title": "Puptime: Puppy Potty Tracker",
+        "subtitle": "Meals, routines & reminders",
         "privacyPolicyUrl": "https://github.com/patrickchin/puptime/blob/main/PRIVACY.md",
         "releaseNotes": "• Set up your puppy profile and choose local logging or optional cloud backup.\n• Sign in for cloud access and keep your puppy history across devices.\n• Restore missing activity from a CSV backup while keeping your current edits."
       }
