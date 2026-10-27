@@ -8,11 +8,14 @@ import {DatabaseSync} from 'node:sqlite';
 import {createLocalDatabase,initializeLocalDatabase} from '../src/local/database.ts';
 import {sqliteTestConnection} from '../src/local/sqlite-test-adapter.ts';
 import {createLocalRuntime} from '../src/local/runtime-factory.ts';
+import {parseEvents} from '../src/storage-validation.ts';
+import {suggestScheduleFromEvents} from '../src/analytics.ts';
 
-const [udid]=process.argv.slice(2),app='com.patrickchin.puptime';
+const [udid,csvPath]=process.argv.slice(2),app='com.patrickchin.puptime';
+assert.ok(csvPath,'Supply the original activity CSV; it stays outside version control.');
 const simctl=(...args)=>execFileSync('xcrun',['simctl',...args],{encoding:'utf8'}).trim();
 const devices=Object.values(JSON.parse(simctl('list','devices','available','-j')).devices).flat();
-assert.match(devices.find(device=>device.udid===udid)?.name??'',/^Puptime 459e App Store (iPhone|iPad)$/);
+assert.match(devices.find(device=>device.udid===udid)?.name??'',/^Puptime 459e App Store (iPhone|iPad) Real History$/);
 try{simctl('terminate',udid,app);}catch{}
 const directory=join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite');
 const target=join(directory,'puptime-v2.db');
@@ -33,19 +36,29 @@ const {storage}=await createLocalRuntime(database,petId);
 await storage.completeOnboarding({puppyName:'Mochi'});
 await storage.saveThemePreference('light');
 await storage.saveLanguagePreference('en');
-const now=Date.now(),events=[];
-const daily=[['pee',7,5],['meal',7,30],['poop',7,55],['walk',8,20],['pee',9,40],['pee',11,35],['meal',12,0],['pee',13,15],['walk',16,30],['pee',17,0],['meal',18,30],['poop',19,5],['pee',20,40]];
-for(let day=20;day>=0;day--)for(const [type,hour,minute] of daily){
-  const at=new Date(now);at.setDate(at.getDate()-day);at.setHours(hour,minute+(day%3-1)*4,0,0);
-  if(at.getTime()<=now)events.push({id:'evt_'+randomBytes(16).toString('base64url'),type,at:at.getTime(),source:'app'});
-}
+// csv's standard parser handles the older nine-column export as well as current CSVs.
+const rows=JSON.parse(execFileSync('python3',['-c','import csv,json,sys; json.dump(list(csv.DictReader(open(sys.argv[1],encoding="utf-8-sig"))),sys.stdout)',resolve(csvPath)],{encoding:'utf8'}));
+assert.ok(rows.length>0,'The CSV must contain activity history.');
+const events=parseEvents(rows.map(row=>({
+ id:'evt_'+randomBytes(16).toString('base64url'),type:row.Type,
+ at:Date.parse(row['Started At (ISO)']),source:row.Source,
+ ...(row['Ended At (ISO)']?{endedAt:Date.parse(row['Ended At (ISO)'])}:{}),
+ ...(row.Estimated==='true'?{estimated:true}:{}),
+ ...(row['Custom Label']?{customLabel:row['Custom Label']}:{}),
+})));
+// Preserve recorded dates, times, sources, durations and duplicate timestamps.
+// Personal notes are deliberately omitted from public marketing captures.
 await storage.appendEvents(events);
-assert.ok(events.length>=260);
-assert.equal((await storage.loadEvents()).length,events.length);
+const saved=await storage.loadEvents();
+assert.deepEqual([...saved].sort((a,b)=>a.id.localeCompare(b.id)),[...events].sort((a,b)=>a.id.localeCompare(b.id)));
+const anchor=Math.max(...events.map(event=>event.at))+10*60_000;
+const suggestion=suggestScheduleFromEvents(events,14,new Date(anchor));
+assert.ok(suggestion.entries.length>0);
+await storage.saveSchedule(suggestion.entries.map(entry=>({...entry,id:'rtn_'+randomBytes(16).toString('base64url'),reminder:false})));
 assert.equal(await storage.loadPuppyName(),'Mochi');
 assert.equal(await storage.shouldShowOnboarding(),false);
 await database.close();
 mkdirSync(directory,{recursive:true});cpSync(path,target);
 simctl('status_bar',udid,'override','--time','9:41','--dataNetwork','wifi','--wifiMode','active','--wifiBars','3','--batteryState','charged','--batteryLevel','100');
 simctl('ui',udid,'appearance','light');
-console.log(`Seeded ${events.length} synthetic events for ${petId}; no customer data used.`);
+console.log(`Imported ${events.length} recorded activities, with original timestamps and sources; personal notes omitted. Capture clock: ${new Date(anchor).toISOString()}`);

@@ -1,0 +1,50 @@
+appId: com.patrickchin.puptime
+name: App Store action preview
+---
+- launchApp
+- extendedWaitUntil:
+    visible: {id: screen.today}
+    timeout: 90000
+- tapOn: {id: nav.open, retryTapIfNoChange: true}
+- waitForAnimationToEnd
+- tapOn: {id: nav.settings}
+- waitForAnimationToEnd
+- tapOn: {id: settings.theme.open}
+- waitForAnimationToEnd
+- tapOn: {id: appearance.theme.light}
+- tapOn: {id: settings.back}
+- tapOn: {id: nav.open, retryTapIfNoChange: true}
+- waitForAnimationToEnd
+- tapOn: {id: nav.log}
+- waitForAnimationToEnd
+- tapOn: {id: quick.pee}
+- waitForAnimationToEnd
+- takeScreenshot: 01-logged
+- tapOn: {id: event.pee.edit, index: 0}
+- waitForAnimationToEnd
+- tapOn: {id: editor.adjust.back.15}
+- waitForAnimationToEnd
+- takeScreenshot: 02-edited
+- tapOn: {id: editor.close}
+- tapOn: {id: nav.switch}
+- waitForAnimationToEnd
+- assertVisible: {id: screen.timeline}
+- takeScreenshot: 03-timeline
+- tapOn: {id: timeline.filter.poop-meal}
+- waitForAnimationToEnd
+- tapOn: {id: timeline.mark.point.2026-10-08.*, index: 0, retryTapIfNoChange: true}
+- waitForAnimationToEnd
+- assertVisible: {id: timeline.details}
+- takeScreenshot: 04-detail
+- tapOn: {id: timeline.details.close}
+- tapOn: {id: nav.open, retryTapIfNoChange: true}
+- waitForAnimationToEnd
+- tapOn: {id: nav.schedule}
+- waitForAnimationToEnd
+- assertVisible: {id: screen.schedule}
+- tapOn: {id: schedule.entry.meal, index: 0}
+- waitForAnimationToEnd
+- tapOn: {id: schedule.editor.window.30}
+- waitForAnimationToEnd
+- takeScreenshot: 06-routine
+- tapOn: {id: schedule.editor.close}
