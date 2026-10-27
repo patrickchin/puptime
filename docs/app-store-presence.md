@@ -1,6 +1,6 @@
 # English App Store presence
 
-Prepared October 27, 2026. These are candidate assets for Puptime 1.12.0, not a
+Prepared October 27–28, 2026. These are candidate assets for Puptime 1.12.0, not a
 published listing or evidence of Apple approval. The broader localization work
 is deferred at the owner's request. App Store Connect requires sign-in in the
 available browser. Apple's US public lookup returned no record for 6813823575;
@@ -19,8 +19,8 @@ that does not establish availability in other storefronts.
 | Icon | Existing 1024 × 1024 opaque PNG; retain the paw/clock identity |
 | iPhone screenshots | Six opaque 1206 × 2622 PNGs in `fastlane/screenshots/en-US/` |
 | iPad screenshots | Six opaque 2064 × 2752 PNGs in the same folder; actual tablet layout |
-| App preview | `fastlane/previews/en-US/iPhone-6.3-preview.mp4`, 27 seconds, 886 × 1920, 30 fps |
-| Poster frame | `fastlane/previews/en-US/poster.jpg`; select 5 seconds in Connect |
+| App preview | `fastlane/previews/en-US/iPhone-6.3-preview.mp4`, 15.13 seconds, 886 × 1920, 30 fps |
+| Poster frame | `fastlane/previews/en-US/poster.jpg`; select 6 seconds in Connect |
 | Optional header | `fastlane/creative-assets/en-US/header.png`, 3840 × 1646 |
 | Optional search art | `fastlane/creative-assets/en-US/search.png`, 1920 × 1280 |
 
@@ -30,8 +30,9 @@ visible feature. The old widget-only upload asset was removed because it did
 not represent the current screen sequence. Current widget footage can be added
 after verifying the exact release's extension on a device.
 
-The preview shows a real tap to log, then real navigation through Timeline,
-Insights, Routine, and Edit log. Holds use the last recorded frame. It uses
+The preview shows a quick log, a 15-minute correction, timeline filtering and
+log details, and a routine-window adjustment. Playback stays at normal
+speed. Setup and waiting are trimmed; no frozen-frame padding is added. It uses
 H.264 High Level 4.0, a 10 Mbps encoder target, yuv420p, and silent 48 kHz stereo
 AAC. It works with audio muted. Only local features appear, so it does not
 suggest that cloud access is included. An iPad preview is optional and has not
@@ -39,10 +40,15 @@ been produced; iPad screenshots are supplied.
 
 The native capture flow passed on dedicated iPhone 17 and iPad Pro 13-inch (M4)
 simulators running iOS 26.5. `fastlane/capture-provenance.json` records the source
-revision, native host, production bundle hash, and fixture details. Each device
-started with 273 generated activities over 21 days. The capture flow adds one
-activity per run. Customer data and accounts are not involved. The status bar
-is standardized to 9:41; the app clock is unchanged.
+revision, native host, bundle hash, and data provenance. Each device starts
+with the owner’s 338 CSV records from September 11 through October 11, 2026.
+Original timestamps, types, durations, app/widget sources, and duplicate
+timestamps are preserved. Personal notes are omitted. The CSV remains local
+and unchanged. Screenshot capture adds no activities; the video adds and edits
+one demonstration activity. Routines are suggested by the app from that history.
+The status bar is standardized to 9:41. An ignored capture-only entry point
+anchors the app clock at October 11, 13:10 in Asia/Shanghai, so the final recorded
+day appears as Today. The release entry point is unchanged.
 
 The native runtime was an existing 1.12.0 simulator host with a fresh production
 JavaScript bundle from this worktree. The captures are not a qualification of
@@ -65,7 +71,7 @@ submission and retake any changed screens.
    the remote media set and remove superseded images in the draft deliberately
    so an old widget image cannot remain first.
 4. In the draft's English Product Page Information, add the preview to the
-   matching iPhone display slot. Choose the poster at 5 seconds and check
+   matching iPhone display slot. Choose the poster at 6 seconds and check
    processing succeeds. Use Apple's current display labels; the local file's
    `6.3` name describes the capture, not an API display-type identifier.
 5. Add the optional header/search images under Header and Search Results.
@@ -125,14 +131,18 @@ editorial and not guaranteed.
 ## Reproduce the assets
 
 Use fresh task-owned simulators with the names in the provenance file, install
-a matching native host, and export the current production bundle into a copy
-of that host before re-signing and installing it. Keep that build outside Git.
+a matching native host, and export a production-mode bundle with the isolated
+capture-only clock entry point into a copy of that host before re-signing and
+installing it. The clock entry point for this pass is retained in ignored
+`output/app-store-real/capture-entry.js`. Its anchor is ten minutes after the
+CSV’s latest timestamp. Keep the CSV, database and capture build outside Git.
 Never overwrite another simulator's database. `scripts/seed-app-store.mjs`
 checks the device name and refuses an existing database.
 
 ```sh
-TZ=Asia/Shanghai node scripts/seed-app-store.mjs IPHONE_UDID
-TZ=Asia/Shanghai node scripts/seed-app-store.mjs IPAD_UDID
+TZ=Asia/Shanghai node scripts/seed-app-store.mjs IPHONE_UDID /path/to/owner-activity.csv
+TZ=Asia/Shanghai node scripts/seed-app-store.mjs IPAD_UDID /path/to/owner-activity.csv
+maestro --device IPHONE_UDID test fastlane/capture.yaml --test-output-dir "$HOME/Pictures/Screenshots/Codex/puptime-app-store/new-iphone-stills"
 python3 scripts/record-store-preview.py IPHONE_UDID "$HOME/Pictures/Screenshots/Codex/puptime-app-store/new-iphone"
 maestro --device IPAD_UDID test fastlane/capture.yaml --test-output-dir "$HOME/Pictures/Screenshots/Codex/puptime-app-store/new-ipad"
 python3 scripts/edit-store-preview.py "$HOME/Pictures/Screenshots/Codex/puptime-app-store/new-iphone/recording.json"
@@ -152,8 +162,9 @@ a contact sheet beside the source captures. Inspect every image and the final
 video after generation. The editor verifies that each exported scene ends on
 the corresponding captured UI; review the action and transitions visually too.
 Original captures for this pass remain under
-`~/Pictures/Screenshots/Codex/puptime-app-store/`. The first recording's raw MOV
-and timing JSON also remain in the worktree's ignored `output/app-store/`.
+`~/Pictures/Screenshots/Codex/puptime-app-store/`. The current native video source and timing JSON are in the `real-history/preview-v3/`
+subdirectory. Earlier synthetic captures remain local historical evidence and
+are superseded by this CSV-based set.
 
 ## Later localization
 
