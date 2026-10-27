@@ -2,7 +2,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { Asset } from 'expo-asset';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View, type GestureResponderEvent } from 'react-native';
+import { ActivityIndicator, Modal, Platform, StyleSheet, Text, useWindowDimensions, View, type GestureResponderEvent } from 'react-native';
+import { Pressable } from './TelemetryPressable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { audioSeek, audioTime, guideSourceText } from '../guide-audio';

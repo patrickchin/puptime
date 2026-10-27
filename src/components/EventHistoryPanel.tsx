@@ -1,6 +1,7 @@
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {ActivityIndicator,FlatList,Pressable,ScrollView,StyleSheet,Text,View,useWindowDimensions} from 'react-native';
+import {ActivityIndicator,FlatList,ScrollView,StyleSheet,Text,View,useWindowDimensions} from 'react-native';
+import { Pressable } from './TelemetryPressable';
 import {CloudApiError} from '../cloud/api';
 import {eventDataSchema,type Revision} from '../cloud/protocol';
 import {useAccountSnapshot} from '../cloud/use-account-snapshot';

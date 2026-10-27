@@ -1,4 +1,5 @@
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, StyleSheet, Text, View } from 'react-native';
+import { Pressable } from './TelemetryPressable';
 
 import { useLocalization } from '../localization-context';
 import { spacing, type Theme } from '../theme';

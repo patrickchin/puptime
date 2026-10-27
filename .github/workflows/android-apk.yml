@@ -77,6 +77,9 @@ jobs:
         env:
           CI: "1"
       - run: ./gradlew assembleRelease --no-daemon
+        env:
+          EXPO_PUBLIC_APP_POSTHOG_KEY: ${{ vars.EXPO_PUBLIC_APP_POSTHOG_KEY }}
+          EXPO_PUBLIC_APP_POSTHOG_HOST: ${{ vars.EXPO_PUBLIC_APP_POSTHOG_HOST || 'https://eu.i.posthog.com' }}
         working-directory: android
       - name: Verify APK signature and archive
         run: |

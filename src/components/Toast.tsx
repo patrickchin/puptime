@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Pressable } from './TelemetryPressable';
 
 import { useLocalization } from '../localization-context';
 import { type Theme } from '../theme';

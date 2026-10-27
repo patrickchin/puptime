@@ -1,3 +1,4 @@
+import { useTelemetryOverlay } from '../telemetry';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
@@ -5,7 +6,6 @@ import {
   Keyboard,
   Linking,
   Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   Switch,
@@ -13,6 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { Pressable } from '../components/TelemetryPressable';
 
 import { scheduleStatusesForDay, suggestScheduleFromEvents, type ScheduleStatus } from '../analytics';
 import {activityWindowBounds,useActivityWindow,type ActivityViewProps} from '../activity-view';
@@ -56,6 +57,7 @@ export function ScheduleScreen({
 }&ActivityViewProps) {
   const { activityColors, activityLabel, locale, t } = useLocalization();
   const [draft, setDraft] = useState<Draft | null>(null);
+  useTelemetryOverlay('routine_editor', draft !== null);
   const originalDraft=useRef<ScheduleEntry|undefined>(undefined);
   const acceptedSuggestion=useRef<{entries:ScheduleEntry[];preview:ReturnType<typeof suggestScheduleFromEvents>}|null>(null);
   const [showTimeSelector, setShowTimeSelector] = useState(false);

@@ -4,8 +4,10 @@ import {OnboardingDesignPreview,type OnboardingDraft} from './src/screens/Onboar
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
+import { initializeAppTelemetry, productTelemetry, flushAppTelemetry } from './src/telemetry';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator,Alert, Appearance, AppState, BackHandler, Linking, Modal, Platform, Pressable,StyleSheet,Text,useColorScheme, View } from 'react-native';
+import { ActivityIndicator,Alert, Appearance, AppState, BackHandler, Linking, Modal, Platform, StyleSheet,Text,useColorScheme, View } from 'react-native';
+import { Pressable } from './src/components/TelemetryPressable';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { BottomNav } from './src/components/BottomNav';
@@ -163,6 +165,18 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
   const handledNotificationResponses = useRef(new Set<string>());
   const onboardingChecked = useRef(false);
 
+  useEffect(() => {
+    void initializeAppTelemetry();
+    productTelemetry.setForeground(AppState.currentState === 'active');
+    const subscription = AppState.addEventListener('change', state => {
+      productTelemetry.setForeground(state === 'active');
+      if (state !== 'active') flushAppTelemetry();
+    });
+    const timer = setInterval(() => productTelemetry.checkpoint('checkpoint'), 15_000);
+    return () => { clearInterval(timer); subscription.remove(); productTelemetry.setForeground(false); };
+  }, []);
+
+
   const showSaveError = useCallback(() => {
     Alert.alert(translate(language, 'app.saveErrorTitle'), translate(language, 'app.saveErrorBody'));
   }, [language]);
@@ -226,6 +240,10 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     catch{Alert.alert(translate(languageRef.current,'app.loadErrorTitle'),translate(languageRef.current,'app.loadErrorBody'));}
   },[refresh]);
   const cloud=useCloud(refreshCommittedState);
+
+  useEffect(() => {
+    productTelemetry.setScreen(onboardingVisible === null ? 'startup' : onboardingVisible ? 'onboarding' : accountVisible && cloud.available ? 'account' : preferencePicker === 'theme' ? 'theme_picker' : preferencePicker === 'language' ? 'language_picker' : historyVisible ? 'log_history' : settingsVisible ? 'settings' : tab);
+  }, [onboardingVisible, accountVisible, preferencePicker, cloud.available, historyVisible, settingsVisible, tab]);
 
   const openJournal=useCallback(async()=>{
     if(startupLoading.current)return;
@@ -411,6 +429,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
       if (openNap) {
         const event = { ...openNap, endedAt: Math.max(openNap.at, now) };
         await updateEvent(openNap.id, { endedAt: event.endedAt });
+        productTelemetry.capture('app_log_action', { action: 'nap_end', activity_type: 'nap', source: 'app', result: 'success' });
         setUndoState({ event, restore: openNap, message: translate(language, 'app.napEnded') });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
         await refreshCommittedState();
@@ -420,6 +439,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
 
     const event = type === 'nap' ? createNapEvent('app', now) : createEvent(type, 'app', now, customLabel);
     await appendEvents([event],{restoreCustomActivities:type==='custom'});
+    productTelemetry.capture('app_log_action', { action: 'create', activity_type: type, source: 'app', result: 'success' });
     setUndoState({
       event,
       message: type === 'nap'
@@ -432,11 +452,15 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
   };
 
   const logEvent = (type: EventType, customLabel?: string) => {
-    return persistLogEvent(type, customLabel).catch(showSaveError);
+    return persistLogEvent(type, customLabel).catch(() => {
+      productTelemetry.capture('app_log_action', { action: 'create', activity_type: type, source: 'app', result: 'error' });
+      showSaveError();
+    });
   };
 
   const deleteEvent = async (event: PuppyEvent) => {
     await removeEvent(event.id);
+    productTelemetry.capture('app_log_action', { action: 'delete', activity_type: event.type, result: 'success' });
     await refreshCommittedState();
   };
 
@@ -445,6 +469,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
       const incoming = await pickEventsCsv();
       if (incoming === null) return;
       const result = await importEvents(incoming);
+      productTelemetry.capture('app_log_action', { action: 'import', count: result.imported, result: 'success' });
       setUndoState(null);
       await refreshCommittedState();
       Alert.alert(translate(language, 'insights.importedTitle'), translate(language, 'insights.importedBody', {
@@ -472,6 +497,10 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
       setCustomActivities(await saveCustomActivity(changes.customLabel));
     }
     await updateEvent(event.id,changes,{restoreCustomActivities});
+    productTelemetry.capture('app_log_action', { action: 'update', activity_type: changes.type ?? event.type, result: 'success' });
+    if (restoreCustomActivities && !customActivities.some(label => activityKey({ type: 'custom', customLabel: label }) === activityKey({ type: 'custom', customLabel: changes.customLabel }))) {
+      productTelemetry.capture('app_log_action', { action: 'custom_activity_create', activity_type: 'custom', result: 'success' });
+    }
     Haptics.selectionAsync().catch(() => undefined);
     await refreshCommittedState();
   };
@@ -480,6 +509,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     if (!undoState) return;
     if (undoState.restore) await appendEvents([undoState.restore]);
     else await removeEvent(undoState.event.id);
+    productTelemetry.capture('app_log_action', { action: 'undo', activity_type: undoState.event.type, result: 'success' });
     setUndoState(null);
     Haptics.selectionAsync().catch(() => undefined);
     await refreshCommittedState();

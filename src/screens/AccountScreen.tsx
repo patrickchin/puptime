@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect,useState } from 'react';
-import { Alert,KeyboardAvoidingView,Linking,Pressable,ScrollView,StyleSheet,Switch,Text,View } from 'react-native';
+import { Alert,KeyboardAvoidingView,Linking,ScrollView,StyleSheet,Switch,Text,View } from 'react-native';
+import { Pressable } from '../components/TelemetryPressable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { CloudHandle } from '../cloud/use-cloud';
 import {AccountButton,AccountSignIn,accountProblemKey} from '../components/AccountSignIn';

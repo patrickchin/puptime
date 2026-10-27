@@ -1,5 +1,6 @@
 import {MaterialCommunityIcons} from '@expo/vector-icons';
-import {Pressable,StyleSheet,Text,View,useWindowDimensions} from 'react-native';
+import {StyleSheet,Text,View,useWindowDimensions} from 'react-native';
+import { Pressable } from './TelemetryPressable';
 import {useLocalization} from '../localization-context';
 import type {Theme} from '../theme';
 

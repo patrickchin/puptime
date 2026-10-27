@@ -1,6 +1,7 @@
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import {useEffect,useState,type ReactNode} from 'react';
-import {AccessibilityInfo,AppState,Modal,Platform,Pressable,ScrollView,StyleSheet,Text,View,useWindowDimensions} from 'react-native';
+import {AccessibilityInfo,AppState,Modal,Platform,ScrollView,StyleSheet,Text,View,useWindowDimensions} from 'react-native';
+import { Pressable } from './TelemetryPressable';
 import {Drawer} from 'react-native-drawer-layout';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useLocalization} from '../localization-context';

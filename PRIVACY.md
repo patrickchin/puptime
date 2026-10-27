@@ -6,7 +6,7 @@ Puptime is a puppy routine tracker developed by Patrick Chin. Local logging work
 
 ## Information handling
 
-Without cloud sync, activity logs, notes, and routine settings stay on your device. The native app does not include advertising or product analytics. Earlier offline-only releases do not have the optional account features described below.
+Without cloud sync, activity logs, notes, and routine settings stay on your device. The native app does not include advertising. Optional usage analytics are off until you enable them in Settings. Earlier offline-only releases do not have the optional account features described below.
 
 ## Optional accounts and cloud data
 
@@ -21,6 +21,14 @@ The account website lets you manage sign-in methods, sign out, download cloud da
 You can choose a profile photo using the system photo picker in Settings. Puptime crops and resizes it and saves a JPEG file in the app’s private storage. SQLite stores only the photo’s identifier. The app does not need camera access for this feature.
 
 With cloud sync enabled, JPEG files are uploaded separately to private Cloudflare R2 object storage. Profile data and version history contain image references. Downloads require an authenticated session for the owning account. Previous photos remain available with profile history until cloud account deletion, which also removes the account’s image objects. Removing the current photo clears its profile reference. Activity CSV exports, automatic activity recovery backups and cloud history exports do not embed image files.
+
+## Optional app usage analytics
+
+Usage analytics are off by default. In builds configured for analytics, enable **Usage analytics** in **Settings → Help & privacy** to share anonymous product events with PostHog's EU cloud. This measures screen visits and transitions, foreground time on screens, named control presses and press duration, and coarse activity-log actions (such as creating, editing, deleting, undoing, importing, ending a nap, or adding a custom activity type). Custom activities are counted as `custom`; their names are never sent.
+
+Events use a random anonymous installation identifier that is separate from your account and puppy records, plus a session identifier, platform and app version. We do not send account/provider identifiers, puppy names or identifiers, log identifiers, activity timestamps, note contents, custom activity labels, photos, email addresses, codes, search terms, typed text, touch coordinates or raw errors. Automatic text/click capture, person profiles, session recordings, feature flags, surveys and automatic push tracking are disabled. Events request no GeoIP enrichment. Requests necessarily reach PostHog; see [PostHog's privacy policy](https://posthog.com/privacy).
+
+Your choice and anonymous identifier stay on this device and are not synced or included in activity exports. Turn the switch off to stop capture, discard queued events, abort pending analytics requests and remove the stored anonymous identifier. Turning it on again creates a new identifier. Events already received by PostHog are not erased by withdrawal. The event queue is bounded and kept in memory, so offline use works normally and unsent events may be lost when the app is closed. Analytics are optional and do not affect local logging or cloud access. App consent and website consent are separate. Earlier releases without this setting do not collect these app events.
 
 ## Public website
 

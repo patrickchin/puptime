@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable } from '../components/TelemetryPressable';
 
 import { EVENT_META } from '../domain';
 import { useLocalization } from '../localization-context';

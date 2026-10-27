@@ -1,6 +1,7 @@
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import {useEffect,useRef,useState} from 'react';
-import {AccessibilityInfo,ActivityIndicator,Alert,Image,Keyboard,KeyboardAvoidingView,Linking,Platform,Pressable,ScrollView,StyleSheet,Text,TextInput,View,useWindowDimensions} from 'react-native';
+import {AccessibilityInfo,ActivityIndicator,Alert,Image,Keyboard,KeyboardAvoidingView,Linking,Platform,ScrollView,StyleSheet,Text,TextInput,View,useWindowDimensions} from 'react-native';
+import { Pressable } from '../components/TelemetryPressable';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {AccountButton,AccountSignIn,accountProblemKey} from '../components/AccountSignIn';
 import {useAccountSnapshot} from '../cloud/use-account-snapshot';
