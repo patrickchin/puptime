@@ -27,7 +27,7 @@ export function AnalyticsSettings({ theme }: { theme: Theme }) {
       <Text style={[styles.label, { color: theme.text }]}>{t('telemetry.title')}</Text>
       <Switch testID="settings.analytics" accessibilityLabel={t('telemetry.title')} accessibilityHint={t('telemetry.detail')}
         value={enabled} disabled={busy || (!appTelemetryConfigured && !enabled)} onValueChange={value => { void change(value); }}
-        trackColor={{ false: theme.border, true: theme.primary }} thumbColor={theme.surfaceRaised} ios_backgroundColor={theme.border} />
+        trackColor={{ false: theme.border, true: theme.primary }} thumbColor={theme.isDark ? theme.text : theme.surfaceRaised} ios_backgroundColor={theme.border} />
     </View>
     <Text style={[styles.detail, { color: theme.textMuted }]}>{t('telemetry.detail')}</Text>
     {!appTelemetryConfigured && <Text style={[styles.detail, { color: theme.textMuted }]}>{t('telemetry.unavailable')}</Text>}
