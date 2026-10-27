@@ -1,6 +1,7 @@
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import {memo} from 'react';
-import {Pressable,StyleSheet,Text,View} from 'react-native';
+import {StyleSheet,Text,View,useWindowDimensions} from 'react-native';
+import {Pressable} from './TelemetryPressable';
 import type {ScheduleStatusItem} from '../analytics';
 import {formatMinutes,formatScheduleWindow,type ScheduleEntry} from '../domain';
 import {useLocalization} from '../localization-context';
@@ -11,6 +12,7 @@ export const RoutineTimeline=memo(function RoutineTimeline({statuses,now,theme,s
  statuses:ScheduleStatusItem[];now:number;theme:Theme;setup?:boolean;onEdit:(entry:ScheduleEntry)=>void;onRemove:(entry:ScheduleEntry)=>void;
 }){
  const {activityColors,activityLabel,locale,t}=useLocalization();
+ const {fontScale}=useWindowDimensions();
  const entries=[...statuses].sort((a,b)=>a.entry.minutes-b.entry.minutes);
  if(!entries.length)return null;
  const firstHour=Math.floor(entries[0].entry.minutes/60),lastHour=Math.floor(entries[entries.length-1].entry.minutes/60);
@@ -24,7 +26,7 @@ export const RoutineTimeline=memo(function RoutineTimeline({statuses,now,theme,s
    </View>;
    const nowIndex=items.findIndex(item=>item.entry.minutes>currentMinute);
    return <View key={hour} style={styles.hour}>
-    <Text maxFontSizeMultiplier={1.5} style={[styles.hourLabel,{color:theme.textMuted}]}>{formatMinutes(hour*60,locale)}</Text>
+    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} maxFontSizeMultiplier={1.5} style={[styles.hourLabel,{color:theme.textMuted,width:Math.max(72,64*Math.min(fontScale,1.5))}]}>{formatMinutes(hour*60,locale)}</Text>
     <View style={[styles.hourContent,{borderColor:theme.border}]}>
      {items.map(({entry,status},index)=>{
       const colors=activityColors(theme,entry),label=activityLabel(entry);
