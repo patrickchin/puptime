@@ -1,5 +1,5 @@
 // Product events describe UI behavior, never customer records or entered text.
-export const telemetryScreens = ['startup', 'log', 'timeline', 'insights', 'schedule', 'pets', 'notifications', 'learn', 'settings', 'account', 'onboarding', 'theme_picker', 'language_picker', 'log_editor', 'log_history', 'routine_editor', 'guide', 'widget_settings', 'backups'] as const;
+export const telemetryScreens = ['startup', 'log', 'timeline', 'insights', 'schedule', 'pets', 'notifications', 'learn', 'settings', 'account', 'onboarding', 'theme_picker', 'language_picker', 'log_editor', 'log_history', 'routine_editor', 'guide', 'widget_settings', 'backups', 'assistant'] as const;
 export type TelemetryScreen = typeof telemetryScreens[number];
 export const telemetryActivities = ['pee', 'poop', 'meal', 'pottyTrip', 'walk', 'nap', 'custom'];
 export const telemetryActions = ['create', 'update', 'delete', 'undo', 'nap_end', 'custom_activity_create', 'import'];
@@ -9,6 +9,9 @@ export type ProductProperties = Record<string, string | number | boolean>;
 // Exact static IDs and finite dynamic variants only. Never send raw test IDs:
 // several contain dates, custom labels, database IDs or other customer data.
 const staticControls = new Set([
+  'assistant.open', 'assistant.close', 'assistant.accept', 'assistant.send', 'assistant.voice', 'assistant.speaker',
+  'assistant.confirm', 'assistant.cancel', 'assistant.undo', 'assistant.account', 'assistant.retry', 'nav.assistant',
+  'assistant.example.0', 'assistant.example.1', 'assistant.example.2',
   "account.apple", "account.back", "account.changeEmail", "account.enable", "account.export", "account.export.cancel",
   "account.google", "account.manage", "account.methods.refresh", "account.open", "account.refresh", "account.resend",
   "account.retry", "account.sendCode", "account.signOut", "account.verify", "account.viewLogs", "activity.retry",

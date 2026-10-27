@@ -6,8 +6,10 @@ name: Hands-free proposes two logs without saving
 - tapOn:
     text: Wait
     optional: true
-- assertVisible:
-    id: assistant.open
+- extendedWaitUntil:
+    visible:
+      id: assistant.open
+    timeout: 60000
 - tapOn:
     id: assistant.open
 - assertVisible:

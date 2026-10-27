@@ -2,7 +2,8 @@ import {MaterialCommunityIcons} from '@expo/vector-icons';
 import {ExpoSpeechRecognitionModule,useSpeechRecognitionEvent} from 'expo-speech-recognition';
 import * as Speech from 'expo-speech';
 import {useEffect,useRef,useState} from 'react';
-import {ActivityIndicator,AppState,Keyboard,KeyboardAvoidingView,Platform,Pressable,ScrollView,StyleSheet,Switch,Text,TextInput,View} from 'react-native';
+import {ActivityIndicator,AppState,Keyboard,KeyboardAvoidingView,Platform,ScrollView,StyleSheet,Switch,Text,TextInput,View} from 'react-native';
+import {Pressable} from './TelemetryPressable';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {assistantNeedsReview,describeAssistantAction,type AssistantPlan,type AssistantRequest} from '../assistant';
 import {assistantCopy} from '../assistant-copy';
@@ -10,12 +11,14 @@ import {CloudApiError} from '../cloud/api';
 import {entityId} from '../entity-id';
 import {getLocalRuntime} from '../local/runtime.native';
 import {useLocalization} from '../localization-context';
+import {useTelemetryOverlay} from '../telemetry';
 import type {AssistantPanelProps} from './assistant-panel-props';
 
 type Message={role:'user'|'assistant';text:string};
 type Pending={commandId:string;plan:AssistantPlan;context:AssistantRequest};
 
 export function AssistantPanel({theme,cloud,onClose,onCommitted,onNavigate}:AssistantPanelProps){
+  useTelemetryOverlay('assistant',true);
   const {language,locale}=useLocalization(),copy=assistantCopy[language];
   const [accepted,setAccepted]=useState(false),[confirm,setConfirm]=useState(true),[ready,setReady]=useState(false);
   const [availability,setAvailability]=useState<'loading'|'ready'|'auth'|'configuration'|'error'>('loading');
