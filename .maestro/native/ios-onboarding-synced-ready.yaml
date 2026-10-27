@@ -14,7 +14,9 @@ name: Normal installed client acknowledges populated cloud history
     id: settings.puppy.name
     text: .*Mochi.*
 - tapOn:
-    id: account.open
+    id: nav.open
+- tapOn:
+    id: nav.account
 - extendedWaitUntil:
     visible:
       id: account.status
@@ -23,5 +25,5 @@ name: Normal installed client acknowledges populated cloud history
 - tapOn:
     id: account.back
 - assertVisible:
-    id: screen.settings
+    id: screen.pets
 - takeScreenshot: puppy-name-current-settings

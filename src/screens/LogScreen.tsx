@@ -956,7 +956,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
-    paddingBottom: spacing.xl,
+    paddingBottom: 96,
   },
   titleBlock: {
     flexDirection: 'row',

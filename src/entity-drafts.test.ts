@@ -13,7 +13,7 @@ function screen(name:string,extra:Record<string,unknown>,props:Record<string,unk
  const jsx=(type:unknown,props:any)=>({type,props});
  const modules:Record<string,unknown>={
   '../telemetry':{useTelemetryOverlay:()=>{}}, '../components/TelemetryPressable':{Pressable:'Pressable'},
-  react:{useState:(initial:unknown)=>{const i=cursor++;hooks[i]??={value:initial};return [hooks[i].value,(next:any)=>{hooks[i].value=typeof next==='function'?next(hooks[i].value):next;}];},useRef:(initial:unknown)=>{const i=cursor++;return hooks[i]??={current:initial};},useEffect:()=>{},useCallback:(fn:unknown)=>fn},
+  react:{useState:(initial:unknown)=>{const i=cursor++;hooks[i]??={value:initial};return [hooks[i].value,(next:any)=>{hooks[i].value=typeof next==='function'?next(hooks[i].value):next;}];},useRef:(initial:unknown)=>{const i=cursor++;return hooks[i]??={current:initial};},useEffect:()=>{},useMemo:(fn:()=>unknown)=>fn(),useCallback:(fn:unknown)=>fn},
   'react/jsx-runtime':{jsx,jsxs:jsx},'@expo/vector-icons':{MaterialCommunityIcons:'Icon'},
   'react-native':{...Object.fromEntries(['View','Text','TextInput','Pressable','Modal','ScrollView','Switch','ActivityIndicator'].map(name=>[name,name])),Platform:{OS:'ios'},StyleSheet:{create:(value:unknown)=>value},Alert:{alert:()=>{}},Keyboard:{dismiss:()=>{}}},
   '../localization-context':{useLocalization:()=>({locale:'en',language:'en',t:(key:string,params:any)=>key==='schedule.usualWindow'?params.range:key,activityColors:()=>({}),activityLabel:()=>''})},
@@ -39,7 +39,7 @@ test('new routine and accepted learned suggestions retain their minted IDs after
  const render=screen('ScheduleScreen',{
   '../analytics':{scheduleStatusesForDay:()=>[],suggestScheduleFromEvents:()=>suggestion},
   '../activity-view':{activityWindowBounds:()=>({}),useActivityWindow:()=>window},
-  ...Object.fromEntries(['ActivityLoadState','ActivityIcon','ConfirmDialog','DateTimeSelector'].map(name=>[`../components/${name}`,{[name]:name}])),
+  ...Object.fromEntries(['RoutineTimeline','ActivityLoadState','ActivityIcon','ConfirmDialog','DateTimeSelector'].map(name=>[`../components/${name}`,{[name]:name}])),
   '../schedule-editor':{ScheduleEntryDeletedError:class extends Error{}},
  },{events:[],schedule:[],customActivities:[],onSaveEntry:async(entry:unknown)=>{saved.push(entry);throw Error('SQL write failed');},onChange:async(entries:unknown)=>{accepted.push(entries);throw Error('SQL write failed');}});
  render(byId('schedule.add')).onPress();

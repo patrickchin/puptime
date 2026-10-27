@@ -11,6 +11,9 @@ name: Android screen hierarchy and settings placement
     text: Log
 - assertNotVisible:
     id: settings.open
+- assertVisible: {id: header.puppy}
+- assertNotVisible: {id: nav.puppy}
+- assertNotVisible: {id: account.open}
 - takeScreenshot: android-log
 - tapOn:
     id: event.pee.edit
@@ -27,7 +30,7 @@ name: Android screen hierarchy and settings placement
     text: Timeline
 - assertNotVisible:
     id: timeline.range
-- assertVisible:
+- assertNotVisible:
     id: timeline.zoom.value
 - takeScreenshot: android-timeline
 - tapOn:
@@ -170,7 +173,8 @@ name: Android screen hierarchy and settings placement
 - tapOn: {id: settings.puppy.name}
 - assertVisible: {id: settings.puppy.name.input}
 - tapOn: {id: settings.puppy.name.cancel}
-- tapOn: {id: account.open}
+- tapOn: {id: nav.open}
+- tapOn: {id: nav.account}
 - assertVisible: {id: screen.account}
 - tapOn: {id: account.back}
 - assertVisible: {id: screen.pets}
@@ -181,10 +185,9 @@ name: Android screen hierarchy and settings placement
 - assertVisible: {id: screen.pets}
 - tapOn: {id: nav.open}
 - tapOn: {id: nav.timeline}
-- tapOn: {id: timeline.zoom.in}
-- assertVisible: {id: timeline.zoom.value, text: 150%}
-- tapOn: {id: timeline.zoom.reset}
-- assertVisible: {id: timeline.zoom.value, text: 100%}
+- assertNotVisible: {id: timeline.zoom.in}
+- assertNotVisible: {id: timeline.zoom.value}
+- assertVisible: {id: nav.switch}
 - tapOn: {id: nav.open}
 - tapOn: {id: nav.settings}
 - tapOn: {id: settings.widget.open}

@@ -1,17 +1,19 @@
 import {MaterialCommunityIcons} from '@expo/vector-icons';
-import {StyleSheet,Text,View,useWindowDimensions} from 'react-native';
+import {StyleSheet,Text} from 'react-native';
 import { Pressable } from './TelemetryPressable';
 import {useLocalization} from '../localization-context';
 import type {Theme} from '../theme';
 
 export function LogViewSwitch({tab,theme,onChange}:{tab:'log'|'timeline';theme:Theme;onChange:(tab:'log'|'timeline')=>void}){
- const {t}=useLocalization(),{fontScale}=useWindowDimensions();
- return <View accessibilityRole="tablist" style={[styles.group,{backgroundColor:theme.surface,borderColor:theme.border,borderRadius:theme.presentation.controlRadius}]}>
-  {(['log','timeline'] as const).map(item=><Pressable key={item} testID={tab===item?`nav.view.${item}`:"nav.switch"} accessibilityRole="tab" accessibilityLabel={t(`nav.${item}`)} accessibilityState={{selected:tab===item}} onPress={()=>onChange(item)}
-   style={({pressed})=>[styles.tab,{backgroundColor:tab===item||pressed?theme.primarySoft:undefined,borderRadius:theme.presentation.controlRadius}]}>
-   {fontScale<1.4?<MaterialCommunityIcons accessible={false} name={item==='log'?'home-outline':'timeline-clock-outline'} size={20} color={tab===item?theme.primary:theme.textMuted}/>:null}
-   <Text maxFontSizeMultiplier={2} style={[styles.label,{color:tab===item?theme.primary:theme.textMuted}]}>{t(`nav.${item}`)}</Text>
-  </Pressable>)}
- </View>;
+ const {t}=useLocalization();
+ const destination=tab==='log'?'timeline':'log';
+ return <Pressable testID="nav.switch" accessibilityRole="button" accessibilityLabel={t(`nav.${destination}`)} onPress={()=>onChange(destination)}
+  style={({pressed})=>[styles.button,{backgroundColor:pressed?theme.primaryPressed:theme.primary,shadowColor:theme.text}]}>
+  <MaterialCommunityIcons accessible={false} name={destination==='log'?'format-list-bulleted':'timeline-clock-outline'} size={22} color={theme.onPrimary}/>
+  <Text maxFontSizeMultiplier={2} style={[styles.label,{color:theme.onPrimary}]}>{t(`nav.${destination}`)}</Text>
+ </Pressable>;
 }
-const styles=StyleSheet.create({group:{flexDirection:'row',marginHorizontal:20,marginBottom:12,padding:4,borderWidth:1},tab:{flex:1,minHeight:48,padding:8,flexDirection:'row',gap:8,alignItems:'center',justifyContent:'center'},label:{fontSize:15,lineHeight:22,fontWeight:'600',flexShrink:1}});
+const styles=StyleSheet.create({
+ button:{position:'absolute',right:20,bottom:16,maxWidth:'85%',minHeight:56,paddingHorizontal:20,paddingVertical:12,borderRadius:28,flexDirection:'row',gap:10,alignItems:'center',justifyContent:'center',shadowOpacity:.18,shadowRadius:8,shadowOffset:{width:0,height:3},elevation:6},
+ label:{fontSize:16,lineHeight:24,fontWeight:'600',flexShrink:1},
+});
