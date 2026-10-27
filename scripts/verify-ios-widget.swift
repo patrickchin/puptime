@@ -56,17 +56,24 @@ datedProps["lastEventAt"] = ["pee": (Date().timeIntervalSince1970 - 120) * 1000]
 precondition(relativeDateCount(invoke("__expoWidgetRender", datedProps)) == 1, "Widget did not render a relative date for a recorded event")
 precondition(buttonCount(invoke("__expoWidgetRender", props, colorScheme: "dark")) == 3, "Dark widget did not render")
 
-let pee = invoke("__expoWidgetHandlePress", props, target: "log|pee|0|en|120|30|")
+func target(_ type: String) -> String {
+  let confirmations = props["notificationConfirmations"] as? Bool == true ? "1" : "0"
+  let language = props["language"] as? String ?? "en"
+  let peeDelay = props["pottyAfterPeeMinutes"] as? Int ?? 0
+  let mealDelay = props["pottyAfterMealMinutes"] as? Int ?? 0
+  return "log|\(type)|\(confirmations)|\(language)|\(peeDelay)|\(mealDelay)|"
+}
+let pee = invoke("__expoWidgetHandlePress", props, target: target("pee"))
 precondition(PropertyListSerialization.propertyList(pee, isValidFor: .binary), "Pee action returned invalid UserDefaults props")
-precondition((pee["pending"] as? [[String: Any]])?.first?["type"] as? String == "pee", "Pee action was not recorded")
+precondition((pee["pending"] as? [[String: Any]])?.last?["type"] as? String == "pee", "Pee action was not recorded")
 
 var napProps = props
 napProps["actions"] = ["nap", "pee"]
-let started = invoke("__expoWidgetHandlePress", napProps, target: "log|nap|0|en|120|30|")
+let started = invoke("__expoWidgetHandlePress", napProps, target: target("nap"))
 precondition(PropertyListSerialization.propertyList(started, isValidFor: .binary), "Nap start returned invalid UserDefaults props")
 precondition(started["openNap"] is [String: Any], "Nap action did not start a nap")
-let ended = invoke("__expoWidgetHandlePress", started, target: "log|nap|0|en|120|30|")
+let ended = invoke("__expoWidgetHandlePress", started, target: target("nap"))
 precondition(PropertyListSerialization.propertyList(ended, isValidFor: .binary), "Nap end returned invalid UserDefaults props")
 precondition(ended["openNap"] as? Bool == false, "Nap action did not end the nap")
-precondition((ended["pending"] as? [[String: Any]])?.first?["endedAt"] != nil, "Ended nap has no end time")
+precondition((ended["pending"] as? [[String: Any]])?.last?["endedAt"] != nil, "Ended nap has no end time")
 print("Widget snapshot, relative time, three rendered buttons, pee action, and nap start/end passed")

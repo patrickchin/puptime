@@ -102,7 +102,7 @@ import {
   updateEvent,
 } from './src/storage';
 import { resolveTheme, type ThemePreference } from './src/theme';
-import { readPendingWidgetEvents, updateHomeWidget } from './src/widgets/sync';
+import { acknowledgePendingWidgetEvents, readPendingWidgetEvents, updateHomeWidget } from './src/widgets/sync';
 
 configureReminderHandling();
 
@@ -172,7 +172,10 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     const [data,nextPetId,history]=await Promise.all([getActivityData(),getActivityPetId(),getEventHistoryData()]);
     activityRef.current=data;
     const pending = await readPendingWidgetEvents();
-    if (pending.length) await appendEvents(pending);
+    if (pending.length) {
+      await appendEvents(pending);
+      await acknowledgePendingWidgetEvents(pending);
+    }
     let nextEvents:PuppyEvent[],count:number;
     if(data){const [latest,summary]=await Promise.all([data.latestEvents(),data.summary()]);nextEvents=latest;count=summary.eventCount;}
     else{nextEvents=await loadEvents();count=nextEvents.length;}

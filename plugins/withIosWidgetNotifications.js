@@ -2,214 +2,87 @@ const { withDangerousMod } = require('expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
 
-const marker = '// Puptime: widget log notification bridge.';
-
-const bridge = `${marker}
-private final class PuptimeWidgetNotificationBridge {
-  static let shared = PuptimeWidgetNotificationBridge()
-  private var observer: NSObjectProtocol?
-
-  func start() {
-    guard observer == nil else { return }
-    observer = NotificationCenter.default.addObserver(
-      forName: Notification.Name("onExpoWidgetsUserInteraction"),
-      object: nil,
-      queue: nil
-    ) { [weak self] notification in
-      self?.handle(notification)
-    }
-  }
-
-  private func handle(_ notification: Notification) {
-    guard
-      let event = notification.userInfo?["eventData"] as? [String: Any],
-      let target = event["target"] as? String,
-      let timestamp = event["timestamp"] as? Int
-    else { return }
-
-    let parts = target.split(separator: "|", maxSplits: 6, omittingEmptySubsequences: false).map(String.init)
-    guard parts.count >= 4, parts[0] == "log" else { return }
-    let type = parts[1].removingPercentEncoding ?? parts[1]
-    let language = parts[3]
-    guard ["pee", "poop", "meal", "pottyTrip", "walk", "nap"].contains(type) || type.hasPrefix("custom:") else { return }
-
-    if parts[2] == "1" {
-      showConfirmation(type, language, timestamp, parts.count > 6 ? parts[6].removingPercentEncoding : nil)
-    }
-    syncPottyReminder(
-      type,
-      parts.count > 4 ? Int(parts[4]) ?? 0 : 0,
-      parts.count > 5 ? Int(parts[5]) ?? 0 : 0,
-      language
-    )
-  }
-
-  private func showConfirmation(_ type: String, _ language: String, _ timestamp: Int, _ customLabel: String?) {
-    let content = UNMutableNotificationContent()
-    content.title = title(language)
-    content.body = body(type, language, customLabel)
-    content.sound = .default
-    content.categoryIdentifier = "puptimeWidgetLog"
-    content.userInfo = ["kind": "widgetLog", "type": type, "at": timestamp]
-
-    let request = UNNotificationRequest(
-      identifier: "puptime-widget-\\(timestamp)-\\(type)",
-      content: content,
-      trigger: UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
-    )
-    UNUserNotificationCenter.current().add(request) { error in
-      if let error {
-        print("[Puptime] Widget confirmation could not be scheduled: \\(error.localizedDescription)")
-      }
-    }
-  }
-
-  private func syncPottyReminder(
-    _ type: String,
-    _ afterPeeMinutes: Int,
-    _ afterMealMinutes: Int,
-    _ language: String
-  ) {
-    let center = UNUserNotificationCenter.current()
-    if type == "pee" {
-      center.removePendingNotificationRequests(withIdentifiers: [
-        "puptime-activity-afterPee", "puptime-activity-afterMeal"
-      ])
-      if afterPeeMinutes > 0 {
-        schedulePottyReminder("afterPee", afterPeeMinutes, language)
-      }
-    } else if type == "meal" {
-      center.removePendingNotificationRequests(withIdentifiers: ["puptime-activity-afterMeal"])
-      if afterMealMinutes > 0 {
-        schedulePottyReminder("afterMeal", afterMealMinutes, language)
-      }
-    }
-  }
-
-  private func schedulePottyReminder(_ kind: String, _ minutes: Int, _ language: String) {
-    let content = UNMutableNotificationContent()
-    content.title = pottyTitle(kind, language)
-    content.body = pottyBody(kind, minutes, language)
-    content.sound = .default
-    content.userInfo = ["kind": "pottyReminder", "sourceType": kind == "afterPee" ? "pee" : "meal"]
-
-    let request = UNNotificationRequest(
-      identifier: "puptime-activity-\\(kind)",
-      content: content,
-      trigger: UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(minutes * 60), repeats: false)
-    )
-    UNUserNotificationCenter.current().add(request) { error in
-      if let error {
-        print("[Puptime] Potty reminder could not be scheduled: \\(error.localizedDescription)")
-      }
-    }
-  }
-
-  private func pottyTitle(_ kind: String, _ language: String) -> String {
-    switch language {
-    case "zh-Hans": return kind == "afterPee" ? "该出去尿尿了吗？" : "饭后该出去尿尿了吗？"
-    case "es": return kind == "afterPee" ? "¿Hora de salir al baño?" : "¿Hora de salir después de comer?"
-    default: return kind == "afterPee" ? "Potty break?" : "Potty break after eating?"
-    }
-  }
-
-  private func pottyBody(_ kind: String, _ minutes: Int, _ language: String) -> String {
-    let delay: String
-    if minutes < 60 {
-      delay = language == "zh-Hans" ? "\\(minutes) 分钟" : language == "es" ? "\\(minutes) minutos" : "\\(minutes) minutes"
-    } else {
-      let hours = minutes / 60
-      delay = language == "zh-Hans"
-        ? "\\(hours) 小时"
-        : language == "es"
-          ? (hours == 1 ? "1 hora" : "\\(hours) horas")
-          : (hours == 1 ? "1 hour" : "\\(hours) hours")
-    }
-
-    switch language {
-    case "zh-Hans":
-      return kind == "afterPee"
-        ? "距离上次尿尿已经 \\(delay)，小狗可能又需要出去了。"
-        : "距离上次吃饭已经 \\(delay)，小狗可能需要出去尿尿。"
-    case "es":
-      return kind == "afterPee"
-        ? "Han pasado \\(delay) desde el último pipí. Puede que necesite volver a salir."
-        : "Han pasado \\(delay) desde la última comida. Puede que necesite salir al baño."
-    default:
-      return kind == "afterPee"
-        ? "It’s been \\(delay) since the last pee. Your puppy may need to go again."
-        : "It’s been \\(delay) since the last meal. Your puppy may need to go."
-    }
-  }
-
-  private func title(_ language: String) -> String {
-    switch language {
-    case "zh-Hans": return "活动已记录"
-    case "es": return "Actividad registrada"
-    default: return "Activity logged"
-    }
-  }
-
-  private func body(_ type: String, _ language: String, _ customLabel: String?) -> String {
-    if type.hasPrefix("custom:") {
-      let activity = customLabel ?? String(type.dropFirst("custom:".count))
-      switch language {
-      case "zh-Hans": return "已通过小组件记录：\\(activity)。"
-      case "es": return "Se guardó \\(activity) desde el widget."
-      default: return "\\(activity) saved from the widget."
-      }
-    }
-    let activity: String
-    switch language {
-    case "zh-Hans":
-      activity = [
-        "pee": "尿尿", "poop": "便便", "meal": "吃饭", "pottyTrip": "外出如厕", "walk": "散步", "nap": "小睡"
-      ][type] ?? type
-      return "已通过小组件记录：\\(activity)。"
-    case "es":
-      activity = [
-        "pee": "Pipí", "poop": "Caca", "meal": "Comida", "pottyTrip": "Salida al baño", "walk": "Paseo", "nap": "Siesta"
-      ][type] ?? type
-      return "Se guardó \\(activity) desde el widget."
-    default:
-      activity = [
-        "pee": "Pee", "poop": "Poop", "meal": "Meal", "pottyTrip": "Potty trip", "walk": "Walk", "nap": "Nap"
-      ][type] ?? type
-      return "\\(activity) was saved from your widget."
-    }
-  }
-}
-`;
+const marker = '// Puptime: durable widget interactions.';
 
 module.exports = function withIosWidgetNotifications(config) {
-  return withDangerousMod(config, [
-    'ios',
-    async (modConfig) => {
-      const indexPath = path.join(
-        modConfig.modRequest.platformProjectRoot,
-        'ExpoWidgetsTarget',
-        'index.swift',
-      );
-      if (!fs.existsSync(indexPath)) {
-        throw new Error('Puptime could not find the Expo widget target. Keep this plugin before expo-widgets.');
-      }
+  return withDangerousMod(config, ['ios', async (modConfig) => {
+    const indexPath = path.join(modConfig.modRequest.platformProjectRoot, 'ExpoWidgetsTarget/index.swift');
+    if (!fs.existsSync(indexPath)) {
+      throw new Error('Puptime could not find the Expo widget target. Keep this plugin before expo-widgets.');
+    }
+    // Upgrade previously generated projects: notification work now runs inside
+    // the awaited AppIntent, rather than a fire-and-forget bundle observer.
+    let index = fs.readFileSync(indexPath, 'utf8');
+    index = index.replace(/\/\/ Puptime: widget log notification bridge\.[\s\S]*?(?=@main\nstruct ExportWidgets0)/, '')
+      .replace('  init() {\n    PuptimeWidgetNotificationBridge.shared.start()\n  }', '');
+    fs.writeFileSync(indexPath, index);
 
-      let source = fs.readFileSync(indexPath, 'utf8');
-      if (!source.includes(marker)) {
-        const widgetBundleAnchor = '@main\nstruct ExportWidgets0: WidgetBundle {';
-        if (!source.includes(widgetBundleAnchor)) {
-          throw new Error('Puptime could not patch the generated Expo widget bundle entry point.');
-        }
-        if (!source.includes('import UserNotifications')) {
-          source = source.replace('import SwiftUI\n', 'import SwiftUI\nimport UserNotifications\n');
-        }
-        source = source.replace(
-          widgetBundleAnchor,
-          `${bridge}\n@main\nstruct ExportWidgets0: WidgetBundle {\n  init() {\n    PuptimeWidgetNotificationBridge.shared.start()\n  }`,
-        );
-        fs.writeFileSync(indexPath, source);
+    const library = path.dirname(require.resolve('expo-widgets/package.json', { paths: [modConfig.modRequest.projectRoot] }));
+    const storagePath = path.join(library, 'ios/WidgetsStorage.swift');
+    const storage = fs.readFileSync(storagePath, 'utf8').split(marker)[0].trimEnd();
+    const native = ['PuptimeWidgetJournal.swift', 'PuptimeWidgetNotifications.swift']
+      .map(file => fs.readFileSync(path.join(__dirname, 'ios-widget', file), 'utf8')).join('\n');
+    fs.writeFileSync(storagePath, `${storage}\n\n${marker}\n${native}\n`);
+
+    const utilsPath = path.join(library, 'ios/Widgets/Utils.swift');
+    let utils = fs.readFileSync(utilsPath, 'utf8');
+    const recoveredProps = 'props: (try? PuptimeWidgetJournal.reconcile(props)) ?? props,';
+    if (!utils.includes(recoveredProps)) {
+      if (!utils.includes('        props: props,')) throw new Error('The Expo widget timeline parser changed.');
+      utils = utils.replace('        props: props,', `        ${recoveredProps}`);
+      fs.writeFileSync(utilsPath, utils);
+    }
+
+    const providerPath = path.join(library, 'ios/Widgets/TimelineProvider.swift');
+    const provider = fs.readFileSync(providerPath, 'utf8').replace(
+      'entries: entries, policy: .atEnd',
+      'entries: entries, policy: name == "PuptimeQuickLog" ? .never : .atEnd');
+    fs.writeFileSync(providerPath, provider);
+
+    // Unordered JSON and random child identities made every timeline update
+    // replace the buttons, allowing a transition to interrupt the next touch.
+    const entryPath = path.join(library, 'ios/Widgets/EntryView.swift');
+    fs.writeFileSync(entryPath, fs.readFileSync(entryPath, 'utf8').replace(
+      'JSONSerialization.data(withJSONObject: widgetEnvironment)',
+      'JSONSerialization.data(withJSONObject: widgetEnvironment, options: .sortedKeys)'));
+    const viewPath = path.join(library, 'ios/Widgets/DynamicView.swift');
+    let view = fs.readFileSync(viewPath, 'utf8');
+    if (!view.includes('let identityPath: String')) {
+      const identity = fs.readFileSync(path.join(__dirname, 'ios-widget/PuptimeWidgetIdentity.swift'), 'utf8');
+      const start = view.indexOf('// TODO(@jakex7): Hack to satisfy ExpoSwiftUI.AnyChild');
+      const end = view.indexOf('public struct WidgetsDynamicView:', start);
+      if (start < 0 || end < 0) throw new Error('The Expo widget child identity changed.');
+      view = view.slice(0, start) + identity + '\n' + view.slice(end);
+      view = view.replace('  let uuid = NodeIdentityWrapper(id: UUID())', '  let identityPath: String\n  private let uuid: NodeIdentityWrapper');
+      view = view.replaceAll('    self.name = name', '    self.identityPath = identityPath ?? name\n    self.uuid = NodeIdentityWrapper.node(identityPath ?? name)\n    self.name = name');
+      view = view.replace('node: [String: Any]) {', 'node: [String: Any], identityPath: String? = nil) {');
+      view = view.replace('environmentString: String?) {', 'environmentString: String?, identityPath: String? = nil) {');
+      view = view.replace('validChildren.map { WidgetsDynamicView', 'validChildren.enumerated().map { index, child in WidgetsDynamicView');
+      view = view.replace('node: $0, entryIndex: entryIndex, environmentString: environmentString)',
+        'node: child, entryIndex: entryIndex, environmentString: environmentString, identityPath: identityPath + "/" + (child["key"] as? String ?? String(index)))');
+      view = view.replace('node: child, entryIndex: entryIndex, environmentString: environmentString)]',
+        'node: child, entryIndex: entryIndex, environmentString: environmentString, identityPath: identityPath + "/0")]');
+      fs.writeFileSync(viewPath, view);
+    }
+
+    const intentPath = path.join(library, 'ios/Widgets/AppIntent.swift');
+    let intent = fs.readFileSync(intentPath, 'utf8');
+    const replacement = fs.readFileSync(path.join(__dirname, 'ios-widget/perform-widget-interaction.swift'), 'utf8').trimEnd();
+    if (!intent.includes(replacement)) {
+      const structure = intent.indexOf('struct WidgetUserInteraction: AppIntent');
+      const start = intent.indexOf('  func perform() async throws -> some IntentResult {', structure);
+      if (structure < 0 || start < 0) throw new Error('The Expo widget AppIntent changed; review the Puptime integration.');
+      const opening = intent.indexOf('{', start);
+      let depth = 1, end = opening + 1;
+      while (end < intent.length && depth) {
+        if (intent[end] === '{') depth++;
+        if (intent[end] === '}') depth--;
+        end++;
       }
-      return modConfig;
-    },
-  ]);
+      if (depth) throw new Error('The Expo widget AppIntent has an unbalanced body.');
+      intent = intent.slice(0, start) + replacement + intent.slice(end);
+      fs.writeFileSync(intentPath, intent);
+    }
+    return modConfig;
+  }]);
 };

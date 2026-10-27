@@ -1,6 +1,7 @@
 import { Button, HStack, Image, Text, VStack } from '@expo/ui/swift-ui';
 import {
   accessibilityHidden,
+  accessibilityIdentifier,
   buttonBorderShape,
   buttonStyle,
   containerBackground,
@@ -9,6 +10,7 @@ import {
   foregroundStyle,
   lineLimit,
   minimumScaleFactor,
+  invalidatableContent,
   padding,
   tint,
 } from '@expo/ui/swift-ui/modifiers';
@@ -46,7 +48,8 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
     ?? { background: '#F5F3EC', surface: '#FFFEFA', controlRadius: 16 };
   const background = { type: 'linearGradient' as const, colors: [appearance.background, appearance.surface], startPoint: { x: 0, y: 0 }, endPoint: { x: 1, y: 1 } };
   const add = (type: ActivityKey): PuptimeWidgetProps => {
-    const at = Date.now();
+    const interaction = environment as WidgetEnvironment & { interactionId?: string; interactionAt?: number };
+    const at = interaction.interactionAt ?? Date.now();
     const customLabel = type.startsWith('custom:') ? props.actionDetails?.[type]?.label ?? type.slice(7) : undefined;
     if (type === 'nap' && props.openNap) {
       const completed = { ...props.openNap, endedAt: Math.max(props.openNap.at, at) };
@@ -64,7 +67,7 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
       };
     }
     const event = {
-      id: `${at}-${type}`,
+      id: interaction.interactionId ?? `evt_${at.toString(36)}${Math.random().toString(36).slice(2)}`,
       type: type.startsWith('custom:') ? 'custom' as const : type as QuickEventType,
       ...(customLabel ? { customLabel } : {}),
       at,
@@ -79,7 +82,8 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
       pottyAfterPeeMinutes: props.pottyAfterPeeMinutes,
       pottyAfterMealMinutes: props.pottyAfterMealMinutes,
       language: props.language,
-      // ponytail: bound widget props; move to a shared native DB if 100 unopened taps becomes realistic.
+      // Presentation stays small; the native AppIntent journals every operation
+      // durably until the app imports it, including records beyond these 100.
       pending: [...pending, event].slice(-100),
     };
   };
@@ -118,7 +122,7 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
             key={type}
             target={`log|${encodeURIComponent(type)}|${props.notificationConfirmations ? '1' : '0'}|${props.language ?? 'en'}|${props.pottyAfterPeeMinutes ?? 0}|${props.pottyAfterMealMinutes ?? 0}|${encodeURIComponent(type.startsWith('custom:') ? detail.label : '')}`}
             onPress={() => add(type)}
-            modifiers={actionModifiers(color)}
+            modifiers={[...actionModifiers(color), accessibilityIdentifier(`widget.log.${type}`)]}
           >
             <VStack spacing={4} modifiers={[padding({ vertical: 8, horizontal: 3 }), frame({ maxWidth: 999, maxHeight: 999 })]}>
               <Image
@@ -152,6 +156,7 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
                     foregroundStyle(color),
                     lineLimit(1),
                     minimumScaleFactor(0.65),
+                    invalidatableContent(),
                   ]}
                 />
               )}

@@ -48,12 +48,12 @@
               "label": "Puptime Quick Log",
               "description": "Pick 2–4 activities to log from the Home Screen.",
               "minWidth": "250dp",
-              "minHeight": "40dp",
+              "minHeight": "56dp",
               "targetCellWidth": 4,
               "targetCellHeight": 2,
               "maxResizeHeight": "110dp",
               "resizeMode": "horizontal|vertical",
-              "updatePeriodMillis": 1800000
+              "updatePeriodMillis": 0
             }
           ]
         }

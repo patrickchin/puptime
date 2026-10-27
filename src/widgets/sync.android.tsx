@@ -8,6 +8,8 @@ export async function readPendingWidgetEvents(): Promise<PuppyEvent[]> {
   return [];
 }
 
+export async function acknowledgePendingWidgetEvents(_events: PuppyEvent[]): Promise<void> {}
+
 export async function updateHomeWidget(events: PuppyEvent[]): Promise<void> {
   const activeNap = events.some(isOpenNap);
   const lastEventAt = latestQuickEventTimes(events);

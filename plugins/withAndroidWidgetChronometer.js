@@ -1,4 +1,4 @@
-const { withDangerousMod } = require('expo/config-plugins');
+const { withAndroidManifest, withDangerousMod } = require('expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
 
@@ -11,6 +11,16 @@ function insertOnce(source, anchor, replacement) {
 }
 
 module.exports = function withAndroidWidgetChronometer(config) {
+  config = withAndroidManifest(config, (modConfig) => {
+    const receiver = modConfig.modResults.manifest.application?.[0]?.receiver
+      ?.find(item => item.$['android:name'].endsWith('.widget.PuptimeQuickLog'));
+    if (!receiver) throw new Error('Puptime could not find its Android widget receiver.');
+    const actions = receiver['intent-filter'][0].action;
+    for (const name of ['android.intent.action.TIME_SET', 'android.intent.action.TIMEZONE_CHANGED']) {
+      if (!actions.some(action => action.$['android:name'] === name)) actions.push({ $: { 'android:name': name } });
+    }
+    return modConfig;
+  });
   return withDangerousMod(config, ['android', async (modConfig) => {
     const library = path.dirname(require.resolve('react-native-android-widget/package.json', {
       paths: [modConfig.modRequest.projectRoot],
@@ -68,6 +78,14 @@ module.exports = function withAndroidWidgetChronometer(config) {
     source = fs.readFileSync(providerPath, 'utf8').replace(/\r\n/g, '\n');
     source = insertOnce(source, '            additionalData = new Data.Builder()',
       '            clickActionData.putDouble("tapAt", System.currentTimeMillis());\n            additionalData = new Data.Builder()');
+    source = insertOnce(source, '        super.onReceive(context, incomingIntent);',
+      `        super.onReceive(context, incomingIntent);
+        if (Intent.ACTION_TIME_CHANGED.equals(incomingIntent.getAction())
+                || Intent.ACTION_TIMEZONE_CHANGED.equals(incomingIntent.getAction())) {
+            AppWidgetManager manager = AppWidgetManager.getInstance(context);
+            onUpdate(context, manager, manager.getAppWidgetIds(new android.content.ComponentName(context, getClass())));
+            return;
+        }`);
     fs.writeFileSync(providerPath, source);
 
     const workerPath = path.join(javaRoot, 'oss/HeadlessJsTaskWorker.java');
