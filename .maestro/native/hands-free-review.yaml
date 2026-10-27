@@ -1,0 +1,28 @@
+appId: com.patrickchin.puptime
+name: Hands-free proposes two logs without saving
+---
+- stopApp
+- launchApp
+- tapOn:
+    text: Wait
+    optional: true
+- assertVisible:
+    id: assistant.open
+- tapOn:
+    id: assistant.open
+- assertVisible:
+    id: assistant.accept
+- takeScreenshot: consent
+- tapOn:
+    id: assistant.accept
+- assertVisible: Tell Puptime what happened.
+- tapOn:
+    id: assistant.input
+- setClipboard: Ellie peed and pooped an hour ago. Her poop was runny.
+- pasteText
+- tapOn:
+    id: assistant.send
+- assertVisible:
+    id: assistant.review
+- assertVisible: '.*Her poop was runny.*'
+- takeScreenshot: review

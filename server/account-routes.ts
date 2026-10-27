@@ -10,6 +10,8 @@ import { createAuth } from './auth';
 import type { AppleRevocation } from './account-lifecycle';
 import { cloudAccess, getCloudAccount, type CloudAccess } from './cloud-access';
 import {legacyProfile,legacyProfileRevision} from './profile-compat';
+import {assistantRequestSchema} from '../src/assistant';
+import {planAssistant} from './assistant';
 
 type AccountEnv = { Bindings: Cloudflare.Env; Variables: {
   user: { id: string; email: string; name: string }; sessionCreatedAt: number; sessionId: string;
@@ -49,6 +51,17 @@ const authenticated = createMiddleware<AccountEnv>(async (context, next) => {
 accountRoutes.get('/account', authenticated, async (context) => {
   const summary = await context.get('store').summary();
   return context.json({ user: context.get('user'), cloud: context.get('cloud'), ...summary });
+});
+accountRoutes.get('/assistant/status',authenticated,context=>context.json({available:!!context.env.OPENAI_API_KEY&&!!context.env.OPENAI_MODEL}));
+accountRoutes.post('/assistant/plan',authenticated,validator('json',value=>assistantRequestSchema.parse(value)),async context=>{
+  if(!context.env.OPENAI_API_KEY||!context.env.OPENAI_MODEL)return context.json({error:'assistant_not_configured'},503);
+  const input=context.req.valid('json');
+  if(Math.abs(input.now-Date.now())>10*60*1000)return context.json({error:'invalid_clock'},400);
+  if(!await context.get('store').allowAssistantRequest()){
+    context.header('Retry-After','60');return context.json({error:'rate_limited'},429);
+  }
+  try{return context.json(await planAssistant(input,context.env));}
+  catch{return context.json({error:'assistant_unavailable'},503);}
 });
 accountRoutes.post('/cloud/enroll', authenticated, syncAccess, validator('json', (value) => enrollmentSchema.parse(value)), async (context) => {
   const result = await context.get('store').enrollForClient(context.req.valid('json'));

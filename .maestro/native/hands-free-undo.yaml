@@ -1,0 +1,8 @@
+appId: com.patrickchin.puptime
+name: Hands-free undoes both logs
+---
+- tapOn:
+    id: assistant.undo
+- assertVisible: Request undone.
+- assertNotVisible:
+    id: assistant.undo

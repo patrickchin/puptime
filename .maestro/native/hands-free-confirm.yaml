@@ -1,0 +1,9 @@
+appId: com.patrickchin.puptime
+name: Hands-free confirms a grouped save
+---
+- tapOn:
+    id: assistant.confirm
+- assertVisible:
+    id: assistant.undo
+- assertVisible: 'Saved.*'
+- takeScreenshot: saved

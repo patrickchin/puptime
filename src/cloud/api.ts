@@ -47,13 +47,13 @@ export function createSdkRequest(fetchClient:(url:string,options:SdkOptions)=>Pr
   const base=cloudBaseUrl(origin,true);if (!base) throw new Error('Cloud origin is missing.');
   return async(path,options)=>{
     const history=historyRoute(path,options);
-    if (!/^\/api\/(?:config|account|cloud\/enroll|sync\/push|sync\/pull\?after=\d+)$/.test(path)&&!history) throw new CloudApiError('invalid-request',400);
+    if (!/^\/api\/(?:config|account|cloud\/enroll|sync\/push|sync\/pull\?after=\d+|assistant\/(?:status|plan))$/.test(path)&&!history) throw new CloudApiError('invalid-request',400);
     throwIfAborted(options.signal);
     let retryAfter:string|null=null;
     // Better Auth encodes path parameters itself; a pre-encoded literal ID would
     // be encoded twice and silently query history for a different record.
     const sdkPath=history?`/api/records/:recordId/history${history.beforeRevision===undefined?'':`?beforeRevision=${history.beforeRevision}`}`:path;
-    const result=await fetchClient(`${base}${sdkPath}`,{...options,...(history?{params:{recordId:history.recordId}}:{}),redirect:'error',credentials:'omit',retry:0,timeout:15000,onResponse:({response})=>{retryAfter=response.headers.get('retry-after');}});
+    const result=await fetchClient(`${base}${sdkPath}`,{...options,...(history?{params:{recordId:history.recordId}}:{}),redirect:'error',credentials:'omit',retry:0,timeout:path==='/api/assistant/plan'?45000:15000,onResponse:({response})=>{retryAfter=response.headers.get('retry-after');}});
     return {...result,retryAfter};
   };
 }
