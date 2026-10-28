@@ -106,6 +106,15 @@ name: Native hour minute AM PM and midnight windows
 - assertVisible:
     id: "schedule.entry.meal"
     text: ".*12:01.*AM.*"
+# The late-night window is below the fold in the full-day routine timeline.
+- scrollUntilVisible:
+    element:
+      id: "schedule.entry.poop"
+      text: ".*11:31.*PM.*12:01.*AM.*"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+    timeout: 60000
 - assertVisible:
     id: "schedule.entry.poop"
     text: ".*11:31.*PM.*12:01.*AM.*"
