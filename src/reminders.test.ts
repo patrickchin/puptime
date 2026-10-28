@@ -5,7 +5,9 @@ import {DEFAULT_NOTIFICATION_PREFERENCES} from './notification-config.ts';
 
 // Exercise the real scheduler with the OS boundary replaced; native prompt
 // and scheduled-request inspection are qualified separately on the simulator.
-type MockRequest = { identifier: string; content?: { title?: string; data?: Record<string, unknown> }; trigger?: { type: string; date?: number; repeats?: boolean; seconds?: number }; [key: string]: unknown };
+type MockRequest = { identifier: string; content?: { title?: string; data?: Record<string, unknown> }; trigger?: { type?: string; date?: number; repeats?: boolean; seconds?: number }; [key: string]: unknown };
+const platform={OS:'ios'};
+(globalThis as typeof globalThis&{__puptimeNotificationPlatform:typeof platform}).__puptimeNotificationPlatform=platform;
 const state={delivery:false,granted:true,canAskAgain:true,answer:true,requests:0,writes:[] as boolean[],scheduled:[] as MockRequest[],cancelled:[] as string[],hold:null as null|(()=>Promise<void>),scheduleHold:null as null|(()=>Promise<void>),failure:null as null|'list'|'create'|'cancel',nextId:0};
 (globalThis as typeof globalThis&{__puptimeNotificationTest:typeof state}).__puptimeNotificationTest=state;
 registerHooks({
@@ -19,7 +21,7 @@ registerHooks({
   return next(specifier,context);
  },
  load(url,context,next){
-  if(url==='puptime-test:platform')return {format:'module',source:"export const Platform={OS:'ios'};",shortCircuit:true};
+  if(url==='puptime-test:platform')return {format:'module',source:'export const Platform=globalThis.__puptimeNotificationPlatform;',shortCircuit:true};
   if(url==='puptime-test:delivery')return {format:'module',source:'const s=globalThis.__puptimeNotificationTest;export async function getNotificationDelivery(){return s.delivery;} export async function setNotificationDelivery(value){s.delivery=value;s.writes.push(value);}',shortCircuit:true};
   if(url==='puptime-test:notifications')return {format:'module',shortCircuit:true,source:`
    const s=globalThis.__puptimeNotificationTest;
@@ -31,6 +33,8 @@ registerHooks({
    export async function cancelScheduledNotificationAsync(id){if(s.failure==='cancel')throw new Error('native cancel failed');s.cancelled.push(id);s.scheduled=s.scheduled.filter(item=>item.identifier!==id);}
    export async function scheduleNotificationAsync(value){if(s.scheduleHold)await s.scheduleHold();if(s.failure==='create')throw new Error('native create failed');const identifier=value.identifier??'native-'+(++s.nextId);s.scheduled.push({...value,identifier});return identifier;}
    export async function setNotificationCategoryAsync(){}
+   export const AndroidImportance={DEFAULT:3};
+   export async function setNotificationChannelAsync(){}
   `};
   return next(url,context);
  }
@@ -38,6 +42,19 @@ registerHooks({
 const reminders=await import('./reminders.ts');
 const routine={id:'break',type:'pee' as const,minutes:420,reminder:true};
 function reset(){Object.assign(state,{delivery:false,granted:true,canAskAgain:true,answer:true,requests:0,writes:[],scheduled:[],cancelled:[],hold:null,scheduleHold:null,failure:null,nextId:0});}
+
+test('Android widget confirmations deliver immediately on their channel with editable event references',async()=>{
+ reset();platform.OS='android';
+ try {
+  const reference={eventId:'evt_widget',type:'pee' as const,at:123456};
+  assert.equal(await reminders.showWidgetLogConfirmation(reference),true);
+  assert.deepEqual(state.scheduled[0].trigger,{channelId:'puptime-widget-log'});
+  assert.deepEqual(state.scheduled[0].content?.data,{kind:'widgetLog',...reference});
+  state.granted=false;
+  assert.equal(await reminders.showWidgetLogConfirmation(reference),false);
+  assert.equal(state.scheduled.length,1);
+ } finally {platform.OS='ios';}
+});
 
 test('the OS scheduler applies independent signed meal and poop offsets',async()=>{
  reset();state.delivery=true;

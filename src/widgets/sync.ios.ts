@@ -9,19 +9,45 @@ import {
   loadWidgetActions,
 } from '../storage';
 import PuptimeWidget, { type PuptimeWidgetProps } from './PuptimeWidget.ios';
+import { widgetsDirectory } from 'expo-widgets';
+import { Directory, File } from 'expo-file-system';
+import { parseEvents } from '../storage-validation';
+
+const importedOperations = new WeakMap<PuppyEvent[], File[]>();
 
 export async function readPendingWidgetEvents(): Promise<PuppyEvent[]> {
+  const directory = widgetsDirectory ? new Directory(widgetsDirectory, 'PuptimePending') : null;
+  const files = directory?.exists ? directory.list().filter((entry): entry is File => entry instanceof File && /^wop_[a-f0-9]+\.json$/.test(entry.name)) : [];
+  const operations = (await Promise.all(files.map(async file => {
+    try { return JSON.parse(await file.text()); }
+    catch (error) { if (!file.exists) return undefined; throw error; }
+  }))).filter(event => event !== undefined);
+  let legacy: PuptimeWidgetProps['pending'] = [];
   try {
     const timeline = await PuptimeWidget.getTimeline();
-    const pending = timeline.flatMap((entry) => (entry.props as PuptimeWidgetProps).pending ?? []);
-    return [...new Map(pending.map((event) => [event.id, {
+    legacy = timeline.flatMap((entry) => (entry.props as PuptimeWidgetProps).pending ?? []);
+  } catch { /* Journaled operations remain importable if a presentation is unavailable. */ }
+  const pending = [...legacy, ...operations].flatMap((event) => parseEvents([{
       ...event,
       ...(event.type === 'nap' && event.endedAt === undefined ? { endedAt: null } : {}),
       source: 'widget' as const,
-    }])).values()];
-  } catch {
-    return [];
+  }]));
+  const latest = new Map<string, PuppyEvent>();
+  for (const event of pending) {
+    const previous = latest.get(event.id);
+    const time = event.endedAt ?? event.at, previousTime = previous?.endedAt ?? previous?.at ?? -Infinity;
+    if (!previous || time > previousTime || (time === previousTime && typeof event.endedAt === 'number')) latest.set(event.id, event);
   }
+  const events = [...latest.values()];
+  importedOperations.set(events, files);
+  return events;
+}
+
+export async function acknowledgePendingWidgetEvents(events: PuppyEvent[]): Promise<void> {
+  // Delete only the immutable operations this read imported, after SQLite saved
+  // them. A concurrently created nap-end operation has a different filename.
+  for (const file of importedOperations.get(events) ?? []) if (file.exists) file.delete();
+  importedOperations.delete(events);
 }
 
 export async function updateHomeWidget(events: PuppyEvent[]): Promise<void> {
