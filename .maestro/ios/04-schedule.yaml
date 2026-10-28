@@ -111,7 +111,7 @@ tags:
       id: schedule.entry.poop.remove
     direction: DOWN
     visibilityPercentage: 100
-    centerElement: false
+    centerElement: true
     timeout: 45000
 - tapOn:
     id: schedule.entry.poop.remove

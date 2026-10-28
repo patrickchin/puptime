@@ -61,7 +61,7 @@ tags:
       id: event.meal.edit
     direction: DOWN
     visibilityPercentage: 50
-    centerElement: false
+    centerElement: true
 - assertVisible:
     id: event.meal.note
     text: Ate after training
@@ -92,7 +92,7 @@ tags:
     element:
       id: history.day.today
     direction: DOWN
-    centerElement: false
+    centerElement: true
 - tapOn:
     id: history.day.today
 - assertNotVisible:

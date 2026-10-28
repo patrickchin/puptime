@@ -108,7 +108,7 @@ name: iOS side navigation and notification preferences
       id: settings.notifications.lead.15
     direction: UP
     visibilityPercentage: 100
-    centerElement: false
+    centerElement: true
 - waitForAnimationToEnd
 - extendedWaitUntil:
     visible:
@@ -129,7 +129,7 @@ name: iOS side navigation and notification preferences
       id: settings.notifications.routines
     direction: UP
     visibilityPercentage: 100
-    centerElement: false
+    centerElement: true
 - tapOn:
     id: settings.notifications.routines
 - assertVisible:
@@ -220,7 +220,7 @@ name: iOS side navigation and notification preferences
       id: settings.notifications.lead.15
     direction: UP
     visibilityPercentage: 100
-    centerElement: false
+    centerElement: true
 - assertVisible:
     id: settings.notifications.lead.15
     text: radio button, checked
@@ -270,7 +270,7 @@ name: iOS side navigation and notification preferences
       id: settings.notifications.lead.15
     direction: UP
     visibilityPercentage: 100
-    centerElement: false
+    centerElement: true
 - assertVisible:
     id: settings.notifications.lead.15
     text: radio button, checked
