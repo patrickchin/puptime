@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { entityId } from './entity-id';
 import { localIdSchema } from './cloud/protocol';
 import {getNotificationDelivery,setNotificationDelivery} from './cloud/notification-delivery';
+import { refreshExactReminderScheduling } from './exact-reminders';
 
 import type { ActivityKey, PuppyEvent, ScheduleEntry } from './domain';
 import { translate, type AppLanguage } from './localization';
@@ -152,6 +153,9 @@ export type CustomTimedReminder = { id: string; petId: string; label: string; at
 export class CustomTimedReminderLimitError extends Error {
   constructor() { super('Remove a pending reminder before adding another.'); this.name = 'CustomTimedReminderLimitError'; }
 }
+export class ExactReminderAccessError extends Error {
+  constructor() { super('Allow precise reminder timing in Android settings.'); this.name = 'ExactReminderAccessError'; }
+}
 
 function customTimedReminder(request: Notifications.NotificationRequest): CustomTimedReminder | null {
   const trigger = request.trigger;
@@ -177,6 +181,7 @@ export async function createCustomTimedReminder(input: { id?: string; petId: str
   if (data.at <= Date.now()) throw new RangeError('Choose a future reminder time.');
   return updateReminders(async () => {
     if (!await getNotificationDelivery() || !permissionAllowsNotifications(await Notifications.getPermissionsAsync())) return null;
+    if (Platform.OS === 'android' && !(await refreshExactReminderScheduling())) throw new ExactReminderAccessError();
     // Keep headroom for potty reminders and routine replacement writes.
     if ((await Notifications.getAllScheduledNotificationsAsync()).length >= 60) throw new CustomTimedReminderLimitError();
     if (data.at <= Date.now()) throw new RangeError('Choose a future reminder time.');

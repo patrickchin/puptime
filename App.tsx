@@ -103,6 +103,7 @@ import {
 } from './src/storage';
 import { resolveTheme, type ThemePreference } from './src/theme';
 import { acknowledgePendingWidgetEvents, readPendingWidgetEvents, updateHomeWidget } from './src/widgets/sync';
+import { openExactReminderSettings, refreshExactReminderScheduling } from './src/exact-reminders';
 
 configureReminderHandling();
 
@@ -207,6 +208,9 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     setNotificationPermission(nextPermission);
     setDelivery(nextDelivery);
     setActivityCustomizations(current=>JSON.stringify(current)===JSON.stringify(nextActivityCustomizations)?current:nextActivityCustomizations);
+    // Exact access revocation cancels OS alarms but preserves Expo's request
+    // store. Restore those requests before replacing current routine/potty plans.
+    await refreshExactReminderScheduling().catch(() => undefined);
     void Promise.all([
       syncScheduleReminders(
         nextSchedule,
@@ -578,6 +582,12 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
       setNotificationPermission(permission);setDelivery(delivery);
     }
     if (granted) {
+      if (Platform.OS === 'android' && !(await refreshExactReminderScheduling())) {
+        Alert.alert(translate(language, 'notifications.exactTitle'), translate(language, 'notifications.exactNeeded'), [
+          { text: translate(language, 'schedule.notNow'), style: 'cancel' },
+          { text: translate(language, 'schedule.openSettings'), onPress: () => { void openExactReminderSettings().catch(showSaveError); } },
+        ]);
+      }
       await Promise.all([
         syncScheduleReminders(
           schedule,

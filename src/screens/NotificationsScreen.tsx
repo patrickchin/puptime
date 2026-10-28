@@ -9,12 +9,15 @@ import {
   reminderLeadOptions,
   type NotificationPreferences,
 } from '../notification-config';
-import { cancelCustomTimedReminder, cancelCustomTimedRemindersIfDeliveryOff, countCustomTimedReminders, createCustomTimedReminder, CustomTimedReminderLimitError, CUSTOM_TIMED_REMINDER_NOTIFICATION_KIND, listCustomTimedReminders, type CustomTimedReminder, type NotificationPermissionState } from '../reminders';
+import { cancelCustomTimedReminder, cancelCustomTimedRemindersIfDeliveryOff, countCustomTimedReminders, createCustomTimedReminder, CustomTimedReminderLimitError, ExactReminderAccessError, CUSTOM_TIMED_REMINDER_NOTIFICATION_KIND, listCustomTimedReminders, type CustomTimedReminder, type NotificationPermissionState } from '../reminders';
 import { spacing, surfaceTreatment, type Theme } from '../theme';
 import {NotificationTimingControls} from '../components/NotificationTimingControls';
 import type {ScheduleEntry} from '../domain';
 import {PuppyIdentity} from '../components/PuppyIdentity';
 import { entityId } from '../entity-id';
+import { openExactReminderSettings, refreshExactReminderScheduling } from '../exact-reminders';
+
+const needsExactAlarmAccess = Platform.OS === 'android' && Number(Platform.Version) >= 31;
 
 export function NotificationsScreen({
   theme,
@@ -48,6 +51,9 @@ export function NotificationsScreen({
   const [timed, setTimed] = useState<CustomTimedReminder[]>([]);
   const [timedLoading, setTimedLoading] = useState(true);
   const [timedLoadFailed, setTimedLoadFailed] = useState(false);
+  const [exactAccess, setExactAccess] = useState<boolean | null>(null);
+  const [exactChecking, setExactChecking] = useState(needsExactAlarmAccess);
+  const [exactFailed, setExactFailed] = useState(false);
   const [draft, setDraft] = useState<{ id: string; label: string; at: Date } | null>(null);
   const [draftError, setDraftError] = useState<string | null>(null);
   const loadGeneration = useRef(0);
@@ -58,6 +64,24 @@ export function NotificationsScreen({
     borderColor: theme.border,
     borderRadius: theme.presentation.cardRadius,
   }];
+
+  const reloadExactAccess = useCallback(async () => {
+    if (!needsExactAlarmAccess) return;
+    setExactChecking(true);
+    try {
+      const allowed = await refreshExactReminderScheduling();
+      setExactAccess(allowed); setExactFailed(false);
+      if (allowed) setDraftError(current => current === t('notifications.exactRequired') ? null : current);
+    }
+    catch { setExactAccess(null); setExactFailed(true); }
+    finally { setExactChecking(false); }
+  }, [t]);
+
+  useEffect(() => {
+    void reloadExactAccess();
+    const subscription = AppState.addEventListener('change', state => { if (state === 'active') void reloadExactAccess(); });
+    return () => subscription.remove();
+  }, [reloadExactAccess]);
 
   const reloadTimed = useCallback(async () => {
     const generation = ++loadGeneration.current;
@@ -113,6 +137,27 @@ export function NotificationsScreen({
     return false;
   };
 
+  const requestExactAccess = () => {
+    if (exactFailed) { void reloadExactAccess(); return; }
+    void save(openExactReminderSettings);
+  };
+
+  const exactAccessAction = (inEditor = false) => (
+    <Pressable testID={inEditor ? 'notifications.timed.exactTiming' : 'settings.notifications.exactTiming'}
+      accessibilityRole="button" accessibilityState={{ disabled: saving || exactChecking, busy: exactChecking }}
+      disabled={saving || exactChecking} onPress={requestExactAccess}
+      style={({ pressed }) => [styles.row, { backgroundColor: pressed ? theme.primarySoft : undefined, borderRadius: theme.presentation.controlRadius }]}>
+      <MaterialCommunityIcons accessible={false} name={exactAccess ? 'alarm-check' : 'alarm'} size={24} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no" />
+      <View style={styles.copy}>
+        <Text style={[styles.label, { color: theme.text }]}>{t('notifications.exactTitle')}</Text>
+        <Text testID={inEditor ? 'notifications.timed.exactStatus' : 'settings.notifications.exactStatus'} style={[styles.detail, { color: theme.textMuted }]}>
+          {t(exactChecking ? 'notifications.exactChecking' : exactFailed ? 'notifications.exactError' : exactAccess ? 'notifications.exactAllowed' : 'notifications.exactNeeded')}
+        </Text>
+      </View>
+      <MaterialCommunityIcons accessible={false} name="chevron-right" size={23} color={theme.textMuted} accessibilityElementsHidden importantForAccessibility="no" />
+    </Pressable>
+  );
+
   const disableDelivery = async () => {
     await onNotificationDeliveryChange?.(false);
     await cancelCustomTimedRemindersIfDeliveryOff();
@@ -148,12 +193,17 @@ export function NotificationsScreen({
       setDraftError(null);
       try {
         if ((notificationPermission !== 'granted' || notificationDelivery === false) && !(await requestNotifications())) return;
+        if (needsExactAlarmAccess && !(await refreshExactReminderScheduling())) {
+          setExactAccess(false);
+          setDraftError(t('notifications.exactRequired'));
+          return;
+        }
         const created = await createCustomTimedReminder({ id: draft.id, petId, label, at: draft.at.getTime() });
         if (!created) { setDraftError(t('notifications.timedEnable')); return; }
         setDraft(null);
         await reloadTimed();
       } catch (error) {
-        setDraftError(t(error instanceof CustomTimedReminderLimitError ? 'notifications.timedLimit' : 'settings.saveErrorBody'));
+        setDraftError(t(error instanceof CustomTimedReminderLimitError ? 'notifications.timedLimit' : error instanceof ExactReminderAccessError ? 'notifications.exactRequired' : 'settings.saveErrorBody'));
       }
     });
   };
@@ -216,6 +266,10 @@ export function NotificationsScreen({
               accessibilityElementsHidden importantForAccessibility="no" />
           </Pressable>
         ) : null}
+        {needsExactAlarmAccess ? <>
+          <View style={[styles.divider, { backgroundColor: theme.border }]} />
+          {exactAccessAction()}
+        </> : null}
       </View>
 
 
@@ -335,6 +389,7 @@ export function NotificationsScreen({
               onValueChange={(_event, at) => {if(!saving)setDraft(current => current&&current.at.getTime()!==at.getTime()?{...current,at}:current);}} style={styles.nativePicker} />)}
           </View> : null}
           <Text style={[styles.detail, { color: theme.textMuted }]}>{t('notifications.timedDeviceOnly')}</Text>
+          {needsExactAlarmAccess && exactAccess !== true ? exactAccessAction(true) : null}
           {draftError ? <Text testID="notifications.timed.error" accessibilityRole="alert" style={[styles.detail, { color: theme.danger }]}>{draftError}</Text> : null}
           <Pressable testID="notifications.timed.save" accessibilityRole="button" accessibilityState={{ disabled: saving || !draft?.label.trim(), busy: saving }}
             disabled={saving || !draft?.label.trim()} onPress={saveTimed}

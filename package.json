@@ -89,5 +89,14 @@
     "dev:server": "wrangler dev",
     "test:web": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/web/*.test.ts"
   },
-  "private": true
+  "private": true,
+  "expo": {
+    "autolinking": {
+      "android": {
+        "buildFromSource": [
+          "expo-notifications"
+        ]
+      }
+    }
+  }
 }
