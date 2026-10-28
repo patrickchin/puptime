@@ -150,6 +150,9 @@ try{
     if(db.prepare("SELECT name FROM sqlite_master WHERE name='local_email_previews'").get()){auth=db;break;}db.close();
   }
   assert.ok(auth);
+  // Expo ignores --reset-cache in CI. Fixture bundles must re-inline the local
+  // backend URL rather than reuse transforms from the production build.
+  const bundleEnv={...childEnv,CI:'false',EXPO_PUBLIC_CLOUD_API_URL:front};
   if(android){
     adb('reverse','tcp:8797','tcp:8797');
     assert.ok(process.env.ANDROID_HOME||process.env.ANDROID_SDK_ROOT,'Set ANDROID_HOME for the isolated native fixture build.');
@@ -171,7 +174,7 @@ try{
       writeFileSync(gradle,readFileSync(gradle,'utf8').replace('react {','react {\n    debuggableVariants = []'));
     const nativeEnv={...childEnv,EXPO_PUBLIC_CLOUD_API_URL:front};
     const embedded=resolve('android/app/build/generated/assets/react/debug/index.android.bundle');
-    await run('node',['node_modules/expo/bin/cli','export:embed','--entry-file','index.ts','--platform','android','--dev','false','--reset-cache','--max-workers','2','--bundle-output',embedded,'--assets-dest',resolve('android/app/build/generated/res/react/debug')],nativeEnv);
+    await run('node',['node_modules/expo/bin/cli','export:embed','--entry-file','index.ts','--platform','android','--dev','false','--reset-cache','--max-workers','2','--bundle-output',embedded,'--assets-dest',resolve('android/app/build/generated/res/react/debug')],bundleEnv);
     assert.ok(readFileSync(embedded,'utf8').includes(front),'Embed the fixture HTTPS address, never the production API.');
     const init=join(privateDir,'embedded-fixture.gradle');
     writeFileSync(init,"gradle.projectsEvaluated { def app = gradle.rootProject.findProject(':app'); if (app != null) app.tasks.named('createBundleDebugJsAndAssets').configure { onlyIf { false } } }\n");
@@ -181,7 +184,7 @@ try{
   }else{
   const bundle=join(privateDir,'Puptime.app');cpSync(host,bundle,{recursive:true});
   await run('node',['node_modules/expo/bin/cli','export:embed','--entry-file','index.ts','--platform','ios','--dev','false','--bytecode','--reset-cache','--max-workers','2','--bundle-output',join(bundle,'main.jsbundle'),'--assets-dest',bundle],
-    {...process.env,EXPO_PUBLIC_CLOUD_API_URL:front});
+    bundleEnv);
   assert.ok(readFileSync(join(bundle,'main.jsbundle')).includes(Buffer.from(front)),'Embed the fixture HTTPS address, never a cached production API.');
   await run('codesign',['--force','--deep','--sign','-',bundle]);
   simctl('install',device,bundle);
