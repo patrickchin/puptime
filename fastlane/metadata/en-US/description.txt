@@ -1,9 +1,18 @@
-Keep track of potty breaks and meals while you learn your puppy's routine. Tap Pee, Poop, or Eat, then adjust the time or add a note when you need to.
+Know when your puppy last peed, pooped, or ate. Puptime keeps the little details in one place while you learn your puppy’s routine.
 
-Build an editable routine and choose reminders that suit your day. Timeline helps you spot patterns. Estimated entries stay labelled and count separately from recorded activity.
+LOG IT WHILE IT HAPPENS
+Tap Pee, Poop, or Eat to save an activity. Adjust the time if you’re catching up later, and add a note when the details matter. Use the Home Screen widget for quick logging.
 
-Local logging is free and works offline without an account. Optional cloud backup and device sync let you keep the same puppy history across your devices. Sign in and choose to enable cloud access before any puppy data is uploaded. Cloud access is a separate service; the available plan and any trial are shown before you choose it.
+FIND YOUR PUPPY’S PATTERN
+Look back through your history and compare activity on the timeline. Insights helps you see how often your puppy goes and when. Estimated entries stay labelled and count separately from recorded activity.
 
-Export an activity CSV from Insights, or import a backup to recover missing entries while keeping your current edits. CSV backups include activity times, notes, custom activity names, and estimate labels. Routines and settings are not included in the activity CSV.
+MAKE THE ROUTINE YOURS
+Edit your puppy’s routine and choose reminders that suit your day. Track walks and custom activities alongside potty breaks and meals.
 
-Voice dictation uses your device's speech-recognition service and may need an internet connection. The starter routine is an editable example. Adjust it with your veterinarian's guidance.
+START WITH LOCAL LOGGING
+Local features are free and work offline without an account. Optional cloud backup and device sync require sign-in and cloud access. Puppy data is uploaded only after you choose to enable cloud access. Available plans and any trial are shown before you choose one.
+
+KEEP A COPY OF YOUR HISTORY
+Export your activities as a CSV, or import a backup to recover missing entries while keeping your current edits. Activity CSVs include times, notes, custom activity names, and estimate labels. Routines and settings are not included.
+
+Voice dictation uses your device’s speech-recognition service and may need an internet connection. The starter routine is an editable example. Adjust it with your veterinarian’s guidance.

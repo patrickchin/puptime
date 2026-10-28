@@ -15,6 +15,7 @@ platform :ios do
 
   desc "Upload candidate App Store metadata and screenshots without submitting"
   lane :metadata do
+    sh("node", File.expand_path("../scripts/check-app-store.mjs", __dir__))
     # Local features are free. Cloud plan prices are configured separately before release.
     deliver(
       api_key: connect_api_key,

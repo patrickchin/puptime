@@ -68,6 +68,7 @@
     "wrangler": "^4.151.1"
   },
   "scripts": {
+    "check:app-store": "node scripts/check-app-store.mjs",
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",

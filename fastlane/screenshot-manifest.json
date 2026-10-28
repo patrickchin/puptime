@@ -1,0 +1,122 @@
+[
+  {
+    "file": "iPhone-6.3-01-log.png",
+    "dimensions": [
+      1206,
+      2622
+    ],
+    "headline": "Log potty breaks\nin a tap",
+    "source_sha256": "9ecc17dc929453f0f88a1442305425688292f4230aef6487c20abe9e418668af",
+    "sha256": "fcf65cf70af0d4d02e00dc7741c899c614c08162a6d4eeec5dcf600f521a0ea1"
+  },
+  {
+    "file": "iPhone-6.3-02-timeline.png",
+    "dimensions": [
+      1206,
+      2622
+    ],
+    "headline": "Spot patterns\nacross the week",
+    "source_sha256": "5daa478b106342d127a68cc27d94c14154b6eca2fbdd8f44f9b41963bdc86fec",
+    "sha256": "4fcd4ef4f0e6e201f13c007285213663520bad4b002cf3e2b42d8cfd7311849a"
+  },
+  {
+    "file": "iPhone-6.3-03-insights.png",
+    "dimensions": [
+      1206,
+      2622
+    ],
+    "headline": "See how often\nyour puppy goes",
+    "source_sha256": "35cc8bf155e18ebcbdb4d254ef02264de0ba4782cdeec5b0cf6f69f3ead94e97",
+    "sha256": "e830a5b0b8d273441b12e1f69d23c93c0fc999d18c6cdb90b03d00fa550cc32a"
+  },
+  {
+    "file": "iPhone-6.3-04-routine.png",
+    "dimensions": [
+      1206,
+      2622
+    ],
+    "headline": "Build a routine\naround your day",
+    "source_sha256": "2639efa92b1734181f1bc9ad19bacd34d1528ec999497220dd3005c0e75657a4",
+    "sha256": "cdb03c9afaf85c4f1e4e2c39969a089cb7707d8f7a5cde45fdce9082c9dcbbe8"
+  },
+  {
+    "file": "iPhone-6.3-05-details.png",
+    "dimensions": [
+      1206,
+      2622
+    ],
+    "headline": "Add the details\nyou’ll want later",
+    "source_sha256": "65ac9e4a986dcc25958bd8cb384dadac2774a014983a6fa86332f1df17703eb0",
+    "sha256": "2e33622a5a51957b2136c52b8e6d830d5c7139ed9036fe22f53dd38a2accdbc6"
+  },
+  {
+    "file": "iPhone-6.3-06-dark.png",
+    "dimensions": [
+      1206,
+      2622
+    ],
+    "headline": "Keep track,\neven after dark",
+    "source_sha256": "036738803fce1689a01b67118dc49d2e318a48e025078cf87840e366e38c2330",
+    "sha256": "d4a07bd7e4248df77d7f73dda3e172bba95a6e320028da3c720f3ad22fe29a89"
+  },
+  {
+    "file": "iPad-13-01-log.png",
+    "dimensions": [
+      2064,
+      2752
+    ],
+    "headline": "Log potty breaks\nin a tap",
+    "source_sha256": "21e1c9495bd554ce516dce77dc464ddd0eae7bb200842d1673e94a025f636266",
+    "sha256": "f55e6f2879c13a5d524bd24aefb84b71e43fa692ba61d2624f5733f3561a9da4"
+  },
+  {
+    "file": "iPad-13-02-timeline.png",
+    "dimensions": [
+      2064,
+      2752
+    ],
+    "headline": "Spot patterns\nacross the week",
+    "source_sha256": "6f7ca6407ab810c0b273d2756207d98c2a520534e673cc06c053fe4f0e087a1e",
+    "sha256": "4f28fa22d1524e33bbbaca77615b7c99540b2ff6d0e0f850d87785efe6b949f7"
+  },
+  {
+    "file": "iPad-13-03-insights.png",
+    "dimensions": [
+      2064,
+      2752
+    ],
+    "headline": "See how often\nyour puppy goes",
+    "source_sha256": "5c478182f2f7710591ec53b2bda186e0fd6a18f21154985463f41c2df3678851",
+    "sha256": "7daab20dc0b9ac6fc66f04478c0be5584ff71d7ca8a422501d8bdb0431fb21a1"
+  },
+  {
+    "file": "iPad-13-04-routine.png",
+    "dimensions": [
+      2064,
+      2752
+    ],
+    "headline": "Build a routine\naround your day",
+    "source_sha256": "5b455425578bc8625946a4da083b5910360aa9330b89670282d7c2bd8b3e7f2f",
+    "sha256": "eaac8af8ebae1d371b64a6a3e9666162c4317d829c459a4b88bc0582f8915856"
+  },
+  {
+    "file": "iPad-13-05-details.png",
+    "dimensions": [
+      2064,
+      2752
+    ],
+    "headline": "Add the details\nyou’ll want later",
+    "source_sha256": "8876b3875882d98826355c7cc0d9e8c5f8adf654951b8fb9a09edab603bddaff",
+    "sha256": "a552e13180f5b415d77d3948cf69023e7ede6fbdeb83b5719484bd37b136da75"
+  },
+  {
+    "file": "iPad-13-06-dark.png",
+    "dimensions": [
+      2064,
+      2752
+    ],
+    "headline": "Keep track,\neven after dark",
+    "source_sha256": "da949ae112f189f06f36d660bef5f94563d053a0527056f4ee717a493ef80a24",
+    "sha256": "fa8dd1b1d67905f88aad3f9d3603d3e7a30abfa2d3560907c3e7e4877b9c5442"
+  }
+]

@@ -1,0 +1,23 @@
+{
+  "source_revision": "c81f5fb",
+  "time_zone": "Asia/Shanghai",
+  "native_version": "1.12.0",
+  "native_build": "1",
+  "bundle_sha256": "45da03e7323b825ac873344b141ad737768929062376cfe280ef78eb64ae1b59",
+  "runtime_sha256": "fbf385af04e80e31bc836a46b485917e46fcced45ce5512d7d54c982db2793ce",
+  "runtime": "Existing 1.12.0 simulator host with a production-mode JS bundle and ignored capture-only clock entry point; release entry point unchanged",
+  "os": "iOS 26.5",
+  "devices": [
+    "Puptime 459e App Store iPhone Real History",
+    "Puptime 459e App Store iPad Real History"
+  ],
+  "data": "338 owner-provided CSV records, September 11 through October 11, 2026. Original timestamps, activity types, durations, and app/widget sources preserved. Personal notes omitted. Screenshot flow adds no events; preview adds and edits one demonstration event.",
+  "status_bar": "9:41, full battery",
+  "release_status": "Candidate assets only. Match to the exact uploaded release before submission.",
+  "csv_sha256": "68db47b5d9748770fdea01f24787b8a43364051fd12637745928c37029256e56",
+  "capture_clock": "2026-10-11T05:10:33.154Z plus session elapsed time (13:10 Asia/Shanghai)",
+  "captured_dates": [
+    "2026-10-27",
+    "2026-10-28"
+  ]
+}

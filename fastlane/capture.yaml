@@ -1,0 +1,49 @@
+appId: com.patrickchin.puptime
+name: English App Store capture sequence
+---
+- launchApp
+- extendedWaitUntil:
+    visible: {id: screen.today}
+    timeout: 90000
+- waitForAnimationToEnd
+- tapOn: {id: nav.open, retryTapIfNoChange: true}
+- waitForAnimationToEnd
+- tapOn: {id: nav.settings}
+- tapOn: {id: settings.theme.open}
+- tapOn: {id: appearance.theme.light}
+- tapOn: {id: settings.back}
+- tapOn: {id: nav.open, retryTapIfNoChange: true}
+- waitForAnimationToEnd
+- tapOn: {id: nav.log}
+- waitForAnimationToEnd
+- takeScreenshot: 01-log
+- tapOn: {id: nav.switch}
+- waitForAnimationToEnd
+- takeScreenshot: 02-timeline
+- tapOn: {id: nav.open, retryTapIfNoChange: true}
+- waitForAnimationToEnd
+- tapOn: {id: nav.insights}
+- waitForAnimationToEnd
+- assertVisible: {id: screen.insights}
+- takeScreenshot: 03-insights
+- tapOn: {id: nav.open, retryTapIfNoChange: true}
+- waitForAnimationToEnd
+- tapOn: {id: nav.schedule}
+- waitForAnimationToEnd
+- assertVisible: {id: screen.schedule}
+- takeScreenshot: 04-routine
+- tapOn: {id: nav.open, retryTapIfNoChange: true}
+- waitForAnimationToEnd
+- tapOn: {id: nav.log}
+- tapOn: {id: event.pee.edit, index: 0}
+- waitForAnimationToEnd
+- takeScreenshot: 05-details
+- tapOn: {id: editor.close}
+- tapOn: {id: nav.open, retryTapIfNoChange: true}
+- waitForAnimationToEnd
+- tapOn: {id: nav.settings}
+- tapOn: {id: settings.theme.open}
+- tapOn: {id: appearance.theme.dark}
+- tapOn: {id: settings.back}
+- waitForAnimationToEnd
+- takeScreenshot: 06-dark

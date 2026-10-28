@@ -1,0 +1,41 @@
+{
+  "seconds": 15.13,
+  "poster_seconds": 6,
+  "source": "Native simulator recording; original CSV history with personal notes omitted; one scripted logging/edit action",
+  "audio": "Silent stereo AAC",
+  "playback_speed": 1,
+  "frozen_padding_seconds": 0,
+  "scenes": [
+    {
+      "screen": "01-logged",
+      "raw_start": 46.343,
+      "raw_end": 49.963,
+      "edited_seconds": 3.633333
+    },
+    {
+      "screen": "02-edited",
+      "raw_start": 51.885,
+      "raw_end": 53.288,
+      "edited_seconds": 1.4
+    },
+    {
+      "screen": "03-timeline",
+      "raw_start": 56.12,
+      "raw_end": 58.75,
+      "edited_seconds": 2.633333
+    },
+    {
+      "screen": "04-detail",
+      "raw_start": 58.75,
+      "raw_end": 63.392,
+      "edited_seconds": 4.633333
+    },
+    {
+      "screen": "06-routine",
+      "raw_start": 77.398,
+      "raw_end": 80.247,
+      "edited_seconds": 2.833333
+    }
+  ],
+  "sha256": "9920dafa77b25a069fc654c33a8c616ba507f6d13a6a9ab033e68f56eb5a5b28"
+}
