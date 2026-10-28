@@ -1,4 +1,5 @@
 import { requireNativeModule } from 'expo-modules-core';
+import { AppState } from 'react-native';
 
 type ExactReminderScheduler = {
   canScheduleExactRemindersAsync(): Promise<boolean>;
@@ -26,4 +27,20 @@ export function refreshExactReminderScheduling(): Promise<boolean> {
 
 export async function openExactReminderSettings(): Promise<void> {
   await scheduler().openExactReminderSettingsAsync();
+}
+
+export async function requestExactReminderAccess(): Promise<boolean> {
+  if (await refreshExactReminderScheduling()) return true;
+  // Opening settings is not permission approval. Keep setup pending until the
+  // user returns, then ask Android for the actual result.
+  return new Promise((resolve, reject) => {
+    let leftApp = false;
+    const subscription = AppState.addEventListener('change', state => {
+      if (state !== 'active') { leftApp = true; return; }
+      if (!leftApp) return;
+      subscription.remove();
+      void refreshExactReminderScheduling().then(resolve, reject);
+    });
+    void openExactReminderSettings().catch(error => { subscription.remove(); reject(error); });
+  });
 }

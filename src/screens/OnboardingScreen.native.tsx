@@ -9,6 +9,7 @@ import { ActivityIcon } from '../components/ActivityIcon';
 import { useLocalization } from '../localization-context';
 import type { OnboardingScreenProps } from '../onboarding';
 import { headingStyle, spacing } from '../theme';
+import { ExactReminderAccessError } from '../reminders';
 
 const practiceActions = ['pee', 'poop', 'meal'] as const;
 type PracticeActivity = (typeof practiceActions)[number];
@@ -76,7 +77,7 @@ export function OnboardingScreen({theme, mode, notificationPermission, onAllowNo
     if(notificationPermission==='blocked'){onOpenSystemSettings();return;}
     locked.current=true;setBusy(true);
     try{await onAllowNotifications();}
-    catch{Alert.alert(t('schedule.reminderErrorTitle'),t('schedule.reminderErrorBody'));}
+    catch(error){Alert.alert(t('schedule.reminderErrorTitle'),t(error instanceof ExactReminderAccessError?'notifications.exactSetupRequired':'schedule.reminderErrorBody'));}
     finally{locked.current=false;if(mounted.current)setBusy(false);}
   }
   const card={backgroundColor:theme.surfaceRaised,borderColor:theme.border,borderRadius:theme.presentation.cardRadius};
