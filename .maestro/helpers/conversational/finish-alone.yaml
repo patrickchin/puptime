@@ -3,7 +3,23 @@ name: Finish without the spotlight
 ---
 - assertVisible:
     id: "preview.ready"
-- waitForAnimationToEnd
-- tapOn:
-    id: "preview.skip"
+# A system permission handoff can swallow a native tap despite a stable snapshot.
+# Retry only completion and its destination, with three 30-second confirmation waits.
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: "preview.ready"
+          commands:
+            - waitForAnimationToEnd
+            - tapOn:
+                id: "preview.skip"
+                enabled: true
+                retryTapIfNoChange: true
+      - extendedWaitUntil:
+          visible:
+            id: "screen.today"
+          timeout: 30000
 - runFlow: "assert-normal.yaml"
