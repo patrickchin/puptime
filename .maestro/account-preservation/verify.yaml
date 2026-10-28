@@ -52,11 +52,9 @@ name: Account preservation verify
     id: account.back
     retryTapIfNoChange: true
 - assertVisible:
-    id: settings.account.open
-    text: ${'My account. ' + TEST_EMAIL}
+    id: screen.settings
 - takeScreenshot: my-account-settings
-- tapOn:
-    id: settings.account.open
+- runFlow: ../helpers/open-account.yaml
 - assertVisible:
     id: account.email
     text: ${TEST_EMAIL}

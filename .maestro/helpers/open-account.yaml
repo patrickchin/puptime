@@ -29,7 +29,9 @@ appId: com.patrickchin.puptime
               id: screen.settings
           commands:
             - tapOn:
-                id: settings.account.open
+                id: nav.open
+            - tapOn:
+                id: nav.account
 - extendedWaitUntil:
     visible:
       id: screen.account
