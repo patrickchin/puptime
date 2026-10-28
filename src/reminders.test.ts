@@ -8,7 +8,7 @@ import {DEFAULT_NOTIFICATION_PREFERENCES} from './notification-config.ts';
 type MockRequest = { identifier: string; content?: { title?: string; data?: Record<string, unknown> }; trigger?: { type?: string; date?: number; repeats?: boolean; seconds?: number }; [key: string]: unknown };
 const platform={OS:'ios'};
 (globalThis as typeof globalThis&{__puptimeNotificationPlatform:typeof platform}).__puptimeNotificationPlatform=platform;
-const state={delivery:false,granted:true,canAskAgain:true,answer:true,requests:0,writes:[] as boolean[],scheduled:[] as MockRequest[],cancelled:[] as string[],hold:null as null|(()=>Promise<void>),scheduleHold:null as null|(()=>Promise<void>),failure:null as null|'list'|'create'|'cancel',nextId:0};
+const state={delivery:false,granted:true,exactAllowed:true,canAskAgain:true,answer:true,requests:0,writes:[] as boolean[],scheduled:[] as MockRequest[],cancelled:[] as string[],hold:null as null|(()=>Promise<void>),scheduleHold:null as null|(()=>Promise<void>),failure:null as null|'list'|'create'|'cancel',nextId:0};
 (globalThis as typeof globalThis&{__puptimeNotificationTest:typeof state}).__puptimeNotificationTest=state;
 registerHooks({
  resolve(specifier,context,next){
@@ -16,12 +16,14 @@ registerHooks({
    if(specifier==='expo-notifications')return {url:'puptime-test:notifications',shortCircuit:true};
    if(specifier==='react-native')return {url:'puptime-test:platform',shortCircuit:true};
    if(specifier==='./cloud/notification-delivery')return {url:'puptime-test:delivery',shortCircuit:true};
+   if(specifier==='./exact-reminders')return {url:'puptime-test:exact',shortCircuit:true};
    if(specifier.startsWith('.'))return next(new URL(specifier+'.ts',context.parentURL).href,context);
   }
   return next(specifier,context);
  },
  load(url,context,next){
   if(url==='puptime-test:platform')return {format:'module',source:'export const Platform=globalThis.__puptimeNotificationPlatform;',shortCircuit:true};
+  if(url==='puptime-test:exact')return {format:'module',source:'export async function refreshExactReminderScheduling(){return globalThis.__puptimeNotificationTest.exactAllowed;}',shortCircuit:true};
   if(url==='puptime-test:delivery')return {format:'module',source:'const s=globalThis.__puptimeNotificationTest;export async function getNotificationDelivery(){return s.delivery;} export async function setNotificationDelivery(value){s.delivery=value;s.writes.push(value);}',shortCircuit:true};
   if(url==='puptime-test:notifications')return {format:'module',shortCircuit:true,source:`
    const s=globalThis.__puptimeNotificationTest;
@@ -41,7 +43,17 @@ registerHooks({
 });
 const reminders=await import('./reminders.ts');
 const routine={id:'break',type:'pee' as const,minutes:420,reminder:true};
-function reset(){Object.assign(state,{delivery:false,granted:true,canAskAgain:true,answer:true,requests:0,writes:[],scheduled:[],cancelled:[],hold:null,scheduleHold:null,failure:null,nextId:0});}
+function reset(){Object.assign(state,{delivery:false,granted:true,exactAllowed:true,canAskAgain:true,answer:true,requests:0,writes:[],scheduled:[],cancelled:[],hold:null,scheduleHold:null,failure:null,nextId:0});}
+
+test('Android one-off reminders require exact access without blocking immediate widget confirmations',async()=>{
+ reset();platform.OS='android';state.delivery=true;state.exactAllowed=false;
+ try{
+  await assert.rejects(reminders.createCustomTimedReminder({petId:'pet_test',label:'A precise reminder',at:Date.now()+60000}),reminders.ExactReminderAccessError);
+  assert.equal(state.scheduled.length,0);
+  assert.equal(await reminders.showWidgetLogConfirmation({eventId:'evt_test',type:'pee',at:Date.now()}),true);
+  assert.equal(state.scheduled.length,1);
+ }finally{platform.OS='ios';}
+});
 
 test('Android widget confirmations deliver immediately on their channel with editable event references',async()=>{
  reset();platform.OS='android';

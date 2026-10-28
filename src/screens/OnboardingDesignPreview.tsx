@@ -19,6 +19,8 @@ import {OnboardingPlanTimeline} from '../components/OnboardingPlanTimeline';
 import {AccountSignIn} from '../components/AccountSignIn';
 import {useAccountSnapshot} from '../cloud/use-account-snapshot';
 import type {CloudHandle} from '../cloud/handle';
+import {ExactReminderAccessError} from '../reminders';
+import {translate} from '../localization';
 export type OnboardingDraft={puppyName:string;schedule:ScheduleEntry[];notifications:NotificationPreferences;showGuide:boolean};
 export type ConversationalOnboardingProps={cloud:CloudHandle;onFinish:(draft:OnboardingDraft)=>Promise<void>;onAllowNotifications:()=>Promise<boolean>;onDisableNotifications:()=>Promise<void>};
 
@@ -136,7 +138,7 @@ function PreviewFlow({cloud,onFinish,onAllowNotifications,onDisableNotifications
     try{
       const granted=await onAllowNotifications();
       setReminderAnswer(granted?'granted':'declined');go('ready');
-    }catch{setReminderError('We couldn’t ask your phone just now. We can do this later, or try again.');}
+    }catch(error){setReminderError(error instanceof ExactReminderAccessError?translate('en','notifications.exactSetupRequired'):'We couldn’t ask your phone just now. We can do this later, or try again.');}
     finally{permissionRequest.current=false;setRequestingReminders(false);}
   }
   async function deferReminders(){
@@ -259,13 +261,14 @@ function PreviewFlow({cloud,onFinish,onAllowNotifications,onDisableNotifications
   else if(step==='reminders')body=<>
     <ScrollView key={step} contentContainerStyle={styles.conversation}>
       {prompt('Set up reminders')}
+      {Platform.OS==='android'&&Number(Platform.Version)>=31?<Text testID="preview.reminders.preciseExplanation" style={styles.body}>{translate('en','notifications.exactExplain')}</Text>:null}
       <NotificationTimingControls theme={theme} pickerTheme={appTheme} preferences={preferences} schedule={schedule} disabled={requestingReminders}
         onChange={async next=>setPreferences(next)} onScheduleChange={async next=>setSchedule(next)}/>
-      {reminderError?<Text accessibilityRole="alert" style={styles.error}>{reminderError}</Text>:null}
-      {requestingReminders?<ActivityIndicator color={theme.primary} accessibilityLabel="Asking your phone about notifications"/>:null}
     </ScrollView>
     <View style={styles.footer}>
-      <Pressable testID="preview.reminders.allow" accessibilityRole="button" accessibilityState={{disabled:requestingReminders,busy:requestingReminders}} disabled={requestingReminders} onPress={()=>{void allowReminders();}} style={[styles.primary,requestingReminders&&styles.pressed]}><Text style={styles.primaryText}>Yes, allow notifications</Text></Pressable>
+      {reminderError?<Text testID="preview.reminders.error" accessibilityRole="alert" style={[styles.error,{marginBottom:12}]}>{reminderError}</Text>:null}
+      {requestingReminders?<ActivityIndicator style={{marginBottom:12}} color={theme.primary} accessibilityLabel="Asking your phone about notifications"/>:null}
+      <Pressable testID="preview.reminders.allow" accessibilityRole="button" accessibilityState={{disabled:requestingReminders,busy:requestingReminders}} disabled={requestingReminders} onPress={()=>{void allowReminders();}} style={[styles.primary,requestingReminders&&styles.pressed]}><Text style={styles.primaryText}>{Platform.OS==='android'?'Yes, enable reminders':'Yes, allow notifications'}</Text></Pressable>
       <Pressable testID="preview.reminders.later" accessibilityRole="button" disabled={requestingReminders} onPress={()=>{void deferReminders();}} style={styles.secondary}><Text style={styles.secondaryText}>Not now, thanks</Text></Pressable>
     </View>
   </>;

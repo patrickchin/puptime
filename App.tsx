@@ -67,6 +67,7 @@ import {
   POTTY_REMINDER_NOTIFICATION_KIND,
   CUSTOM_TIMED_REMINDER_NOTIFICATION_KIND,
   cancelCustomTimedRemindersIfDeliveryOff,
+  ExactReminderAccessError,
   requestReminderPermission,
   syncPottyReminders,
   syncScheduleReminders,
@@ -105,6 +106,7 @@ import {
 } from './src/storage';
 import { resolveTheme, type ThemePreference } from './src/theme';
 import { acknowledgePendingWidgetEvents, readPendingWidgetEvents, updateHomeWidget } from './src/widgets/sync';
+import { requestExactReminderAccess, refreshExactReminderScheduling } from './src/exact-reminders';
 
 configureReminderHandling();
 
@@ -221,6 +223,9 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     setNotificationPermission(nextPermission);
     setDelivery(nextDelivery);
     setActivityCustomizations(current=>JSON.stringify(current)===JSON.stringify(nextActivityCustomizations)?current:nextActivityCustomizations);
+    // Exact access revocation cancels OS alarms but preserves Expo's request
+    // store. Restore those requests before replacing current routine/potty plans.
+    await refreshExactReminderScheduling().catch(() => undefined);
     void Promise.all([
       syncScheduleReminders(
         nextSchedule,
@@ -600,7 +605,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     ]);
   };
 
-  const requestNotifications = async () => {
+  const requestNotifications = async (requirePreciseTiming = false) => {
     let granted:boolean;
     try{granted=await requestReminderPermission(language);}
     finally{
@@ -608,6 +613,17 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
       setNotificationPermission(permission);setDelivery(delivery);
     }
     if (granted) {
+      let precise = true;
+      if (Platform.OS === 'android' && !(await refreshExactReminderScheduling())) {
+        const openSettings = await new Promise<boolean>(resolve => {
+          Alert.alert(translate(language, 'notifications.exactTitle'), translate(language, 'notifications.exactExplain'), [
+            { text: translate(language, 'schedule.notNow'), style: 'cancel', onPress: () => resolve(false) },
+            { text: translate(language, 'schedule.openSettings'), onPress: () => resolve(true) },
+          ], { cancelable: true, onDismiss: () => resolve(false) });
+        });
+        precise = openSettings && await requestExactReminderAccess();
+      }
+      if (requirePreciseTiming && !precise) throw new ExactReminderAccessError();
       await Promise.all([
         syncScheduleReminders(
           schedule,
@@ -619,6 +635,13 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
       ]);
     }
     return granted;
+  };
+  const requestOnboardingNotifications = async () => {
+    try { return await requestNotifications(true); }
+    catch (error) {
+      await changeNotificationDelivery(false);
+      throw error;
+    }
   };
 
   const changeNotificationDelivery=async(enabled:boolean)=>{
@@ -804,7 +827,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
                 theme={theme}
                 mode={guideOpenedFromSettings?'replay':'first-run'}
                 notificationPermission={notificationPermission}
-                onAllowNotifications={requestNotifications}
+                onAllowNotifications={requestOnboardingNotifications}
                 onOpenSystemSettings={() => Linking.openSettings().catch(() => undefined)}
                 onFinish={finishOnboarding}
                 onBack={() => {
@@ -815,7 +838,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
                   return true;
                 }}
               />
-            ):firstLaunch?conversationalOnboarding?<OnboardingDesignPreview cloud={cloud} onFinish={finishConversationalOnboarding} onAllowNotifications={requestNotifications} onDisableNotifications={()=>changeNotificationDelivery(false)}/>:<FirstLaunchScreen progress={firstLaunch} cloud={cloud} theme={theme} notificationPermission={notificationPermission} onAllowNotifications={requestNotifications} onDisableNotifications={()=>changeNotificationDelivery(false)} onOpenSystemSettings={()=>{void Linking.openSettings().catch(()=>undefined);}} onFinish={finishOnboarding}/>:null : screen}
+            ):firstLaunch?conversationalOnboarding?<OnboardingDesignPreview cloud={cloud} onFinish={finishConversationalOnboarding} onAllowNotifications={requestOnboardingNotifications} onDisableNotifications={()=>changeNotificationDelivery(false)}/>:<FirstLaunchScreen progress={firstLaunch} cloud={cloud} theme={theme} notificationPermission={notificationPermission} onAllowNotifications={requestOnboardingNotifications} onDisableNotifications={()=>changeNotificationDelivery(false)} onOpenSystemSettings={()=>{void Linking.openSettings().catch(()=>undefined);}} onFinish={finishOnboarding}/>:null : screen}
             {nativeApp&&onboardingVisible===false&&!historyVisible&&!settingsVisible&&(tab==='log'||tab==='timeline')?<LogViewSwitch tab={tab} theme={theme} onChange={navigateToTab}/>:null}
             {!onboardingVisible && undoState ? (
               <Toast

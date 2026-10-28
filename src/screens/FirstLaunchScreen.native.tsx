@@ -13,6 +13,7 @@ import type {MessageKey} from '../localization';
 import {firstLaunchStepSchema,type FirstLaunchScreenProps,type FirstLaunchStep} from '../first-launch';
 import {headingStyle,spacing} from '../theme';
 import {OnboardingScreen} from './OnboardingScreen';
+import {ExactReminderAccessError} from '../reminders';
 
 export {loadFirstLaunch as loadInitialSetup} from '../storage.native';
 const titles:Record<FirstLaunchStep,MessageKey>={welcome:'setup.welcomeTitle',profile:'setup.profileTitle',account:'setup.accountTitle',cloud:'setup.cloudTitle',walkthrough:'tour.logTitle',reminders:'setup.remindersTitle'};
@@ -52,7 +53,7 @@ export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPerm
   if(locked.current||state?.busy)return;
   locked.current=true;setBusy(true);setError(null);
   try{await action();}
-  catch{if(mounted.current){setError(t('settings.saveErrorBody'));scroll.current?.scrollTo({y:0,animated:false});AccessibilityInfo.announceForAccessibility(t('settings.saveErrorBody'));}}
+  catch(error){if(mounted.current){const message=t(error instanceof ExactReminderAccessError?'notifications.exactSetupRequired':'settings.saveErrorBody');setError(message);scroll.current?.scrollTo({y:0,animated:false});AccessibilityInfo.announceForAccessibility(message);}}
   finally{locked.current=false;if(mounted.current)setBusy(false);}
  }
  async function checkpoint(next:FirstLaunchStep) {
@@ -157,6 +158,7 @@ export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPerm
    </>:null}
    {step==='reminders'&&!ready?<>
     <Text style={bodyStyle}>{t('setup.remindersBody')}</Text>
+    {Platform.OS==='android'&&Number(Platform.Version)>=31?<Text testID="setup.reminders.preciseExplanation" style={bodyStyle}>{t('notifications.exactExplain')}</Text>:null}
     <View style={[cardStyle,styles.notificationPreview]}>
      <View style={[styles.notificationIcon,{backgroundColor:theme.primarySoft}]}><MaterialCommunityIcons accessible={false} name="bell-outline" color={theme.primary} size={27}/></View>
      <View style={styles.notificationCopy}><Text style={[styles.label,{color:theme.text}]}>{t('onboarding.notificationExampleTitle')}</Text><Text style={bodyStyle}>{t('onboarding.notificationExampleBody')}</Text></View>

@@ -1,0 +1,34 @@
+appId: com.patrickchin.puptime
+name: Android onboarding requires precise timing before reminders are ready
+---
+# Run on a dedicated emulator at first launch, with notification permission
+# unset and Alarms & reminders access off. Existing synthetic history may stay.
+- runFlow: ../helpers/conversational/to-reminders.yaml
+- assertVisible:
+    id: preview.reminders.preciseExplanation
+- tapOn:
+    id: preview.reminders.allow
+- tapOn: ^Allow$
+- assertVisible: Precise reminder timing
+- tapOn: Not now
+- assertVisible: Allow precise timing to finish reminder setup, or choose Not now.
+- assertNotVisible:
+    id: preview.ready
+- takeScreenshot: onboarding-exact-timing-required
+- tapOn:
+    id: preview.reminders.allow
+- tapOn: Open settings
+- assertVisible: Allow setting alarms and reminders
+# Opening the settings page alone must not count as granting access.
+- back
+- assertVisible: Allow precise timing to finish reminder setup, or choose Not now.
+- assertNotVisible:
+    id: preview.ready
+- tapOn:
+    id: preview.reminders.allow
+- tapOn: Open settings
+- tapOn: Allow setting alarms and reminders
+- back
+- assertVisible:
+    id: preview.ready
+- assertVisible: You can change reminders in Notifications.

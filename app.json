@@ -38,6 +38,7 @@
       "output": "static"
     },
     "plugins": [
+      "./plugins/withAndroidExactReminders",
       "./plugins/withAndroidWidgetChronometer",
       [
         "react-native-android-widget",

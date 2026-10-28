@@ -19,6 +19,7 @@ function screen(name:string,extra:Record<string,unknown>,props:Record<string,unk
   '../localization-context':{useLocalization:()=>({locale:'en',language:'en',t:(key:string,params:any)=>key==='schedule.usualWindow'?params.range:key,activityColors:()=>({}),activityLabel:()=>''})},
   '../theme':theme,'../domain':domain,'../notification-config':notificationConfig,
   '../entity-id':entityIds,
+  '../exact-reminders':{refreshExactReminderScheduling:async()=>true,openExactReminderSettings:async()=>{}},
   ...extra,
  };
  const source=readFileSync(new URL(`./screens/${name}.tsx`,import.meta.url),'utf8');
@@ -69,7 +70,7 @@ test('a timed reminder draft retries with the same OS request identity',async()=
   '../components/PuppyIdentity':{PuppyIdentity:'PuppyIdentity'},
   '../components/NotificationTimingControls':{NotificationTimingControls:'NotificationTimingControls'},
   'expo-notifications':{},'@expo/ui/community/datetime-picker':{default:'DateTimePicker'},
-  '../reminders':{CustomTimedReminderLimitError:class extends Error{},createCustomTimedReminder:async(input:unknown)=>{saved.push(input);throw Error('OS acknowledgement lost');}},
+  '../reminders':{CustomTimedReminderLimitError:class extends Error{},ExactReminderAccessError:class extends Error{},createCustomTimedReminder:async(input:unknown)=>{saved.push(input);throw Error('OS acknowledgement lost');}},
  },{petId:'pet-1',notificationPermission:'granted',notificationDelivery:true,notificationPreferences:notificationConfig.DEFAULT_NOTIFICATION_PREFERENCES});
  render(byId('notifications.timed.add')).onPress();
  render(byId('notifications.timed.label')).onChangeText('Medicine');
