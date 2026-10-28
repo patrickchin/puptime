@@ -171,6 +171,9 @@ name: Complete conversational setup into the real app
 - takeScreenshot: conversational-reminder-timing
 - tapOn:
     id: preview.reminders.later
+- assertVisible:
+    id: preview.ready
+- waitForAnimationToEnd
 - takeScreenshot: conversational-ready
 - tapOn:
     id: preview.continue

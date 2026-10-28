@@ -8,6 +8,9 @@ name: Spotlight poop action uses real logging and persists
 - runFlow: "../helpers/conversational/to-reminders.yaml"
 - tapOn:
     id: "preview.reminders.later"
+- assertVisible:
+    id: "preview.ready"
+- waitForAnimationToEnd
 - tapOn:
     id: "preview.continue"
 - assertVisible:
