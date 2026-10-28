@@ -7,5 +7,12 @@ name: Permission intent retry succeeds
     text: "^Allow$"
 - assertVisible:
     id: "preview.ready"
+- waitForAnimationToEnd
 - tapOn:
     id: "preview.back"
+- extendedWaitUntil:
+    visible:
+      id: "preview.prompt"
+      text: "Set up reminders"
+    timeout: 30000
+- waitForAnimationToEnd
