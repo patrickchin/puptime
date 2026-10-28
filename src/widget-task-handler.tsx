@@ -28,6 +28,8 @@ import {
 } from './storage';
 import { QuickLogWidget } from './widgets/QuickLogWidget.android';
 import { updateHomeWidget } from './widgets/sync';
+import { widgetLayout } from './widgets/widget-layouts';
+import { pottyReminderPlans } from './reminder-config';
 
 // Headless launches no longer import App, which also installs this handler.
 configureReminderHandling();
@@ -84,9 +86,12 @@ async function render(props: WidgetTaskHandlerProps, events: PuppyEvent[]) {
   const actions = await loadWidgetActions(customActivities);
   const themePreference = await loadThemePreference();
   const lastEventAt = latestQuickEventTimes(events);
+  const layout = widgetLayout(props.widgetInfo.widgetName);
+  const nextPottyAt = pottyReminderPlans(events, await loadNotificationPreferences()).sort((a, b) => a.at - b.at)[0]?.at;
+  const openNapAt = events.find(isOpenNap)?.at;
   props.renderWidget({
-    light: <QuickLogWidget compact={compact} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} />,
-    dark: <QuickLogWidget compact={compact} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} dark />,
+    light: <QuickLogWidget layout={layout} nextPottyAt={nextPottyAt} openNapAt={openNapAt} compact={compact} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} />,
+    dark: <QuickLogWidget layout={layout} nextPottyAt={nextPottyAt} openNapAt={openNapAt} compact={compact} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} dark />,
   });
 }
 

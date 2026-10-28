@@ -7,6 +7,9 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 const device = process.argv[2];
+const widgetName = process.argv[3] ?? 'PuptimeQuickLog';
+assert.ok(['PuptimeQuickLog', 'PuptimeActions'].includes(widgetName));
+const grid = widgetName === 'PuptimeActions';
 assert.ok(device, 'Pass the dedicated emulator serial.');
 const app = 'com.patrickchin.puptime';
 const adb = (...args) => execFileSync('adb', ['-s', device, ...args], { timeout: 30000, maxBuffer: 16 * 1024 * 1024 });
@@ -19,17 +22,18 @@ const rows = () => sql("SELECT id,type,at FROM events WHERE source='widget' ORDE
 assert.ok(sql('SELECT COUNT(*) AS count FROM events')[0].count >= 1000, 'Seed at least 1,000 synthetic logs first.');
 const hierarchy = JSON.parse(execFileSync('maestro', ['--device', device, 'hierarchy', '--no-ansi', '--no-reinstall-driver'], { timeout: 60000 }).toString());
 const targets = {};
-function visit(node) {
+function visit(node, selected = false) {
   const a = node.attributes ?? {};
-  const type = /^Log (pee|poop|ate),/.exec(a.accessibilityText ?? '')?.[1];
-  if (type) {
+  if (a.class?.endsWith('LauncherAppWidgetHostView')) selected = a.accessibilityText === (grid ? 'Puptime · All activities' : 'Puptime · Quick log') || (!grid && a.accessibilityText === 'Puptime Quick Log');
+  const type = /^Log (pee|poop|ate|out|walk|nap),/.exec(a.accessibilityText ?? '')?.[1];
+  if (type && selected) {
     const [left, top, right, bottom] = a.bounds.match(/\d+/g).map(Number);
-    targets[type === 'ate' ? 'meal' : type] = [Math.round((left + right) / 2), Math.round((top + bottom) / 2)];
+    targets[type === 'ate' ? 'meal' : type === 'out' ? 'pottyTrip' : type] = [Math.round((left + right) / 2), Math.round((top + bottom) / 2)];
   }
-  node.children?.forEach(visit);
+  node.children?.forEach(child => visit(child, selected));
 }
 visit(hierarchy);
-assert.deepEqual(Object.keys(targets).sort(), ['meal', 'pee', 'poop']);
+assert.deepEqual(Object.keys(targets).sort(), grid ? ['meal', 'nap', 'pee', 'poop', 'pottyTrip', 'walk'] : ['meal', 'pee', 'poop']);
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const results = [];
 for (const cold of [false, true]) {
@@ -40,7 +44,7 @@ for (const cold of [false, true]) {
     if (pid) adb('shell', 'kill', '-9', ...pid.split(/\s+/));
   }
   const before = new Set(rows().map(row => row.id));
-  const actions = ['pee', 'poop', 'meal', 'pee', 'meal', 'poop'];
+  const actions = grid ? ['pee', 'poop', 'meal', 'pottyTrip', 'walk'] : ['pee', 'poop', 'meal', 'pee', 'meal', 'poop'];
   const started = Date.now();
   // One shell connection keeps taps close together and exercises real launcher
   // PendingIntents, including targets updated while subsequent taps arrive.
@@ -69,9 +73,32 @@ for (const cold of [false, true]) {
   results.push({ cold, taps: added.length, burstPersistedMs, notificationLatencyMs: latency });
 }
 const intents = adb('shell', 'dumpsys', 'activity', 'intents').toString();
-const identities = new Set([...intents.matchAll(/dat=(puptime-widget:\/\/\S+)/g)].map(match => match[1]));
-assert.equal(identities.size, 3, 'Each launcher button must retain its own stable PendingIntent.');
+const identities = new Set([...intents.matchAll(/dat=(puptime-widget:\/\/\S+)/g)].map(match => match[1]).filter(uri => uri.startsWith(`puptime-widget://${widgetName}/`)));
+assert.equal(identities.size, grid ? 6 : 3, 'Each launcher button must retain its own stable PendingIntent.');
+if (grid) {
+  assert.equal(sql("SELECT COUNT(*) count FROM events WHERE type='nap' AND end_state=1")[0].count, 0, 'Finish the synthetic open nap first.');
+  adb('shell', 'input', 'tap', ...targets.nap.map(String));
+  let nap;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    nap = sql("SELECT id,at FROM events WHERE type='nap' AND end_state=1")[0];
+    if (nap) break;
+    await pause(100);
+  }
+  assert.ok(nap, 'The sixth grid button must start a nap.');
+  await pause(1000);
+  const updated = JSON.parse(execFileSync('maestro', ['--device', device, 'hierarchy', '--no-ansi', '--no-reinstall-driver'], { timeout: 60000 }).toString());
+  let end;
+  function findEnd(node) { const a = node.attributes ?? {}; if (a.accessibilityText?.startsWith('End nap,')) { const [l,t,r,b] = a.bounds.match(/\d+/g).map(Number); end = [Math.round((l+r)/2),Math.round((t+b)/2)]; } node.children?.forEach(findEnd); }
+  findEnd(updated);
+  assert.deepEqual(end, targets.nap, 'Starting a nap must not rearrange the six grid targets.');
+  adb('shell', 'input', 'tap', ...end.map(String));
+  for (let attempt = 0; attempt < 100; attempt++) {
+    if (sql(`SELECT ended_at FROM events WHERE id='${nap.id}'`)[0]?.ended_at >= nap.at) break;
+    await pause(100);
+  }
+  assert.ok(sql(`SELECT ended_at FROM events WHERE id='${nap.id}'`)[0]?.ended_at >= nap.at, 'The same sixth button must end the nap.');
+}
 const output = join(homedir(), 'Pictures/Screenshots/Codex/puptime-widget-responsiveness');
 mkdirSync(output, { recursive: true });
 writeFileSync(join(output, 'android-widget.png'), adb('exec-out', 'screencap', '-p'));
-console.log(JSON.stringify({ results, identities: [...identities], screenshot: join(output, 'android-widget.png') }, null, 2));
+console.log(JSON.stringify({ widgetName, results, identities: [...identities], napToggle: grid, screenshot: join(output, 'android-widget.png') }, null, 2));

@@ -45,13 +45,57 @@
           "widgets": [
             {
               "name": "PuptimeQuickLog",
-              "label": "Puptime Quick Log",
-              "description": "Pick 2–4 activities to log from the Home Screen.",
+              "label": "Puptime · Quick log",
+              "description": "Your activities in one full-width row.",
               "minWidth": "250dp",
               "minHeight": "56dp",
               "targetCellWidth": 4,
+              "targetCellHeight": 1,
+              "maxResizeHeight": "96dp",
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 0
+            },
+            {
+              "name": "PuptimeActions",
+              "label": "Puptime · All activities",
+              "description": "Six quick-log buttons in two rows.",
+              "minWidth": "250dp",
+              "minHeight": "128dp",
+              "targetCellWidth": 4,
               "targetCellHeight": 2,
-              "maxResizeHeight": "110dp",
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 0
+            },
+            {
+              "name": "PuptimeOverview",
+              "label": "Puptime · At a glance",
+              "description": "Quick logs, a potty reminder, and nap or walk status.",
+              "minWidth": "250dp",
+              "minHeight": "128dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 2,
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 0
+            },
+            {
+              "name": "PuptimeSingle",
+              "label": "Puptime · Single button",
+              "description": "Your first selected widget activity in one small tile.",
+              "minWidth": "56dp",
+              "minHeight": "56dp",
+              "targetCellWidth": 1,
+              "targetCellHeight": 1,
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 0
+            },
+            {
+              "name": "PuptimePair",
+              "label": "Puptime · Two buttons",
+              "description": "Your first two selected widget activities.",
+              "minWidth": "128dp",
+              "minHeight": "56dp",
+              "targetCellWidth": 2,
+              "targetCellHeight": 1,
               "resizeMode": "horizontal|vertical",
               "updatePeriodMillis": 0
             }
