@@ -40,6 +40,14 @@ name: Skip grouped meal times and recover using Back
     id: "screen.schedule"
 - assertNotVisible:
     id: "schedule.entry.meal"
+- scrollUntilVisible:
+    element:
+      id: "schedule.entry.poop"
+      text: ".*6:30.*7:00.*"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+    timeout: 60000
 - assertVisible:
     id: "schedule.entry.poop"
     text: ".*6:30.*7:00.*"

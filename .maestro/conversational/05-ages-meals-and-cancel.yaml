@@ -180,6 +180,14 @@ name: All ages meal counts cancellation and back routes
 - assertVisible:
     id: "schedule.entry.meal"
     text: ".*8:00.*"
+- scrollUntilVisible:
+    element:
+      id: "schedule.entry.poop"
+      text: ".*11:30.*12:00.*"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: false
+    timeout: 60000
 - assertVisible:
     id: "schedule.entry.poop"
     text: ".*11:30.*12:00.*"

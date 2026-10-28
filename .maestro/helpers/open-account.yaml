@@ -22,14 +22,18 @@ appId: com.patrickchin.puptime
             - tapOn:
                 id: nav.open
             - tapOn:
-                id: nav.settings
+                id: nav.account
       - runFlow:
           when:
             visible:
               id: screen.settings
           commands:
             - tapOn:
-                id: settings.account.open
+                id: settings.back
+            - tapOn:
+                id: nav.open
+            - tapOn:
+                id: nav.account
 - extendedWaitUntil:
     visible:
       id: screen.account

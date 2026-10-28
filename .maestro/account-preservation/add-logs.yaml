@@ -14,8 +14,6 @@ name: Account preservation add-logs
 - tapOn:
     id: account.back
     retryTapIfNoChange: true
-- tapOn:
-    id: settings.back
 - assertVisible:
     id: screen.today
 - repeat:

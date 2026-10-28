@@ -1,16 +1,30 @@
 appId: com.patrickchin.puptime
 name: Welcome sign-in verifies the code and resumes real setup
 ---
+- scrollUntilVisible:
+    element:
+      id: account.code.input
+    direction: DOWN
+- waitForAnimationToEnd
 - tapOn:
     id: account.code.input
+    enabled: true
+    retryTapIfNoChange: true
+- waitForAnimationToEnd
 - inputText: "${MAESTRO_TEST_CODE === '000000' ? '111111' : '000000'}"
+- assertVisible:
+    id: account.code.input
+    text: "${MAESTRO_TEST_CODE === '000000' ? '111111' : '000000'}"
 - tapOn: Sign-in code
 - scrollUntilVisible:
     element:
       id: account.verify
     direction: DOWN
+- waitForAnimationToEnd
 - tapOn:
     id: account.verify
+    enabled: true
+    retryTapIfNoChange: true
 - extendedWaitUntil:
     visible:
       id: account.error
@@ -19,15 +33,24 @@ name: Welcome sign-in verifies the code and resumes real setup
     id: account.code.input
 - tapOn:
     id: account.code.input
+    enabled: true
+    retryTapIfNoChange: true
+- waitForAnimationToEnd
 - eraseText: 6
 - inputText: ${MAESTRO_TEST_CODE}
+- assertVisible:
+    id: account.code.input
+    text: ^[0-9]{6}$
 - tapOn: Sign-in code
 - scrollUntilVisible:
     element:
       id: account.verify
     direction: DOWN
+- waitForAnimationToEnd
 - tapOn:
     id: account.verify
+    enabled: true
+    retryTapIfNoChange: true
 - extendedWaitUntil:
     visible:
       id: preview.name

@@ -13,8 +13,6 @@ name: Account preservation reopen
 - tapOn:
     id: account.back
     retryTapIfNoChange: true
-- tapOn:
-    id: settings.back
 - runFlow: ../helpers/conversational/assert-normal.yaml
 - runFlow: ../helpers/open-account.yaml
 - extendedWaitUntil:

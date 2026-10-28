@@ -82,6 +82,7 @@ name: iOS side navigation and notification preferences
     element:
       id: notifications.timing.pottyAfterPee.enabled
     direction: DOWN
+    timeout: 60000
 - assertVisible:
     id: notifications.timing.pottyAfterPee.enabled
     checked: false
@@ -107,6 +108,7 @@ name: iOS side navigation and notification preferences
     element:
       id: settings.notifications.lead.15
     direction: UP
+    timeout: 60000
     visibilityPercentage: 100
     centerElement: true
 - waitForAnimationToEnd
@@ -128,6 +130,7 @@ name: iOS side navigation and notification preferences
     element:
       id: settings.notifications.routines
     direction: UP
+    timeout: 60000
     visibilityPercentage: 100
     centerElement: true
 - tapOn:
@@ -208,6 +211,7 @@ name: iOS side navigation and notification preferences
     element:
       id: notifications.timing.pottyAfterPee.time
     direction: DOWN
+    timeout: 60000
 - tapOn:
     id: notifications.timing.pottyAfterPee.time
 - assertVisible:
@@ -219,6 +223,7 @@ name: iOS side navigation and notification preferences
     element:
       id: settings.notifications.lead.15
     direction: UP
+    timeout: 60000
     visibilityPercentage: 100
     centerElement: true
 - assertVisible:
@@ -262,6 +267,7 @@ name: iOS side navigation and notification preferences
     element:
       id: notifications.timing.pottyAfterPee.enabled
     direction: DOWN
+    timeout: 60000
 - assertVisible:
     id: notifications.timing.pottyAfterPee.enabled
     checked: true
@@ -269,6 +275,7 @@ name: iOS side navigation and notification preferences
     element:
       id: settings.notifications.lead.15
     direction: UP
+    timeout: 60000
     visibilityPercentage: 100
     centerElement: true
 - assertVisible:

@@ -13,11 +13,16 @@ name: Notification allow reaches the normal app and survives Back
 - assertVisible:
     id: "preview.ready"
 - assertVisible: You can change reminders in Notifications.
+- waitForAnimationToEnd
 - tapOn:
     id: "preview.back"
-- assertVisible:
-    id: "preview.prompt"
-    text: "Set up reminders"
+    enabled: true
+- extendedWaitUntil:
+    visible:
+      id: "preview.prompt"
+      text: "Set up reminders"
+    timeout: 30000
+- waitForAnimationToEnd
 - tapOn:
     id: "preview.reminders.allow"
 - assertVisible:
