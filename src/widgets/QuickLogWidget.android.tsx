@@ -6,13 +6,13 @@ import {
   DEFAULT_WIDGET_ACTIONS,
   customActivityKey,
   EVENT_META,
-  widgetActionsForState,
   type QuickEventTimes,
   type ActivityKey,
   type QuickEventType,
 } from '../domain';
 import { resolveTheme, type ThemePreference } from '../theme';
 import { ChronometerWidget } from './ChronometerWidget.android';
+import { layoutActions, type WidgetLayout } from './widget-layouts';
 
 type ActionButton = {
   type: QuickEventType;
@@ -50,6 +50,11 @@ type Props = {
   actions?: readonly ActivityKey[];
   customActivities?: readonly string[];
   themePreference?: ThemePreference;
+  layout?: WidgetLayout;
+  nextPottyAt?: number;
+  openNapAt?: number;
+  // Native gallery previews cannot host RemoteViews chronometers.
+  previewAt?: number;
 };
 
 export function QuickLogWidget({
@@ -60,23 +65,34 @@ export function QuickLogWidget({
   actions: configuredActions = DEFAULT_WIDGET_ACTIONS,
   customActivities = [],
   themePreference = 'system',
+  layout = 'row',
+  nextPottyAt,
+  openNapAt,
+  previewAt,
 }: Props) {
   const theme = resolveTheme(themePreference, dark ? 'dark' : 'light');
   const background = theme.background as `#${string}`;
   const surface = theme.surface as `#${string}`;
   const border = theme.border as `#${string}`;
-  const visibleTypes = widgetActionsForState(configuredActions, activeNap, customActivities);
+  const visibleTypes = layoutActions(layout, configuredActions, activeNap, customActivities);
   const visibleButtons = visibleTypes.map((type) => ({
     type,
     label: type.startsWith('custom:')
       ? customActivities.find((item) => customActivityKey(item) === type) ?? type.slice(7)
       : buttons.find((button) => button.type === type)?.label ?? type,
   }));
-  const actionButtons = (
-    <FlexWidget style={{ width: 'match_parent', flex: 1, flexDirection: 'row', flexGap: compact ? 4 : 7 }}>
-      {visibleButtons.map((button) => {
+  const smallTile = layout === 'single' || layout === 'pair';
+  const inline = !smallTile;
+  const elapsed = (at: number, color: `#${string}`, size = 11) => previewAt === undefined ? (
+    <ChronometerWidget at={at} maxLines={1} style={{ color, fontSize: size, fontWeight: '600', textAlign: 'center', adjustsFontSizeToFit: true, marginTop: 2 }} />
+  ) : (
+    <TextWidget text={`${Math.max(0, Math.floor((previewAt - at) / 60_000))}m ago`} maxLines={1} style={{ color, fontSize: size, fontWeight: '600', textAlign: 'center', marginTop: 2 }} />
+  );
+  const actionRow = (row: typeof visibleButtons) => (
+    <FlexWidget key={row[0]?.type} style={{ width: 'match_parent', flex: 1, flexDirection: 'row', flexGap: 8 }}>
+      {row.map((button) => {
         const isActiveNap = button.type === 'nap' && activeNap;
-        const label = isActiveNap ? (compact ? 'Wake' : 'End nap') : button.label;
+        const label = isActiveNap ? (inline && visibleButtons.length === 4 ? 'Wake' : 'End nap') : button.label;
         const meta = EVENT_META[button.type.startsWith('custom:') ? 'custom' : button.type as QuickEventType];
         const actionInk = (theme.isDark ? meta.darkColor : meta.color) as `#${string}`;
         const actionBackground = (theme.isDark ? meta.darkSoftColor : meta.softColor) as `#${string}`;
@@ -95,39 +111,35 @@ export function QuickLogWidget({
             style={{
               flex: 1,
               height: 'match_parent',
-              flexDirection: compact ? 'row' : 'column',
+              flexDirection: inline ? 'row' : 'column',
               alignItems: 'center',
               justifyContent: 'center',
               backgroundColor: actionBackground,
               borderColor: actionBorder,
               borderWidth: theme.presentation.borderWidth,
-              borderRadius: theme.presentation.controlRadius,
-              paddingHorizontal: compact ? 4 : 3,
-              paddingVertical: compact ? 2 : 7,
+              borderRadius: Math.min(theme.presentation.controlRadius, 16),
+              paddingHorizontal: inline ? 8 : 3,
+              paddingVertical: 4,
             }}
           >
             <SvgWidget
               svg={makeIcon(isActiveNap ? 'stop' : button.type.startsWith('custom:') ? 'custom' : button.type as QuickEventType, actionInk)}
-              style={{ width: compact ? 20 : 28, height: compact ? 20 : 28, marginRight: compact ? 4 : 0, marginBottom: compact ? 0 : 4 }}
+              style={{ width: inline ? 22 : 28, height: inline ? 22 : 28, marginRight: inline ? 6 : 0, marginBottom: inline ? 0 : 2 }}
             />
-            <FlexWidget style={{ flex: compact ? 1 : undefined, flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <FlexWidget style={{ flex: inline ? 1 : undefined, flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
               <TextWidget
                 text={label}
                 maxLines={1}
-                style={{ color: actionInk, fontSize: compact ? 12 : 14, fontWeight: '700', textAlign: 'center', adjustsFontSizeToFit: true }}
+                style={{ color: actionInk, fontSize: 13, fontWeight: '700', textAlign: 'center', adjustsFontSizeToFit: true }}
               />
-              {lastAt === undefined ? (
+              {smallTile ? null : lastAt === undefined ? (
                 <TextWidget
                   text="Never"
                   maxLines={1}
-                  style={{ color: actionInk, fontSize: compact ? 9 : 11, fontWeight: '600', textAlign: 'center', marginTop: 1 }}
+                  style={{ color: actionInk, fontSize: 11, fontWeight: '600', textAlign: 'center', marginTop: 2 }}
                 />
               ) : (
-                <ChronometerWidget
-                  at={lastAt}
-                  maxLines={1}
-                  style={{ color: actionInk, fontSize: compact ? 9 : 11, fontWeight: '600', textAlign: 'center', adjustsFontSizeToFit: true, marginTop: 1 }}
-                />
+                elapsed(lastAt, actionInk)
               )}
             </FlexWidget>
           </FlexWidget>
@@ -135,26 +147,6 @@ export function QuickLogWidget({
       })}
     </FlexWidget>
   );
-
-  if (compact) {
-    return (
-      <FlexWidget
-        accessibilityLabel="Puptime quick log widget"
-        style={{
-          height: 'match_parent',
-          width: 'match_parent',
-          backgroundColor: background,
-          backgroundGradient: { from: background, to: surface, orientation: 'TL_BR' },
-          borderColor: border,
-          borderWidth: theme.presentation.borderWidth,
-          borderRadius: theme.presentation.cardRadius,
-          padding: 4,
-        }}
-      >
-        {actionButtons}
-      </FlexWidget>
-    );
-  }
 
   return (
     <FlexWidget
@@ -167,10 +159,27 @@ export function QuickLogWidget({
         borderColor: border,
         borderWidth: theme.presentation.borderWidth,
         borderRadius: theme.presentation.cardRadius,
-        padding: 7,
+        flexDirection: 'column',
+        flexGap: 8,
+        padding: compact || layout === 'single' || layout === 'pair' ? 4 : 8,
       }}
     >
-      {actionButtons}
+      {layout === 'grid' ? [actionRow(visibleButtons.slice(0, 3)), actionRow(visibleButtons.slice(3))] : actionRow(visibleButtons)}
+      {layout === 'overview' ? (
+        <FlexWidget style={{ width: 'match_parent', flex: 1, flexDirection: 'row', alignItems: 'center', flexGap: 12, paddingHorizontal: 12, backgroundColor: surface, borderRadius: 14 }}>
+          <FlexWidget style={{ flex: 1, flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center' }}>
+            <TextWidget text="Potty reminder" style={{ fontSize: 11, color: theme.textMuted as `#${string}` }} />
+            <TextWidget text={nextPottyAt === undefined ? 'None scheduled' : new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(nextPottyAt)} maxLines={1} style={{ fontSize: 15, fontWeight: '700', color: theme.text as `#${string}`, marginTop: 3 }} />
+          </FlexWidget>
+          <FlexWidget style={{ width: 1, height: 28, backgroundColor: border }} />
+          <FlexWidget style={{ flex: 1, flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <TextWidget text={openNapAt === undefined ? 'Last walk' : 'Nap started'} style={{ fontSize: 11, color: theme.textMuted as `#${string}` }} />
+            {openNapAt !== undefined || lastEventAt?.walk !== undefined
+              ? elapsed(openNapAt ?? lastEventAt!.walk!, theme.text as `#${string}`, 14)
+              : <TextWidget text="Not logged yet" style={{ fontSize: 13, fontWeight: '700', color: theme.text as `#${string}`, marginTop: 3 }} />}
+          </FlexWidget>
+        </FlexWidget>
+      ) : null}
     </FlexWidget>
   );
 }

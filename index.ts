@@ -10,6 +10,9 @@ import { widgetTaskHandler } from './src/widget-task-handler';
 // the environment is set up appropriately
 // A cold widget tap needs storage and the handler, not the app's screens.
 registerRootComponent(function Root() {
+  if (Platform.OS === 'android' && process.env.EXPO_PUBLIC_WIDGET_PLAYGROUND === '1') {
+    return createElement(require('./src/widgets/WidgetPlayground.android').default);
+  }
   const App = require('./App').default;
   return createElement(App);
 });

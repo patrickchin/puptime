@@ -12,12 +12,14 @@ function insertOnce(source, anchor, replacement) {
 
 module.exports = function withAndroidWidgetChronometer(config) {
   config = withAndroidManifest(config, (modConfig) => {
-    const receiver = modConfig.modResults.manifest.application?.[0]?.receiver
-      ?.find(item => item.$['android:name'].endsWith('.widget.PuptimeQuickLog'));
-    if (!receiver) throw new Error('Puptime could not find its Android widget receiver.');
-    const actions = receiver['intent-filter'][0].action;
-    for (const name of ['android.intent.action.TIME_SET', 'android.intent.action.TIMEZONE_CHANGED']) {
-      if (!actions.some(action => action.$['android:name'] === name)) actions.push({ $: { 'android:name': name } });
+    const receivers = modConfig.modResults.manifest.application?.[0]?.receiver
+      ?.filter(item => /\.widget\.Puptime/.test(item.$['android:name']));
+    if (!receivers?.length) throw new Error('Puptime could not find its Android widget receivers.');
+    for (const receiver of receivers) {
+      const actions = receiver['intent-filter'][0].action;
+      for (const name of ['android.intent.action.TIME_SET', 'android.intent.action.TIMEZONE_CHANGED']) {
+        if (!actions.some(action => action.$['android:name'] === name)) actions.push({ $: { 'android:name': name } });
+      }
     }
     return modConfig;
   });
@@ -48,7 +50,7 @@ module.exports = function withAndroidWidgetChronometer(config) {
     source = source.replace('(int) System.currentTimeMillis(),', 'id,')
       .replace('PendingIntent.FLAG_CANCEL_CURRENT\n                | PendingIntent.FLAG_MUTABLE',
         'PendingIntent.FLAG_UPDATE_CURRENT\n                | PendingIntent.FLAG_IMMUTABLE');
-    // Puptime has at most four buttons. Keep them in the XML hierarchy so a
+    // Puptime has at most six buttons. Keep them in the XML hierarchy so a
     // refresh never removes the View receiving a DOWN/UP gesture.
     source = source.replace('R.layout.rn_widget);', 'R.layout.puptime_widget);')
       .replace('        remoteWidgetView.removeAllViews(R.id.rn_widget_clickable_container);',
@@ -68,7 +70,7 @@ module.exports = function withAndroidWidgetChronometer(config) {
     fs.copyFileSync(path.join(__dirname, 'android-widget/PuptimeWidgetClicks.java'),
       path.join(javaRoot, 'PuptimeWidgetClicks.java'));
     const clickableLayout = fs.readFileSync(path.join(nativeRoot, 'res/layout/rn_widget_clickable.xml'), 'utf8');
-    for (let slot = 0; slot < 4; slot++) {
+    for (let slot = 0; slot < 6; slot++) {
       fs.writeFileSync(path.join(nativeRoot, `res/layout/puptime_widget_clickable_${slot}.xml`),
         clickableLayout.replaceAll('rn_widget_clickable_area', `puptime_widget_clickable_${slot}`)
           .replaceAll('rn_widget_clickable_positioner', `puptime_widget_positioner_${slot}`));
@@ -113,7 +115,7 @@ module.exports = function withAndroidWidgetChronometer(config) {
         '    <FrameLayout\n        android:id="@+id/puptime_chronometers"\n        android:layout_width="match_parent"\n        android:layout_height="match_parent" />\n\n' + anchor);
       fs.writeFileSync(rootPath, source);
       const clickableContainer = `${anchor}\n        android:layout_width="match_parent"\n        android:layout_height="match_parent" />`;
-      const staticButtons = `${anchor}\n        android:layout_width="match_parent"\n        android:layout_height="match_parent">\n${Array.from({ length: 4 }, (_, slot) => `        <include layout="@layout/puptime_widget_clickable_${slot}" />`).join('\n')}\n    </FrameLayout>`;
+      const staticButtons = `${anchor}\n        android:layout_width="match_parent"\n        android:layout_height="match_parent">\n${Array.from({ length: 6 }, (_, slot) => `        <include layout="@layout/puptime_widget_clickable_${slot}" />`).join('\n')}\n    </FrameLayout>`;
       fs.writeFileSync(path.join(layoutRoot, 'puptime_widget.xml'), insertOnce(source, clickableContainer, staticButtons));
       const isDark = qualifier === 'layout-night';
       fs.writeFileSync(path.join(layoutRoot, 'puptime_chronometer.xml'), `
