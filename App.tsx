@@ -788,12 +788,8 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
               <MaterialCommunityIcons accessible={false} name={settingsVisible||navigationHistory.length>0?'arrow-left':'menu'} size={25} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
             </Pressable>
             <Text testID="nav.title" accessibilityRole="header" maxFontSizeMultiplier={1.5} style={[styles.navigationTitle,{color:theme.text,minWidth:70}]}>{translate(language,settingsVisible?'settings.title':tab==='notifications'?'notifications.title':tab==='learn'?'learn.title':`nav.${tab}`)}</Text>
-            <Pressable testID={settingsVisible?"settings.account.open":"account.open"} accessibilityRole="button" accessibilityLabel={translate(language,'account.title')} onPress={()=>setAccountVisible(true)} style={({pressed})=>[styles.menuButton,{borderRadius:theme.presentation.controlRadius,backgroundColor:pressed?theme.primarySoft:undefined}]}>
-              <MaterialCommunityIcons accessible={false} name="account-circle-outline" size={28} color={theme.primary}/>
-            </Pressable>
+            <PuppyIdentity theme={theme} onPress={tab==='pets'&&!settingsVisible?undefined:()=>openTab('pets')}/>
           </View>:null}
-          {nativeApp&&onboardingVisible===false&&!historyVisible&&!settingsVisible&&(tab==='log'||tab==='timeline')?<LogViewSwitch tab={tab} theme={theme} onChange={navigateToTab}/>:null}
-          {nativeApp&&onboardingVisible===false&&!historyVisible&&!settingsVisible&&tab!=='pets'&&tab!=='learn'&&tab!=='notifications'?<View style={{marginHorizontal:20,marginBottom:8}}><PuppyIdentity showName theme={theme} onPress={()=>openTab('pets')}/></View>:null}
           <View style={styles.screen}>
             {onboardingVisible === null ? nativeApp?<View testID="setup.loading" style={styles.startup}>
               {startupFailed?<>
@@ -817,8 +813,10 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
                 }}
               />
             ):firstLaunch?conversationalOnboarding?<OnboardingDesignPreview cloud={cloud} onFinish={finishConversationalOnboarding} onAllowNotifications={requestNotifications} onDisableNotifications={()=>changeNotificationDelivery(false)}/>:<FirstLaunchScreen progress={firstLaunch} cloud={cloud} theme={theme} notificationPermission={notificationPermission} onAllowNotifications={requestNotifications} onDisableNotifications={()=>changeNotificationDelivery(false)} onOpenSystemSettings={()=>{void Linking.openSettings().catch(()=>undefined);}} onFinish={finishOnboarding}/>:null : screen}
+            {nativeApp&&onboardingVisible===false&&!historyVisible&&!settingsVisible&&(tab==='log'||tab==='timeline')?<LogViewSwitch tab={tab} theme={theme} onChange={navigateToTab}/>:null}
             {!onboardingVisible && undoState ? (
               <Toast
+                bottom={nativeApp&&(tab==='log'||tab==='timeline')?104:12}
                 message={undoState.message}
                 onEdit={() => {
                   setSettingsVisible(false);
