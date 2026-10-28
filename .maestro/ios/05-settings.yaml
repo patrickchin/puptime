@@ -25,7 +25,7 @@ tags:
       id: settings.widget.action.walk
     direction: DOWN
     visibilityPercentage: 100
-    centerElement: true
+    centerElement: false
 - waitForAnimationToEnd:
     timeout: 5000
 - assertVisible:
@@ -63,7 +63,7 @@ tags:
       id: settings.widget.action.walk
     direction: DOWN
     visibilityPercentage: 100
-    centerElement: true
+    centerElement: false
 - waitForAnimationToEnd:
     timeout: 5000
 - assertVisible:
@@ -76,7 +76,7 @@ tags:
       id: settings.theme.open
     direction: UP
     visibilityPercentage: 100
-    centerElement: true
+    centerElement: false
 - waitForAnimationToEnd:
     timeout: 5000
 - tapOn:
@@ -123,7 +123,7 @@ tags:
       id: settings.back
     direction: UP
     visibilityPercentage: 100
-    centerElement: true
+    centerElement: false
 - waitForAnimationToEnd:
     timeout: 5000
 - tapOn:
@@ -188,7 +188,7 @@ tags:
       id: settings.widget.action.walk
     direction: DOWN
     visibilityPercentage: 100
-    centerElement: true
+    centerElement: false
 - waitForAnimationToEnd:
     timeout: 5000
 - assertVisible:

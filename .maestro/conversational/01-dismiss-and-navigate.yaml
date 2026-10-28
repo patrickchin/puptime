@@ -42,7 +42,7 @@ name: Conversational onboarding dismisses into normal navigation and persists
     element:
       id: notifications.timing.poop.time
     direction: DOWN
-    centerElement: true
+    centerElement: false
 - assertVisible:
     id: notifications.timing.poop.time
     text: '.*5 min after.*'
@@ -50,7 +50,7 @@ name: Conversational onboarding dismisses into normal navigation and persists
     element:
       id: notifications.timing.pottyAfterMeal.time
     direction: DOWN
-    centerElement: true
+    centerElement: false
 - assertVisible:
     id: notifications.timing.pottyAfterMeal.time
     text: '.*45m.*'
@@ -58,7 +58,7 @@ name: Conversational onboarding dismisses into normal navigation and persists
     element:
       id: notifications.timing.pottyAfterPee.time
     direction: DOWN
-    centerElement: true
+    centerElement: false
 - assertVisible:
     id: notifications.timing.pottyAfterPee.time
     text: '.*3h.*'

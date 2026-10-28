@@ -30,7 +30,7 @@ tags:
     element:
       id: settings.guide.open
     direction: DOWN
-    centerElement: true
+    centerElement: false
 - waitForAnimationToEnd
 - tapOn:
     id: settings.guide.open

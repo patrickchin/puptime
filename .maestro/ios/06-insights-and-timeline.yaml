@@ -20,7 +20,7 @@ tags:
       id: event.pee.edit
     direction: DOWN
     visibilityPercentage: 50
-    centerElement: true
+    centerElement: false
 - tapOn:
     id: event.pee.edit
 - extendedWaitUntil:

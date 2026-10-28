@@ -23,7 +23,7 @@ name: iOS custom timed reminder create remove and restart
       id: notifications.timed.add
     direction: DOWN
     visibilityPercentage: 100
-    centerElement: true
+    centerElement: false
 - assertVisible:
     id: notifications.timed.add
     enabled: true
@@ -97,7 +97,7 @@ name: iOS custom timed reminder create remove and restart
       id: notifications.timed.item..*
     direction: DOWN
     visibilityPercentage: 100
-    centerElement: true
+    centerElement: false
 - assertVisible: Flea treatment
 - assertNotVisible:
     id: notifications.timed.item..*
@@ -128,7 +128,7 @@ name: iOS custom timed reminder create remove and restart
       id: settings.notifications.deviceDelivery
     direction: UP
     visibilityPercentage: 100
-    centerElement: true
+    centerElement: false
 - tapOn:
     id: settings.notifications.deviceDelivery
 - assertVisible: Turn off notifications?
@@ -165,7 +165,7 @@ name: iOS custom timed reminder create remove and restart
       id: notifications.timing.pottyAfterPee.enabled
     direction: UP
     visibilityPercentage: 100
-    centerElement: true
+    centerElement: false
 - assertVisible:
     id: notifications.timing.pottyAfterPee.enabled
     checked: true
@@ -189,7 +189,7 @@ name: iOS custom timed reminder create remove and restart
       id: notifications.timed.add
     direction: DOWN
     visibilityPercentage: 100
-    centerElement: true
+    centerElement: false
 - assertVisible:
     id: notifications.timed.add
     enabled: true
