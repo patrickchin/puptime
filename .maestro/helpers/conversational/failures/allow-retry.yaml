@@ -10,6 +10,7 @@ name: Permission intent retry succeeds
 - waitForAnimationToEnd
 - tapOn:
     id: "preview.back"
+    enabled: true
 - extendedWaitUntil:
     visible:
       id: "preview.prompt"

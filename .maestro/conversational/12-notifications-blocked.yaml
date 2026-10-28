@@ -37,6 +37,7 @@ name: Notification blocked reaches the normal app and survives Back
 - waitForAnimationToEnd
 - tapOn:
     id: "preview.back"
+    enabled: true
 - extendedWaitUntil:
     visible:
       id: "preview.prompt"
