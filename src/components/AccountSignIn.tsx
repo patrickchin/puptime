@@ -1,6 +1,7 @@
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import {useEffect,useState} from 'react';
-import {ActivityIndicator,Keyboard,Platform,Pressable,StyleSheet,Text,TextInput,View} from 'react-native';
+import {ActivityIndicator,Keyboard,Platform,StyleSheet,Text,TextInput,View} from 'react-native';
+import { Pressable } from './TelemetryPressable';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import {GoogleSigninButton} from '@react-native-google-signin/google-signin';
 import type {CloudHandle} from '../cloud/use-cloud';

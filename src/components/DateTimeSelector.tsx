@@ -1,7 +1,8 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView,Modal,Platform,Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView,Modal,Platform,StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable } from './TelemetryPressable';
 
 import { useLocalization } from '../localization-context';
 import { spacing, type Theme } from '../theme';

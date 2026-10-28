@@ -2,7 +2,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import * as Notifications from 'expo-notifications';
-import { ActivityIndicator, Alert, AppState, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, Modal, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Pressable } from '../components/TelemetryPressable';
 
 import { useLocalization } from '../localization-context';
 import {

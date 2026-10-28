@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Pressable } from './TelemetryPressable';
 
 import { useLocalization } from '../localization-context';
 import { type Theme } from '../theme';
@@ -8,11 +9,13 @@ export function Toast({
   onEdit,
   onUndo,
   theme,
+  bottom=12,
 }: {
   message: string;
   onEdit?: () => void;
   onUndo: () => void;
   theme: Theme;
+  bottom?:number;
 }) {
   const { t } = useLocalization();
 
@@ -22,7 +25,7 @@ export function Toast({
       accessibilityLiveRegion="polite"
       style={[
         styles.toast,
-        { backgroundColor: theme.text, borderRadius: theme.presentation.controlRadius },
+        { bottom, backgroundColor: theme.text, borderRadius: theme.presentation.controlRadius },
       ]}
     >
       <Text style={[styles.message, { color: theme.background }]}>{message}</Text>

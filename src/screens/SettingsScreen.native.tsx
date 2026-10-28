@@ -1,6 +1,9 @@
+import { AnalyticsSettings } from '../components/AnalyticsSettings.native';
+import { useTelemetryOverlay } from '../telemetry';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Alert, Linking, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
+import { Alert, Linking, Modal, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable } from '../components/TelemetryPressable';
 
 import {SafeAreaView} from 'react-native-safe-area-context';
 import { customActivityKey, quickEventTypes, type ActivityKey, type EventType } from '../domain';
@@ -78,6 +81,7 @@ export function SettingsScreen({
   const {width,fontScale}=useWindowDimensions();
   const largeWidgetText=width/Math.min(fontScale,2)<300;
   const [widgetVisible,setWidgetVisible]=useState(false);
+  useTelemetryOverlay('widget_settings', widgetVisible);
   const [savingWidget, setSavingWidget] = useState(false);
   const [savingNotifications, setSavingNotifications] = useState(false);
 
@@ -228,6 +232,7 @@ export function SettingsScreen({
       <ActivityCsvSettings theme={theme} eventCount={eventCount} onImport={onImport}/>
       {onOpenHistory?<View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}><SettingsRow testID="settings.history.open" icon="history" label={t('history.recentTitle')} detail={t('history.recentDetail')} onPress={onOpenHistory} theme={theme} wrap/></View>:null}
       <SectionLabel label={t('settings.helpPrivacy')} theme={theme}/>
+      <AnalyticsSettings theme={theme}/>
       <View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}>
         <SettingsRow testID="settings.guide.open" icon="compass-outline" label={t('settings.guide')} detail={t('settings.guideDetail')} onPress={onOpenGuide} theme={theme} wrap/>
         <View style={[styles.divider,{backgroundColor:theme.border}]}/>

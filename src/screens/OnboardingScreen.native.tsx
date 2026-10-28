@@ -2,8 +2,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo, Alert, Animated, Easing, Image, Keyboard,
-  KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions,
+  KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions,
 } from 'react-native';
+import { Pressable } from '../components/TelemetryPressable';
 
 import { ActivityIcon } from '../components/ActivityIcon';
 import { useLocalization } from '../localization-context';

@@ -7,12 +7,12 @@ import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   Alert,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { Pressable } from './TelemetryPressable';
 
 import { useLocalization } from '../localization-context';
 import { type Theme } from '../theme';

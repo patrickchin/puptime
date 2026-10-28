@@ -2,19 +2,17 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import {
   ActivityIndicator,
-  Animated,
   FlatList,
   Modal,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
-  PanResponder,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
 } from 'react-native';
+import { Pressable } from '../components/TelemetryPressable';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -43,8 +41,6 @@ const BEFORE_FIRST_LOG_DAYS = 2;
 const LOAD_DAYS = 14;
 const DATE_COLUMN_WIDTH = 56;
 const LOAD_ROW_HEIGHT = 48;
-const MIN_TIME_SCALE = 1;
-const MAX_TIME_SCALE = 4;
 const ESTIMATE_OPACITY = 0.35;
 const AXIS_HOURS = Array.from({ length: 25 }, (_, index) => index);
 const GRID_HOURS = Array.from({ length: 23 }, (_, index) => index + 1);
@@ -52,10 +48,6 @@ const TIMELINE_VIEWS = [
   { id: 'pee', types: ['pee'] },
   { id: 'poop-meal', types: ['poop', 'meal'] },
 ] as const;
-
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.min(maximum, Math.max(minimum, value));
-}
 
 function formatBucket(bucket: number, language: AppLanguage): string {
   return timelineFormatters(language).time
@@ -104,10 +96,6 @@ function formatDateRange(start: Date, end: Date, language: AppLanguage): string 
     : `${rangeDate.format(start)} – ${rangeDate.format(end)}`;
 }
 
-function horizontalTouchDistance(touches: readonly { pageX: number }[]): number {
-  return touches.length < 2 ? 0 : Math.abs(touches[1].pageX - touches[0].pageX);
-}
-
 function TimelineDateLabel({
   day,
   selectedTypes,
@@ -115,7 +103,6 @@ function TimelineDateLabel({
   isToday,
   currentTime,
   rowHeight,
-  horizontalOffset,
   theme,
 }: {
   day: TimelineDay;
@@ -124,7 +111,6 @@ function TimelineDateLabel({
   isToday: boolean;
   currentTime?: Date;
   rowHeight: number;
-  horizontalOffset: Animated.Value;
   theme: Theme;
 }) {
   const { activityLabel, language, t } = useLocalization();
@@ -144,7 +130,7 @@ function TimelineDateLabel({
     : undefined;
 
   return (
-    <Animated.View
+    <View
       testID={`timeline.date.${day.key}`}
       accessible
       accessibilityLabel={`${[fullDate.format(day.date), currentTimeDescription, description].filter(Boolean).join('. ')}.`}
@@ -155,7 +141,6 @@ function TimelineDateLabel({
           borderColor: theme.border,
           height: rowHeight,
           borderRightWidth: StyleSheet.hairlineWidth,
-          transform: [{ translateX: horizontalOffset }],
         },
       ]}
     >
@@ -165,7 +150,7 @@ function TimelineDateLabel({
       <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} maxFontSizeMultiplier={1.5} style={[styles.calendarDate, { color: theme.textMuted }]}>
         {shortDate.format(day.date)}
       </Text>
-    </Animated.View>
+    </View>
   );
 }
 
@@ -377,11 +362,9 @@ function TimelineTrack({
 
 function TimelineAxis({
   trackWidth,
-  horizontalOffset,
   theme,
 }: {
   trackWidth: number;
-  horizontalOffset: Animated.Value;
   theme: Theme;
 }) {
   const { t } = useLocalization();
@@ -391,19 +374,18 @@ function TimelineAxis({
   const labelWidth = trackWidth / 12;
   return (
     <View style={[styles.axisRow, { height: axisHeight, backgroundColor: theme.background, borderColor: theme.border }]}>
-      <Animated.View
+      <View
         style={[
           styles.axisDateCell,
           {
             height: axisHeight,
             backgroundColor: theme.background,
             borderColor: theme.border,
-            transform: [{ translateX: horizontalOffset }],
           },
         ]}
       >
         <Text maxFontSizeMultiplier={1.4} style={[styles.axisDateText, { color: theme.textMuted }]}>{t('timeline.date')}</Text>
-      </Animated.View>
+      </View>
       <View
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
@@ -451,7 +433,6 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
   const expectedDescription = schedule.filter(entry => expectedWindows.some(window => window.id === entry.id))
     .map(entry => `${activityLabel(entry)}: ${formatScheduleWindow(entry, locale)}`).join('. ');
   const [loadedDayCount, setLoadedDayCount] = useState(INITIAL_DAYS + BEFORE_FIRST_LOG_DAYS);
-  const [timeScale, setTimeScale] = useState(1);
   const [nowTime, setNowTime] = useState(Date.now());
   const bounds=activityWindowBounds(nowTime,Math.max(loadedDayCount,minimumHistoryDays)+BEFORE_FIRST_LOG_DAYS-1);
   const window=useActivityWindow(activity,projectedEvents,bounds.from,bounds.until,refreshToken);
@@ -466,8 +447,7 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
   const [selection, setSelection] = useState<string[]>([]);
   const [isLoadingEarlier, startLoadingEarlier] = useTransition();
   const viewportWidth = width - insets.left - insets.right;
-  const baseTrackWidth = Math.max(1, viewportWidth - DATE_COLUMN_WIDTH);
-  const trackWidth = baseTrackWidth * timeScale;
+  const trackWidth = Math.max(1, viewportWidth - DATE_COLUMN_WIDTH);
   const totalWidth = DATE_COLUMN_WIDTH + trackWidth;
   const now = useMemo(() => new Date(nowTime), [nowTime]);
   const estimates = useMemo(() => estimateMissingLogs(events, INITIAL_DAYS, now).estimates, [events, now]);
@@ -505,18 +485,9 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
         ? timelineFormatters(language).fullDate.format(sharedDetailDay)
         : timelineFormatters(language).rangeDate.format(sharedDetailDay);
   const listRef = useRef<FlatList<TimelineDay | TimelineGap>>(null);
-  const horizontalRef = useRef<ScrollView>(null);
-  const horizontalOffset = useRef(new Animated.Value(0)).current;
-  const horizontalOffsetValue = useRef(0);
   const verticalOffsetValue = useRef(0);
   const didInitialScroll = useRef(false);
   const didUserScroll = useRef(false);
-  const timeScaleValue = useRef(timeScale);
-  const pendingHorizontalOffset = useRef<number | null>(null);
-  const zoomMetrics = useRef({ baseTrackWidth, viewportWidth, gutter: 0 });
-  const pinch = useRef({ distance: 0, scale: 1, offset: 0, focalX: 0 });
-  timeScaleValue.current = timeScale;
-  zoomMetrics.current = { baseTrackWidth, viewportWidth, gutter: 0 };
 
   useEffect(() => {
     const timer = setInterval(() => setNowTime(Date.now()), 60_000);
@@ -526,74 +497,6 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
   useEffect(() => {
     setLoadedDayCount((current) => Math.min(current, maxHistoryDays));
   }, [maxHistoryDays]);
-
-  useEffect(() => {
-    const nextOffset = pendingHorizontalOffset.current;
-    if (nextOffset === null) return;
-    pendingHorizontalOffset.current = null;
-    const frame = requestAnimationFrame(() => {
-      horizontalRef.current?.scrollTo({ x: nextOffset, animated: false });
-      horizontalOffsetValue.current = nextOffset;
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [trackWidth]);
-
-  const horizontalScrollHandler = useMemo(() => Animated.event(
-    [{ nativeEvent: { contentOffset: { x: horizontalOffset } } }],
-    {
-      useNativeDriver: true,
-      listener: (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-        horizontalOffsetValue.current = event.nativeEvent.contentOffset.x;
-      },
-    },
-  ), [horizontalOffset]);
-
-  const pinchResponder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponderCapture: (event) => event.nativeEvent.touches.length >= 2,
-    onMoveShouldSetPanResponderCapture: (event) => event.nativeEvent.touches.length >= 2,
-    onPanResponderGrant: (event) => {
-      const touches = event.nativeEvent.touches;
-      if (touches.length < 2) return;
-      pinch.current = {
-        distance: Math.max(1, horizontalTouchDistance(touches)),
-        scale: timeScaleValue.current,
-        offset: horizontalOffsetValue.current,
-        focalX: (touches[0].locationX + touches[1].locationX) / 2,
-      };
-    },
-    onPanResponderMove: (event) => {
-      const touches = event.nativeEvent.touches;
-      if (touches.length < 2 || pinch.current.distance <= 0) return;
-      const rawScale = pinch.current.scale * horizontalTouchDistance(touches) / pinch.current.distance;
-      const nextScale = Math.round(clamp(rawScale, MIN_TIME_SCALE, MAX_TIME_SCALE) * 20) / 20;
-      if (Math.abs(nextScale - timeScaleValue.current) < 0.025) return;
-
-      const { baseTrackWidth: baseWidth, viewportWidth: viewport, gutter } = zoomMetrics.current;
-      const focalX = Math.max(DATE_COLUMN_WIDTH, pinch.current.focalX);
-      const oldTrackWidth = baseWidth * pinch.current.scale;
-      const timeAtFocal = clamp(
-        (pinch.current.offset + focalX - DATE_COLUMN_WIDTH - gutter) / Math.max(1, oldTrackWidth - gutter * 2),
-        0,
-        1,
-      );
-      const nextTrackWidth = baseWidth * nextScale;
-      pendingHorizontalOffset.current = clamp(
-        gutter + timeAtFocal * Math.max(1, nextTrackWidth - gutter * 2) - focalX + DATE_COLUMN_WIDTH,
-        0,
-        Math.max(0, DATE_COLUMN_WIDTH + nextTrackWidth - viewport),
-      );
-      timeScaleValue.current = nextScale;
-      setTimeScale(nextScale);
-    },
-    onPanResponderTerminationRequest: () => false,
-  }), []);
-
-  function changeZoom(next:number){
-    const scale=clamp(next,MIN_TIME_SCALE,MAX_TIME_SCALE);
-    const center=horizontalOffsetValue.current+Math.max(0,viewportWidth-DATE_COLUMN_WIDTH)/2;
-    pendingHorizontalOffset.current=clamp(center*scale/timeScaleValue.current-Math.max(0,viewportWidth-DATE_COLUMN_WIDTH)/2,0,Math.max(0,DATE_COLUMN_WIDTH+baseTrackWidth*scale-viewportWidth));
-    timeScaleValue.current=scale;setTimeScale(scale);
-  }
 
   function loadEarlierDays() {
     if (!hasEarlierDays || isLoadingEarlier || window.loading || window.error) return;
@@ -626,11 +529,6 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
   }
 
   const selectMarks = useCallback((ids: string[]) => setSelection(ids), []);
-  const zoomControls=<View style={{flexDirection:'row',alignItems:'center',justifyContent:'flex-end',gap:4}}>
-          <Pressable testID="timeline.zoom.out" accessibilityRole="button" accessibilityLabel={t('timeline.zoomOut')} disabled={timeScale<=MIN_TIME_SCALE} accessibilityState={{disabled:timeScale<=MIN_TIME_SCALE}} onPress={()=>changeZoom(timeScale-0.5)} style={({pressed})=>({minWidth:48,minHeight:48,alignItems:'center',justifyContent:'center',borderRadius:theme.presentation.controlRadius,backgroundColor:pressed?theme.primarySoft:undefined,opacity:timeScale<=MIN_TIME_SCALE?0.4:1})}><MaterialCommunityIcons accessible={false} name="minus" size={22} color={theme.primary}/></Pressable>
-          <Pressable testID="timeline.zoom.reset" accessibilityRole="button" accessibilityLabel={t('timeline.resetZoom')} onPress={()=>changeZoom(1)} style={({pressed})=>({minWidth:64,minHeight:48,alignItems:'center',justifyContent:'center',borderRadius:theme.presentation.controlRadius,backgroundColor:pressed?theme.primarySoft:undefined})}><Text testID="timeline.zoom.value" style={{color:theme.primary,fontSize:14,fontWeight:'600'}}>{Math.round(timeScale*100)}%</Text></Pressable>
-          <Pressable testID="timeline.zoom.in" accessibilityRole="button" accessibilityLabel={t('timeline.zoomIn')} disabled={timeScale>=MAX_TIME_SCALE} accessibilityState={{disabled:timeScale>=MAX_TIME_SCALE}} onPress={()=>changeZoom(timeScale+0.5)} style={({pressed})=>({minWidth:48,minHeight:48,alignItems:'center',justifyContent:'center',borderRadius:theme.presentation.controlRadius,backgroundColor:pressed?theme.primarySoft:undefined,opacity:timeScale>=MAX_TIME_SCALE?0.4:1})}><MaterialCommunityIcons accessible={false} name="plus" size={22} color={theme.primary}/></Pressable>
-        </View>;
 
   return (
     <View
@@ -670,7 +568,6 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
           <Text style={[styles.estimateLegendText, { color: theme.text }]}>{t('timeline.estimatedLegend')}</Text>
         ) : null}
 
-        {!isCompactHeight?zoomControls:null}
         <View style={[styles.timelineControls, isCompactHeight && styles.compactControls]}>
         <View accessibilityRole="radiogroup" style={[styles.filters, isCompactHeight && styles.compactFilters]}>
           {TIMELINE_VIEWS.map((view) => {
@@ -716,7 +613,6 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
           })}
         </View>
 
-        {isCompactHeight?zoomControls:null}
         {selectedView.id === 'poop-meal' ? <Pressable
           testID="timeline.windows.edit"
           accessibilityRole="button"
@@ -746,136 +642,121 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
         ) : null}
       </View>
 
-      <View style={styles.timelineViewport} {...pinchResponder.panHandlers}>
-        <Animated.ScrollView
-          ref={horizontalRef}
-          horizontal
-          scrollEnabled={timeScale > MIN_TIME_SCALE}
-          directionalLockEnabled
-          nestedScrollEnabled
-          scrollEventThrottle={16}
-          showsHorizontalScrollIndicator
-          onScroll={horizontalScrollHandler}
-          style={styles.horizontalScroller}
-          contentContainerStyle={styles.horizontalContent}
-        >
-          <View style={[styles.timelineCanvas, { width: totalWidth }]}>
-            <MemoTimelineAxis
-              trackWidth={trackWidth}
-              horizontalOffset={horizontalOffset}
-              theme={theme}
-            />
-            <FlatList
-              ref={listRef}
-              data={rows}
-              keyExtractor={(day) => day.key}
-              renderItem={({ item: day }) => 'emptyDays' in day ? (
-                <View style={{ height: rowHeight, width: totalWidth, backgroundColor: theme.background }}>
-                  <Animated.View
-                    testID={`timeline.gap.${day.key}`}
-                    accessible
-                    accessibilityLabel={`${formatDateRange(day.start, day.end, language)}. ${t('timeline.emptyDays', { count: day.emptyDays })}`}
-                    style={[styles.gapRow, { height: rowHeight, width: viewportWidth, borderColor: theme.border, transform: [{ translateX: horizontalOffset }] }]}
-                  >
-                    <Text accessibilityElementsHidden importantForAccessibility="no" style={[styles.gapDots, { color: theme.textMuted }]}>⋮</Text>
-                    <View style={styles.gapCopy}>
-                      <Text maxFontSizeMultiplier={1.5} style={[styles.gapLabel, { color: theme.textMuted }]}>{t('timeline.emptyDays', { count: day.emptyDays })}</Text>
-                      <Text maxFontSizeMultiplier={1.5} style={[styles.gapDates, { color: theme.textMuted }]}>{formatDateRange(day.start, day.end, language)}</Text>
-                    </View>
-                  </Animated.View>
+      <View style={styles.timelineViewport}>
+        <View style={[styles.timelineCanvas, { width: totalWidth }]}>
+          <MemoTimelineAxis
+            trackWidth={trackWidth}
+            theme={theme}
+          />
+          <FlatList
+            ref={listRef}
+            data={rows}
+            keyExtractor={(day) => day.key}
+            renderItem={({ item: day }) => 'emptyDays' in day ? (
+              <View style={{ height: rowHeight, width: totalWidth, backgroundColor: theme.background }}>
+                <View
+                  testID={`timeline.gap.${day.key}`}
+                  accessible
+                  accessibilityLabel={`${formatDateRange(day.start, day.end, language)}. ${t('timeline.emptyDays', { count: day.emptyDays })}`}
+                  style={[styles.gapRow, { height: rowHeight, width: viewportWidth, borderColor: theme.border }]}
+                >
+                  <Text accessibilityElementsHidden importantForAccessibility="no" style={[styles.gapDots, { color: theme.textMuted }]}>⋮</Text>
+                  <View style={styles.gapCopy}>
+                    <Text maxFontSizeMultiplier={1.5} style={[styles.gapLabel, { color: theme.textMuted }]}>{t('timeline.emptyDays', { count: day.emptyDays })}</Text>
+                    <Text maxFontSizeMultiplier={1.5} style={[styles.gapDates, { color: theme.textMuted }]}>{formatDateRange(day.start, day.end, language)}</Text>
+                  </View>
                 </View>
-              ) : (
-                <View style={[styles.dayRow, { height: rowHeight, width: totalWidth }]}>
-                  <MemoTimelineDateLabel
+              </View>
+            ) : (
+              <View style={[styles.dayRow, { height: rowHeight, width: totalWidth }]}>
+                <MemoTimelineDateLabel
+                  day={day}
+                  selectedTypes={selectedTypes}
+                  savedEstimateIds={savedEstimateIds}
+                  isToday={day.key === todayKey}
+                  currentTime={day.key === todayKey ? now : undefined}
+                  rowHeight={rowHeight}
+                  theme={theme}
+                />
+                <View style={{ width: trackWidth }}>
+                  <MemoTimelineTrack
                     day={day}
+                    expectedWindows={expectedWindows}
                     selectedTypes={selectedTypes}
                     savedEstimateIds={savedEstimateIds}
                     isToday={day.key === todayKey}
                     currentTime={day.key === todayKey ? now : undefined}
                     rowHeight={rowHeight}
-                    horizontalOffset={horizontalOffset}
+                    trackWidth={trackWidth}
+                    gridHours={GRID_HOURS}
+                    onSelectMarks={selectMarks}
                     theme={theme}
                   />
-                  <View style={{ width: trackWidth }}>
-                    <MemoTimelineTrack
-                      day={day}
-                      expectedWindows={expectedWindows}
-                      selectedTypes={selectedTypes}
-                      savedEstimateIds={savedEstimateIds}
-                      isToday={day.key === todayKey}
-                      currentTime={day.key === todayKey ? now : undefined}
-                      rowHeight={rowHeight}
-                      trackWidth={trackWidth}
-                      gridHours={GRID_HOURS}
-                      onSelectMarks={selectMarks}
-                      theme={theme}
-                    />
-                  </View>
                 </View>
-              )}
-              ListHeaderComponent={(
-                <Pressable
-                  testID="timeline.loadEarlier"
-                  accessibilityRole={hasEarlierDays ? 'button' : 'text'}
-                  accessibilityLabel={t(hasEarlierDays ? 'timeline.loadEarlier' : 'timeline.historyStart')}
-                  accessibilityState={{ busy: isLoadingEarlier, disabled: !hasEarlierDays }}
-                  disabled={!hasEarlierDays || isLoadingEarlier || window.loading || window.error}
-                  onPress={loadEarlierDays}
+              </View>
+            )}
+            ListHeaderComponent={(
+              <Pressable
+                testID="timeline.loadEarlier"
+                accessibilityRole={hasEarlierDays ? 'button' : 'text'}
+                accessibilityLabel={t(hasEarlierDays ? 'timeline.loadEarlier' : 'timeline.historyStart')}
+                accessibilityState={{ busy: isLoadingEarlier, disabled: !hasEarlierDays }}
+                disabled={!hasEarlierDays || isLoadingEarlier || window.loading || window.error}
+                onPress={loadEarlierDays}
+                style={[
+                  styles.loadEarlier,
+                  {
+                    backgroundColor: theme.surface,
+                    borderColor: theme.border,
+                    width: totalWidth,
+                  },
+                ]}
+              >
+                <View>
+                  {isLoadingEarlier ? (
+                    <ActivityIndicator size="small" color={theme.primary} />
+                  ) : (
+                    <MaterialCommunityIcons
+                      name={hasEarlierDays ? 'arrow-up' : 'check'}
+                      size={18}
+                      color={hasEarlierDays ? theme.primary : theme.textMuted}
+                    />
+                  )}
+                </View>
+                <Text
                   style={[
-                    styles.loadEarlier,
+                    styles.loadEarlierText,
                     {
-                      backgroundColor: theme.surface,
-                      borderColor: theme.border,
-                      width: totalWidth,
+                      color: hasEarlierDays ? theme.primary : theme.textMuted,
                     },
                   ]}
                 >
-                  <Animated.View style={{ transform: [{ translateX: horizontalOffset }] }}>
-                    {isLoadingEarlier ? (
-                      <ActivityIndicator size="small" color={theme.primary} />
-                    ) : (
-                      <MaterialCommunityIcons
-                        name={hasEarlierDays ? 'arrow-up' : 'check'}
-                        size={18}
-                        color={hasEarlierDays ? theme.primary : theme.textMuted}
-                      />
-                    )}
-                  </Animated.View>
-                  <Animated.Text
-                    style={[
-                      styles.loadEarlierText,
-                      {
-                        color: hasEarlierDays ? theme.primary : theme.textMuted,
-                        transform: [{ translateX: horizontalOffset }],
-                      },
-                    ]}
-                  >
-                    {t(isLoadingEarlier
-                      ? 'timeline.loadingEarlier'
-                      : hasEarlierDays
-                        ? 'timeline.loadEarlier'
-                        : 'timeline.historyStart')}
-                  </Animated.Text>
-                </Pressable>
-              )}
-              getItemLayout={(_, index) => ({
-                length: rowHeight,
-                offset: LOAD_ROW_HEIGHT + rowHeight * index,
-                index,
-              })}
-              initialNumToRender={INITIAL_DAYS}
-              maxToRenderPerBatch={INITIAL_DAYS}
-              windowSize={7}
-              maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-              onContentSizeChange={handleListContentSizeChange}
-              onScroll={handleVerticalScroll}
-              onScrollBeginDrag={handleVerticalDragStart}
-              scrollEventThrottle={16}
-              showsVerticalScrollIndicator
-              style={styles.dayList}
-            />
-          </View>
-        </Animated.ScrollView>
+                  {t(isLoadingEarlier
+                    ? 'timeline.loadingEarlier'
+                    : hasEarlierDays
+                      ? 'timeline.loadEarlier'
+                      : 'timeline.historyStart')}
+                </Text>
+              </Pressable>
+            )}
+            getItemLayout={(_, index) => ({
+              length: rowHeight,
+              offset: LOAD_ROW_HEIGHT + rowHeight * index,
+              index,
+            })}
+            initialNumToRender={INITIAL_DAYS}
+            maxToRenderPerBatch={INITIAL_DAYS}
+            windowSize={7}
+            maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+            onContentSizeChange={handleListContentSizeChange}
+            onScroll={handleVerticalScroll}
+            onScrollBeginDrag={handleVerticalDragStart}
+            scrollEventThrottle={16}
+            showsVerticalScrollIndicator
+            style={styles.dayList}
+            contentContainerStyle={{paddingBottom:96}}
+          />
+        </View>
       </View>
       <Modal
         visible={selectedEvents.length > 0}
@@ -990,8 +871,6 @@ const styles = StyleSheet.create({
   emptyNote: { minHeight: 36, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   emptyText: { flex: 1, fontSize: 11, lineHeight: 16 },
   timelineViewport: { flex: 1, overflow: 'hidden' },
-  horizontalScroller: { flex: 1 },
-  horizontalContent: { flexGrow: 1 },
   timelineCanvas: { flex: 1 },
   axisRow: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth, zIndex: 4 },
   axisDateCell: {

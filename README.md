@@ -47,7 +47,7 @@ The screenshots, features, and Android installation instructions below describe 
 - Use the default style in Light or Dark mode, or follow the device setting. Removed theme selections fall back to the device setting.
 - Manage appearance, language, widget actions, and activity data in Settings. Manage reminders and device delivery in Notifications.
 - Browse illustrated topic cards in **Learn**, with a short getting-started guide and 12 detailed puppy-care articles. Each article opens with an at-a-glance overview and links to its sections and sources, plus further reading and selected YouTube demonstrations. The same guides are on the website under **Puppy care**. Articles are currently in English; in-app navigation supports all app languages. Text and bundled English ElevenLabs narration work offline in the app; external resources need a browser and internet connection. Each guide has play/pause, 15-second skips, and playback speed controls.
-- Keep data on the device without an account, subscription, server, ads, analytics, or tracking.
+- Keep activity data on the device without an account, subscription, server or ads. Optional anonymous usage analytics are off by default and controlled in Settings.
 
 The starter routine is only an editable example, not veterinary guidance. Change it to fit your puppy and your veterinarian’s advice.
 
@@ -136,3 +136,5 @@ MIT for the application code. The website’s bundled Red Hat Display and Red Ha
 ## Privacy
 
 See the [Puptime privacy policy](PRIVACY.md).
+
+For optional native product telemetry, event definitions, analysis recipes and verification, see [App telemetry](docs/app-telemetry.md).

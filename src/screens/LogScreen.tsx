@@ -1,6 +1,8 @@
+import { useTelemetryOverlay } from '../telemetry';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, FlatList, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Keyboard, KeyboardAvoidingView, Modal, Platform, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable } from '../components/TelemetryPressable';
 
 import type {SpotlightRect} from '../components/OnboardingSpotlight';
 import { QuickActions } from '../components/QuickActions';
@@ -137,6 +139,8 @@ export function LogScreen({
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [closing, setClosing] = useState(false);
   const [historyOpen,setHistoryOpen]=useState(false);
+  useTelemetryOverlay('log_editor', draft !== null);
+  useTelemetryOverlay('log_history', historyOpen);
   const historyBusy=useRef(false);
   const onHistoryRestoredRef=useRef(onHistoryRestored);onHistoryRestoredRef.current=onHistoryRestored;
   const [now, setNow] = useState(Date.now());
@@ -952,7 +956,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
-    paddingBottom: spacing.xl,
+    paddingBottom: 96,
   },
   titleBlock: {
     flexDirection: 'row',

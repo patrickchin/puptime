@@ -1,5 +1,7 @@
+import { useTelemetryOverlay } from '../telemetry';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable } from './TelemetryPressable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getLocalRuntime } from '../local/runtime.native';
 import type { BackupSummary } from '../local/activity-backups';
@@ -13,6 +15,7 @@ export function ActivityBackupSettings({ theme, onRestored }: { theme: Theme; on
   const [visible, setVisible] = useState(false), [busy, setBusy] = useState(false);
   const [backups, setBackups] = useState<BackupSummary[]>([]), [failed, setFailed] = useState(false);
   const [selectedPet,setSelectedPet]=useState<string|null>(null);
+  useTelemetryOverlay('backups', visible);
   const [unreadable, setUnreadable] = useState(0);
   const locked = useRef(false), mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);

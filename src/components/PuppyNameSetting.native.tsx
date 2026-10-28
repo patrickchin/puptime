@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AppState, KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable } from './TelemetryPressable';
 
 import { useAccountSnapshot } from '../cloud/use-account-snapshot';
 import { getLocalRuntime, subscribeLocalWrites } from '../local/runtime.native';

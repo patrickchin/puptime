@@ -1,6 +1,7 @@
 import {BlurView} from 'expo-blur';
 import type {RefObject} from 'react';
-import {Pressable,StyleSheet,Text,View} from 'react-native';
+import {StyleSheet,Text,View} from 'react-native';
+import { Pressable } from './TelemetryPressable';
 import type {Theme} from '../theme';
 
 export type SpotlightRect={x:number;y:number;width:number;height:number};

@@ -1,5 +1,6 @@
 import {useRef,useState} from 'react';
-import {Modal,Pressable,ScrollView,StyleSheet,Switch,Text,View,useWindowDimensions} from 'react-native';
+import {Modal,ScrollView,StyleSheet,Switch,Text,View,useWindowDimensions} from 'react-native';
+import { Pressable } from './TelemetryPressable';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {ScheduleEntry} from '../domain';
 import {useLocalization} from '../localization-context';

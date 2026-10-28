@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable } from '../components/TelemetryPressable';
 
 import { customActivityKey, quickEventTypes, type ActivityKey, type EventType } from '../domain';
 import { ActivityIcon } from '../components/ActivityIcon';

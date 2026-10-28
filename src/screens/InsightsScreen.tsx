@@ -1,12 +1,12 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect,useMemo, useState } from 'react';
 import {
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { Pressable } from '../components/TelemetryPressable';
 
 import {
   activityFrequencyStats,

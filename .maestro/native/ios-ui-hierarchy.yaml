@@ -6,7 +6,8 @@ name: UI hierarchy on iPhone
 - extendedWaitUntil:
     visible: {id: screen.today}
     timeout: 90000
-- assertVisible: {id: account.open}
+- assertVisible: {id: header.puppy}
+- assertNotVisible: {id: account.open}
 - assertNotVisible: {id: settings.open}
 - takeScreenshot: ios-log
 - tapOn: {id: nav.open, retryTapIfNoChange: true}
@@ -15,7 +16,8 @@ name: UI hierarchy on iPhone
 - assertVisible: {id: screen.pets}
 - assertVisible: {id: settings.puppy.name}
 - takeScreenshot: ios-pet-profile
-- tapOn: {id: account.open}
+- tapOn: {id: nav.open, retryTapIfNoChange: true}
+- tapOn: {id: nav.account}
 - assertVisible: {id: screen.account}
 - takeScreenshot: ios-account
 - tapOn: {id: account.back}

@@ -1,11 +1,11 @@
+import { useTelemetryOverlay } from '../telemetry';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Alert,
   Keyboard,
   Linking,
   Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   Switch,
@@ -13,10 +13,12 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { Pressable } from '../components/TelemetryPressable';
 
-import { scheduleStatusesForDay, suggestScheduleFromEvents, type ScheduleStatus } from '../analytics';
+import { scheduleStatusesForDay, suggestScheduleFromEvents } from '../analytics';
 import {activityWindowBounds,useActivityWindow,type ActivityViewProps} from '../activity-view';
 import {ActivityLoadState} from '../components/ActivityLoadState';
+import {RoutineTimeline} from '../components/RoutineTimeline';
 import { ActivityIcon } from '../components/ActivityIcon';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { DateTimeSelector } from '../components/DateTimeSelector';
@@ -56,6 +58,7 @@ export function ScheduleScreen({
 }&ActivityViewProps) {
   const { activityColors, activityLabel, locale, t } = useLocalization();
   const [draft, setDraft] = useState<Draft | null>(null);
+  useTelemetryOverlay('routine_editor', draft !== null);
   const originalDraft=useRef<ScheduleEntry|undefined>(undefined);
   const acceptedSuggestion=useRef<{entries:ScheduleEntry[];preview:ReturnType<typeof suggestScheduleFromEvents>}|null>(null);
   const [showTimeSelector, setShowTimeSelector] = useState(false);
@@ -76,7 +79,7 @@ export function ScheduleScreen({
     return () => clearInterval(timer);
   }, []);
 
-  const statuses = scheduleStatusesForDay(events, schedule, new Date(now), 30, now);
+  const statuses = useMemo(()=>scheduleStatusesForDay(events, schedule, new Date(now), 30, now),[events,schedule,now]);
   const suggestion = suggestScheduleFromEvents(events, 14, new Date(now));
   const previewSuggestion = acceptedSuggestion.current?.preview ?? suggestion;
   const canSuggest = suggestion.entries.length > 0&&!window.loading&&!window.error;
@@ -87,15 +90,12 @@ export function ScheduleScreen({
     ? `${Math.round((completed / schedule.length) * 100)}%`
     : '0%';
 
-  const statusPresentation = (status: ScheduleStatus, activity: ScheduleEntry) => {
-    if (status === 'done') return { label: t('schedule.status.logged'), color: theme.primary, background: theme.primarySoft };
-    if (status === 'due') {
-      const colors = activityColors(theme, activity);
-      return { label: t(activity.toleranceMinutes !== undefined ? 'schedule.status.flexibleDue' : 'schedule.status.due'), color: colors.color, background: colors.softColor };
-    }
-    if (status === 'missed') return { label: t('schedule.status.missed'), color: theme.textMuted, background: theme.surface };
-    return { label: t('schedule.status.upcoming'), color: theme.textMuted, background: theme.surface };
-  };
+  const editEntry=useCallback((entry:ScheduleEntry)=>{
+    originalDraft.current={...entry,reminder:Boolean(entry.reminder)};
+    setDraft({...originalDraft.current,reminder:Boolean(entry.reminder)});
+    setShowTimeSelector(false);
+  },[]);
+  const requestRemove=useCallback((entry:ScheduleEntry)=>{setRemoveFailed(false);setPendingRemove(entry);},[]);
 
   const openNew = () => {
     const now = new Date();
@@ -351,92 +351,7 @@ export function ScheduleScreen({
             <Text style={[styles.emptyTitle, { color: theme.text }]}>{t('schedule.emptyTitle')}</Text>
           </View>
         ) : (
-          schedule.map((entry, index) => {
-            const colors = activityColors(theme, entry);
-            const label = activityLabel(entry);
-            const status = statuses.find((item) => item.entry.id === entry.id)?.status ?? 'upcoming';
-            const presentation = statusPresentation(status, entry);
-            return (
-              <Pressable
-                key={entry.id}
-                testID={`schedule.entry.${entry.type}`}
-                accessibilityRole="button"
-                accessibilityLabel={t('schedule.editA11y', {
-                  activity: label,
-                  time: entry.toleranceMinutes === undefined ? formatMinutes(entry.minutes, locale) : formatScheduleWindow(entry, locale),
-                  status: setupHeader ? '' : presentation.label,
-                  reminder: entry.reminder ? t('schedule.reminderOn') : '',
-                })}
-                onPress={() => { originalDraft.current={...entry,reminder:Boolean(entry.reminder)};setDraft({...originalDraft.current,reminder:Boolean(entry.reminder)}); setShowTimeSelector(false); }}
-                style={({ pressed }) => [
-                  styles.scheduleRow,
-                  surfaceTreatment(theme),
-                  {
-                    backgroundColor: theme.surfaceRaised,
-                    borderColor: pressed ? theme.primary : theme.border,
-                  },
-                ]}
-              >
-                <View style={styles.timelineRail}>
-                  <View style={[styles.timelineDot, { backgroundColor: colors.color }]} />
-                  {index < schedule.length - 1 ? <View style={[styles.timelineLine, { backgroundColor: theme.border }]} /> : null}
-                </View>
-                <Text style={[styles.time, { color: theme.text }]}>{formatMinutes(entry.minutes, locale)}</Text>
-                <View style={styles.rowCopy}>
-                  <Text style={[styles.rowTitle, { color: theme.text }]}>{label}</Text>
-                  {entry.toleranceMinutes !== undefined ? (
-                    <Text style={[styles.windowDetail, { color: theme.textMuted }]}>
-                      {t('schedule.usualWindow', { range: formatScheduleWindow(entry, locale) })}
-                    </Text>
-                  ) : null}
-                  {!setupHeader ? <View
-                    style={[
-                      styles.statusPill,
-                      {
-                        backgroundColor: presentation.background,
-                        borderRadius: theme.presentation.controlRadius,
-                      },
-                    ]}
-                  >
-                    <View style={[styles.statusDot, { backgroundColor: presentation.color }]} />
-                    <Text style={[styles.statusText, { color: presentation.color }]}>{presentation.label}</Text>
-                  </View> : null}
-                </View>
-                {entry.reminder ? (
-                  <View
-                    accessible={false}
-                    style={[
-                      styles.reminderIndicator,
-                      {
-                        backgroundColor: theme.primarySoft,
-                        borderRadius: theme.presentation.iconRadius,
-                      },
-                    ]}
-                  >
-                    <MaterialCommunityIcons name="bell-ring-outline" size={17} color={theme.primary} />
-                  </View>
-                ) : null}
-                <Pressable
-                  testID={`schedule.entry.${entry.type}.remove`}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('schedule.removeA11y', { activity: label, time: formatMinutes(entry.minutes, locale) })}
-                  hitSlop={8}
-                  onPress={(event) => {
-                    event.stopPropagation();
-                    setRemoveFailed(false);
-                    setPendingRemove(entry);
-                  }}
-                  style={({ pressed }) => [
-                    styles.removeButton,
-                    { borderRadius: theme.presentation.controlRadius },
-                    pressed && { backgroundColor: theme.primarySoft },
-                  ]}
-                >
-                  <MaterialCommunityIcons name="close" size={20} color={theme.textMuted} />
-                </Pressable>
-              </Pressable>
-            );
-          })
+          <RoutineTimeline statuses={statuses} now={now} theme={theme} setup={Boolean(setupHeader)} onEdit={editEntry} onRemove={requestRemove}/>
         )}
 
         <Pressable
@@ -771,19 +686,7 @@ const styles = StyleSheet.create({
   progressFill: { height: 8, borderRadius: 4 },
   headingRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: spacing.xl, marginBottom: 12 },
   sectionTitle: { flex: 1, fontSize: 21, fontWeight: '800' },
-  scheduleRow: { minHeight: 68, borderWidth: 1, borderRadius: 18, marginBottom: 8, flexDirection: 'row', alignItems: 'center', paddingRight: 10 },
-  timelineRail: { alignSelf: 'stretch', width: 32, alignItems: 'center' },
-  timelineDot: { width: 10, height: 10, borderRadius: 5, marginTop: 28 },
-  timelineLine: { position: 'absolute', width: 2, top: 38, bottom: -18 },
-  time: { width: 78, fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  rowCopy: { flex: 1, minWidth: 0, paddingVertical: 10 },
   windowDetail: { fontSize: 12, lineHeight: 18, marginTop: 2 },
-  rowTitle: { fontSize: 15, fontWeight: '700' },
-  statusPill: { alignSelf: 'flex-start', minHeight: 22, borderRadius: 11, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
-  statusDot: { width: 6, height: 6, borderRadius: 3 },
-  statusText: { fontSize: 11, lineHeight: 15, fontWeight: '700' },
-  reminderIndicator: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 2 },
-  removeButton: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   addButton: { minHeight: 54, borderRadius: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: spacing.md },
   addButtonText: { fontSize: 16, fontWeight: '700' },
   empty: { borderWidth: 1, borderStyle: 'dashed', borderRadius: 20, padding: spacing.lg, marginTop: spacing.xl, alignItems: 'center' },
