@@ -23,7 +23,8 @@ if(existsSync(path)){
 function flow(name){
   const wrapper=join(output,name+'-active.yaml');
   writeFileSync(wrapper,'appId: '+app+'\n---\n- launchApp:\n    stopApp: false\n    permissions: {}\n- runFlow: '+JSON.stringify(resolve('.maestro/helpers/conversational/failures',name+'.yaml'))+'\n');
-  execFileSync(process.env.MAESTRO_BIN??'maestro',['--device',device,'test',wrapper,'--test-output-dir',join(output,name)],{stdio:'inherit',timeout:180000,env:{...process.env,MAESTRO_CLI_NO_ANALYTICS:'1'}});
+  // Driver startup alone may take three minutes on the hosted simulator.
+  execFileSync(process.env.MAESTRO_BIN??'maestro',['--device',device,'test',wrapper,'--test-output-dir',join(output,name)],{stdio:'inherit',timeout:600000,env:{...process.env,MAESTRO_CLI_NO_ANALYTICS:'1'}});
 }
 flow('prepare');
 // clearState recreated the container; resolve the path again after preparation.

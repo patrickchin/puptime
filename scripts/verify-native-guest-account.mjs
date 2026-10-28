@@ -41,7 +41,8 @@ function run(binary,args,env=process.env,cwd=process.cwd()){
   return new Promise((resolveRun,reject)=>{
     const child=spawn(binary,args,{env,cwd,stdio:['ignore','pipe','pipe']});let raw='';
     child.stdout.on('data',data=>{raw+=data;});child.stderr.on('data',data=>{raw+=data;});
-    const timer=setTimeout(()=>child.kill('SIGTERM'),240000);
+    // Include hosted driver startup as well as the flow's own bounded assertions.
+    const timer=setTimeout(()=>child.kill('SIGTERM'),binary==='maestro'?600000:240000);
     child.once('error',reject);child.once('close',status=>{clearTimeout(timer);if(status===0)resolveRun(raw);else{
       for(const value of codes)raw=raw.replaceAll(value,'[REDACTED]');
       writeFileSync(join(output,'failure-redacted.log'),raw,{mode:0o600});reject(new Error(`${binary} failed (${status}); see redacted log.`));
