@@ -54,7 +54,7 @@ async function flow(name,env={}){
   try{
     await run('maestro',['--device',device,'test',...Object.entries({TEST_EMAIL:email,...env}).flatMap(([key,value])=>['-e',`${key}=${value}`]),resolve('.maestro/account-preservation',name+'.yaml'),'--test-output-dir',artifacts],
       {...process.env,MAESTRO_CLI_NO_ANALYTICS:'1',TEST_EMAIL:email,MAESTRO_TEST_CODE:code,...env});
-    const screenshots=['recovered-account-history.png','my-account-settings.png','my-account-signed-in.png','my-account-guest.png'];
+    const screenshots=['recovered-account-history.png','my-account-returned-log.png','my-account-signed-in.png','my-account-guest.png'];
     for(const path of readdirSync(artifacts,{recursive:true}).filter(path=>screenshots.some(name=>String(path).endsWith(name))))
       cpSync(join(artifacts,path),join(output,String(path).split('/').at(-1)));
     console.log('PASS native account phase: '+name);
