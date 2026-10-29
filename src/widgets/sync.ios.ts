@@ -54,8 +54,8 @@ export async function acknowledgePendingWidgetEvents(events: PuppyEvent[]): Prom
   importedOperations.delete(events);
 }
 
-export async function updateHomeWidget(events: PuppyEvent[]): Promise<void> {
-  const access=await getCareAccess();
+export async function updateHomeWidget(events: PuppyEvent[],expectedPetId?:string): Promise<void> {
+  const access=await getCareAccess();if(expectedPetId&&access.petId!==expectedPetId)return;
   const openNap = events.find(isOpenNap);
   const customActivities = await loadCustomActivities(events);
   const [actions, themePreference, notificationPreferences, languagePreference] = await Promise.all([

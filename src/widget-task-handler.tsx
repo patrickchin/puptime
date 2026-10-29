@@ -16,16 +16,14 @@ import {
 } from './domain';
 import { resolveLanguage, type AppLanguage } from './localization';
 import type { NotificationPreferences } from './notification-config';
-import { getLocalRuntime } from './local/runtime.native';
+import { getLocalRuntime,getCareSelection,getRuntimeForCare } from './local/runtime.native';
 import { configureReminderHandling, showWidgetLogConfirmation, syncPottyReminders } from './reminders';
 import {
-  appendEvents,
   loadCustomActivities,
   loadLanguagePreference,
   loadNotificationPreferences,
   loadThemePreference,
   loadWidgetActions,
-  updateEvent,
 } from './storage';
 import { QuickLogWidget } from './widgets/QuickLogWidget.android';
 import { updateHomeWidget } from './widgets/sync';
@@ -38,17 +36,19 @@ const latestEvents = async () => (await getLocalRuntime()).activity.latestEvents
 
 // Serialize nap's read/change pair without holding later taps behind reminders.
 let logWrites: Promise<unknown> = Promise.resolve();
-function saveLog(key: ActivityKey, at: number, customActivities: string[]) {
+function saveLog(key: ActivityKey, at: number, customActivities: string[],expectedScope:string) {
   const result = logWrites.then(async () => {
+    const selection=getCareSelection(),runtime=await getRuntimeForCare(selection);
+    if((selection?runtime.petId:'owner')!==expectedScope)return null;
     const activity = activityFromKey(key, customActivities);
-    const openNap = key === 'nap' ? (await latestEvents()).find(isOpenNap) : undefined;
+    const openNap = key === 'nap' ? (await runtime.activity.latestEvents()).find(isOpenNap) : undefined;
     const event = openNap
       ? { ...openNap, endedAt: Math.max(openNap.at, at) }
       : key === 'nap'
         ? createNapEvent('widget', at)
         : createEvent(activity.type, 'widget', at, activity.customLabel);
-    if (openNap) await updateEvent(openNap.id, { endedAt: event.endedAt });
-    else await appendEvents([event]);
+    if (openNap) await runtime.storage.updateEvent(openNap.id, { endedAt: event.endedAt });
+    else await runtime.storage.appendEvents([event]);
     return { event, activity };
   });
   logWrites = result.catch(() => undefined);
@@ -104,7 +104,9 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
     const custom = typeof type === 'string' && customActivities.some((label) => customActivityKey(label) === type);
     if (isQuickEventType(type) || custom) {
       const key = type as ActivityKey;
-      const { event, activity } = await saveLog(key, at, customActivities);
+      const saved=await saveLog(key,at,customActivities,access.scope);
+      if(!saved){await render(props,await latestEvents());return;}
+      const {event,activity}=saved;
       const [preferences, languagePreference] = await Promise.all([
         loadNotificationPreferences(),
         loadLanguagePreference(),

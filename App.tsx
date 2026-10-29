@@ -239,7 +239,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
         nextNotificationPreferences,
         resolveLanguage(nextLanguagePreference),
       ).catch(() => undefined),
-      updateHomeWidget(nextEvents).catch(() => undefined),
+      updateHomeWidget(nextEvents,nextPetId).catch(() => undefined),
       ...(nativeApp?[cancelCustomTimedRemindersIfDeliveryOff().catch(()=>undefined)]:[]),
     ]);
     return nextEvents;

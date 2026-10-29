@@ -11,8 +11,8 @@ export async function readPendingWidgetEvents(): Promise<PuppyEvent[]> {
 
 export async function acknowledgePendingWidgetEvents(_events: PuppyEvent[]): Promise<void> {}
 
-export async function updateHomeWidget(events: PuppyEvent[]): Promise<void> {
-  const access=await getCareAccess();
+export async function updateHomeWidget(events: PuppyEvent[],expectedPetId?:string): Promise<void> {
+  const access=await getCareAccess();if(expectedPetId&&access.petId!==expectedPetId)return;
   const activeNap = events.some(isOpenNap);
   const lastEventAt = latestQuickEventTimes(events);
   const customActivities = await loadCustomActivities(events);

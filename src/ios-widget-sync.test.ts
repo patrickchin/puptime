@@ -20,7 +20,7 @@ registerHooks({
   },
   load(url, context, next) {
     const mocks: Record<string, string> = {
-      'ios-widget:access': `export async function getCareAccess(){return {scope:s.scope,expiresAt:null,canLog:true,ended:false};}`,
+      'ios-widget:access': `export async function getCareAccess(){return {scope:s.scope,petId:s.scope==='owner'?'owner-pet':s.scope,expiresAt:null,canLog:true,ended:false};}`,
       'ios-widget:widgets': `export const widgetsDirectory='file:///shared/ExpoWidgets';`,
       'ios-widget:files': `
         export class File {
@@ -94,4 +94,10 @@ test('widget actions remain with their original puppy when the active puppy chan
  const pending=await widget.readPendingWidgetEvents();assert.deepEqual(pending,[event(2)]);
  await widget.acknowledgePendingWidgetEvents(pending);assert.deepEqual([...state.files.keys()],['wop_a.json']);
  state.scope='owner';assert.deepEqual(await widget.readPendingWidgetEvents(),[event(1)]);
+});
+
+
+test('a late journal refresh cannot publish one puppy’s events into another puppy’s widget',async()=>{
+ state.files.clear();state.scope='owner';state.legacy=[event(9)];
+ await widget.updateHomeWidget([], 'another-puppy');assert.deepEqual(state.legacy,[event(9)]);
 });
