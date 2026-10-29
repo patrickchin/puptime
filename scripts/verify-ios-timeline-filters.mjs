@@ -50,7 +50,7 @@ function flow(name,body){
  execFileSync(maestro,['--device',udid,'test',path,'--test-output-dir',join(output,name)],{stdio:'inherit',env});
 }
 function snapshot(name){
- const tree=JSON.parse(execFileSync(maestro,['--device',udid,'hierarchy','--no-ansi'],{encoding:'utf8',env})),bounds={},marks=[],markBounds={};
+ const tree=JSON.parse(execFileSync(maestro,['--device',udid,'hierarchy','--no-ansi'],{encoding:'utf8',env,maxBuffer:16*1024*1024})),bounds={},marks=[],markBounds={};
  function visit(node){
   const attrs=node.attributes??{},id=attrs['resource-id'];
   if(id==='timeline.days'||id?.startsWith('timeline.date.')||id?.startsWith('timeline.gap.')||id?.startsWith('timeline.filter.'))bounds[id]=attrs.bounds;
