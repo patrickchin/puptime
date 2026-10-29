@@ -1,6 +1,6 @@
 # Puptime Privacy Policy
 
-Last updated: October 23, 2026
+Last updated: October 29, 2026
 
 Puptime is a puppy routine tracker developed by Patrick Chin. Local logging works without an account. This policy explains optional cloud accounts, the native app, and the public website.
 
@@ -15,6 +15,12 @@ Where configured, you can sign in with an email code, Google, or Apple. Puptime 
 Signing in does not upload puppy history or activate cloud sync. In account-enabled iPhone builds, choosing cloud sync uploads your puppy's profile (including an optional profile photo), activity, notes, routines, and supported preferences. Cloudflare D1 stores account/authentication records, and Cloudflare Durable Objects store synchronized puppy data and version history. Different sign-in methods are connected only through an explicit authenticated action; they are not silently joined by matching email addresses.
 
 The account website lets you manage sign-in methods, sign out, download cloud data, and delete the cloud account. It does not record puppy activity. Authentication uses server-managed HttpOnly cookies. Temporary session storage records an account-return check for provider linking or reauthentication; it contains no password, email code, or session token and is cleared when used or the browser session ends. A necessary deletion guard in browser local storage keeps the original account identifier and attempt time until deletion is confirmed. This survives interrupted requests and closed tabs and is separate from optional analytics.
+
+## Shared care
+
+An owner can share a puppy's name, activity logs, notes and routines with household members or temporary carers. Household members sign in to accept an invitation and can access the full log history and manage logs and routines until the owner removes access. Temporary carers do not need an account: their invitation opens the last seven days of logs and the routine, with either view-only or log-adding access, until the owner's chosen end time. Anyone holding a temporary invitation link can use that access. Entries include a carer's display name or the invitation name for attribution.
+
+Invitation and guest-session secrets are stored as hashes on the service. A pending invitation secret is kept in browser session storage until acceptance or the browser session ends. A necessary HttpOnly cookie remembers temporary browser access. The care page does not load usage analytics. Expiry and revocation prevent further service access; they cannot erase information a recipient already copied. Deleting an account removes its owned invitations and accepted household access. Logs contributed to another owner's puppy remain in that puppy's history.
 
 ## Dog profile photos
 
