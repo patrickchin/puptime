@@ -1,6 +1,5 @@
 import {memo,useCallback,useEffect,useRef,useState} from 'react';
 import Head from 'expo-router/head';
-import {useRouter} from 'expo-router';
 import {getWebAccountClient,checkResult} from './account-client';
 import {createCareClient,CareError,type CareClient,type CarePage as Page,type CarePreview,type CareRow} from './care-client';
 import {shareIdSchema,inviteTokenSchema,reuseCareRows as reuseRows,careEditPatch,type CareWrite} from '../sharing';
@@ -13,7 +12,6 @@ const dateTime=(at:number)=>new Intl.DateTimeFormat(undefined,{dateStyle:'medium
 const inputTime=(at:number)=>{const date=new Date(at);return new Date(at-date.getTimezoneOffset()*60000).toISOString().slice(0,16);};
 const problem=(reason:unknown)=>reason instanceof Error?reason.message:'Couldn’t load Puptime. Try again.';
 export default function CarePage(){
- const router=useRouter();
  const [client,setClient]=useState<CareClient|null>(null),[id,setId]=useState<string|null>(null),[token,setToken]=useState<string|null>(null),[initialError,setInitialError]=useState('');
  useEffect(()=>{
   setClient(createCareClient(window.location.origin));
@@ -26,7 +24,7 @@ export default function CarePage(){
     if(secret&&inviteTokenSchema.safeParse(secret).success){setToken(secret);sessionStorage.setItem(key,secret);}
    }catch{if(inviteTokenSchema.safeParse(url.hash.slice(1)).success)setToken(url.hash.slice(1));}
    // Invitation credentials never enter API URLs, referrers or analytics.
-   if(url.hash)router.replace(`/care?invite=${candidate}`);
+   if(url.hash)window.history.replaceState(window.history.state,'',url.pathname+url.search);
   }
  },[]);
  return <div className="account-page care-page"><Head><title>Shared puppy care | Puptime</title><meta name="robots" content="noindex, nofollow"/><meta name="referrer" content="no-referrer"/></Head><style>{css}</style>
