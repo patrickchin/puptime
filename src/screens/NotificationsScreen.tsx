@@ -26,6 +26,10 @@ export function NotificationsScreen({
   notificationPreferences,
   notificationPermission,
   notificationDelivery,
+  quietStatusEnabled = false,
+  onQuietStatusChange,
+  onTimedRemindersChange,
+  onRequestQuietStatusPermission,
   routineReminderCount,
   onNotificationPreferencesChange,
   onRequestNotificationPermission,
@@ -40,6 +44,10 @@ export function NotificationsScreen({
   notificationPreferences: NotificationPreferences;
   notificationPermission: NotificationPermissionState;
   notificationDelivery?: boolean;
+  quietStatusEnabled?: boolean;
+  onQuietStatusChange?: (enabled: boolean) => Promise<void>;
+  onTimedRemindersChange?: () => Promise<void>;
+  onRequestQuietStatusPermission?: () => Promise<boolean>;
   routineReminderCount: number;
   onNotificationPreferencesChange: (preferences: NotificationPreferences) => Promise<void>;
   onRequestNotificationPermission: () => Promise<boolean>;
@@ -123,9 +131,9 @@ export function NotificationsScreen({
     }
   };
 
-  const requestNotifications = async () => {
+  const requestNotifications = async (request = onRequestNotificationPermission) => {
     // The shared request also records device opt-in when OS access is blocked.
-    const granted = await onRequestNotificationPermission();
+    const granted = await request();
     if (granted) return true;
     if (notificationPermission === 'blocked') {
       onOpenSystemSettings();
@@ -203,6 +211,7 @@ export function NotificationsScreen({
         if (!created) { setDraftError(t('notifications.timedEnable')); return; }
         setDraft(null);
         await reloadTimed();
+        await onTimedRemindersChange?.().catch(() => undefined);
       } catch (error) {
         setDraftError(t(error instanceof CustomTimedReminderLimitError ? 'notifications.timedLimit' : error instanceof ExactReminderAccessError ? 'notifications.exactRequired' : 'settings.saveErrorBody'));
       }
@@ -214,6 +223,7 @@ export function NotificationsScreen({
       await cancelCustomTimedReminder(reminder.petId, reminder.id);
       setTimed((current) => current.filter((item) => item.id !== reminder.id));
       await reloadTimed();
+      await onTimedRemindersChange?.().catch(() => undefined);
     });
   };
 
@@ -272,9 +282,26 @@ export function NotificationsScreen({
           {exactAccessAction()}
         </> : null}
       </View>
-
-
-
+      {onQuietStatusChange ? <View style={cardStyle}>
+        <View style={styles.row}>
+          <MaterialCommunityIcons accessible={false} name="bell-sleep-outline" size={24} color={theme.primary}
+            accessibilityElementsHidden importantForAccessibility="no" />
+          <View style={styles.copy}>
+            <Text style={[styles.label, { color: theme.text }]}>{t('notifications.statusSwitch')}</Text>
+            <Text style={[styles.detail, { color: theme.textMuted }]}>{t('notifications.statusDetail')}</Text>
+          </View>
+          <Switch testID="notifications.quietStatus" accessibilityLabel={t('notifications.statusSwitch')}
+            accessibilityHint={t('notifications.statusDetail')} disabled={saving} hitSlop={8}
+            ios_backgroundColor={theme.border} thumbColor={theme.surfaceRaised}
+            trackColor={{ false: theme.border, true: theme.primary }}
+            value={quietStatusEnabled && notificationDelivery !== false && notificationPermission === 'granted'}
+            onValueChange={enabled => void save(async () => {
+              if (enabled && (notificationPermission !== 'granted' || notificationDelivery === false) && !await requestNotifications(onRequestQuietStatusPermission)) return;
+              await onQuietStatusChange(enabled);
+            })} />
+        </View>
+        <Text style={[styles.detail, { color: theme.textMuted }]}>{t(Platform.OS === 'ios' ? 'notifications.statusIos' : 'notifications.statusAndroid')}</Text>
+      </View> : null}
       <Text accessibilityRole="header" style={[styles.label,{color:theme.text}]}>{t('notifications.petReminders')}</Text>
       {onOpenPet?<PuppyIdentity showName theme={theme} onPress={onOpenPet}/>:null}
       <View style={cardStyle}>

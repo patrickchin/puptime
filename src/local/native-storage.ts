@@ -106,6 +106,15 @@ export function createNativeStorage(database: LocalDatabase, petId: string, onCh
       if(typeof enabled!=='boolean')throw new TypeError('Invalid device notification choice.');
       await database.write(sql=>sql.runAsync("INSERT INTO metadata(key,value) VALUES ('notify_on_device',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",String(enabled)));
     },
+    loadQuietStatusEnabled:()=>database.read(async sql=>{
+      const flag=await sql.getFirstAsync<{value:string}>("SELECT value FROM metadata WHERE key='quiet_status_on_device'");
+      if(flag&&!['true','false'].includes(flag.value))throw new Error('Saved quiet status choice is invalid.');
+      return flag?.value==='true';
+    }),
+    async saveQuietStatusEnabled(enabled:boolean) {
+      if(typeof enabled!=='boolean')throw new TypeError('Invalid quiet status choice.');
+      await database.write(sql=>sql.runAsync("INSERT INTO metadata(key,value) VALUES ('quiet_status_on_device',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",String(enabled)));
+    },
     async saveFirstLaunchStep(step:FirstLaunchStep) {
       firstLaunchStepSchema.parse(step);
       await database.write(async sql=>{

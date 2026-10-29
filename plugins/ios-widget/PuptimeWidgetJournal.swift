@@ -1,13 +1,25 @@
 import Foundation
+import Darwin
 
 // App Intents can overlap. Serialize the complete read/evaluate/save operation,
 // rather than only the JavaScriptCore evaluation inside the widget library.
 enum PuptimeWidgetJournal {
   private static let lock = NSRecursiveLock()
 
-  static func transaction<T>(_ action: () throws -> T) rethrows -> T {
+  private static var depth = 0
+  static func transaction<T>(in scope: URL? = nil, _ action: () throws -> T) throws -> T {
     lock.lock()
     defer { lock.unlock() }
+    if depth > 0 { return try action() }
+    let parent = try (scope ?? directory()).deletingLastPathComponent()
+    try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+    let descriptor = open(parent.appendingPathComponent("PuptimeQuickLog.lock").path, O_CREAT | O_RDWR, 0o600)
+    guard descriptor >= 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+    defer { close(descriptor) }
+    guard flock(descriptor, LOCK_EX) == 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+    defer { flock(descriptor, LOCK_UN) }
+    depth += 1
+    defer { depth -= 1 }
     return try action()
   }
 

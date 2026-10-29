@@ -3,7 +3,7 @@ import UserNotifications
 // Puptime: native widget confirmations.
 final class PuptimeWidgetNotificationBridge {
   static let shared = PuptimeWidgetNotificationBridge()
-  func handle(_ event: [String: Any]) async {
+  func handle(_ event: [String: Any], refreshStatus: Bool = true) async {
     guard
       let target = event["target"] as? String,
       let timestamp = event["timestamp"] as? Int
@@ -24,6 +24,46 @@ final class PuptimeWidgetNotificationBridge {
       parts.count > 5 ? Int(parts[5]) ?? 0 : 0,
       language
     )
+    if refreshStatus, let source = event["source"] as? String { await showStatus(source) }
+  }
+
+  private func showStatus(_ source: String) async {
+    let center = UNUserNotificationCenter.current()
+    // Keep the default (off) path out of notification-center queries, so
+    // ordinary widget logging does not wait for an unused status card.
+    guard let first = WidgetsStorage.getArray(forKey: "__expo_widgets_\(source)_timeline")?.first as? [String: Any],
+          let firstProps = first["props"] as? [String: Any],
+          let firstStatus = firstProps["quietStatus"] as? [String: Any],
+          firstStatus["enabled"] as? Bool == true else { return }
+    let delivered = await center.deliveredNotifications()
+    // Read the latest committed snapshot after awaited work, so a rapid widget
+    // tap burst cannot replace newer activity with an older tap's presentation.
+    guard let timeline = WidgetsStorage.getArray(forKey: "__expo_widgets_\(source)_timeline"),
+          let entry = timeline.first as? [String: Any],
+          let stored = entry["props"] as? [String: Any],
+          let props = try? PuptimeWidgetJournal.reconcile(stored),
+          let status = props["quietStatus"] as? [String: Any] else { return }
+    guard status["enabled"] as? Bool == true else {
+      center.removeDeliveredNotifications(withIdentifiers: ["puptime-status"])
+      return
+    }
+    let language = props["language"] as? String ?? "en"
+    let name = status["name"] as? String ?? "Puptime"
+    let petId = status["petId"] as? String ?? ""
+    let content = UNMutableNotificationContent()
+    content.title = language == "zh-Hans" ? "\(name) · 快捷记录" : language == "es" ? "\(name) · Registro rápido" : "\(name) · Quick log"
+    content.body = language == "zh-Hans" ? "长按以记录活动，无需打开 Puptime。" : language == "es" ? "Mantén pulsado para registrar sin abrir Puptime." : "Press and hold to log without opening Puptime."
+    content.categoryIdentifier = "puptimeQuickLog"
+    content.interruptionLevel = .passive
+    content.userInfo = ["kind": "quietStatus", "petId": petId]
+    if let existing = delivered.first(where: { $0.request.identifier == "puptime-status" })?.request.content,
+       existing.title == content.title, existing.body == content.body,
+       existing.userInfo["petId"] as? String == petId { return }
+    do {
+      try await center.add(UNNotificationRequest(identifier: "puptime-status", content: content, trigger: nil))
+    } catch {
+      print("[Puptime] Quiet status could not be updated: \(error.localizedDescription)")
+    }
   }
 
   private func showConfirmation(_ type: String, _ language: String, _ timestamp: Int, _ customLabel: String?, _ eventId: String?) async {

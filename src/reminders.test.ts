@@ -8,7 +8,7 @@ import {DEFAULT_NOTIFICATION_PREFERENCES} from './notification-config.ts';
 type MockRequest = { identifier: string; content?: { title?: string; data?: Record<string, unknown> }; trigger?: { type?: string; date?: number; repeats?: boolean; seconds?: number }; [key: string]: unknown };
 const platform={OS:'ios'};
 (globalThis as typeof globalThis&{__puptimeNotificationPlatform:typeof platform}).__puptimeNotificationPlatform=platform;
-const state={expiresAt:null as number|null,ended:false,delivery:false,granted:true,exactAllowed:true,canAskAgain:true,answer:true,requests:0,writes:[] as boolean[],scheduled:[] as MockRequest[],cancelled:[] as string[],hold:null as null|(()=>Promise<void>),scheduleHold:null as null|(()=>Promise<void>),failure:null as null|'list'|'create'|'cancel',nextId:0};
+const state={expiresAt:null as number|null,ended:false,handler:null as null|{handleNotification:(value:{request:{content:{data:{kind:string}}}})=>Promise<{shouldShowBanner:boolean;shouldShowList:boolean;shouldPlaySound:boolean;shouldSetBadge:boolean}>},delivery:false,granted:true,exactAllowed:true,canAskAgain:true,answer:true,requests:0,writes:[] as boolean[],scheduled:[] as MockRequest[],cancelled:[] as string[],hold:null as null|(()=>Promise<void>),scheduleHold:null as null|(()=>Promise<void>),failure:null as null|'list'|'create'|'cancel',nextId:0};
 (globalThis as typeof globalThis&{__puptimeNotificationTest:typeof state}).__puptimeNotificationTest=state;
 registerHooks({
  resolve(specifier,context,next){
@@ -36,6 +36,7 @@ registerHooks({
    export async function getAllScheduledNotificationsAsync(){if(s.hold)await s.hold();if(s.failure==='list')throw new Error('native list failed');return structuredClone(s.scheduled).map(item=>item.trigger?.type==='date'?{...item,trigger:{type:'timeInterval',repeats:false,seconds:(item.trigger.date-Date.now())/1000}}:item);}
    export async function cancelScheduledNotificationAsync(id){if(s.failure==='cancel')throw new Error('native cancel failed');s.cancelled.push(id);s.scheduled=s.scheduled.filter(item=>item.identifier!==id);}
    export async function scheduleNotificationAsync(value){if(s.scheduleHold)await s.scheduleHold();if(s.failure==='create')throw new Error('native create failed');const identifier=value.identifier??'native-'+(++s.nextId);s.scheduled.push({...value,identifier});return identifier;}
+   export function setNotificationHandler(handler){s.handler=handler;}
    export async function setNotificationCategoryAsync(){}
    export const AndroidImportance={DEFAULT:3};
    export async function setNotificationChannelAsync(){}
@@ -55,6 +56,14 @@ test('Android one-off reminders require exact access without blocking immediate 
   assert.equal(await reminders.showWidgetLogConfirmation({eventId:'evt_test',type:'pee',at:Date.now()}),true);
   assert.equal(state.scheduled.length,1);
  }finally{platform.OS='ios';}
+});
+
+test('quiet status reaches the foreground list without a banner, sound or badge while reminder alerts still work',async()=>{
+ reminders.configureReminderHandling();
+ assert.ok(state.handler);
+ const behavior=(kind:string)=>state.handler!.handleNotification({request:{content:{data:{kind}}}});
+ assert.deepEqual(await behavior('quietStatus'),{shouldShowBanner:false,shouldShowList:true,shouldPlaySound:false,shouldSetBadge:false});
+ assert.deepEqual(await behavior('pottyReminder'),{shouldShowBanner:true,shouldShowList:true,shouldPlaySound:true,shouldSetBadge:false});
 });
 
 test('Android widget confirmations deliver immediately on their channel with editable event references',async()=>{

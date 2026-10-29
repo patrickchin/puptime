@@ -6,6 +6,7 @@ import { entityId } from './entity-id';
 import { localIdSchema } from './cloud/protocol';
 import {getNotificationDelivery,setNotificationDelivery} from './cloud/notification-delivery';
 import { refreshExactReminderScheduling } from './exact-reminders';
+import { QUIET_STATUS_KIND } from './quiet-status-config';
 
 import type { ActivityKey, PuppyEvent, ScheduleEntry } from './domain';
 import { translate, type AppLanguage } from './localization';
@@ -85,10 +86,10 @@ async function ensureWidgetChannel(): Promise<void> {
 
 export function configureReminderHandling(): void {
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowBanner: true,
+    handleNotification: async (notification) => ({
+      shouldShowBanner: notification.request.content.data?.kind !== QUIET_STATUS_KIND,
       shouldShowList: true,
-      shouldPlaySound: true,
+      shouldPlaySound: notification.request.content.data?.kind !== QUIET_STATUS_KIND,
       shouldSetBadge: false,
     }),
   });

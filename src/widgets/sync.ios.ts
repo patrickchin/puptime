@@ -13,6 +13,7 @@ import PuptimeWidget, { type PuptimeWidgetProps } from './PuptimeWidget.ios';
 import { widgetsDirectory } from 'expo-widgets';
 import { Directory, File } from 'expo-file-system';
 import { parseEvents } from '../storage-validation';
+import { getLocalRuntime } from '../local/runtime.native';
 
 const importedOperations = new WeakMap<PuppyEvent[], File[]>();
 
@@ -56,6 +57,10 @@ export async function acknowledgePendingWidgetEvents(events: PuppyEvent[]): Prom
 
 export async function updateHomeWidget(events: PuppyEvent[],expectedPetId?:string): Promise<void> {
   const access=await getCareAccess();if(expectedPetId&&access.petId!==expectedPetId)return;
+  const { storage, petId } = await getLocalRuntime();
+  const [quietEnabled, delivery, name] = await Promise.all([
+    storage.loadQuietStatusEnabled(), storage.loadNotificationDelivery(), storage.loadPuppyName(),
+  ]);
   const openNap = events.find(isOpenNap);
   const customActivities = await loadCustomActivities(events);
   const [actions, themePreference, notificationPreferences, languagePreference] = await Promise.all([
@@ -77,12 +82,14 @@ export async function updateHomeWidget(events: PuppyEvent[],expectedPetId?:strin
       darkColor: darkTheme.isDark ? meta.darkColor : meta.color,
     }];
   }));
+  const currentAccess=await getCareAccess();
+  if(currentAccess.scope!==access.scope||currentAccess.petId!==petId)return;
   await PuptimeWidget.updateSnapshot({
     scope:access.scope,
     expiresAt:access.expiresAt??0,
     canLog:access.canLog,
     pending: [],
-    openNap: openNap ? { id: openNap.id, type: 'nap', at: openNap.at } : false,
+    openNap: openNap ? { scope:access.scope, id: openNap.id, type: 'nap', at: openNap.at } : false,
     lastEventAt: latestQuickEventTimes(events),
     actions,
     actionDetails,
@@ -99,6 +106,7 @@ export async function updateHomeWidget(events: PuppyEvent[],expectedPetId?:strin
       },
     },
     notificationConfirmations: notificationPreferences.widgetConfirmations,
+    quietStatus: { enabled: quietEnabled && delivery && access.canLog, name, petId },
     pottyAfterPeeMinutes: notificationPreferences.pottyAfterPee.enabled
       ? notificationPreferences.pottyAfterPee.delayMinutes
       : 0,

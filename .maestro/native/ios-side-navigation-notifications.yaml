@@ -78,6 +78,19 @@ name: iOS side navigation and notification preferences
     checked: true
 - assertNotVisible:
     id: settings.notifications.permission
+- assertVisible:
+    id: notifications.quietStatus
+    checked: false
+- tapOn:
+    id: notifications.quietStatus
+- assertVisible:
+    id: notifications.quietStatus
+    checked: true
+- tapOn:
+    id: notifications.quietStatus
+- assertVisible:
+    id: notifications.quietStatus
+    checked: false
 - scrollUntilVisible:
     element:
       id: notifications.timing.pottyAfterPee.enabled

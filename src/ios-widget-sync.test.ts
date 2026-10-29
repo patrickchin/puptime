@@ -14,6 +14,7 @@ registerHooks({
       if (specifier === './PuptimeWidget.ios') return { url: 'ios-widget:timeline', shortCircuit: true };
       if (specifier === '../care-access') return {url:'ios-widget:access',shortCircuit:true};
       if (specifier === '../storage') return { url: 'ios-widget:storage', shortCircuit: true };
+      if (specifier === '../local/runtime.native') return { url: 'ios-widget:runtime', shortCircuit: true };
       if (specifier.startsWith('.')) return next(new URL(specifier + '.ts', context.parentURL).href, context);
     }
     return next(specifier, context);
@@ -22,6 +23,7 @@ registerHooks({
     const mocks: Record<string, string> = {
       'ios-widget:access': `export async function getCareAccess(){return {scope:s.scope,petId:s.scope==='owner'?'owner-pet':s.scope,expiresAt:null,canLog:true,ended:false};}`,
       'ios-widget:widgets': `export const widgetsDirectory='file:///shared/ExpoWidgets';`,
+      'ios-widget:runtime': `export async function getLocalRuntime(){return {petId:s.scope==='owner'?'owner-pet':s.scope,storage:{async loadQuietStatusEnabled(){return false;},async loadNotificationDelivery(){return true;},async loadPuppyName(){return 'Biscuit';}}};}`,
       'ios-widget:files': `
         export class File {
           constructor(name){this.name=name;}

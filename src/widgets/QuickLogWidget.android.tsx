@@ -51,6 +51,7 @@ type Props = {
   actions?: readonly ActivityKey[];
   customActivities?: readonly string[];
   themePreference?: ThemePreference;
+  notificationPetId?: string;
 };
 
 export function QuickLogWidget({
@@ -62,6 +63,7 @@ export function QuickLogWidget({
   actions: configuredActions = DEFAULT_WIDGET_ACTIONS,
   customActivities = [],
   themePreference = 'system',
+  notificationPetId,
 }: Props) {
   const theme = resolveTheme(themePreference, dark ? 'dark' : 'light');
   const background = theme.background as `#${string}`;
@@ -92,7 +94,7 @@ export function QuickLogWidget({
           <FlexWidget
             key={button.type}
             clickAction={canLog?"LOG_EVENT":"OPEN_APP"}
-            clickActionData={{ type: button.type,scope }}
+            clickActionData={{ type: button.type,scope, ...(notificationPetId ? {source:'notification',petId:notificationPetId}: {}) }}
             accessibilityLabel={`${isActiveNap ? 'End nap' : `Log ${button.label.toLowerCase()}`}, ${lastDate === undefined ? 'never logged' : `last logged ${lastDate.toDateString()} at ${timeLabel}`}`}
             style={{
               flex: 1,

@@ -8,6 +8,17 @@ export type LanguagePreference = 'system' | AppLanguage;
 export const languageChoices: readonly LanguagePreference[] = ['system', 'en', 'zh-Hans', 'es'];
 
 const english = {
+  "notifications.quickLogTitle": "{name} · Quick log",
+  "notifications.quickLogExpand": "Press and hold to log without opening Puptime.",
+
+  "notifications.statusSwitch": "Quiet puppy status",
+  "notifications.statusDetail": "Your widget’s quick-log buttons and timers, available without opening Puptime.",
+  "notifications.statusIos": "Press and hold the silent notification to log. You or iOS can clear it.",
+  "notifications.statusAndroid": "Expand the silent notification to use the full widget. Android lets you dismiss it.",
+  "notifications.statusTitle": "{name} · Recent activity",
+  "notifications.statusEmpty": "No pee, poop or meal logs yet.",
+  "notifications.statusReminder": "Reminder · {activity} · {time}",
+
   "backup.reason.daily": "Daily snapshot",
   "backup.reason.before-update": "Before app update",
   "backup.reason.account-change": "Before account change",
@@ -711,6 +722,17 @@ export type MessageKey = keyof typeof english;
 type Dictionary = Record<MessageKey, string>;
 
 const simplifiedChinese: Dictionary = {
+  "notifications.quickLogTitle": "{name} · 快捷记录",
+  "notifications.quickLogExpand": "长按以记录活动，无需打开 Puptime。",
+
+  "notifications.statusSwitch": "静默小狗状态",
+  "notifications.statusDetail": "无需打开 Puptime，即可使用小组件的快捷记录按钮和计时器。",
+  "notifications.statusIos": "长按静默通知即可记录。你或 iOS 都可以清除通知。",
+  "notifications.statusAndroid": "展开静默通知即可使用完整小组件。Android 允许你移除通知。",
+  "notifications.statusTitle": "{name} · 最近活动",
+  "notifications.statusEmpty": "还没有尿尿、便便或吃饭记录。",
+  "notifications.statusReminder": "提醒 · {activity} · {time}",
+
   "backup.reason.daily": "每日快照",
   "backup.reason.before-update": "更新前",
   "backup.reason.account-change": "账号更改前",
@@ -1411,6 +1433,17 @@ const simplifiedChinese: Dictionary = {
 };
 
 const spanish: Dictionary = {
+  "notifications.quickLogTitle": "{name} · Registro rápido",
+  "notifications.quickLogExpand": "Mantén pulsado para registrar sin abrir Puptime.",
+
+  "notifications.statusSwitch": "Estado silencioso del cachorro",
+  "notifications.statusDetail": "Los botones y temporizadores del widget, sin abrir Puptime.",
+  "notifications.statusIos": "Mantén pulsada la notificación silenciosa para registrar. Tú o iOS podéis borrarla.",
+  "notifications.statusAndroid": "Expande la notificación silenciosa para usar el widget completo. Android permite descartarla.",
+  "notifications.statusTitle": "{name} · Actividad reciente",
+  "notifications.statusEmpty": "Aún no hay registros de pipí, caca o comida.",
+  "notifications.statusReminder": "Recordatorio · {activity} · {time}",
+
   "backup.reason.daily": "Copia diaria",
   "backup.reason.before-update": "Antes de actualizar",
   "backup.reason.account-change": "Antes de cambiar de cuenta",

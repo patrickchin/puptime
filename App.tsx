@@ -59,6 +59,8 @@ import {NotificationsScreen} from './src/screens/NotificationsScreen';
 import { AccountScreen } from './src/screens/AccountScreen';
 import { useCloud } from './src/cloud/use-cloud';
 import {getNotificationDelivery,setNotificationDelivery} from './src/cloud/notification-delivery';
+import {getQuietStatusEnabled,setQuietStatusEnabled,syncQuietStatus} from './src/quiet-status';
+import {QUIET_STATUS_KIND} from './src/quiet-status-config';
 import {getActivityData as defaultGetActivityData,getActivityPetId as defaultGetActivityPetId,getEventHistoryData as defaultGetEventHistoryData,type ActivityQueries,type EventHistoryData} from './src/activity-data';
 import {EventHistoryScreen} from './src/screens/EventHistoryScreen';
 import { TimelineScreen } from './src/screens/TimelineScreen';
@@ -159,6 +161,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
   });
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionState>('requestable');
   const [notificationDelivery,setDelivery]=useState(false);
+  const [quietStatusEnabled,setQuietStatus]=useState(false);
   const [undoState, setUndoState] = useState<{ event: PuppyEvent; message: string; restore?: PuppyEvent } | null>(null);
   const [editRequest, setEditRequest] = useState<LogEditRequest | null>(null);
   const handledNotificationResponses = useRef(new Set<string>());
@@ -205,7 +208,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     setRefreshToken(value=>value+1);
     const nextCustomActivities = await loadCustomActivities(nextEvents);
     setCustomActivities(nextCustomActivities);
-    const [nextSchedule, nextWidgetActions, nextTheme, nextLanguagePreference, nextNotificationPreferences, nextPermission, nextActivityCustomizations,nextDelivery] = await Promise.all([
+    const [nextSchedule, nextWidgetActions, nextTheme, nextLanguagePreference, nextNotificationPreferences, nextPermission, nextActivityCustomizations,nextDelivery,nextQuietStatus] = await Promise.all([
       loadSchedule(),
       loadWidgetActions(nextCustomActivities),
       loadThemePreference(),
@@ -214,6 +217,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
       getNotificationPermissionState(),
       loadActivityCustomizations(),
       getNotificationDelivery(),
+      getQuietStatusEnabled(),
     ]);
     if(generation!==refreshGeneration.current)return nextEvents;
     setSchedule(nextSchedule);
@@ -223,6 +227,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     setNotificationPreferences(nextNotificationPreferences);
     setNotificationPermission(nextPermission);
     setDelivery(nextDelivery);
+    setQuietStatus(nextQuietStatus);
     setActivityCustomizations(current=>JSON.stringify(current)===JSON.stringify(nextActivityCustomizations)?current:nextActivityCustomizations);
     if(!careSession.isCurrent())return nextEvents;
     // Exact access revocation cancels OS alarms but preserves Expo's request
@@ -241,7 +246,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
       ).catch(() => undefined),
       updateHomeWidget(nextEvents,nextPetId).catch(() => undefined),
       ...(nativeApp?[cancelCustomTimedRemindersIfDeliveryOff().catch(()=>undefined)]:[]),
-    ]);
+    ]).then(syncQuietStatus).catch(() => undefined);
     return nextEvents;
   }, []);
 
@@ -357,12 +362,19 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     configureNotificationActions(language).catch(() => undefined);
   }, [language]);
 
+  useEffect(() => {
+    const received = Notifications.addNotificationReceivedListener(notification => {
+      if (notification.request.content.data?.kind !== QUIET_STATUS_KIND) void syncQuietStatus().catch(() => undefined);
+    });
+    return () => received.remove();
+  }, []);
+
   const handleNotificationResponse = useCallback(async (response: Notifications.NotificationResponse) => {
     const data = response.notification.request.content.data;
     if(nativeApp&&data?.kind===CUSTOM_TIMED_REMINDER_NOTIFICATION_KIND){
       setNavigationHistory([]);setDrawerOpen(false);setAccountVisible(false);setHistoryVisible(false);setSettingsVisible(false);setTab('notifications');return;
     }
-    if (data?.kind === POTTY_REMINDER_NOTIFICATION_KIND) {
+    if (data?.kind === POTTY_REMINDER_NOTIFICATION_KIND || data?.kind === QUIET_STATUS_KIND) {
       setAccountVisible(false);
       setHistoryVisible(false);
       setSettingsVisible(false);
@@ -546,6 +558,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
         notificationPreferences,
         language,
       );
+      await syncQuietStatus();
       if (!synced && nextSchedule.some((entry) => entry.reminder)) {
         Alert.alert(translate(language, 'app.routineSaved'), translate(language, 'app.notificationsOff'));
       }
@@ -591,7 +604,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
             resolveLanguage(preference),
           ),
           updateHomeWidget(events),
-        ]).catch(() => undefined);
+        ]).then(syncQuietStatus).catch(() => undefined);
       })
       .catch(() => Alert.alert(translate(language, 'settings.saveErrorTitle'), translate(language, 'settings.saveErrorBody')));
   };
@@ -614,9 +627,10 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
       syncPottyReminders(events, nextPreferences, language),
       updateHomeWidget(events).catch(() => undefined),
     ]);
+    await syncQuietStatus();
   };
 
-  const requestNotifications = async (requirePreciseTiming = false) => {
+  const requestNotifications = async (requirePreciseTiming = false, includeReminderTiming = true) => {
     let granted:boolean;
     try{granted=await requestReminderPermission(language);}
     finally{
@@ -625,7 +639,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     }
     if (granted) {
       let precise = true;
-      if (Platform.OS === 'android' && !(await refreshExactReminderScheduling())) {
+      if (includeReminderTiming && Platform.OS === 'android' && !(await refreshExactReminderScheduling())) {
         const openSettings = await new Promise<boolean>(resolve => {
           Alert.alert(translate(language, 'notifications.exactTitle'), translate(language, 'notifications.exactExplain'), [
             { text: translate(language, 'schedule.notNow'), style: 'cancel', onPress: () => resolve(false) },
@@ -644,6 +658,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
         syncPottyReminders(events, notificationPreferences, language),
         updateHomeWidget(events).catch(() => undefined),
       ]);
+      await syncQuietStatus();
     }
     return granted;
   };
@@ -658,11 +673,22 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
   const changeNotificationDelivery=async(enabled:boolean)=>{
     if(enabled){await requestNotifications();return;}
     await setNotificationDelivery(false);setDelivery(false);
+    await syncQuietStatus();
     await Promise.all([
       ...(nativeApp?[cancelCustomTimedRemindersIfDeliveryOff()]:[]),
       syncScheduleReminders(schedule,notificationPreferences,language),
       syncPottyReminders(events,notificationPreferences,language),
+      updateHomeWidget(events),
     ]);
+    await syncQuietStatus();
+  };
+
+  const changeQuietStatus=async(enabled:boolean)=>{
+    try { await setQuietStatusEnabled(enabled); }
+    finally {
+      setQuietStatus(await getQuietStatusEnabled());
+      await updateHomeWidget(events);
+    }
   };
 
   const finishOnboarding = async (options?:FinishOnboardingOptions) => {
@@ -733,6 +759,9 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     if(tab==='pets')return <PetsScreen theme={theme} cloud={cloud} eventCount={eventCount} shared={!!care} sharedName={care?.name} onShare={()=>setSharingKind('household')} onOpenShared={()=>setSharedView({})}/>;
     if(tab==='notifications')return <NotificationsScreen theme={theme} petId={petId} notificationPreferences={notificationPreferences}
       notificationPermission={notificationPermission} notificationDelivery={notificationDelivery}
+      quietStatusEnabled={quietStatusEnabled} onQuietStatusChange={nativeApp?changeQuietStatus:undefined}
+      onRequestQuietStatusPermission={()=>requestNotifications(false,false)}
+      onTimedRemindersChange={syncQuietStatus}
       routineReminderCount={schedule.filter(entry=>entry.reminder).length}
       onNotificationPreferencesChange={changeNotificationPreferences} onRequestNotificationPermission={requestNotifications}
       onNotificationDeliveryChange={changeNotificationDelivery} onOpenSystemSettings={()=>{void Linking.openSettings().catch(()=>undefined);}}
@@ -799,6 +828,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     languagePreference,
     notificationPermission,
     notificationDelivery,
+    quietStatusEnabled,
     notificationPreferences,
     schedule,
     settingsVisible,

@@ -72,6 +72,9 @@ func target(_ type: String) -> String {
 let pee = invoke("__expoWidgetHandlePress", props, target: target("pee"))
 precondition(PropertyListSerialization.propertyList(pee, isValidFor: .binary), "Pee action returned invalid UserDefaults props")
 precondition((pee["pending"] as? [[String: Any]])?.last?["type"] as? String == "pee", "Pee action was not recorded")
+if let quietStatus = props["quietStatus"] as? [String: Any] {
+  precondition(NSDictionary(dictionary: pee["quietStatus"] as? [String: Any] ?? [:]).isEqual(to: quietStatus), "Widget action lost its device quiet status settings")
+}
 
 var napProps = props
 napProps["actions"] = ["nap", "pee"]
