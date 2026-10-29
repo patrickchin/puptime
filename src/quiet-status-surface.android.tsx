@@ -4,7 +4,7 @@ import {AndroidWidget} from 'react-native-android-widget/src/AndroidWidget';
 import {buildWidgetTree} from 'react-native-android-widget/src/api/build-widget-tree';
 import {isOpenNap,latestQuickEventTimes} from './domain';
 import {QuickLogWidget} from './widgets/QuickLogWidget.android';
-import type {NotificationWidgetProps} from './quiet-status-surface.ts';
+import type {NotificationWidgetProps} from './quiet-status-config';
 
 export async function renderQuickLogNotification({events,actions,customActivities,themePreference,petId,scope,title}:NotificationWidgetProps):Promise<void>{
   const props={scope,canLog:true,activeNap:events.some(isOpenNap),lastEventAt:latestQuickEventTimes(events),actions,customActivities,themePreference,notificationPetId:petId};

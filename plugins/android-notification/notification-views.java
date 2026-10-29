@@ -1,12 +1,36 @@
     public RemoteViews notificationViews(int id, int width, int height) throws Exception {
         WidgetWithViews light = WidgetFactory.buildWidgetFromRoot(appContext, Arguments.makeNativeMap(config.getMap("light").toHashMap()), width, height);
         WidgetWithViews dark = WidgetFactory.buildWidgetFromRoot(appContext, Arguments.makeNativeMap(config.getMap("dark").toHashMap()), width, height);
-        RemoteViews views = new RemoteViews(appContext.getPackageName(), R.layout.puptime_widget);
-        views.setImageViewUri(R.id.rn_widget_image_light, saveBitmapToDisk(id, "light", drawViewToBitmap(light.getRootView())));
-        views.setImageViewUri(R.id.rn_widget_image_dark, saveBitmapToDisk(id, "dark", drawViewToBitmap(dark.getRootView())));
-        views.setInt(android.R.id.background, "setMinimumHeight", Math.round(height * appContext.getResources().getDisplayMetrics().density));
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) views.setViewLayoutHeight(android.R.id.background, height, TypedValue.COMPLEX_UNIT_DIP);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) addClickableAreas(id, views, light);
-        PuptimeWidgetChronometers.add(appContext, views, light.getRootView(), dark.getRootView());
+        boolean compact = height < 90;
+        RemoteViews views = new RemoteViews(appContext.getPackageName(), compact ? R.layout.puptime_notification_compact : R.layout.puptime_notification_expanded);
+        int[] cells = {R.id.puptime_notification_cell_0, R.id.puptime_notification_cell_1, R.id.puptime_notification_cell_2, R.id.puptime_notification_cell_3};
+        int[] images = {R.id.puptime_notification_light_0, R.id.puptime_notification_light_1, R.id.puptime_notification_light_2, R.id.puptime_notification_light_3};
+        int[] darkImages = {R.id.puptime_notification_dark_0, R.id.puptime_notification_dark_1, R.id.puptime_notification_dark_2, R.id.puptime_notification_dark_3};
+        int[] timers = {R.id.puptime_notification_timer_0, R.id.puptime_notification_timer_1, R.id.puptime_notification_timer_2, R.id.puptime_notification_timer_3};
+        int[] clocks = {R.id.puptime_notification_clock_0, R.id.puptime_notification_clock_1, R.id.puptime_notification_clock_2, R.id.puptime_notification_clock_3};
+        int[] darkClocks = {R.id.puptime_notification_dark_clock_0, R.id.puptime_notification_dark_clock_1, R.id.puptime_notification_dark_clock_2, R.id.puptime_notification_dark_clock_3};
+        // SystemUI supplies the available width. Native layout weights keep
+        // every button and its click target aligned across notification sizes.
+        List<ClickableView> buttons = light.getClickableViews();
+        for (int slot = 0; slot < cells.length; slot++) {
+            views.setViewVisibility(cells[slot], slot < buttons.size() ? View.VISIBLE : View.GONE);
+            if (slot >= buttons.size()) continue;
+            ClickableView button = buttons.get(slot);
+            View darkButton = dark.getClickableViews().get(slot).getView();
+            views.setImageViewUri(images[slot], saveBitmapToDisk(id * 10 + slot, "light", drawViewToBitmap(button.getView())));
+            views.setImageViewUri(darkImages[slot], saveBitmapToDisk(id * 10 + slot, "dark", drawViewToBitmap(darkButton)));
+            views.setContentDescription(cells[slot], button.getAccessibilityLabel());
+            registerClickTask(id, button, views, cells[slot]);
+            PuptimeWidgetChronometers.notification(appContext, views, button.getView(), darkButton,
+                timers[slot], clocks[slot], darkClocks[slot], compact);
+        }
+        View[] roots = {light.getRootView(), dark.getRootView()};
+        int[] backgrounds = {R.id.rn_widget_image_light, R.id.rn_widget_image_dark};
+        for (int mode = 0; mode < roots.length; mode++) {
+            View root = roots[mode];
+            Bitmap bitmap = Bitmap.createBitmap(root.getWidth(), root.getHeight(), Bitmap.Config.ARGB_8888);
+            if (root.getBackground() != null) root.getBackground().draw(new Canvas(bitmap));
+            views.setImageViewUri(backgrounds[mode], saveBitmapToDisk(id, mode == 0 ? "light" : "dark", bitmap));
+        }
         return views;
     }

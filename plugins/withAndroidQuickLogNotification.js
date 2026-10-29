@@ -37,23 +37,30 @@ ${anchor}`);
   const end=source.indexOf(anchor,previous<0?0:previous);
   if(end<0)throw Error('Android widget renderer changed.');
   source=previous<0?source.replace(anchor,renderer+anchor):source.slice(0,previous)+renderer+source.slice(end);
-  // Only the click overlay has a rootWidget parameter. Collection layouts keep
-  // their launcher sizing; notifications use the bitmap's measured bounds.
+  // Remove old absolute notification coordinates when re-running prebuild.
   const width='RNWidgetUtil.dpToPx(appContext, RNWidgetUtil.getWidgetWidth(appContext, widgetId))';
-  const notificationWidth=`(widgetId < 0 ? rootWidget.getWidth() : ${width})`;
-  source=source.replaceAll(notificationWidth,width);
-  const start=source.indexOf('    private void addClickableArea(');
-  const finish=source.indexOf('    private void registerClickTask(',start);
-  if(start<0||finish<0)throw Error('Android widget click overlay changed.');
-  let clicks=source.slice(start,finish).replace(width+' - offsetViewBounds.right,',notificationWidth+' - offsetViewBounds.right,');
-  const bounds='        rootWidget.offsetDescendantRectToMyCoords(clickableWidget, offsetViewBounds);';
-  if(!clicks.includes('widgetId < 0 && rootWidget.getHeight()'))clicks=clicks.replace(bounds,bounds+`
-        if (widgetId < 0 && rootWidget.getHeight() <= RNWidgetUtil.dpToPx(appContext, 48)) {
-            offsetViewBounds.top = 0;
-            offsetViewBounds.bottom = rootWidget.getHeight();
-        }`);
-  source=source.slice(0,start)+clicks+source.slice(finish);
+  source=source.replaceAll(`(widgetId < 0 ? rootWidget.getWidth() : ${width})`,width);
   fs.writeFileSync(widgetPath,source);
   fs.copyFileSync(path.join(__dirname,'android-notification/PuptimeQuickLogNotification.java'),path.join(java,'PuptimeQuickLogNotification.java'));
+  const resources=path.join(root,'android/src/main/res');
+  for(const compact of [true,false]){
+    const variant=compact?'compact':'expanded',gap=compact?4:7,height=compact?48:112;
+    fs.mkdirSync(path.join(resources,'drawable'),{recursive:true});
+    fs.writeFileSync(path.join(resources,'drawable',`puptime_notification_gap_${variant}.xml`),`<shape xmlns:android="http://schemas.android.com/apk/res/android"><size android:width="${gap}dp"/><solid android:color="@android:color/transparent"/></shape>`);
+    for(const night of [false,true]){
+      const folder=path.join(resources,night?'layout-night':'layout');fs.mkdirSync(folder,{recursive:true});
+      const visibility=dark=>dark===night?'visible':'gone';
+      const cells=Array.from({length:4},(_,slot)=>`<FrameLayout android:id="@+id/puptime_notification_cell_${slot}" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:foreground="?android:attr/selectableItemBackground">
+        ${[false,true].map(dark=>`<ImageView android:id="@+id/puptime_notification_${dark?'dark':'light'}_${slot}" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_marginTop="${compact?4:0}dp" android:layout_marginBottom="${compact?4:0}dp" android:scaleType="fitXY" android:visibility="${visibility(dark)}" android:importantForAccessibility="no"/>`).join('')}
+        <FrameLayout android:id="@+id/puptime_notification_timer_${slot}" android:layout_width="match_parent" android:layout_height="match_parent" android:importantForAccessibility="noHideDescendants">
+          ${[false,true].map(dark=>`<Chronometer android:id="@+id/puptime_notification_${dark?'dark_clock':'clock'}_${slot}" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_horizontal" android:singleLine="true" android:ellipsize="end" android:textStyle="bold" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="7sp" android:autoSizeMaxTextSize="${compact?9:11}sp" android:autoSizeStepGranularity="1sp" android:visibility="${visibility(dark)}"/>`).join('')}
+        </FrameLayout>
+      </FrameLayout>`).join('');
+      fs.writeFileSync(path.join(folder,`puptime_notification_${variant}.xml`),`<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="${height}dp">
+        ${[false,true].map(dark=>`<ImageView android:id="@+id/rn_widget_image_${dark?'dark':'light'}" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:visibility="${visibility(dark)}" android:importantForAccessibility="no"/>`).join('')}
+        <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="horizontal" android:paddingStart="${gap}dp" android:paddingEnd="${gap}dp" android:paddingTop="${compact?0:gap}dp" android:paddingBottom="${compact?0:gap}dp" android:divider="@drawable/puptime_notification_gap_${variant}" android:showDividers="middle">${cells}</LinearLayout>
+      </FrameLayout>`);
+    }
+  }
   return mod;
 }]);

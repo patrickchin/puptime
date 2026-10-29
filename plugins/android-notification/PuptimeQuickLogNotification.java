@@ -20,7 +20,7 @@ public final class PuptimeQuickLogNotification {
         int icon = context.getPackageManager().getApplicationInfo(context.getPackageName(), PackageManager.GET_META_DATA)
             .metaData.getInt("expo.modules.notifications.default_notification_icon", context.getApplicationInfo().icon);
         Notification notification = new NotificationCompat.Builder(context, "puptime-status")
-            .setSmallIcon(icon).setContentTitle(title).setShowWhen(false)
+            .setSmallIcon(icon).setContentTitle(title).setSubText(title).setShowWhen(false)
             .setStyle(new NotificationCompat.DecoratedCustomViewStyle())
             .setCustomContentView(compact).setCustomBigContentView(expanded)
             .setOngoing(true).setAutoCancel(false).setOnlyAlertOnce(true).setSilent(true)
