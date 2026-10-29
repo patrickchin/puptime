@@ -12,6 +12,7 @@ appId: com.patrickchin.puptime
       - runFlow: conversational/to-reminders.yaml
       - tapOn:
           id: preview.reminders.later
+      - runFlow: "conversational/skip-sharing.yaml"
       - assertVisible:
           id: preview.ready
       - waitForAnimationToEnd

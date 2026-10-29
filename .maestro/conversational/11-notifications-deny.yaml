@@ -10,9 +10,14 @@ name: Notification deny reaches the normal app and survives Back
     id: "preview.reminders.allow"
 - tapOn:
     text: "Don.t [Aa]llow"
+- runFlow: "../helpers/conversational/skip-sharing.yaml"
 - assertVisible:
     id: "preview.ready"
 - assertNotVisible: You can change reminders in Notifications.
+- waitForAnimationToEnd
+- tapOn:
+    id: "preview.back"
+    enabled: true
 - waitForAnimationToEnd
 - tapOn:
     id: "preview.back"
@@ -33,6 +38,7 @@ name: Notification deny reaches the normal app and survives Back
       - tapOn:
           text: "Don.t [Aa]llow"
           optional: true
+- runFlow: "../helpers/conversational/skip-sharing.yaml"
 - assertVisible:
     id: "preview.ready"
 - runFlow: "../helpers/conversational/finish-alone.yaml"

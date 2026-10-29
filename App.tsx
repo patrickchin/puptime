@@ -51,6 +51,9 @@ import { ScheduleScreen } from './src/screens/ScheduleScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { PuppyIdentity } from './src/components/PuppyIdentity';
 import {PetsScreen} from './src/screens/PetsScreen';
+import {SharePuppyScreen} from './src/screens/SharePuppyScreen';
+import {SharedPuppiesScreen} from './src/screens/SharedPuppiesScreen';
+import {shareIdSchema} from './src/sharing';
 import {LogViewSwitch} from './src/components/LogViewSwitch';
 import {NotificationsScreen} from './src/screens/NotificationsScreen';
 import { AccountScreen } from './src/screens/AccountScreen';
@@ -122,6 +125,13 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [historyVisible,setHistoryVisible]=useState(false);
   const [accountVisible,setAccountVisible]=useState(false);
+  const [sharingKind,setSharingKind]=useState<'household'|'temporary'|null>(null);
+  const [sharedView,setSharedView]=useState<{id?:string}|null>(null);
+  useEffect(()=>{
+    const open=(url:string)=>{try{const link=new URL(url);if(link.protocol==='puptime:'&&link.hostname==='care'){const id=shareIdSchema.parse(link.searchParams.get('invite'));setSharedView({id});}}catch{}};
+    void Linking.getInitialURL().then(url=>{if(url)open(url);});
+    const subscription=Linking.addEventListener('url',event=>open(event.url));return()=>subscription.remove();
+  },[]);
   const [drawerOpen,setDrawerOpen]=useState(false);
   const [showSpotlight,setShowSpotlight]=useState(false);
   const [spotlightTarget,setSpotlightTarget]=useState<SpotlightRect|null>(null);
@@ -681,6 +691,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     await refresh();
     setFirstLaunch(null);setOnboardingVisible(false);setGuideOpenedFromSettings(false);
     navigateToTab('log');setShowSpotlight(draft.showGuide);
+    if(draft.sharingKind){setShowSpotlight(false);setSharingKind(draft.sharingKind);}
   };
 
   const screen = useMemo(() => {
@@ -718,7 +729,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
         />
       );
     }
-    if(tab==='pets')return <PetsScreen theme={theme} cloud={cloud} eventCount={eventCount}/>;
+    if(tab==='pets')return <PetsScreen theme={theme} cloud={cloud} eventCount={eventCount} onShare={()=>setSharingKind('household')} onOpenShared={()=>setSharedView({})}/>;
     if(tab==='notifications')return <NotificationsScreen theme={theme} petId={petId} notificationPreferences={notificationPreferences}
       notificationPermission={notificationPermission} notificationDelivery={notificationDelivery}
       routineReminderCount={schedule.filter(entry=>entry.reminder).length}
@@ -838,7 +849,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
                   return true;
                 }}
               />
-            ):firstLaunch?conversationalOnboarding?<OnboardingDesignPreview cloud={cloud} onFinish={finishConversationalOnboarding} onAllowNotifications={requestOnboardingNotifications} onDisableNotifications={()=>changeNotificationDelivery(false)}/>:<FirstLaunchScreen progress={firstLaunch} cloud={cloud} theme={theme} notificationPermission={notificationPermission} onAllowNotifications={requestOnboardingNotifications} onDisableNotifications={()=>changeNotificationDelivery(false)} onOpenSystemSettings={()=>{void Linking.openSettings().catch(()=>undefined);}} onFinish={finishOnboarding}/>:null : screen}
+            ):firstLaunch?conversationalOnboarding?<OnboardingDesignPreview cloud={cloud} onOpenShared={()=>setSharedView({})} onFinish={finishConversationalOnboarding} onAllowNotifications={requestOnboardingNotifications} onDisableNotifications={()=>changeNotificationDelivery(false)}/>:<FirstLaunchScreen progress={firstLaunch} cloud={cloud} theme={theme} notificationPermission={notificationPermission} onAllowNotifications={requestOnboardingNotifications} onDisableNotifications={()=>changeNotificationDelivery(false)} onOpenSystemSettings={()=>{void Linking.openSettings().catch(()=>undefined);}} onFinish={finishOnboarding}/>:null : screen}
             {nativeApp&&onboardingVisible===false&&!historyVisible&&!settingsVisible&&(tab==='log'||tab==='timeline')?<LogViewSwitch tab={tab} theme={theme} onChange={navigateToTab}/>:null}
             {!onboardingVisible && undoState ? (
               <Toast
@@ -878,6 +889,12 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
           />
           <Modal visible={accountVisible&&cloud.available} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={()=>setAccountVisible(false)}>
             {accountVisible?<SafeAreaProvider><AccountScreen cloud={cloud} theme={theme} eventCount={eventCount} onBack={()=>setAccountVisible(false)} onOpenActivity={()=>{setAccountVisible(false);navigateToTab('log');}}/></SafeAreaProvider>:null}
+          </Modal>
+          <Modal visible={sharingKind!==null&&onboardingVisible===false} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={()=>setSharingKind(null)}>
+            {sharingKind?<SafeAreaProvider><SharePuppyScreen cloud={cloud} theme={theme} eventCount={eventCount} initialKind={sharingKind} onBack={()=>setSharingKind(null)}/></SafeAreaProvider>:null}
+          </Modal>
+          <Modal visible={sharedView!==null} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={()=>setSharedView(null)}>
+            {sharedView?<SafeAreaProvider><SharedPuppiesScreen key={sharedView.id??"list"} cloud={cloud} theme={theme} initialShareId={sharedView.id} onBack={()=>setSharedView(null)}/></SafeAreaProvider>:null}
           </Modal>
         </SafeAreaView>
       </LocalizationProvider>

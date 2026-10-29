@@ -3,5 +3,6 @@ name: Deferred reminder choice retries successfully
 ---
 - tapOn:
     id: "preview.reminders.later"
+- runFlow: "../skip-sharing.yaml"
 - assertVisible:
     id: "preview.ready"

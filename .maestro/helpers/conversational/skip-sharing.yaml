@@ -1,0 +1,12 @@
+appId: com.patrickchin.puptime
+name: Skip optional sharing
+---
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      visible:
+        id: preview.sharing
+    commands:
+      - tapOn:
+          id: preview.skip
+      - waitForAnimationToEnd

@@ -31,7 +31,7 @@ export function useCloud(onRemoteChange:()=>unknown):CloudHandle {
         controller=createAccountController({runtime,api:client.api,photos:createNativePhotoSync(client.photoTransfer),identity:client.identity,exportCloud:client.exportCloud,subscribeLocalWrites,changed:()=>{void Promise.resolve(callback.current()).catch(()=>{});}});
         stopChanges=watchAccountChanges({controller,open:client.openChanges});
         controller.setOnline(online);controller.setActive(active);
-        setHandle({available:true,controller,problem:null,getLocalName,retry});
+        setHandle({available:true,controller,problem:null,getLocalName,retry,sharing:client.sharing,sharingOrigin:client.origin});
         await controller.refresh();
       }catch{if(!disposed)setHandle({available:true,controller:null,problem:'local-storage',getLocalName,retry});}
     })();

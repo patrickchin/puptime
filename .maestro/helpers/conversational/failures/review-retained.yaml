@@ -6,6 +6,8 @@ name: Every answer survives a failed completion and Back
 - tapOn:
     id: "preview.back"
 - tapOn:
+    id: "preview.back"
+- tapOn:
     id: "preview.skip"
 - tapOn:
     id: "preview.back"
@@ -48,5 +50,6 @@ name: Every answer survives a failed completion and Back
     checked: true
 - tapOn:
     id: "preview.reminders.later"
+- runFlow: "../skip-sharing.yaml"
 - assertVisible:
     id: "preview.ready"

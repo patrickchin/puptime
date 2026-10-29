@@ -11,7 +11,7 @@ import type { AppleRevocation } from './account-lifecycle';
 import { cloudAccess, getCloudAccount, type CloudAccess } from './cloud-access';
 import {legacyProfile,legacyProfileRevision} from './profile-compat';
 
-type AccountEnv = { Bindings: Cloudflare.Env; Variables: {
+export type AccountEnv = { Bindings: Cloudflare.Env; Variables: {
   user: { id: string; email: string; name: string }; sessionCreatedAt: number; sessionId: string;
   store: DurableObjectStub<AccountStore>; cloud: CloudAccess;
 } };
@@ -23,7 +23,7 @@ const pushSchema = z.strictObject({ mutations: z.array(mutationSchema).min(1).ma
 const afterSchema = z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 
 export const accountRoutes = new Hono<AccountEnv>();
-const authenticated = createMiddleware<AccountEnv>(async (context, next) => {
+export const authenticated = createMiddleware<AccountEnv>(async (context, next) => {
   context.header('Cache-Control', 'no-store');
   if (!['GET', 'HEAD', 'OPTIONS'].includes(context.req.method)) {
     const origin = context.req.header('origin');
