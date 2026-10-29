@@ -33,8 +33,8 @@ export function SharedPuppiesScreen({cloud,theme,onBack,initialShareId,inviteTok
  }
  return <SafeAreaView style={[styles.root,{backgroundColor:theme.background}]} edges={['top','bottom']}>
   <View style={styles.header}><AccountButton theme={theme} testID="shared.back" label={t('account.back')} onPress={onBack}/><Text accessibilityRole="header" style={[styles.title,headingStyle(theme),{color:theme.text}]}>{t('sharing.sharedTitle')}</Text></View>
-  <ScrollView testID="screen.sharedPuppies" contentContainerStyle={styles.content}>
-   {!accountId?<><Text style={[styles.body,{color:theme.textMuted}]}>{t('sharing.signInShared')}</Text><AccountSignIn cloud={cloud} theme={theme}/></>:<>
+  <ScrollView keyboardShouldPersistTaps="handled" testID="screen.sharedPuppies" contentContainerStyle={styles.content}>
+   {!accountId?<><Text style={[styles.body,{color:theme.textMuted}]}>{t('sharing.signInShared')}</Text><AccountSignIn cloud={cloud} theme={theme} showIntro={false}/></>:<>
     {error?<Text accessibilityRole="alert" style={[styles.body,{color:theme.danger}]}>{t('sharing.error')}</Text>:null}
     {loading||opening?<Text accessibilityRole="progressbar" style={[styles.body,{color:theme.textMuted}]}>{t('sharing.loading')}</Text>:null}
     {initialShareId&&inviteToken&&!puppies.some(puppy=>puppy.id===initialShareId)?<AccountButton theme={theme} primary testID="shared.accept" label={t('sharing.accept')} disabled={loading||!!opening} onPress={()=>{void accept();}}/>:null}
