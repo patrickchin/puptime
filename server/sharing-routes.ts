@@ -1,11 +1,9 @@
 import {Hono,type Context} from 'hono';
-import {getCookie,setCookie} from 'hono/cookie';
 import {HTTPException} from 'hono/http-exception';
 import {z} from 'zod';
 import {authenticated,type AccountEnv} from './account-routes';
 import {createAuth} from './auth';
 import {getAccountStore} from './account-store';
-import {entityId} from '../src/entity-id';
 import {acceptShareSchema,careWriteSchema,createShareSchema,shareIdSchema} from '../src/sharing';
 import {identifierSchema} from '../src/cloud/protocol';
 
@@ -27,19 +25,10 @@ async function user(context:Context<AccountEnv>){
   const active=await context.env.AUTH_DB.prepare("SELECT id FROM user LEFT JOIN cloud_accounts c ON c.account_id=user.id WHERE id=? AND COALESCE(c.state,'')!='deleting'").bind(result.response.user.id).first();
   return active?result.response.user:null;
 }
-const cookieName=(id:string)=>`puptime.care.${id}`;
-async function guest(context:Context<AccountEnv>,row:ShareRow){
-  const token=getCookie(context,cookieName(row.id));
-  if(!token||!/^inv_[a-f0-9]{32}$/.test(token))return null;
-  return context.env.AUTH_DB.prepare('SELECT id,name FROM care_sessions WHERE share_id=? AND token_hash=?').bind(row.id,await secretHash(token)).first<{id:string;name:string}>();
-}
 async function access(context:Context<AccountEnv>,row:ShareRow){
-  if(row.kind==='household'){
-    const member=await user(context);
-    if(!member||member.id!==row.member_id)throw new HTTPException(401);
-    return {id:member.id,name:member.name||row.label};
-  }
-  const session=await guest(context,row);if(!session)throw new HTTPException(401);return session;
+  const member=await user(context);
+  if(!member||member.id!==row.member_id)throw new HTTPException(401);
+  return {id:member.id,name:member.name||row.label};
 }
 export const sharingRoutes=new Hono<AccountEnv>();
 sharingRoutes.use('*',async(context,next)=>{
@@ -91,26 +80,16 @@ sharingRoutes.post('/care/preview',async context=>{
 sharingRoutes.post('/care/accept',async context=>{
   const input=acceptShareSchema.parse(await context.req.json()),row=await share(context,input.id);
   if(row.token_hash!==await secretHash(input.token)||row.invite_expires_at<=Date.now())unavailable();
-  if(row.kind==='household'){
-    const member=await user(context);if(!member)throw new HTTPException(401);
-    if(member.id===row.owner_id)throw new HTTPException(409,{message:'You already own this puppy. Send this invitation to your household member.'});
-    const result=await context.env.AUTH_DB.prepare('UPDATE puppy_shares SET member_id=? WHERE id=? AND revoked_at IS NULL AND (member_id IS NULL OR member_id=?)').bind(member.id,row.id,member.id).run();
-    if(!result.meta.changes)throw new HTTPException(409,{message:'This invitation has already been accepted.'});
-  }else{
-    let session=await guest(context,row);
-    if(!session){
-      const count=await context.env.AUTH_DB.prepare('SELECT COUNT(*) AS n FROM care_sessions WHERE share_id=?').bind(row.id).first<{n:number}>();if(count!.n>=1000)throw new HTTPException(429);
-      const token=entityId('inv');session={id:entityId('csr'),name:input.name?.trim()||'Guest carer'};
-      await context.env.AUTH_DB.prepare('INSERT INTO care_sessions(id,share_id,token_hash,name,created_at) VALUES(?,?,?,?,?)').bind(session.id,row.id,await secretHash(token),session.name,Date.now()).run();
-      setCookie(context,cookieName(row.id),token,{httpOnly:true,secure:new URL(context.req.url).protocol==='https:',sameSite:'Lax',path:'/',maxAge:Math.max(1,Math.ceil((row.expires_at!-Date.now())/1000))});
-    }
-  }
+  const member=await user(context);if(!member)throw new HTTPException(401);
+  if(member.id===row.owner_id)throw new HTTPException(409,{message:'You already own this puppy. Send this invitation to your carer.'});
+  const result=await context.env.AUTH_DB.prepare('UPDATE puppy_shares SET member_id=? WHERE id=? AND revoked_at IS NULL AND (member_id IS NULL OR member_id=?)').bind(member.id,row.id,member.id).run();
+  if(!result.meta.changes)throw new HTTPException(409,{message:'This invitation has already been accepted.'});
   return context.json({id:row.id});
 });
 sharingRoutes.get('/care/puppies',async context=>{
   const member=await user(context);if(!member)throw new HTTPException(401);
-  const rows=await context.env.AUTH_DB.prepare(`SELECT s.*,u.name AS owner_name FROM puppy_shares s JOIN user u ON u.id=s.owner_id LEFT JOIN cloud_accounts c ON c.account_id=s.owner_id WHERE s.member_id=? AND s.revoked_at IS NULL AND COALESCE(c.state,'')!='deleting' ORDER BY s.created_at DESC LIMIT 100`).bind(member.id).all<ShareRow>();
-  const puppies=await Promise.all(rows.results.map(async row=>({id:row.id,name:(await getAccountStore(context.env,row.owner_id).summary()).pets.find(pet=>pet.id===row.pet_id)?.name??'Puppy',ownerName:row.owner_name})));
+  const rows=await context.env.AUTH_DB.prepare(`SELECT s.*,u.name AS owner_name FROM puppy_shares s JOIN user u ON u.id=s.owner_id LEFT JOIN cloud_accounts c ON c.account_id=s.owner_id WHERE s.member_id=? AND s.revoked_at IS NULL AND (s.expires_at IS NULL OR s.expires_at>?) AND COALESCE(c.state,'')!='deleting' ORDER BY s.created_at DESC LIMIT 100`).bind(member.id,Date.now()).all<ShareRow>();
+  const puppies=await Promise.all(rows.results.map(async row=>({id:row.id,name:(await getAccountStore(context.env,row.owner_id).summary()).pets.find(pet=>pet.id===row.pet_id)?.name??'Puppy',ownerName:row.owner_name,petId:row.pet_id,kind:row.kind,permission:row.permission,expiresAt:row.expires_at})));
   return context.json({puppies});
 });
 sharingRoutes.get('/care/:id',async context=>{

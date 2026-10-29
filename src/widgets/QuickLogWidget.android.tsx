@@ -43,6 +43,7 @@ const makeIcon = (name: QuickEventType | 'custom' | 'stop', color: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${iconPaths[name]}</svg>`;
 
 type Props = {
+  scope?:string;canLog?:boolean;
   dark?: boolean;
   compact?: boolean;
   activeNap?: boolean;
@@ -53,6 +54,7 @@ type Props = {
 };
 
 export function QuickLogWidget({
+  scope='owner',canLog=true,
   dark = false,
   compact = false,
   activeNap = false,
@@ -89,8 +91,8 @@ export function QuickLogWidget({
         return (
           <FlexWidget
             key={button.type}
-            clickAction="LOG_EVENT"
-            clickActionData={{ type: button.type }}
+            clickAction={canLog?"LOG_EVENT":"OPEN_APP"}
+            clickActionData={{ type: button.type,scope }}
             accessibilityLabel={`${isActiveNap ? 'End nap' : `Log ${button.label.toLowerCase()}`}, ${lastDate === undefined ? 'never logged' : `last logged ${lastDate.toDateString()} at ${timeLabel}`}`}
             style={{
               flex: 1,

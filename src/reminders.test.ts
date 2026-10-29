@@ -8,11 +8,12 @@ import {DEFAULT_NOTIFICATION_PREFERENCES} from './notification-config.ts';
 type MockRequest = { identifier: string; content?: { title?: string; data?: Record<string, unknown> }; trigger?: { type?: string; date?: number; repeats?: boolean; seconds?: number }; [key: string]: unknown };
 const platform={OS:'ios'};
 (globalThis as typeof globalThis&{__puptimeNotificationPlatform:typeof platform}).__puptimeNotificationPlatform=platform;
-const state={delivery:false,granted:true,exactAllowed:true,canAskAgain:true,answer:true,requests:0,writes:[] as boolean[],scheduled:[] as MockRequest[],cancelled:[] as string[],hold:null as null|(()=>Promise<void>),scheduleHold:null as null|(()=>Promise<void>),failure:null as null|'list'|'create'|'cancel',nextId:0};
+const state={expiresAt:null as number|null,ended:false,delivery:false,granted:true,exactAllowed:true,canAskAgain:true,answer:true,requests:0,writes:[] as boolean[],scheduled:[] as MockRequest[],cancelled:[] as string[],hold:null as null|(()=>Promise<void>),scheduleHold:null as null|(()=>Promise<void>),failure:null as null|'list'|'create'|'cancel',nextId:0};
 (globalThis as typeof globalThis&{__puptimeNotificationTest:typeof state}).__puptimeNotificationTest=state;
 registerHooks({
  resolve(specifier,context,next){
   if(context.parentURL===new URL('./reminders.ts',import.meta.url).href){
+   if(specifier==='./care-access')return {url:'puptime-test:care',shortCircuit:true};
    if(specifier==='expo-notifications')return {url:'puptime-test:notifications',shortCircuit:true};
    if(specifier==='react-native')return {url:'puptime-test:platform',shortCircuit:true};
    if(specifier==='./cloud/notification-delivery')return {url:'puptime-test:delivery',shortCircuit:true};
@@ -22,6 +23,7 @@ registerHooks({
   return next(specifier,context);
  },
  load(url,context,next){
+  if(url==='puptime-test:care')return {format:'module',source:'const s=globalThis.__puptimeNotificationTest;export async function getCareAccess(){return {scope:"owner",expiresAt:s.expiresAt,canLog:!s.ended,ended:s.ended};}',shortCircuit:true};
   if(url==='puptime-test:platform')return {format:'module',source:'export const Platform=globalThis.__puptimeNotificationPlatform;',shortCircuit:true};
   if(url==='puptime-test:exact')return {format:'module',source:'export async function refreshExactReminderScheduling(){return globalThis.__puptimeNotificationTest.exactAllowed;}',shortCircuit:true};
   if(url==='puptime-test:delivery')return {format:'module',source:'const s=globalThis.__puptimeNotificationTest;export async function getNotificationDelivery(){return s.delivery;} export async function setNotificationDelivery(value){s.delivery=value;s.writes.push(value);}',shortCircuit:true};
@@ -43,7 +45,7 @@ registerHooks({
 });
 const reminders=await import('./reminders.ts');
 const routine={id:'break',type:'pee' as const,minutes:420,reminder:true};
-function reset(){Object.assign(state,{delivery:false,granted:true,exactAllowed:true,canAskAgain:true,answer:true,requests:0,writes:[],scheduled:[],cancelled:[],hold:null,scheduleHold:null,failure:null,nextId:0});}
+function reset(){Object.assign(state,{expiresAt:null,ended:false,delivery:false,granted:true,exactAllowed:true,canAskAgain:true,answer:true,requests:0,writes:[],scheduled:[],cancelled:[],hold:null,scheduleHold:null,failure:null,nextId:0});}
 
 test('Android one-off reminders require exact access without blocking immediate widget confirmations',async()=>{
  reset();platform.OS='android';state.delivery=true;state.exactAllowed=false;
@@ -282,4 +284,13 @@ test('queued routine and potty writes reserve against the latest native total ra
  assert.equal(state.scheduled.length,63);assert.deepEqual(state.cancelled,[]);
  assert.equal(state.scheduled.filter(item=>item.identifier.startsWith('puptime-activity-')).length,0);
  assert.equal((await reminders.countCustomTimedReminders()),60);
+});
+
+
+test('temporary care reminders stop at the access deadline, including when the app stays closed',async()=>{
+ reset();state.delivery=true;state.expiresAt=Date.now()+3*86400000;
+ await reminders.syncScheduleReminders([routine]);
+ assert.ok(state.scheduled.length>=2);assert.ok(state.scheduled.every(request=>request.trigger?.type==='date'&&Number(request.trigger.date)<state.expiresAt!));
+ await assert.rejects(reminders.createCustomTimedReminder({petId:'shared',label:'Too late',at:state.expiresAt+1}),/before your access ends/);
+ state.ended=true;await reminders.syncScheduleReminders([routine]);assert.equal(state.scheduled.length,0);
 });

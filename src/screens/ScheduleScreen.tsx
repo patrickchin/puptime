@@ -32,6 +32,7 @@ import { entityId } from '../entity-id';
 type Draft = { id: string; type: EventType; customLabel?: string; minutes: number; reminder: boolean; toleranceMinutes?: number };
 
 export function ScheduleScreen({
+  readOnly=false,
   events:projectedEvents,
   activity,
   refreshToken,
@@ -45,7 +46,7 @@ export function ScheduleScreen({
   setupHeader,
   showHeader=true,
 }: {
-  events: PuppyEvent[];
+  readOnly?:boolean;events: PuppyEvent[];
   schedule: ScheduleEntry[];
   customActivities: string[];
   onChange: (schedule: ScheduleEntry[]) => Promise<void>;
@@ -226,7 +227,7 @@ export function ScheduleScreen({
                   : t('schedule.noPattern')}
             </Text>
           </View>
-          {canSuggest ? (
+          {canSuggest&&!readOnly ? (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t('schedule.previewA11y', { count: suggestion.entries.length })}
@@ -351,10 +352,10 @@ export function ScheduleScreen({
             <Text style={[styles.emptyTitle, { color: theme.text }]}>{t('schedule.emptyTitle')}</Text>
           </View>
         ) : (
-          <RoutineTimeline statuses={statuses} now={now} theme={theme} setup={Boolean(setupHeader)} onEdit={editEntry} onRemove={requestRemove}/>
+          <RoutineTimeline readOnly={readOnly} statuses={statuses} now={now} theme={theme} setup={Boolean(setupHeader)} onEdit={editEntry} onRemove={requestRemove}/>
         )}
 
-        <Pressable
+        {!readOnly?<Pressable
           testID="schedule.add"
           accessibilityRole="button"
           accessibilityLabel={t('schedule.addA11y')}
@@ -369,7 +370,7 @@ export function ScheduleScreen({
         >
           <MaterialCommunityIcons name="plus" color={theme.onPrimary} size={22} />
           <Text style={[styles.addButtonText, { color: theme.onPrimary }]}>{t('schedule.addTime')}</Text>
-        </Pressable>
+        </Pressable>:null}
         {!setupHeader&&schedule.length?suggestionCard:null}
       </ScrollView>
 

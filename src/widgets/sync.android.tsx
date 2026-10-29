@@ -1,3 +1,4 @@
+import {getCareAccess} from '../care-access';
 import { requestWidgetUpdate } from 'react-native-android-widget';
 
 import { isOpenNap, latestQuickEventTimes, type PuppyEvent } from '../domain';
@@ -11,6 +12,7 @@ export async function readPendingWidgetEvents(): Promise<PuppyEvent[]> {
 export async function acknowledgePendingWidgetEvents(_events: PuppyEvent[]): Promise<void> {}
 
 export async function updateHomeWidget(events: PuppyEvent[]): Promise<void> {
+  const access=await getCareAccess();
   const activeNap = events.some(isOpenNap);
   const lastEventAt = latestQuickEventTimes(events);
   const customActivities = await loadCustomActivities(events);
@@ -20,8 +22,8 @@ export async function updateHomeWidget(events: PuppyEvent[]): Promise<void> {
   await requestWidgetUpdate({
     widgetName: 'PuptimeQuickLog',
     renderWidget: ({ height }) => ({
-      light: <QuickLogWidget compact={height < 90} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} />,
-      dark: <QuickLogWidget compact={height < 90} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} dark />,
+      light: <QuickLogWidget scope={access.scope} canLog={access.canLog} compact={height < 90} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} />,
+      dark: <QuickLogWidget scope={access.scope} canLog={access.canLog} compact={height < 90} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} dark />,
     }),
   });
 }

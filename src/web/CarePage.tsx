@@ -34,7 +34,7 @@ export default function CarePage(){
 }
 function CareContent({client,id,token,clearToken}:{client:CareClient;id:string|null;token:string|null;clearToken:()=>void}){
  const [preview,setPreview]=useState<CarePreview|null>(null),[page,setPage]=useState<Page|null>(null),[routines,setRoutines]=useState<CareRow[]>([]),[puppies,setPuppies]=useState<{id:string;name:string;ownerName:string}[]|null>(null);
- const [error,setError]=useState(''),[loading,setLoading]=useState(true),[accepting,setAccepting]=useState(false),[name,setName]=useState(''),[signedIn,setSignedIn]=useState(false),[retry,setRetry]=useState(0);
+ const [error,setError]=useState(''),[loading,setLoading]=useState(true),[accepting,setAccepting]=useState(false),[signedIn,setSignedIn]=useState(false),[retry,setRetry]=useState(0);
  const generation=useRef(0),acceptLock=useRef(false);
  const [newLog,setNewLog]=useState(false),[newRoutine,setNewRoutine]=useState(false),[busy,setBusy]=useState(false);
  const active=useRef(true);useEffect(()=>{active.current=true;return()=>{active.current=false;generation.current++;};},[]);
@@ -67,7 +67,7 @@ function CareContent({client,id,token,clearToken}:{client:CareClient;id:string|n
  const write=useCallback(async(input:CareWrite)=>{if(!id)return;await client.write(id,input);await refresh();},[client,id,refresh]);
  async function accept(){
   if(!id||!token||acceptLock.current)return;acceptLock.current=true;setAccepting(true);setError('');
-  try{await client.accept(id,token,name);clearToken();setRetry(value=>value+1);}
+  try{await client.accept(id,token);clearToken();setRetry(value=>value+1);}
   catch(reason){setError(problem(reason));}finally{acceptLock.current=false;if(active.current)setAccepting(false);}
  }
  async function more(){
@@ -79,15 +79,16 @@ function CareContent({client,id,token,clearToken}:{client:CareClient;id:string|n
  if(!id)return <><p className="eyebrow">YOUR HOUSEHOLD</p><h1>Shared puppies</h1>{error?<p role="alert" className="care-error">{error}</p>:null}{puppies?<>{puppies.length?<ul className="puppy-list">{puppies.map(puppy=><li key={puppy.id}><a href={`/care?invite=${puppy.id}`}><strong>{puppy.name}</strong><span>Shared by {puppy.ownerName||'their owner'}</span></a></li>)}</ul>:<p>No puppies have been shared with this account yet. Open the invitation your household member sent you.</p>}<a href="/account">Your account</a></>:<><p>Sign in to see puppies shared with you. For temporary care, open your invitation link.</p><CareSignIn onSignedIn={()=>{setSignedIn(true);setRetry(value=>value+1);}}/></>}</>;
  if(!page)return <>{error?<p role="alert" className="care-error">{error}</p>:null}{preview?<>
   <p className="eyebrow">SHARED BY {preview.ownerName||'THEIR OWNER'}</p><h1>You’re looking after {preview.puppyName}.</h1>
-  <p>{preview.share.kind==='household'?'Join the household to see the full history, record activities and manage routines. Your access continues until the owner removes it.':`${preview.share.permission==='view'?'View recent logs and routines':'View recent logs, routines and add activities'}. Access ends ${dateTime(preview.share.expiresAt!)}.`}</p>
-  {preview.share.kind==='temporary'?<label className="care-field">Your name <span className="muted">(optional)</span><input autoComplete="given-name" maxLength={80} value={name} onChange={event=>setName(event.target.value)}/></label>:<CareSignIn onSignedIn={()=>setSignedIn(true)}/>}
-  <button className="primary" disabled={accepting||preview.share.kind==='household'&&!signedIn} onClick={()=>{void accept();}}>{accepting?'Opening…':preview.share.kind==='household'?'Join household':'Open puppy logs'}</button>
+  <p>{preview.share.kind==='household'?'Use the full Puptime app with your own account. Your access continues until the owner removes it.':`Use the full Puptime app with your own account, including offline logging, reminders and widgets. Access ends ${dateTime(preview.share.expiresAt!)}.`}</p>
+  <p><a className="primary" href={`puptime://care?invite=${id}#${token}`}>Open in Puptime</a></p>
+  <CareSignIn onSignedIn={()=>setSignedIn(true)}/>
+  <button className="primary" disabled={accepting||!signedIn} onClick={()=>{void accept();}}>{accepting?'Opening…':'Accept invitation'}</button>
  </>:<><h1>Access unavailable</h1><p>Open your original invitation, or ask the puppy’s owner for a new one.</p><button onClick={()=>setRetry(value=>value+1)}>Try again</button></>}</>;
  const household=page.share.kind==='household',canAdd=page.share.permission==='contribute';
  return <>
   <p className="eyebrow">{household?'HOUSEHOLD MEMBER':'TEMPORARY CARE'} · {household?'UNTIL REMOVED':`ENDS ${dateTime(page.share.expiresAt!)}`}</p>
   <h1>{page.puppyName}</h1><p className="muted">Shared by {page.ownerName||'their owner'} · {page.actorName}</p>
-  {household?<p><a href={`puptime://care?invite=${page.share.id}`}>Open in Puptime</a></p>:null}
+  {<p><a href={`puptime://care?invite=${page.share.id}`}>Open in Puptime</a></p>}
   {error?<p role="alert" className="care-error">{error}</p>:null}
   <div className="care-actions">{canAdd?<button className="primary" onClick={()=>setNewLog(true)}>Log an activity</button>:<span className="care-pill">View only</span>}<button onClick={()=>{void refresh();}}>Refresh logs</button></div>
   {newLog?<CareEditor kind="event" write={write} onClose={()=>setNewLog(false)}/>:null}
@@ -95,7 +96,7 @@ function CareContent({client,id,token,clearToken}:{client:CareClient;id:string|n
    {newRoutine?<CareEditor kind="routine" write={write} onClose={()=>setNewRoutine(false)}/>:null}
    {routines.length?routines.slice().sort((a,b)=>('minutes' in a.record.data?a.record.data.minutes:0)-('minutes' in b.record.data?b.record.data.minutes:0)).map(row=><CareLogRow key={row.record.id} row={row} write={write} allowEdit={household}/>):<p className="muted">No routine set up yet.</p>}
   </section>
-  <section aria-labelledby="logs-heading"><h2 id="logs-heading">{household?'Puppy logs':'Recent logs · last 7 days'}</h2>
+  <section aria-labelledby="logs-heading"><h2 id="logs-heading">Puppy logs</h2>
    {page.records.length?page.records.slice().sort((a,b)=>('at' in b.record.data?b.record.data.at:0)-('at' in a.record.data?a.record.data.at:0)).map(row=><CareLogRow key={row.record.id} row={row} write={write} allowEdit={canAdd&&row.canEdit}/>):<p className="muted">No logs here yet.</p>}
    {page.nextCursor?<button disabled={busy} onClick={()=>{void more();}}>{busy?'Loading…':'Load more logs'}</button>:null}
   </section>

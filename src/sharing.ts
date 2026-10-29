@@ -23,7 +23,7 @@ export const careRowSchema=z.object({record:cloudRecordSchema,localId:z.string()
 export type CareRow=z.infer<typeof careRowSchema>;
 export const carePageSchema=z.object({puppyName:z.string(),records:z.array(careRowSchema).max(50),nextCursor:z.number().nullable(),share:shareSchema,ownerName:z.string(),actorName:z.string()});
 export type CarePage=z.infer<typeof carePageSchema>;
-export const sharedPuppiesSchema=z.object({puppies:z.array(z.object({id:shareIdSchema,name:z.string(),ownerName:z.string()})).max(100)});
+export const sharedPuppiesSchema=z.object({puppies:z.array(z.object({id:shareIdSchema,name:z.string(),ownerName:z.string(),petId:identifierSchema,kind:z.enum(['household','temporary']),permission:z.enum(['contribute','view']),expiresAt:z.number().nullable()})).max(100)});
 export function reuseCareRows(previous:CareRow[],next:CareRow[]){const old=new Map(previous.map(row=>[row.record.id,row]));return next.map(row=>{const saved=old.get(row.record.id);return saved&&saved.record.revision===row.record.revision&&saved.canEdit===row.canEdit?saved:row;});}
 export const careNote=(note:string|undefined)=>note?.replace(/(?:^|\n\n)Logged by [^\n]+$/,'')??'';
 export function careEditPatch(row:CareRow|undefined,desired:Record<string,unknown>){
@@ -34,3 +34,5 @@ export function careEditPatch(row:CareRow|undefined,desired:Record<string,unknow
     && JSON.stringify(value)!==JSON.stringify(key==='note'?careNote(before.note as string|undefined):before[key])));
 }
 export function sharingUrl(origin:string,id:string,token:string){return `${origin}/care?invite=${shareIdSchema.parse(id)}#${inviteTokenSchema.parse(token)}`;}
+
+export type SharedPuppy=z.infer<typeof sharedPuppiesSchema>['puppies'][number];

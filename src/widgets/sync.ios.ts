@@ -1,3 +1,4 @@
+import {getCareAccess} from '../care-access';
 import { EVENT_META, customActivityKey, isOpenNap, latestQuickEventTimes, type PuppyEvent } from '../domain';
 import { resolveLanguage } from '../localization';
 import { resolveTheme } from '../theme';
@@ -16,10 +17,12 @@ import { parseEvents } from '../storage-validation';
 const importedOperations = new WeakMap<PuppyEvent[], File[]>();
 
 export async function readPendingWidgetEvents(): Promise<PuppyEvent[]> {
+  const access=await getCareAccess();
+  if(!access.canLog)return [];
   const directory = widgetsDirectory ? new Directory(widgetsDirectory, 'PuptimePending') : null;
   const files = directory?.exists ? directory.list().filter((entry): entry is File => entry instanceof File && /^wop_[a-f0-9]+\.json$/.test(entry.name)) : [];
   const operations = (await Promise.all(files.map(async file => {
-    try { return JSON.parse(await file.text()); }
+    try { const event=JSON.parse(await file.text());return {...event,__file:file}; }
     catch (error) { if (!file.exists) return undefined; throw error; }
   }))).filter(event => event !== undefined);
   let legacy: PuptimeWidgetProps['pending'] = [];
@@ -27,7 +30,8 @@ export async function readPendingWidgetEvents(): Promise<PuppyEvent[]> {
     const timeline = await PuptimeWidget.getTimeline();
     legacy = timeline.flatMap((entry) => (entry.props as PuptimeWidgetProps).pending ?? []);
   } catch { /* Journaled operations remain importable if a presentation is unavailable. */ }
-  const pending = [...legacy, ...operations].flatMap((event) => parseEvents([{
+  const belongs=(event:{scope?:string})=>(event.scope??'owner')===access.scope;
+  const pending = [...legacy, ...operations].filter(belongs).flatMap(({scope:_scope,__file:_file,...event}) => parseEvents([{
       ...event,
       ...(event.type === 'nap' && event.endedAt === undefined ? { endedAt: null } : {}),
       source: 'widget' as const,
@@ -39,7 +43,7 @@ export async function readPendingWidgetEvents(): Promise<PuppyEvent[]> {
     if (!previous || time > previousTime || (time === previousTime && typeof event.endedAt === 'number')) latest.set(event.id, event);
   }
   const events = [...latest.values()];
-  importedOperations.set(events, files);
+  importedOperations.set(events,operations.filter(belongs).map(event=>event.__file));
   return events;
 }
 
@@ -51,6 +55,7 @@ export async function acknowledgePendingWidgetEvents(events: PuppyEvent[]): Prom
 }
 
 export async function updateHomeWidget(events: PuppyEvent[]): Promise<void> {
+  const access=await getCareAccess();
   const openNap = events.find(isOpenNap);
   const customActivities = await loadCustomActivities(events);
   const [actions, themePreference, notificationPreferences, languagePreference] = await Promise.all([
@@ -73,6 +78,9 @@ export async function updateHomeWidget(events: PuppyEvent[]): Promise<void> {
     }];
   }));
   await PuptimeWidget.updateSnapshot({
+    scope:access.scope,
+    expiresAt:access.expiresAt??0,
+    canLog:access.canLog,
     pending: [],
     openNap: openNap ? { id: openNap.id, type: 'nap', at: openNap.at } : false,
     lastEventAt: latestQuickEventTimes(events),

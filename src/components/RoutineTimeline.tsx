@@ -8,8 +8,8 @@ import {useLocalization} from '../localization-context';
 import type {Theme} from '../theme';
 import {ActivityIcon} from './ActivityIcon';
 
-export const RoutineTimeline=memo(function RoutineTimeline({statuses,now,theme,setup=false,onEdit,onRemove}:{
- statuses:ScheduleStatusItem[];now:number;theme:Theme;setup?:boolean;onEdit:(entry:ScheduleEntry)=>void;onRemove:(entry:ScheduleEntry)=>void;
+export const RoutineTimeline=memo(function RoutineTimeline({statuses,now,theme,setup=false,readOnly=false,onEdit,onRemove}:{
+ statuses:ScheduleStatusItem[];now:number;theme:Theme;readOnly?:boolean;setup?:boolean;onEdit:(entry:ScheduleEntry)=>void;onRemove:(entry:ScheduleEntry)=>void;
 }){
  const {activityColors,activityLabel,locale,t}=useLocalization();
  const {fontScale}=useWindowDimensions();
@@ -33,7 +33,7 @@ export const RoutineTimeline=memo(function RoutineTimeline({statuses,now,theme,s
       const statusLabel=t(status==='done'?'schedule.status.logged':status==='due'?entry.toleranceMinutes!==undefined?'schedule.status.flexibleDue':'schedule.status.due':status==='missed'?'schedule.status.missed':'schedule.status.upcoming');
       return <View key={entry.id}>
        {current&&nowIndex===index?nowLine:null}
-       <Pressable testID={`schedule.entry.${entry.type}`} accessibilityRole="button"
+       <Pressable testID={`schedule.entry.${entry.type}`} accessibilityRole={readOnly?undefined:"button"} disabled={readOnly}
         accessibilityLabel={t('schedule.editA11y',{activity:label,time:entry.toleranceMinutes===undefined?formatMinutes(entry.minutes,locale):formatScheduleWindow(entry,locale),status:setup?'':statusLabel,reminder:entry.reminder?t('schedule.reminderOn'):''})}
         onPress={()=>onEdit(entry)} style={({pressed})=>[styles.entry,{backgroundColor:pressed?colors.softColor:theme.surfaceRaised,borderColor:theme.border,borderLeftColor:colors.color,borderRadius:theme.presentation.controlRadius}]}>
         <View style={[styles.icon,{backgroundColor:colors.softColor}]}><ActivityIcon activity={entry} theme={theme} color={colors.color} size={21}/></View>
@@ -46,10 +46,10 @@ export const RoutineTimeline=memo(function RoutineTimeline({statuses,now,theme,s
           {entry.reminder?<MaterialCommunityIcons accessible={false} name="bell-outline" size={14} color={theme.primary}/>:null}
          </View>:null}
         </View>
-        <Pressable testID={`schedule.entry.${entry.type}.remove`} accessibilityRole="button" accessibilityLabel={t('schedule.removeA11y',{activity:label,time:formatMinutes(entry.minutes,locale)})}
+        {!readOnly?<Pressable testID={`schedule.entry.${entry.type}.remove`} accessibilityRole="button" accessibilityLabel={t('schedule.removeA11y',{activity:label,time:formatMinutes(entry.minutes,locale)})}
          onPress={event=>{event.stopPropagation();onRemove(entry);}} style={({pressed})=>[styles.remove,{backgroundColor:pressed?theme.primarySoft:undefined,borderRadius:theme.presentation.controlRadius}]}>
          <MaterialCommunityIcons accessible={false} name="close" size={20} color={theme.textMuted}/>
-        </Pressable>
+        </Pressable>:null}
        </Pressable>
       </View>;
      })}

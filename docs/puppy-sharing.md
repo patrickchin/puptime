@@ -1,35 +1,30 @@
 # Puppy sharing
 
-Owners open **Puppy → Share puppy** or choose sharing at the end of conversational onboarding. Sharing requires the owner's signed-in account and explicit cloud enrollment. Existing local-only use remains available.
+Owners open **Puppy → Share puppy** or choose sharing during onboarding. Sharing requires cloud sync. Local-only logging remains available.
 
-## Access
+| Access | Account | Puppy permissions | Duration |
+|---|---|---|---|
+| Household member | Normal Puptime account | Full history, logging and routines | Until removed |
+| Temporary carer | Normal Puptime account | Full history and routines; add logs and correct their own, or view only | Chosen date within 30 days |
 
-| Mode | Acceptance | Rights | Duration |
-| --- | --- | --- | --- |
-| Household | Sign in to claim a single-person invitation within seven days | Full puppy log history; create, edit and delete logs and routines | Until the owner removes access |
-| Temporary | Open a browser link; optional display name; no account created | Last seven days and routines; view-only or add logs and correct entries created in the same browser session | Owner chooses 24 hours, 3 days, 7 days, or a date/time within 30 days |
+Send an invitation using the native share sheet or scan its QR code. One account claims each invitation; the same account can retry acceptance. Recipients can accept in the app or on the private care page, then open the puppy in Puptime. Onboarding includes **Already invited?** and an optional owner sharing step.
 
-Owner invitations are distinct grants. A household invitation can be retried by the same recipient, but cannot be claimed by a second person. Removing one grant does not affect other invitations. The owner controls puppy settings and access; carers cannot manage the owner's account, download account exports, use its integration keys or enroll devices into it.
+Shared puppies open the same native app screens as the owner's journal: logging, timeline, routines, insights, notifications, settings and widgets. Each puppy/account pair has its own local SQLite database and uses the existing resumable sync engine and offline outbox. Selecting another puppy remounts the journal and binds its callbacks to that database. The recipient's own puppy and preferences remain separate. Foreground sync checks for changes every 15 seconds and on resume. Owner WebSocket channels are never exposed to members.
 
-Household members can use **Puppy → Shared puppies**, **Already invited? Open shared puppies** during onboarding, or **Open in Puptime** after accepting on the website. Sign in using the same account that accepted the invitation. Shared journals use the owner's existing cloud records and mutation engine; they do not copy ownership or merge the owner's account preferences into the recipient's local puppy. They require connectivity and refresh while foregrounded every 15 seconds, on resume, after writes and on explicit refresh. A member's own local puppy remains separate.
+Personal appearance, widget choices, notification preferences and temporary carers' routine reminder toggles remain local. Guests cannot rename a puppy, change access, edit another person's logs, or manage shared routines. Server authorization is authoritative. A stored deadline also blocks local writes after expiry. Revocation is discovered when online; an offline device cannot learn a new revocation until it reconnects. Unsynced work is retained when service access ends.
 
-Temporary carers use `/care` in their browser. Its session cookie remembers access until the grant ends. A new browser gets a distinct actor and cannot correct another browser's entries. Logging attribution is stored as a `Logged by …` note suffix for compatibility with existing native clients; immutable revision actors enforce authorship. Identity remains linked to the signed-in member or guest session regardless of editable display text.
+Widget operations carry their original puppy scope and remain queued until that puppy is selected and its SQLite commit succeeds. Temporary routine reminders use dated requests ending before access expires. The OS notification limit bounds how far a large routine can be scheduled; the app replenishes requests when opened.
 
 ## Deployment and security
 
-Apply additive D1 migration `server/migrations/0003-puppy-sharing.sql` before deploying the Worker and website. Preserve existing auth and account databases. No device or per-account database migration is needed. Deploy the `/care` static page with the existing Pages API proxy, then release the native client.
+Apply `server/migrations/0003-puppy-sharing.sql` before deploying the Worker and website, then release the native client. This migration is new in this PR and requires no per-account schema changes. Never replace existing auth/account databases.
 
-Application IDs use `shr_` for grants, `csr_` for guest sessions and retry identities, and `inv_` for random invitation/session secrets. Only SHA-256 hashes of secrets are stored. Invitation secrets are URL fragments and are exchanged through POST bodies, never API URL parameters. Successful acceptance clears the saved invitation from session storage. Guest cookies are HttpOnly, SameSite=Lax and Secure on HTTPS. Pending household credentials cannot be used as permanent account sessions.
+Application IDs use `shr_` grants, `inv_` invitation secrets and `csr_` request identities. Secrets are URL fragments and POST bodies, never API URL parameters. Only SHA-256 hashes are saved. Normal Better Auth sessions identify every recipient; there is no anonymous guest credential mechanism.
 
-Sharing checks owner state, puppy scope, account identity, membership, expiry and revocation. The account object rechecks the grant before accessing records, including requests queued before revocation. All writes use the existing revision preconditions and actor-scoped idempotency receipts. Owner deletion fences requests immediately; foreign keys cascade grants and guest sessions when identities are removed.
+Shared native requests carry an expected member account and grant ID. Only account summary, enrollment, pull/push, record history and photo reads support shared scope. Each reads the authorized puppy alone. Account preferences, exports, integration keys and account management remain the member's own. The owner Durable Object rechecks membership, expiry, revocation and deletion state before each shared operation. Immutable revision actors enforce authorship even if a client spoofs its device ID. Existing revision reconciliation and idempotency protect offline retries.
 
-The care page loads no analytics, uses `no-referrer` and `no-store`, and is excluded from indexing and the sitemap. QR codes are generated locally from the same invitation URL. Raw secrets are shown only for the newly created invitation; create a new invitation if its link is lost.
+Private `/care` has no analytics, is excluded from the sitemap, and sends no-store/no-referrer/noindex headers.
 
 ## Verification
 
-- `npm test`, `npm run test:server`, `npm run test:web`
-- `npm run typecheck`, `npm run typecheck:ios`, `npm run typecheck:android`, `npm run typecheck:server`
-- `npm run build:web`
-- `.maestro/conversational/17-sharing.yaml` covers the optional setup branch; existing completion helpers skip the new sharing step.
-
-The server tests use actual Better Auth, local D1 and SQLite Durable Objects. They cover guest access without account creation, household claim/retry, isolation, revision-safe retries, authorship, view-only access, expiry, revocation and owner deletion fencing. Populated-history reference tests keep unchanged rows stable for memoized care rows.
+Server tests exercise normal account acceptance, claim/retry, complete history, owner isolation, scoped native sync, spoofed authorship, view-only access, expiry, revocation and account deletion. SQLite tests check offline writes, rollback of unauthorized changes and personal preference isolation. Widget tests cover scope changes without lost or misattributed operations. Scheduler tests check deadlines with the app closed.

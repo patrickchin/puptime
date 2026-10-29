@@ -1,5 +1,6 @@
 'use no memo';
 
+import {getCareAccess} from './care-access';
 import type { WidgetTaskHandlerProps } from 'react-native-android-widget';
 
 import {
@@ -78,6 +79,7 @@ function refreshAfterTaps(preferences: NotificationPreferences, language: AppLan
 }
 
 async function render(props: WidgetTaskHandlerProps, events: PuppyEvent[]) {
+  const access=await getCareAccess();
   const compact = props.widgetInfo.height < 90;
   const activeNap = events.some(isOpenNap);
   const customActivities = await loadCustomActivities(events);
@@ -85,14 +87,16 @@ async function render(props: WidgetTaskHandlerProps, events: PuppyEvent[]) {
   const themePreference = await loadThemePreference();
   const lastEventAt = latestQuickEventTimes(events);
   props.renderWidget({
-    light: <QuickLogWidget compact={compact} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} />,
-    dark: <QuickLogWidget compact={compact} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} dark />,
+    light: <QuickLogWidget scope={access.scope} canLog={access.canLog} compact={compact} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} />,
+    dark: <QuickLogWidget scope={access.scope} canLog={access.canLog} compact={compact} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} dark />,
   });
 }
 
 export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
   if (props.widgetAction === 'WIDGET_CLICK' && props.clickAction === 'LOG_EVENT') {
     // Keep the tap time even when Android has to start the JavaScript runtime.
+    const access=await getCareAccess();
+    if(!access.canLog||(props.clickActionData?.scope??'owner')!==access.scope){await render(props,await latestEvents());return;}
     const tapAt = props.clickActionData?.tapAt;
     const at = typeof tapAt === 'number' && Number.isSafeInteger(tapAt) && tapAt > 0 ? tapAt : Date.now();
     const type = props.clickActionData?.type;

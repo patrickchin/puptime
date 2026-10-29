@@ -1,5 +1,5 @@
 import {z} from 'zod';
-import {createShareSchema,shareListSchema,shareSchema,shareIdSchema,carePageSchema,careWriteSchema,sharedPuppiesSchema,type CreateShare,type CareWrite} from '../sharing.ts';
+import {acceptShareSchema,createShareSchema,shareListSchema,shareSchema,shareIdSchema,carePageSchema,careWriteSchema,sharedPuppiesSchema,type CreateShare,type CareWrite} from '../sharing.ts';
 import {cloudRecordSchema} from './protocol.ts';
 import {CloudApiError,cloudErrorCategory} from './api.ts';
 
@@ -10,6 +10,7 @@ export function createSharingApi(origin:string,fetcher:(url:string,options:{meth
     const parsed=schema.safeParse(result.data);if(!parsed.success)throw new CloudApiError('invalid-response');return parsed.data;
   }
   return {
+    accept:(accountId:string,id:string,token:string)=>call('/api/care/accept',accountId,z.strictObject({id:shareIdSchema}),acceptShareSchema.parse({id,token})),
     list:(accountId:string,petId:string)=>call(`/api/sharing?petId=${encodeURIComponent(petId)}`,accountId,shareListSchema),
     create:(accountId:string,input:CreateShare)=>call('/api/sharing',accountId,shareSchema,createShareSchema.parse(input)),
     revoke:(accountId:string,id:string)=>call(`/api/sharing/${shareIdSchema.parse(id)}/revoke`,accountId,z.strictObject({ok:z.literal(true)}),{}),
