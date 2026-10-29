@@ -90,3 +90,17 @@ test('pee, poop, and meals use distinct blue, orange, and green families', () =>
     });
   });
 });
+
+// The canvas and its paper cards have separate foregrounds in both appearances.
+test('canvas and content foregrounds retain accessible contrast', () => {
+  for (const theme of [lightTheme, darkTheme]) {
+    for (const foreground of [theme.onCanvas, theme.onCanvasMuted]) {
+      assert.ok(contrastRatio(foreground, theme.canvas) >= 4.5);
+    }
+    for (const surface of [theme.surface, theme.surfaceRaised]) {
+      for (const foreground of [theme.text, theme.textMuted, theme.primary]) {
+        assert.ok(contrastRatio(foreground, surface) >= 4.5);
+      }
+    }
+  }
+});

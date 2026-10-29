@@ -32,25 +32,25 @@ export function SideNavigation({open,enabled,tab,settingsVisible,theme,onOpen,on
   const icon=key==='settings'?'cog-outline':key==='account'?'account-circle-outline':key==='notifications'?'bell-outline':key==='pets'?'paw-outline':navigationIcon(theme,key);
   return <Pressable key={key} testID={`nav.${key}`} accessibilityRole="button" accessibilityLabel={label}
    accessibilityState={{selected}} onPress={()=>{onClose();if(key==='settings')onSettings();else if(key==='account')onAccount?.();else onChange(key);}}
-   style={({pressed})=>[styles.item,{backgroundColor:selected?theme.primarySoft:pressed?theme.surface:undefined,borderRadius:theme.presentation.controlRadius}]}>
-   <MaterialCommunityIcons accessible={false} name={icon as keyof typeof MaterialCommunityIcons.glyphMap} size={24} color={selected?theme.primary:theme.textMuted} accessibilityElementsHidden importantForAccessibility="no"/>
-   <Text maxFontSizeMultiplier={2} style={[styles.itemText,{color:selected?theme.primary:theme.text,fontWeight:selected?'700':'500'}]}>{label}</Text>
+   style={({pressed})=>[styles.item,{backgroundColor:selected?theme.primarySoft:undefined,opacity:pressed?0.65:1,borderRadius:theme.presentation.controlRadius}]}>
+   <MaterialCommunityIcons accessible={false} name={icon as keyof typeof MaterialCommunityIcons.glyphMap} size={24} color={selected?theme.primary:theme.onCanvasMuted} accessibilityElementsHidden importantForAccessibility="no"/>
+   <Text maxFontSizeMultiplier={2} style={[styles.itemText,{color:selected?theme.primary:theme.onCanvas,fontWeight:selected?'700':'500'}]}>{label}</Text>
   </Pressable>;
  };
  const drawerWidth=Math.min(340,width*0.84);
  const content=()=><ScrollView testID="nav.drawer" stickyHeaderIndices={[0]} contentContainerStyle={styles.content} onAccessibilityEscape={onClose}>
-   <View style={{backgroundColor:theme.background}}><View style={styles.brandRow}><Text maxFontSizeMultiplier={1.5} style={[styles.brand,headingStyle(theme),{color:theme.text}]}>Puptime</Text>
+   <View style={{backgroundColor:theme.canvas}}><View style={styles.brandRow}><Text maxFontSizeMultiplier={1.5} style={[styles.brand,headingStyle(theme),{color:theme.onCanvas}]}>Puptime</Text>
     <Pressable testID="nav.close" accessibilityRole="button" accessibilityLabel={t('nav.close')} onPress={onClose} style={styles.close}>
-     <MaterialCommunityIcons accessible={false} name="close" size={24} color={theme.text} accessibilityElementsHidden importantForAccessibility="no"/>
+     <MaterialCommunityIcons accessible={false} name="close" size={24} color={theme.onCanvas} accessibilityElementsHidden importantForAccessibility="no"/>
     </Pressable>
    </View></View>
    <View style={styles.items}>{destinations.map(item)}</View>
 
 
-   <View style={[styles.settings,{borderTopColor:theme.border}]}>{onAccount?item('account'):null}{item('settings')}</View>
+   <View style={[styles.settings,{borderTopColor:theme.canvasBorder}]}>{onAccount?item('account'):null}{item('settings')}</View>
   </ScrollView>;
  return <><Drawer open={!reduceMotion&&enabled&&open} onOpen={onOpen} onClose={onClose} drawerPosition="left" drawerType="front"
-  swipeEnabled={!reduceMotion&&enabled} drawerStyle={{width:drawerWidth,backgroundColor:theme.background}}
+  swipeEnabled={!reduceMotion&&enabled} drawerStyle={{width:drawerWidth,backgroundColor:theme.canvas}}
   overlayAccessibilityLabel={t('nav.close')} renderDrawerContent={content}>
   {children}
  </Drawer>
@@ -59,7 +59,7 @@ export function SideNavigation({open,enabled,tab,settingsVisible,theme,onOpen,on
  <Modal visible={reduceMotion&&enabled&&open} transparent animationType="none" onRequestClose={onClose}>
   <View style={styles.motionLayer} onAccessibilityEscape={onClose}>
    <Pressable testID="nav.backdrop" accessibilityRole="button" accessibilityLabel={t('nav.close')} onPress={onClose} style={[StyleSheet.absoluteFill,styles.backdrop]}/>
-   <View testID="nav.reducedMotion" accessibilityViewIsModal style={{width:drawerWidth,backgroundColor:theme.background,paddingTop:insets.top,paddingBottom:insets.bottom}}>{content()}</View>
+   <View testID="nav.reducedMotion" accessibilityViewIsModal style={{width:drawerWidth,backgroundColor:theme.canvas,paddingTop:insets.top,paddingBottom:insets.bottom}}>{content()}</View>
   </View>
  </Modal></>;
 }

@@ -533,7 +533,7 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
   return (
     <View
       testID="screen.timeline"
-      style={[styles.screen, { backgroundColor: theme.background }]}
+      style={[styles.screen, { backgroundColor: theme.background, borderTopLeftRadius: theme.presentation.cardRadius, borderTopRightRadius: theme.presentation.cardRadius, overflow: 'hidden' }]}
     >
       <ActivityLoadState loading={window.loading} error={window.error||summaryError} onRetry={()=>{window.retry();setSummaryAttempt(value=>value+1);}} theme={theme}/>
       <View

@@ -22,12 +22,12 @@ export const RoutineTimeline=memo(function RoutineTimeline({statuses,now,theme,s
    const items=entries.filter(item=>Math.floor(item.entry.minutes/60)===hour);
    const current=!setup&&date.getHours()===hour;
    const nowLine=<View key="now" testID="schedule.now" accessible accessibilityLabel={`${t('schedule.now')}, ${formatMinutes(currentMinute,locale)}`} style={styles.now}>
-    <Text style={[styles.nowText,{color:theme.primary}]}>{t('schedule.now')} · {formatMinutes(currentMinute,locale)}</Text><View style={[styles.nowLine,{backgroundColor:theme.primary}]}/>
+    <Text style={[styles.nowText,{color:theme.onCanvas}]}>{t('schedule.now')} · {formatMinutes(currentMinute,locale)}</Text><View style={[styles.nowLine,{backgroundColor:theme.onCanvas}]}/>
    </View>;
    const nowIndex=items.findIndex(item=>item.entry.minutes>currentMinute);
    return <View key={hour} style={styles.hour}>
-    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} maxFontSizeMultiplier={1.5} style={[styles.hourLabel,{color:theme.textMuted,width:Math.max(72,64*Math.min(fontScale,1.5))}]}>{formatMinutes(hour*60,locale)}</Text>
-    <View style={[styles.hourContent,{borderColor:theme.border}]}>
+    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} maxFontSizeMultiplier={1.5} style={[styles.hourLabel,{color:setup?theme.textMuted:theme.onCanvasMuted,width:Math.max(72,64*Math.min(fontScale,1.5))}]}>{formatMinutes(hour*60,locale)}</Text>
+    <View style={[styles.hourContent,{borderColor:setup?theme.border:theme.canvasBorder}]}>
      {items.map(({entry,status},index)=>{
       const colors=activityColors(theme,entry),label=activityLabel(entry);
       const statusLabel=t(status==='done'?'schedule.status.logged':status==='due'?entry.toleranceMinutes!==undefined?'schedule.status.flexibleDue':'schedule.status.due':status==='missed'?'schedule.status.missed':'schedule.status.upcoming');

@@ -183,7 +183,7 @@ export function SettingsScreen({
           style={[
             styles.title,
             {
-              color: theme.text,
+              color: theme.onCanvas,
               fontSize: theme.presentation.titleSize,
               lineHeight: theme.presentation.titleLineHeight,
               fontWeight: theme.presentation.titleWeight,
@@ -343,7 +343,7 @@ export function SettingsScreen({
 
 function SectionLabel({ label, theme }: { label: string; theme: Theme }) {
   return (
-    <Text accessibilityRole="header" maxFontSizeMultiplier={2} style={[styles.sectionLabel, { color: theme.primary, letterSpacing: theme.presentation.eyebrowTracking }]}>
+    <Text accessibilityRole="header" maxFontSizeMultiplier={2} style={[styles.sectionLabel, { color: theme.onCanvas, letterSpacing: theme.presentation.eyebrowTracking }]}>
       {label}
     </Text>
   );

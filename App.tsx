@@ -103,7 +103,7 @@ import {
   shouldShowOnboarding,
   updateEvent,
 } from './src/storage';
-import { resolveTheme, type ThemePreference } from './src/theme';
+import { lightTheme, resolveTheme, type ThemePreference } from './src/theme';
 import { acknowledgePendingWidgetEvents, readPendingWidgetEvents, updateHomeWidget } from './src/widgets/sync';
 
 configureReminderHandling();
@@ -775,10 +775,10 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     <SafeAreaProvider>
       <LocalizationProvider language={language} customizations={activityCustomizations}>
         <SafeAreaView
-          style={[styles.container, { backgroundColor: conversationalOnboarding&&onboardingVisible&&!guideOpenedFromSettings?'#176B52':theme.background }]}
+          style={[styles.container, { backgroundColor: onboardingVisible ? conversationalOnboarding && !guideOpenedFromSettings ? lightTheme.canvas : theme.background : theme.canvas }]}
           edges={conversationalOnboarding&&onboardingVisible&&!guideOpenedFromSettings?[]:nativeApp||settingsVisible||onboardingVisible ? ['top', 'bottom', 'left', 'right'] : ['top', 'left', 'right']}
         >
-          <StatusBar style={theme.isDark ? 'light' : 'dark'} />
+          <StatusBar style={onboardingVisible && (!conversationalOnboarding || guideOpenedFromSettings) && !theme.isDark ? 'dark' : 'light'} />
           <View ref={spotlightContainer} collapsable={false} style={styles.screen}>
           <BlurTargetView ref={blurTarget} style={styles.screen}>
           <SideNavigation open={drawerOpen} enabled={onboardingVisible===false} tab={tab} settingsVisible={settingsVisible} theme={theme}
@@ -790,15 +790,15 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
               style={({pressed})=>[styles.menuButton,{backgroundColor:pressed?theme.primarySoft:theme.surface,borderRadius:theme.presentation.controlRadius}]}>
               <MaterialCommunityIcons accessible={false} name={settingsVisible||navigationHistory.length>0?'arrow-left':'menu'} size={25} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
             </Pressable>
-            <Text testID="nav.title" accessibilityRole="header" maxFontSizeMultiplier={1.5} style={[styles.navigationTitle,{color:theme.text,minWidth:70}]}>{translate(language,settingsVisible?'settings.title':tab==='notifications'?'notifications.title':tab==='learn'?'learn.title':`nav.${tab}`)}</Text>
+            <Text testID="nav.title" accessibilityRole="header" maxFontSizeMultiplier={1.5} style={[styles.navigationTitle,{color:theme.onCanvas,minWidth:70}]}>{translate(language,settingsVisible?'settings.title':tab==='notifications'?'notifications.title':tab==='learn'?'learn.title':`nav.${tab}`)}</Text>
             <PuppyIdentity theme={theme} onPress={tab==='pets'&&!settingsVisible?undefined:()=>openTab('pets')}/>
           </View>:null}
           <View style={styles.screen}>
             {onboardingVisible === null ? nativeApp?<View testID="setup.loading" style={styles.startup}>
               {startupFailed?<>
-                <Text testID="setup.loadError" accessibilityRole="alert" style={[styles.startupText,{color:theme.text}]}>{translate(language,'setup.loadError')}</Text>
-                <Pressable testID="setup.retry" accessibilityRole="button" onPress={()=>{cloud.retry?.();void openJournal();}} style={[styles.startupRetry,{backgroundColor:theme.primary}]}><Text style={[styles.startupText,{color:theme.onPrimary}]}>{translate(language,'setup.retry')}</Text></Pressable>
-              </>:<><ActivityIndicator color={theme.primary}/><Text style={[styles.startupText,{color:theme.textMuted}]}>{translate(language,'setup.loading')}</Text></>}
+                <Text testID="setup.loadError" accessibilityRole="alert" style={[styles.startupText,{color:theme.onCanvas}]}>{translate(language,'setup.loadError')}</Text>
+                <Pressable testID="setup.retry" accessibilityRole="button" onPress={()=>{cloud.retry?.();void openJournal();}} style={[styles.startupRetry,{backgroundColor:theme.surfaceRaised}]}><Text style={[styles.startupText,{color:theme.primary}]}>{translate(language,'setup.retry')}</Text></Pressable>
+              </>:<><ActivityIndicator color={theme.onCanvas}/><Text style={[styles.startupText,{color:theme.onCanvasMuted}]}>{translate(language,'setup.loading')}</Text></>}
             </View>:null : onboardingVisible ? guideOpenedFromSettings?(
               <OnboardingScreen
                 theme={theme}

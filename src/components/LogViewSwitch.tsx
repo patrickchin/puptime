@@ -8,9 +8,9 @@ export function LogViewSwitch({tab,theme,onChange}:{tab:'log'|'timeline';theme:T
  const {t}=useLocalization();
  const destination=tab==='log'?'timeline':'log';
  return <Pressable testID="nav.switch" accessibilityRole="button" accessibilityLabel={t(`nav.${destination}`)} onPress={()=>onChange(destination)}
-  style={({pressed})=>[styles.button,{backgroundColor:pressed?theme.primaryPressed:theme.primary,shadowColor:theme.text}]}>
-  <MaterialCommunityIcons accessible={false} name={destination==='log'?'format-list-bulleted':'timeline-clock-outline'} size={22} color={theme.onPrimary}/>
-  <Text maxFontSizeMultiplier={2} style={[styles.label,{color:theme.onPrimary}]}>{t(`nav.${destination}`)}</Text>
+  style={({pressed})=>[styles.button,{backgroundColor:pressed?theme.primarySoft:theme.surfaceRaised,shadowColor:theme.text}]}>
+  <MaterialCommunityIcons accessible={false} name={destination==='log'?'format-list-bulleted':'timeline-clock-outline'} size={22} color={theme.primary}/>
+  <Text maxFontSizeMultiplier={2} style={[styles.label,{color:theme.primary}]}>{t(`nav.${destination}`)}</Text>
  </Pressable>;
 }
 const styles=StyleSheet.create({

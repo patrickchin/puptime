@@ -11,9 +11,14 @@ export type ThemePreference = 'system' | 'light' | 'dark';
 
 export const lightTheme = {
   isDark: false as boolean,
+  // Emerald canvas and cream content surfaces continue the onboarding palette.
+  canvas: '#176B52',
+  onCanvas: '#FFFDF5',
+  onCanvasMuted: '#DCE9DD',
+  canvasBorder: '#598E79',
   background: '#F5F3EC',
-  surface: '#FFFEFA',
-  surfaceRaised: '#FFFFFF',
+  surface: '#FFFDF7',
+  surfaceRaised: '#FFFDF7',
   text: '#17231E',
   textMuted: '#56635D',
   border: '#DDE5DF',
@@ -50,6 +55,10 @@ export const lightTheme = {
 
 export const darkTheme: Theme = {
   isDark: true,
+  canvas: '#101F19',
+  onCanvas: '#F2F6F3',
+  onCanvasMuted: '#B9C5BE',
+  canvasBorder: '#4A6757',
   background: '#101713',
   surface: '#17211C',
   surfaceRaised: '#1D2923',
