@@ -9,9 +9,15 @@ let defaults = try PropertyListSerialization.propertyList(
 let layout = defaults["__expo_widgets_PuptimeQuickLog_layout"] as! String
 let timeline = defaults["__expo_widgets_PuptimeQuickLog_timeline"] as! [[String: Any]]
 precondition(!timeline.isEmpty, "Widget snapshot has no timeline")
-let props = timeline[0]["props"] as! [String: Any]
+var props = timeline[0]["props"] as! [String: Any]
 precondition(PropertyListSerialization.propertyList(props, isValidFor: .binary), "Widget props cannot be saved to UserDefaults")
 
+// Exercise an active fixture even when the inspected device has already
+// reached its deadline. These values never write back to widget storage.
+if props["canLog"] != nil {
+  props["canLog"] = true
+  props["expiresAt"] = Date().timeIntervalSince1970 * 1000 + 86400000
+}
 let context = JSContext()!
 context.evaluateScript(try String(contentsOfFile: CommandLine.arguments[2], encoding: .utf8))
 precondition(context.exception == nil, "Widget JS bundle failed: \(String(describing: context.exception))")
@@ -77,3 +83,17 @@ precondition(PropertyListSerialization.propertyList(ended, isValidFor: .binary),
 precondition(ended["openNap"] as? Bool == false, "Nap action did not end the nap")
 precondition((ended["pending"] as? [[String: Any]])?.last?["endedAt"] != nil, "Ended nap has no end time")
 print("Widget snapshot, relative time, three rendered buttons, pee action, and nap start/end passed")
+
+if let scope = props["scope"] as? String {
+  precondition((pee["pending"] as? [[String: Any]])?.last?["scope"] as? String == scope, "Widget action lost its puppy scope")
+  let original = props["pending"] as? [[String: Any]] ?? []
+  var blocked = props
+  blocked["canLog"] = false
+  let disabled = invoke("__expoWidgetHandlePress", blocked, target: target("pee"))
+  precondition(NSDictionary(dictionary: disabled).isEqual(to: blocked), "Disabled access created a widget log")
+  blocked["canLog"] = true
+  blocked["expiresAt"] = Date().timeIntervalSince1970 * 1000 - 1
+  let expired = invoke("__expoWidgetHandlePress", blocked, target: target("pee"))
+  precondition((expired["pending"] as? [[String: Any]])?.count == original.count, "Expired access created a widget log")
+  print("Shared widget scope, disabled access and deadline guards passed")
+}
