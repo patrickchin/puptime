@@ -807,10 +807,14 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     widgetActions,
   ]);
 
-  if(accessEnded)return <SafeAreaProvider><SafeAreaView style={[styles.container,{backgroundColor:theme.background,padding:24,justifyContent:'center'}]}>
+  if(accessEnded)return <SafeAreaProvider><LocalizationProvider language={language} customizations={activityCustomizations}><SafeAreaView style={[styles.container,{backgroundColor:theme.background,padding:24,justifyContent:'center'}]}>
     <Text accessibilityRole="header" style={[styles.navigationTitle,{color:theme.text}]}>{translate(language,'sharing.ended')}</Text>
+    <Pressable accessibilityRole="button" testID="shared.switchEnded" onPress={()=>setSharedView({})} style={styles.startupRetry}><Text style={[styles.startupText,{color:theme.primary}]}>{translate(language,'sharing.sharedTitle')}</Text></Pressable>
     <Pressable accessibilityRole="button" testID="shared.leaveEnded" onPress={()=>{void careSession.leave();}} style={styles.startupRetry}><Text style={[styles.startupText,{color:theme.primary}]}>{translate(language,'sharing.ownPuppy')}</Text></Pressable>
-  </SafeAreaView></SafeAreaProvider>;
+    <Modal visible={sharedView!==null} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setSharedView(null)}>
+      {sharedView?<SafeAreaProvider><SharedPuppiesScreen key={sharedView.id??'list'} cloud={cloud} theme={theme} initialShareId={sharedView.id} inviteToken={sharedView.token} onBack={()=>setSharedView(null)}/></SafeAreaProvider>:null}
+    </Modal>
+  </SafeAreaView></LocalizationProvider></SafeAreaProvider>;
   return (
     <SafeAreaProvider>
       <LocalizationProvider language={language} customizations={activityCustomizations}>

@@ -10,7 +10,7 @@ import {useLocalization} from '../localization-context';
 import {headingStyle,spacing,type Theme} from '../theme';
 
 export function SharedPuppiesScreen({cloud,theme,onBack,initialShareId,inviteToken}:{cloud:CloudHandle;theme:Theme;onBack:()=>void;initialShareId?:string;inviteToken?:string}){
- const {t}=useLocalization(),session=useCareSession(),state=useAccountSnapshot(cloud.controller),accountId=state?.account?.user.id;
+ const {t}=useLocalization(),session=useCareSession(),state=useAccountSnapshot(cloud.controller),accountId=state?.account?.user.id??(state?.problem&&['account-deleted','forbidden'].includes(state.problem)?session.selection?.accountId:undefined);
  const [puppies,setPuppies]=useState<SharedPuppy[]>([]),[loading,setLoading]=useState(false),[error,setError]=useState(false),[retry,setRetry]=useState(0),[opening,setOpening]=useState<string|null>(null);
  const autoOpened=useRef(false),locked=useRef(false);
  async function open(puppy:SharedPuppy){
