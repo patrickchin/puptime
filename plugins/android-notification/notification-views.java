@@ -4,9 +4,10 @@
         com.facebook.react.bridge.ReadableArray actions = config.getArray("actions");
         RemoteViews views = new RemoteViews(appContext.getPackageName(), compact ? R.layout.puptime_notification_compact : R.layout.puptime_notification_expanded);
         int[] cells = {R.id.puptime_notification_cell_0, R.id.puptime_notification_cell_1, R.id.puptime_notification_cell_2, R.id.puptime_notification_cell_3};
-        boolean largeText = appContext.getResources().getConfiguration().fontScale > 1.4f;
-        if (!compact && largeText) {
-            int minimum = RNWidgetUtil.dpToPx(appContext, 116);
+        float fontScale = appContext.getResources().getConfiguration().fontScale;
+        boolean largeText = fontScale > 1.4f;
+        if (!compact && fontScale > 1.1f) {
+            int minimum = RNWidgetUtil.dpToPx(appContext, largeText ? 112 : 80);
             views.setInt(R.id.puptime_notification_first_row, "setMinimumHeight", minimum);
             views.setInt(R.id.puptime_notification_second_row, "setMinimumHeight", minimum);
         }
@@ -38,11 +39,13 @@
                 views.setInt(icon, "setColorFilter", ink);
                 if (compact && largeText) views.setViewVisibility(icon, View.GONE);
                 if (!compact) {
-                    boolean hasTime = !action.isNull("lastAt");
+                    boolean awake = "nap".equals(action.getString("icon"));
+                    boolean hasTime = !awake && !action.isNull("lastAt");
                     int clock = notificationPart(mode, "clock", slot), empty = notificationPart(mode, "empty", slot);
                     views.setViewVisibility(clock, hasTime ? View.VISIBLE : View.GONE);
                     views.setViewVisibility(empty, hasTime ? View.GONE : View.VISIBLE);
                     views.setTextColor(empty, ink);
+                    views.setTextViewText(empty, awake ? "Awake" : "Never");
                     views.setTextColor(clock, ink);
                     if (hasTime) {
                         long base = android.os.SystemClock.elapsedRealtime() - Math.max(0, System.currentTimeMillis() - (long) action.getDouble("lastAt"));
