@@ -33,9 +33,10 @@
                 int label = notificationPart(mode, "label", slot);
                 views.setTextColor(label, ink);
                 views.setTextViewText(label, action.getString("label"));
-                int emoji = notificationPart(mode, "emoji", slot);
-                views.setTextViewText(emoji, action.getString("emoji"));
-                if (compact && largeText) views.setViewVisibility(emoji, View.GONE);
+                int icon = notificationPart(mode, "icon", slot);
+                views.setImageViewResource(icon, notificationIcon(action.getString("icon")));
+                views.setInt(icon, "setColorFilter", ink);
+                if (compact && largeText) views.setViewVisibility(icon, View.GONE);
                 if (!compact) {
                     boolean hasTime = !action.isNull("lastAt");
                     int clock = notificationPart(mode, "clock", slot), empty = notificationPart(mode, "empty", slot);
@@ -58,4 +59,17 @@
 
     private int notificationPart(String mode, String part, int slot) {
         return appContext.getResources().getIdentifier("puptime_notification_" + mode + "_" + part + "_" + slot, "id", appContext.getPackageName());
+    }
+
+    private int notificationIcon(String name) {
+        switch (name) {
+            case "pee": return R.drawable.puptime_notification_icon_pee;
+            case "poop": return R.drawable.puptime_notification_icon_poop;
+            case "meal": return R.drawable.puptime_notification_icon_meal;
+            case "pottyTrip": return R.drawable.puptime_notification_icon_pottytrip;
+            case "walk": return R.drawable.puptime_notification_icon_walk;
+            case "nap": return R.drawable.puptime_notification_icon_nap;
+            case "stop": return R.drawable.puptime_notification_icon_stop;
+            default: return R.drawable.puptime_notification_icon_custom;
+        }
     }

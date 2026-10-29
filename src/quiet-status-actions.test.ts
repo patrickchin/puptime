@@ -9,10 +9,10 @@ test('notification actions preserve widget selection, real event timers and scop
     {id:'evt_poop',type:'poop',at:1000,source:'app'},
     {id:'evt_estimate',type:'poop',at:2000,estimated:true,source:'app'},
   ]});
-  assert.deepEqual(actions.map(a=>[a.label,a.emoji,a.lastAt]),[['Pee','💧',null],['Poop','💩',1000],['Ate','🍽️',null]]);
+  assert.deepEqual(actions.map(a=>[a.label,a.icon,a.lastAt]),[['Pee','pee',null],['Poop','poop',1000],['Ate','meal',null]]);
   assert.deepEqual(actions[1].clickActionData,{type:'poop',scope:'owner',source:'notification',petId:'pet_biscuit'});
   const sleeping=notificationActions({...props,events:[{id:'evt_nap',type:'nap',at:1000,endedAt:null,source:'app'}]});
-  assert.equal(sleeping[3].label,'End nap');assert.equal(sleeping[3].emoji,'☀️');
+  assert.equal(sleeping[3].label,'End nap');assert.equal(sleeping[3].icon,'stop');
   const custom=notificationActions({...props,actions:['pee','custom:medicine'],customActivities:['Medicine']});
-  assert.equal(custom[1].label,'Medicine');assert.equal(custom[1].emoji,'🏷️');
+  assert.equal(custom[1].label,'Medicine');assert.equal(custom[1].icon,'custom');
 });
