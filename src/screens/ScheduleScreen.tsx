@@ -448,12 +448,12 @@ export function ScheduleScreen({
           <ScrollView
             key={previewIds!==null?'choices':draft?.id}
             bounces={false}
-            style={[styles.sheet, { backgroundColor: theme.surfaceRaised }]}
+            style={[styles.sheet, { backgroundColor: theme.surfaceRaised },previewIds!==null&&styles.choiceSheet]}
             contentContainerStyle={styles.sheetContent}
           >
             <View style={styles.sheetHeading}>
               <Text style={[styles.sheetTitle, { color: theme.text }]}>
-                {t(previewIds!==null||originalDraft.current ? 'schedule.editTime' : 'schedule.addTime')}
+                {t(previewIds!==null?'schedule.activity':originalDraft.current?'schedule.editTime':'schedule.addTime')}
               </Text>
               <Pressable
                 testID="schedule.editor.close"
@@ -662,6 +662,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
   },
+  choiceSheet:{flexGrow:0},
   sheetContent: { padding: spacing.lg, paddingBottom: 34 },
   sheetHeading: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg },
   sheetTitle: { flex: 1, fontSize: 23, fontWeight: '800' },
