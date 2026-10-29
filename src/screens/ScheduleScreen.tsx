@@ -453,7 +453,7 @@ export function ScheduleScreen({
           >
             <View style={styles.sheetHeading}>
               <Text style={[styles.sheetTitle, { color: theme.text }]}>
-                {t(previewIds!==null?'schedule.activity':originalDraft.current?'schedule.editTime':'schedule.addTime')}
+                {t(previewIds!==null?'common.edit':originalDraft.current?'schedule.editTime':'schedule.addTime')}
               </Text>
               <Pressable
                 testID="schedule.editor.close"
