@@ -147,7 +147,7 @@ export function LearnScreen({ theme, articleId, onArticleChange, showHeader=true
   const title = article?.shortTitle ?? (invalidArticle ? t('learn.notFound') : t('learn.title'));
 
   const content = (
-    <ScrollView key={selectedId ?? 'library'} testID="screen.learn" style={{ backgroundColor: theme.background }} contentContainerStyle={[styles.scrollContent, Platform.OS === 'web' && webStyles.scrollContent]} keyboardShouldPersistTaps="handled">
+    <ScrollView key={selectedId ?? 'library'} testID="screen.learn" style={[{ backgroundColor: theme.background }, Platform.OS !== 'web' && { borderTopLeftRadius: theme.presentation.cardRadius, borderTopRightRadius: theme.presentation.cardRadius }]} contentContainerStyle={[styles.scrollContent, Platform.OS === 'web' && webStyles.scrollContent]} keyboardShouldPersistTaps="handled">
       <View style={[styles.content, article && styles.articleContent, Platform.OS === 'web' && [webStyles.content, article && webStyles.articleContent]]}>
         {selectedId !== null && (
           <Pressable testID="learn.back" accessibilityRole="button" onPress={() => open(null)} style={({ pressed }) => [styles.back, pressed && styles.pressed]}>

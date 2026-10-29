@@ -275,7 +275,7 @@ export function NotificationsScreen({
 
 
 
-      <Text accessibilityRole="header" style={[styles.label,{color:theme.text}]}>{t('notifications.petReminders')}</Text>
+      <Text accessibilityRole="header" style={[styles.label,{color:theme.onCanvas}]}>{t('notifications.petReminders')}</Text>
       {onOpenPet?<PuppyIdentity showName theme={theme} onPress={onOpenPet}/>:null}
       <View style={cardStyle}>
         <Pressable

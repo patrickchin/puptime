@@ -23,7 +23,7 @@ import { ActivityIcon } from '../components/ActivityIcon';
 import {ActivityLoadState} from '../components/ActivityLoadState';
 import {activityWindowBounds,useActivityWindow,type ActivityViewProps} from '../activity-view';
 import { useLocalization } from '../localization-context';
-import { spacing, type Theme } from '../theme';
+import { surfaceTreatment, spacing, type Theme } from '../theme';
 
 const FREQUENCY_DAYS = 10;
 const MONTH_PREVIEW_COUNT = 6;
@@ -191,7 +191,7 @@ export function InsightsScreen({
         style={[
           styles.title,
           {
-            color: theme.text,
+            color: theme.onCanvas,
             fontSize: theme.presentation.titleSize,
             lineHeight: theme.presentation.titleLineHeight,
             fontWeight: theme.presentation.titleWeight,
@@ -203,7 +203,7 @@ export function InsightsScreen({
         {t('insights.title')}
       </Text>:null}
 
-      <View style={[styles.section, { borderColor: theme.border }]}>
+      <View style={[styles.section, surfaceTreatment(theme), { backgroundColor: theme.surfaceRaised, borderColor: theme.border, padding: theme.presentation.cardPadding }]}>
         <View style={styles.sectionHeading}>
           <View style={styles.smallIcon}>
             <MaterialCommunityIcons
@@ -235,7 +235,7 @@ export function InsightsScreen({
       </View>
 
       {monthly.length > 1 ? (
-        <View style={[styles.section, { borderColor: theme.border }]}>
+        <View style={[styles.section, surfaceTreatment(theme), { backgroundColor: theme.surfaceRaised, borderColor: theme.border, padding: theme.presentation.cardPadding }]}>
           <View style={styles.sectionHeading}>
             <View style={styles.smallIcon}>
               <MaterialCommunityIcons

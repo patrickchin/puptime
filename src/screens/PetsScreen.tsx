@@ -10,7 +10,7 @@ export function PetsScreen({theme,cloud,eventCount}:{theme:Theme;cloud:CloudHand
  const {t,locale}=useLocalization();
  return <ScrollView testID="screen.pets" contentContainerStyle={styles.content}>
   <PuppyNameSetting theme={theme} cloud={cloud}/>
-  <Text style={[styles.count,{color:theme.textMuted}]}>{t(eventCount===1?'account.logsOne':'account.logsMany',{count:new Intl.NumberFormat(locale).format(eventCount)})}</Text>
+  <Text style={[styles.count,{color:theme.onCanvasMuted}]}>{t(eventCount===1?'account.logsOne':'account.logsMany',{count:new Intl.NumberFormat(locale).format(eventCount)})}</Text>
  </ScrollView>;
 }
 const styles=StyleSheet.create({content:{width:'100%',maxWidth:720,alignSelf:'center',padding:spacing.md},count:{fontSize:15,lineHeight:22,paddingHorizontal:8}});

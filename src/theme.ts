@@ -11,6 +11,11 @@ export type ThemePreference = 'system' | 'light' | 'dark';
 
 export const lightTheme = {
   isDark: false as boolean,
+  // Screen canvas foregrounds are separate from card and reading surfaces.
+  canvas: '#F5F3EC',
+  onCanvas: '#17231E',
+  onCanvasMuted: '#56635D',
+  canvasBorder: '#DDE5DF',
   background: '#F5F3EC',
   surface: '#FFFEFA',
   surfaceRaised: '#FFFFFF',
@@ -50,6 +55,10 @@ export const lightTheme = {
 
 export const darkTheme: Theme = {
   isDark: true,
+  canvas: '#101713',
+  onCanvas: '#F2F6F3',
+  onCanvasMuted: '#B9C5BE',
+  canvasBorder: '#35443C',
   background: '#101713',
   surface: '#17211C',
   surfaceRaised: '#1D2923',

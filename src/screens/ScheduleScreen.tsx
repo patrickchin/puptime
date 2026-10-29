@@ -267,7 +267,7 @@ export function ScheduleScreen({
           style={[
             styles.title,
             {
-              color: theme.text,
+              color: theme.onCanvas,
               fontSize: theme.presentation.titleSize,
               lineHeight: theme.presentation.titleLineHeight,
               fontWeight: theme.presentation.titleWeight,
@@ -332,7 +332,7 @@ export function ScheduleScreen({
 
         {!setupHeader && schedule.length ? (
           <View testID="schedule.plan" style={styles.headingRow}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('schedule.todayPlan')}</Text>
+            <Text style={[styles.sectionTitle, { color: theme.onCanvas }]}>{t('schedule.todayPlan')}</Text>
           </View>
         ) : null}
 
@@ -362,13 +362,13 @@ export function ScheduleScreen({
           style={({ pressed }) => [
             styles.addButton,
             {
-              backgroundColor: pressed ? theme.primaryPressed : theme.primary,
+              backgroundColor: pressed ? theme.primarySoft : theme.surfaceRaised,
               borderRadius: theme.presentation.controlRadius,
             },
           ]}
         >
-          <MaterialCommunityIcons name="plus" color={theme.onPrimary} size={22} />
-          <Text style={[styles.addButtonText, { color: theme.onPrimary }]}>{t('schedule.addTime')}</Text>
+          <MaterialCommunityIcons name="plus" color={theme.primary} size={22} />
+          <Text style={[styles.addButtonText, { color: theme.primary }]}>{t('schedule.addTime')}</Text>
         </Pressable>
         {!setupHeader&&schedule.length?suggestionCard:null}
       </ScrollView>

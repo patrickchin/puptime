@@ -180,7 +180,7 @@ export function ThemePicker({
                     style={[
                       styles.preview,
                       {
-                        backgroundColor: preview.background,
+                        backgroundColor: preview.canvas,
                         borderColor: preview.border,
                         borderRadius: Math.max(4, preview.presentation.cardRadius * 0.35),
                       },

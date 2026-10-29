@@ -470,7 +470,7 @@ export function LogScreen({
                   style={[
                     styles.title,
                     {
-                      color: theme.text,
+                      color: theme.onCanvas,
                       fontSize: theme.presentation.titleSize,
                       lineHeight: theme.presentation.titleLineHeight,
                       fontWeight: theme.presentation.titleWeight,
@@ -510,7 +510,7 @@ export function LogScreen({
             </View>:null}
             <QuickActions events={activity?projectedEvents:events} onLog={onLog} now={now} theme={theme} onLayout={onQuickActionsLayout} />
             <View style={styles.activityHeading}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('log.activity')}</Text>
+              <Text style={[styles.sectionTitle, { color: theme.onCanvas }]}>{t('log.activity')}</Text>
             </View>
           </>
         }
@@ -573,9 +573,9 @@ export function LogScreen({
             testID="history.loadMore"
             accessibilityRole="button"
             onPress={() => {if(activity&&!hasMoreDays)void page.loadMore();setLoadedOlderDays((count) => count + olderDaysPerPage);}}
-            style={({ pressed }) => [styles.loadMore, { backgroundColor: pressed ? theme.primarySoft : 'transparent' }]}
+            style={({ pressed }) => [styles.loadMore, { opacity: pressed ? 0.65 : 1 }]}
           >
-            <Text style={[styles.loadMoreText, { color: theme.primary }]}>{t('log.loadMore')}</Text>
+            <Text style={[styles.loadMoreText, { color: theme.onCanvas }]}>{t('log.loadMore')}</Text>
           </Pressable>
         ) : null}</>}
       /> : null}
