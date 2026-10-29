@@ -812,6 +812,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     languagePreference,
     notificationPermission,
     notificationDelivery,
+    quietStatusEnabled,
     notificationPreferences,
     schedule,
     settingsVisible,
