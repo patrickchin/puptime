@@ -253,6 +253,9 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
   const accountState=useAccountSnapshot(cloud.controller);
   const [accessExpired,setAccessExpired]=useState(!!care&&care.expiresAt!==null&&care.expiresAt<=Date.now());
   useEffect(()=>{if(!care?.expiresAt)return;const timer=setTimeout(()=>setAccessExpired(true),Math.max(0,Math.min(2147483647,care.expiresAt-Date.now())));return()=>clearTimeout(timer);},[care?.expiresAt]);
+  useEffect(()=>{
+    if(care&&careSession.runtime)void careSession.runtime.database.read(sql=>sql.getFirstAsync("SELECT value FROM metadata WHERE key='care_blocked' AND value='1'")).then(blocked=>{if(blocked)setAccessExpired(true);}).catch(()=>{});
+  },[care,careSession.runtime]);
   const accessEnded=!!care&&(accessExpired||['account-deleted','forbidden','account-mismatch','auth-required','conflict'].includes(accountState?.problem??''));
   useEffect(()=>{if(accessEnded)void refreshCommittedState();},[accessEnded,refreshCommittedState]);
 
