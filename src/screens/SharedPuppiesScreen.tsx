@@ -12,6 +12,7 @@ import {eventTypes,type EventType} from '../domain';
 import {entityId} from '../entity-id';
 import {reuseCareRows,careEditPatch,type CarePage,type CareRow,type CareWrite} from '../sharing';
 import {useLocalization} from '../localization-context';
+import {localizedEventLabel} from '../localization';
 import {headingStyle,spacing,type Theme} from '../theme';
 
 export function SharedPuppiesScreen({cloud,theme,onBack,initialShareId}:{cloud:CloudHandle;theme:Theme;onBack:()=>void;initialShareId?:string}){
@@ -67,13 +68,14 @@ function SharedJournal({api,accountId,shareId,theme}:{api:SharingApi;accountId:s
  </View>;
 }
 const SharedRow=memo(function SharedRow({row,theme,onEdit}:{row:CareRow;theme:Theme;onEdit:(row:CareRow)=>void}){
- const {t,locale,activityLabel}=useLocalization(),data=row.record.data;
+ const {t,locale,language}=useLocalization(),data=row.record.data;
  if(!('type' in data))return null;
  const when='at' in data?new Intl.DateTimeFormat(locale,{dateStyle:'medium',timeStyle:'short'}).format(data.at):'minutes' in data?new Intl.DateTimeFormat(locale,{hour:'numeric',minute:'2-digit'}).format(new Date(2000,0,1,Math.floor(data.minutes/60),data.minutes%60)):'';
- return <View style={[styles.row,{borderColor:theme.border}]}><View style={styles.grow}><Text style={[styles.label,{color:theme.text}]}>{activityLabel(data)}</Text><Text style={[styles.body,{color:theme.textMuted}]}>{when}</Text>{'note' in data&&data.note?<Text style={[styles.body,{color:theme.text}]}>{data.note}</Text>:null}</View>{row.canEdit?<AccountButton theme={theme} testID="shared.action.4" label={t('sharing.edit')} onPress={()=>onEdit(row)}/>:null}</View>;
+ return <View style={[styles.row,{borderColor:theme.border}]}><View style={styles.grow}><Text style={[styles.label,{color:theme.text}]}>{data.type==='custom'&&'customLabel' in data?data.customLabel:localizedEventLabel(language,data.type)}</Text><Text style={[styles.body,{color:theme.textMuted}]}>{when}</Text>{'note' in data&&data.note?<Text style={[styles.body,{color:theme.text}]}>{data.note}</Text>:null}</View>{row.canEdit?<AccountButton theme={theme} testID="shared.action.4" label={t('sharing.edit')} onPress={()=>onEdit(row)}/>:null}</View>;
 });
 function SharedEditor({theme,kind,row,onClose,write}:{theme:Theme;kind:'event'|'routine';row?:CareRow;onClose:()=>void;write:(input:CareWrite)=>Promise<void>}){
- const {t,locale,eventLabel}=useLocalization(),data=row?.record.data;
+ const {t,locale,language}=useLocalization(),data=row?.record.data;
+ const eventLabel=(type:EventType)=>localizedEventLabel(language,type);
  const [type,setType]=useState<EventType>(data&&'type' in data?data.type:'walk'),[label,setLabel]=useState(data&&'customLabel' in data?data.customLabel??'':'');
  const [at,setAt]=useState(()=>data&&'at' in data?new Date(data.at):data&&'minutes' in data?new Date(2000,0,1,Math.floor(data.minutes/60),data.minutes%60):new Date());
  const [endedAt,setEndedAt]=useState<Date|null>(()=>data&&'endedAt' in data&&typeof data.endedAt==='number'?new Date(data.endedAt):null);
