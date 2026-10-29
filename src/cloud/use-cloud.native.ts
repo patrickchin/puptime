@@ -35,7 +35,7 @@ export function useCloud(onRemoteChange:()=>unknown):CloudHandle {
         else stopChanges=watchAccountChanges({controller,open:client.openChanges});
         controller.setOnline(online);controller.setActive(active);
         setHandle({available:true,controller,problem:null,getLocalName,retry,sharing:client.sharing,sharingOrigin:client.origin});
-        if(care.selection){controller.subscribe(()=>{const snapshot=controller?.read();if(snapshot?.problem==='account-deleted'||snapshot?.problem==='forbidden'){void runtime.database.write(sql=>sql.runAsync("INSERT OR REPLACE INTO metadata(key,value) VALUES('care_blocked','1')"));}});}
+        if(care.selection){controller.subscribe(()=>{const snapshot=controller?.read();if(snapshot?.problem==='account-deleted'||snapshot?.problem==='forbidden'||snapshot?.problem==='account-mismatch'||snapshot?.problem==='conflict'){void runtime.database.write(sql=>sql.runAsync("INSERT OR REPLACE INTO metadata(key,value) VALUES('care_blocked','1')")).then(()=>{if(care.isCurrent())return callback.current();}).catch(()=>{});}});}
         await controller.refresh();
       }catch{if(!disposed)setHandle({available:true,controller:null,problem:'local-storage',getLocalName,retry});}
     })();

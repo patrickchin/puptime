@@ -152,7 +152,7 @@ function CareSignIn({onSignedIn}:{onSignedIn:()=>void}){
  }
  if(session.isPending)return <p role="status">Checking sign-in…</p>;
  if(session.data?.user)return <p className="care-signed-in">Signed in as {session.data.user.email}</p>;
- return <div className="care-sign-in"><h2>Sign in to your household</h2>{error?<p role="alert" className="care-error">{error}</p>:null}
+ return <div className="care-sign-in"><h2>Sign in to Puptime</h2>{error?<p role="alert" className="care-error">{error}</p>:null}
   {(['apple','google'] as const).filter(provider=>providers?.[provider]).map(provider=><button key={provider} disabled={busy} onClick={()=>{void signIn(provider);}}>Continue with {provider==='apple'?'Apple':'Google'}</button>)}
   {providers?.email?<form onSubmit={event=>{event.preventDefault();void signIn();}}>{sent?<><p>Code sent to {sent}</p><label>Email code<input inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required value={code} onChange={event=>setCode(event.target.value.replace(/\D/g,''))} disabled={busy}/></label></>:<label>Email address<input type="email" autoComplete="email" value={email} onChange={event=>setEmail(event.target.value)} required disabled={busy}/></label>}<button disabled={busy}>{busy?'Working…':sent?'Sign in':'Email me a code'}</button>{sent?<button type="button" disabled={busy} onClick={()=>{setSent(null);setCode('');}}>Use another email or resend</button>:null}</form>:providers&&!providers.apple&&!providers.google?<p>Sign-in is unavailable. Try again later.</p>:null}
  </div>;

@@ -216,9 +216,10 @@ export async function countCustomTimedReminders(): Promise<number> {
 
 export async function cancelCustomTimedRemindersIfDeliveryOff(): Promise<void> {
   return updateReminders(async () => {
-    if (await getNotificationDelivery()) return;
+    const delivery=await getNotificationDelivery(),access=await getCareAccess();
+    if(delivery&&!access.ended)return;
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-    await Promise.all(scheduled.filter((request) => customTimedReminder(request) !== null)
+    await Promise.all(scheduled.filter((request) => {const reminder=customTimedReminder(request);return reminder!==null&&(!delivery||reminder.petId===access.scope);})
       .map((request) => Notifications.cancelScheduledNotificationAsync(request.identifier)));
   });
 }

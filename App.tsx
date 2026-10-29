@@ -253,7 +253,8 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
   const accountState=useAccountSnapshot(cloud.controller);
   const [accessExpired,setAccessExpired]=useState(!!care&&care.expiresAt!==null&&care.expiresAt<=Date.now());
   useEffect(()=>{if(!care?.expiresAt)return;const timer=setTimeout(()=>setAccessExpired(true),Math.max(0,Math.min(2147483647,care.expiresAt-Date.now())));return()=>clearTimeout(timer);},[care?.expiresAt]);
-  const accessEnded=!!care&&(accessExpired||['account-deleted','forbidden','account-mismatch','auth-required'].includes(accountState?.problem??''));
+  const accessEnded=!!care&&(accessExpired||['account-deleted','forbidden','account-mismatch','auth-required','conflict'].includes(accountState?.problem??''));
+  useEffect(()=>{if(accessEnded)void refreshCommittedState();},[accessEnded,refreshCommittedState]);
 
 
   useEffect(() => {
