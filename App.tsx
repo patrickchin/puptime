@@ -727,7 +727,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
       schedule={schedule} onScheduleChange={changeSchedule}
       onOpenSchedule={()=>openTab('schedule')} onOpenPet={()=>openTab('pets')}/>;
     if (tab === 'learn') return <LearnScreen showHeader={!nativeApp} theme={theme} />;
-    if (tab === 'timeline') return <TimelineScreen showHeader={!nativeApp} events={events} activity={activity} refreshToken={refreshToken} schedule={schedule} onOpenSchedule={()=>openTab('schedule')} theme={theme} />;
+    if (tab === 'timeline') return <TimelineScreen showHeader={!nativeApp} events={events} activity={activity} refreshToken={refreshToken} schedule={schedule} theme={theme} />;
     if (tab === 'insights') return <InsightsScreen showHeader={!nativeApp} events={events} activity={activity} refreshToken={refreshToken} customActivities={customActivities} theme={theme} />;
     if (tab === 'schedule') {
       return (
