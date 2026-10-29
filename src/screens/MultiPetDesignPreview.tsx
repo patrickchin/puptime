@@ -201,7 +201,7 @@ function Preview({onRowRender}:{onRowRender?:(key:string,phase:'mount'|'update')
 
       <View style={s.flex}>
         {naming?petForm():settings?settingsContent():tab==='pets'?petsContent():tab==='log'?<FlatList testID="preview.history" data={logs} keyExtractor={item=>`${item.petId}:${item.event.id}`} renderItem={renderRow} ListHeaderComponent={logHeader} contentContainerStyle={[s.content,{paddingBottom:96}]} initialNumToRender={12}/>
-          :tab==='timeline'?<TimelineScreen showHeader={false} key={pet.id} events={pet.events} schedule={pet.schedule} onOpenSchedule={()=>openTab('schedule')} theme={theme}/>
+          :tab==='timeline'?<TimelineScreen showHeader={false} key={pet.id} events={pet.events} schedule={pet.schedule} theme={theme}/>
           :tab==='insights'?<InsightsScreen showHeader={false} key={pet.id} events={pet.events} customActivities={emptyActivities} theme={theme}/>
           :tab==='schedule'?<ScheduleScreen showHeader={false} key={pet.id} events={pet.events} schedule={pet.schedule} customActivities={emptyActivities} theme={theme} onChange={changeSchedule} onSaveEntry={async entry=>{await changeSchedule([...pet.schedule.filter(item=>item.id!==entry.id),entry].sort((a,b)=>a.minutes-b.minutes));}} onRemoveEntry={async id=>{await changeSchedule(pet.schedule.filter(item=>item.id!==id));}} onRequestReminderPermission={async()=>true}/>
           :tab==='learn'?<LearnScreen showHeader={false} theme={theme}/>

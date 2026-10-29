@@ -7,5 +7,5 @@ config.resolver.resolveRequest=(context,moduleName,platform)=>{
  return (previous||context.resolveRequest)(context,moduleName,platform);
 };
 config.transformer.babelTransformerPath=path.join(__dirname,'transformer.cjs');
-config.cacheVersion='puptime-native-activity-qualification-v1';
+config.cacheVersion='puptime-native-activity-qualification-v1:'+root;
 module.exports=config;
