@@ -18,7 +18,7 @@ import { Pressable } from '../components/TelemetryPressable';
 import { scheduleStatusesForDay, suggestScheduleFromEvents } from '../analytics';
 import {activityWindowBounds,useActivityWindow,type ActivityViewProps} from '../activity-view';
 import {ActivityLoadState} from '../components/ActivityLoadState';
-import {RoutineTimeline} from '../components/RoutineTimeline';
+import {RoutineDayPreview,RoutineTimeline} from '../components/RoutineTimeline';
 import { ActivityIcon } from '../components/ActivityIcon';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { DateTimeSelector } from '../components/DateTimeSelector';
@@ -83,12 +83,6 @@ export function ScheduleScreen({
   const suggestion = suggestScheduleFromEvents(events, 14, new Date(now));
   const previewSuggestion = acceptedSuggestion.current?.preview ?? suggestion;
   const canSuggest = suggestion.entries.length > 0&&!window.loading&&!window.error;
-  const completed = statuses.filter((item) => item.status === 'done').length;
-  const due = statuses.filter((item) => item.status === 'due').length;
-  const missed = statuses.filter((item) => item.status === 'missed').length;
-  const progress: `${number}%` = schedule.length
-    ? `${Math.round((completed / schedule.length) * 100)}%`
-    : '0%';
 
   const editEntry=useCallback((entry:ScheduleEntry)=>{
     originalDraft.current={...entry,reminder:Boolean(entry.reminder)};
@@ -283,51 +277,7 @@ export function ScheduleScreen({
 
         </>}
         {!setupHeader && schedule.length ? (
-          <View
-            style={[
-              styles.progressCard,
-              surfaceTreatment(theme),
-              {
-                backgroundColor: theme.surfaceRaised,
-                borderColor: theme.border,
-                padding: theme.presentation.cardPadding,
-              },
-            ]}
-          >
-            <View style={styles.progressHeading}>
-              <Text style={[styles.progressTitle, { color: theme.text }]}>
-                {t('schedule.loggedProgress', { completed, total: schedule.length })}
-              </Text>
-              <View
-                style={[
-                  styles.progressIcon,
-                  { backgroundColor: theme.primarySoft, borderRadius: theme.presentation.iconRadius },
-                ]}
-              >
-                <MaterialCommunityIcons name="calendar-check-outline" color={theme.primary} size={23} />
-              </View>
-            </View>
-            <Text style={[styles.progressDetail, { color: theme.textMuted }]}>
-              {due
-                ? t(due === 1 ? 'schedule.dueOne' : 'schedule.dueMany', { count: due })
-                : missed
-                  ? t(missed === 1 ? 'schedule.missedOne' : 'schedule.missedMany', { count: missed })
-                  : t(completed === schedule.length ? 'schedule.everythingLogged' : 'schedule.nextAhead')}
-            </Text>
-            <View
-              style={[
-                styles.progressTrack,
-                { backgroundColor: theme.primarySoft, borderRadius: theme.presentation.controlRadius },
-              ]}
-            >
-              <View
-                style={[
-                  styles.progressFill,
-                  { backgroundColor: theme.primary, borderRadius: theme.presentation.controlRadius, width: progress },
-                ]}
-              />
-            </View>
-          </View>
+          <RoutineDayPreview statuses={statuses} now={now} theme={theme}/>
         ) : null}
 
         {!setupHeader && schedule.length ? (
@@ -677,14 +627,7 @@ const styles = StyleSheet.create({
   learnStatusText: { flex: 1, fontSize: 12, lineHeight: 17, fontWeight: '600' },
   learnButton: { minHeight: 50, borderRadius: 16, borderWidth: 1, marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 14 },
   learnButtonText: { fontSize: 15, lineHeight: 20, fontWeight: '800', textAlign: 'center' },
-  progressCard: { borderWidth: 1, borderRadius: 22, padding: spacing.md },
-  progressHeading: { flexDirection: 'row', alignItems: 'center' },
-  progressTitle: { flex: 1, fontSize: 20, lineHeight: 26, fontWeight: '800' },
-  progressIcon: { marginLeft: 'auto', width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  progressDetail: { fontSize: 13, lineHeight: 18, marginTop: 7 },
-  progressTrack: { height: 8, borderRadius: 4, overflow: 'hidden', marginTop: 13 },
-  progressFill: { height: 8, borderRadius: 4 },
-  headingRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: spacing.xl, marginBottom: 12 },
+  headingRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: spacing.md, marginBottom: 8 },
   sectionTitle: { flex: 1, fontSize: 21, fontWeight: '800' },
   windowDetail: { fontSize: 12, lineHeight: 18, marginTop: 2 },
   addButton: { minHeight: 54, borderRadius: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: spacing.md },
