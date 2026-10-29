@@ -94,6 +94,11 @@ async function render(props: WidgetTaskHandlerProps, events: PuppyEvent[]) {
 
 export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
   if (props.widgetAction === 'WIDGET_CLICK' && props.clickAction === 'LOG_EVENT') {
+    if (props.clickActionData?.source === 'notification') {
+      const runtime = await getLocalRuntime();
+      const [enabled, delivery] = await Promise.all([runtime.storage.loadQuietStatusEnabled(),runtime.storage.loadNotificationDelivery()]);
+      if (!enabled || !delivery || props.clickActionData.petId !== runtime.petId) return;
+    }
     // Keep the tap time even when Android has to start the JavaScript runtime.
     const tapAt = props.clickActionData?.tapAt;
     const at = typeof tapAt === 'number' && Number.isSafeInteger(tapAt) && tapAt > 0 ? tapAt : Date.now();

@@ -3,7 +3,7 @@ import UserNotifications
 // Puptime: native widget confirmations.
 final class PuptimeWidgetNotificationBridge {
   static let shared = PuptimeWidgetNotificationBridge()
-  func handle(_ event: [String: Any]) async {
+  func handle(_ event: [String: Any], refreshStatus: Bool = true) async {
     guard
       let target = event["target"] as? String,
       let timestamp = event["timestamp"] as? Int
@@ -24,7 +24,7 @@ final class PuptimeWidgetNotificationBridge {
       parts.count > 5 ? Int(parts[5]) ?? 0 : 0,
       language
     )
-    if let source = event["source"] as? String { await showStatus(source) }
+    if refreshStatus, let source = event["source"] as? String { await showStatus(source) }
   }
 
   private func showStatus(_ source: String) async {
@@ -35,7 +35,6 @@ final class PuptimeWidgetNotificationBridge {
           let firstProps = first["props"] as? [String: Any],
           let firstStatus = firstProps["quietStatus"] as? [String: Any],
           firstStatus["enabled"] as? Bool == true else { return }
-    let requests = await center.pendingNotificationRequests()
     let delivered = await center.deliveredNotifications()
     // Read the latest committed snapshot after awaited work, so a rapid widget
     // tap burst cannot replace newer activity with an older tap's presentation.
@@ -51,35 +50,10 @@ final class PuptimeWidgetNotificationBridge {
     let language = props["language"] as? String ?? "en"
     let name = status["name"] as? String ?? "Puptime"
     let petId = status["petId"] as? String ?? ""
-    let times = props["lastEventAt"] as? [String: Double] ?? [:]
-    let formatter = DateFormatter()
-    formatter.locale = Locale(identifier: language)
-    formatter.setLocalizedDateFormatFromTemplate("MMMdjmm")
-    func clock(_ milliseconds: Double) -> String { formatter.string(from: Date(timeIntervalSince1970: milliseconds / 1000)) }
-    let labels = language == "zh-Hans" ? ["尿尿", "便便", "吃饭"] : language == "es" ? ["Pipí", "Caca", "Comida"] : ["Pee", "Poop", "Meal"]
-    var lines = zip(["pee", "poop", "meal"], labels).compactMap { key, label in
-      times[key].map { "\(label) · \(clock($0))" }
-    }
-    if lines.isEmpty {
-      lines.append(language == "zh-Hans" ? "还没有尿尿、便便或吃饭记录。" : language == "es" ? "Aún no hay registros de pipí, caca o comida." : "No pee, poop or meal logs yet.")
-    }
-    let next = requests.compactMap { request -> (String, Date)? in
-      let data = request.content.userInfo
-      let routine = request.identifier.hasPrefix("puptime-routine-") || request.identifier.hasPrefix("puptime-activity-")
-      let timed = data["kind"] as? String == "customTimedReminder" && data["petId"] as? String == petId
-      let nextDate = (request.trigger as? UNCalendarNotificationTrigger)?.nextTriggerDate()
-        ?? (request.trigger as? UNTimeIntervalNotificationTrigger)?.nextTriggerDate()
-      guard routine || timed, let at = nextDate, at > Date() else { return nil }
-      return (request.content.title, at)
-    }.min { $0.1 < $1.1 }
-    if let next {
-      let label = language == "zh-Hans" ? "提醒" : language == "es" ? "Recordatorio" : "Reminder"
-      lines.append("\(label) · \(next.0) · \(clock(next.1.timeIntervalSince1970 * 1000))")
-    }
     let content = UNMutableNotificationContent()
-    let title = language == "zh-Hans" ? "最近活动" : language == "es" ? "Actividad reciente" : "Recent activity"
-    content.title = "\(name) · \(title)"
-    content.body = lines.joined(separator: "\n")
+    content.title = language == "zh-Hans" ? "\(name) · 快捷记录" : language == "es" ? "\(name) · Registro rápido" : "\(name) · Quick log"
+    content.body = language == "zh-Hans" ? "长按以记录活动，无需打开 Puptime。" : language == "es" ? "Mantén pulsado para registrar sin abrir Puptime." : "Press and hold to log without opening Puptime."
+    content.categoryIdentifier = "puptimeQuickLog"
     content.interruptionLevel = .passive
     content.userInfo = ["kind": "quietStatus", "petId": petId]
     if let existing = delivered.first(where: { $0.request.identifier == "puptime-status" })?.request.content,

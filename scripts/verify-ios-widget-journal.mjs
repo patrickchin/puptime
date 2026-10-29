@@ -19,7 +19,7 @@ precondition(decodedIdentity == "PuptimeQuickLog/pee/0")
 let directory = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
 var count = 0
 DispatchQueue.concurrentPerform(iterations: 250) { index in
-  PuptimeWidgetJournal.transaction {
+  try! PuptimeWidgetJournal.transaction(in: directory) {
     try! PuptimeWidgetJournal.record(["id": PuptimeWidgetJournal.newId("evt"), "type": "pee", "at": index + 100], in: directory)
     count += 1
   }

@@ -7,10 +7,13 @@ export type LanguagePreference = 'system' | AppLanguage;
 export const languageChoices: readonly LanguagePreference[] = ['system', 'en', 'zh-Hans', 'es'];
 
 const english = {
+  "notifications.quickLogTitle": "{name} · Quick log",
+  "notifications.quickLogExpand": "Press and hold to log without opening Puptime.",
+
   "notifications.statusSwitch": "Quiet puppy status",
-  "notifications.statusDetail": "Last pee, poop, meal and upcoming reminder. Updates when you log or open Puptime.",
-  "notifications.statusIos": "Appears silently in Notification Center. You or iOS can clear it.",
-  "notifications.statusAndroid": "Stays in the notification drawer without sound or vibration. You can dismiss it in Android.",
+  "notifications.statusDetail": "Your widget’s quick-log buttons and timers, available without opening Puptime.",
+  "notifications.statusIos": "Press and hold the silent notification to log. You or iOS can clear it.",
+  "notifications.statusAndroid": "Expand the silent notification to use the full widget. Android lets you dismiss it.",
   "notifications.statusTitle": "{name} · Recent activity",
   "notifications.statusEmpty": "No pee, poop or meal logs yet.",
   "notifications.statusReminder": "Reminder · {activity} · {time}",
@@ -717,10 +720,13 @@ export type MessageKey = keyof typeof english;
 type Dictionary = Record<MessageKey, string>;
 
 const simplifiedChinese: Dictionary = {
+  "notifications.quickLogTitle": "{name} · 快捷记录",
+  "notifications.quickLogExpand": "长按以记录活动，无需打开 Puptime。",
+
   "notifications.statusSwitch": "静默小狗状态",
-  "notifications.statusDetail": "查看最近尿尿、便便、吃饭和即将到来的提醒。记录活动或打开 Puptime 时更新。",
-  "notifications.statusIos": "静默显示在通知中心。你或 iOS 都可以清除。",
-  "notifications.statusAndroid": "保留在通知栏中，不发声或振动。你可以在 Android 中移除。",
+  "notifications.statusDetail": "无需打开 Puptime，即可使用小组件的快捷记录按钮和计时器。",
+  "notifications.statusIos": "长按静默通知即可记录。你或 iOS 都可以清除通知。",
+  "notifications.statusAndroid": "展开静默通知即可使用完整小组件。Android 允许你移除通知。",
   "notifications.statusTitle": "{name} · 最近活动",
   "notifications.statusEmpty": "还没有尿尿、便便或吃饭记录。",
   "notifications.statusReminder": "提醒 · {activity} · {time}",
@@ -1424,10 +1430,13 @@ const simplifiedChinese: Dictionary = {
 };
 
 const spanish: Dictionary = {
+  "notifications.quickLogTitle": "{name} · Registro rápido",
+  "notifications.quickLogExpand": "Mantén pulsado para registrar sin abrir Puptime.",
+
   "notifications.statusSwitch": "Estado silencioso del cachorro",
-  "notifications.statusDetail": "Último pipí, caca, comida y próximo recordatorio. Se actualiza al registrar o abrir Puptime.",
-  "notifications.statusIos": "Aparece en silencio en el Centro de notificaciones. Tú o iOS podéis borrarlo.",
-  "notifications.statusAndroid": "Se queda en el panel sin sonido ni vibración. Puedes descartarlo en Android.",
+  "notifications.statusDetail": "Los botones y temporizadores del widget, sin abrir Puptime.",
+  "notifications.statusIos": "Mantén pulsada la notificación silenciosa para registrar. Tú o iOS podéis borrarla.",
+  "notifications.statusAndroid": "Expande la notificación silenciosa para usar el widget completo. Android permite descartarla.",
   "notifications.statusTitle": "{name} · Actividad reciente",
   "notifications.statusEmpty": "Aún no hay registros de pipí, caca o comida.",
   "notifications.statusReminder": "Recordatorio · {activity} · {time}",

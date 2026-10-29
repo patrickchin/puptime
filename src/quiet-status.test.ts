@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { registerHooks } from 'node:module';
 import { DEFAULT_NOTIFICATION_PREFERENCES } from './notification-config.ts';
-import { quietStatusCopy, quietStatusSnapshot } from './quiet-status-config.ts';
+import { quietStatusCopy } from './quiet-status-config.ts';
 import type { PuppyEvent } from './domain.ts';
 
 const now = new Date(2026, 9, 29, 12, 0).getTime();
@@ -12,32 +12,20 @@ const events: PuppyEvent[] = [
   { id: 'evt_estimate', type: 'pee', at: now, source: 'app', estimated: true },
   { id: 'evt_future', type: 'poop', at: now + 60_000, source: 'app' },
 ];
-test('quiet status uses real past logs, signed reminder offsets and the earliest future one-off', () => {
-  const schedule = [{ id: 'rtn_meal', type: 'meal' as const, minutes: 5, reminder: true }];
-  const snapshot = quietStatusSnapshot(events, schedule, { ...preferences, mealReminderOffsetMinutes: -15 }, [
-    { label: 'Expired medicine', at: now - 1 }, { label: 'Medicine', at: now + 3600_000 },
-  ], 'Biscuit', 'en', now);
-  assert.deepEqual(snapshot.times, { pee: now - 60_000, poop: undefined, meal: undefined });
-  assert.deepEqual(snapshot.reminder, { label: 'Medicine', at: now + 3600_000 });
-  const copy = quietStatusCopy(snapshot);
-  assert.match(copy.title, /Biscuit/); assert.match(copy.body, /Pee/); assert.match(copy.body, /Medicine/);
-  assert.doesNotMatch(copy.body, /Poop|Expired/);
-  const daily = quietStatusSnapshot([], schedule, { ...preferences, mealReminderOffsetMinutes: -15 }, [], 'Biscuit', 'en', now).reminder!;
-  assert.equal(daily.at, new Date(2026, 9, 29, 23, 50).getTime());
-  for (const language of ['en', 'es', 'zh-Hans'] as const) {
-    assert.ok(quietStatusCopy(quietStatusSnapshot([], [], preferences, [], 'Biscuit', language, now)).body.length > 0);
-  }
+test('compact iOS notification is a short expansion cue in every supported language',()=>{
+ for(const language of ['en','es','zh-Hans'] as const){const copy=quietStatusCopy('Biscuit',language);assert.match(copy.title,/Biscuit/);assert.ok(copy.body.length<100);}
+ assert.match(quietStatusCopy('Biscuit','en').body,/Press and hold/);
 });
 
 const state = { enabled: false, delivery: true, permission: 'granted', os: 'ios', events,
   delivered: [] as { request: { identifier: string; content: Record<string, unknown> } }[],
-  posted: [] as any[], dismissed: [] as string[], channels: [] as any[], hold: null as null | (() => Promise<void>) };
+  rendered: [] as any[], posted: [] as any[], dismissed: [] as string[], channels: [] as any[], hold: null as null | (() => Promise<void>) };
 (globalThis as any).__quietStatusTest = state;
 const target = new URL('./quiet-status.native.ts', import.meta.url).href;
 registerHooks({
   resolve(specifier, context, next) {
     if (context.parentURL === target) {
-      if (['expo-notifications', 'react-native', './local/runtime.native', './reminders'].includes(specifier)) return { url: 'status-test:' + specifier, shortCircuit: true };
+      if (['expo-notifications', 'react-native', './local/runtime.native', './reminders', './quiet-status-surface'].includes(specifier)) return { url: 'status-test:' + specifier, shortCircuit: true };
       if (specifier.startsWith('.')) return next(new URL(specifier + '.ts', context.parentURL).href, context);
     }
     return next(specifier, context);
@@ -48,11 +36,13 @@ registerHooks({
       'status-test:./local/runtime.native': `export async function getLocalRuntime(){return {petId:'pet_test',activity:{async latestEvents(){return s.events;}},storage:{
         async loadQuietStatusEnabled(){return s.enabled;},async saveQuietStatusEnabled(value){s.enabled=value;},
         async loadNotificationDelivery(){return s.delivery;},async loadSchedule(){return [];},async loadNotificationPreferences(){return ${JSON.stringify(preferences)};},
-        async loadLanguagePreference(){return 'en';},async loadPuppyName(){return 'Biscuit';}
+        async loadLanguagePreference(){return 'en';},async loadPuppyName(){return 'Biscuit';},async loadCustomActivities(){return [];},async loadWidgetActions(){return ['pee','poop','meal'];},async loadThemePreference(){return 'system';}
       }}};`,
       'status-test:./reminders': `export async function getNotificationPermissionState(){return s.permission;} export async function listCustomTimedReminders(){return [];}`,
+      'status-test:./quiet-status-surface': `export async function renderQuickLogNotification(props){s.rendered.push(props);s.delivered=[{request:{identifier:'puptime-status',content:{}}}];}`,
       'status-test:expo-notifications': `
         export const AndroidImportance={LOW:2};
+        export async function setNotificationCategoryAsync(){}
         export async function getPresentedNotificationsAsync(){return s.delivered;}
         export async function getAllScheduledNotificationsAsync(){return [];}
         export async function cancelScheduledNotificationAsync(){}
@@ -76,9 +66,10 @@ test('native status is opt-in, silent, replaces a single card, skips unchanged u
   assert.equal(state.posted[0].trigger, null);
   await status.syncQuietStatus(); assert.equal(state.posted.length, 1);
   state.events = [...events, { id: 'evt_meal', type: 'meal', at: Date.now(), source: 'app' }];
-  await status.syncQuietStatus(); assert.equal(state.delivered.length, 1); assert.equal(state.posted.length, 2);
+  await status.syncQuietStatus(); assert.equal(state.delivered.length, 1); assert.equal(state.posted.length, 1);
+  assert.equal(state.posted[0].content.categoryIdentifier,'puptimeQuickLog');
   state.os = 'android'; state.delivered = [];
-  await status.syncQuietStatus(); assert.deepEqual(state.posted.at(-1).trigger, { channelId: 'puptime-status' });
+  await status.syncQuietStatus(); assert.equal(state.rendered.length,1);assert.equal(state.rendered[0].petId,'pet_test');assert.deepEqual(state.rendered[0].actions,['pee','poop','meal']);
   assert.deepEqual(state.channels[0], { id: 'puptime-status', name: 'Quiet puppy status', importance: 2, sound: null, enableVibrate: false, showBadge: false });
   state.permission = 'blocked'; await status.syncQuietStatus(); assert.equal(state.delivered.length, 0);
   state.permission = 'granted'; state.delivery = false; await status.syncQuietStatus(); assert.equal(state.delivered.length, 0);
@@ -89,6 +80,7 @@ test('a device disable queued behind a native delivery in flight removes that ca
   let release!: () => void, entered!: () => void;
   const ready = new Promise<void>(resolve => { entered = resolve; });
   const gate = new Promise<void>(resolve => { release = resolve; });
+  state.os='ios';state.delivered=[];
   state.hold = () => { entered(); return gate; };
   const enabling = status.setQuietStatusEnabled(true); await ready;
   state.delivery = false;

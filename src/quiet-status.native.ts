@@ -2,9 +2,9 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { getLocalRuntime } from './local/runtime.native';
 import { resolveLanguage } from './localization';
-import { getNotificationPermissionState, listCustomTimedReminders } from './reminders';
-import { pottyReminderIdentifier, reminderIdentifier } from './reminder-config';
-import { QUIET_STATUS_CHANNEL, QUIET_STATUS_IDENTIFIER, QUIET_STATUS_KIND, quietStatusCopy, quietStatusSnapshot } from './quiet-status-config';
+import { getNotificationPermissionState } from './reminders';
+import {renderQuickLogNotification} from './quiet-status-surface';
+import { QUIET_STATUS_CHANNEL, QUIET_STATUS_IDENTIFIER, QUIET_STATUS_KIND, QUIET_STATUS_CATEGORY, quietStatusCopy } from './quiet-status-config';
 
 export const getQuietStatusEnabled = async () => (await getLocalRuntime()).storage.loadQuietStatusEnabled();
 
@@ -23,33 +23,30 @@ export function syncQuietStatus(): Promise<void> {
       await Notifications.dismissNotificationAsync(QUIET_STATUS_IDENTIFIER);
       return;
     }
-    const [events, schedule, preferences, languagePreference, name, timed, pending] = await Promise.all([
-      activity.latestEvents(), storage.loadSchedule(), storage.loadNotificationPreferences(),
-      storage.loadLanguagePreference(), storage.loadPuppyName(), listCustomTimedReminders(petId),
-      Notifications.getAllScheduledNotificationsAsync(),
-    ]);
-    const scheduled = new Set(pending.map(item => item.identifier));
-    const copy = quietStatusCopy(quietStatusSnapshot(events, schedule.filter(entry => scheduled.has(reminderIdentifier(entry))), {
-      ...preferences,
-      pottyAfterPee: { ...preferences.pottyAfterPee, enabled: preferences.pottyAfterPee.enabled && scheduled.has(pottyReminderIdentifier('afterPee')) },
-      pottyAfterMeal: { ...preferences.pottyAfterMeal, enabled: preferences.pottyAfterMeal.enabled && scheduled.has(pottyReminderIdentifier('afterMeal')) },
-    }, timed, name, resolveLanguage(languagePreference)));
-    const delivered = await Notifications.getPresentedNotificationsAsync();
-    const existing = delivered.find(item => item.request.identifier === QUIET_STATUS_IDENTIFIER)?.request.content;
-    if (existing?.title === copy.title && existing.body === copy.body && existing.data?.petId === petId) return;
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync(QUIET_STATUS_CHANNEL, {
-        name: 'Quiet puppy status', importance: Notifications.AndroidImportance.LOW,
-        sound: null, enableVibrate: false, showBadge: false,
+    const [languagePreference,name]=await Promise.all([storage.loadLanguagePreference(),storage.loadPuppyName()]);
+    const copy=quietStatusCopy(name,resolveLanguage(languagePreference));
+    if(Platform.OS==='android'){
+      await Notifications.setNotificationChannelAsync(QUIET_STATUS_CHANNEL,{
+        name:'Quiet puppy status',importance:Notifications.AndroidImportance.LOW,
+        sound:null,enableVibrate:false,showBadge:false,
       });
+      const events=await activity.latestEvents();
+      const customActivities=await storage.loadCustomActivities(events);
+      const [actions,themePreference]=await Promise.all([storage.loadWidgetActions(customActivities),storage.loadThemePreference()]);
+      await renderQuickLogNotification({events,actions,customActivities,themePreference,petId,title:copy.title});
+      return;
     }
+    const delivered=await Notifications.getPresentedNotificationsAsync();
+    const existing=delivered.find(item=>item.request.identifier===QUIET_STATUS_IDENTIFIER)?.request.content;
+    if(existing?.title===copy.title&&existing.body===copy.body&&existing.data?.petId===petId&&existing.categoryIdentifier===QUIET_STATUS_CATEGORY)return;
+    await Notifications.setNotificationCategoryAsync(QUIET_STATUS_CATEGORY,[]);
     await Notifications.scheduleNotificationAsync({
       identifier: QUIET_STATUS_IDENTIFIER,
       content: {
-        ...copy, sound: false, interruptionLevel: 'passive', sticky: true, autoDismiss: false,
+        ...copy, sound: false, interruptionLevel: 'passive', sticky: true, autoDismiss: false, categoryIdentifier: QUIET_STATUS_CATEGORY,
         data: { kind: QUIET_STATUS_KIND, petId },
       },
-      trigger: Platform.OS === 'android' ? { channelId: QUIET_STATUS_CHANNEL } : null,
+      trigger: null,
     });
   });
   writes = next.catch(() => undefined);

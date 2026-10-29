@@ -2,6 +2,7 @@
     let at = Int(Date().timeIntervalSince1970 * 1000)
     let eventData: [String: Any]? = try PuptimeWidgetJournal.transaction {
       guard let source else { return nil }
+      WidgetsStorage.defaults?.synchronize()
       let layout = WidgetsStorage.getString(forKey: "__expo_widgets_\(source)_layout") ?? ""
       guard let timeline = WidgetsStorage.getArray(forKey: "__expo_widgets_\(source)_timeline"),
             let entryIndex, timeline.indices.contains(entryIndex),
@@ -34,6 +35,7 @@
       guard var newTimeline = timeline as? [[String: Any]] else { return nil }
       newTimeline[entryIndex] = newEntry
       WidgetsStorage.set(newTimeline, forKey: "__expo_widgets_\(source)_timeline")
+      WidgetsStorage.defaults?.synchronize()
       return ["source": source, "target": target as Any, "timestamp": at,
               "eventId": eventId, "type": "ExpoWidgetsUserInteraction"]
     }

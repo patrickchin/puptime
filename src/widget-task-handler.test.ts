@@ -6,7 +6,7 @@ import ts from 'typescript';
 import type { PuppyEvent } from './domain.ts';
 
 const state = {
-  events: [] as PuppyEvent[], reads: 0, customReads: 0, redraws: 0,
+  enabled: true, delivery: true, events: [] as PuppyEvent[], reads: 0, customReads: 0, redraws: 0,
   confirmations: [] as { eventId: string; type: string; at: number }[],
   hold: Promise.resolve(), readHold: Promise.resolve(), fail: false,
 };
@@ -41,7 +41,7 @@ registerHooks({
         export async function loadNotificationPreferences(){return {widgetConfirmations:true};}
         export async function loadLanguagePreference(){return 'en';}`,
       'widget-test:./local/runtime.native': `
-        export async function getLocalRuntime(){return {activity:{async latestEvents(){s.reads++;await s.readHold;return [...s.events];}}};}`,
+        export async function getLocalRuntime(){return {petId:'pet_test',storage:{async loadQuietStatusEnabled(){return s.enabled;},async loadNotificationDelivery(){return s.delivery;}},activity:{async latestEvents(){s.reads++;await s.readHold;return [...s.events];}}};}`,
       'widget-test:./reminders': `
         export function configureReminderHandling(){}
         export async function showWidgetLogConfirmation(reference){s.confirmations.push(reference);return true;}
@@ -55,14 +55,14 @@ registerHooks({
   },
 });
 const { widgetTaskHandler } = await import('./widget-task-handler.tsx');
-const tap = (type: string, tapAt: number) => widgetTaskHandler({
-  widgetAction: 'WIDGET_CLICK', clickAction: 'LOG_EVENT', clickActionData: { type, tapAt },
+const tap = (type: string, tapAt: number, notification?: {source:string;petId:string}) => widgetTaskHandler({
+  widgetAction: 'WIDGET_CLICK', clickAction: 'LOG_EVENT', clickActionData: { type, tapAt, ...notification },
   widgetInfo: { widgetId: 1, widgetName: 'PuptimeQuickLog', width: 300, height: 100,
     screenInfo: { screenHeightDp: 900, screenWidthDp: 400, density: 2, densityDpi: 320 } },
   renderWidget() { throw Error('A tap must not redraw the same widget twice.'); },
 });
 function reset() {
-  Object.assign(state, { events: [], reads: 0, customReads: 0, redraws: 0, confirmations: [], hold: Promise.resolve(), readHold: Promise.resolve(), fail: false });
+  Object.assign(state, { enabled:true, delivery:true, events: [], reads: 0, customReads: 0, redraws: 0, confirmations: [], hold: Promise.resolve(), readHold: Promise.resolve(), fail: false });
 }
 
 test('confirmation starts after the save without waiting for widget history queries', async () => {
@@ -114,4 +114,17 @@ test('a failed write never confirms and does not block the next tap; custom acti
   await tap('custom:training', 123457); await tap('custom:removed', 123458);
   assert.equal(state.events.length, 1);
   assert.equal(state.events[0].customLabel, 'Training');
+});
+
+
+test('notification actions stay in the background and reject disabled or stale pet cards', async () => {
+  reset();
+  const notification = {source:'notification',petId:'pet_test'};
+  await tap('pee',123456,notification);
+  assert.equal(state.events.length,1);
+  state.enabled=false;await tap('poop',123457,notification);
+  state.enabled=true;state.delivery=false;await tap('meal',123458,notification);
+  state.delivery=true;await tap('pee',123459,{...notification,petId:'pet_old'});
+  assert.equal(state.events.length,1);
+  assert.equal(state.confirmations.length,1);
 });

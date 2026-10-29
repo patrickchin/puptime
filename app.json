@@ -12,7 +12,7 @@
       "usesAppleSignIn": true,
       "bundleIdentifier": "com.patrickchin.puptime",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "Choose a photo for your dog’s profile."
+        "NSPhotoLibraryUsageDescription": "Choose a photo for your dog\u2019s profile."
       },
       "config": {
         "usesNonExemptEncryption": false
@@ -38,6 +38,8 @@
       "output": "static"
     },
     "plugins": [
+      "./plugins/withAndroidQuickLogNotification",
+      "./plugins/withQuickLogNotification",
       "./plugins/withAndroidExactReminders",
       "./plugins/withAndroidWidgetChronometer",
       [
@@ -47,7 +49,7 @@
             {
               "name": "PuptimeQuickLog",
               "label": "Puptime Quick Log",
-              "description": "Pick 2–4 activities to log from the Home Screen.",
+              "description": "Pick 2\u20134 activities to log from the Home Screen.",
               "minWidth": "250dp",
               "minHeight": "56dp",
               "targetCellWidth": 4,
@@ -69,7 +71,7 @@
             {
               "name": "PuptimeQuickLog",
               "displayName": "Puptime Quick Log",
-              "description": "Pick 2–4 activities to log from the Home Screen.",
+              "description": "Pick 2\u20134 activities to log from the Home Screen.",
               "ios": {
                 "supportedFamilies": [
                   "systemMedium"
@@ -125,7 +127,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Choose a photo for your dog’s profile.",
+          "photosPermission": "Choose a photo for your dog\u2019s profile.",
           "cameraPermission": false,
           "microphonePermission": "Allow Puptime to use the microphone when you dictate a log note."
         }
