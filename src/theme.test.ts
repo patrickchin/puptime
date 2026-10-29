@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import { activityColors } from './activity-customization.ts';
 import { EVENT_META } from './domain.ts';
+import { themePreviews, themePreviewFromUrl } from './theme-previews.ts';
 import {
   darkTheme,
   eventColors,
@@ -93,7 +94,7 @@ test('pee, poop, and meals use distinct blue, orange, and green families', () =>
 
 // The canvas and its paper cards have separate foregrounds in both appearances.
 test('canvas and content foregrounds retain accessible contrast', () => {
-  for (const theme of [lightTheme, darkTheme]) {
+  for (const theme of [lightTheme, darkTheme, ...Object.values(themePreviews).map(preview => preview.theme)]) {
     for (const foreground of [theme.onCanvas, theme.onCanvasMuted]) {
       assert.ok(contrastRatio(foreground, theme.canvas) >= 4.5);
     }
@@ -102,5 +103,14 @@ test('canvas and content foregrounds retain accessible contrast', () => {
         assert.ok(contrastRatio(foreground, surface) >= 4.5);
       }
     }
+  }
+});
+
+test('palette preview links accept only named comparisons', () => {
+  for (const name of Object.keys(themePreviews)) {
+    assert.equal(themePreviewFromUrl(`puptime://theme-preview?variant=${name}`), name);
+  }
+  for (const url of ['invalid', 'puptime://theme-preview', 'puptime://theme-preview?variant=unknown', 'puptime://theme-preview?variant=constructor']) {
+    assert.equal(themePreviewFromUrl(url), null);
   }
 });

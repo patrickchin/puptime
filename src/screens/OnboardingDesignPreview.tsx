@@ -25,8 +25,8 @@ export type ConversationalOnboardingProps={cloud:CloudHandle;onFinish:(draft:Onb
 const appTheme:Theme={...lightTheme,surface:'#FFFDF7',surfaceRaised:'#FFFDF7',
   text:'#243D2E',textMuted:'#53685A',border:'#CDD8CF',primary:'#176B52',onPrimary:'#FFFDF5',
   presentation:{...lightTheme.presentation,headingFont:'RedHatDisplayBold',titleWeight:'400',controlRadius:12,cardRadius:18}};
-const theme:Theme={...appTheme,isDark:true,background:appTheme.canvas,
-  surface:'#216F59',surfaceRaised:'#2B7C64',text:appTheme.onCanvas,textMuted:appTheme.onCanvasMuted,border:appTheme.canvasBorder,
+const theme:Theme={...appTheme,isDark:true,background:appTheme.primary,
+  surface:'#216F59',surfaceRaised:'#2B7C64',text:'#FFFDF5',textMuted:'#DCE9DD',border:'#598E79',
   primary:'#F7EBD2',onPrimary:'#1B503C',primaryPressed:'#E4D6B8',primarySoft:'#2B7C64',danger:'#FFB7A5'};
 const welcomeAccountTheme:Theme={...theme,surfaceRaised:appTheme.surface,primarySoft:appTheme.primarySoft};
 const mascots=[require('../../assets/mascots/scruffy-terrier.png'),

@@ -1,0 +1,93 @@
+appId: com.patrickchin.puptime
+name: Compare light palettes and a green dark theme
+---
+- launchApp:
+    stopApp: false
+- runFlow:
+    when:
+      visible: ^Open$
+    commands:
+      - tapOn: ^Open$
+- openLink: puptime://theme-preview?variant=ink
+- runFlow:
+    when:
+      visible: ^Open$
+    commands:
+      - tapOn: ^Open$
+- extendedWaitUntil:
+    visible:
+      id: preview.theme.ink
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 30000
+- takeScreenshot: ink-log
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.schedule
+- assertVisible:
+    id: screen.schedule
+- takeScreenshot: ink-routine
+- openLink: puptime://theme-preview?variant=sage
+- runFlow:
+    when:
+      visible: ^Open$
+    commands:
+      - tapOn: ^Open$
+- extendedWaitUntil:
+    visible:
+      id: preview.theme.sage
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 15000
+- takeScreenshot: sage-log
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.schedule
+- takeScreenshot: sage-routine
+- openLink: puptime://theme-preview?variant=cream
+- runFlow:
+    when:
+      visible: ^Open$
+    commands:
+      - tapOn: ^Open$
+- extendedWaitUntil:
+    visible:
+      id: preview.theme.cream
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 15000
+- takeScreenshot: cream-log
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.schedule
+- takeScreenshot: cream-routine
+- openLink: puptime://theme-preview?variant=forest
+- runFlow:
+    when:
+      visible: ^Open$
+    commands:
+      - tapOn: ^Open$
+- extendedWaitUntil:
+    visible:
+      id: preview.theme.forest
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 15000
+- takeScreenshot: forest-log
+- tapOn:
+    id: nav.open
+- takeScreenshot: forest-menu
+- tapOn:
+    id: nav.schedule
+- takeScreenshot: forest-routine

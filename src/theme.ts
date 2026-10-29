@@ -11,14 +11,14 @@ export type ThemePreference = 'system' | 'light' | 'dark';
 
 export const lightTheme = {
   isDark: false as boolean,
-  // Emerald canvas and cream content surfaces continue the onboarding palette.
-  canvas: '#176B52',
-  onCanvas: '#FFFDF5',
-  onCanvasMuted: '#DCE9DD',
-  canvasBorder: '#598E79',
+  // Screen canvas foregrounds are separate from card and reading surfaces.
+  canvas: '#F5F3EC',
+  onCanvas: '#17231E',
+  onCanvasMuted: '#56635D',
+  canvasBorder: '#DDE5DF',
   background: '#F5F3EC',
-  surface: '#FFFDF7',
-  surfaceRaised: '#FFFDF7',
+  surface: '#FFFEFA',
+  surfaceRaised: '#FFFFFF',
   text: '#17231E',
   textMuted: '#56635D',
   border: '#DDE5DF',
@@ -55,10 +55,10 @@ export const lightTheme = {
 
 export const darkTheme: Theme = {
   isDark: true,
-  canvas: '#101F19',
+  canvas: '#101713',
   onCanvas: '#F2F6F3',
   onCanvasMuted: '#B9C5BE',
-  canvasBorder: '#4A6757',
+  canvasBorder: '#35443C',
   background: '#101713',
   surface: '#17211C',
   surfaceRaised: '#1D2923',

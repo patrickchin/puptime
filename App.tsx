@@ -103,7 +103,7 @@ import {
   shouldShowOnboarding,
   updateEvent,
 } from './src/storage';
-import { lightTheme, resolveTheme, type ThemePreference } from './src/theme';
+import { lightTheme, resolveTheme, type Theme, type ThemePreference } from './src/theme';
 import { acknowledgePendingWidgetEvents, readPendingWidgetEvents, updateHomeWidget } from './src/widgets/sync';
 
 configureReminderHandling();
@@ -112,7 +112,7 @@ const nativeApp = Platform.OS !== 'web';
 
 export default function App(){return <PuptimeApp conversationalOnboarding={Platform.OS!=='web'}/>;}
 
-export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboarding?:boolean}={}) {
+export function PuptimeApp({conversationalOnboarding=false,themeOverride}:{conversationalOnboarding?:boolean;themeOverride?:Theme}={}) {
   const colorScheme = useColorScheme();
   const [themePreference, setThemePreference] = useState<ThemePreference>('system');
   const [languagePreference, setLanguagePreference] = useState<LanguagePreference>('system');
@@ -138,7 +138,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
   const [startupFailed,setStartupFailed]=useState(false);
   const startupLoading=useRef(false);
   const [initialOnboardingCheck]=useState(()=>shouldShowOnboarding().catch(()=>false));
-  const theme = resolveTheme(themePreference, colorScheme);
+  const theme = themeOverride ?? resolveTheme(themePreference, colorScheme);
   const language = resolveLanguage(languagePreference);
   const languageRef = useRef(language);
   languageRef.current = language;
@@ -286,8 +286,8 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
   }, [openJournal, refresh]);
 
   useEffect(() => {
-    Appearance.setColorScheme(themePreference === 'system' ? 'unspecified' : theme.isDark ? 'dark' : 'light');
-  }, [theme.isDark, themePreference]);
+    Appearance.setColorScheme(themeOverride ? themeOverride.isDark ? 'dark' : 'light' : themePreference === 'system' ? 'unspecified' : theme.isDark ? 'dark' : 'light');
+  }, [theme.isDark, themePreference, themeOverride]);
 
   const navigateToTab = (nextTab: AppTab) => {
     setDrawerOpen(false);
@@ -775,10 +775,10 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     <SafeAreaProvider>
       <LocalizationProvider language={language} customizations={activityCustomizations}>
         <SafeAreaView
-          style={[styles.container, { backgroundColor: onboardingVisible ? conversationalOnboarding && !guideOpenedFromSettings ? lightTheme.canvas : theme.background : theme.canvas }]}
+          style={[styles.container, { backgroundColor: onboardingVisible ? conversationalOnboarding && !guideOpenedFromSettings ? lightTheme.primary : theme.background : theme.canvas }]}
           edges={conversationalOnboarding&&onboardingVisible&&!guideOpenedFromSettings?[]:nativeApp||settingsVisible||onboardingVisible ? ['top', 'bottom', 'left', 'right'] : ['top', 'left', 'right']}
         >
-          <StatusBar style={onboardingVisible && (!conversationalOnboarding || guideOpenedFromSettings) && !theme.isDark ? 'dark' : 'light'} />
+          <StatusBar style={(onboardingVisible && conversationalOnboarding && !guideOpenedFromSettings) || theme.isDark ? 'light' : 'dark'} />
           <View ref={spotlightContainer} collapsable={false} style={styles.screen}>
           <BlurTargetView ref={blurTarget} style={styles.screen}>
           <SideNavigation open={drawerOpen} enabled={onboardingVisible===false} tab={tab} settingsVisible={settingsVisible} theme={theme}
