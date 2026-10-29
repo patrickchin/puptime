@@ -838,7 +838,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   filterLabel: { flexShrink: 1, fontSize: 12, lineHeight: 17, fontWeight: '700' },
-  emptyNote: { position: 'absolute', bottom: 96 + spacing.md, left: spacing.md, right: spacing.md, minHeight: 36, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  emptyNote: { position: 'absolute', bottom: 96 + spacing.md, left: DATE_COLUMN_WIDTH + spacing.sm, right: spacing.md, minHeight: 36, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   emptyText: { flex: 1, fontSize: 11, lineHeight: 16 },
   timelineViewport: { flex: 1, overflow: 'hidden' },
   timelineCanvas: { flex: 1 },
