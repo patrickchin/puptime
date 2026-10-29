@@ -26,7 +26,7 @@ import {
   type TimelineDay,
   type TimelineMark,
 } from '../analytics';
-import { activityFromKey, activityKey, dateKey, formatDuration, formatScheduleWindow, isOpenNap, type Activity, type ActivityKey, type PuppyEvent, type ScheduleEntry } from '../domain';
+import { activityFromKey, activityKey, dateKey, formatDuration, isOpenNap, type Activity, type ActivityKey, type PuppyEvent, type ScheduleEntry } from '../domain';
 import {ActivityLoadState} from '../components/ActivityLoadState';
 import {activityWindowBounds,useActivityWindow,type ActivityViewProps} from '../activity-view';
 import { ActivityIcon } from '../components/ActivityIcon';
@@ -48,6 +48,7 @@ const TIMELINE_VIEWS = [
   { id: 'pee', types: ['pee'] },
   { id: 'poop-meal', types: ['poop', 'meal'] },
 ] as const;
+const TIMELINE_TYPES: readonly ActivityKey[] = TIMELINE_VIEWS.flatMap((view) => [...view.types]);
 
 function formatBucket(bucket: number, language: AppLanguage): string {
   return timelineFormatters(language).time
@@ -420,18 +421,17 @@ const MemoTimelineDateLabel = memo(TimelineDateLabel);
 const MemoTimelineTrack = memo(TimelineTrack);
 const MemoTimelineAxis = memo(TimelineAxis);
 
-type TimelineProps={showHeader?:boolean;events:PuppyEvent[];schedule:ScheduleEntry[];onOpenSchedule:()=>void;theme:Theme}&ActivityViewProps;
-export function TimelineScreen({ events:projectedEvents,activity,refreshToken,schedule,onOpenSchedule,theme,showHeader=true }:TimelineProps) {
-  const { activityColors, activityLabel, language, locale, t } = useLocalization();
+type TimelineProps={showHeader?:boolean;events:PuppyEvent[];schedule:ScheduleEntry[];theme:Theme}&ActivityViewProps;
+export function TimelineScreen({ events:projectedEvents,activity,refreshToken,schedule,theme,showHeader=true }:TimelineProps) {
+  const { activityColors, activityLabel, language, t } = useLocalization();
   const { fontScale, height, width } = useWindowDimensions();
   const rowHeight = Math.round(52 * Math.min(fontScale, 1.5));
   const minimumHistoryDays = Math.max(INITIAL_DAYS + BEFORE_FIRST_LOG_DAYS, Math.ceil(height / rowHeight));
   const insets = useSafeAreaInsets();
   const [selectedView, setSelectedView] = useState<(typeof TIMELINE_VIEWS)[number]>(TIMELINE_VIEWS[0]);
   const selectedTypes: readonly ActivityKey[] = selectedView.types;
-  const expectedWindows = useMemo(() => timelineExpectedWindows(schedule, selectedTypes), [schedule, selectedTypes]);
-  const expectedDescription = schedule.filter(entry => expectedWindows.some(window => window.id === entry.id))
-    .map(entry => `${activityLabel(entry)}: ${formatScheduleWindow(entry, locale)}`).join('. ');
+  const allExpectedWindows = useMemo(() => timelineExpectedWindows(schedule, TIMELINE_TYPES), [schedule]);
+  const expectedWindows = useMemo(() => allExpectedWindows.filter(window => selectedTypes.includes(window.type)), [allExpectedWindows, selectedTypes]);
   const [loadedDayCount, setLoadedDayCount] = useState(INITIAL_DAYS + BEFORE_FIRST_LOG_DAYS);
   const [nowTime, setNowTime] = useState(Date.now());
   const bounds=activityWindowBounds(nowTime,Math.max(loadedDayCount,minimumHistoryDays)+BEFORE_FIRST_LOG_DAYS-1);
@@ -465,13 +465,12 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
     [events, estimates, historyDayCount, now, timelineEnd],
   );
   const todayKey = dateKey(now);
-  const rows = useMemo(() => expectedWindows.length ? days : collapseEmptyTimelineDays(days, todayKey), [days, todayKey, expectedWindows]);
+  // Filtering changes marks, never the date grid or its scroll position.
+  const rows = useMemo(() => allExpectedWindows.length ? days : collapseEmptyTimelineDays(days, todayKey), [days, todayKey, allExpectedWindows]);
   const savedEstimateIds = useMemo(() => new Set(events.filter((event) => event.estimated).map((event) => event.id)), [events]);
   const visibleMarkCount = days.flatMap((day) => day.marks.filter((mark) => selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label })))).length;
-  const visibleEstimateCount = new Set(
-    days.flatMap((day) => day.marks.filter((mark) => savedEstimateIds.has(mark.id) && selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label }))).map((mark) => mark.id)),
-  ).size;
-  const hasVisibleGaps = days.some((day) => day.marks.some((mark) => mark.estimated && !savedEstimateIds.has(mark.id) && selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label }))));
+  const hasSavedEstimates = days.some((day) => day.marks.some((mark) => savedEstimateIds.has(mark.id) && TIMELINE_TYPES.includes(activityKey({ type: mark.type, customLabel: mark.label }))));
+  const hasGaps = days.some((day) => day.marks.some((mark) => mark.estimated && !savedEstimateIds.has(mark.id) && TIMELINE_TYPES.includes(activityKey({ type: mark.type, customLabel: mark.label }))));
   const hasEarlierDays = historyDayCount < maxHistoryDays;
   const isCompactHeight = height < 500;
   const selectedEvents = events.filter((event) => selection.includes(event.id)).sort((a, b) => a.at - b.at);
@@ -557,19 +556,18 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
         >
           {t('timeline.title')}
         </Text> : null}
-        {hasVisibleGaps ? (
+        {hasGaps ? (
           <View style={styles.estimateLegend}>
             <View style={[styles.estimateLegendMark, { backgroundColor: theme.textMuted, opacity: ESTIMATE_OPACITY }]} />
             <Text style={[styles.estimateLegendText, { color: theme.textMuted }]}>{t('timeline.estimateLegend')}</Text>
           </View>
         ) : null}
 
-        {visibleEstimateCount ? (
+        {hasSavedEstimates ? (
           <Text style={[styles.estimateLegendText, { color: theme.text }]}>{t('timeline.estimatedLegend')}</Text>
         ) : null}
 
-        <View style={[styles.timelineControls, isCompactHeight && styles.compactControls]}>
-        <View accessibilityRole="radiogroup" style={[styles.filters, isCompactHeight && styles.compactFilters]}>
+        <View accessibilityRole="radiogroup" style={styles.filters}>
           {TIMELINE_VIEWS.map((view) => {
             const active = selectedView === view;
             const label = view.id === 'pee' ? activityLabel({ type: 'pee' }) : t('timeline.poopAndEat', { poop: activityLabel({ type: 'poop' }), meal: activityLabel({ type: 'meal' }) });
@@ -599,47 +597,18 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
               >
                 {view.types.map(type => <ActivityIcon key={type} activity={{ type }} theme={theme} size={17} color={active ? activityColors(theme, { type }).color : theme.textMuted} />)}
                 <Text style={[styles.filterLabel, { color: active ? color : theme.textMuted }]}>{label}</Text>
-                {active ? (
-                  <MaterialCommunityIcons
-                    accessibilityElementsHidden
-                    importantForAccessibility="no"
-                    name="check"
-                    size={14}
-                    color={color}
-                  />
-                ) : null}
+                <MaterialCommunityIcons
+                  accessibilityElementsHidden
+                  importantForAccessibility="no"
+                  name="check"
+                  size={14}
+                  color={color}
+                  style={{ opacity: active ? 1 : 0 }}
+                />
               </Pressable>
             );
           })}
         </View>
-
-        {selectedView.id === 'poop-meal' ? <Pressable
-          testID="timeline.windows.edit"
-          accessibilityRole="button"
-          accessibilityLabel={`${t('schedule.expectedWindow')}. ${expectedDescription ? `${t('timeline.windowsDaily')}. ${expectedDescription}. ` : ''}${t('timeline.editWindows')}`}
-          onPress={onOpenSchedule}
-          style={({ pressed }) => [styles.windowLegend, isCompactHeight && styles.compactWindowLegend, pressed && { backgroundColor: theme.primarySoft }]}
-        >
-          <MaterialCommunityIcons accessibilityElementsHidden importantForAccessibility="no" name="calendar-clock-outline" size={18} color={theme.textMuted} />
-          <Text style={[styles.windowLegendText, { color: theme.textMuted }]}>{t(expectedWindows.length ? 'timeline.windowsDaily' : 'timeline.editWindows')}</Text>
-          {(['meal', 'poop'] as const).filter(type => expectedWindows.some(window => window.type === type)).map(type => (
-            <View key={type} style={styles.windowLegendActivity}>
-              <View style={[styles.windowLegendSwatch, { backgroundColor: activityColors(theme, { type }).color }]} />
-              <Text style={[styles.windowLegendText, { color: theme.text }]}>{activityLabel({ type })}</Text>
-            </View>
-          ))}
-          <MaterialCommunityIcons accessibilityElementsHidden importantForAccessibility="no" name="chevron-right" size={18} color={theme.textMuted} />
-        </Pressable> : null}
-        </View>
-
-        {!isCompactHeight && !window.loading && !window.error && !summaryError && visibleMarkCount === 0 ? (
-          <View testID="timeline.empty" style={[styles.emptyNote, { backgroundColor: theme.surface, borderRadius: theme.presentation.controlRadius }]}>
-            <MaterialCommunityIcons name="clock-outline" size={18} color={theme.textMuted} />
-            <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-              {t('insights.noRangeLogs', { activity: filterName(selectedTypes, language, activityLabel) })}
-            </Text>
-          </View>
-        ) : null}
       </View>
 
       <View style={styles.timelineViewport}>
@@ -649,6 +618,7 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
             theme={theme}
           />
           <FlatList
+            testID="timeline.days"
             ref={listRef}
             data={rows}
             keyExtractor={(day) => day.key}
@@ -757,6 +727,14 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
             contentContainerStyle={{paddingBottom:96}}
           />
         </View>
+        {!isCompactHeight && !window.loading && !window.error && !summaryError && visibleMarkCount === 0 ? (
+          <View testID="timeline.empty" pointerEvents="none" style={[styles.emptyNote, { backgroundColor: theme.surface, borderRadius: theme.presentation.controlRadius }]}>
+            <MaterialCommunityIcons name="clock-outline" size={18} color={theme.textMuted} />
+            <Text style={[styles.emptyText, { color: theme.textMuted }]}>
+              {t('insights.noRangeLogs', { activity: filterName(selectedTypes, language, activityLabel) })}
+            </Text>
+          </View>
+        ) : null}
       </View>
       <Modal
         visible={selectedEvents.length > 0}
@@ -837,14 +815,6 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
 
 const styles = StyleSheet.create({
   expectedWindow: { position: 'absolute', top: 0, bottom: 0, opacity: 0.16 },
-  timelineControls: { gap: spacing.sm },
-  compactControls: { flexDirection: 'row', alignItems: 'center' },
-  compactFilters: { flex: 1 },
-  compactWindowLegend: { maxWidth: '50%' },
-  windowLegend: { minHeight: 48, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: 8, rowGap: 4, paddingVertical: 6 },
-  windowLegendText: { fontSize: 12, lineHeight: 18, flexShrink: 1 },
-  windowLegendActivity: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  windowLegendSwatch: { width: 14, height: 14, opacity: 0.4, borderRadius: 3 },
   screen: { flex: 1 },
   header: {
     paddingHorizontal: spacing.md,
@@ -868,7 +838,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   filterLabel: { flexShrink: 1, fontSize: 12, lineHeight: 17, fontWeight: '700' },
-  emptyNote: { minHeight: 36, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  emptyNote: { position: 'absolute', bottom: 96 + spacing.md, left: DATE_COLUMN_WIDTH + spacing.sm, right: spacing.md, minHeight: 36, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   emptyText: { flex: 1, fontSize: 11, lineHeight: 16 },
   timelineViewport: { flex: 1, overflow: 'hidden' },
   timelineCanvas: { flex: 1 },

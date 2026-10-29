@@ -6,6 +6,8 @@ export function recordEventRow(id){state.renders[id]=(state.renders[id]||0)+1;if
 const timelineFile=new File(Paths.document,'timeline-render-probe.json'),timeline={date:{},track:{}};let timelineScheduled=false;
 timelineFile.create({overwrite:true});timelineFile.write(JSON.stringify(timeline));
 export function recordTimelineRender(kind,key){timeline[kind][key]=(timeline[kind][key]||0)+1;if(!timelineScheduled){timelineScheduled=true;setTimeout(()=>{timelineScheduled=false;timelineFile.write(JSON.stringify(timeline));},0);}}
+const timelineLists=new WeakMap();let nextTimelineList=1;
+export function recordTimelineList(list){if(!list)return;if(!timelineLists.has(list))timelineLists.set(list,nextTimelineList++);timeline.lists??=[];timeline.lists.push(timelineLists.get(list));timelineFile.write(JSON.stringify(timeline));}
 
 const phasesFile=new File(Paths.document,'sql-phase-probe.json'),phases=[];
 phasesFile.create({overwrite:true});phasesFile.write('[]');
