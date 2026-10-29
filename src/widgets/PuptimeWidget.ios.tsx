@@ -32,6 +32,7 @@ export type PuptimeWidgetProps = {
     dark: { background: string; surface: string; controlRadius: number };
   };
   notificationConfirmations?: boolean;
+  quietStatus?: { enabled: boolean; name: string; petId: string };
   pottyAfterPeeMinutes?: number;
   pottyAfterMealMinutes?: number;
   language?: 'en' | 'zh-Hans' | 'es';
@@ -60,6 +61,7 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
         actionDetails: props.actionDetails,
         appearance: props.appearance,
         notificationConfirmations: props.notificationConfirmations,
+        quietStatus: props.quietStatus,
         pottyAfterPeeMinutes: props.pottyAfterPeeMinutes,
         pottyAfterMealMinutes: props.pottyAfterMealMinutes,
         language: props.language,
@@ -79,6 +81,7 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
       actionDetails: props.actionDetails,
       appearance: props.appearance,
       notificationConfirmations: props.notificationConfirmations,
+      quietStatus: props.quietStatus,
       pottyAfterPeeMinutes: props.pottyAfterPeeMinutes,
       pottyAfterMealMinutes: props.pottyAfterMealMinutes,
       language: props.language,

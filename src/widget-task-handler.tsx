@@ -28,6 +28,7 @@ import {
 } from './storage';
 import { QuickLogWidget } from './widgets/QuickLogWidget.android';
 import { updateHomeWidget } from './widgets/sync';
+import { syncQuietStatus } from './quiet-status';
 
 // Headless launches no longer import App, which also installs this handler.
 configureReminderHandling();
@@ -71,6 +72,7 @@ function refreshAfterTaps(preferences: NotificationPreferences, language: AppLan
         updateHomeWidget(events).catch(() => undefined),
         syncPottyReminders(events, preferences, language).catch(() => false),
       ]);
+      await syncQuietStatus().catch(() => undefined);
       waiters.forEach(({ resolve }) => resolve());
     } catch (error) { waiters.forEach(({ reject }) => reject(error)); }
   }, 200);

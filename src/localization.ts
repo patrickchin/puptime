@@ -7,6 +7,14 @@ export type LanguagePreference = 'system' | AppLanguage;
 export const languageChoices: readonly LanguagePreference[] = ['system', 'en', 'zh-Hans', 'es'];
 
 const english = {
+  "notifications.statusSwitch": "Quiet puppy status",
+  "notifications.statusDetail": "Last pee, poop, meal and upcoming reminder. Updates when you log or open Puptime.",
+  "notifications.statusIos": "Appears silently in Notification Center. You or iOS can clear it.",
+  "notifications.statusAndroid": "Stays in the notification drawer without sound or vibration. You can dismiss it in Android.",
+  "notifications.statusTitle": "{name} · Recent activity",
+  "notifications.statusEmpty": "No pee, poop or meal logs yet.",
+  "notifications.statusReminder": "Reminder · {activity} · {time}",
+
   "backup.reason.daily": "Daily snapshot",
   "backup.reason.before-update": "Before app update",
   "backup.reason.account-change": "Before account change",
@@ -709,6 +717,14 @@ export type MessageKey = keyof typeof english;
 type Dictionary = Record<MessageKey, string>;
 
 const simplifiedChinese: Dictionary = {
+  "notifications.statusSwitch": "静默小狗状态",
+  "notifications.statusDetail": "查看最近尿尿、便便、吃饭和即将到来的提醒。记录活动或打开 Puptime 时更新。",
+  "notifications.statusIos": "静默显示在通知中心。你或 iOS 都可以清除。",
+  "notifications.statusAndroid": "保留在通知栏中，不发声或振动。你可以在 Android 中移除。",
+  "notifications.statusTitle": "{name} · 最近活动",
+  "notifications.statusEmpty": "还没有尿尿、便便或吃饭记录。",
+  "notifications.statusReminder": "提醒 · {activity} · {time}",
+
   "backup.reason.daily": "每日快照",
   "backup.reason.before-update": "更新前",
   "backup.reason.account-change": "账号更改前",
@@ -1408,6 +1424,14 @@ const simplifiedChinese: Dictionary = {
 };
 
 const spanish: Dictionary = {
+  "notifications.statusSwitch": "Estado silencioso del cachorro",
+  "notifications.statusDetail": "Último pipí, caca, comida y próximo recordatorio. Se actualiza al registrar o abrir Puptime.",
+  "notifications.statusIos": "Aparece en silencio en el Centro de notificaciones. Tú o iOS podéis borrarlo.",
+  "notifications.statusAndroid": "Se queda en el panel sin sonido ni vibración. Puedes descartarlo en Android.",
+  "notifications.statusTitle": "{name} · Actividad reciente",
+  "notifications.statusEmpty": "Aún no hay registros de pipí, caca o comida.",
+  "notifications.statusReminder": "Recordatorio · {activity} · {time}",
+
   "backup.reason.daily": "Copia diaria",
   "backup.reason.before-update": "Antes de actualizar",
   "backup.reason.account-change": "Antes de cambiar de cuenta",

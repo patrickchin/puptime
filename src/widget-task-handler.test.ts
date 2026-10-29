@@ -15,7 +15,7 @@ const handlerUrl = new URL('./widget-task-handler.tsx', import.meta.url).href;
 registerHooks({
   resolve(specifier, context, next) {
     if (context.parentURL === handlerUrl) {
-      if (['./storage', './local/runtime.native', './reminders', './widgets/sync', './widgets/QuickLogWidget.android'].includes(specifier)) {
+      if (['./storage', './local/runtime.native', './reminders', './quiet-status', './widgets/sync', './widgets/QuickLogWidget.android'].includes(specifier)) {
         return { url: `widget-test:${specifier}`, shortCircuit: true };
       }
       if (specifier.startsWith('.')) return next(new URL(specifier + '.ts', context.parentURL).href, context);
@@ -47,6 +47,7 @@ registerHooks({
         export async function showWidgetLogConfirmation(reference){s.confirmations.push(reference);return true;}
         export async function syncPottyReminders(){await s.hold;return true;}`,
       'widget-test:./widgets/sync': 'export async function updateHomeWidget(){s.redraws++;}',
+      'widget-test:./quiet-status': 'export async function syncQuietStatus(){}',
       'widget-test:./widgets/QuickLogWidget.android': 'export function QuickLogWidget(){return null;}',
     };
     if (sources[url]) return { format: 'module', shortCircuit: true, source: prefix + sources[url] };

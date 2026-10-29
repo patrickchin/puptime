@@ -6,7 +6,7 @@ import ts from 'typescript';
 test('both native module graphs select the shared cloud, SQLite and setup implementation', () => {
   const entry = resolve('App.tsx');
   const facades = ['storage', 'activity-data', 'cloud/use-cloud', 'cloud/auth', 'cloud/export',
-    'cloud/notification-delivery', 'local/runtime', 'screens/FirstLaunchScreen',
+    'cloud/notification-delivery', 'quiet-status', 'local/runtime', 'screens/FirstLaunchScreen',
     'screens/OnboardingScreen', 'screens/SettingsScreen', 'components/PuppyNameSetting'];
   for (const facade of facades) {
     const file = (platform: string) => ts.resolveModuleName(`./src/${facade}`, entry, {

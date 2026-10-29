@@ -13,6 +13,7 @@ registerHooks({
       if (specifier === 'expo-widgets') return { url: 'ios-widget:widgets', shortCircuit: true };
       if (specifier === './PuptimeWidget.ios') return { url: 'ios-widget:timeline', shortCircuit: true };
       if (specifier === '../storage') return { url: 'ios-widget:storage', shortCircuit: true };
+      if (specifier === '../local/runtime.native') return { url: 'ios-widget:runtime', shortCircuit: true };
       if (specifier.startsWith('.')) return next(new URL(specifier + '.ts', context.parentURL).href, context);
     }
     return next(specifier, context);
@@ -20,6 +21,7 @@ registerHooks({
   load(url, context, next) {
     const mocks: Record<string, string> = {
       'ios-widget:widgets': `export const widgetsDirectory='file:///shared/ExpoWidgets';`,
+      'ios-widget:runtime': `export async function getLocalRuntime(){return {petId:'pet_test',storage:{async loadQuietStatusEnabled(){return false;},async loadNotificationDelivery(){return true;},async loadPuppyName(){return 'Biscuit';}}};}`,
       'ios-widget:files': `
         export class File {
           constructor(name){this.name=name;}

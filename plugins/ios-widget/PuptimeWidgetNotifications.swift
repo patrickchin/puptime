@@ -24,6 +24,60 @@ final class PuptimeWidgetNotificationBridge {
       parts.count > 5 ? Int(parts[5]) ?? 0 : 0,
       language
     )
+    if let source = event["source"] as? String { await showStatus(source) }
+  }
+
+  private func showStatus(_ source: String) async {
+    let center = UNUserNotificationCenter.current()
+    let requests = await center.pendingNotificationRequests()
+    // Read the latest committed snapshot after awaited work, so a rapid widget
+    // tap burst cannot replace newer activity with an older tap's presentation.
+    guard let timeline = WidgetsStorage.getArray(forKey: "__expo_widgets_\(source)_timeline"),
+          let entry = timeline.first as? [String: Any],
+          let stored = entry["props"] as? [String: Any],
+          let props = try? PuptimeWidgetJournal.reconcile(stored),
+          let status = props["quietStatus"] as? [String: Any] else { return }
+    guard status["enabled"] as? Bool == true else {
+      center.removeDeliveredNotifications(withIdentifiers: ["puptime-status"])
+      return
+    }
+    let language = props["language"] as? String ?? "en"
+    let name = status["name"] as? String ?? "Puptime"
+    let petId = status["petId"] as? String ?? ""
+    let times = props["lastEventAt"] as? [String: Double] ?? [:]
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: language)
+    formatter.setLocalizedDateFormatFromTemplate("MMMdjmm")
+    func clock(_ milliseconds: Double) -> String { formatter.string(from: Date(timeIntervalSince1970: milliseconds / 1000)) }
+    let labels = language == "zh-Hans" ? ["尿尿", "便便", "吃饭"] : language == "es" ? ["Pipí", "Caca", "Comida"] : ["Pee", "Poop", "Meal"]
+    var lines = zip(["pee", "poop", "meal"], labels).compactMap { key, label in
+      times[key].map { "\(label) · \(clock($0))" }
+    }
+    if lines.isEmpty {
+      lines.append(language == "zh-Hans" ? "还没有尿尿、便便或吃饭记录。" : language == "es" ? "Aún no hay registros de pipí, caca o comida." : "No pee, poop or meal logs yet.")
+    }
+    let next = requests.compactMap { request -> (String, Date)? in
+      let data = request.content.userInfo
+      let routine = request.identifier.hasPrefix("puptime-routine-") || request.identifier.hasPrefix("puptime-activity-")
+      let timed = data["kind"] as? String == "customTimedReminder" && data["petId"] as? String == petId
+      guard routine || timed, let at = request.trigger?.nextTriggerDate(), at > Date() else { return nil }
+      return (request.content.title, at)
+    }.min { $0.1 < $1.1 }
+    if let next {
+      let label = language == "zh-Hans" ? "提醒" : language == "es" ? "Recordatorio" : "Reminder"
+      lines.append("\(label) · \(next.0) · \(clock(next.1.timeIntervalSince1970 * 1000))")
+    }
+    let content = UNMutableNotificationContent()
+    let title = language == "zh-Hans" ? "最近活动" : language == "es" ? "Actividad reciente" : "Recent activity"
+    content.title = "\(name) · \(title)"
+    content.body = lines.joined(separator: "\n")
+    content.interruptionLevel = .passive
+    content.userInfo = ["kind": "quietStatus", "petId": petId]
+    do {
+      try await center.add(UNNotificationRequest(identifier: "puptime-status", content: content, trigger: nil))
+    } catch {
+      print("[Puptime] Quiet status could not be updated: \(error.localizedDescription)")
+    }
   }
 
   private func showConfirmation(_ type: String, _ language: String, _ timestamp: Int, _ customLabel: String?, _ eventId: String?) async {

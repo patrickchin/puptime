@@ -37,6 +37,21 @@ test('device notification delivery stays local across preference projection and 
  await first.storage.saveNotificationDelivery(false);assert.equal(await first.storage.loadNotificationDelivery(),false);
 });
 
+test('quiet status defaults off, persists only on its device, and validates stored choices',async t=>{
+ const first=await setup(t),second=await setup(t);
+ assert.equal(await first.storage.loadQuietStatusEnabled(),false);
+ await first.storage.saveQuietStatusEnabled(true);
+ const records=await first.database.read(sql=>readLocalRecords(sql,'pet-1'));
+ await second.database.write(sql=>applyLocalRecords(sql,'pet-1',records,[]));
+ assert.equal(await second.storage.loadQuietStatusEnabled(),false);
+ assert.ok(!JSON.stringify(records).includes('quiet_status_on_device'));
+ const reopened=await createLocalDatabase(sqliteTestConnection(first.path));
+ try{assert.equal(await createNativeStorage(reopened,'pet-1').loadQuietStatusEnabled(),true);}finally{await reopened.close();}
+ await assert.rejects(first.storage.saveQuietStatusEnabled('true' as never));
+ await first.database.write(sql=>sql.runAsync("UPDATE metadata SET value='invalid' WHERE key='quiet_status_on_device'"));
+ await assert.rejects(first.storage.loadQuietStatusEnabled());
+});
+
 test('device delivery preserves legacy completion and rejects corrupt flags without rewriting them',async t=>{
  const {database,storage}=await setup(t);
  await database.write(sql=>sql.runAsync("DELETE FROM metadata WHERE key='notify_on_device'"));
