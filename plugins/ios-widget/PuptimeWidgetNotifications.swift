@@ -29,6 +29,12 @@ final class PuptimeWidgetNotificationBridge {
 
   private func showStatus(_ source: String) async {
     let center = UNUserNotificationCenter.current()
+    // Keep the default (off) path out of notification-center queries, so
+    // ordinary widget logging does not wait for an unused status card.
+    guard let first = WidgetsStorage.getArray(forKey: "__expo_widgets_\(source)_timeline")?.first as? [String: Any],
+          let firstProps = first["props"] as? [String: Any],
+          let firstStatus = firstProps["quietStatus"] as? [String: Any],
+          firstStatus["enabled"] as? Bool == true else { return }
     let requests = await center.pendingNotificationRequests()
     let delivered = await center.deliveredNotifications()
     // Read the latest committed snapshot after awaited work, so a rapid widget
