@@ -19,13 +19,6 @@ const pageSizeSchema = z.number().int().min(1).max(100);
 type JsonRow = { body: string };
 type RecordRow={id:string;pet_id:string|null;kind:CloudRecord['kind'];revision:number;sequence:number;deleted:number;updated_at:number;data_json:string|null};
 
-function attributedCarePatch(before:CloudRecord|null,patch:Record<string,unknown>,actorName:string){
-  const oldNote=before&&'note' in before.data?before.data.note??'':'';
-  const attribution=oldNote.match(/(?:^|\n\n)Logged by ([^\n]+)$/)?.[1]??actorName.replace(/[\r\n]/g,' ').slice(0,80);
-  const note=typeof patch.note==='string'?patch.note.replace(/(?:^|\n\n)Logged by [^\n]+$/,'').trim():'';
-  return {...patch,note:[note,`Logged by ${attribution}`].filter(Boolean).join('\n\n')};
-}
-
 export class AccountStore extends DurableObject<Cloudflare.Env> {
   constructor(ctx: DurableObjectState, env: Cloudflare.Env) {
     super(ctx, env);
@@ -244,7 +237,10 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
     // device schema migration; immutable revision actors enforce permissions.
     let patch:Record<string,unknown>=input.patch;
     if(input.kind==='event'&&input.intent!=='delete'&&(input.intent==='create'||'note' in patch)){
-      patch=attributedCarePatch(before,patch,actorName);
+      const oldNote=before&&'note' in before.data?before.data.note??'':'';
+      const attribution=oldNote.match(/(?:^|\n\n)Logged by ([^\n]+)$/)?.[1]??actorName.replace(/[\r\n]/g,' ').slice(0,80);
+      const note=typeof patch.note==='string'?patch.note.replace(/(?:^|\n\n)Logged by [^\n]+$/,'').trim():'';
+      patch={...patch,note:[note,`Logged by ${attribution}`].filter(Boolean).join('\n\n')};
     }
     return this.resourceWrite({kind:input.kind,petId,localId:input.localId,intent:input.intent,expectedRevision:input.expectedRevision,patch,actorId,requestId:`${actorId}:${input.requestId}`});
   }
@@ -272,16 +268,11 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
   async sharedPush(shareId:string,actorId:string,inputs:Mutation[]){
     const grant=await this.#careGrant(shareId,actorId),accepted:MutationResult[]=[],rejected:{operationId:string;error:'invalid_mutation'|'conflict'}[]=[];
     for(const input of inputs){
-      let mutation=mutationSchema.parse(input);const before=this.#record(mutation.recordId),household=grant.kind==='household';
+      const mutation=mutationSchema.parse(input),before=this.#record(mutation.recordId),household=grant.kind==='household';
       const canWrite=grant.permission==='contribute'&&mutation.petId===grant.pet_id
         &&(mutation.kind==='event'||household&&mutation.kind==='routine')
         &&(!before||before.petId===grant.pet_id&&this.#sharedEditable(before,actorId,household,true).editable);
       if(!canWrite){rejected.push({operationId:input.operationId,error:'invalid_mutation'});continue;}
-      if(mutation.kind==='event'&&mutation.intent!=='delete'&&(mutation.intent==='create'||'note' in mutation.patch)){
-        const attributed=mutationSchema.safeParse({...mutation,patch:attributedCarePatch(before,mutation.patch,grant.name)});
-        if(!attributed.success){rejected.push({operationId:input.operationId,error:'invalid_mutation'});continue;}
-        mutation=attributed.data;
-      }
       // The authenticated member is the revision actor. A client cannot spoof authorship.
       this.ctx.storage.sql.exec('INSERT INTO enrolled_devices(id,pet_id) VALUES(?,?) ON CONFLICT(id,pet_id) DO NOTHING',actorId,grant.pet_id);
       const result=this.push([{...mutation,deviceId:actorId}]);
