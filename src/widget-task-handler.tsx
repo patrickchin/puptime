@@ -1,5 +1,6 @@
 'use no memo';
 
+import {getCareAccess} from './care-access';
 import type { WidgetTaskHandlerProps } from 'react-native-android-widget';
 
 import {
@@ -15,16 +16,14 @@ import {
 } from './domain';
 import { resolveLanguage, type AppLanguage } from './localization';
 import type { NotificationPreferences } from './notification-config';
-import { getLocalRuntime } from './local/runtime.native';
+import { getLocalRuntime,getCareSelection,getRuntimeForCare } from './local/runtime.native';
 import { configureReminderHandling, showWidgetLogConfirmation, syncPottyReminders } from './reminders';
 import {
-  appendEvents,
   loadCustomActivities,
   loadLanguagePreference,
   loadNotificationPreferences,
   loadThemePreference,
   loadWidgetActions,
-  updateEvent,
 } from './storage';
 import { QuickLogWidget } from './widgets/QuickLogWidget.android';
 import { updateHomeWidget } from './widgets/sync';
@@ -38,17 +37,20 @@ const latestEvents = async () => (await getLocalRuntime()).activity.latestEvents
 
 // Serialize nap's read/change pair without holding later taps behind reminders.
 let logWrites: Promise<unknown> = Promise.resolve();
-function saveLog(key: ActivityKey, at: number, customActivities: string[]) {
+function saveLog(key: ActivityKey, at: number, customActivities: string[],expectedScope:string,notificationPetId?:string) {
   const result = logWrites.then(async () => {
+    const selection=getCareSelection(),runtime=await getRuntimeForCare(selection);
+    if((selection?runtime.petId:'owner')!==expectedScope)return null;
+    if(notificationPetId&&(runtime.petId!==notificationPetId||!await runtime.storage.loadQuietStatusEnabled()||!await runtime.storage.loadNotificationDelivery()))return null;
     const activity = activityFromKey(key, customActivities);
-    const openNap = key === 'nap' ? (await latestEvents()).find(isOpenNap) : undefined;
+    const openNap = key === 'nap' ? (await runtime.activity.latestEvents()).find(isOpenNap) : undefined;
     const event = openNap
       ? { ...openNap, endedAt: Math.max(openNap.at, at) }
       : key === 'nap'
         ? createNapEvent('widget', at)
         : createEvent(activity.type, 'widget', at, activity.customLabel);
-    if (openNap) await updateEvent(openNap.id, { endedAt: event.endedAt });
-    else await appendEvents([event]);
+    if (openNap) await runtime.storage.updateEvent(openNap.id, { endedAt: event.endedAt });
+    else await runtime.storage.appendEvents([event]);
     return { event, activity };
   });
   logWrites = result.catch(() => undefined);
@@ -80,6 +82,7 @@ function refreshAfterTaps(preferences: NotificationPreferences, language: AppLan
 }
 
 async function render(props: WidgetTaskHandlerProps, events: PuppyEvent[]) {
+  const access=await getCareAccess();
   const compact = props.widgetInfo.height < 90;
   const activeNap = events.some(isOpenNap);
   const customActivities = await loadCustomActivities(events);
@@ -87,8 +90,8 @@ async function render(props: WidgetTaskHandlerProps, events: PuppyEvent[]) {
   const themePreference = await loadThemePreference();
   const lastEventAt = latestQuickEventTimes(events);
   props.renderWidget({
-    light: <QuickLogWidget compact={compact} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} />,
-    dark: <QuickLogWidget compact={compact} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} dark />,
+    light: <QuickLogWidget scope={access.scope} canLog={access.canLog} compact={compact} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} />,
+    dark: <QuickLogWidget scope={access.scope} canLog={access.canLog} compact={compact} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} dark />,
   });
 }
 
@@ -100,6 +103,12 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
       if (!enabled || !delivery || props.clickActionData.petId !== runtime.petId) return;
     }
     // Keep the tap time even when Android has to start the JavaScript runtime.
+    const access=await getCareAccess();
+    if(!access.canLog||(props.clickActionData?.scope??'owner')!==access.scope){
+      if(props.clickActionData?.source==='notification')await syncQuietStatus();
+      else await render(props,await latestEvents());
+      return;
+    }
     const tapAt = props.clickActionData?.tapAt;
     const at = typeof tapAt === 'number' && Number.isSafeInteger(tapAt) && tapAt > 0 ? tapAt : Date.now();
     const type = props.clickActionData?.type;
@@ -107,7 +116,13 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
     const custom = typeof type === 'string' && customActivities.some((label) => customActivityKey(label) === type);
     if (isQuickEventType(type) || custom) {
       const key = type as ActivityKey;
-      const { event, activity } = await saveLog(key, at, customActivities);
+      const saved=await saveLog(key,at,customActivities,access.scope,props.clickActionData?.source==='notification'?props.clickActionData.petId:undefined);
+      if(!saved){
+        if(props.clickActionData?.source==='notification')await syncQuietStatus();
+        else await render(props,await latestEvents());
+        return;
+      }
+      const {event,activity}=saved;
       const [preferences, languagePreference] = await Promise.all([
         loadNotificationPreferences(),
         loadLanguagePreference(),

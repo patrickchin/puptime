@@ -1,4 +1,5 @@
 import { accountEnglish,accountChinese,accountSpanish } from './cloud/account-copy.ts';
+import {sharingEnglish,sharingChinese,sharingSpanish} from './sharing-copy.ts';
 import type { EventType, PuppyEvent } from './domain';
 
 export type AppLanguage = 'en' | 'zh-Hans' | 'es';
@@ -100,6 +101,7 @@ const english = {
   "history.reason.preserved-timing": "Timing kept",
   "history.reason.inferred-nap-end": "Nap end inferred",
   ...accountEnglish,
+  ...sharingEnglish,
   "telemetry.title": "Usage analytics",
   "telemetry.detail": "Share anonymous screen visits, time spent, control presses and activity types with PostHog in the EU to improve Puptime. Names, notes and custom activity labels are excluded. Optional; turn off anytime.",
   "telemetry.unavailable": "Analytics are unavailable in this build.",
@@ -813,6 +815,7 @@ const simplifiedChinese: Dictionary = {
   "history.reason.preserved-timing": "保留时间",
   "history.reason.inferred-nap-end": "推算的小睡结束时间",
   ...accountChinese,
+  ...sharingChinese,
   "telemetry.title": "使用情况分析",
   "telemetry.detail": "向欧盟的 PostHog 分享匿名页面访问、停留时间、控件点击和活动类型，帮助改进 Puptime。不包含姓名、备注或自定义活动名称。此功能可选，可随时关闭。",
   "telemetry.unavailable": "此版本暂不支持使用情况分析。",
@@ -1523,6 +1526,7 @@ const spanish: Dictionary = {
   "history.reason.preserved-timing": "Horario conservado",
   "history.reason.inferred-nap-end": "Fin de siesta estimado",
   ...accountSpanish,
+  ...sharingSpanish,
   "telemetry.title": "Análisis de uso",
   "telemetry.detail": "Comparte visitas anónimas, tiempo en pantalla, pulsaciones y tipos de actividad con PostHog en la UE para mejorar Puptime. Se excluyen nombres, notas y etiquetas personalizadas. Es opcional; puedes desactivarlo cuando quieras.",
   "telemetry.unavailable": "Los análisis no están disponibles en esta versión.",

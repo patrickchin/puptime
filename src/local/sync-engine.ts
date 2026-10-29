@@ -25,7 +25,7 @@ const historySelection=z.discriminatedUnion('source',[
   z.strictObject({source:z.literal('local'),sequence:z.number().int().min(1).max(Number.MAX_SAFE_INTEGER)}),
   z.strictObject({source:z.literal('cloud'),revision:revisionSchema}),
 ]);
-export function createLocalSync(database:LocalDatabase,options:{newId?:()=>string;now?:()=>number;afterCommit?:()=>void;beforeChange?:BackupGuard}={}) {
+export function createLocalSync(database:LocalDatabase,options:{newId?:()=>string;now?:()=>number;afterCommit?:()=>void;beforeChange?:BackupGuard;localRoutineReminders?:boolean}={}) {
   const now=options.now??Date.now;
   async function id(sql:SqlExecutor,prefix:'op'|'gen'='op') {return identifierSchema.parse(options.newId?.()??(await sql.getFirstAsync<{id:string}>('SELECT ? || lower(hex(randomblob(16))) id',prefix+'_'))!.id);}
   async function owner(sql:SqlExecutor,fence?:Fence):Promise<Owner|null> {
@@ -160,7 +160,9 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
     for (const record of working.values()) {
       const local=location(record);if (!local) continue;
       if (record.deleted) {remove(record);continue;}
-      projected.get(local.pet.pet_id)!.set(key(local),{kind:local.kind,localId:local.localId,data:record.data});
+      const oldRoutine=options.localRoutineReminders&&local.kind==='routine'?before.get(local.pet.pet_id)?.find(value=>value.kind==='routine'&&value.localId===local.localId):undefined;
+      const data=oldRoutine?{...record.data,reminder:'reminder' in oldRoutine.data?oldRoutine.data.reminder:false}:record.data;
+      projected.get(local.pet.pet_id)!.set(key(local),{kind:local.kind,localId:local.localId,data});
       deletions.get(local.pet.pet_id)!.delete(key(local));
     }
     for (const item of raw) {
@@ -182,6 +184,7 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
     if (!saved||saved.revision!==proposed.revision||saved.sequence!==proposed.sequence||saved.kind!==proposed.kind||saved.petId!==proposed.petId) throw new Error('Restore requires the current record identity and revision.');
     const pet=saved.kind==='accountPreferences'?await sql.getFirstAsync<Binding>("SELECT * FROM local_sync_pets WHERE generation=? AND status='active' ORDER BY rowid LIMIT 1",current.generation):await sql.getFirstAsync<Binding>("SELECT * FROM local_sync_pets WHERE generation=? AND cloud_pet_id=? AND status='active'",current.generation,saved.petId);
     if (!pet) throw new Error('Restore puppy ownership changed.');
+    if(saved.editable===false)throw new Error('Your access does not allow restoring this record.');
     const localId=saved.kind==='puppy'?pet.pet_id:localRecordId(saved);
     if (await sql.getFirstAsync('SELECT operation_id FROM local_sync_outbox WHERE generation=? AND local_pet_id=? AND local_kind=? AND local_id=? LIMIT 1',current.generation,pet.pet_id,saved.kind,localId)) throw new Error("Wait for this record's pending changes to be acknowledged before restoring.");
     const data=recordDataSchema(saved.kind).parse(input.data),operationId=await id(sql);

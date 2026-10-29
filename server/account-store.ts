@@ -6,6 +6,8 @@ import {cloudAccess,getCloudAccount} from './cloud-access';
 import {eventSqlColumns,routineSqlColumns,eventSqlValues,routineSqlValues,eventDataFromSql,routineDataFromSql,type EventSqlRow,type RoutineSqlRow} from '../src/record-sql';
 import { reconcileMutation, ReconciliationError } from '../src/cloud/reconcile';
 import { cloudRecordId } from '../src/cloud/record-identity';
+import {localRecordId} from '../src/cloud/record-identity';
+import {careWriteSchema,type CareWrite} from '../src/sharing';
 import { entityId } from '../src/entity-id';
 import { customActivityKey } from '../src/domain';
 import { resourceKindSchema, resourceListSchema, resourceWriteSchema, type ResourceKind, type ResourceListQuery, type ResourceList, type ResourceWrite, type ResourceWriteResult } from './resource-types';
@@ -197,6 +199,91 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
   resourceHistory(kind: ResourceKind, petId: string | null, localId: string, beforeRevision = Number.MAX_SAFE_INTEGER): Revision[] {
     resourceKindSchema.parse(kind);
     return this.history(cloudRecordId(kind, petId, localId), beforeRevision);
+  }
+
+  async #careGrant(id:string,actorId:string){
+    const grant=await this.env.AUTH_DB.prepare(`SELECT s.owner_id,s.pet_id,s.kind,s.permission,COALESCE(NULLIF(u.name,''),s.label) AS name
+      FROM puppy_shares s JOIN user owner ON owner.id=s.owner_id LEFT JOIN cloud_accounts c ON c.account_id=owner.id
+      JOIN user u ON u.id=s.member_id LEFT JOIN cloud_accounts m ON m.account_id=u.id
+      WHERE s.id=? AND s.member_id=? AND s.revoked_at IS NULL AND (s.expires_at IS NULL OR s.expires_at>?)
+      AND COALESCE(c.state,'')!='deleting' AND COALESCE(m.state,'')!='deleting'`).bind(id,actorId,Date.now()).first<{owner_id:string;pet_id:string;kind:'household'|'temporary';permission:'view'|'contribute';name:string}>();
+    if(!grant||getAccountStore(this.env,grant.owner_id).id.toString()!==this.ctx.id.toString())throw new ReconciliationError('Shared access has ended.');
+    this.#assertActive();return grant;
+  }
+
+  async careList(shareId:string,actorId:string,kind:'event'|'routine',before:number) {
+    const grant=await this.#careGrant(shareId,actorId),petId=grant.pet_id,household=grant.kind==='household',since=undefined;
+    this.#assertActive();identifierSchema.parse(petId);cursorSchema.parse(before);
+    const puppy=this.resourceGet('puppy',petId,petId);if(!puppy)throw new ReconciliationError('Puppy does not exist.');
+    const rows=this.ctx.storage.sql.exec<{id:string;sequence:number}>(`SELECT r.id,r.sequence FROM records r ${kind==='event'?'JOIN record_events e ON e.record_id=r.id':''} WHERE r.pet_id=? AND r.kind=? AND r.deleted=0 AND r.sequence<? ${kind==='event'&&since!==undefined?'AND e.at>=?':''} ORDER BY r.sequence DESC LIMIT 51`,petId,kind,before||Number.MAX_SAFE_INTEGER,...(kind==='event'&&since!==undefined?[since]:[])).toArray();
+    return {puppyName:'name' in puppy.data?puppy.data.name:'Puppy',records:rows.slice(0,50).map(row=>{
+      const record=this.#record(row.id)!;
+      const creator=this.ctx.storage.sql.exec<{body:string}>('SELECT body FROM revisions WHERE record_id=? ORDER BY revision LIMIT 1',row.id).toArray()[0];
+      return {record,localId:localRecordId(record),canEdit:household||!!creator&&(JSON.parse(creator.body) as Revision).deviceId===actorId};
+    }),nextCursor:rows.length>50?rows[49].sequence:null};
+  }
+
+  async careWrite(shareId:string,actorId:string,value:CareWrite):Promise<ResourceWriteResult|{ok:false;error:'forbidden';message:string}> {
+    const grant=await this.#careGrant(shareId,actorId),petId=grant.pet_id,actorName=grant.name,household=grant.kind==='household';
+    if(grant.permission==='view')return {ok:false,error:'forbidden',message:'This access is view only.'};
+    this.#assertActive();const input=careWriteSchema.parse(value);
+    if(input.kind==='routine'&&!household)return {ok:false,error:'forbidden',message:'Only household members can change routines.'};
+    const before=this.resourceGet(input.kind,petId,input.localId);
+    if(!household&&input.intent!=='create'){
+      const first=before?this.ctx.storage.sql.exec<{body:string}>('SELECT body FROM revisions WHERE record_id=? ORDER BY revision LIMIT 1',before.id).toArray()[0]:null;
+      if(!first||(JSON.parse(first.body) as Revision).deviceId!==actorId)return {ok:false,error:'forbidden',message:'You can only correct your own logs.'};
+    }
+    // Attribution is readable by existing native clients without a protocol or
+    // device schema migration; immutable revision actors enforce permissions.
+    let patch:Record<string,unknown>=input.patch;
+    if(input.kind==='event'&&input.intent!=='delete'&&(input.intent==='create'||'note' in patch)){
+      const oldNote=before&&'note' in before.data?before.data.note??'':'';
+      const attribution=oldNote.match(/(?:^|\n\n)Logged by ([^\n]+)$/)?.[1]??actorName.replace(/[\r\n]/g,' ').slice(0,80);
+      const note=typeof patch.note==='string'?patch.note.replace(/(?:^|\n\n)Logged by [^\n]+$/,'').trim():'';
+      patch={...patch,note:[note,`Logged by ${attribution}`].filter(Boolean).join('\n\n')};
+    }
+    return this.resourceWrite({kind:input.kind,petId,localId:input.localId,intent:input.intent,expectedRevision:input.expectedRevision,patch,actorId,requestId:`${actorId}:${input.requestId}`});
+  }
+
+  async sharedSummary(shareId:string,actorId:string){
+    const grant=await this.#careGrant(shareId,actorId);
+    return {pets:this.summary().pets.filter(pet=>pet.id===grant.pet_id)};
+  }
+  async sharedEnroll(shareId:string,actorId:string,input:Enrollment){
+    const grant=await this.#careGrant(shareId,actorId),request=enrollmentSchema.parse(input);
+    if(request.confirmedPetId!==grant.pet_id)throw new ReconciliationError('Puppy confirmation required.');
+    // Shared enrollment never creates a profile or grants an owner device.
+    return {petId:grant.pet_id};
+  }
+  #sharedEditable(record:CloudRecord,actorId:string,household:boolean,contribute:boolean){
+    const first=this.ctx.storage.sql.exec<JsonRow>('SELECT body FROM revisions WHERE record_id=? ORDER BY revision LIMIT 1',record.id).toArray()[0];
+    return {...record,editable:contribute&&(record.kind==='event'&&(household||!!first&&(JSON.parse(first.body) as Revision).deviceId===actorId)||household&&record.kind==='routine')};
+  }
+  async sharedPull(shareId:string,actorId:string,after:number,limit=100):Promise<PullPage>{
+    const grant=await this.#careGrant(shareId,actorId);cursorSchema.parse(after);pageSizeSchema.parse(limit);
+    const rows=this.ctx.storage.sql.exec<JsonRow>(`SELECT v.body FROM revisions v JOIN records r ON r.id=v.record_id WHERE r.pet_id=? AND v.sequence>? ORDER BY v.sequence LIMIT ?`,grant.pet_id,after,limit+1).toArray();
+    const changes=rows.slice(0,limit).map(row=>this.#sharedEditable((JSON.parse(row.body) as Revision).after,actorId,grant.kind==='household',grant.permission==='contribute'));
+    return {changes,cursor:changes.at(-1)?.sequence??after,hasMore:rows.length>limit};
+  }
+  async sharedPush(shareId:string,actorId:string,inputs:Mutation[]){
+    const grant=await this.#careGrant(shareId,actorId),accepted:MutationResult[]=[],rejected:{operationId:string;error:'invalid_mutation'|'conflict'}[]=[];
+    for(const input of inputs){
+      const mutation=mutationSchema.parse(input),before=this.#record(mutation.recordId),household=grant.kind==='household';
+      const canWrite=grant.permission==='contribute'&&mutation.petId===grant.pet_id
+        &&(mutation.kind==='event'||household&&mutation.kind==='routine')
+        &&(!before||before.petId===grant.pet_id&&this.#sharedEditable(before,actorId,household,true).editable);
+      if(!canWrite){rejected.push({operationId:input.operationId,error:'invalid_mutation'});continue;}
+      // The authenticated member is the revision actor. A client cannot spoof authorship.
+      this.ctx.storage.sql.exec('INSERT INTO enrolled_devices(id,pet_id) VALUES(?,?) ON CONFLICT(id,pet_id) DO NOTHING',actorId,grant.pet_id);
+      const result=this.push([{...mutation,deviceId:actorId}]);
+      accepted.push(...result.accepted.map(value=>({...value,record:this.#sharedEditable(value.record,actorId,household,true)})));
+      rejected.push(...result.rejected.map(value=>({operationId:value.operationId,error:'conflict' as const})));
+    }
+    return {accepted,rejected};
+  }
+  async sharedHistory(shareId:string,actorId:string,id:string,before:number){
+    const grant=await this.#careGrant(shareId,actorId),record=this.#record(recordIdSchema.parse(id));
+    return record?.petId===grant.pet_id?this.history(id,before):[];
   }
 
   resourceWrite(input: ResourceWrite): ResourceWriteResult {

@@ -51,6 +51,9 @@ import { ScheduleScreen } from './src/screens/ScheduleScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { PuppyIdentity } from './src/components/PuppyIdentity';
 import {PetsScreen} from './src/screens/PetsScreen';
+import {SharePuppyScreen} from './src/screens/SharePuppyScreen';
+import {SharedPuppiesScreen} from './src/screens/SharedPuppiesScreen';
+import {shareIdSchema} from './src/sharing';
 import {LogViewSwitch} from './src/components/LogViewSwitch';
 import {NotificationsScreen} from './src/screens/NotificationsScreen';
 import { AccountScreen } from './src/screens/AccountScreen';
@@ -58,7 +61,7 @@ import { useCloud } from './src/cloud/use-cloud';
 import {getNotificationDelivery,setNotificationDelivery} from './src/cloud/notification-delivery';
 import {getQuietStatusEnabled,setQuietStatusEnabled,syncQuietStatus} from './src/quiet-status';
 import {QUIET_STATUS_KIND} from './src/quiet-status-config';
-import {getActivityData,getActivityPetId,getEventHistoryData,type ActivityQueries,type EventHistoryData} from './src/activity-data';
+import {getActivityData as defaultGetActivityData,getActivityPetId as defaultGetActivityPetId,getEventHistoryData as defaultGetEventHistoryData,type ActivityQueries,type EventHistoryData} from './src/activity-data';
 import {EventHistoryScreen} from './src/screens/EventHistoryScreen';
 import { TimelineScreen } from './src/screens/TimelineScreen';
 import {
@@ -80,32 +83,11 @@ import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   type NotificationPreferences,
 } from './src/notification-config';
-import {
-  appendEvents,
-  completeOnboarding,
-  loadActivityCustomizations,
-  EventsImportError,
-  EventsStorageError,
-  importEvents,
-  loadEvents,
-  loadCustomActivities,
-  loadLanguagePreference,
-  loadNotificationPreferences,
-  loadSchedule,
-  loadThemePreference,
-  loadWidgetActions,
-  removeEvent,
-  saveSchedule,
-  saveScheduleEntry,
-  removeScheduleEntry,
-  saveCustomActivity,
-  saveLanguagePreference,
-  saveNotificationPreferences,
-  saveThemePreference,
-  saveWidgetActions,
-  shouldShowOnboarding,
-  updateEvent,
-} from './src/storage';
+import * as defaultStorage from './src/storage';
+import {EventsImportError,EventsStorageError} from './src/storage';
+import {useAccountSnapshot} from './src/cloud/use-account-snapshot';
+import {CareSessionHost,useCareSession} from './src/care-session';
+
 import { resolveTheme, type ThemePreference } from './src/theme';
 import { acknowledgePendingWidgetEvents, readPendingWidgetEvents, updateHomeWidget } from './src/widgets/sync';
 import { requestExactReminderAccess, refreshExactReminderScheduling } from './src/exact-reminders';
@@ -114,9 +96,15 @@ configureReminderHandling();
 
 const nativeApp = Platform.OS !== 'web';
 
-export default function App(){return <PuptimeApp conversationalOnboarding={Platform.OS!=='web'}/>;}
+export default function App(){return <CareSessionHost><ActiveJournal/></CareSessionHost>;}
+function ActiveJournal(){const session=useCareSession();return <PuptimeApp key={session.key} conversationalOnboarding={Platform.OS!=='web'}/>;}
 
 export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboarding?:boolean}={}) {
+  const careSession=useCareSession(),care=careSession.selection;
+  const {appendEvents,completeOnboarding,loadActivityCustomizations,importEvents,loadEvents,loadCustomActivities,loadLanguagePreference,loadNotificationPreferences,loadSchedule,loadThemePreference,loadWidgetActions,removeEvent,saveSchedule,saveScheduleEntry,removeScheduleEntry,saveCustomActivity,saveLanguagePreference,saveNotificationPreferences,saveThemePreference,saveWidgetActions,shouldShowOnboarding,updateEvent}=careSession.runtime?.storage??defaultStorage;
+  const getActivityData=careSession.runtime?async()=>careSession.runtime!.activity:defaultGetActivityData;
+  const getActivityPetId=careSession.runtime?async()=>careSession.runtime!.petId:defaultGetActivityPetId;
+  const getEventHistoryData=careSession.runtime?async()=>careSession.runtime!.history:defaultGetEventHistoryData;
   const colorScheme = useColorScheme();
   const [themePreference, setThemePreference] = useState<ThemePreference>('system');
   const [languagePreference, setLanguagePreference] = useState<LanguagePreference>('system');
@@ -124,6 +112,13 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [historyVisible,setHistoryVisible]=useState(false);
   const [accountVisible,setAccountVisible]=useState(false);
+  const [sharingKind,setSharingKind]=useState<'household'|'temporary'|null>(null);
+  const [sharedView,setSharedView]=useState<{id?:string;token?:string}|null>(null);
+  useEffect(()=>{
+    const open=(url:string)=>{try{const link=new URL(url);if(link.protocol==='puptime:'&&link.hostname==='care'){const id=shareIdSchema.parse(link.searchParams.get('invite'));setSharedView({id,token:link.hash.slice(1)||undefined});}}catch{}};
+    void Linking.getInitialURL().then(url=>{if(url)open(url);});
+    const subscription=Linking.addEventListener('url',event=>open(event.url));return()=>subscription.remove();
+  },[]);
   const [drawerOpen,setDrawerOpen]=useState(false);
   const [showSpotlight,setShowSpotlight]=useState(false);
   const [spotlightTarget,setSpotlightTarget]=useState<SpotlightRect|null>(null);
@@ -154,6 +149,8 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
   const activityRef=useRef<ActivityQueries|undefined>(undefined);
   const [refreshToken,setRefreshToken]=useState(0);
   const [eventCount,setEventCount]=useState(0);
+  const [lockedEvents,setLockedEvents]=useState<Set<string>>(new Set());
+  const canEditEvent=useCallback((event:PuppyEvent)=>!lockedEvents.has(event.id),[lockedEvents]);
   const refreshGeneration=useRef(0);
   const [customActivities, setCustomActivities] = useState<string[]>([]);
   const [activityCustomizations, setActivityCustomizations] = useState<ActivityCustomizations>({});
@@ -203,6 +200,10 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     setEventHistory(history);
     setPetId(nextPetId);
     setEvents(nextEvents);
+    if(careSession.runtime&&care){
+      const rows=await careSession.runtime.database.read(sql=>sql.getAllAsync<{record_id:string}>("SELECT record_id FROM local_sync_records WHERE json_extract(body,'$.kind')='event' AND json_extract(body,'$.editable')=0"));
+      setLockedEvents(new Set(rows.map(row=>(JSON.parse(row.record_id) as string[])[2])));
+    }
     setEventCount(count);
     setRefreshToken(value=>value+1);
     const nextCustomActivities = await loadCustomActivities(nextEvents);
@@ -228,6 +229,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     setDelivery(nextDelivery);
     setQuietStatus(nextQuietStatus);
     setActivityCustomizations(current=>JSON.stringify(current)===JSON.stringify(nextActivityCustomizations)?current:nextActivityCustomizations);
+    if(!careSession.isCurrent())return nextEvents;
     // Exact access revocation cancels OS alarms but preserves Expo's request
     // store. Restore those requests before replacing current routine/potty plans.
     await refreshExactReminderScheduling().catch(() => undefined);
@@ -242,7 +244,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
         nextNotificationPreferences,
         resolveLanguage(nextLanguagePreference),
       ).catch(() => undefined),
-      updateHomeWidget(nextEvents).catch(() => undefined),
+      updateHomeWidget(nextEvents,nextPetId).catch(() => undefined),
       ...(nativeApp?[cancelCustomTimedRemindersIfDeliveryOff().catch(()=>undefined)]:[]),
     ]).then(syncQuietStatus).catch(() => undefined);
     return nextEvents;
@@ -253,6 +255,15 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     catch{Alert.alert(translate(languageRef.current,'app.loadErrorTitle'),translate(languageRef.current,'app.loadErrorBody'));}
   },[refresh]);
   const cloud=useCloud(refreshCommittedState);
+  const accountState=useAccountSnapshot(cloud.controller);
+  const [accessExpired,setAccessExpired]=useState(!!care&&care.expiresAt!==null&&care.expiresAt<=Date.now());
+  useEffect(()=>{if(!care?.expiresAt)return;const timer=setTimeout(()=>setAccessExpired(true),Math.max(0,Math.min(2147483647,care.expiresAt-Date.now())));return()=>clearTimeout(timer);},[care?.expiresAt]);
+  useEffect(()=>{
+    if(care&&careSession.runtime)void careSession.runtime.database.read(sql=>sql.getFirstAsync("SELECT value FROM metadata WHERE key='care_blocked' AND value='1'")).then(blocked=>{if(blocked)setAccessExpired(true);}).catch(()=>{});
+  },[care,careSession.runtime]);
+  const accessEnded=!!care&&(accessExpired||['account-deleted','forbidden','account-mismatch','auth-required','conflict'].includes(accountState?.problem??''));
+  useEffect(()=>{if(accessEnded)void refreshCommittedState();},[accessEnded,refreshCommittedState]);
+
 
   useEffect(() => {
     productTelemetry.setScreen(onboardingVisible === null ? 'startup' : onboardingVisible ? 'onboarding' : accountVisible && cloud.available ? 'account' : preferencePicker === 'theme' ? 'theme_picker' : preferencePicker === 'language' ? 'language_picker' : historyVisible ? 'log_history' : settingsVisible ? 'settings' : tab);
@@ -263,7 +274,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     startupLoading.current=true;setStartupFailed(false);
     try{
       let setup:FirstLaunchProgress|null;
-      if(nativeApp){setup=await loadInitialSetup();await refresh();}
+      if(nativeApp){setup=care?null:await loadInitialSetup();await refresh();}
       else{
         const shown=await initialOnboardingCheck;
         try{await refresh();}catch{Alert.alert(translate(languageRef.current,'app.loadErrorTitle'),translate(languageRef.current,'app.loadErrorBody'));}
@@ -707,6 +718,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     await refresh();
     setFirstLaunch(null);setOnboardingVisible(false);setGuideOpenedFromSettings(false);
     navigateToTab('log');setShowSpotlight(draft.showGuide);
+    if(draft.sharingKind){setShowSpotlight(false);setSharingKind(draft.sharingKind);}
   };
 
   const screen = useMemo(() => {
@@ -744,7 +756,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
         />
       );
     }
-    if(tab==='pets')return <PetsScreen theme={theme} cloud={cloud} eventCount={eventCount}/>;
+    if(tab==='pets')return <PetsScreen theme={theme} cloud={cloud} eventCount={eventCount} shared={!!care} sharedName={care?.name} onShare={()=>setSharingKind('household')} onOpenShared={()=>setSharedView({})}/>;
     if(tab==='notifications')return <NotificationsScreen theme={theme} petId={petId} notificationPreferences={notificationPreferences}
       notificationPermission={notificationPermission} notificationDelivery={notificationDelivery}
       quietStatusEnabled={quietStatusEnabled} onQuietStatusChange={nativeApp?changeQuietStatus:undefined}
@@ -756,11 +768,12 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
       schedule={schedule} onScheduleChange={changeSchedule}
       onOpenSchedule={()=>openTab('schedule')} onOpenPet={()=>openTab('pets')}/>;
     if (tab === 'learn') return <LearnScreen showHeader={!nativeApp} theme={theme} />;
-    if (tab === 'timeline') return <TimelineScreen showHeader={!nativeApp} events={events} activity={activity} refreshToken={refreshToken} schedule={schedule} onOpenSchedule={()=>openTab('schedule')} theme={theme} />;
+    if (tab === 'timeline') return <TimelineScreen showHeader={!nativeApp} events={events} activity={activity} refreshToken={refreshToken} schedule={schedule} theme={theme} />;
     if (tab === 'insights') return <InsightsScreen showHeader={!nativeApp} events={events} activity={activity} refreshToken={refreshToken} customActivities={customActivities} theme={theme} />;
     if (tab === 'schedule') {
       return (
         <ScheduleScreen
+          readOnly={!!care&&(care.kind==='temporary'||care.permission==='view')}
           showHeader={!nativeApp}
           events={events}
           activity={activity}
@@ -777,6 +790,8 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     }
     return (
       <LogScreen
+        canEditEvent={care?canEditEvent:undefined}
+        readOnly={care?.permission==='view'}
         showHeader={!nativeApp}
         onQuickActionsLayout={measureQuickActions}
         events={events}
@@ -798,6 +813,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
   }, [
     changeWidgetActions,
     cloud,
+    canEditEvent,
     customActivities,
     activityCustomizations,
     editRequest,
@@ -824,6 +840,14 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     widgetActions,
   ]);
 
+  if(accessEnded)return <SafeAreaProvider><LocalizationProvider language={language} customizations={activityCustomizations}><SafeAreaView style={[styles.container,{backgroundColor:theme.background,padding:24,justifyContent:'center'}]}>
+    <Text accessibilityRole="header" style={[styles.navigationTitle,{color:theme.text}]}>{translate(language,'sharing.ended')}</Text>
+    <Pressable accessibilityRole="button" testID="shared.switchEnded" onPress={()=>setSharedView({})} style={styles.startupRetry}><Text style={[styles.startupText,{color:theme.primary}]}>{translate(language,'sharing.sharedTitle')}</Text></Pressable>
+    <Pressable accessibilityRole="button" testID="shared.leaveEnded" onPress={()=>{void careSession.leave();}} style={styles.startupRetry}><Text style={[styles.startupText,{color:theme.primary}]}>{translate(language,'sharing.ownPuppy')}</Text></Pressable>
+    <Modal visible={sharedView!==null} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setSharedView(null)}>
+      {sharedView?<SafeAreaProvider><SharedPuppiesScreen key={sharedView.id??'list'} cloud={cloud} theme={theme} initialShareId={sharedView.id} inviteToken={sharedView.token} onBack={()=>setSharedView(null)}/></SafeAreaProvider>:null}
+    </Modal>
+  </SafeAreaView></LocalizationProvider></SafeAreaProvider>;
   return (
     <SafeAreaProvider>
       <LocalizationProvider language={language} customizations={activityCustomizations}>
@@ -868,7 +892,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
                   return true;
                 }}
               />
-            ):firstLaunch?conversationalOnboarding?<OnboardingDesignPreview cloud={cloud} onFinish={finishConversationalOnboarding} onAllowNotifications={requestOnboardingNotifications} onDisableNotifications={()=>changeNotificationDelivery(false)}/>:<FirstLaunchScreen progress={firstLaunch} cloud={cloud} theme={theme} notificationPermission={notificationPermission} onAllowNotifications={requestOnboardingNotifications} onDisableNotifications={()=>changeNotificationDelivery(false)} onOpenSystemSettings={()=>{void Linking.openSettings().catch(()=>undefined);}} onFinish={finishOnboarding}/>:null : screen}
+            ):firstLaunch?conversationalOnboarding?<OnboardingDesignPreview cloud={cloud} onOpenShared={()=>setSharedView({})} onFinish={finishConversationalOnboarding} onAllowNotifications={requestOnboardingNotifications} onDisableNotifications={()=>changeNotificationDelivery(false)}/>:<FirstLaunchScreen progress={firstLaunch} cloud={cloud} theme={theme} notificationPermission={notificationPermission} onAllowNotifications={requestOnboardingNotifications} onDisableNotifications={()=>changeNotificationDelivery(false)} onOpenSystemSettings={()=>{void Linking.openSettings().catch(()=>undefined);}} onFinish={finishOnboarding}/>:null : screen}
             {nativeApp&&onboardingVisible===false&&!historyVisible&&!settingsVisible&&(tab==='log'||tab==='timeline')?<LogViewSwitch tab={tab} theme={theme} onChange={navigateToTab}/>:null}
             {!onboardingVisible && undoState ? (
               <Toast
@@ -908,6 +932,12 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
           />
           <Modal visible={accountVisible&&cloud.available} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={()=>setAccountVisible(false)}>
             {accountVisible?<SafeAreaProvider><AccountScreen cloud={cloud} theme={theme} eventCount={eventCount} onBack={()=>setAccountVisible(false)} onOpenActivity={()=>{setAccountVisible(false);navigateToTab('log');}}/></SafeAreaProvider>:null}
+          </Modal>
+          <Modal visible={sharingKind!==null&&onboardingVisible===false} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={()=>setSharingKind(null)}>
+            {sharingKind?<SafeAreaProvider><SharePuppyScreen cloud={cloud} theme={theme} eventCount={eventCount} initialKind={sharingKind} onBack={()=>setSharingKind(null)}/></SafeAreaProvider>:null}
+          </Modal>
+          <Modal visible={sharedView!==null} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={()=>setSharedView(null)}>
+            {sharedView?<SafeAreaProvider><SharedPuppiesScreen key={sharedView.id??"list"} cloud={cloud} theme={theme} initialShareId={sharedView.id} inviteToken={sharedView.token} onBack={()=>setSharedView(null)}/></SafeAreaProvider>:null}
           </Modal>
         </SafeAreaView>
       </LocalizationProvider>

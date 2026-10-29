@@ -1,6 +1,6 @@
 # Puptime Privacy Policy
 
-Last updated: October 23, 2026
+Last updated: October 29, 2026
 
 Puptime is a puppy routine tracker developed by Patrick Chin. Local logging works without an account. This policy explains optional cloud accounts, the native app, and the public website.
 
@@ -15,6 +15,12 @@ Where configured, you can sign in with an email code, Google, or Apple. Puptime 
 Signing in does not upload puppy history or activate cloud sync. In account-enabled iPhone builds, choosing cloud sync uploads your puppy's profile (including an optional profile photo), activity, notes, routines, and supported preferences. Cloudflare D1 stores account/authentication records, and Cloudflare Durable Objects store synchronized puppy data and version history. Different sign-in methods are connected only through an explicit authenticated action; they are not silently joined by matching email addresses.
 
 The account website lets you manage sign-in methods, sign out, download cloud data, and delete the cloud account. It does not record puppy activity. Authentication uses server-managed HttpOnly cookies. Temporary session storage records an account-return check for provider linking or reauthentication; it contains no password, email code, or session token and is cleared when used or the browser session ends. A necessary deletion guard in browser local storage keeps the original account identifier and attempt time until deletion is confirmed. This survives interrupted requests and closed tabs and is separate from optional analytics.
+
+## Shared care
+
+An owner can share a puppy's profile, activity history, notes and routines with household members or temporary carers. Every recipient signs in with their own Puptime account. Household members can manage logs and routines until removed. Temporary carers can see the full history and routines and, with contributing access, add logs and correct their own entries until the owner's chosen end time. Carers use the full native app, including offline storage, insights, reminders and Home Screen widgets. Their personal settings remain separate from the owner's account.
+
+Each invitation can be accepted by one account. Only a hash of its secret is stored on the service; the pending secret is kept in browser session storage until acceptance or the browser session ends. The care page does not load usage analytics. Expiry and revocation prevent further service access and synchronization. Cached offline records and unsynced logs remain on the recipient's device; information already copied cannot be remotely erased. Deleting an account removes its owned invitations and accepted access. Logs contributed to another owner's puppy remain in that puppy's history.
 
 ## Dog profile photos
 

@@ -5,8 +5,13 @@ name: Permission intent retry succeeds
     id: "preview.reminders.allow"
 - tapOn:
     text: "^Allow$"
+- runFlow: "../skip-sharing.yaml"
 - assertVisible:
     id: "preview.ready"
+- waitForAnimationToEnd
+- tapOn:
+    id: "preview.back"
+    enabled: true
 - waitForAnimationToEnd
 - tapOn:
     id: "preview.back"

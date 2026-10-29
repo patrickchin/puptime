@@ -22,7 +22,10 @@ module.exports={...upstream,transform(args){
  }else if(file===root+'/src/screens/TimelineScreen.tsx'){
   let src=inject(args.src,'TimelineDateLabel','  const { activityLabel, language, t } = useLocalization();',"  recordTimelineRender('date',day.key);");
   src=inject(src,'TimelineTrack','  const { activityColors, activityLabel, language, t } = useLocalization();',"  recordTimelineRender('track',day.key);");
-  args={...args,src:'import {recordTimelineRender} from '+JSON.stringify(observer)+';\n'+src};
+  const marker='  const verticalOffsetValue = useRef(0);';
+  if(!src.includes(marker))throw new Error('Timeline list observer target changed.');
+  src=src.replace(marker,"  useEffect(() => { recordTimelineList(listRef.current); }, [selectedView]);\n"+marker);
+  args={...args,src:'import {recordTimelineRender,recordTimelineList} from '+JSON.stringify(observer)+';\n'+src};
  }
  return upstream.transform(args);
 }};

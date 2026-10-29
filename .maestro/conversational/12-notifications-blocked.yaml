@@ -16,24 +16,37 @@ name: Notification blocked reaches the normal app and survives Back
           id: preview.reminders.allow
       - tapOn:
           text: "Don.t [Aa]llow"
+      - runFlow: "../helpers/conversational/skip-sharing.yaml"
       - assertVisible:
           id: preview.ready
       - tapOn:
           id: preview.back
+      - waitForAnimationToEnd
+      - tapOn:
+          id: "preview.back"
       - tapOn:
           id: preview.reminders.allow
       - tapOn:
           text: "Don.t [Aa]llow"
           optional: true
+      - runFlow: "../helpers/conversational/skip-sharing.yaml"
       - assertVisible:
           id: preview.ready
       - tapOn:
           id: preview.back
+      - waitForAnimationToEnd
+      - tapOn:
+          id: "preview.back"
 - tapOn:
     id: "preview.reminders.allow"
+- runFlow: "../helpers/conversational/skip-sharing.yaml"
 - assertVisible:
     id: "preview.ready"
 - assertNotVisible: You can change reminders in Notifications.
+- waitForAnimationToEnd
+- tapOn:
+    id: "preview.back"
+    enabled: true
 - waitForAnimationToEnd
 - tapOn:
     id: "preview.back"
@@ -46,6 +59,7 @@ name: Notification blocked reaches the normal app and survives Back
 - waitForAnimationToEnd
 - tapOn:
     id: "preview.reminders.allow"
+- runFlow: "../helpers/conversational/skip-sharing.yaml"
 - assertVisible:
     id: "preview.ready"
 - runFlow: "../helpers/conversational/finish-alone.yaml"

@@ -87,7 +87,9 @@ flow('back',`- pressKey: Back
 - tapOn: {id: nav.open}
 - tapOn: {id: nav.timeline}
 - tapOn: {id: timeline.filter.poop-meal}
-- tapOn: {id: timeline.windows.edit}
+- assertNotVisible: {id: timeline.windows.edit}
+- tapOn: {id: nav.open}
+- tapOn: {id: nav.schedule}
 - assertVisible: {id: nav.title, text: Routine}
 - takeScreenshot: preview-schedule
 - pressKey: Back

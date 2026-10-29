@@ -53,3 +53,4 @@ yarn-error.*
 
 # Local browser verification artifacts
 /output/
+.playwright-cli/

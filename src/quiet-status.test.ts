@@ -17,7 +17,7 @@ test('compact iOS notification is a short expansion cue in every supported langu
  assert.match(quietStatusCopy('Biscuit','en').body,/Press and hold/);
 });
 
-const state = { enabled: false, delivery: true, permission: 'granted', os: 'ios', events,
+const state = { canLog:true, enabled: false, delivery: true, permission: 'granted', os: 'ios', events,
   delivered: [] as { request: { identifier: string; content: Record<string, unknown> } }[],
   rendered: [] as any[], posted: [] as any[], dismissed: [] as string[], channels: [] as any[], hold: null as null | (() => Promise<void>) };
 (globalThis as any).__quietStatusTest = state;
@@ -25,13 +25,14 @@ const target = new URL('./quiet-status.native.ts', import.meta.url).href;
 registerHooks({
   resolve(specifier, context, next) {
     if (context.parentURL === target) {
-      if (['expo-notifications', 'react-native', './local/runtime.native', './reminders', './quiet-status-surface'].includes(specifier)) return { url: 'status-test:' + specifier, shortCircuit: true };
+      if (['expo-notifications', 'react-native', './local/runtime.native', './reminders', './quiet-status-surface', './care-access'].includes(specifier)) return { url: 'status-test:' + specifier, shortCircuit: true };
       if (specifier.startsWith('.')) return next(new URL(specifier + '.ts', context.parentURL).href, context);
     }
     return next(specifier, context);
   },
   load(url, context, next) {
     const mocks: Record<string, string> = {
+      'status-test:./care-access': `export async function getCareAccess(){return {scope:'owner',petId:'pet_test',canLog:s.canLog};}`,
       'status-test:react-native': `export const Platform={get OS(){return s.os;}};`,
       'status-test:./local/runtime.native': `export async function getLocalRuntime(){return {petId:'pet_test',activity:{async latestEvents(){return s.events;}},storage:{
         async loadQuietStatusEnabled(){return s.enabled;},async saveQuietStatusEnabled(value){s.enabled=value;},
@@ -87,4 +88,11 @@ test('a device disable queued behind a native delivery in flight removes that ca
   const disabling = status.syncQuietStatus();
   release(); await Promise.all([enabling, disabling]); state.hold = null;
   assert.equal(state.delivered.length, 0);
+});
+
+
+test('quiet status removes its logging surface when shared access ends',async()=>{
+  state.os='ios';state.delivery=true;state.permission='granted';state.canLog=true;
+  await status.setQuietStatusEnabled(true);assert.equal(state.delivered.length,1);
+  state.canLog=false;await status.syncQuietStatus();assert.equal(state.delivered.length,0);
 });

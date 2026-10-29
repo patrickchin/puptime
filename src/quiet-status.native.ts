@@ -1,4 +1,5 @@
 import * as Notifications from 'expo-notifications';
+import {getCareAccess} from './care-access';
 import { Platform } from 'react-native';
 import { getLocalRuntime } from './local/runtime.native';
 import { resolveLanguage } from './localization';
@@ -15,14 +16,15 @@ export function syncQuietStatus(): Promise<void> {
   const next = writes.then(async () => {
     const runtime = await getLocalRuntime();
     const { storage, activity, petId } = runtime;
-    const [enabled, delivery, permission] = await Promise.all([
-      storage.loadQuietStatusEnabled(), storage.loadNotificationDelivery(), getNotificationPermissionState(),
+    const [enabled, delivery, permission, access] = await Promise.all([
+      storage.loadQuietStatusEnabled(), storage.loadNotificationDelivery(), getNotificationPermissionState(), getCareAccess(),
     ]);
-    if (!enabled || !delivery || permission !== 'granted') {
+    if (!enabled || !delivery || permission !== 'granted' || !access.canLog) {
       await Notifications.cancelScheduledNotificationAsync(QUIET_STATUS_IDENTIFIER);
       await Notifications.dismissNotificationAsync(QUIET_STATUS_IDENTIFIER);
       return;
     }
+    if(access.petId && access.petId!==petId)return;
     const [languagePreference,name]=await Promise.all([storage.loadLanguagePreference(),storage.loadPuppyName()]);
     const copy=quietStatusCopy(name,resolveLanguage(languagePreference));
     if(Platform.OS==='android'){
@@ -33,7 +35,7 @@ export function syncQuietStatus(): Promise<void> {
       const events=await activity.latestEvents();
       const customActivities=await storage.loadCustomActivities(events);
       const [actions,themePreference]=await Promise.all([storage.loadWidgetActions(customActivities),storage.loadThemePreference()]);
-      await renderQuickLogNotification({events,actions,customActivities,themePreference,petId,title:copy.title});
+      await renderQuickLogNotification({events,actions,customActivities,themePreference,petId,scope:access.scope,title:copy.title});
       return;
     }
     const delivered=await Notifications.getPresentedNotificationsAsync();

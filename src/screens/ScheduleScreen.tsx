@@ -18,7 +18,7 @@ import { Pressable } from '../components/TelemetryPressable';
 import { scheduleStatusesForDay, suggestScheduleFromEvents } from '../analytics';
 import {activityWindowBounds,useActivityWindow,type ActivityViewProps} from '../activity-view';
 import {ActivityLoadState} from '../components/ActivityLoadState';
-import {RoutineTimeline} from '../components/RoutineTimeline';
+import {RoutineDayPreview,RoutineTimeline} from '../components/RoutineTimeline';
 import { ActivityIcon } from '../components/ActivityIcon';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { DateTimeSelector } from '../components/DateTimeSelector';
@@ -32,6 +32,7 @@ import { entityId } from '../entity-id';
 type Draft = { id: string; type: EventType; customLabel?: string; minutes: number; reminder: boolean; toleranceMinutes?: number };
 
 export function ScheduleScreen({
+  readOnly=false,
   events:projectedEvents,
   activity,
   refreshToken,
@@ -45,7 +46,7 @@ export function ScheduleScreen({
   setupHeader,
   showHeader=true,
 }: {
-  events: PuppyEvent[];
+  readOnly?:boolean;events: PuppyEvent[];
   schedule: ScheduleEntry[];
   customActivities: string[];
   onChange: (schedule: ScheduleEntry[]) => Promise<void>;
@@ -58,6 +59,8 @@ export function ScheduleScreen({
 }&ActivityViewProps) {
   const { activityColors, activityLabel, locale, t } = useLocalization();
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [previewIds,setPreviewIds]=useState<string[]|null>(null);
+  const previewEntries=previewIds===null?null:schedule.filter(entry=>previewIds.includes(entry.id)).sort((a,b)=>a.minutes-b.minutes);
   useTelemetryOverlay('routine_editor', draft !== null);
   const originalDraft=useRef<ScheduleEntry|undefined>(undefined);
   const acceptedSuggestion=useRef<{entries:ScheduleEntry[];preview:ReturnType<typeof suggestScheduleFromEvents>}|null>(null);
@@ -83,18 +86,17 @@ export function ScheduleScreen({
   const suggestion = suggestScheduleFromEvents(events, 14, new Date(now));
   const previewSuggestion = acceptedSuggestion.current?.preview ?? suggestion;
   const canSuggest = suggestion.entries.length > 0&&!window.loading&&!window.error;
-  const completed = statuses.filter((item) => item.status === 'done').length;
-  const due = statuses.filter((item) => item.status === 'due').length;
-  const missed = statuses.filter((item) => item.status === 'missed').length;
-  const progress: `${number}%` = schedule.length
-    ? `${Math.round((completed / schedule.length) * 100)}%`
-    : '0%';
 
   const editEntry=useCallback((entry:ScheduleEntry)=>{
     originalDraft.current={...entry,reminder:Boolean(entry.reminder)};
     setDraft({...originalDraft.current,reminder:Boolean(entry.reminder)});
     setShowTimeSelector(false);
   },[]);
+  const selectPreview=useCallback((entries:ScheduleEntry[])=>{
+    setShowTimeSelector(false);
+    if(entries.length===1)editEntry(entries[0]);
+    else setPreviewIds(entries.map(entry=>entry.id));
+  },[editEntry]);
   const requestRemove=useCallback((entry:ScheduleEntry)=>{setRemoveFailed(false);setPendingRemove(entry);},[]);
 
   const openNew = () => {
@@ -226,7 +228,7 @@ export function ScheduleScreen({
                   : t('schedule.noPattern')}
             </Text>
           </View>
-          {canSuggest ? (
+          {canSuggest&&!readOnly ? (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t('schedule.previewA11y', { count: suggestion.entries.length })}
@@ -283,51 +285,7 @@ export function ScheduleScreen({
 
         </>}
         {!setupHeader && schedule.length ? (
-          <View
-            style={[
-              styles.progressCard,
-              surfaceTreatment(theme),
-              {
-                backgroundColor: theme.surfaceRaised,
-                borderColor: theme.border,
-                padding: theme.presentation.cardPadding,
-              },
-            ]}
-          >
-            <View style={styles.progressHeading}>
-              <Text style={[styles.progressTitle, { color: theme.text }]}>
-                {t('schedule.loggedProgress', { completed, total: schedule.length })}
-              </Text>
-              <View
-                style={[
-                  styles.progressIcon,
-                  { backgroundColor: theme.primarySoft, borderRadius: theme.presentation.iconRadius },
-                ]}
-              >
-                <MaterialCommunityIcons name="calendar-check-outline" color={theme.primary} size={23} />
-              </View>
-            </View>
-            <Text style={[styles.progressDetail, { color: theme.textMuted }]}>
-              {due
-                ? t(due === 1 ? 'schedule.dueOne' : 'schedule.dueMany', { count: due })
-                : missed
-                  ? t(missed === 1 ? 'schedule.missedOne' : 'schedule.missedMany', { count: missed })
-                  : t(completed === schedule.length ? 'schedule.everythingLogged' : 'schedule.nextAhead')}
-            </Text>
-            <View
-              style={[
-                styles.progressTrack,
-                { backgroundColor: theme.primarySoft, borderRadius: theme.presentation.controlRadius },
-              ]}
-            >
-              <View
-                style={[
-                  styles.progressFill,
-                  { backgroundColor: theme.primary, borderRadius: theme.presentation.controlRadius, width: progress },
-                ]}
-              />
-            </View>
-          </View>
+          <RoutineDayPreview statuses={statuses} now={now} theme={theme} onSelect={selectPreview}/>
         ) : null}
 
         {!setupHeader && schedule.length ? (
@@ -351,10 +309,10 @@ export function ScheduleScreen({
             <Text style={[styles.emptyTitle, { color: theme.text }]}>{t('schedule.emptyTitle')}</Text>
           </View>
         ) : (
-          <RoutineTimeline statuses={statuses} now={now} theme={theme} setup={Boolean(setupHeader)} onEdit={editEntry} onRemove={requestRemove}/>
+          <RoutineTimeline readOnly={readOnly} statuses={statuses} now={now} theme={theme} setup={Boolean(setupHeader)} onEdit={editEntry} onRemove={requestRemove}/>
         )}
 
-        <Pressable
+        {!readOnly?<Pressable
           testID="schedule.add"
           accessibilityRole="button"
           accessibilityLabel={t('schedule.addA11y')}
@@ -369,7 +327,7 @@ export function ScheduleScreen({
         >
           <MaterialCommunityIcons name="plus" color={theme.onPrimary} size={22} />
           <Text style={[styles.addButtonText, { color: theme.onPrimary }]}>{t('schedule.addTime')}</Text>
-        </Pressable>
+        </Pressable>:null}
         {!setupHeader&&schedule.length?suggestionCard:null}
       </ScrollView>
 
@@ -478,7 +436,8 @@ export function ScheduleScreen({
         </View>
       </Modal>
 
-      <Modal visible={draft !== null} transparent animationType="none" onRequestClose={() => {
+      <Modal visible={draft !== null||previewIds!==null} supportedOrientations={['portrait','landscape-left','landscape-right']} transparent animationType="none" onRequestClose={() => {
+        if(previewIds!==null){setPreviewIds(null);return;}
         const focusedInput = TextInput.State.currentlyFocusedInput();
         if (focusedInput) {
           focusedInput.blur();
@@ -488,24 +447,34 @@ export function ScheduleScreen({
       }}>
         <View testID="schedule.editor" accessibilityViewIsModal style={styles.scrim}>
           <ScrollView
+            key={previewIds!==null?'choices':draft?.id}
             bounces={false}
-            style={[styles.sheet, { backgroundColor: theme.surfaceRaised }]}
+            style={[styles.sheet, { backgroundColor: theme.surfaceRaised },previewIds!==null&&styles.choiceSheet]}
             contentContainerStyle={styles.sheetContent}
           >
             <View style={styles.sheetHeading}>
               <Text style={[styles.sheetTitle, { color: theme.text }]}>
-                {t(originalDraft.current ? 'schedule.editTime' : 'schedule.addTime')}
+                {t(previewIds!==null?'common.edit':originalDraft.current?'schedule.editTime':'schedule.addTime')}
               </Text>
               <Pressable
                 testID="schedule.editor.close"
                 accessibilityLabel={t('schedule.close')}
-                onPress={() => setDraft(null)}
+                onPress={() => {setDraft(null);setPreviewIds(null);}}
                 style={({ pressed }) => [styles.closeButton, pressed && { backgroundColor: theme.primarySoft }]}
               >
                 <MaterialCommunityIcons name="close" size={22} color={theme.text} />
               </Pressable>
             </View>
 
+            {previewEntries?<View testID="schedule.timelineChoices">
+              {previewEntries.length?previewEntries.map(entry=><Pressable key={entry.id} testID={`schedule.previewChoice.${entry.id}`} accessibilityRole="button"
+                accessibilityLabel={`${t('common.edit')}: ${t('schedule.entryAt',{activity:activityLabel(entry),time:formatMinutes(entry.minutes,locale)})}`}
+                onPress={()=>{setPreviewIds(null);editEntry(entry);}} style={({pressed})=>[styles.previewChoice,{borderColor:theme.border,backgroundColor:pressed?theme.primarySoft:undefined}]}>
+                <ActivityIcon activity={entry} theme={theme} color={activityColors(theme,entry).color} size={21}/>
+                <View style={styles.previewCopy}><Text style={[styles.previewActivity,{color:theme.text}]}>{activityLabel(entry)}</Text><Text style={[styles.windowDetail,{color:theme.textMuted}]}>{entry.toleranceMinutes===undefined?formatMinutes(entry.minutes,locale):formatScheduleWindow(entry,locale)}</Text></View>
+                <MaterialCommunityIcons accessible={false} name="chevron-right" size={20} color={theme.textMuted}/>
+              </Pressable>):<Text style={[styles.previewSubtitle,{color:theme.textMuted}]}>{t('schedule.removedErrorBody')}</Text>}
+            </View>:<>
             <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{t('schedule.activity')}</Text>
             <View style={styles.typePicker}>
               {[...quickEventTypes.map((type) => ({ type, customLabel: undefined as string | undefined })),
@@ -629,6 +598,7 @@ export function ScheduleScreen({
                 {t(saving ? 'common.saving' : 'schedule.saveTime')}
               </Text>
             </Pressable>
+            </>}
           </ScrollView>
           {showTimeSelector ? (
             <DateTimeSelector
@@ -677,14 +647,7 @@ const styles = StyleSheet.create({
   learnStatusText: { flex: 1, fontSize: 12, lineHeight: 17, fontWeight: '600' },
   learnButton: { minHeight: 50, borderRadius: 16, borderWidth: 1, marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 14 },
   learnButtonText: { fontSize: 15, lineHeight: 20, fontWeight: '800', textAlign: 'center' },
-  progressCard: { borderWidth: 1, borderRadius: 22, padding: spacing.md },
-  progressHeading: { flexDirection: 'row', alignItems: 'center' },
-  progressTitle: { flex: 1, fontSize: 20, lineHeight: 26, fontWeight: '800' },
-  progressIcon: { marginLeft: 'auto', width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  progressDetail: { fontSize: 13, lineHeight: 18, marginTop: 7 },
-  progressTrack: { height: 8, borderRadius: 4, overflow: 'hidden', marginTop: 13 },
-  progressFill: { height: 8, borderRadius: 4 },
-  headingRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: spacing.xl, marginBottom: 12 },
+  headingRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: spacing.md, marginBottom: 8 },
   sectionTitle: { flex: 1, fontSize: 21, fontWeight: '800' },
   windowDetail: { fontSize: 12, lineHeight: 18, marginTop: 2 },
   addButton: { minHeight: 54, borderRadius: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: spacing.md },
@@ -700,11 +663,13 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
   },
+  choiceSheet:{flexGrow:0},
   sheetContent: { padding: spacing.lg, paddingBottom: 34 },
   sheetHeading: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg },
   sheetTitle: { flex: 1, fontSize: 23, fontWeight: '800' },
   previewSubtitle: { fontSize: 13, lineHeight: 19, marginTop: 4 },
   previewList: { borderWidth: 1, borderRadius: 17, paddingHorizontal: 12, overflow: 'hidden' },
+  previewChoice:{minHeight:56,paddingVertical:8,flexDirection:'row',alignItems:'center',gap:12,borderBottomWidth:StyleSheet.hairlineWidth},
   previewRow: { minHeight: 86, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
   previewIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   previewCopy: { flex: 1, minWidth: 0 },

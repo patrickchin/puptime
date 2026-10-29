@@ -1,3 +1,4 @@
+import {getCareAccess} from './care-access';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { z } from 'zod';
@@ -181,6 +182,8 @@ export async function createCustomTimedReminder(input: { id?: string; petId: str
   const data = customTimedDataSchema.parse({ ...content, app: 'com.patrickchin.puptime', version: 1, kind: CUSTOM_TIMED_REMINDER_NOTIFICATION_KIND });
   if (data.at <= Date.now()) throw new RangeError('Choose a future reminder time.');
   return updateReminders(async () => {
+    const access=await getCareAccess();
+    if(access.ended||access.expiresAt!==null&&data.at>=access.expiresAt)throw new RangeError('Choose a reminder before your access ends.');
     if (!await getNotificationDelivery() || !permissionAllowsNotifications(await Notifications.getPermissionsAsync())) return null;
     if (Platform.OS === 'android' && !(await refreshExactReminderScheduling())) throw new ExactReminderAccessError();
     // Keep headroom for potty reminders and routine replacement writes.
@@ -214,9 +217,10 @@ export async function countCustomTimedReminders(): Promise<number> {
 
 export async function cancelCustomTimedRemindersIfDeliveryOff(): Promise<void> {
   return updateReminders(async () => {
-    if (await getNotificationDelivery()) return;
+    const delivery=await getNotificationDelivery(),access=await getCareAccess();
+    if(delivery&&!access.ended)return;
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-    await Promise.all(scheduled.filter((request) => customTimedReminder(request) !== null)
+    await Promise.all(scheduled.filter((request) => {const reminder=customTimedReminder(request);return reminder!==null&&(!delivery||reminder.petId===access.scope);})
       .map((request) => Notifications.cancelScheduledNotificationAsync(request.identifier)));
   });
 }
@@ -232,7 +236,8 @@ export async function syncPottyReminders(
 
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
   const replacing = scheduled.filter((notification) => notification.identifier.startsWith(POTTY_REMINDER_IDENTIFIER_PREFIX));
-  const plans = pottyReminderPlans(events, preferences, now);
+  const access=await getCareAccess();
+  const plans = pottyReminderPlans(events, preferences, now).filter(plan=>!access.ended&&(access.expiresAt===null||plan.at<access.expiresAt));
   const canDeliver = plans.length > 0 && await getNotificationDelivery()
     && permissionAllowsNotifications(await Notifications.getPermissionsAsync());
   if (canDeliver && Platform.OS === 'ios' && scheduled.length - replacing.length + plans.length > IOS_SCHEDULED_NOTIFICATION_LIMIT) {
@@ -277,7 +282,8 @@ export async function syncScheduleReminders(
 
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
   const replacing = scheduled.filter((notification) => notification.identifier.startsWith(REMINDER_IDENTIFIER_PREFIX));
-  const reminders = schedule.filter((entry) => entry.reminder);
+  const access=await getCareAccess();
+  const reminders = schedule.filter((entry) => entry.reminder&&!access.ended);
   const canDeliver = reminders.length > 0 && await getNotificationDelivery()
     && permissionAllowsNotifications(await Notifications.getPermissionsAsync());
   if (canDeliver && Platform.OS === 'ios' && scheduled.length - replacing.length + reminders.length > IOS_SCHEDULED_NOTIFICATION_LIMIT) {
@@ -287,23 +293,18 @@ export async function syncScheduleReminders(
   if (reminders.length === 0) return true;
   if (!canDeliver) return false;
 
-  await Promise.all(reminders.map(async (entry) => {
+  const plans=reminders.flatMap<{identifier:string;content:ReturnType<typeof reminderCopy>;trigger:Notifications.DailyTriggerInput|Notifications.DateTriggerInput}>(entry=>{
     const lead=typeof leadMinutes==='number'?leadMinutes:scheduleReminderLead(entry.type,leadMinutes);
-    const content = reminderCopy(entry, language, lead);
-    const trigger = reminderTrigger(entry, lead);
-    await Notifications.scheduleNotificationAsync({
-      identifier: reminderIdentifier(entry),
-      content: {
-        ...content,
-        sound: 'default',
-        data: { scheduleEntryId: entry.id, type: entry.type },
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        ...trigger,
-        channelId: ROUTINE_CHANNEL_ID,
-      },
-    });
+    const content=reminderCopy(entry,language,lead),time=reminderTrigger(entry,lead);
+    if(access.expiresAt===null)return [{identifier:reminderIdentifier(entry),content,trigger:{type:Notifications.SchedulableTriggerInputTypes.DAILY,...time,channelId:ROUTINE_CHANNEL_ID}}];
+    const dates:Date[]=[];let date=new Date();date.setHours(time.hour,time.minute,0,0);
+    if(date.getTime()<=Date.now())date.setDate(date.getDate()+1);
+    while(date.getTime()<access.expiresAt&&dates.length<48){dates.push(new Date(date));date.setDate(date.getDate()+1);}
+    return dates.map(date=>({identifier:`${reminderIdentifier(entry)}-${date.getTime()}`,content,trigger:{type:Notifications.SchedulableTriggerInputTypes.DATE,date:date.getTime(),channelId:ROUTINE_CHANNEL_ID}}));
+  }).sort((a,b)=>('date' in a.trigger?Number(a.trigger.date):0)-('date' in b.trigger?Number(b.trigger.date):0));
+  const capacity=Platform.OS==='ios'?Math.max(0,IOS_SCHEDULED_NOTIFICATION_LIMIT-(scheduled.length-replacing.length)):plans.length;
+  await Promise.all(plans.slice(0,capacity).map(async plan=>{
+    await Notifications.scheduleNotificationAsync({...plan,content:{...plan.content,sound:'default'}});
   }));
 
   return true;

@@ -76,7 +76,8 @@ enum PuptimeWidgetJournal {
       (event["endedAt"] as? NSNumber)?.doubleValue ?? (event["at"] as? NSNumber)?.doubleValue ?? 0
     }
     for event in previous + operations {
-      guard let id = event["id"] as? String else { continue }
+      guard (event["scope"] as? String ?? "owner") == (props["scope"] as? String ?? "owner"),
+            let id = event["id"] as? String else { continue }
       if let before = latest[id], instant(before) > instant(event)
           || (instant(before) == instant(event) && before["endedAt"] is NSNumber) { continue }
       latest[id] = event

@@ -1,6 +1,8 @@
 import {assertPuppyPhotoBytes,puppyPhotoSchema} from '../src/puppy-photo';
 import {accountPhotoKey} from './photo-storage';
 import { Hono, type Context } from 'hono';
+import {HTTPException} from 'hono/http-exception';
+import {shareIdSchema} from '../src/sharing';
 import { createMiddleware } from 'hono/factory';
 import { validator } from 'hono/validator';
 import { z } from 'zod';
@@ -11,7 +13,7 @@ import type { AppleRevocation } from './account-lifecycle';
 import { cloudAccess, getCloudAccount, type CloudAccess } from './cloud-access';
 import {legacyProfile,legacyProfileRevision} from './profile-compat';
 
-type AccountEnv = { Bindings: Cloudflare.Env; Variables: {
+export type AccountEnv = { Bindings: Cloudflare.Env; Variables: {
   user: { id: string; email: string; name: string }; sessionCreatedAt: number; sessionId: string;
   store: DurableObjectStub<AccountStore>; cloud: CloudAccess;
 } };
@@ -23,7 +25,7 @@ const pushSchema = z.strictObject({ mutations: z.array(mutationSchema).min(1).ma
 const afterSchema = z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 
 export const accountRoutes = new Hono<AccountEnv>();
-const authenticated = createMiddleware<AccountEnv>(async (context, next) => {
+export const authenticated = createMiddleware<AccountEnv>(async (context, next) => {
   context.header('Cache-Control', 'no-store');
   if (!['GET', 'HEAD', 'OPTIONS'].includes(context.req.method)) {
     const origin = context.req.header('origin');
@@ -46,16 +48,29 @@ const authenticated = createMiddleware<AccountEnv>(async (context, next) => {
   context.set('store', getAccountStore(context.env, user.id));
   await next();
 });
+async function sharedScope(context:Context<AccountEnv>){
+  const value=context.req.header('x-puptime-share');if(!value)return null;
+  const expected=context.req.header('x-puptime-account');
+  if(expected!==context.get('user').id)throw new HTTPException(409);
+  const id=shareIdSchema.parse(value);
+  const grant=await context.env.AUTH_DB.prepare(`SELECT s.owner_id,s.pet_id FROM puppy_shares s JOIN user u ON u.id=s.owner_id LEFT JOIN cloud_accounts c ON c.account_id=u.id
+    WHERE s.id=? AND s.member_id=? AND s.revoked_at IS NULL AND (s.expires_at IS NULL OR s.expires_at>?) AND COALESCE(c.state,'')!='deleting'`).bind(id,expected,Date.now()).first<{owner_id:string;pet_id:string}>();
+  if(!grant)throw new HTTPException(410);
+  return {...grant,id,actor:expected,store:getAccountStore(context.env,grant.owner_id)};
+}
 accountRoutes.get('/account', authenticated, async (context) => {
-  const summary = await context.get('store').summary();
+  const scope=await sharedScope(context);
+  const summary = scope?await scope.store.sharedSummary(scope.id,scope.actor):await context.get('store').summary();
   return context.json({ user: context.get('user'), cloud: context.get('cloud'), ...summary });
 });
 accountRoutes.post('/cloud/enroll', authenticated, syncAccess, validator('json', (value) => enrollmentSchema.parse(value)), async (context) => {
-  const result = await context.get('store').enrollForClient(context.req.valid('json'));
+  const scope=await sharedScope(context);
+  const result = scope?await scope.store.sharedEnroll(scope.id,scope.actor,context.req.valid('json')):await context.get('store').enrollForClient(context.req.valid('json'));
   return 'error' in result ? context.json(result, 409) : context.json(result);
 });
 accountRoutes.post('/sync/push', authenticated, syncAccess, validator('json', (value) => pushSchema.parse(value)), async (context) => {
-  const result=await context.get('store').push(context.req.valid('json').mutations);
+  const scope=await sharedScope(context);
+  const result=scope?await scope.store.sharedPush(scope.id,scope.actor,context.req.valid('json').mutations):await context.get('store').push(context.req.valid('json').mutations);
   return context.json(context.req.header('x-puptime-profile-photos')==='1'?result:{...result,accepted:result.accepted.map(value=>({...value,record:legacyProfile(value.record)}))});
 });
 accountRoutes.get('/sync/changes', authenticated, syncAccess, async (context) => {
@@ -69,13 +84,15 @@ accountRoutes.get('/sync/changes', authenticated, syncAccess, async (context) =>
 accountRoutes.get('/sync/pull', authenticated, syncAccess, async (context) => {
   const after = afterSchema.parse(context.req.query('after') ?? 0);
   const limit = z.coerce.number().int().min(1).max(100).parse(context.req.query('limit') ?? 100);
-  const page=await context.get('store').pullForClient(after, limit);
+  const scope=await sharedScope(context);
+  const page=scope?await scope.store.sharedPull(scope.id,scope.actor,after,limit):await context.get('store').pullForClient(after, limit);
   return context.json(context.req.header('x-puptime-profile-photos')==='1'?page:{...page,changes:page.changes.map(legacyProfile)});
 });
 accountRoutes.get('/records/:id/history', authenticated, syncAccess, async (context) => {
   const id = recordIdSchema.parse(context.req.param('id'));
   const before = afterSchema.parse(context.req.query('beforeRevision') ?? Number.MAX_SAFE_INTEGER);
-  const revisions=await context.get('store').history(id, before);
+  const scope=await sharedScope(context);
+  const revisions=scope?await scope.store.sharedHistory(scope.id,scope.actor,id,before):await context.get('store').history(id, before);
   return context.json({revisions:context.req.header('x-puptime-profile-photos')==='1'?revisions:revisions.map(legacyProfileRevision)});
 });
 async function exportAccount(context: Context<AccountEnv>,photos=context.req.header('x-puptime-profile-photos')==='1') {
@@ -107,6 +124,7 @@ accountRoutes.delete('/account', authenticated, validator('json', (value) => z.s
 
 accountRoutes.post('/photos/:petId/:photoId',authenticated,syncAccess,async context=>{
   const accountId=context.get('user').id;
+  if(context.req.header('x-puptime-share'))throw new HTTPException(403);
   if(context.req.header('x-puptime-account')!==accountId)return context.json({error:'account_mismatch'},409);
   const petId=identifierSchema.parse(context.req.param('petId')),photoId=puppyPhotoSchema.parse(context.req.param('photoId'));
   if(!(await context.get('store').summary()).pets.some(pet=>pet.id===petId))return context.json({error:'not_found'},404);
@@ -133,7 +151,9 @@ accountRoutes.get('/photos/:photoId',authenticated,syncAccess,async context=>{
   if(context.req.header('x-puptime-account')!==accountId)return context.json({error:'account_mismatch'},409);
   const photoId=puppyPhotoSchema.parse(context.req.param('photoId')),bucket=context.env.PUPPY_PHOTOS;
   if(!bucket)return context.json({error:'photos_unavailable'},503);
-  const photo=await bucket.get(accountPhotoKey(accountId,photoId));
+  const scope=await sharedScope(context);
+  const photo=await bucket.get(accountPhotoKey(scope?.owner_id??accountId,photoId));
+  if(scope&&photo?.customMetadata?.petId!==scope.pet_id)return context.json({error:'not_found'},404);
   if(!photo)return context.json({error:'not_found'},404);
   return context.body(photo.body,200,{'Content-Type':'image/jpeg','Content-Length':String(photo.size),'X-Content-Type-Options':'nosniff'});
 });

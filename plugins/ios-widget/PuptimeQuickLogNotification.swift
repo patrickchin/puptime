@@ -46,6 +46,10 @@ final class NotificationQuickLogModel: ObservableObject {
           let petId, status["petId"] as? String == petId else {
       throw NSError(domain: "PuptimeQuickLog", code: 1)
     }
+    guard stored["canLog"] as? Bool != false,
+          ((stored["expiresAt"] as? Double) ?? 0) <= 0 || (stored["expiresAt"] as? Double ?? 0) > Date().timeIntervalSince1970 * 1000 else {
+      throw NSError(domain: "PuptimeQuickLog", code: 4)
+    }
     return (timeline, try PuptimeWidgetJournal.reconcile(stored))
   }
 
@@ -73,6 +77,7 @@ final class NotificationQuickLogModel: ObservableObject {
             event["customLabel"] = label
           }
         }
+        event["scope"] = current["scope"] as? String ?? "owner"
         try PuptimeWidgetJournal.record(event)
         current = PuptimeWidgetJournal.reconcile(current, operations: [event])
         timeline[0]["props"] = current
