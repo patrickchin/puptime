@@ -4,6 +4,7 @@ name: Failed completion never leaves setup
 - tapOn:
     id: "preview.continue"
 - assertVisible: We couldn.t save your setup.*
+- runFlow: "../skip-sharing.yaml"
 - assertVisible:
     id: "preview.ready"
 - assertNotVisible:

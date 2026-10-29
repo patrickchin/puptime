@@ -61,3 +61,24 @@ test('a cloud-deleted routine rejects an old draft without a local resurrection 
  await assert.rejects(local.storage.saveScheduleEntry({...original,minutes:545},original),/removed/i);
  assert.deepEqual(await local.storage.loadSchedule(),[]);assert.equal((await local.sync.status('pet-1')).pending,0);
 });
+
+
+test('shared offline storage keeps preferences personal and rejects edits to other carers, profile changes and expired access atomically',async t=>{
+ const db=await database();t.after(()=>db.close());
+ const access={kind:'temporary' as const,permission:'contribute' as const,expiresAt:Date.now()+60000};
+ const local=await runtime.createLocalRuntime(db,'pet-1',undefined,undefined,access);
+ const fence={...await local.sync.prepareAssociation({accountId:'member',localPetId:'pet-1',deviceId:local.deviceId,enrollment:{operationId:'enrollment',deviceId:local.deviceId,localPetId:'pet-1',name:'My puppy'}}),accountId:'member'};
+ const other={id:JSON.stringify(['event','pet-1','other']),petId:'pet-1',kind:'event' as const,revision:1,sequence:1,deleted:false,updatedAt:100,editable:false,data:{type:'pee' as const,at:100,source:'app' as const}};
+ await local.sync.stageBaseline({...fence,page:{changes:[other],cursor:1,hasMore:false}});await local.sync.completeAssociation({...fence,cloudPetId:'pet-1'});
+ const baseline=(await local.sync.status('pet-1')).pending;
+ await local.storage.saveThemePreference('dark');await local.storage.saveWidgetActions(['pee','meal']);
+ assert.equal((await local.sync.status('pet-1')).pending,baseline);
+ await assert.rejects(local.storage.updateEvent('other',{note:'not mine'}),/own logs/);
+ await assert.rejects(local.storage.savePuppyName('Changed'),/access does not allow/);
+ await local.storage.appendEvents([{id:'mine',type:'walk',at:200,source:'app'}]);await local.storage.updateEvent('mine',{note:'offline correction'});
+ assert.equal((await local.sync.status('pet-1')).pending,baseline+2);
+ await assert.rejects(local.storage.saveScheduleEntry({id:'routine',type:'meal',minutes:500}),/access does not allow/);
+ access.expiresAt=Date.now()-1;
+ await assert.rejects(local.storage.appendEvents([{id:'late',type:'walk',at:300,source:'widget'}]),/access.*ended/i);
+ assert.deepEqual((await local.storage.loadEvents()).map(event=>event.id).sort(),['mine','other']);
+});

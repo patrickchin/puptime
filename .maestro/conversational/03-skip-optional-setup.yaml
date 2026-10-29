@@ -13,6 +13,7 @@ name: Skipping optional setup and the tour still reaches the normal app
 - assertNotVisible: Optional
 - tapOn:
     id: preview.reminders.later
+- runFlow: "../helpers/conversational/skip-sharing.yaml"
 - assertVisible:
     id: preview.ready
 - waitForAnimationToEnd

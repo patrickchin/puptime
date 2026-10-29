@@ -45,6 +45,7 @@
     "hono": "^4.13.13",
     "posthog-js": "^1.438.12",
     "posthog-react-native": "^4.84.1",
+    "qrcode-generator": "^2.0.4",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",

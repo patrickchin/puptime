@@ -1,6 +1,7 @@
 appId: com.patrickchin.puptime
 name: Finish without the spotlight
 ---
+- runFlow: "skip-sharing.yaml"
 - assertVisible:
     id: "preview.ready"
 # A system permission handoff can swallow a native tap despite a stable snapshot.

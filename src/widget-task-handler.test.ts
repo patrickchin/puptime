@@ -6,7 +6,7 @@ import ts from 'typescript';
 import type { PuppyEvent } from './domain.ts';
 
 const state = {
-  events: [] as PuppyEvent[], reads: 0, customReads: 0, redraws: 0,
+  scope:'owner',renders:0,events: [] as PuppyEvent[], reads: 0, customReads: 0, redraws: 0,
   confirmations: [] as { eventId: string; type: string; at: number }[],
   hold: Promise.resolve(), readHold: Promise.resolve(), fail: false,
 };
@@ -41,7 +41,9 @@ registerHooks({
         export async function loadNotificationPreferences(){return {widgetConfirmations:true};}
         export async function loadLanguagePreference(){return 'en';}`,
       'widget-test:./local/runtime.native': `
-        export async function getLocalRuntime(){return {activity:{async latestEvents(){s.reads++;await s.readHold;return [...s.events];}}};}`,
+        export function getCareSelection(){return s.scope==='owner'?null:{id:'shared'};}
+        export const getRuntimeForCare=()=>getLocalRuntime();
+        export async function getLocalRuntime(){return {petId:s.scope,storage:{async appendEvents(events){await Promise.resolve();if(s.fail)throw Error('disk full');s.events.push(...events);},async updateEvent(id,changes){await Promise.resolve();s.events=s.events.map(e=>e.id===id?{...e,...changes}:e);}},activity:{async latestEvents(){s.reads++;await s.readHold;return [...s.events];}}};}`,
       'widget-test:./reminders': `
         export function configureReminderHandling(){}
         export async function showWidgetLogConfirmation(reference){s.confirmations.push(reference);return true;}
@@ -54,14 +56,14 @@ registerHooks({
   },
 });
 const { widgetTaskHandler } = await import('./widget-task-handler.tsx');
-const tap = (type: string, tapAt: number) => widgetTaskHandler({
+const tap = (type: string, tapAt: number,allowRender=false) => widgetTaskHandler({
   widgetAction: 'WIDGET_CLICK', clickAction: 'LOG_EVENT', clickActionData: { type, tapAt },
   widgetInfo: { widgetId: 1, widgetName: 'PuptimeQuickLog', width: 300, height: 100,
     screenInfo: { screenHeightDp: 900, screenWidthDp: 400, density: 2, densityDpi: 320 } },
-  renderWidget() { throw Error('A tap must not redraw the same widget twice.'); },
+  renderWidget() { if(allowRender){state.renders++;return;}throw Error('A tap must not redraw the same widget twice.'); },
 });
 function reset() {
-  Object.assign(state, { events: [], reads: 0, customReads: 0, redraws: 0, confirmations: [], hold: Promise.resolve(), readHold: Promise.resolve(), fail: false });
+  Object.assign(state, { scope:'owner',renders:0,events: [], reads: 0, customReads: 0, redraws: 0, confirmations: [], hold: Promise.resolve(), readHold: Promise.resolve(), fail: false });
 }
 
 test('confirmation starts after the save without waiting for widget history queries', async () => {
@@ -113,4 +115,14 @@ test('a failed write never confirms and does not block the next tap; custom acti
   await tap('custom:training', 123457); await tap('custom:removed', 123458);
   assert.equal(state.events.length, 1);
   assert.equal(state.events[0].customLabel, 'Training');
+});
+
+
+test('a queued Android widget tap cannot write to a puppy selected after the tap',async()=>{
+ reset();let release!:()=>void;state.readHold=new Promise<void>(resolve=>{release=resolve;});
+ const first=tap('nap',123456);await new Promise(resolve=>setImmediate(resolve));
+ const queued=tap('pee',123457,true);await new Promise(resolve=>setImmediate(resolve));
+ state.scope='another-puppy';release();await Promise.all([first,queued]);
+ assert.deepEqual(state.events.map(event=>event.type),['nap']);assert.equal(state.renders,1);
+ assert.deepEqual(state.confirmations.map(event=>event.type),['nap']);
 });

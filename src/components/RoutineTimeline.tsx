@@ -9,8 +9,8 @@ import type {Theme} from '../theme';
 import {ActivityIcon} from './ActivityIcon';
 import {routineTimelineTargets} from '../routine-timeline';
 
-export const RoutineTimeline=memo(function RoutineTimeline({statuses,now,theme,setup=false,onEdit,onRemove}:{
- statuses:ScheduleStatusItem[];now:number;theme:Theme;setup?:boolean;onEdit:(entry:ScheduleEntry)=>void;onRemove:(entry:ScheduleEntry)=>void;
+export const RoutineTimeline=memo(function RoutineTimeline({statuses,now,theme,setup=false,readOnly=false,onEdit,onRemove}:{
+ statuses:ScheduleStatusItem[];now:number;theme:Theme;readOnly?:boolean;setup?:boolean;onEdit:(entry:ScheduleEntry)=>void;onRemove:(entry:ScheduleEntry)=>void;
 }){
  const {activityColors,activityLabel,locale,t}=useLocalization();
  const {fontScale}=useWindowDimensions();
@@ -28,7 +28,7 @@ export const RoutineTimeline=memo(function RoutineTimeline({statuses,now,theme,s
    return <View key={entry.id}>
     {!setup&&nowIndex===index?nowLine:null}
     <View style={[styles.entry,{borderTopWidth:index>0?StyleSheet.hairlineWidth:0,borderColor:theme.border}]}>
-     <Pressable testID={`schedule.entry.${entry.type}`} accessibilityRole="button"
+     <Pressable testID={`schedule.entry.${entry.type}`} accessibilityRole={readOnly?undefined:"button"} disabled={readOnly}
       accessibilityLabel={t('schedule.editA11y',{activity:label,time:entry.toleranceMinutes===undefined?formatMinutes(entry.minutes,locale):formatScheduleWindow(entry,locale),status:setup?'':statusLabel,reminder:entry.reminder?t('schedule.reminderOn'):''})}
       onPress={()=>onEdit(entry)} style={({pressed})=>[styles.edit,{backgroundColor:pressed?colors.softColor:undefined}]}>
       <Text style={[styles.time,{color:theme.textMuted,width:Math.max(76,68*Math.min(fontScale,1.5))}]}>{formatMinutes(entry.minutes,locale)}</Text>

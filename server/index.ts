@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { accountRoutes } from './account-routes';
 import { configuredProviders, createAuth } from './auth';
 import { resourceRoutes } from './resource-routes';
+import {sharingRoutes} from './sharing-routes';
 import type { ApiEnv } from './api-auth';
 export { AccountStore } from './account-store';
 
@@ -41,6 +42,7 @@ app.on(['GET', 'POST'], '/api/auth/*', async (context) => {
   return auth.handler(context.req.raw);
 });
 app.route('/api', accountRoutes);
+app.route('/api', sharingRoutes);
 app.route('/api/v1', resourceRoutes);
 app.notFound((context) => context.req.path.startsWith('/api/v1/')
   ? context.json({ error: { code: 'not_found', message: 'No API route matches this request.', requestId: context.get('requestId') } }, 404)

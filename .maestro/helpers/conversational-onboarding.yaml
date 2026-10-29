@@ -171,6 +171,7 @@ name: Complete conversational setup into the real app
 - takeScreenshot: conversational-reminder-timing
 - tapOn:
     id: preview.reminders.later
+- runFlow: "conversational/skip-sharing.yaml"
 - assertVisible:
     id: preview.ready
 - waitForAnimationToEnd

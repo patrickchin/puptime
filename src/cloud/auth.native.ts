@@ -14,16 +14,18 @@ import { createChangeOpener } from './change-subscription';
 import { createIdentityAdapter } from './account-controller';
 import { createCloudExportRequest } from './export-request';
 import { createPhotoTransfer } from './photo-transfer';
+import {createSharingApi} from './sharing-api';
 import { clearCloudExportCache, createNativeCloudExport } from './export.native';
 
 // One SDK/storage adapter instance coordinates native secure credential access.
 // The caller initializes lazily; missing cloud configuration leaves local use intact.
-export function createNativeCloudClient() {
+export function createNativeCloudClient(care?:{id:string;accountId:string}) {
   clearCloudExportCache();
   const origin=cloudBaseUrl(process.env.EXPO_PUBLIC_CLOUD_API_URL,__DEV__&&process.env.EXPO_PUBLIC_CLOUD_ALLOW_LOCAL==='1');
   if (!origin) return null;
   const auth=createAuthClient({baseURL:origin,fetchOptions:{customFetchImpl:expoFetch,timeout:15000,retry:0,redirect:'error'},plugins:[expoClient({scheme:'puptime',storagePrefix:'puptime.auth',storage:SecureStore}),emailOTPClient()]});
-  const api=createCloudApi(createSdkRequest((url,options)=>auth.$fetch<unknown>(url,options),origin));
+  const scopedHeaders=care?{'x-puptime-share':care.id,'x-puptime-account':care.accountId}:{};
+  const api=createCloudApi(createSdkRequest((url,options)=>auth.$fetch<unknown>(url,{...options,headers:{...options.headers,...scopedHeaders}}),origin));
   // React Native's installed WebSocket supports headers as the third argument;
   // the DOM declaration selected by the shared web tsconfig omits that overload.
   const NativeSocket=WebSocket as unknown as {new(url:string,protocols:string[],options:{headers:Record<string,string>}):WebSocket};
@@ -34,5 +36,5 @@ export function createNativeCloudClient() {
   }):undefined;
   const googleIdToken=Platform.OS==='ios'?createGoogleIdTokenRequest(GoogleSignin):undefined;
   const nativeSignOut=Platform.OS==='ios'?async()=>{await GoogleSignin.signOut();if(GoogleSignin.hasPreviousSignIn())throw new Error('Google sign-out did not complete.');}:undefined;
-  return {identity:createIdentityAdapter(auth,{appleIdToken,googleIdToken,nativeSignOut}),api,origin,photoTransfer:createPhotoTransfer((url,options)=>auth.$fetch<unknown>(url,options),origin),exportCloud:createNativeCloudExport(createCloudExportRequest((url,options)=>auth.$fetch<unknown>(url,options),origin)),openChanges:createChangeOpener({origin,getCookie:async()=>auth.getCookie(),createSocket:(url,options)=>new NativeSocket(url,[],options)})};
+  return {identity:createIdentityAdapter(auth,{appleIdToken,googleIdToken,nativeSignOut}),api,origin,sharing:createSharingApi(origin,(url,options)=>auth.$fetch<unknown>(url,options)),photoTransfer:createPhotoTransfer((url,options)=>auth.$fetch<unknown>(url,{...options,headers:{...options.headers,...scopedHeaders}}),origin),exportCloud:createNativeCloudExport(createCloudExportRequest((url,options)=>auth.$fetch<unknown>(url,options),origin)),openChanges:createChangeOpener({origin,getCookie:async()=>auth.getCookie(),createSocket:(url,options)=>new NativeSocket(url,[],options)})};
 }

@@ -3,7 +3,7 @@ import test from 'node:test';
 import { registerHooks } from 'node:module';
 import type { PuppyEvent } from './domain.ts';
 
-const state = { files: new Map<string, string>(), legacy: [] as unknown[] };
+const state = { files: new Map<string, string>(), legacy: [] as unknown[], scope: 'owner' };
 (globalThis as typeof globalThis & { __iosWidgetTest: typeof state }).__iosWidgetTest = state;
 const target = new URL('./widgets/sync.ios.ts', import.meta.url).href;
 registerHooks({
@@ -12,6 +12,7 @@ registerHooks({
       if (specifier === 'expo-file-system') return { url: 'ios-widget:files', shortCircuit: true };
       if (specifier === 'expo-widgets') return { url: 'ios-widget:widgets', shortCircuit: true };
       if (specifier === './PuptimeWidget.ios') return { url: 'ios-widget:timeline', shortCircuit: true };
+      if (specifier === '../care-access') return {url:'ios-widget:access',shortCircuit:true};
       if (specifier === '../storage') return { url: 'ios-widget:storage', shortCircuit: true };
       if (specifier.startsWith('.')) return next(new URL(specifier + '.ts', context.parentURL).href, context);
     }
@@ -19,6 +20,7 @@ registerHooks({
   },
   load(url, context, next) {
     const mocks: Record<string, string> = {
+      'ios-widget:access': `export async function getCareAccess(){return {scope:s.scope,petId:s.scope==='owner'?'owner-pet':s.scope,expiresAt:null,canLog:true,ended:false};}`,
       'ios-widget:widgets': `export const widgetsDirectory='file:///shared/ExpoWidgets';`,
       'ios-widget:files': `
         export class File {
@@ -83,4 +85,19 @@ test('corrupt operations fail visibly and remain available for recovery', async 
   state.files.set('wop_bad.json', '{broken');
   await assert.rejects(widget.readPendingWidgetEvents());
   assert.equal(state.files.get('wop_bad.json'), '{broken');
+});
+
+
+test('widget actions remain with their original puppy when the active puppy changes',async()=>{
+ state.files.clear();state.legacy=[];state.scope='shared-puppy';
+ operation('a',{...event(1),scope:'owner'});operation('b',{...event(2),scope:'shared-puppy'});
+ const pending=await widget.readPendingWidgetEvents();assert.deepEqual(pending,[event(2)]);
+ await widget.acknowledgePendingWidgetEvents(pending);assert.deepEqual([...state.files.keys()],['wop_a.json']);
+ state.scope='owner';assert.deepEqual(await widget.readPendingWidgetEvents(),[event(1)]);
+});
+
+
+test('a late journal refresh cannot publish one puppy’s events into another puppy’s widget',async()=>{
+ state.files.clear();state.scope='owner';state.legacy=[event(9)];
+ await widget.updateHomeWidget([], 'another-puppy');assert.deepEqual(state.legacy,[event(9)]);
 });

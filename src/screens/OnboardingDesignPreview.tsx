@@ -3,7 +3,7 @@ import {useFonts} from 'expo-font';
 import {StatusBar} from 'expo-status-bar';
 import {useEffect,useRef,useState,type ReactNode} from 'react';
 import {
-  AccessibilityInfo,ActivityIndicator,Animated,BackHandler,Easing,Image,Keyboard,KeyboardAvoidingView,Platform,Pressable,
+  AccessibilityInfo,ActivityIndicator,Animated,BackHandler,Easing,Image,Keyboard,KeyboardAvoidingView,Linking,Platform,Pressable,
   ScrollView,StyleSheet,Text,TextInput,View,useWindowDimensions,type ImageSourcePropType,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -21,8 +21,8 @@ import {useAccountSnapshot} from '../cloud/use-account-snapshot';
 import type {CloudHandle} from '../cloud/handle';
 import {ExactReminderAccessError} from '../reminders';
 import {translate} from '../localization';
-export type OnboardingDraft={puppyName:string;schedule:ScheduleEntry[];notifications:NotificationPreferences;showGuide:boolean};
-export type ConversationalOnboardingProps={cloud:CloudHandle;onFinish:(draft:OnboardingDraft)=>Promise<void>;onAllowNotifications:()=>Promise<boolean>;onDisableNotifications:()=>Promise<void>};
+export type OnboardingDraft={puppyName:string;schedule:ScheduleEntry[];notifications:NotificationPreferences;showGuide:boolean;sharingKind?:'household'|'temporary'|null};
+export type ConversationalOnboardingProps={cloud:CloudHandle;onFinish:(draft:OnboardingDraft)=>Promise<void>;onAllowNotifications:()=>Promise<boolean>;onDisableNotifications:()=>Promise<void>;onOpenShared?:()=>void};
 
 const appTheme:Theme={...lightTheme,surface:'#FFFDF7',surfaceRaised:'#FFFDF7',
   text:'#243D2E',textMuted:'#53685A',border:'#CDD8CF',primary:'#176B52',onPrimary:'#FFFDF5',
@@ -36,7 +36,7 @@ const mascots=[require('../../assets/mascots/scruffy-terrier.png'),
   require('../../assets/mascots/onboarding/scruffy-grass.png'),
   require('../../assets/mascots/onboarding/scruffy-bone.png'),
   require('../../assets/mascots/onboarding/scruffy-roll.png')];
-type Step='welcome'|'account'|'profile'|'age'|'meals'|'mealTime'|'poop'|'review'|'reminders'|'ready';
+type Step='welcome'|'account'|'profile'|'age'|'meals'|'mealTime'|'poop'|'review'|'reminders'|'sharing'|'ready';
 
 // Draft answers are committed by the real app when setup finishes.
 export function OnboardingDesignPreview(props:ConversationalOnboardingProps){
@@ -48,8 +48,9 @@ export function OnboardingDesignPreview(props:ConversationalOnboardingProps){
   return fontsLoaded||fontError?<PreviewFlow {...props}/>:<View style={styles.loading}><ActivityIndicator color={theme.primary}/></View>;
 }
 
-function PreviewFlow({cloud,onFinish,onAllowNotifications,onDisableNotifications}:ConversationalOnboardingProps){
+function PreviewFlow({cloud,onFinish,onAllowNotifications,onDisableNotifications,onOpenShared}:ConversationalOnboardingProps){
   const [step,setStep]=useState<Step>('welcome');
+  const [sharingKind,setSharingKind]=useState<'household'|'temporary'|null>(null);
   const accountState=useAccountSnapshot(cloud.controller),signingIn=accountState?.busy??false;
   const [name,setName]=useState('');
   const [age,setAge]=useState<PuppyAge|null>(null);
@@ -125,10 +126,10 @@ function PreviewFlow({cloud,onFinish,onAllowNotifications,onDisableNotifications
       return [...current.filter(entry=>entry.type!==type),...times.map((time,index)=>({id:previous[index]?.id??entityId('rtn'),type,...time,reminder:previous[index]?.reminder??false}))].sort((a,b)=>a.minutes-b.minutes);
     });
   }
-  async function complete(showGuide:boolean){
+  async function complete(showGuide:boolean,invite=sharingKind){
     if(completion.current)return;
     completion.current=true;setFinishing(true);setFinishError(false);
-    try{await onFinish({puppyName:name.trim()||'My puppy',schedule,notifications:preferences,showGuide});}
+    try{await onFinish({puppyName:name.trim()||'My puppy',schedule,notifications:preferences,showGuide,sharingKind:invite});}
     catch{setFinishError(true);}
     finally{completion.current=false;setFinishing(false);}
   }
@@ -137,20 +138,20 @@ function PreviewFlow({cloud,onFinish,onAllowNotifications,onDisableNotifications
     permissionRequest.current=true;setRequestingReminders(true);setReminderError(null);
     try{
       const granted=await onAllowNotifications();
-      setReminderAnswer(granted?'granted':'declined');go('ready');
+      setReminderAnswer(granted?'granted':'declined');go('sharing');
     }catch(error){setReminderError(error instanceof ExactReminderAccessError?translate('en','notifications.exactSetupRequired'):'We couldn’t ask your phone just now. We can do this later, or try again.');}
     finally{permissionRequest.current=false;setRequestingReminders(false);}
   }
   async function deferReminders(){
     if(permissionRequest.current)return;
     permissionRequest.current=true;setRequestingReminders(true);setReminderError(null);
-    try{await onDisableNotifications();setReminderAnswer('later');go('ready');}
+    try{await onDisableNotifications();setReminderAnswer('later');go('sharing');}
     catch{setReminderError('We couldn’t save that choice. Please try again.');}
     finally{permissionRequest.current=false;setRequestingReminders(false);}
   }
   function back(){
     if(pickingTime){setPickingTime(false);return;}
-    const previous:Partial<Record<Step,Step>>={account:'welcome',profile:'welcome',age:'profile',meals:'age',mealTime:'meals',poop:meals.length?'mealTime':'meals',review:'poop',reminders:'review',ready:'reminders'};
+    const previous:Partial<Record<Step,Step>>={account:'welcome',profile:'welcome',age:'profile',meals:'age',mealTime:'meals',poop:meals.length?'mealTime':'meals',review:'poop',reminders:'review',sharing:'reminders',ready:'sharing'};
     go(previous[step]??'profile',true);
   }
   const header=<View style={styles.header}>
@@ -186,6 +187,8 @@ function PreviewFlow({cloud,onFinish,onAllowNotifications,onDisableNotifications
       <Text style={styles.welcomeQuestion}>How would you like to begin?</Text>
       <Pressable testID="preview.guest" accessibilityRole="button" disabled={signingIn} accessibilityState={{disabled:signingIn}} onPress={()=>go('profile')} style={[styles.secondary,{backgroundColor:theme.primary}]}><Text style={[styles.secondaryText,{color:theme.onPrimary}]}>Let’s start without an account</Text></Pressable>
       <AccountSignIn cloud={cloud} theme={welcomeAccountTheme} showIntro={false} onEmailPress={()=>go('account')}/>
+      <Pressable testID="preview.invited" accessibilityRole="button" onPress={()=>{if(onOpenShared)onOpenShared();else void Linking.openURL(`${cloud.sharingOrigin??'https://puptime.pages.dev'}/care`).catch(()=>setReminderError('Couldn’t open shared puppies. Open your invitation link in your browser.'));}} style={styles.secondary}><Text style={styles.secondaryText}>Already invited? Open shared puppies</Text></Pressable>
+      {reminderError?<Text accessibilityRole="alert" style={styles.error}>{reminderError}</Text>:null}
     </View>
   </ScrollView>;
   else if(step==='account')body=<ScrollView testID="preview.account" keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={styles.conversation}>
@@ -272,12 +275,25 @@ function PreviewFlow({cloud,onFinish,onAllowNotifications,onDisableNotifications
       <Pressable testID="preview.reminders.later" accessibilityRole="button" disabled={requestingReminders} onPress={()=>{void deferReminders();}} style={styles.secondary}><Text style={styles.secondaryText}>Not now, thanks</Text></Pressable>
     </View>
   </>;
+  else if(step==='sharing')body=<>
+    <ScrollView testID="preview.sharing" contentContainerStyle={styles.conversation}>
+      {prompt(`Who else cares for ${pup}?`,'Invite someone at home, or share care for a few days. You can also do this later from your puppy’s profile.')}
+      <View style={styles.answers}>
+        {choice('household','Invite a household member',()=>{setSharingKind('household');go('ready');})}
+        <Text style={styles.body}>Full history, logs and routines. Access continues until you remove it.</Text>
+        {choice('temporary','Share temporary access',()=>{setSharingKind('temporary');go('ready');})}
+        <Text style={styles.body}>A link or QR code with an end time. No account needed for the carer.</Text>
+      </View>
+      {mascotImage}
+    </ScrollView>
+    {later('Not now',()=>{setSharingKind(null);go('ready');})}
+  </>;
   else if(step==='ready')body=<>
     <ScrollView testID="preview.ready" contentContainerStyle={styles.ready}>
-      {mascotImage}{prompt('Ready for today?',reminderAnswer==='granted'?'You can change reminders in Notifications.':undefined)}
+      {mascotImage}{prompt('Ready for today?',sharingKind?'We’ll create your invitation next.':reminderAnswer==='granted'?'You can change reminders in Notifications.':undefined)}
     </ScrollView>
     {finishError?<Text accessibilityRole="alert" style={[styles.error,{paddingHorizontal:22}]}>We couldn’t save your setup. Your answers are still here—please try again.</Text>:null}
-    {footer(finishing?'Saving…':'Show me around',()=>{void complete(true);},'I’ll explore on my own',()=>{void complete(false);})}
+    {footer(finishing?'Saving…':sharingKind?'Continue to invitation':'Show me around',()=>{void complete(!sharingKind);},'I’ll explore on my own',()=>{void complete(false,null);})}
   </>;
   const currentPage=<>{step!=='welcome'?header:null}<View style={styles.bodyViewport}>{body}</View></>;
   page.current=currentPage;

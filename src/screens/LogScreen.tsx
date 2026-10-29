@@ -90,6 +90,7 @@ function sectionTitle(
 }
 
 export function LogScreen({
+  readOnly=false,canEditEvent,
   events:projectedEvents,
   activity,
   history,
@@ -109,6 +110,7 @@ export function LogScreen({
   onQuickActionsLayout,
   theme,
 }: {
+  readOnly?:boolean;canEditEvent?:(event:PuppyEvent)=>boolean;
   events: PuppyEvent[];
   history?:EventHistoryData;
   cloud?:CloudHandle;
@@ -508,7 +510,7 @@ export function LogScreen({
                 </Pressable>
               </View>
             </View>:null}
-            <QuickActions events={activity?projectedEvents:events} onLog={onLog} now={now} theme={theme} onLayout={onQuickActionsLayout} />
+            {!readOnly?<QuickActions events={activity?projectedEvents:events} onLog={onLog} now={now} theme={theme} onLayout={onQuickActionsLayout} />:null}
             <View style={styles.activityHeading}>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('log.activity')}</Text>
             </View>
@@ -550,6 +552,7 @@ export function LogScreen({
             {section.data.map((event, index) => (
               <View key={event.id} style={styles.dayRow}>
                 <EventRow
+                  editable={!readOnly&&(canEditEvent?.(event)??true)}
                   event={event}
                   now={isOpenNap(event) ? now : 0}
                   onEdit={startEditing}

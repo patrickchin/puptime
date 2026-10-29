@@ -1,0 +1,26 @@
+appId: com.patrickchin.puptime
+name: Optional temporary sharing finishes setup and offers cloud sign-in
+---
+- runFlow:
+    file: ../helpers/conversational/start.yaml
+    env:
+      NOTIFICATIONS: deny
+- runFlow: ../helpers/conversational/to-reminders.yaml
+- tapOn:
+    id: preview.reminders.later
+- assertVisible:
+    id: preview.sharing
+- tapOn:
+    id: preview.choice.temporary
+- assertVisible:
+    id: preview.ready
+- tapOn:
+    id: preview.continue
+- assertVisible:
+    id: screen.sharing
+- assertVisible:
+    id: sharing.setup
+- tapOn:
+    id: sharing.back
+- assertVisible:
+    id: screen.today

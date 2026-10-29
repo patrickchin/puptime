@@ -12,6 +12,8 @@
         return nil
       }
       let props = try PuptimeWidgetJournal.reconcile(storedProps)
+      guard props["canLog"] as? Bool != false else { return nil }
+      if let expiry = props["expiresAt"] as? Double, expiry > 0, expiry <= Double(at) { return nil }
       environment["target"] = target
       environment["interactionId"] = PuptimeWidgetJournal.newId("evt")
       environment["interactionAt"] = at

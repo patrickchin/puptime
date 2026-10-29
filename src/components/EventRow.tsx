@@ -14,14 +14,14 @@ import { useLocalization } from '../localization-context';
 import { type Theme } from '../theme';
 
 export const EventRow = memo(function EventRow({
-  event,
+  event,editable=true,
   onEdit,
   onDelete,
   now,
   showDivider,
   theme,
 }: {
-  event: PuppyEvent;
+  editable?:boolean;event: PuppyEvent;
   onEdit: (event: PuppyEvent) => void;
   onDelete: (event: PuppyEvent) => void;
   now: number;
@@ -69,7 +69,7 @@ export const EventRow = memo(function EventRow({
           </View>
         ) : null}
       </View>
-      <Pressable
+      {editable?<><Pressable
         testID={`event.${event.type}.edit`}
         accessibilityRole="button"
         accessibilityLabel={t('eventRow.edit', { activity: pastLabel })}
@@ -98,7 +98,7 @@ export const EventRow = memo(function EventRow({
         ]}
       >
         <MaterialCommunityIcons name="trash-can-outline" size={20} color={theme.textMuted} />
-      </Pressable>
+      </Pressable></>:null}
     </View>
   );
 });

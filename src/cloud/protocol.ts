@@ -77,7 +77,7 @@ const recordMetadata = {
   id: recordIdSchema, petId: identifierSchema.nullable(),
   revision: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
   sequence: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
-  deleted: z.boolean(), updatedAt: timestamp,
+  deleted: z.boolean(), updatedAt: timestamp, editable:z.boolean().optional(),
 };
 export const cloudRecordSchema = z.discriminatedUnion('kind', [
   z.strictObject({ ...recordMetadata, kind: z.literal('event'), data: eventDataSchema }),
@@ -92,7 +92,7 @@ export const cloudRecordSchema = z.discriminatedUnion('kind', [
 // store assigns committed metadata. Network responses use the stricter schema.
 export type CloudRecord = {
   id: string; petId: string | null; kind: RecordKind; data: RecordData;
-  revision: number; sequence: number; deleted: boolean; updatedAt: number;
+  revision: number; sequence: number; deleted: boolean; updatedAt: number; editable?:boolean;
 };
 export type RevisionReason = typeof revisionReasons[number];
 export const mutationResultSchema = z.strictObject({

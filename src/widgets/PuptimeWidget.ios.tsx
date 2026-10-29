@@ -18,9 +18,10 @@ import { createWidget, type WidgetEnvironment } from 'expo-widgets';
 
 import type { QuickEventTimes, ActivityKey, QuickEventType } from '../domain';
 
-export type WidgetPendingEvent = { id: string; type: QuickEventType | 'custom'; customLabel?: string; at: number; endedAt?: number };
+export type WidgetPendingEvent = { scope?:string;id: string; type: QuickEventType | 'custom'; customLabel?: string; at: number; endedAt?: number };
 
 export type PuptimeWidgetProps = {
+  scope?:string;expiresAt?:number;canLog?:boolean;
   pending: WidgetPendingEvent[];
   // iOS UserDefaults rejects null inside widget snapshots.
   openNap?: WidgetPendingEvent | false;
@@ -48,12 +49,14 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
     ?? { background: '#F5F3EC', surface: '#FFFEFA', controlRadius: 16 };
   const background = { type: 'linearGradient' as const, colors: [appearance.background, appearance.surface], startPoint: { x: 0, y: 0 }, endPoint: { x: 1, y: 1 } };
   const add = (type: ActivityKey): PuptimeWidgetProps => {
+    if(props.canLog===false||props.expiresAt&&props.expiresAt<=Date.now())return props;
     const interaction = environment as WidgetEnvironment & { interactionId?: string; interactionAt?: number };
     const at = interaction.interactionAt ?? Date.now();
     const customLabel = type.startsWith('custom:') ? props.actionDetails?.[type]?.label ?? type.slice(7) : undefined;
     if (type === 'nap' && props.openNap) {
       const completed = { ...props.openNap, endedAt: Math.max(props.openNap.at, at) };
       return {
+        scope:props.scope,expiresAt:props.expiresAt,canLog:props.canLog,
         openNap: false,
         lastEventAt: { ...props.lastEventAt, nap: at },
         actions: configuredActions,
@@ -67,12 +70,14 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
       };
     }
     const event = {
+      scope:props.scope??'owner',
       id: interaction.interactionId ?? `evt_${at.toString(36)}${Math.random().toString(36).slice(2)}`,
       type: type.startsWith('custom:') ? 'custom' as const : type as QuickEventType,
       ...(customLabel ? { customLabel } : {}),
       at,
     };
     return {
+      scope:props.scope,expiresAt:props.expiresAt,canLog:props.canLog,
       openNap: type === 'nap' ? event : props.openNap ?? false,
       lastEventAt: { ...props.lastEventAt, [type]: at },
       actions: configuredActions,
