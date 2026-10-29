@@ -1,5 +1,5 @@
 import {MaterialCommunityIcons} from '@expo/vector-icons';
-import {memo} from 'react';
+import {memo,useMemo,useState} from 'react';
 import {StyleSheet,Text,View,useWindowDimensions} from 'react-native';
 import {Pressable} from './TelemetryPressable';
 import type {ScheduleStatusItem} from '../analytics';
@@ -7,6 +7,7 @@ import {formatMinutes,formatScheduleWindow,type ScheduleEntry} from '../domain';
 import {useLocalization} from '../localization-context';
 import type {Theme} from '../theme';
 import {ActivityIcon} from './ActivityIcon';
+import {routineTimelineTargets} from '../routine-timeline';
 
 export const RoutineTimeline=memo(function RoutineTimeline({statuses,now,theme,setup=false,onEdit,onRemove}:{
  statuses:ScheduleStatusItem[];now:number;theme:Theme;setup?:boolean;onEdit:(entry:ScheduleEntry)=>void;onRemove:(entry:ScheduleEntry)=>void;
@@ -54,25 +55,30 @@ export const RoutineTimeline=memo(function RoutineTimeline({statuses,now,theme,s
  </View>;
 });
 
-export const RoutineDayPreview=memo(function RoutineDayPreview({statuses,now,theme}:{statuses:ScheduleStatusItem[];now:number;theme:Theme}){
+export const RoutineDayPreview=memo(function RoutineDayPreview({statuses,now,theme,onSelect}:{statuses:ScheduleStatusItem[];now:number;theme:Theme;onSelect:(entries:ScheduleEntry[])=>void}){
  const {activityColors,activityLabel,locale,t}=useLocalization();
+ const [trackWidth,setTrackWidth]=useState(0);
+ const targets=useMemo(()=>routineTimelineTargets(statuses.map(item=>item.entry),trackWidth),[statuses,trackWidth]);
  const entries=[...statuses].sort((a,b)=>a.entry.minutes-b.entry.minutes);
  const date=new Date(now),currentMinute=date.getHours()*60+date.getMinutes();
  const activities=entries.filter(({entry},index)=>entries.findIndex(item=>item.entry.type===entry.type&&item.entry.customLabel===entry.customLabel)===index);
  return <View testID="schedule.dayPreview" style={styles.preview}>
   <Text accessibilityRole="header" style={[styles.previewTitle,{color:theme.text}]}>{t('timeline.title')}</Text>
-  <View accessible accessibilityLabel={`${t('schedule.todayPlan')}. ${entries.map(({entry})=>`${activityLabel(entry)}, ${formatMinutes(entry.minutes,locale)}`).join('. ')}. ${t('schedule.now')}, ${formatMinutes(currentMinute,locale)}`}>
-   <View style={styles.axis}>
+  <View>
+   <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.axis}>
     {[0,6,12,18,24].map(hour=><Text key={hour} maxFontSizeMultiplier={1.5} style={[styles.axisLabel,{color:theme.textMuted}]}>{hour===24?'24':hour.toString().padStart(2,'0')}</Text>)}
    </View>
-   <View style={[styles.track,{backgroundColor:theme.surface,borderColor:theme.border}]}>
-    {[6,12,18].map(hour=><View key={hour} style={[styles.gridLine,{left:`${hour/24*100}%`,backgroundColor:theme.border}]}/>)}
+   <View onLayout={event=>setTrackWidth(event.nativeEvent.layout.width)} style={[styles.track,{backgroundColor:theme.surface,borderColor:theme.border}]}>
+    {[6,12,18].map(hour=><View key={hour} pointerEvents="none" style={[styles.gridLine,{left:`${hour/24*100}%`,backgroundColor:theme.border}]}/>)}
     {entries.map(({entry})=>{
      const sameTime=entries.filter(item=>item.entry.minutes===entry.minutes);
      const lane=sameTime.findIndex(item=>item.entry.id===entry.id);
-     return <View key={entry.id} testID={`schedule.previewMark.${entry.id}`} style={[styles.mark,{backgroundColor:activityColors(theme,entry).color,left:`${entry.minutes/1440*100}%`,top:4+lane*32/sameTime.length,height:32/sameTime.length}]}/>;
+     return <View key={entry.id} pointerEvents="none" testID={`schedule.previewMark.${entry.id}`} style={[styles.mark,{backgroundColor:activityColors(theme,entry).color,left:`${entry.minutes/1440*100}%`,top:4+lane*40/sameTime.length,height:40/sameTime.length}]}/>;
     })}
-    <View style={[styles.currentTime,{left:`${currentMinute/1440*100}%`,backgroundColor:theme.text}]}><View style={[styles.currentTimeHead,{backgroundColor:theme.text}]}/></View>
+    {targets.map(target=><Pressable key={target.entries[0].id} testID={`schedule.previewTarget.${target.entries[0].id}`} accessibilityRole="button"
+     accessibilityLabel={`${t('common.edit')}: ${target.entries.map(entry=>t('schedule.entryAt',{activity:activityLabel(entry),time:entry.toleranceMinutes===undefined?formatMinutes(entry.minutes,locale):formatScheduleWindow(entry,locale)})).join('. ')}`}
+     onPress={()=>onSelect(target.entries)} style={({pressed})=>[styles.previewTarget,{left:target.left,width:target.width,backgroundColor:pressed?theme.primarySoft:undefined,opacity:pressed?0.6:1}]}/>)}
+    <View pointerEvents="none" accessible accessibilityLabel={`${t('schedule.now')}, ${formatMinutes(currentMinute,locale)}`} style={[styles.currentTime,{left:`${currentMinute/1440*100}%`,backgroundColor:theme.text}]}><View style={[styles.currentTimeHead,{backgroundColor:theme.text}]}/></View>
    </View>
   </View>
   <View style={styles.legend}>
@@ -89,7 +95,7 @@ const styles=StyleSheet.create({
  remove:{width:48,minHeight:48,alignItems:'center',justifyContent:'center',marginLeft:8},
  now:{flexDirection:'row',alignItems:'center',gap:8,paddingHorizontal:10,paddingVertical:6},nowText:{fontSize:12,lineHeight:18,fontWeight:'700',fontVariant:['tabular-nums'],flexShrink:1},nowLine:{height:1,flex:1},
  preview:{gap:8},previewTitle:{fontSize:16,lineHeight:22,fontWeight:'700'},axis:{flexDirection:'row',justifyContent:'space-between',marginBottom:4},axisLabel:{fontSize:11,lineHeight:16,fontVariant:['tabular-nums']},
- track:{height:40,borderWidth:StyleSheet.hairlineWidth,borderRadius:4,marginHorizontal:7},gridLine:{position:'absolute',top:0,bottom:0,width:StyleSheet.hairlineWidth},mark:{position:'absolute',width:6,marginLeft:-3,borderRadius:2},
+ previewTarget:{position:'absolute',top:0,bottom:0},track:{height:48,borderWidth:StyleSheet.hairlineWidth,borderRadius:4,marginHorizontal:7},gridLine:{position:'absolute',top:0,bottom:0,width:StyleSheet.hairlineWidth},mark:{position:'absolute',width:6,marginLeft:-3,borderRadius:2},
  currentTime:{position:'absolute',top:0,bottom:0,width:2,marginLeft:-1},currentTimeHead:{position:'absolute',top:-3,left:-2,width:6,height:6,borderRadius:3},
  legend:{flexDirection:'row',flexWrap:'wrap',gap:12},legendItem:{flexDirection:'row',alignItems:'center',gap:4},
 });

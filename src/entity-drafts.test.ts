@@ -78,3 +78,31 @@ test('a timed reminder draft retries with the same OS request identity',async()=
  render(byId('notifications.timed.save')).onPress();await new Promise(resolve=>setImmediate(resolve));
  assert.equal(saved.length,2);assert.match(saved[0].id,/^rem_[a-f0-9]{32}$/);assert.deepEqual(saved[1],saved[0]);
 });
+
+test('routine timeline opens the same editor, selects the current entry from a dense group, and saves only that entry',async()=>{
+ const saved:any[]=[];
+ const schedule:domain.ScheduleEntry[]=[{id:'rtn_pee',type:'pee',minutes:360},{id:'rtn_meal',type:'meal',minutes:390}];
+ const render=screen('ScheduleScreen',{
+  '../analytics':{scheduleStatusesForDay:()=>schedule.map(entry=>({entry,status:'upcoming'})),suggestScheduleFromEvents:()=>({entries:[],daysAnalyzed:0})},
+  '../activity-view':{activityWindowBounds:()=>({}),useActivityWindow:()=>({events:[],loading:false,error:false})},
+  ...Object.fromEntries(['ActivityLoadState','ActivityIcon','ConfirmDialog','DateTimeSelector'].map(name=>[`../components/${name}`,{[name]:name}])),
+  '../components/RoutineTimeline':{RoutineTimeline:'RoutineTimeline',RoutineDayPreview:'RoutineDayPreview'},
+  '../schedule-editor':{ScheduleEntryDeletedError:class extends Error{}},
+ },{events:[],schedule,customActivities:[],onSaveEntry:async(entry:unknown,original:unknown)=>{saved.push({entry,original});},onChange:async()=>{}});
+ const preview=()=>render(node=>node.type==='RoutineDayPreview');
+ preview().onSelect([schedule[0]]);
+ render(byId('schedule.editor.type.poop')).onPress();
+ await render(byId('schedule.editor.save')).onPress();
+ assert.equal(saved[0].entry.id,'rtn_pee');assert.equal(saved[0].entry.type,'poop');
+ assert.deepEqual(saved[0].original,{...schedule[0],reminder:false});
+ preview().onSelect(schedule);
+ schedule[1]={...schedule[1],minutes:405,reminder:true};
+ render(byId('schedule.previewChoice.rtn_meal')).onPress();
+ render(byId('schedule.editor.type.walk')).onPress();
+ await render(byId('schedule.editor.save')).onPress();
+ assert.deepEqual(saved[1],{entry:{...schedule[1],type:'walk'},original:{...schedule[1]}});
+ preview().onSelect(schedule);
+ schedule.splice(0);
+ render(byId('schedule.editor.close')).onPress();
+ assert.equal(saved.length,2,'closing an empty or cancelled picker never writes');
+});
