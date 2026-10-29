@@ -10,7 +10,7 @@ import type {SharingApi} from '../cloud/sharing-api';
 import {CloudApiError} from '../cloud/api';
 import {eventTypes,type EventType} from '../domain';
 import {entityId} from '../entity-id';
-import {reuseCareRows,type CarePage,type CareRow,type CareWrite} from '../sharing';
+import {reuseCareRows,careEditPatch,type CarePage,type CareRow,type CareWrite} from '../sharing';
 import {useLocalization} from '../localization-context';
 import {headingStyle,spacing,type Theme} from '../theme';
 
@@ -83,7 +83,8 @@ function SharedEditor({theme,kind,row,onClose,write}:{theme:Theme;kind:'event'|'
  async function save(remove=false){
   if(locked.current)return;locked.current=true;setBusy(true);setError(false);
   try{
-   const patch=remove?{}:kind==='event'?{type,at:at.getTime(),source:'app',note,...(type==='nap'?{endedAt:endedAt?.getTime()??null}:{}),...(type==='custom'?{customLabel:label}:{})}:{type,minutes:at.getHours()*60+at.getMinutes(),...(type==='custom'?{customLabel:label}:{})};
+   const patch=remove?{}:careEditPatch(row,kind==='event'?{type,at:at.getTime(),source:'app',note,...(type==='nap'?{endedAt:endedAt?.getTime()??null}:{}),...(type==='custom'?{customLabel:label}:{})}:{type,minutes:at.getHours()*60+at.getMinutes(),...(type==='custom'?{customLabel:label}:{})});
+   if(!remove&&row&&!Object.keys(patch).length){onClose();return;}
    const fingerprint=JSON.stringify({patch,remove,revision:row?.record.revision});
    if(draft.current?.fingerprint!==fingerprint)draft.current={fingerprint,requestId:entityId('csr'),localId:row?.localId??entityId(kind==='event'?'evt':'rtn')};
    await write({kind,requestId:draft.current.requestId,localId:draft.current.localId,intent:remove?'delete':row?'patch':'create',...(row?{expectedRevision:row.record.revision}:{}),patch} as CareWrite);onClose();

@@ -3,7 +3,7 @@ import Head from 'expo-router/head';
 import {useRouter} from 'expo-router';
 import {getWebAccountClient,checkResult} from './account-client';
 import {createCareClient,CareError,type CareClient,type CarePage as Page,type CarePreview,type CareRow} from './care-client';
-import {shareIdSchema,inviteTokenSchema,reuseCareRows as reuseRows,type CareWrite} from '../sharing';
+import {shareIdSchema,inviteTokenSchema,reuseCareRows as reuseRows,careEditPatch,type CareWrite} from '../sharing';
 import {entityId} from '../entity-id';
 import {eventTypes,type EventType} from '../domain';
 import {websiteStyles} from './brand';
@@ -28,7 +28,7 @@ export default function CarePage(){
    // Invitation credentials never enter API URLs, referrers or analytics.
    if(url.hash)router.replace(`/care?invite=${candidate}`);
   }
- },[router]);
+ },[]);
  return <div className="account-page care-page"><Head><title>Shared puppy care | Puptime</title><meta name="robots" content="noindex, nofollow"/><meta name="referrer" content="no-referrer"/></Head><style>{css}</style>
   <header><a className="care-brand" href="/"><img src="/brand-icon.svg" width="32" height="32" alt=""/>Puptime</a><a href="/care">Shared puppies</a></header>
   <main>{initialError?<p role="alert">{initialError}</p>:client?<CareContent client={client} id={id} token={token} clearToken={()=>{if(id)try{sessionStorage.removeItem(`puptime.care.invite.${id}`);}catch{}setToken(null);}}/>:<p role="status">Loading puppy care…</p>}</main>
@@ -122,7 +122,8 @@ function CareEditor({kind,row,write,onClose}:{kind:'event'|'routine';row?:CareRo
  async function save(remove=false){
   if(locked.current)return;locked.current=true;setBusy(true);setError('');
   try{
-   const patch=remove?{}:kind==='event'?{type,at:new Date(at).getTime(),source:'app' as const,note,...(type==='nap'?{endedAt:endedAt?new Date(endedAt).getTime():null}:{}),...(type==='custom'?{customLabel}:{})}:{type,minutes:Number(time.slice(0,2))*60+Number(time.slice(3)),...(type==='custom'?{customLabel}:{})};
+   const patch=remove?{}:careEditPatch(row,kind==='event'?{type,at:new Date(at).getTime(),source:'app' as const,note,...(type==='nap'?{endedAt:endedAt?new Date(endedAt).getTime():null}:{}),...(type==='custom'?{customLabel}:{})}:{type,minutes:Number(time.slice(0,2))*60+Number(time.slice(3)),...(type==='custom'?{customLabel}:{})});
+   if(!remove&&row&&!Object.keys(patch).length){onClose();return;}
    const fingerprint=JSON.stringify({patch,remove,revision:row?.record.revision});
    if(draft.current?.fingerprint!==fingerprint)draft.current={fingerprint,requestId:entityId('csr'),localId:row?.localId??entityId(kind==='event'?'evt':'rtn')};
    await write({kind,requestId:draft.current.requestId,localId:draft.current.localId,intent:remove?'delete':row?'patch':'create',...(row?{expectedRevision:row.record.revision}:{}),patch} as CareWrite);onClose();

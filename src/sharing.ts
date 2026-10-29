@@ -25,4 +25,12 @@ export const carePageSchema=z.object({puppyName:z.string(),records:z.array(careR
 export type CarePage=z.infer<typeof carePageSchema>;
 export const sharedPuppiesSchema=z.object({puppies:z.array(z.object({id:shareIdSchema,name:z.string(),ownerName:z.string()})).max(100)});
 export function reuseCareRows(previous:CareRow[],next:CareRow[]){const old=new Map(previous.map(row=>[row.record.id,row]));return next.map(row=>{const saved=old.get(row.record.id);return saved&&saved.record.revision===row.record.revision&&saved.canEdit===row.canEdit?saved:row;});}
+export const careNote=(note:string|undefined)=>note?.replace(/(?:^|\n\n)Logged by [^\n]+$/,'')??'';
+export function careEditPatch(row:CareRow|undefined,desired:Record<string,unknown>){
+  if(!row)return desired;
+  const before=row.record.data as Record<string,unknown>;
+  return Object.fromEntries(Object.entries(desired).filter(([key,value])=>key!=='source'
+    && !(key==='endedAt'&&value===null&&before.endedAt===undefined)
+    && JSON.stringify(value)!==JSON.stringify(key==='note'?careNote(before.note as string|undefined):before[key])));
+}
 export function sharingUrl(origin:string,id:string,token:string){return `${origin}/care?invite=${shareIdSchema.parse(id)}#${inviteTokenSchema.parse(token)}`;}
