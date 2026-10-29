@@ -58,6 +58,8 @@ export function ScheduleScreen({
 }&ActivityViewProps) {
   const { activityColors, activityLabel, locale, t } = useLocalization();
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [previewIds,setPreviewIds]=useState<string[]|null>(null);
+  const previewEntries=previewIds===null?null:schedule.filter(entry=>previewIds.includes(entry.id)).sort((a,b)=>a.minutes-b.minutes);
   useTelemetryOverlay('routine_editor', draft !== null);
   const originalDraft=useRef<ScheduleEntry|undefined>(undefined);
   const acceptedSuggestion=useRef<{entries:ScheduleEntry[];preview:ReturnType<typeof suggestScheduleFromEvents>}|null>(null);
@@ -89,6 +91,11 @@ export function ScheduleScreen({
     setDraft({...originalDraft.current,reminder:Boolean(entry.reminder)});
     setShowTimeSelector(false);
   },[]);
+  const selectPreview=useCallback((entries:ScheduleEntry[])=>{
+    setShowTimeSelector(false);
+    if(entries.length===1)editEntry(entries[0]);
+    else setPreviewIds(entries.map(entry=>entry.id));
+  },[editEntry]);
   const requestRemove=useCallback((entry:ScheduleEntry)=>{setRemoveFailed(false);setPendingRemove(entry);},[]);
 
   const openNew = () => {
@@ -277,7 +284,7 @@ export function ScheduleScreen({
 
         </>}
         {!setupHeader && schedule.length ? (
-          <RoutineDayPreview statuses={statuses} now={now} theme={theme}/>
+          <RoutineDayPreview statuses={statuses} now={now} theme={theme} onSelect={selectPreview}/>
         ) : null}
 
         {!setupHeader && schedule.length ? (
@@ -428,7 +435,8 @@ export function ScheduleScreen({
         </View>
       </Modal>
 
-      <Modal visible={draft !== null} transparent animationType="none" onRequestClose={() => {
+      <Modal visible={draft !== null||previewIds!==null} transparent animationType="none" onRequestClose={() => {
+        if(previewIds!==null){setPreviewIds(null);return;}
         const focusedInput = TextInput.State.currentlyFocusedInput();
         if (focusedInput) {
           focusedInput.blur();
@@ -438,24 +446,34 @@ export function ScheduleScreen({
       }}>
         <View testID="schedule.editor" accessibilityViewIsModal style={styles.scrim}>
           <ScrollView
+            key={previewIds!==null?'choices':draft?.id}
             bounces={false}
             style={[styles.sheet, { backgroundColor: theme.surfaceRaised }]}
             contentContainerStyle={styles.sheetContent}
           >
             <View style={styles.sheetHeading}>
               <Text style={[styles.sheetTitle, { color: theme.text }]}>
-                {t(originalDraft.current ? 'schedule.editTime' : 'schedule.addTime')}
+                {t(previewIds!==null||originalDraft.current ? 'schedule.editTime' : 'schedule.addTime')}
               </Text>
               <Pressable
                 testID="schedule.editor.close"
                 accessibilityLabel={t('schedule.close')}
-                onPress={() => setDraft(null)}
+                onPress={() => {setDraft(null);setPreviewIds(null);}}
                 style={({ pressed }) => [styles.closeButton, pressed && { backgroundColor: theme.primarySoft }]}
               >
                 <MaterialCommunityIcons name="close" size={22} color={theme.text} />
               </Pressable>
             </View>
 
+            {previewEntries?<View testID="schedule.timelineChoices">
+              {previewEntries.length?previewEntries.map(entry=><Pressable key={entry.id} testID={`schedule.previewChoice.${entry.id}`} accessibilityRole="button"
+                accessibilityLabel={`${t('common.edit')}: ${t('schedule.entryAt',{activity:activityLabel(entry),time:formatMinutes(entry.minutes,locale)})}`}
+                onPress={()=>{setPreviewIds(null);editEntry(entry);}} style={({pressed})=>[styles.previewChoice,{borderColor:theme.border,backgroundColor:pressed?theme.primarySoft:undefined}]}>
+                <ActivityIcon activity={entry} theme={theme} color={activityColors(theme,entry).color} size={21}/>
+                <View style={styles.previewCopy}><Text style={[styles.previewActivity,{color:theme.text}]}>{activityLabel(entry)}</Text><Text style={[styles.windowDetail,{color:theme.textMuted}]}>{entry.toleranceMinutes===undefined?formatMinutes(entry.minutes,locale):formatScheduleWindow(entry,locale)}</Text></View>
+                <MaterialCommunityIcons accessible={false} name="chevron-right" size={20} color={theme.textMuted}/>
+              </Pressable>):<Text style={[styles.previewSubtitle,{color:theme.textMuted}]}>{t('schedule.removedErrorBody')}</Text>}
+            </View>:<>
             <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{t('schedule.activity')}</Text>
             <View style={styles.typePicker}>
               {[...quickEventTypes.map((type) => ({ type, customLabel: undefined as string | undefined })),
@@ -579,6 +597,7 @@ export function ScheduleScreen({
                 {t(saving ? 'common.saving' : 'schedule.saveTime')}
               </Text>
             </Pressable>
+            </>}
           </ScrollView>
           {showTimeSelector ? (
             <DateTimeSelector
@@ -648,6 +667,7 @@ const styles = StyleSheet.create({
   sheetTitle: { flex: 1, fontSize: 23, fontWeight: '800' },
   previewSubtitle: { fontSize: 13, lineHeight: 19, marginTop: 4 },
   previewList: { borderWidth: 1, borderRadius: 17, paddingHorizontal: 12, overflow: 'hidden' },
+  previewChoice:{minHeight:56,paddingVertical:8,flexDirection:'row',alignItems:'center',gap:12,borderBottomWidth:StyleSheet.hairlineWidth},
   previewRow: { minHeight: 86, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 10 },
   previewIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   previewCopy: { flex: 1, minWidth: 0 },
