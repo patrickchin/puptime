@@ -435,7 +435,7 @@ export function ScheduleScreen({
         </View>
       </Modal>
 
-      <Modal visible={draft !== null||previewIds!==null} transparent animationType="none" onRequestClose={() => {
+      <Modal visible={draft !== null||previewIds!==null} supportedOrientations={['portrait','landscape-left','landscape-right']} transparent animationType="none" onRequestClose={() => {
         if(previewIds!==null){setPreviewIds(null);return;}
         const focusedInput = TextInput.State.currentlyFocusedInput();
         if (focusedInput) {
