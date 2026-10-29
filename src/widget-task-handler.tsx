@@ -116,7 +116,7 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
     const custom = typeof type === 'string' && customActivities.some((label) => customActivityKey(label) === type);
     if (isQuickEventType(type) || custom) {
       const key = type as ActivityKey;
-      const saved=await saveLog(key,at,customActivities,access.scope,props.clickActionData?.source==='notification'?props.clickActionData.petId:undefined);
+      const saved=await saveLog(key,at,customActivities,access.scope,props.clickActionData?.source==='notification'&&typeof props.clickActionData.petId==='string'?props.clickActionData.petId:undefined);
       if(!saved){
         if(props.clickActionData?.source==='notification')await syncQuietStatus();
         else await render(props,await latestEvents());

@@ -5,6 +5,7 @@
         views.setImageViewUri(R.id.rn_widget_image_light, saveBitmapToDisk(id, "light", drawViewToBitmap(light.getRootView())));
         views.setImageViewUri(R.id.rn_widget_image_dark, saveBitmapToDisk(id, "dark", drawViewToBitmap(dark.getRootView())));
         views.setInt(android.R.id.background, "setMinimumHeight", Math.round(height * appContext.getResources().getDisplayMetrics().density));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) views.setViewLayoutHeight(android.R.id.background, height, TypedValue.COMPLEX_UNIT_DIP);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) addClickableAreas(id, views, light);
         PuptimeWidgetChronometers.add(appContext, views, light.getRootView(), dark.getRootView());
         return views;
