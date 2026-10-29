@@ -43,23 +43,31 @@ ${anchor}`);
   fs.writeFileSync(widgetPath,source);
   fs.copyFileSync(path.join(__dirname,'android-notification/PuptimeQuickLogNotification.java'),path.join(java,'PuptimeQuickLogNotification.java'));
   const resources=path.join(root,'android/src/main/res');
+  fs.mkdirSync(path.join(resources,'drawable'),{recursive:true});
+  fs.writeFileSync(path.join(resources,'drawable','puptime_notification_tile.xml'),`<shape xmlns:android="http://schemas.android.com/apk/res/android"><solid android:color="#EAEEF0"/><corners android:radius="14dp"/></shape>`);
   for(const compact of [true,false]){
-    const variant=compact?'compact':'expanded',gap=compact?4:7,height=compact?48:112;
-    fs.mkdirSync(path.join(resources,'drawable'),{recursive:true});
-    fs.writeFileSync(path.join(resources,'drawable',`puptime_notification_gap_${variant}.xml`),`<shape xmlns:android="http://schemas.android.com/apk/res/android"><size android:width="${gap}dp"/><solid android:color="@android:color/transparent"/></shape>`);
+    const variant=compact?'compact':'expanded';
     for(const night of [false,true]){
+      const panel=(slot,dark)=>{
+        const mode=dark?'dark':'light';
+        return `<LinearLayout android:id="@+id/puptime_notification_${mode}_panel_${slot}" android:layout_width="match_parent" android:layout_height="match_parent" android:visibility="${dark===night?'visible':'gone'}" android:orientation="vertical" android:gravity="${compact?'center':'center_vertical'}" android:paddingHorizontal="${compact?4:12}dp" android:background="@drawable/puptime_notification_tile" android:importantForAccessibility="noHideDescendants">
+          <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="${compact?'center':'center_vertical'}">
+            <TextView android:id="@+id/puptime_notification_${mode}_emoji_${slot}" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textSize="${compact?16:20}sp" android:includeFontPadding="false" android:layout_marginEnd="${compact?4:8}dp"/>
+            <TextView android:id="@+id/puptime_notification_${mode}_label_${slot}" android:layout_width="${compact?'wrap_content':'0dp'}" ${compact?'':'android:layout_weight="1"'} android:layout_height="wrap_content" android:textSize="${compact?14:16}sp" android:textStyle="bold" android:maxLines="${compact?1:2}" android:ellipsize="end" android:includeFontPadding="false"/>
+          </LinearLayout>
+          <TextView android:id="@+id/puptime_notification_${mode}_empty_${slot}" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Never" android:textSize="12sp" android:singleLine="true" android:visibility="${compact?'gone':'visible'}"/>
+          <Chronometer android:id="@+id/puptime_notification_${mode}_clock_${slot}" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:textSize="12sp" android:singleLine="true" android:ellipsize="end" android:visibility="gone"/>
+        </LinearLayout>`;
+      };
+      const cell=slot=>`<FrameLayout android:id="@+id/puptime_notification_cell_${slot}" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:background="@drawable/puptime_notification_tile" android:foreground="?android:attr/selectableItemBackground" android:clipToOutline="true" android:focusable="true" android:importantForAccessibility="yes">${panel(slot,false)}${panel(slot,true)}</FrameLayout>`;
+      const row=(slots,second=false)=>{
+        const spacer=`<TextView ${second?'android:id="@+id/puptime_notification_second_gap"':''} android:layout_width="8dp" android:layout_height="1dp" android:importantForAccessibility="no"/>`;
+        return `<LinearLayout android:id="@+id/puptime_notification_${second?'second':'first'}_row" android:layout_width="match_parent" android:layout_height="${compact?'48dp':'wrap_content'}" android:minHeight="${compact?48:84}dp" android:orientation="horizontal" ${second?'android:layout_marginTop="8dp" android:visibility="gone"':''}>${slots.map(cell).join(spacer)}</LinearLayout>`;
+      };
       const folder=path.join(resources,night?'layout-night':'layout');fs.mkdirSync(folder,{recursive:true});
-      const visibility=dark=>dark===night?'visible':'gone';
-      const cells=Array.from({length:4},(_,slot)=>`<FrameLayout android:id="@+id/puptime_notification_cell_${slot}" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:foreground="?android:attr/selectableItemBackground">
-        ${[false,true].map(dark=>`<ImageView android:id="@+id/puptime_notification_${dark?'dark':'light'}_${slot}" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_marginTop="${compact?4:0}dp" android:layout_marginBottom="${compact?4:0}dp" android:scaleType="fitXY" android:visibility="${visibility(dark)}" android:importantForAccessibility="no"/>`).join('')}
-        <FrameLayout android:id="@+id/puptime_notification_timer_${slot}" android:layout_width="match_parent" android:layout_height="match_parent" android:importantForAccessibility="noHideDescendants">
-          ${[false,true].map(dark=>`<Chronometer android:id="@+id/puptime_notification_${dark?'dark_clock':'clock'}_${slot}" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_horizontal" android:singleLine="true" android:ellipsize="end" android:textStyle="bold" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="7sp" android:autoSizeMaxTextSize="${compact?9:11}sp" android:autoSizeStepGranularity="1sp" android:visibility="${visibility(dark)}"/>`).join('')}
-        </FrameLayout>
-      </FrameLayout>`).join('');
-      fs.writeFileSync(path.join(folder,`puptime_notification_${variant}.xml`),`<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="${height}dp">
-        ${[false,true].map(dark=>`<ImageView android:id="@+id/rn_widget_image_${dark?'dark':'light'}" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="fitXY" android:visibility="${visibility(dark)}" android:importantForAccessibility="no"/>`).join('')}
-        <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="horizontal" android:paddingStart="${gap}dp" android:paddingEnd="${gap}dp" android:paddingTop="${compact?0:gap}dp" android:paddingBottom="${compact?0:gap}dp" android:divider="@drawable/puptime_notification_gap_${variant}" android:showDividers="middle">${cells}</LinearLayout>
-      </FrameLayout>`);
+      fs.writeFileSync(path.join(folder,`puptime_notification_${variant}.xml`),`<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingHorizontal="${compact?0:8}dp" android:paddingBottom="${compact?0:8}dp">
+        ${row(compact?[0,1,2]:[0,1])}${row(compact?[3]:[2,3],true)}
+      </LinearLayout>`);
     }
   }
   return mod;

@@ -1,36 +1,61 @@
     public RemoteViews notificationViews(int id, int width, int height) throws Exception {
-        WidgetWithViews light = WidgetFactory.buildWidgetFromRoot(appContext, Arguments.makeNativeMap(config.getMap("light").toHashMap()), width, height);
-        WidgetWithViews dark = WidgetFactory.buildWidgetFromRoot(appContext, Arguments.makeNativeMap(config.getMap("dark").toHashMap()), width, height);
-        boolean compact = height < 90;
+        boolean compact = height == 48;
+        String preference = config.getString("themePreference");
+        com.facebook.react.bridge.ReadableArray actions = config.getArray("actions");
         RemoteViews views = new RemoteViews(appContext.getPackageName(), compact ? R.layout.puptime_notification_compact : R.layout.puptime_notification_expanded);
         int[] cells = {R.id.puptime_notification_cell_0, R.id.puptime_notification_cell_1, R.id.puptime_notification_cell_2, R.id.puptime_notification_cell_3};
-        int[] images = {R.id.puptime_notification_light_0, R.id.puptime_notification_light_1, R.id.puptime_notification_light_2, R.id.puptime_notification_light_3};
-        int[] darkImages = {R.id.puptime_notification_dark_0, R.id.puptime_notification_dark_1, R.id.puptime_notification_dark_2, R.id.puptime_notification_dark_3};
-        int[] timers = {R.id.puptime_notification_timer_0, R.id.puptime_notification_timer_1, R.id.puptime_notification_timer_2, R.id.puptime_notification_timer_3};
-        int[] clocks = {R.id.puptime_notification_clock_0, R.id.puptime_notification_clock_1, R.id.puptime_notification_clock_2, R.id.puptime_notification_clock_3};
-        int[] darkClocks = {R.id.puptime_notification_dark_clock_0, R.id.puptime_notification_dark_clock_1, R.id.puptime_notification_dark_clock_2, R.id.puptime_notification_dark_clock_3};
-        // SystemUI supplies the available width. Native layout weights keep
-        // every button and its click target aligned across notification sizes.
-        List<ClickableView> buttons = light.getClickableViews();
-        for (int slot = 0; slot < cells.length; slot++) {
-            views.setViewVisibility(cells[slot], slot < buttons.size() ? View.VISIBLE : View.GONE);
-            if (slot >= buttons.size()) continue;
-            ClickableView button = buttons.get(slot);
-            View darkButton = dark.getClickableViews().get(slot).getView();
-            views.setImageViewUri(images[slot], saveBitmapToDisk(id * 10 + slot, "light", drawViewToBitmap(button.getView())));
-            views.setImageViewUri(darkImages[slot], saveBitmapToDisk(id * 10 + slot, "dark", drawViewToBitmap(darkButton)));
-            views.setContentDescription(cells[slot], button.getAccessibilityLabel());
-            registerClickTask(id, button, views, cells[slot]);
-            PuptimeWidgetChronometers.notification(appContext, views, button.getView(), darkButton,
-                timers[slot], clocks[slot], darkClocks[slot], compact);
+        boolean largeText = appContext.getResources().getConfiguration().fontScale > 1.4f;
+        if (!compact && largeText) {
+            int minimum = RNWidgetUtil.dpToPx(appContext, 116);
+            views.setInt(R.id.puptime_notification_first_row, "setMinimumHeight", minimum);
+            views.setInt(R.id.puptime_notification_second_row, "setMinimumHeight", minimum);
         }
-        View[] roots = {light.getRootView(), dark.getRootView()};
-        int[] backgrounds = {R.id.rn_widget_image_light, R.id.rn_widget_image_dark};
-        for (int mode = 0; mode < roots.length; mode++) {
-            View root = roots[mode];
-            Bitmap bitmap = Bitmap.createBitmap(root.getWidth(), root.getHeight(), Bitmap.Config.ARGB_8888);
-            if (root.getBackground() != null) root.getBackground().draw(new Canvas(bitmap));
-            views.setImageViewUri(backgrounds[mode], saveBitmapToDisk(id, mode == 0 ? "light" : "dark", bitmap));
+        int count = Math.min(actions.size(), compact ? 3 : 4);
+        views.setViewVisibility(R.id.puptime_notification_second_row, !compact && count > 2 ? View.VISIBLE : View.GONE);
+        if (!compact) views.setViewVisibility(R.id.puptime_notification_second_gap, count == 4 ? View.VISIBLE : View.GONE);
+        for (int slot = 0; slot < cells.length; slot++) {
+            views.setViewVisibility(cells[slot], slot < count ? View.VISIBLE : View.GONE);
+            if (slot >= count) continue;
+            ReadableMap action = actions.getMap(slot);
+            String accessibility = action.getString("accessibilityLabel");
+            if (!compact) accessibility += action.isNull("lastAt") ? ", never logged"
+                : ", last logged " + java.text.DateFormat.getDateTimeInstance().format(new java.util.Date((long) action.getDouble("lastAt")));
+            // Separate native panels let SystemUI switch palettes while the app is asleep.
+            for (String mode : new String[]{"light", "dark"}) {
+                ReadableMap colors = action.getMap(mode);
+                int ink = android.graphics.Color.parseColor(colors.getString("ink"));
+                int background = android.graphics.Color.parseColor(colors.getString("background"));
+                int panel = notificationPart(mode, "panel", slot);
+                if (!"system".equals(preference)) views.setViewVisibility(panel, mode.equals(preference) ? View.VISIBLE : View.GONE);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    views.setColorStateList(panel, "setBackgroundTintList", android.content.res.ColorStateList.valueOf(background));
+                } else views.setInt(panel, "setBackgroundColor", background);
+                int label = notificationPart(mode, "label", slot);
+                views.setTextColor(label, ink);
+                views.setTextViewText(label, action.getString("label"));
+                int emoji = notificationPart(mode, "emoji", slot);
+                views.setTextViewText(emoji, action.getString("emoji"));
+                if (compact && largeText) views.setViewVisibility(emoji, View.GONE);
+                if (!compact) {
+                    boolean hasTime = !action.isNull("lastAt");
+                    int clock = notificationPart(mode, "clock", slot), empty = notificationPart(mode, "empty", slot);
+                    views.setViewVisibility(clock, hasTime ? View.VISIBLE : View.GONE);
+                    views.setViewVisibility(empty, hasTime ? View.GONE : View.VISIBLE);
+                    views.setTextColor(empty, ink);
+                    views.setTextColor(clock, ink);
+                    if (hasTime) {
+                        long base = android.os.SystemClock.elapsedRealtime() - Math.max(0, System.currentTimeMillis() - (long) action.getDouble("lastAt"));
+                        views.setChronometer(clock, base, largeText ? "%s" : "%s ago", true);
+                    }
+                }
+            }
+            views.setContentDescription(cells[slot], accessibility);
+            ClickableView button = new ClickableView(action.getString("type"), new View(appContext), "LOG_EVENT", action.getMap("clickActionData"));
+            registerClickTask(id, button, views, cells[slot]);
         }
         return views;
+    }
+
+    private int notificationPart(String mode, String part, int slot) {
+        return appContext.getResources().getIdentifier("puptime_notification_" + mode + "_" + part + "_" + slot, "id", appContext.getPackageName());
     }
