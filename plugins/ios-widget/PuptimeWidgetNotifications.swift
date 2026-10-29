@@ -30,6 +30,7 @@ final class PuptimeWidgetNotificationBridge {
   private func showStatus(_ source: String) async {
     let center = UNUserNotificationCenter.current()
     let requests = await center.pendingNotificationRequests()
+    let delivered = await center.deliveredNotifications()
     // Read the latest committed snapshot after awaited work, so a rapid widget
     // tap burst cannot replace newer activity with an older tap's presentation.
     guard let timeline = WidgetsStorage.getArray(forKey: "__expo_widgets_\(source)_timeline"),
@@ -60,7 +61,9 @@ final class PuptimeWidgetNotificationBridge {
       let data = request.content.userInfo
       let routine = request.identifier.hasPrefix("puptime-routine-") || request.identifier.hasPrefix("puptime-activity-")
       let timed = data["kind"] as? String == "customTimedReminder" && data["petId"] as? String == petId
-      guard routine || timed, let at = request.trigger?.nextTriggerDate(), at > Date() else { return nil }
+      let nextDate = (request.trigger as? UNCalendarNotificationTrigger)?.nextTriggerDate()
+        ?? (request.trigger as? UNTimeIntervalNotificationTrigger)?.nextTriggerDate()
+      guard routine || timed, let at = nextDate, at > Date() else { return nil }
       return (request.content.title, at)
     }.min { $0.1 < $1.1 }
     if let next {
@@ -73,6 +76,9 @@ final class PuptimeWidgetNotificationBridge {
     content.body = lines.joined(separator: "\n")
     content.interruptionLevel = .passive
     content.userInfo = ["kind": "quietStatus", "petId": petId]
+    if let existing = delivered.first(where: { $0.request.identifier == "puptime-status" })?.request.content,
+       existing.title == content.title, existing.body == content.body,
+       existing.userInfo["petId"] as? String == petId { return }
     do {
       try await center.add(UNNotificationRequest(identifier: "puptime-status", content: content, trigger: nil))
     } catch {

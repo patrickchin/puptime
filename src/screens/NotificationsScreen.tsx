@@ -29,6 +29,7 @@ export function NotificationsScreen({
   quietStatusEnabled = false,
   onQuietStatusChange,
   onTimedRemindersChange,
+  onRequestQuietStatusPermission,
   routineReminderCount,
   onNotificationPreferencesChange,
   onRequestNotificationPermission,
@@ -46,6 +47,7 @@ export function NotificationsScreen({
   quietStatusEnabled?: boolean;
   onQuietStatusChange?: (enabled: boolean) => Promise<void>;
   onTimedRemindersChange?: () => Promise<void>;
+  onRequestQuietStatusPermission?: () => Promise<boolean>;
   routineReminderCount: number;
   onNotificationPreferencesChange: (preferences: NotificationPreferences) => Promise<void>;
   onRequestNotificationPermission: () => Promise<boolean>;
@@ -129,9 +131,9 @@ export function NotificationsScreen({
     }
   };
 
-  const requestNotifications = async () => {
+  const requestNotifications = async (request = onRequestNotificationPermission) => {
     // The shared request also records device opt-in when OS access is blocked.
-    const granted = await onRequestNotificationPermission();
+    const granted = await request();
     if (granted) return true;
     if (notificationPermission === 'blocked') {
       onOpenSystemSettings();
@@ -209,7 +211,7 @@ export function NotificationsScreen({
         if (!created) { setDraftError(t('notifications.timedEnable')); return; }
         setDraft(null);
         await reloadTimed();
-        await onTimedRemindersChange?.();
+        await onTimedRemindersChange?.().catch(() => undefined);
       } catch (error) {
         setDraftError(t(error instanceof CustomTimedReminderLimitError ? 'notifications.timedLimit' : error instanceof ExactReminderAccessError ? 'notifications.exactRequired' : 'settings.saveErrorBody'));
       }
@@ -221,7 +223,7 @@ export function NotificationsScreen({
       await cancelCustomTimedReminder(reminder.petId, reminder.id);
       setTimed((current) => current.filter((item) => item.id !== reminder.id));
       await reloadTimed();
-      await onTimedRemindersChange?.();
+      await onTimedRemindersChange?.().catch(() => undefined);
     });
   };
 
@@ -294,7 +296,7 @@ export function NotificationsScreen({
             trackColor={{ false: theme.border, true: theme.primary }}
             value={quietStatusEnabled && notificationDelivery !== false && notificationPermission === 'granted'}
             onValueChange={enabled => void save(async () => {
-              if (enabled && (notificationPermission !== 'granted' || notificationDelivery === false) && !await requestNotifications()) return;
+              if (enabled && (notificationPermission !== 'granted' || notificationDelivery === false) && !await requestNotifications(onRequestQuietStatusPermission)) return;
               await onQuietStatusChange(enabled);
             })} />
         </View>

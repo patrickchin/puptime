@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { getLocalRuntime } from './local/runtime.native';
 import { resolveLanguage } from './localization';
 import { getNotificationPermissionState, listCustomTimedReminders } from './reminders';
+import { pottyReminderIdentifier, reminderIdentifier } from './reminder-config';
 import { QUIET_STATUS_CHANNEL, QUIET_STATUS_IDENTIFIER, QUIET_STATUS_KIND, quietStatusCopy, quietStatusSnapshot } from './quiet-status-config';
 
 export const getQuietStatusEnabled = async () => (await getLocalRuntime()).storage.loadQuietStatusEnabled();
@@ -22,11 +23,17 @@ export function syncQuietStatus(): Promise<void> {
       await Notifications.dismissNotificationAsync(QUIET_STATUS_IDENTIFIER);
       return;
     }
-    const [events, schedule, preferences, languagePreference, name, timed] = await Promise.all([
+    const [events, schedule, preferences, languagePreference, name, timed, pending] = await Promise.all([
       activity.latestEvents(), storage.loadSchedule(), storage.loadNotificationPreferences(),
       storage.loadLanguagePreference(), storage.loadPuppyName(), listCustomTimedReminders(petId),
+      Notifications.getAllScheduledNotificationsAsync(),
     ]);
-    const copy = quietStatusCopy(quietStatusSnapshot(events, schedule, preferences, timed, name, resolveLanguage(languagePreference)));
+    const scheduled = new Set(pending.map(item => item.identifier));
+    const copy = quietStatusCopy(quietStatusSnapshot(events, schedule.filter(entry => scheduled.has(reminderIdentifier(entry))), {
+      ...preferences,
+      pottyAfterPee: { ...preferences.pottyAfterPee, enabled: preferences.pottyAfterPee.enabled && scheduled.has(pottyReminderIdentifier('afterPee')) },
+      pottyAfterMeal: { ...preferences.pottyAfterMeal, enabled: preferences.pottyAfterMeal.enabled && scheduled.has(pottyReminderIdentifier('afterMeal')) },
+    }, timed, name, resolveLanguage(languagePreference)));
     const delivered = await Notifications.getPresentedNotificationsAsync();
     const existing = delivered.find(item => item.request.identifier === QUIET_STATUS_IDENTIFIER)?.request.content;
     if (existing?.title === copy.title && existing.body === copy.body && existing.data?.petId === petId) return;

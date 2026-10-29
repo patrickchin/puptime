@@ -54,6 +54,7 @@ registerHooks({
       'status-test:expo-notifications': `
         export const AndroidImportance={LOW:2};
         export async function getPresentedNotificationsAsync(){return s.delivered;}
+        export async function getAllScheduledNotificationsAsync(){return [];}
         export async function cancelScheduledNotificationAsync(){}
         export async function dismissNotificationAsync(id){s.dismissed.push(id);s.delivered=s.delivered.filter(n=>n.request.identifier!==id);}
         export async function setNotificationChannelAsync(id,options){s.channels.push({id,...options});}

@@ -351,6 +351,13 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     configureNotificationActions(language).catch(() => undefined);
   }, [language]);
 
+  useEffect(() => {
+    const received = Notifications.addNotificationReceivedListener(notification => {
+      if (notification.request.content.data?.kind !== QUIET_STATUS_KIND) void syncQuietStatus().catch(() => undefined);
+    });
+    return () => received.remove();
+  }, []);
+
   const handleNotificationResponse = useCallback(async (response: Notifications.NotificationResponse) => {
     const data = response.notification.request.content.data;
     if(nativeApp&&data?.kind===CUSTOM_TIMED_REMINDER_NOTIFICATION_KIND){
@@ -612,7 +619,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     await syncQuietStatus();
   };
 
-  const requestNotifications = async (requirePreciseTiming = false) => {
+  const requestNotifications = async (requirePreciseTiming = false, includeReminderTiming = true) => {
     let granted:boolean;
     try{granted=await requestReminderPermission(language);}
     finally{
@@ -621,7 +628,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     }
     if (granted) {
       let precise = true;
-      if (Platform.OS === 'android' && !(await refreshExactReminderScheduling())) {
+      if (includeReminderTiming && Platform.OS === 'android' && !(await refreshExactReminderScheduling())) {
         const openSettings = await new Promise<boolean>(resolve => {
           Alert.alert(translate(language, 'notifications.exactTitle'), translate(language, 'notifications.exactExplain'), [
             { text: translate(language, 'schedule.notNow'), style: 'cancel', onPress: () => resolve(false) },
@@ -741,6 +748,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     if(tab==='notifications')return <NotificationsScreen theme={theme} petId={petId} notificationPreferences={notificationPreferences}
       notificationPermission={notificationPermission} notificationDelivery={notificationDelivery}
       quietStatusEnabled={quietStatusEnabled} onQuietStatusChange={nativeApp?changeQuietStatus:undefined}
+      onRequestQuietStatusPermission={()=>requestNotifications(false,false)}
       onTimedRemindersChange={syncQuietStatus}
       routineReminderCount={schedule.filter(entry=>entry.reminder).length}
       onNotificationPreferencesChange={changeNotificationPreferences} onRequestNotificationPermission={requestNotifications}
