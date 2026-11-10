@@ -19,8 +19,10 @@ name: Account preservation enable
       - assertVisible:
           id: account.samePuppy
           checked: true
+- waitForAnimationToEnd
 - tapOn:
     id: account.enable
+    retryTapIfNoChange: true
 - scrollUntilVisible:
     element:
       id: account.status

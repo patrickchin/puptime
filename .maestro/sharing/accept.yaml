@@ -1,0 +1,36 @@
+appId: com.patrickchin.puptime
+name: Recipient accepts invitation in the native app
+---
+- launchApp:
+    stopApp: false
+    permissions: {}
+- runFlow: confirm-link.yaml
+- extendedWaitUntil:
+    visible:
+      id: 'screen\.(sharedPuppies|today)'
+    timeout: 30000
+- runFlow:
+    when:
+      visible:
+        id: shared.accept
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: shared.accept
+            enabled: true
+          timeout: 30000
+      - tapOn:
+          id: shared.accept
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 60000
+- extendedWaitUntil:
+    notVisible:
+      id: screen.sharedPuppies
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: header.puppy
+      text: .*Biscuit.*
+    timeout: 30000

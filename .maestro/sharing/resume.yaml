@@ -1,0 +1,6 @@
+appId: com.patrickchin.puptime
+name: Shared journal resumes and rechecks service access
+---
+- stopApp
+- launchApp:
+    permissions: {}

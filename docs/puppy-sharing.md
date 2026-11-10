@@ -17,7 +17,7 @@ Widget operations carry their original puppy scope and remain queued until that 
 
 ## Deployment and security
 
-Apply `server/migrations/0003-puppy-sharing.sql` before deploying the Worker and website, then release the native client. This migration is new in this PR and requires no per-account schema changes. Never replace existing auth/account databases.
+Apply `server/migrations/0003-puppy-sharing.sql` before deploying the Worker and website, then release the native client. This migration requires no per-account schema changes. Never replace existing auth/account databases.
 
 Application IDs use `shr_` grants, `inv_` invitation secrets and `csr_` request identities. Secrets are URL fragments and POST bodies, never API URL parameters. Only SHA-256 hashes are saved. Normal Better Auth sessions identify every recipient; there is no anonymous guest credential mechanism.
 
@@ -26,6 +26,8 @@ Shared native requests carry an expected member account and grant ID. Only accou
 Private `/care` has no analytics, is excluded from the sitemap, and sends no-store/no-referrer/noindex headers.
 
 ## Verification
+
+Repeatable native and browser journeys, prerequisites, and evidence limits are documented in [Puppy sharing end-to-end qualification](puppy-sharing-e2e.md).
 
 Server tests exercise normal account acceptance, claim/retry, complete history, owner isolation, scoped native sync, spoofed authorship, view-only access, expiry, revocation and account deletion. SQLite tests check offline writes, rollback of unauthorized changes and personal preference isolation. Widget tests cover scope changes without lost or misattributed operations. Scheduler tests check deadlines with the app closed.
 

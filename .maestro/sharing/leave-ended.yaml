@@ -1,0 +1,16 @@
+appId: com.patrickchin.puptime
+name: Return to the recipient's own puppy
+---
+- launchApp:
+    stopApp: false
+    permissions: {}
+- tapOn:
+    id: shared.leaveEnded
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 30000
+- assertVisible:
+    id: quick.pee
+- takeScreenshot: sharing-own-puppy

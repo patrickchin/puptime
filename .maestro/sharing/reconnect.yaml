@@ -1,0 +1,12 @@
+appId: com.patrickchin.puptime
+name: Reconnected shared writes finish synchronizing
+---
+- runFlow: ../account-preservation/wait-synced.yaml
+- scrollUntilVisible:
+    element:
+      id: account.back
+    direction: UP
+- tapOn:
+    id: account.back
+- assertVisible:
+    id: screen.today

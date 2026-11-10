@@ -1,0 +1,14 @@
+appId: com.patrickchin.puptime
+name: Ended access blocks shared journal
+---
+- launchApp:
+    stopApp: false
+    permissions: {}
+- extendedWaitUntil:
+    visible:
+      id: shared.leaveEnded
+    timeout: 60000
+- assertVisible: Access ended
+- assertNotVisible:
+    id: quick.pee
+- takeScreenshot: sharing-access-ended

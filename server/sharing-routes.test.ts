@@ -148,3 +148,20 @@ test('the native sync protocol scopes complete history to one puppy, protects au
  expect((await call(guest,'sync/push',{mutations:[mutation]},headers)).status).toBe(410);
  expect((await (await call(guest,'care/puppies')).json<{puppies:unknown[]}>()).puppies).toHaveLength(0);
 });
+
+test('shared photo reads use the owner puppy scope, reject uploads and fence revoked access',async()=>{
+ const {owner,petId}=await puppy(),input=await invite(owner,petId,'temporary','view'),member=await accept(input);
+ const photoId=entityId('img'),foreignPhoto=entityId('img'),jpeg=new Uint8Array([255,216,255,219,0,255,217]);
+ const photo=(who:Person,path:string,body?:Uint8Array,shared=false)=>worker.fetch(new Request('https://puptime.test/api/'+path,{method:body?'POST':'GET',headers:{origin:'https://puptime.test',cookie:who.cookie,'x-puptime-account':who.id,'cf-connecting-ip':who.ip,...(shared?{'x-puptime-share':input.id}:{}),...(body?{'content-type':'image/jpeg'}:{})},...(body?{body}: {})}),settings);
+ expect((await photo(owner,`photos/${petId}/${photoId}`,jpeg)).status).toBe(200);
+ const read=await photo(member,`photos/${photoId}`,undefined,true);expect(read.status).toBe(200);expect(new Uint8Array(await read.arrayBuffer())).toEqual(jpeg);
+ expect((await photo(member,`photos/${photoId}`)).status).toBe(404);
+ expect((await photo(member,`photos/${petId}/${entityId('img')}`,jpeg,true)).status).toBe(403);
+ // A private object from another puppy in the same owner account must stay private.
+ const {accountPhotoKey}=await import('./photo-storage');
+ await env.PUPPY_PHOTOS!.put(accountPhotoKey(owner.id,foreignPhoto),jpeg,{customMetadata:{petId:entityId('pet')}});
+ expect((await photo(member,`photos/${foreignPhoto}`,undefined,true)).status).toBe(404);
+ expect((await call(owner,`sharing/${input.id}/revoke`,{})).status).toBe(200);
+ expect((await photo(member,`photos/${photoId}`,undefined,true)).status).toBe(410);
+ expect((await photo(owner,`photos/${photoId}`)).status).toBe(200);
+});

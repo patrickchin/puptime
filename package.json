@@ -89,7 +89,9 @@
     "test:api:http": "node scripts/test-resource-api.mjs",
     "typecheck:server": "tsc --noEmit -p server/tsconfig.json",
     "dev:server": "wrangler dev",
-    "test:web": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/web/*.test.ts"
+    "test:web": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/web/*.test.ts",
+    "test:e2e:sharing:ios": "node scripts/verify-ios-sharing.mjs",
+    "test:e2e:sharing:web": "node scripts/verify-web-accounts.mjs --sharing"
   },
   "private": true,
   "expo": {

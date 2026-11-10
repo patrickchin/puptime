@@ -930,14 +930,21 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
             onSelectLanguage={chooseLanguage}
             onClose={() => setPreferencePicker(null)}
           />
-          <Modal visible={accountVisible&&cloud.available} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={()=>setAccountVisible(false)}>
-            {accountVisible?<SafeAreaProvider><AccountScreen cloud={cloud} theme={theme} eventCount={eventCount} onBack={()=>setAccountVisible(false)} onOpenActivity={()=>{setAccountVisible(false);navigateToTab('log');}}/></SafeAreaProvider>:null}
-          </Modal>
-          <Modal visible={sharingKind!==null&&onboardingVisible===false} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={()=>setSharingKind(null)}>
-            {sharingKind?<SafeAreaProvider><SharePuppyScreen cloud={cloud} theme={theme} eventCount={eventCount} initialKind={sharingKind} onBack={()=>setSharingKind(null)}/></SafeAreaProvider>:null}
-          </Modal>
-          <Modal visible={sharedView!==null} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={()=>setSharedView(null)}>
-            {sharedView?<SafeAreaProvider><SharedPuppiesScreen key={sharedView.id??"list"} cloud={cloud} theme={theme} initialShareId={sharedView.id} inviteToken={sharedView.token} onBack={()=>setSharedView(null)}/></SafeAreaProvider>:null}
+          {/* iOS rejects a second modal when an invitation arrives over My account. */}
+          <Modal
+            visible={sharedView!==null||(sharingKind!==null&&onboardingVisible===false)||(accountVisible&&cloud.available)}
+            animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal
+            onRequestClose={()=>{setSharedView(null);setSharingKind(null);setAccountVisible(false);}}
+          >
+            <SafeAreaProvider>
+              {sharedView ? (
+                <SharedPuppiesScreen key={sharedView.id??'list'} cloud={cloud} theme={theme} initialShareId={sharedView.id} inviteToken={sharedView.token} onBack={()=>setSharedView(null)}/>
+              ) : sharingKind&&onboardingVisible===false ? (
+                <SharePuppyScreen cloud={cloud} theme={theme} eventCount={eventCount} initialKind={sharingKind} onBack={()=>setSharingKind(null)}/>
+              ) : accountVisible ? (
+                <AccountScreen cloud={cloud} theme={theme} eventCount={eventCount} onBack={()=>setAccountVisible(false)} onOpenActivity={()=>{setAccountVisible(false);navigateToTab('log');}}/>
+              ) : null}
+            </SafeAreaProvider>
           </Modal>
         </SafeAreaView>
       </LocalizationProvider>
