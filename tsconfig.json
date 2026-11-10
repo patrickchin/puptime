@@ -8,6 +8,8 @@
     "server",
     "ios",
     "android",
-    "output"
+    "output",
+    "dist-web",
+    "dist-web-app"
   ]
 }
