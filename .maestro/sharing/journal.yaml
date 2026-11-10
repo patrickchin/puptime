@@ -36,20 +36,26 @@ name: Shared journal history and permissions
     direction: UP
 - tapOn:
     id: nav.open
+    retryTapIfNoChange: true
 - tapOn:
     id: nav.timeline
+    retryTapIfNoChange: true
 - assertVisible:
     id: screen.timeline
 - tapOn:
     id: nav.open
+    retryTapIfNoChange: true
 - tapOn:
     id: nav.insights
+    retryTapIfNoChange: true
 - assertVisible:
     id: screen.insights
 - tapOn:
     id: nav.open
+    retryTapIfNoChange: true
 - tapOn:
     id: nav.schedule
+    retryTapIfNoChange: true
 - assertVisible:
     id: screen.schedule
 - assertVisible:
@@ -66,6 +72,8 @@ name: Shared journal history and permissions
           id: schedule.editor
 - tapOn:
     id: nav.open
+    retryTapIfNoChange: true
 - tapOn:
     id: nav.log
+    retryTapIfNoChange: true
 - takeScreenshot: sharing-journal-${READ_ONLY}-${TEMPORARY}

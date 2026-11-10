@@ -12,6 +12,7 @@ name: Shared journal create and edit log
     id: quick.pee
 - tapOn:
     id: toast.edit
+    retryTapIfNoChange: true
 - assertVisible:
     id: editor
 - scrollUntilVisible:
@@ -27,6 +28,7 @@ name: Shared journal create and edit log
     direction: UP
 - tapOn:
     id: editor.close
+    retryTapIfNoChange: true
 - scrollUntilVisible:
     element:
       id: event.pee.note

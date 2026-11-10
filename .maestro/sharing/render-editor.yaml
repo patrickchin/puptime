@@ -7,12 +7,16 @@ name: Local editor state leaves unchanged activity rows alone
 - tapOn:
     id: event.meal.edit
     index: 0
+    retryTapIfNoChange: true
+- assertVisible:
+    id: editor
 - scrollUntilVisible:
     element:
       id: editor.note.input
     direction: DOWN
 - tapOn:
     id: editor.note.input
+    retryTapIfNoChange: true
 - assertVisible:
     id: Return
 - scrollUntilVisible:
@@ -21,6 +25,7 @@ name: Local editor state leaves unchanged activity rows alone
     direction: UP
 - tapOn:
     id: editor.close
+    retryTapIfNoChange: true
 - extendedWaitUntil:
     notVisible:
       id: editor.note.input

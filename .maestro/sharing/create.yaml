@@ -15,6 +15,7 @@ name: Owner creates and shares invitation
           direction: UP
       - tapOn:
           id: sharing.back
+          retryTapIfNoChange: true
 - runFlow:
     when:
       visible:
@@ -28,10 +29,13 @@ name: Owner creates and shares invitation
           id: account.back
 - tapOn:
     id: nav.open
+    retryTapIfNoChange: true
 - tapOn:
     id: nav.pets
+    retryTapIfNoChange: true
 - tapOn:
     id: puppy.share
+    retryTapIfNoChange: true
 - extendedWaitUntil:
     visible:
       id: sharing.kind.household
@@ -70,9 +74,12 @@ name: Owner creates and shares invitation
     direction: UP
 - tapOn:
     id: sharing.back
+    retryTapIfNoChange: true
 - tapOn:
     id: nav.open
+    retryTapIfNoChange: true
 - tapOn:
     id: nav.log
+    retryTapIfNoChange: true
 - assertVisible:
     id: screen.today

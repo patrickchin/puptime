@@ -6,6 +6,7 @@ name: Return to the recipient's own puppy
     permissions: {}
 - tapOn:
     id: shared.leaveEnded
+    retryTapIfNoChange: true
 - extendedWaitUntil:
     visible:
       id: screen.today

@@ -16,5 +16,10 @@ name: An invitation requires a normal account
 - takeScreenshot: sharing-invitation-sign-in
 - tapOn:
     id: shared.back
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    notVisible:
+      id: screen.sharedPuppies
+    timeout: 30000
 - assertVisible:
     id: 'screen\.(today|account)'
