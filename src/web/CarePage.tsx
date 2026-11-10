@@ -34,12 +34,12 @@ export default function CarePage(){
 }
 function CareContent({client,id,token,clearToken}:{client:CareClient;id:string|null;token:string|null;clearToken:()=>void}){
  const [preview,setPreview]=useState<CarePreview|null>(null),[page,setPage]=useState<Page|null>(null),[routines,setRoutines]=useState<CareRow[]>([]),[puppies,setPuppies]=useState<{id:string;name:string;ownerName:string}[]|null>(null);
- const [error,setError]=useState(''),[loading,setLoading]=useState(true),[accepting,setAccepting]=useState(false),[signedIn,setSignedIn]=useState(false),[retry,setRetry]=useState(0);
+ const [error,setError]=useState(''),[loading,setLoading]=useState(true),[accepting,setAccepting]=useState(false),[signedIn,setSignedIn]=useState<string|null>(null),[retry,setRetry]=useState(0),[needsSignIn,setNeedsSignIn]=useState(false);
  const generation=useRef(0),acceptLock=useRef(false);
  const [newLog,setNewLog]=useState(false),[newRoutine,setNewRoutine]=useState(false),[busy,setBusy]=useState(false);
  const active=useRef(true);useEffect(()=>{active.current=true;return()=>{active.current=false;generation.current++;};},[]);
  useEffect(()=>{
-  const ticket=++generation.current;setLoading(true);setError('');setPage(null);setPreview(null);
+  const ticket=++generation.current;setLoading(true);setError('');setPage(null);setPreview(null);setNeedsSignIn(false);
   void(async()=>{
    try{
     if(!id){const result=await client.puppies();if(ticket===generation.current)setPuppies(result.puppies);return;}
@@ -48,7 +48,7 @@ function CareContent({client,id,token,clearToken}:{client:CareClient;id:string|n
      if(ticket===generation.current){setPage(logs);setRoutines(routine);if(token)clearToken();}return;
     }catch(reason){if(!(reason instanceof CareError)||reason.status!==401||!token)throw reason;}
     const next=await client.preview(id,token);if(ticket===generation.current)setPreview(next);
-   }catch(reason){if(ticket===generation.current)setError(problem(reason));}
+   }catch(reason){if(ticket===generation.current){setError(problem(reason));setNeedsSignIn(reason instanceof CareError&&reason.status===401);}}
    finally{if(ticket===generation.current)setLoading(false);}
   })();
  },[client,id,retry,signedIn]);
@@ -76,12 +76,12 @@ function CareContent({client,id,token,clearToken}:{client:CareClient;id:string|n
   catch(reason){setError(problem(reason));}finally{if(active.current)setBusy(false);}
  }
  if(loading)return <p role="status">Loading puppy care…</p>;
- if(!id)return <><p className="eyebrow">YOUR HOUSEHOLD</p><h1>Shared puppies</h1>{error?<p role="alert" className="care-error">{error}</p>:null}{puppies?<>{puppies.length?<ul className="puppy-list">{puppies.map(puppy=><li key={puppy.id}><a href={`/care?invite=${puppy.id}`}><strong>{puppy.name}</strong><span>Shared by {puppy.ownerName||'their owner'}</span></a></li>)}</ul>:<p>No puppies have been shared with this account yet. Open the invitation your household member sent you.</p>}<a href="/account">Your account</a></>:<><p>Sign in to see puppies shared with you. For temporary care, open your invitation link.</p><CareSignIn onSignedIn={()=>{setSignedIn(true);setRetry(value=>value+1);}}/></>}</>;
+ if(!id)return <><p className="eyebrow">YOUR HOUSEHOLD</p><h1>Shared puppies</h1>{error&&!needsSignIn?<p role="alert" className="care-error">{error}</p>:null}{puppies?<>{puppies.length?<ul className="puppy-list">{puppies.map(puppy=><li key={puppy.id}><a href={`/care?invite=${puppy.id}`}><strong>{puppy.name}</strong><span>Shared by {puppy.ownerName||'their owner'}</span></a></li>)}</ul>:<p>No puppies have been shared with this account yet. Open the invitation your household member sent you.</p>}<a href="/account">Your account</a></>:needsSignIn?<><p>Sign in to see puppies shared with you. For temporary care, open your invitation link.</p><CareSignIn onSignedIn={setSignedIn}/><button onClick={()=>setRetry(value=>value+1)}>Try again</button></>:<button onClick={()=>setRetry(value=>value+1)}>Try again</button>}</>;
  if(!page)return <>{error?<p role="alert" className="care-error">{error}</p>:null}{preview?<>
   <p className="eyebrow">SHARED BY {preview.ownerName||'THEIR OWNER'}</p><h1>You’re looking after {preview.puppyName}.</h1>
   <p>{preview.share.kind==='household'?'Use the full Puptime app with your own account. Your access continues until the owner removes it.':`Use the full Puptime app with your own account, including offline logging, reminders and widgets. Access ends ${dateTime(preview.share.expiresAt!)}.`}</p>
   <p><a className="primary" href={`puptime://care?invite=${id}#${token}`}>Open in Puptime</a></p>
-  <CareSignIn onSignedIn={()=>setSignedIn(true)}/>
+  <CareSignIn onSignedIn={setSignedIn}/>
   <button className="primary" disabled={accepting||!signedIn} onClick={()=>{void accept();}}>{accepting?'Opening…':'Accept invitation'}</button>
  </>:<><h1>Access unavailable</h1><p>Open your original invitation, or ask the puppy’s owner for a new one.</p><button onClick={()=>setRetry(value=>value+1)}>Try again</button></>}</>;
  const household=page.share.kind==='household',canAdd=page.share.permission==='contribute';
@@ -136,11 +136,11 @@ function CareEditor({kind,row,write,onClose}:{kind:'event'|'routine';row?:CareRo
   <div className="care-actions"><button className="primary" disabled={busy}>{busy?'Saving…':'Save'}</button><button type="button" onClick={onClose} disabled={busy}>Cancel</button>{row?<button type="button" className="danger" disabled={busy} onClick={()=>{if(deleting)void save(true);else setDeleting(true);}}>{deleting?'Confirm delete':'Delete'}</button>:null}</div>
  </form>;
 }
-function CareSignIn({onSignedIn}:{onSignedIn:()=>void}){
+function CareSignIn({onSignedIn}:{onSignedIn:(sessionId:string)=>void}){
  const client=getWebAccountClient(),session=client.auth.useSession();
  const [email,setEmail]=useState(''),[sent,setSent]=useState<string|null>(null),[code,setCode]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[providers,setProviders]=useState<{apple:boolean;google:boolean;email:boolean}|null>(null);
- const locked=useRef(false),notified=useRef<string|null>(null);
- useEffect(()=>{if(session.data?.user&&notified.current!==session.data.user.id){notified.current=session.data.user.id;onSignedIn();}},[session.data?.user.id,onSignedIn]);
+ const locked=useRef(false);
+ useEffect(()=>{if(session.data?.session)onSignedIn(session.data.session.id);},[session.data?.session.id,onSignedIn]);
  useEffect(()=>{void client.config().then(value=>setProviders(value.providers)).catch(reason=>setError(problem(reason)));},[client]);
  async function signIn(provider?:'apple'|'google'){
   if(locked.current)return;locked.current=true;setBusy(true);setError('');
