@@ -77,8 +77,11 @@ test('installed SDK sign-in sync scoped history and WebSocket invalidations work
  const user=client('192.0.2.246');
  expect((await user.api.config()).providers.email).toBe(true);
  expect((await user.request('/api/account')).status).toBe(401);
+ expect((await user.request('/api/care/puppies')).status).toBe(401);
  expect((await user.request('/api/sync/changes',undefined,{upgrade:'websocket'})).status).toBe(401);
  await user.login();
+ const puppies=await user.request('/api/care/puppies');
+ expect(puppies.status).toBe(200);expect(await puppies.json()).toEqual({puppies:[]});
  const account=await user.api.account();expect(account.cloud).toEqual({canSync:true,canExport:true});expect(account.pets).toEqual([]);
  expect(await user.api.enroll({operationId:'pages-enroll',deviceId:'pages-device',localPetId:'pages-pet',name:'Pages puppy'})).toEqual({petId:'pages-pet'});
  expect((await user.request('/api/cloud/enroll',{}, {origin:'https://untrusted.example'})).status).toBe(403);

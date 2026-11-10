@@ -62,7 +62,7 @@ function coreSourceSnapshot(){
  const bundleText=bundles.map(path=>readFileSync(path,'utf8')).join('\n');
  assert.ok(bundleText.includes('Cloud access')&&bundleText.includes('Available'),'Build the current development account status before qualification.');
  assert.ok(!bundleText.includes('trialDays')&&!bundleText.includes('pricingFinalized'),'The served bundle must use the current no-trial contract.');
- const frontend=['src/web/AccountPage.tsx','src/web/account-client.ts','src/cloud/api.ts'],builtAt=Math.max(...bundles.map(path=>statSync(path).mtimeMs));
+ const frontend=['src/web/AccountPage.tsx','src/web/account-client.ts','src/web/CarePage.tsx','src/web/care-client.ts','src/cloud/api.ts'],builtAt=Math.max(...bundles.map(path=>statSync(path).mtimeMs));
  for(const path of frontend)assert.ok(statSync(path).mtimeMs<=builtAt,`${path} changed after the web build; rebuild before qualification.`);
  const paths=[...frontend,'server/auth.ts','server/cloud-access.ts','server/account-routes.ts','server/account-store.ts','server/migrations/0001-auth.sql','scripts/verify-web-accounts.mjs'];
  return {head:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),files:Object.fromEntries(paths.map(path=>[path,digest(readFileSync(path))])),bundles:Object.fromEntries(bundles.map(path=>[path,digest(readFileSync(path))]))};
@@ -120,11 +120,51 @@ async function qualifyCoreAccounts(source){
  pass('Fresh genuine UI OTP reuses the same owner and cloud copy with a new recent session, without repeated enrollment or upload.');
  await screenshot('core-account-desktop');await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);await screenshot('core-account-mobile');
  pass('Fresh desktop and mobile account screenshots show the current Available status; this core mode records no videos.');
+ await qualifyCareSignIn(auth);
  assert.equal(apiCalls.some(call=>call.method==='DELETE'),false);assert.deepEqual(coreSourceSnapshot(),source,'Qualified source or served bundles changed during the core account run.');
  await auth.close();reviewPage=null;
  const media=readdirSync(output).filter(path=>path.endsWith('.png')).map(path=>({path,sha256:createHash('sha256').update(readFileSync(join(output,path))).digest('hex')}));
  writeFileSync(join(output,'verification.json'),JSON.stringify({passed:summary,source,scope:'Isolated local website + genuine Better Auth UI OTP, SDK-managed sessions, D1 and populated SQL Durable Object. Only the independent marked HTTP fixture creates a puppy/log. No native, external provider, live service or telemetry ingestion claim.',privateAuthRecorded:false,videosRecorded:false,media},null,2));
  console.log('Core account evidence:',output);
+}
+
+async function qualifyCareSignIn(auth){
+ const page=await auth.newPage();reviewPage=page;
+ for(const status of [404,503,401]){
+  let requests=0;
+  await page.route('**/api/care/puppies',route=>{requests++;return route.fulfill({status,json:{error:'synthetic_failure'}});});
+  await page.goto(front+'/care');
+  await page.getByRole('heading',{name:'Shared puppies',exact:true}).waitFor();
+  if(status===401)await page.getByText('Signed in as ',{exact:false}).waitFor();
+  else await page.getByRole('alert').waitFor();
+  await page.waitForTimeout(1000);
+  assert.ok(requests<=2,`HTTP ${status} must settle rather than repeatedly treating the same session as a new sign-in (saw ${requests} requests).`);
+  assert.equal(await page.getByRole('status').count(),0);
+  if(status!==401)assert.equal(await page.getByRole('heading',{name:'Sign in to Puptime',exact:true}).count(),0);
+  if(status===404)await page.screenshot({path:join(output,'core-care-service-error.png'),fullPage:true});
+  await page.unroute('**/api/care/puppies');
+  await page.getByRole('button',{name:'Try again',exact:true}).click();
+  await page.getByText('No puppies have been shared with this account yet.',{exact:false}).waitFor();
+  assert.equal(await page.getByRole('alert').count(),0);
+ }
+ pass('Signed-in care HTTP404/503/401 failures settle without flashing or automatic retry loops; explicit retry recovers.');
+ await page.route('**/api/care/puppies',route=>route.fulfill({json:{puppies:[{id:'shr_'+ 'a'.repeat(32),petId:'pet_care_fixture',name:'Biscuit',ownerName:'Alex',kind:'household',permission:'contribute',expiresAt:null}]}}));
+ await page.reload();await page.getByRole('link',{name:'Biscuit Shared by Alex',exact:true}).waitFor();
+ await page.screenshot({path:join(output,'core-care-puppies-desktop.png'),fullPage:true});
+ await page.setViewportSize({width:390,height:844});
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ await page.screenshot({path:join(output,'core-care-puppies-mobile.png'),fullPage:true});
+ await page.close();reviewPage=null;
+ const visitor=await context(),login=await visitor.newPage(),email=`care-${crypto.randomUUID()}@example.invalid`;
+ await login.goto(front+'/care');await login.getByLabel('Email address',{exact:true}).fill(email);
+ await login.getByRole('button',{name:'Email me a code',exact:true}).click();
+ await login.getByLabel('Email code',{exact:true}).waitFor();const privateCode=code(email);assert.match(privateCode??'',/^\d{6}$/);
+ await login.getByLabel('Email code',{exact:true}).fill(privateCode);await login.getByRole('button',{name:'Sign in',exact:true}).click();
+ await login.getByText('No puppies have been shared with this account yet.',{exact:false}).waitFor();
+ assert.equal((await visitor.request.get(front+'/api/care/puppies')).status(),200);
+ reviewPage=login;await login.screenshot({path:join(output,'core-care-signed-in.png'),fullPage:true});
+ await visitor.close();reviewPage=null;
+ pass('Genuine email OTP on /care reaches the empty household; populated desktop/mobile directory fixtures render without overflow.');
 }
 
 async function qualifyAppleDeletion(){
