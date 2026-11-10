@@ -80,7 +80,10 @@ try {
       await page.getByRole('img', { name: `Puptime ${name} screen`, exact: true }).evaluate(image => image.decode());
       const size = await page.getByRole('img', { name: `Puptime ${name} screen`, exact: true }).evaluate(image => ({ width: image.naturalWidth, height: image.naturalHeight }));
       assert.deepEqual(size, { width: 1206, height: 2622 }, 'Use full-resolution native iPhone captures.');
-      assert.ok(await page.locator('.app-preview .phone-frame').evaluate(element => parseFloat(getComputedStyle(element).borderRadius) >= 28), 'Keep rounded phone frames around the captures.');
+      assert.ok(await page.locator('.app-preview .phone-frame').evaluate(element => {
+        const radius = getComputedStyle(element).borderTopLeftRadius;
+        return (radius.endsWith('%') ? parseFloat(radius) * element.clientWidth / 100 : parseFloat(radius)) >= 28;
+      }), 'Keep rounded phone frames around the captures.');
     }
     await page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished)));
     await page.screenshot({ path: `${output}/${width}-app-preview.png` });
