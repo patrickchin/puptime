@@ -11,8 +11,9 @@ writeFileSync('dist-web/_headers', `/*\n  Referrer-Policy: strict-origin-when-cr
 const accountHtml=readFileSync('dist-web/account.html','utf8');
 writeFileSync('dist-web/_headers',readFileSync('dist-web/_headers','utf8')+`/care\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n  Referrer-Policy: no-referrer\n/care.html\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n  Referrer-Policy: no-referrer\n`);
 const careHtml=readFileSync('dist-web/care.html','utf8');
-if(!careHtml.includes('noindex')||!careHtml.includes('Shared puppy care | Puptime')||publicPaths.includes('/care'))throw new Error('Care must be private and excluded from the sitemap.');
-if(!accountHtml.includes('noindex')||!accountHtml.includes('Your account | Puptime')||publicPaths.includes('/account'))throw new Error('Account must be static, private and excluded from the sitemap.');
+if(!careHtml.includes('noindex')||!careHtml.includes('Shared puppy care | Puptime')||publicPaths.includes('/care'))throw new Error('Care handoff must be excluded from the sitemap.');
+if(!accountHtml.includes('noindex')||!accountHtml.includes('Your account | Puptime')||publicPaths.includes('/account'))throw new Error('Account handoff must be excluded from the sitemap.');
+for(const html of [accountHtml,careHtml])if(html.includes('<form')||html.includes('<input')||!html.includes('Open Puptime'))throw new Error('Legacy account and care routes must only hand off to the native app.');
 for (const path of publicPaths) {
   const filename = path === '/' ? 'index' : path === '/puppy-care/' ? 'puppy-care/index' : path.slice(1);
   const html = readFileSync(`dist-web/${filename}.html`, 'utf8');

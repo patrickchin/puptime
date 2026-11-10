@@ -1,0 +1,35 @@
+appId: com.patrickchin.puptime
+name: Confirm native account deletion and preserve local history
+---
+- scrollUntilVisible:
+    element:
+      id: account.delete
+    direction: DOWN
+- tapOn:
+    id: account.delete
+- extendedWaitUntil:
+    visible: Delete cloud account?
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn:
+    text: ^Delete cloud account$
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: account.deleted
+    timeout: 45000
+- assertVisible: Cloud account deleted. Your puppy logs are kept on this device.
+- scrollUntilVisible:
+    element:
+      id: account.delete.apple
+    direction: DOWN
+- takeScreenshot: native-deleted-account
+- assertNotVisible:
+    id: account.manage
+- scrollUntilVisible:
+    element:
+      id: account.local.count
+    direction: DOWN
+- assertVisible:
+    id: account.local.count
+    text: 12 activity logs

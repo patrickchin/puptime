@@ -1,0 +1,28 @@
+appId: com.patrickchin.puptime
+name: Native account deletion cancellation
+---
+- runFlow: ../helpers/open-account.yaml
+- scrollUntilVisible:
+    element:
+      id: account.delete
+    direction: DOWN
+- tapOn:
+    id: account.delete
+- extendedWaitUntil:
+    visible: Delete cloud account?
+    timeout: 15000
+- takeScreenshot: native-delete-confirmation
+- waitForAnimationToEnd
+- tapOn:
+    text: ^Cancel$
+    below:
+      text: ^Delete cloud account$
+    retryTapIfNoChange: true
+- scrollUntilVisible:
+    element:
+      id: account.email
+    direction: UP
+- assertVisible:
+    id: account.email
+- assertNotVisible:
+    id: account.manage

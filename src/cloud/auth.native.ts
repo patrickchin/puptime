@@ -15,6 +15,7 @@ import { createIdentityAdapter } from './account-controller';
 import { createCloudExportRequest } from './export-request';
 import { createPhotoTransfer } from './photo-transfer';
 import {createSharingApi} from './sharing-api';
+import {createAccountDeletionApi} from './account-deletion';
 import { clearCloudExportCache, createNativeCloudExport } from './export.native';
 
 // One SDK/storage adapter instance coordinates native secure credential access.
@@ -36,5 +37,5 @@ export function createNativeCloudClient(care?:{id:string;accountId:string}) {
   }):undefined;
   const googleIdToken=Platform.OS==='ios'?createGoogleIdTokenRequest(GoogleSignin):undefined;
   const nativeSignOut=Platform.OS==='ios'?async()=>{await GoogleSignin.signOut();if(GoogleSignin.hasPreviousSignIn())throw new Error('Google sign-out did not complete.');}:undefined;
-  return {identity:createIdentityAdapter(auth,{appleIdToken,googleIdToken,nativeSignOut}),api,origin,sharing:createSharingApi(origin,(url,options)=>auth.$fetch<unknown>(url,options)),photoTransfer:createPhotoTransfer((url,options)=>auth.$fetch<unknown>(url,{...options,headers:{...options.headers,...scopedHeaders}}),origin),exportCloud:createNativeCloudExport(createCloudExportRequest((url,options)=>auth.$fetch<unknown>(url,options),origin)),openChanges:createChangeOpener({origin,getCookie:async()=>auth.getCookie(),createSocket:(url,options)=>new NativeSocket(url,[],options)})};
+  return {identity:createIdentityAdapter(auth,{appleIdToken,googleIdToken,nativeSignOut}),api,deletion:createAccountDeletionApi((url,options)=>auth.$fetch<unknown>(url,options),origin),origin,sharing:createSharingApi(origin,(url,options)=>auth.$fetch<unknown>(url,options)),photoTransfer:createPhotoTransfer((url,options)=>auth.$fetch<unknown>(url,{...options,headers:{...options.headers,...scopedHeaders}}),origin),exportCloud:createNativeCloudExport(createCloudExportRequest((url,options)=>auth.$fetch<unknown>(url,options),origin)),openChanges:createChangeOpener({origin,getCookie:async()=>auth.getCookie(),createSocket:(url,options)=>new NativeSocket(url,[],options)})};
 }

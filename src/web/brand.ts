@@ -18,7 +18,7 @@ export const websiteTheme: Theme = {
 export const websiteStyles = `
 @font-face{font-family:'Red Hat Display';src:url('/fonts/RedHatDisplay-Latin.woff2') format('woff2');font-weight:900;font-style:normal;font-display:swap}
 @font-face{font-family:'Red Hat Text';src:url('/fonts/RedHatText-Latin.woff2') format('woff2');font-weight:400 700;font-style:normal;font-display:swap}
-.marketing-site,.account-page{
+.marketing-site{
   --paper:${websiteTheme.background};--white:${websiteTheme.surface};--ink:${websiteTheme.text};--muted:${websiteTheme.textMuted};--border:${websiteTheme.border};
   --green:${websiteTheme.primary};--deep:${websiteTheme.primaryPressed};--mint:${websiteTheme.primarySoft};--ochre:#EBAD43;--lime:#D7EC98;
   font-family:'Red Hat Text',sans-serif;

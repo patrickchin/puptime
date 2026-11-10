@@ -30,7 +30,7 @@ export function useCloud(onRemoteChange:()=>unknown):CloudHandle {
       try {
         const [runtime,network]=await Promise.all([getLocalRuntime(),Network.getNetworkStateAsync().catch(()=>null)]);
         if(disposed)return;if(network&&!networkEvent)online=connectivity(network);
-        controller=createAccountController({runtime,api:client.api,photos:createNativePhotoSync(client.photoTransfer),identity:client.identity,exportCloud:client.exportCloud,subscribeLocalWrites,changed:()=>{if(care.isCurrent())void Promise.resolve(callback.current()).catch(()=>{});}});
+        controller=createAccountController({runtime,api:client.api,deletion:client.deletion,photos:createNativePhotoSync(client.photoTransfer),identity:client.identity,exportCloud:client.exportCloud,subscribeLocalWrites,changed:()=>{if(care.isCurrent())void Promise.resolve(callback.current()).catch(()=>{});}});
         if(care.selection){const timer=setInterval(()=>{if(active&&online)controller?.invalidate();},15000);stopChanges=()=>clearInterval(timer);}
         else stopChanges=watchAccountChanges({controller,open:client.openChanges});
         controller.setOnline(online);controller.setActive(active);

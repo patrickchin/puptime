@@ -107,6 +107,23 @@ jobs:
           node scripts/verify-ios-guest-account.mjs \
             "$onboarding_device" build/onboarding-ci/Puptime.app \
             --replace-synthetic build/guest-account-ios
+      - name: Verify native cloud account deletion preserves local history
+        timeout-minutes: 60
+        env:
+          CI: "1"
+          MAESTRO_CLI_NO_ANALYTICS: "1"
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: "180000"
+        run: |
+          runtime_id=$(xcrun simctl list runtimes -j | jq -r '[.runtimes[] | select(.isAvailable and (.identifier | contains("iOS-26")))][-1].identifier // empty')
+          test -n "$runtime_id"
+          deletion_device=$(xcrun simctl create "Puptime Account Deletion CI $GITHUB_RUN_ID" com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro "$runtime_id")
+          trap 'xcrun simctl delete "$deletion_device" >/dev/null 2>&1 || true' EXIT
+          xcrun simctl boot "$deletion_device"
+          xcrun simctl bootstatus "$deletion_device" -b
+          xcrun simctl install "$deletion_device" build/ios-simulator/Build/Products/Release-iphonesimulator/Puptime.app
+          node scripts/verify-ios-guest-account.mjs \
+            "$deletion_device" build/ios-simulator/Build/Products/Release-iphonesimulator/Puptime.app \
+            --replace-synthetic build/account-deletion-ios --account-deletion
       - name: Upload Maestro results
         if: always()
         uses: actions/upload-artifact@v6
@@ -120,6 +137,7 @@ jobs:
             build/onboarding-failure-results
             build/guest-account-ios
             build/welcome-account-ios
+            build/account-deletion-ios
           if-no-files-found: warn
           retention-days: 7
       - name: Capture App Store screenshots

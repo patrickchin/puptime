@@ -21,6 +21,8 @@ export function accountProblemKey(problem:AccountProblem|null):MessageKey|null {
   if(problem==='account-mismatch')return 'account.error.mismatch';
   if(problem==='sign-out-failed')return 'account.error.signOut';
   if(problem==='remote-sign-out-unconfirmed')return 'account.error.remoteSignOut';
+  if(problem==='deletion-unconfirmed')return 'account.delete.unconfirmed';
+  if(problem==='deletion-failed')return 'account.delete.failed';
   if(problem==='export-failed')return 'account.error.export';
   if(problem==='local-storage')return 'account.error.storage';
   if(problem==='social-incomplete')return 'account.error.socialIncomplete';
@@ -82,8 +84,8 @@ export function AccountSignIn({cloud,theme,showError=true,showIntro=true,onEmail
   </>}
  </View>;
 }
-export function AccountButton({theme,label,onPress,testID,primary=false,disabled=false,loading=false,icon}:{theme:Theme;label:string;onPress:()=>void;testID:string;primary?:boolean;disabled?:boolean;loading?:boolean;icon?:keyof typeof MaterialCommunityIcons.glyphMap}) {
-  const color=disabled?theme.textMuted:primary?theme.onPrimary:theme.primary;
+export function AccountButton({theme,label,onPress,testID,primary=false,disabled=false,loading=false,icon,danger=false}:{theme:Theme;label:string;onPress:()=>void;testID:string;primary?:boolean;disabled?:boolean;loading?:boolean;danger?:boolean;icon?:keyof typeof MaterialCommunityIcons.glyphMap}) {
+  const color=disabled?theme.textMuted:danger?theme.danger:primary?theme.onPrimary:theme.primary;
   return <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{disabled,busy:loading}} disabled={disabled} onPress={onPress} style={({pressed})=>[styles.button,{borderColor:theme.border,borderRadius:theme.presentation.controlRadius,backgroundColor:disabled?theme.surface:primary?(pressed?theme.primaryPressed:theme.primary):(pressed?theme.primarySoft:theme.surfaceRaised)}]}>
     {loading?<ActivityIndicator color={color}/>:icon?<MaterialCommunityIcons name={icon} size={22} color={color} accessibilityElementsHidden importantForAccessibility="no"/>:null}
     <Text style={[styles.buttonText,{color}]}>{label}</Text>
