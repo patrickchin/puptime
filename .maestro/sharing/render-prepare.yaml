@@ -1,0 +1,12 @@
+appId: com.patrickchin.puptime
+name: Prepare populated rows for render measurement
+---
+- launchApp:
+    stopApp: false
+    permissions: {}
+- scrollUntilVisible:
+    element:
+      id: event.pee.edit
+    direction: DOWN
+- assertVisible:
+    id: event.pee.edit

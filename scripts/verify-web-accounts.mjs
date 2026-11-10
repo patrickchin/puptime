@@ -7,7 +7,7 @@ import {createServer,request as httpRequest} from 'node:http';
 import {createRequire} from 'node:module';
 import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,readdirSync,existsSync,rmSync,createReadStream,realpathSync,statSync} from 'node:fs';
 import {join,resolve,extname,dirname} from 'node:path';
-import {tmpdir} from 'node:os';
+import {tmpdir,homedir} from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
@@ -17,10 +17,12 @@ const require=createRequire(import.meta.url),{chromium}=require(process.env.PUPT
 const root=realpathSync(process.cwd());
 assert.equal(root,realpathSync(fileURLToPath(new URL('..',import.meta.url))),'Run from this script’s Puptime checkout root.');
 assert.equal(JSON.parse(readFileSync('package.json','utf8')).name,'puptime');
-const modes=process.argv.slice(2);assert.ok(modes.length<=1&&modes.every(value=>['--apple-deletion','--core-accounts'].includes(value)),'Use --apple-deletion or --core-accounts, or omit the mode for historical full qualification. No remote target is accepted.');
+const modes=process.argv.slice(2);assert.ok(modes.length<=1&&modes.every(value=>['--apple-deletion','--core-accounts','--sharing'].includes(value)),'Use --apple-deletion, --core-accounts or --sharing, or omit the mode for historical full qualification. No remote target is accepted.');
+const sharingOnly=modes.includes('--sharing');
 const appleDeletionOnly=modes.includes('--apple-deletion'),coreAccountsOnly=modes.includes('--core-accounts');
 const front='http://127.0.0.1:8898',back='http://127.0.0.1:8798',directory=mkdtempSync(join(tmpdir(),'puptime-web-account-local-'));
-const output=resolve(coreAccountsOnly?join('output/playwright/core-accounts',new Date().toISOString().replace(/[:.]/g,'-')):appleDeletionOnly?join('output/playwright/apple-deletion',new Date().toISOString().replace(/[:.]/g,'-')):'output/playwright/web-accounts');mkdirSync(output,{recursive:true});
+const output=resolve(sharingOnly?join(homedir(),'Pictures/Screenshots/Codex/puptime-sharing-2c13/web'):coreAccountsOnly?join('output/playwright/core-accounts',new Date().toISOString().replace(/[:.]/g,'-')):appleDeletionOnly?join('output/playwright/apple-deletion',new Date().toISOString().replace(/[:.]/g,'-')):'output/playwright/web-accounts');mkdirSync(output,{recursive:true});
+if(sharingOnly)rmSync(join(output,'verification.json'),{force:true});
 const persist=join(directory,'persist'),configPath=join(directory,'wrangler.json');
 const config={...JSON.parse(readFileSync('wrangler.jsonc','utf8')),name:'puptime-web-accounts-local',main:resolve('server/index.ts'),env:undefined,vars:{ENVIRONMENT:'local',AUTH_BASE_URL:front,WEB_ORIGINS:front,AUTH_SECRET:crypto.randomUUID()+crypto.randomUUID(),GOOGLE_CLIENT_ID:'synthetic-google-client',GOOGLE_CLIENT_SECRET:'synthetic-google-secret',APPLE_CLIENT_ID:'synthetic-apple-client',APPLE_CLIENT_SECRET:'synthetic-apple-secret'}};
 config.d1_databases=config.d1_databases.map(db=>({...db,migrations_dir:resolve(db.migrations_dir)}));writeFileSync(configPath,JSON.stringify(config),{mode:0o600});
@@ -230,7 +232,7 @@ try{
   res.writeHead(200,{'content-type':types[extname(file)]??'application/octet-stream','cache-control':'no-store'});createReadStream(file).pipe(res);
  });await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(8898,'127.0.0.1',resolve);});
  browser=await chromium.launch({headless:true,executablePath:process.env.PUPTIME_CHROMIUM_EXECUTABLE??chromium.executablePath()});
- if(appleDeletionOnly){await qualifyAppleDeletion();}else if(coreAccountsOnly){await qualifyCoreAccounts(coreSource);}else{
+ if(sharingOnly){const {qualifyWebSharing}=await import('./verify-web-sharing.mjs');await qualifyWebSharing({context,signIn,code,read,sql,front,output,pass,apiCalls,telemetry,privateCodes});writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',checks:summary,scope:'Chromium UI with real isolated local Better Auth/D1/DO; no production accounts or external providers.'},null,2));}else if(appleDeletionOnly){await qualifyAppleDeletion();}else if(coreAccountsOnly){await qualifyCoreAccounts(coreSource);}else{
  const privateContext=await context(),page=await privateContext.newPage(),email=`web-review-${crypto.randomUUID().slice(0,8)}@example.invalid`;
  await page.goto(front+'/account');await page.getByLabel('Email address',{exact:true}).waitFor();assert.equal(await page.locator('meta[name=robots]').getAttribute('content'),'noindex, nofollow');
  await page.screenshot({path:join(output,'300-web-account-sign-in.png'),fullPage:true});

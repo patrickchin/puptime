@@ -1,0 +1,78 @@
+appId: com.patrickchin.puptime
+name: Owner creates and shares invitation
+---
+- launchApp:
+    stopApp: false
+    permissions: {}
+- runFlow:
+    when:
+      visible:
+        id: screen.sharing
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: sharing.back
+          direction: UP
+      - tapOn:
+          id: sharing.back
+- runFlow:
+    when:
+      visible:
+        id: screen.account
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: account.back
+          direction: UP
+      - tapOn:
+          id: account.back
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.pets
+- tapOn:
+    id: puppy.share
+- extendedWaitUntil:
+    visible:
+      id: sharing.kind.household
+    timeout: 30000
+- tapOn:
+    id: sharing.kind.${KIND}
+- runFlow:
+    when:
+      true: ${KIND == 'temporary'}
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: sharing.permission.${PERMISSION}
+          direction: DOWN
+      - tapOn:
+          id: sharing.permission.${PERMISSION}
+- scrollUntilVisible:
+    element:
+      id: sharing.create
+    direction: DOWN
+- tapOn:
+    id: sharing.create
+- scrollUntilVisible:
+    element:
+      id: sharing.send
+    direction: DOWN
+    timeout: 30000
+- assertVisible: Scan to open this invitation
+- tapOn:
+    id: sharing.send
+- assertVisible: Copy
+- tapOn: Copy
+- scrollUntilVisible:
+    element:
+      id: sharing.back
+    direction: UP
+- tapOn:
+    id: sharing.back
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.log
+- assertVisible:
+    id: screen.today

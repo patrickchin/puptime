@@ -1,0 +1,71 @@
+appId: com.patrickchin.puptime
+name: Shared journal history and permissions
+---
+- launchApp:
+    stopApp: false
+    permissions: {}
+- assertVisible:
+    id: screen.today
+- runFlow:
+    when:
+      true: ${READ_ONLY == 'true'}
+    commands:
+      - assertNotVisible:
+          id: quick.pee
+- runFlow:
+    when:
+      true: ${READ_ONLY != 'true'}
+    commands:
+      - assertVisible:
+          id: quick.pee
+- scrollUntilVisible:
+    element:
+      id: event.meal
+    direction: DOWN
+- runFlow:
+    when:
+      true: ${TEMPORARY == 'true'}
+    commands:
+      - assertNotVisible:
+          id: event.meal.edit
+      - assertNotVisible:
+          id: event.meal.delete
+- scrollUntilVisible:
+    element:
+      id: nav.open
+    direction: UP
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.timeline
+- assertVisible:
+    id: screen.timeline
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.insights
+- assertVisible:
+    id: screen.insights
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.schedule
+- assertVisible:
+    id: screen.schedule
+- assertVisible:
+    id: schedule.entry.meal
+- runFlow:
+    when:
+      true: ${TEMPORARY == 'true'}
+    commands:
+      - assertNotVisible:
+          id: schedule.add
+      - tapOn:
+          id: schedule.entry.meal
+      - assertNotVisible:
+          id: schedule.editor
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.log
+- takeScreenshot: sharing-journal-${READ_ONLY}-${TEMPORARY}

@@ -1,0 +1,21 @@
+appId: com.patrickchin.puptime
+name: Owner loads the seeded cloud history
+---
+- launchApp:
+    stopApp: false
+    permissions: {}
+- scrollUntilVisible:
+    element:
+      id: account.retry
+    direction: DOWN
+- tapOn:
+    id: account.retry
+- scrollUntilVisible:
+    element:
+      id: account.local.count
+    direction: UP
+- extendedWaitUntil:
+    visible:
+      id: account.local.count
+      text: 501 activity logs
+    timeout: 45000

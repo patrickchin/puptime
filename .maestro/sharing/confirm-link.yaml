@@ -1,0 +1,9 @@
+appId: com.patrickchin.puptime
+name: Confirm opening the invitation in Puptime
+---
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      visible: ^Open in .*Puptime.*\?$
+    commands:
+      - tapOn: ^Open$

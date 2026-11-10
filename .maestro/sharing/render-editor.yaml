@@ -1,0 +1,23 @@
+appId: com.patrickchin.puptime
+name: Local editor state leaves unchanged activity rows alone
+---
+- launchApp:
+    stopApp: false
+    permissions: {}
+- tapOn:
+    id: event.pee.edit
+    index: 0
+- scrollUntilVisible:
+    element:
+      id: editor.note.input
+    direction: DOWN
+- tapOn:
+    id: editor.note.input
+- inputText: ' draft'
+- eraseText: 6
+- scrollUntilVisible:
+    element:
+      id: editor.close
+    direction: UP
+- tapOn:
+    id: editor.close

@@ -1,0 +1,17 @@
+appId: com.patrickchin.puptime
+name: Shared puppy and offline log survive process death
+---
+- stopApp
+- launchApp:
+    permissions: {}
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 45000
+- scrollUntilVisible:
+    element:
+      id: event.pee.note
+    direction: DOWN
+- assertVisible:
+    id: event.pee.note
+    text: .*${NOTE}.*

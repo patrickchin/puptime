@@ -11,9 +11,11 @@ import {DatabaseSync} from 'node:sqlite';
 import {eventSqlColumns,eventDataFromSql} from '../src/record-sql.ts';
 import {localRecordId} from '../src/cloud/record-identity.ts';
 
-const [platform,device,host,consent,destination='build/guest-account-'+platform,onboarding]=process.argv.slice(2);
+const [platform,device,host,consent,destination='build/guest-account-'+platform,scenario]=process.argv.slice(2);
+const onboarding=scenario==='--onboarding-sign-in',sharing=scenario==='--sharing';
 assert.ok(['ios','android'].includes(platform));
-assert.ok(onboarding===undefined||onboarding==='--onboarding-sign-in');
+assert.ok(scenario===undefined||onboarding||sharing);
+assert.ok(!sharing||platform==='ios','Sharing qualification currently uses iOS.');
 const android=platform==='android';
 assert.equal(consent,'--replace-synthetic','Use PLATFORM DEVICE HOST --replace-synthetic [OUTPUT].');
 const app='com.patrickchin.puptime',output=resolve(destination),front='https://127.0.0.1:8797';
@@ -22,12 +24,13 @@ const adb=(...args)=>execFileSync('adb',['-s',device,...args],{encoding:'utf8',s
 if(android){assert.match(adb('emu','avd','name'),/^Puptime_(Onboarding_2f17|SignIn_461a)/);assert.ok(existsSync(host),'Supply a debuggable native APK.');}
 else{
   const devices=Object.values(JSON.parse(simctl('list','devices','available','-j')).devices).flat();
-  assert.match(devices.find(item=>item.udid===device)?.name??'',/^Puptime (2f17 Onboarding|Onboarding CI|SignIn 461a|Account )/);
+  assert.match(devices.find(item=>item.udid===device)?.name??'',/^Puptime (2f17 Onboarding|Onboarding CI|SignIn 461a|Account |2c13 Sharing )/);
   assert.ok(existsSync(join(host,'Info.plist')),'Supply a current native simulator host.');
   assert.ok(execFileSync('otool',['-arch','arm64','-s','__TEXT','__entitlements',join(host,'Puptime')],{encoding:'utf8'}).includes('Contents of (__TEXT,__entitlements)'),
     'Build the simulator host with CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- so SecureStore has its simulator entitlements.');
 }
 mkdirSync(output,{recursive:true});
+if(sharing)rmSync(join(output,'verification.json'),{force:true});
 const privateDir=mkdtempSync(join(tmpdir(),'puptime-2f17-account-')),persist=join(privateDir,'state'),configPath=join(privateDir,'wrangler.json');
 const config={...JSON.parse(readFileSync('wrangler.jsonc','utf8')),name:'puptime-2f17-account',main:resolve('server/index.ts'),env:undefined,
   vars:{ENVIRONMENT:'local',AUTH_BASE_URL:front,WEB_ORIGINS:front,AUTH_SECRET:crypto.randomUUID()+crypto.randomUUID()}};
@@ -36,7 +39,7 @@ writeFileSync(configPath,JSON.stringify(config),{mode:0o600});
 let worker,proxy,cookie='',code='',auth;
 const requests=new Set(),restoreNative=[];
 let certificate;
-const codes=new Set(),checks=[];
+const codes=new Set(),checks=[],invitations=[];let offline=false,sharingFlowRuns=0;
 function run(binary,args,env=process.env,cwd=process.cwd()){
   return new Promise((resolveRun,reject)=>{
     const child=spawn(binary,args,{env,cwd,stdio:['ignore','pipe','pipe']});let raw='';
@@ -53,10 +56,10 @@ async function flow(name,env={}){
   const startup=join(homedir(),'.maestro/tests'),before=new Set(existsSync(startup)?readdirSync(startup):[]);
   const artifacts=join(privateDir,'maestro-'+name+'-'+Date.now());
   try{
-    await run('maestro',['--device',device,'test',...Object.entries({TEST_EMAIL:email,...env}).flatMap(([key,value])=>['-e',`${key}=${value}`]),resolve('.maestro/account-preservation',name+'.yaml'),'--test-output-dir',artifacts],
+    await run('maestro',['--device',device,'test',...(sharing&&sharingFlowRuns++>0?['--no-reinstall-driver']:[]),...Object.entries({TEST_EMAIL:email,...env}).flatMap(([key,value])=>['-e',`${key}=${value}`]),resolve('.maestro/account-preservation',name+'.yaml'),'--test-output-dir',artifacts],
       {...process.env,MAESTRO_CLI_NO_ANALYTICS:'1',TEST_EMAIL:email,MAESTRO_TEST_CODE:code,...env});
     const screenshots=['recovered-account-history.png','my-account-returned-log.png','my-account-signed-in.png','my-account-guest.png'];
-    for(const path of readdirSync(artifacts,{recursive:true}).filter(path=>screenshots.some(name=>String(path).endsWith(name))))
+    for(const path of readdirSync(artifacts,{recursive:true}).filter(path=>(screenshots.some(name=>String(path).endsWith(name))||String(path).split('/').at(-1).startsWith('sharing-')&&String(path).endsWith('.png'))))
       cpSync(join(artifacts,path),join(output,String(path).split('/').at(-1)));
     console.log('PASS native account phase: '+name);
   }finally{
@@ -71,7 +74,7 @@ async function flow(name,env={}){
     rmSync(artifacts,{recursive:true,force:true});
   }
 }
-const email='native-'+crypto.randomUUID()+'@example.invalid';
+let email='native-'+crypto.randomUUID()+'@example.invalid';
 const androidSnapshot=join(privateDir,'android-snapshot');
 function sqliteDirectory(){
   if(!android)return join(simctl('get_app_container',device,app,'data'),'Documents/SQLite');
@@ -114,7 +117,11 @@ try{
   // Own both ports; never attach to another task's backend or account.
   for(const port of [8797,8799])await new Promise((resolveProbe,reject)=>{const server=createServer();server.once('error',reject);server.listen(port,'127.0.0.1',()=>server.close(resolveProbe));});
   if(android){adb('install','-r',resolve(host));adb('shell','run-as',app,'id');}
-  else try{simctl('terminate',device,app);}catch{}
+  else{
+    try{simctl('terminate',device,app);}catch{}
+    // A dedicated simulator can be brand new; installation preserves existing data.
+    simctl('install',device,resolve(host));
+  }
   const old=sqliteDirectory();
   if(existsSync(join(old,'puptime-v2.db'))){
     const prior=database();try{assert.equal(prior.prepare('SELECT COUNT(*) n FROM local_sync_owner').get().n,0,'Do not replace another account fixture.');}finally{prior.close();}
@@ -133,6 +140,8 @@ try{
   certificate=readFileSync(rootPath);if(!android)simctl('keychain',device,'add-root-cert',rootPath);
   const forward=(req,res)=>{
     requests.add(req.url);
+    if(offline){res.writeHead(503);res.end();return;}
+    if(req.url==='/api/sharing'&&req.method==='POST'){let body='';req.on('data',chunk=>body+=chunk);req.on('end',()=>{const input=JSON.parse(body);invitations.push(input);codes.add(input.token);});}
     if(req.headers.cookie)cookie=req.headers.cookie;
     const outgoing=request('http://127.0.0.1:8799'+req.url,{method:req.method,headers:req.headers},incoming=>{res.writeHead(incoming.statusCode,incoming.headers);incoming.pipe(res);});
     outgoing.on('error',()=>{res.writeHead(502);res.end();});req.pipe(outgoing);
@@ -200,7 +209,18 @@ try{
     assert.ok(!requests.has('/api/cloud/enroll')&&!requests.has('/api/sync/push'),'Sign-in must not enroll or upload.');
     checks.push('welcome email sign-in uses the real SDK, rejects a wrong code, resumes setup after verification and cold restart, and never enrolls or uploads');
   }
-  if(!onboarding){
+  if(sharing){
+    const {qualifyNativeSharing}=await import('./verify-native-sharing.mjs');
+    checks.push(...await qualifyNativeSharing({flow,signIn,snapshot,sqliteDirectory,simctl,device,auth,invitations,
+      setEmail:value=>{email=value;},getCookie:()=>cookie,setOffline:value=>{offline=value;},front,
+      installRenderProbe:async()=>{
+        simctl('terminate',device,app);const bundle=join(privateDir,'Puptime-probe.app');cpSync(host,bundle,{recursive:true});
+        await run('node',['node_modules/expo/bin/cli','export:embed','--entry-file','index.ts','--platform','ios','--dev','false','--bytecode','--reset-cache','--max-workers','2','--config',resolve('scripts/native-activity-probe/metro.config.cjs'),'--bundle-output',join(bundle,'main.jsbundle'),'--assets-dest',bundle],bundleEnv);
+        assert.ok(readFileSync(join(bundle,'main.jsbundle')).includes(Buffer.from(front)));
+        await run('codesign',['--force','--deep','--sign','-',bundle]);simctl('install',device,bundle);simctl('launch',device,app);
+      }}));
+  }
+  if(!onboarding&&!sharing){
   await flow('prepare');assert.equal(snapshot().events.length,0);
   assert.ok(requests.has('/api/config'),'The real app must reach this isolated backend before any sign-in attempt.');
   await flow('add-logs',{BATCHES:'4',EXPECTED_COUNT:'12'});const guest=snapshot();assert.equal(guest.events.length,12);assert.equal(guest.owner.length,0);
@@ -228,7 +248,7 @@ try{
   }
   rmSync(join(output,'failure-redacted.log'),{force:true});
   writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',checks,scope:android?'Android Debug native host with normal embedded release JS and isolated local HTTPS Better Auth/D1/SQLite DO; actual native email SDK and Keystore. Its temporary CA is trusted only in the ignored Debug source set, restored after the run. Production onboarding is tested separately in the Release APK. No real email, production account, session injection or mocked sync.':'Release bundle and actual native email SDK with isolated local HTTPS Better Auth/D1/SQLite DO. Simulator trusts the fixture certificate. No real email, production account, session injection or mocked sync.'},null,2)+'\n');
-  console.log('PASS '+(onboarding?'welcome sign-in and session recovery':'guest account preservation and empty-device recovery')+': '+output);
+  console.log('PASS '+(sharing?'puppy sharing':onboarding?'welcome sign-in and session recovery':'guest account preservation and empty-device recovery')+': '+output);
 }finally{
   auth?.close();proxy?.close();for(const child of [worker])if(child?.pid)try{process.kill(-child.pid,'SIGTERM');}catch{}
   if(android)try{adb('reverse','--remove','tcp:8797');}catch{}

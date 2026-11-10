@@ -1,0 +1,37 @@
+appId: com.patrickchin.puptime
+name: Shared journal create and edit log
+---
+- launchApp:
+    stopApp: false
+    permissions: {}
+- scrollUntilVisible:
+    element:
+      id: quick.pee
+    direction: UP
+- tapOn:
+    id: quick.pee
+- tapOn:
+    id: toast.edit
+- assertVisible:
+    id: editor
+- scrollUntilVisible:
+    element:
+      id: editor.note.input
+    direction: DOWN
+- tapOn:
+    id: editor.note.input
+- inputText: ${NOTE}
+- scrollUntilVisible:
+    element:
+      id: editor.close
+    direction: UP
+- tapOn:
+    id: editor.close
+- scrollUntilVisible:
+    element:
+      id: event.pee.note
+    direction: DOWN
+- assertVisible:
+    id: event.pee.note
+    text: .*${NOTE}.*
+- takeScreenshot: sharing-created-log
