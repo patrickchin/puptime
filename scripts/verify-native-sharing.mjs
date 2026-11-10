@@ -64,17 +64,20 @@ export async function qualifyNativeSharing({flow,signIn,snapshot,sqliteDirectory
  assert.ok(ownerChanges.changes.length>0);assert.deepEqual(snapshot(),personal);
  checks.push('household native create and edit commit locally and converge on the owner store without changing the recipient’s own journal');
  await open(temporary);await sharingFlow('journal',{READ_ONLY:'false',TEMPORARY:'true'});
- const beforeOffline=sharedSnapshot(temporary,member.user.id);setOffline(true);
+ const beforeOffline=sharedSnapshot(temporary,member.user.id);let offlinePayloads=[];setOffline(true);
  try{
   await sharingFlow('log',{NOTE:'Shared native log temporary'});await sharingFlow('restart',{NOTE:'Shared native log temporary'});
   const queued=sharedSnapshot(temporary,member.user.id);assert.equal(queued.events.length,beforeOffline.events.length+1);assert.ok(queued.pending.length>0);
-  const payloads=queued.pending;
+  const payloads=queued.pending;offlinePayloads=payloads;
   await sharingFlow('restart',{NOTE:'Shared native log temporary'});assert.deepEqual(sharedSnapshot(temporary,member.user.id).pending,payloads);
  }finally{setOffline(false);}
  await sharingFlow('reconnect');await until(()=>sharedSnapshot(temporary,member.user.id).pending.length===0,'Offline writes must upload after reconnect.');
  const converged=await call(memberCookie,`care/${temporary.id}`);
  const uploaded=converged.records.filter(row=>row.record.data.note?.includes('Shared native log temporary'));
- assert.equal(uploaded.length,1);assert.equal(uploaded[0].record.revision,2);
+ assert.equal(uploaded.length,1);assert.equal(uploaded[0].record.revision,offlinePayloads.length);
+ const history=await call(memberCookie,`records/${encodeURIComponent(uploaded[0].record.id)}/history`,undefined,200,{'x-puptime-share':temporary.id});
+ assert.deepEqual(history.revisions.map(row=>row.operationId).sort(),offlinePayloads.map(row=>JSON.parse(row.mutation_json).operationId).sort(),'Each actual autosave intent must be accepted exactly once.');
+ assert.ok(history.revisions.every(row=>row.deviceId===member.user.id));
  const remoteRecords=new Map();let cursor=0;
  for(;;){const page=await call(ownerCookie,'sync/pull?after='+cursor);for(const row of page.changes)remoteRecords.set(row.id,row);if(!page.hasMore)break;cursor=page.cursor;}
  const allEvents=[...remoteRecords.values()].filter(row=>row.kind==='event'&&!row.deleted);
@@ -101,6 +104,8 @@ export async function qualifyNativeSharing({flow,signIn,snapshot,sqliteDirectory
  await sharingFlow('leave-ended');assert.deepEqual(snapshot(),personal);
  checks.push('temporary expiry blocks native access and retains unsynced work; returning to My puppy preserves all original IDs, bodies, ownership and outbox state');
  await installRenderProbe();await open(household);
+ assert.equal(sharedSnapshot(household,member.user.id).events.length,503);
+ assert.deepEqual(sharedSnapshot(temporary,member.user.id).pending,retained.pending,'Switching grants must not consume expired access’s pending work.');
  await sharingFlow('render-prepare');
  const renderFile=join(sqliteDirectory(),'../row-render-probe.json'),renders=()=>JSON.parse(readFileSync(renderFile,'utf8')).renders;
  const beforeRenders=renders();assert.ok(Object.keys(beforeRenders).length>=20,'Probe must observe populated mounted history.');

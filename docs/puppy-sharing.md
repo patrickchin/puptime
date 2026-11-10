@@ -17,7 +17,7 @@ Widget operations carry their original puppy scope and remain queued until that 
 
 ## Deployment and security
 
-Apply `server/migrations/0003-puppy-sharing.sql` before deploying the Worker and website, then release the native client. This migration is new in this PR and requires no per-account schema changes. Never replace existing auth/account databases.
+Apply `server/migrations/0003-puppy-sharing.sql` before deploying the Worker and website, then release the native client. This migration requires no per-account schema changes. Never replace existing auth/account databases.
 
 Application IDs use `shr_` grants, `inv_` invitation secrets and `csr_` request identities. Secrets are URL fragments and POST bodies, never API URL parameters. Only SHA-256 hashes are saved. Normal Better Auth sessions identify every recipient; there is no anonymous guest credential mechanism.
 

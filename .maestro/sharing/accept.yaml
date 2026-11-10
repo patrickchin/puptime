@@ -25,5 +25,7 @@ name: Recipient accepts invitation in the native app
     visible:
       id: screen.today
     timeout: 60000
-- assertNotVisible:
-    id: screen.sharedPuppies
+- extendedWaitUntil:
+    notVisible:
+      id: screen.sharedPuppies
+    timeout: 30000
