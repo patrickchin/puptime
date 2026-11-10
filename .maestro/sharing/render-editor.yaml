@@ -5,7 +5,7 @@ name: Local editor state leaves unchanged activity rows alone
     stopApp: false
     permissions: {}
 - tapOn:
-    id: event.pee.edit
+    id: event.meal.edit
     index: 0
 - scrollUntilVisible:
     element:
@@ -13,9 +13,18 @@ name: Local editor state leaves unchanged activity rows alone
     direction: DOWN
 - tapOn:
     id: editor.note.input
+- assertVisible:
+    id: Return
 - scrollUntilVisible:
     element:
       id: editor.close
     direction: UP
 - tapOn:
     id: editor.close
+- extendedWaitUntil:
+    notVisible:
+      id: editor.note.input
+    timeout: 30000
+- assertVisible:
+    id: screen.today
+- takeScreenshot: sharing-render-verified

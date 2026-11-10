@@ -6,7 +6,13 @@ name: Prepare populated rows for render measurement
     permissions: {}
 - scrollUntilVisible:
     element:
-      id: event.pee.edit
+      id: quick.pee
+    direction: UP
+    visibilityPercentage: 50
+    timeout: 45000
+- scrollUntilVisible:
+    element:
+      id: event.meal.edit
     direction: DOWN
 - assertVisible:
-    id: event.pee.edit
+    id: event.meal.edit

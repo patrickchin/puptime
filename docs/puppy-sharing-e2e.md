@@ -22,7 +22,7 @@ Ports 8797 and 8799 must be free. `--replace-synthetic` authorizes resetting thi
 | Ended access | Owner revocation and temporary expiry block the active journal; cached history and exact unsynced intents survive; My puppy returns to the unchanged personal journal. |
 | Render isolation | After the normal functional journeys, a separate diagnostic bundle uses the existing native activity probe; mounted event render counters must stay identical while the editor opens, gains input focus and closes without changing data. |
 
-The diagnostic bundle is identified separately from the normal bundle. This qualifies current JavaScript inside a compatible native host; it does not establish a fresh native build or App Store signing. Android parity is assumed for the shared implementation; Android runtime is not run by this command. Camera QR scanning, external Apple/Google login, physical Home Screen widgets and OS delivery while the app is terminated remain separate device qualification checks.
+The diagnostic bundle is identified separately from the normal bundle. The runner selects household care before replacing the bundle, loads the observer through `EXPO_OVERRIDE_METRO_CONFIG`, and checks that the observer is embedded before installing it. This qualifies current JavaScript inside a compatible native host; it does not establish a fresh native build or App Store signing. Android parity is assumed for the shared implementation; Android runtime is not run by this command. Camera QR scanning, external Apple/Google login, physical Home Screen widgets and OS delivery while the app is terminated remain separate device qualification checks.
 
 ## Browser care page
 

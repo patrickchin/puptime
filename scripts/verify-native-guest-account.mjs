@@ -223,8 +223,9 @@ try{
       setEmail:value=>{email=value;},getCookie:()=>cookie,setOffline:value=>{offline=value;},front,
       installRenderProbe:async()=>{
         simctl('terminate',device,app);const bundle=join(privateDir,'Puptime-probe.app');cpSync(host,bundle,{recursive:true});
-        await run('node',['node_modules/expo/bin/cli','export:embed','--entry-file','index.ts','--platform','ios','--dev','false','--bytecode','--reset-cache','--max-workers','2','--config',resolve('scripts/native-activity-probe/metro.config.cjs'),'--bundle-output',join(bundle,'main.jsbundle'),'--assets-dest',bundle],bundleEnv);
+        await run('node',['node_modules/expo/bin/cli','export:embed','--entry-file','index.ts','--platform','ios','--dev','false','--bytecode','--reset-cache','--max-workers','2','--bundle-output',join(bundle,'main.jsbundle'),'--assets-dest',bundle],{...bundleEnv,EXPO_OVERRIDE_METRO_CONFIG:resolve('scripts/native-activity-probe/metro.config.cjs')});
         assert.ok(readFileSync(join(bundle,'main.jsbundle')).includes(Buffer.from(front)));
+        assert.ok(readFileSync(join(bundle,'main.jsbundle')).includes(Buffer.from('row-render-probe.json')),'The diagnostic bundle must contain the actual row observer.');
         await run('codesign',['--force','--deep','--sign','-',bundle]);simctl('install',device,bundle);simctl('launch',device,app);
       }}));
   }

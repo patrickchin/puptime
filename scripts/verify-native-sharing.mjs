@@ -103,9 +103,11 @@ export async function qualifyNativeSharing({flow,signIn,snapshot,sqliteDirectory
  await call(memberCookie,`care/${temporary.id}`,undefined,410);
  await sharingFlow('leave-ended');assert.deepEqual(snapshot(),personal);
  checks.push('temporary expiry blocks native access and retains unsynced work; returning to My puppy preserves all original IDs, bodies, ownership and outbox state');
- await installRenderProbe();await open(household);
- await sharingFlow('render-prepare');
+ // Select care while the normal app is ready. Sending a link immediately after
+ // replacing the native bundle can precede React's URL listener on cold start.
+ await open(household);
  await until(()=>sharedSnapshot(household,member.user.id).events.length===503,'The diagnostic journal must finish restoring before render measurement.');
+ await installRenderProbe();await sharingFlow('render-prepare');
  assert.deepEqual(sharedSnapshot(temporary,member.user.id).pending,retained.pending,'Switching grants must not consume expired access’s pending work.');
  const renderFile=join(sqliteDirectory(),'../row-render-probe.json'),renders=()=>JSON.parse(readFileSync(renderFile,'utf8')).renders;
  await until(()=>Object.keys(renders()).length>=20,'Probe must observe populated mounted history.');
