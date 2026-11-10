@@ -63,6 +63,14 @@ async function flow(name,env={}){
       cpSync(join(artifacts,path),join(output,String(path).split('/').at(-1)));
     console.log('PASS native account phase: '+name);
   }finally{
+    // Maestro can orphan its XCTest driver after the CLI exits. This simulator
+    // is dedicated to the fixture; stop only its abandoned, parentless drivers.
+    if(sharing&&!android)for(const line of execFileSync('ps',['-axo','pid=,ppid=,command='],{encoding:'utf8'}).split('\n')){
+      const processRow=line.match(/^\s*(\d+)\s+(\d+)\s+(.*)$/);
+      if(processRow?.[2]==='1'&&processRow[3].includes('/xcodebuild test-without-building ')&&processRow[3].includes('-destination id='+device+' ')){
+        try{process.kill(Number(processRow[1]),'SIGTERM');}catch(error){if(error.code!=='ESRCH')throw error;}
+      }
+    }
     if(existsSync(startup))for(const directory of readdirSync(startup).filter(value=>!before.has(value))){
       const root=join(startup,directory);
       for(const file of readdirSync(root,{recursive:true}).filter(file=>String(file).endsWith('maestro.log'))){
