@@ -71,12 +71,9 @@ function AccountContent({client}:{client:Client}){
   if(session.isPending)return;
   void(async()=>{
    try{
-    const nextConfig=await client.config();if(!mounted.current||ticket!==epoch.current)return;setConfig(nextConfig);
-    if(user){
-     const [account,providers]=await Promise.all([client.summary(user.id),(nextConfig.providers.apple||nextConfig.providers.google)?client.providers(user.id):Promise.resolve([] as Provider[])]);
-     if(!mounted.current||ticket!==epoch.current||userId.current!==user.id)return;
-     setSummary(account);setLinked(providers);
-    }
+    const [nextConfig,account,providers]=await Promise.all([client.config(),user?client.summary(user.id):Promise.resolve(null),user?client.providers(user.id):Promise.resolve([] as Provider[])]);
+    if(!mounted.current||ticket!==epoch.current||userId.current!==user?.id)return;
+    setConfig(nextConfig);setSummary(account);setLinked(user?providers:null);
     const returning=pending.current;pending.current=null;
     if(returning){
      if(returning.intent==='sign-in'){captureWebsiteEvent('website_account',{action:'sign_in',result:user?'success':'error'});}
@@ -85,7 +82,7 @@ function AccountContent({client}:{client:Client}){
       setReauth(returning.userId);
       if(!callbackFailed.current){await client.freshUser(returning.userId);if(!mounted.current||ticket!==epoch.current||userId.current!==returning.userId)return;setReauth(null);setNotice('Signed in again. Choose Delete cloud account to continue.');}
      }
-     else if(returning.provider){const providers=await client.providers(user.id);if(!mounted.current||ticket!==epoch.current)return;setLinked(providers);const connected=providers.includes(returning.provider);captureWebsiteEvent('website_account',{action:'link_provider',result:connected?'success':'error'});if(connected)setNotice(`${providerName(returning.provider)} connected.`);else setError('The sign-in method wasn’t connected. Try again with the same email shown above.');}
+     else if(returning.provider){const connected=providers.includes(returning.provider);captureWebsiteEvent('website_account',{action:'link_provider',result:connected?'success':'error'});if(connected)setNotice(`${providerName(returning.provider)} connected.`);else setError('The sign-in method wasn’t connected. Try again with the same email shown above.');}
     }
    }catch(reason){if(mounted.current&&ticket===epoch.current)setError(reason instanceof AccountError?messages[reason.kind]:messages.service);}
    finally{if(mounted.current&&ticket===epoch.current)setLoading(false);}

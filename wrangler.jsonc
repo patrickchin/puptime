@@ -36,6 +36,7 @@
   "env": {
     "staging": {
       "name": "puptime-api-staging",
+      "placement": { "region": "aws:eu-central-1" },
       "vars": {
         "ENVIRONMENT": "staging",
         "AUTH_BASE_URL": "https://puptime.pages.dev",

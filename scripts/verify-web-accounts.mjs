@@ -92,7 +92,13 @@ async function qualifyCoreAccounts(source){
  const accountResponse=await auth.request.get(front+'/api/account');assert.equal(accountResponse.status(),200);const account=await accountResponse.json(),uid=account.user.id;
  assert.deepEqual(account.cloud,{canSync:true,canExport:true});assert.deepEqual(account.pets,[]);noProductWrites();
  pass('Genuine UI OTP grants immediate cloud access while leaving puppy enrollment and uploads explicit.');
- await page.reload();await signedIn();assert.equal((await(await auth.request.get(front+'/api/account')).json()).user.id,uid);noProductWrites();
+ const reloadStart=apiCalls.length;
+ await page.reload();await signedIn();
+ const reloadCalls=apiCalls.slice(reloadStart);
+ assert.equal(reloadCalls.filter(call=>call.path.startsWith('/api/auth/get-session')).length,1,'Account loading should check the session once.');
+ assert.equal(reloadCalls.filter(call=>call.path==='/api/account').length,1);
+ assert.equal(reloadCalls.filter(call=>call.path==='/api/auth/list-accounts').length,1);
+ assert.equal((await(await auth.request.get(front+'/api/account')).json()).user.id,uid);noProductWrites();
  pass('Reload preserves the real browser session and displays Cloud access Available without an activation request.');
  await page.getByRole('button',{name:'Sign out',exact:true}).click();await page.getByLabel('Email address',{exact:true}).waitFor();
  assert.equal((await auth.request.get(front+'/api/account')).status(),401);assert.equal(read('SELECT id FROM user WHERE id=? AND email=?',uid,email).length,1);noProductWrites();

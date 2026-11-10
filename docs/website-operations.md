@@ -2,6 +2,8 @@
 
 The public origin is `https://puptime.pages.dev`. Cloudflare Pages builds `npm run build:web` and publishes `dist-web` from `main`. Submit changes through a PR. The native entry remains `index.ts`; `index.web.ts` uses Expo Router for static marketing and account routes.
 
+The API Worker's staging environment uses explicit Frankfurt placement (`aws:eu-central-1`) near its EU auth database and account Durable Objects. Keep this placement with the backend deployment: running the database-heavy API at the visitor's edge adds repeated intercontinental database trips. Static Pages assets continue to be served near the visitor. Browser account reads validate ownership from their authenticated responses; linking, reauthentication and deletion retain fresh session checks.
+
 ## Account management
 
 `/account` is a static, noindex shell; private data loads only in the browser through the installed Better Auth SDK and same-origin `/api/*` Pages service binding. It is excluded from the public sitemap. Do not enable the native `useCloud` hook for this page or reuse its SecureStore/SQLite adapters. Browser authentication stays in HttpOnly cookies, with no tokens in localStorage. A short-lived sessionStorage return intent fences provider linking and same-account reauthentication across redirects; no destructive action resumes automatically after return.

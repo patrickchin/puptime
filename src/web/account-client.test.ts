@@ -27,6 +27,14 @@ test('wrong-user and stale authentication cannot submit a destructive request',a
  state.createdAt=Date.now()+60000;await assert.rejects(client.freshUser('owner-a'),error=>error instanceof AccountError&&error.kind==='reauth');
  assert.equal(calls.some(call=>call.method==='DELETE'),false);
 });
+test('account reads validate response ownership without repeating the session request',async()=>{
+ const {client,calls,state}=fixture();
+ const [summary,providers]=await Promise.all([client.summary('owner-a'),client.providers('owner-a')]);
+ assert.equal(summary.user.id,'owner-a');assert.deepEqual(providers,['google']);
+ assert.deepEqual(calls.map(call=>new URL(call.url).pathname).sort(),['/api/account','/api/auth/list-accounts']);
+ state.userId='owner-b';
+ for(const read of [()=>client.summary('owner-a'),()=>client.providers('owner-a')])await assert.rejects(read(),error=>error instanceof AccountError&&error.kind==='mismatch');
+});
 test('deletion distinguishes recent-auth refusal, account mismatch and uncertain acknowledgments',async()=>{
  const {client,state}=fixture();
  for(const [status,body,kind] of [[401,{error:'reauthentication_required'},'reauth'],[409,{error:'account_mismatch'},'mismatch'],[401,{error:'unauthorized'},'unconfirmed'],[200,{success:false},'unconfirmed'],[503,{error:'upstream_failed'},'unconfirmed'],[500,{error:'internal'},'unconfirmed']] as const){
