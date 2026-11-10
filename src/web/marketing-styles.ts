@@ -50,12 +50,12 @@ body:has(.marketing-site){overflow-y:auto}
 .preview-description{max-width:36ch;min-height:4.5em}
 .small-copy{font-size:var(--small);margin-top:24px}
 .app-preview{justify-self:center;width:min(100%,360px);position:relative}
-.phone-frame{position:relative;container-type:inline-size;width:100%;padding:2px;border:1px solid #656b68;border-radius:16% / 7.5%;background:linear-gradient(110deg,#c3c8c5,#535a56 28%,#252a27 65%,#9ca39e);box-shadow:0 20px 40px #07130e40,inset 0 0 0 1px #c2c7c180} /* taste-skill-ignore: physical metal rim and contact shadow */
+.phone-frame{position:relative;container-type:inline-size;width:100%;padding:2px;border:1px solid #080a09;border-radius:16% / 7.5%;background:#111312;box-shadow:0 20px 40px #07130e40,inset 0 0 0 1px #252827} /* taste-skill-ignore: physical black rim and contact shadow */
 /* Size the bezel and hardware from the phone, including the smaller story captures. */
 .phone-screen{position:relative;overflow:hidden;border:1.8cqi solid #080a09;border-radius:15.4% / 7.2%;background:#080a09}
 .phone-screen::after{content:'';position:absolute;top:1.4%;left:50%;transform:translateX(-50%);width:29%;height:3.5%;border-radius:999px;background:#080a09;pointer-events:none}
 .phone-screen::before{content:'';position:absolute;bottom:1%;left:50%;transform:translateX(-50%);width:32%;height:.6%;border-radius:999px;background:#080a09;pointer-events:none;z-index:1}
-.phone-button{position:absolute;left:-1cqi;width:.9cqi;border-radius:.6cqi 0 0 .6cqi;background:linear-gradient(90deg,#505853,#a5ada7);pointer-events:none} /* taste-skill-ignore: physical side-button highlight */
+.phone-button{position:absolute;left:-1cqi;width:.9cqi;border-radius:.6cqi 0 0 .6cqi;background:#111312;pointer-events:none}
 .phone-action{top:15%;height:3%}.phone-volume-up{top:23%;height:6%}.phone-volume-down{top:31%;height:6%}
 .phone-power{left:auto;right:-1cqi;top:25%;height:10%;border-radius:0 .6cqi .6cqi 0}
 .phone-frame img{display:block;width:100%;height:auto}
