@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { LearnScreen } from './src/screens/LearnScreen';
 import { careArticles } from './src/puppy-care';
 import { websiteTheme } from './src/web/brand';
@@ -22,6 +22,16 @@ const previews = [
   { name: 'Insights', image: assetUrl(require('./assets/screenshots/insights-summary.png')), description: 'See recorded activity counts and timing patterns across days, with possible missing logs clearly marked.' },
   { name: 'Routine', image: routineImage, description: 'Build a routine around your puppy. Review suggested times, make them your own, and choose optional reminders.' },
 ];
+
+function PhoneFrame({ children, reveal = false }: { children: ReactNode; reveal?: boolean }) {
+  return <div className="phone-frame" data-reveal={reveal || undefined}>
+    <span className="phone-button phone-action" aria-hidden="true" />
+    <span className="phone-button phone-volume-up" aria-hidden="true" />
+    <span className="phone-button phone-volume-down" aria-hidden="true" />
+    <span className="phone-button phone-power" aria-hidden="true" />
+    <div className="phone-screen">{children}</div>
+  </div>;
+}
 
 function SourceLink({ className = '', children = 'View the source' }: { className?: string; children?: string }) {
   return <a className={className} href={sourceUrl} onClick={() => captureWebsiteEvent('website_cta', { destination: 'source' })}>{children}</a>;
@@ -94,7 +104,7 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
           <p className="small-copy">From the app, with real puppy logs.</p>
         </div>
         <figure className="app-preview" id="app-preview" data-reveal>
-          <div className="phone-frame"><img key={selected} src={previews[selected].image} alt={`Puptime ${previews[selected].name} screen`} width="1206" height="2622" /></div>
+          <PhoneFrame><img key={selected} src={previews[selected].image} alt={`Puptime ${previews[selected].name} screen`} width="1206" height="2622" /></PhoneFrame>
           <figcaption>{previews[selected].name} on Puptime</figcaption>
         </figure>
       </section>
@@ -108,14 +118,14 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
           <article className="rhythm-story">
             <h3 data-reveal>Spot the potty patterns</h3>
             <div className="story-content">
-              <div className="phone-frame" data-reveal><img src={timingImage} alt="Puptime timeline showing real puppy activity with varied daily timings" width="1206" height="2622" loading="lazy" /></div>
+              <PhoneFrame reveal><img src={timingImage} alt="Puptime timeline showing real puppy activity with varied daily timings" width="1206" height="2622" loading="lazy" /></PhoneFrame>
               <p data-reveal>Compare activity across recorded days. Look for recurring potty times, with estimates kept separate from recorded logs.</p>
             </div>
           </article>
           <article className="rhythm-story">
             <h3 data-reveal>A routine that fits</h3>
             <div className="story-content reverse">
-              <div className="phone-frame" data-reveal><img src={routineImage} alt="Editable daily routine with activity times and optional reminders" width="1206" height="2622" loading="lazy" /></div>
+              <PhoneFrame reveal><img src={routineImage} alt="Editable daily routine with activity times and optional reminders" width="1206" height="2622" loading="lazy" /></PhoneFrame>
               <p data-reveal>Review suggested times from your puppy’s history, then adjust each activity. Choose reminders for the routine you want to follow.</p>
             </div>
           </article>

@@ -16,7 +16,7 @@ a capture-only clock override; the published app has no override or demo data.
 The native runtime is the existing 1.11.30 simulator build, with a fresh
 production JavaScript bundle and assets exported from the current checkout.
 
-The PNGs contain the app screen only. The website adds rounded bezels, the
-camera cutout, home indicator, and shadow in CSS, keeping the original pixels
-available at native resolution. The widget and appearance reference images
+The PNGs contain the app screen only. The website adds a metal rim, proportional
+black bezels, side buttons, camera cutout, home indicator, and shadow in CSS,
+keeping the original pixels available at native resolution. The widget and appearance reference images
 are older captures and are not displayed on the website.
