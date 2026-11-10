@@ -19,7 +19,11 @@ export async function qualifyNativeSharing({flow,signIn,snapshot,sqliteDirectory
   try{return {events:db.prepare('SELECT * FROM events ORDER BY id').all(),pending:db.prepare('SELECT * FROM local_sync_outbox ORDER BY operation_id').all(),metadata:db.prepare('SELECT * FROM metadata ORDER BY key').all()};}finally{db.close();}
  }
  async function open(share){simctl('openurl',device,`puptime://care?invite=${share.id}#${share.token}`);await sharingFlow('accept');}
- await flow('prepare');await signIn();await flow('enable',{EXPECTED_COUNT:'0'});
+ await flow('prepare');
+ // Exercise native routing before account/data setup; no grant is claimed here.
+ simctl('openurl',device,`puptime://care?invite=${entityId('shr')}#${entityId('inv')}`);await sharingFlow('signed-out');
+ checks.push('a signed-out invitation replaces an already open My account sheet and returns safely');
+ await signIn();await flow('enable',{EXPECTED_COUNT:'0'});
  let ownerCookie=getCookie();const owner=await call(ownerCookie,'account'),petId=owner.pets[0].id;
  await call(ownerCookie,'cloud/enroll',{operationId:entityId('csr'),deviceId:'sharing-fixture',localPetId:petId,confirmedPetId:petId,name:'Biscuit'});
  const initial=await call(ownerCookie,'sync/pull?after=0'),profile=initial.changes.findLast(row=>row.kind==='puppy'&&row.id===petId);

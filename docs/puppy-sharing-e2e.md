@@ -15,7 +15,7 @@ Ports 8797 and 8799 must be free. `--replace-synthetic` authorizes resetting thi
 | Journey | Checks |
 | --- | --- |
 | Owner invitations | Real native email sign-in and explicit cloud enrollment; household, temporary contributor and view-only invitations; QR availability and native share sheet. |
-| Separate recipient | An invitation opens from My account through the iOS confirmation; signed-out acceptance requires an account; different SDK account owns its own three-log puppy; accepting a link restores all 501 owner logs and a routine across sync pages. |
+| Separate recipient | An invitation replaces the open My account sheet through the iOS confirmation; signed-out acceptance requires an account; different SDK account owns its own three-log puppy; accepting a link restores all 501 owner logs and a routine across sync pages. |
 | Full journal | Log, timeline, insights and routines open normally; temporary carers cannot edit owner logs or routines; view-only access exposes no logging or editing. |
 | Shared writes | Native create/edit reaches the owner's store; recipient's own event IDs, data, ownership and outbox remain exact. |
 | Offline recovery | Real HTTPS outage; create/edit persists through two process restarts; reconnect uploads once and drains the outbox; owner converges to 503 logs. |
