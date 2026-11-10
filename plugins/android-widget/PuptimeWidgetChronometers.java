@@ -64,26 +64,6 @@ public final class PuptimeWidgetChronometers {
         }
     }
 
-    /** Uses native cell widths instead of absolute launcher coordinates. */
-    public static void notification(Context context, RemoteViews views, View lightRoot, View darkRoot,
-            int positioner, int lightId, int darkId, boolean compact) {
-        List<TextView> light = new ArrayList<>(), dark = new ArrayList<>();
-        collect(lightRoot, light);
-        collect(darkRoot, dark);
-        views.setViewVisibility(positioner, light.isEmpty() ? View.GONE : View.VISIBLE);
-        if (light.isEmpty()) return;
-        TextView label = light.get(0);
-        Rect bounds = new Rect();
-        label.getDrawingRect(bounds);
-        ((ViewGroup) lightRoot).offsetDescendantRectToMyCoords(label, bounds);
-        float density = context.getResources().getDisplayMetrics().density;
-        views.setViewPadding(positioner, compact ? Math.round(28 * density) : 0,
-            bounds.top + (compact ? Math.round(4 * density) : 0), compact ? Math.round(4 * density) : 0, 0);
-        long base = SystemClock.elapsedRealtime() - Math.max(0, System.currentTimeMillis() - ((Timer) label.getTag()).at);
-        configure(views, lightId, label, base);
-        configure(views, darkId, dark.get(0), base);
-    }
-
     private static void configure(RemoteViews views, int id, TextView label, long base) {
         views.setTextColor(id, ((Timer) label.getTag()).color);
         views.setTextViewTextSize(id, TypedValue.COMPLEX_UNIT_PX, label.getTextSize());
