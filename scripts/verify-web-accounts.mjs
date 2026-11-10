@@ -7,7 +7,7 @@ import {createServer,request as httpRequest} from 'node:http';
 import {createRequire} from 'node:module';
 import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,readdirSync,existsSync,rmSync,createReadStream,realpathSync,statSync} from 'node:fs';
 import {join,resolve,extname,dirname} from 'node:path';
-import {tmpdir} from 'node:os';
+import {homedir,tmpdir} from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
@@ -15,12 +15,13 @@ import {gunzipSync} from 'node:zlib';
 import {cloudRecordId} from '../src/cloud/record-identity.ts';
 const require=createRequire(import.meta.url),{chromium}=require(process.env.PUPTIME_PLAYWRIGHT_MODULE??'playwright');
 const root=realpathSync(process.cwd());
+const buildDirectory=process.env.PUPTIME_WEB_BUILD_DIR??'dist-web';assert.ok(['dist-web','dist-web-app'].includes(buildDirectory),'Use a local website or app build directory.');
 assert.equal(root,realpathSync(fileURLToPath(new URL('..',import.meta.url))),'Run from this script’s Puptime checkout root.');
 assert.equal(JSON.parse(readFileSync('package.json','utf8')).name,'puptime');
-const modes=process.argv.slice(2);assert.ok(modes.length<=1&&modes.every(value=>['--apple-deletion','--core-accounts'].includes(value)),'Use --apple-deletion or --core-accounts, or omit the mode for historical full qualification. No remote target is accepted.');
-const appleDeletionOnly=modes.includes('--apple-deletion'),coreAccountsOnly=modes.includes('--core-accounts');
+const modes=process.argv.slice(2);assert.ok(modes.length<=1&&modes.every(value=>['--apple-deletion','--core-accounts','--sign-in'].includes(value)),'Use --apple-deletion, --core-accounts or --sign-in, or omit the mode for historical full qualification. No remote target is accepted.');
+const appleDeletionOnly=modes.includes('--apple-deletion'),coreAccountsOnly=modes.includes('--core-accounts'),signInOnly=modes.includes('--sign-in');
 const front='http://127.0.0.1:8898',back='http://127.0.0.1:8798',directory=mkdtempSync(join(tmpdir(),'puptime-web-account-local-'));
-const output=resolve(coreAccountsOnly?join('output/playwright/core-accounts',new Date().toISOString().replace(/[:.]/g,'-')):appleDeletionOnly?join('output/playwright/apple-deletion',new Date().toISOString().replace(/[:.]/g,'-')):'output/playwright/web-accounts');mkdirSync(output,{recursive:true});
+const output=resolve(signInOnly?join('output/playwright/web-sign-in',new Date().toISOString().replace(/[:.]/g,'-')):coreAccountsOnly?join('output/playwright/core-accounts',new Date().toISOString().replace(/[:.]/g,'-')):appleDeletionOnly?join('output/playwright/apple-deletion',new Date().toISOString().replace(/[:.]/g,'-')):'output/playwright/web-accounts');mkdirSync(output,{recursive:true});
 const persist=join(directory,'persist'),configPath=join(directory,'wrangler.json');
 const config={...JSON.parse(readFileSync('wrangler.jsonc','utf8')),name:'puptime-web-accounts-local',main:resolve('server/index.ts'),env:undefined,vars:{ENVIRONMENT:'local',AUTH_BASE_URL:front,WEB_ORIGINS:front,AUTH_SECRET:crypto.randomUUID()+crypto.randomUUID(),GOOGLE_CLIENT_ID:'synthetic-google-client',GOOGLE_CLIENT_SECRET:'synthetic-google-secret',APPLE_CLIENT_ID:'synthetic-apple-client',APPLE_CLIENT_SECRET:'synthetic-apple-secret'}};
 config.d1_databases=config.d1_databases.map(db=>({...db,migrations_dir:resolve(db.migrations_dir)}));writeFileSync(configPath,JSON.stringify(config),{mode:0o600});
@@ -56,18 +57,68 @@ async function signIn(page,email,wrongCode=false){
  await page.getByLabel('Email code',{exact:true}).fill(privateCode);await page.getByRole('button',{name:'Continue',exact:true}).click();await page.getByRole('button',{name:'Sign out',exact:true}).waitFor();
 }
 
+// Focused interaction checks share the isolated Worker rather than introducing a second auth fixture.
+async function qualifySignInExperience(){
+ const screenshots=resolve(process.env.PUPTIME_SCREENSHOTS_DIR??join(homedir(),'Pictures/Screenshots/Codex/puptime-web-login'));mkdirSync(screenshots,{recursive:true});
+ if(buildDirectory==='dist-web-app'){const auth=await context(),page=await auth.newPage();await page.goto(front+'/');await page.getByRole('heading',{name:'Sign in to Puptime',exact:true}).waitFor();assert.equal((await auth.request.get(front+'/sitemap.xml')).status(),404);assert.equal((await auth.request.get(front+'/puppy-care/feeding')).status(),404);await auth.close();pass('The app homepage opens sign-in and contains no public care pages or sitemap.');}
+ for(const routePath of ['/account','/care']){
+  const auth=await context({viewport:{width:1440,height:900}}),page=await auth.newPage();
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  let configFails=true,providers={apple:true,google:true,email:true};
+  await page.route('**/api/config',async route=>{if(configFails)await route.fulfill({status:503,json:{error:'synthetic_unavailable'}});else await route.fulfill({json:{protocolVersion:1,providers}});});
+  await page.goto(front+routePath);await page.getByRole('alert').filter({hasText:'service is unavailable'}).waitFor();
+  assert.equal(await page.getByText('Sign-in is unavailable right now.',{exact:false}).count(),0);
+  configFails=false;await page.getByRole('button',{name:'Try again',exact:true}).click();await page.getByLabel('Email address',{exact:true}).waitFor();
+  for(const width of [1440,768,390,320]){
+   await page.setViewportSize({width,height:width<500?844:900});
+   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+   if(width!==320)await page.screenshot({path:join(screenshots,`${routePath.slice(1)}-sign-in-${width}.png`),fullPage:true});
+  }
+  await page.setViewportSize({width:1440,height:500});await page.keyboard.press('End');
+  if(routePath==='/account'){await page.locator('.account-footer').scrollIntoViewIfNeeded();assert.ok(await page.locator('.account-footer').evaluate(el=>el.getBoundingClientRect().bottom<=innerHeight));}
+  providers={apple:false,google:false,email:false};await page.reload();await page.getByText('Sign-in is unavailable right now.',{exact:false}).waitFor();assert.equal(await page.getByLabel('Email address',{exact:true}).count(),0);
+  providers={apple:false,google:true,email:false};await page.getByRole('button',{name:'Try again',exact:true}).click();await page.getByRole('button',{name:'Continue with Google',exact:true}).waitFor();assert.equal(await page.getByLabel('Email address',{exact:true}).count(),0);
+  providers={apple:false,google:false,email:true};await page.reload();await page.getByLabel('Email address',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Continue with Google',exact:true}).count(),0);
+  providers={apple:true,google:true,email:true};await page.reload();await page.getByLabel('Email address',{exact:true}).waitFor();
+  await page.clock.install();
+  let requests=0,rateLimit=true,release;const held=new Promise(resolve=>{release=resolve;});
+  await page.route('**/api/auth/email-otp/send-verification-otp',async route=>{requests++;if(rateLimit){await route.fulfill({status:429,json:{message:'Synthetic rate limit'}});return;}if(requests===2)await held;await route.continue();});
+  await page.getByLabel('Email address',{exact:true}).fill('invalid');await page.getByRole('button',{name:'Email me a code',exact:true}).click();assert.equal(requests,0);
+  const email=`signin-${routePath.slice(1)}-${crypto.randomUUID()}@example.invalid`;
+  await page.getByLabel('Email address',{exact:true}).fill(email);await page.getByRole('button',{name:'Email me a code',exact:true}).click();await page.getByRole('alert').filter({hasText:'Too many attempts'}).waitFor();
+  rateLimit=false;await page.getByRole('button',{name:'Email me a code',exact:true}).click();await page.getByRole('button',{name:'Sending code…',exact:true}).waitFor();
+  assert.ok(await page.getByRole('button',{name:'Continue with Google',exact:true}).isDisabled());
+  await page.locator('.web-sign-in form').evaluate(form=>{form.requestSubmit();form.requestSubmit();});assert.equal(requests,2);release();
+  const field=page.getByLabel('Email code',{exact:true});await field.waitFor();await page.getByRole('heading',{name:'Enter your code',exact:true}).waitFor();
+  assert.ok(await field.evaluate(el=>el===document.activeElement));assert.equal(await page.getByRole('button',{name:'Continue with Google',exact:true}).count(),0);
+  assert.ok(await page.getByRole('button',{name:'Continue',exact:true}).isDisabled());assert.ok(await page.getByRole('button',{name:/Resend in/}).isDisabled());
+  assert.equal(await field.inputValue(),'');await page.setViewportSize({width:390,height:844});await page.screenshot({path:join(screenshots,`${routePath.slice(1)}-code-empty.png`),fullPage:true});
+  await field.fill('123');assert.ok(await page.getByRole('button',{name:'Continue',exact:true}).isDisabled());
+  await field.evaluate(el=>{const data=new DataTransfer();data.setData('text/plain','12 34 56');el.dispatchEvent(new ClipboardEvent('paste',{clipboardData:data,bubbles:true,cancelable:true}));});assert.equal(await field.inputValue(),'123456');
+  await page.getByRole('button',{name:'Change email',exact:true}).click();assert.equal(await page.getByLabel('Email address',{exact:true}).inputValue(),email);
+  await page.getByRole('button',{name:'Email me a code',exact:true}).click();await field.waitFor();await page.clock.fastForward(31000);await page.getByRole('button',{name:'Resend code',exact:true}).click();await page.getByRole('status').filter({hasText:'A new code has been sent.'}).waitFor();assert.equal(requests,4);assert.equal(await field.inputValue(),'');
+  const privateCode=code(email);assert.match(privateCode??'',/^\d{6}$/);
+  await field.fill(privateCode==='000000'?'111111':'000000');await field.press('Enter');await page.getByRole('alert').filter({hasText:'That code didn’t work'}).waitFor();assert.equal(await field.getAttribute('aria-invalid'),'true');assert.ok(await field.evaluate(el=>el===document.activeElement));
+  await field.fill(privateCode);await field.press('Enter');
+  if(routePath==='/account')await page.getByRole('button',{name:'Sign out',exact:true}).waitFor();else await page.getByText('No puppies have been shared with this account yet.',{exact:false}).waitFor();
+  assert.deepEqual(errors,[]);await auth.close();
+  pass(`${routePath}: responsive shared form, configuration recovery, provider availability, native email validation, rate errors, duplicate-submit lock, focused code entry, formatted paste, change email, resend cooldown, wrong-code correction and genuine keyboard OTP sign-in.`);
+ }
+}
+
 function coreSourceSnapshot(){
  const digest=value=>createHash('sha256').update(value).digest('hex'),bundleRoot='dist-web/_expo/static/js/web';
  const bundles=readdirSync(bundleRoot).filter(path=>path.endsWith('.js')).map(path=>join(bundleRoot,path));assert.ok(bundles.length>0);
  const bundleText=bundles.map(path=>readFileSync(path,'utf8')).join('\n');
  assert.ok(bundleText.includes('Cloud access')&&bundleText.includes('Available'),'Build the current development account status before qualification.');
  assert.ok(!bundleText.includes('trialDays')&&!bundleText.includes('pricingFinalized'),'The served bundle must use the current no-trial contract.');
- const frontend=['src/web/AccountPage.tsx','src/web/account-client.ts','src/web/CarePage.tsx','src/web/care-client.ts','src/cloud/api.ts'],builtAt=Math.max(...bundles.map(path=>statSync(path).mtimeMs));
+ const frontend=['src/web/AccountPage.tsx','src/web/WebSignIn.tsx','src/web/origins.ts','src/web/account-client.ts','src/web/CarePage.tsx','src/web/care-client.ts','src/cloud/api.ts'],builtAt=Math.max(...bundles.map(path=>statSync(path).mtimeMs));
  for(const path of frontend)assert.ok(statSync(path).mtimeMs<=builtAt,`${path} changed after the web build; rebuild before qualification.`);
  const paths=[...frontend,'server/auth.ts','server/cloud-access.ts','server/account-routes.ts','server/account-store.ts','server/migrations/0001-auth.sql','scripts/verify-web-accounts.mjs'];
  return {head:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),files:Object.fromEntries(paths.map(path=>[path,digest(readFileSync(path))])),bundles:Object.fromEntries(bundles.map(path=>[path,digest(readFileSync(path))]))};
 }
 async function qualifyCoreAccounts(source){
+ await qualifySignInExperience();
  const wrong=await context(),wrongPage=await wrong.newPage();
  await signIn(wrongPage,`core-wrong-${crypto.randomUUID()}@example.invalid`,true);await wrong.close();
  const auth=await context({viewport:{width:1440,height:1000}}),page=await auth.newPage(),email=`core-account-${crypto.randomUUID()}@example.invalid`;
@@ -149,7 +200,7 @@ async function qualifyCareSignIn(auth){
   if(status!==401)assert.equal(await page.getByRole('heading',{name:'Sign in to Puptime',exact:true}).count(),0);
   if(status===404)await page.screenshot({path:join(output,'core-care-service-error.png'),fullPage:true});
   await page.unroute('**/api/care/puppies');
-  await page.getByRole('button',{name:'Try again',exact:true}).click();
+  await page.getByRole('button',{name:status===401?'Refresh access':'Try again',exact:true}).click();
   await page.getByText('No puppies have been shared with this account yet.',{exact:false}).waitFor();
   assert.equal(await page.getByRole('alert').count(),0);
  }
@@ -165,7 +216,7 @@ async function qualifyCareSignIn(auth){
  await login.goto(front+'/care');await login.getByLabel('Email address',{exact:true}).fill(email);
  await login.getByRole('button',{name:'Email me a code',exact:true}).click();
  await login.getByLabel('Email code',{exact:true}).waitFor();const privateCode=code(email);assert.match(privateCode??'',/^\d{6}$/);
- await login.getByLabel('Email code',{exact:true}).fill(privateCode);await login.getByRole('button',{name:'Sign in',exact:true}).click();
+ await login.getByLabel('Email code',{exact:true}).fill(privateCode);await login.getByRole('button',{name:'Continue',exact:true}).click();
  await login.getByText('No puppies have been shared with this account yet.',{exact:false}).waitFor();
  assert.equal((await visitor.request.get(front+'/api/care/puppies')).status(),200);
  reviewPage=login;await login.screenshot({path:join(output,'core-care-signed-in.png'),fullPage:true});
@@ -254,7 +305,7 @@ async function qualifyAppleDeletion(){
  console.log('Apple deletion evidence:',output);
 }
 try{
- assert.ok(existsSync('dist-web/account.html'),'Build the static website first.');
+ assert.ok(existsSync(buildDirectory+'/account.html'),'Build the static website first.');
  const coreSource=coreAccountsOnly?coreSourceSnapshot():null;
  // Refuse another local service before spawning or issuing any fixture request.
  for(const port of [8798,8898])await new Promise((resolve,reject)=>{const probe=createServer();probe.once('error',reject);probe.listen(port,'127.0.0.1',()=>probe.close(resolve));});
@@ -269,14 +320,14 @@ try{
    const client=req.headers['x-puptime-test-client'];if(/^198\.51\.100\.\d+$/.test(client??''))headers['cf-connecting-ip']=client;
    const proxy=httpRequest(back+req.url,{method:req.method,headers},upstream=>{res.writeHead(upstream.statusCode,upstream.headers);upstream.pipe(res);});proxy.on('error',()=>{res.writeHead(503);res.end();});req.pipe(proxy);return;
   }
-  const path=decodeURIComponent(new URL(req.url,front).pathname),base=resolve('dist-web');let file=resolve(base,'.'+(path==='/'?'/index.html':path));
+  const path=decodeURIComponent(new URL(req.url,front).pathname),base=resolve(buildDirectory);let file=resolve(base,'.'+(path==='/'?'/index.html':path));
   if(!file.startsWith(base+'/')){res.writeHead(404);res.end();return;}if(!extname(file))file+='.html';
   if(!existsSync(file)){res.writeHead(404);res.end('Not found');return;}
   const types={'.html':'text/html','.js':'application/javascript','.css':'text/css','.png':'image/png','.jpg':'image/jpeg','.ttf':'font/ttf','.svg':'image/svg+xml','.json':'application/json'};
   res.writeHead(200,{'content-type':types[extname(file)]??'application/octet-stream','cache-control':'no-store'});createReadStream(file).pipe(res);
  });await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(8898,'127.0.0.1',resolve);});
  browser=await chromium.launch({headless:true,executablePath:process.env.PUPTIME_CHROMIUM_EXECUTABLE??chromium.executablePath()});
- if(appleDeletionOnly){await qualifyAppleDeletion();}else if(coreAccountsOnly){await qualifyCoreAccounts(coreSource);}else{
+ if(signInOnly){await qualifySignInExperience();writeFileSync(join(output,'verification.json'),JSON.stringify({passed:summary,scope:'Isolated local OTP plus synthetic configuration/network failures; no live provider or private code recording.'},null,2));}else if(appleDeletionOnly){await qualifyAppleDeletion();}else if(coreAccountsOnly){await qualifyCoreAccounts(coreSource);}else{
  const privateContext=await context(),page=await privateContext.newPage(),email=`web-review-${crypto.randomUUID().slice(0,8)}@example.invalid`;
  await page.goto(front+'/account');await page.getByLabel('Email address',{exact:true}).waitFor();assert.equal(await page.locator('meta[name=robots]').getAttribute('content'),'noindex, nofollow');
  await page.screenshot({path:join(output,'300-web-account-sign-in.png'),fullPage:true});
@@ -364,5 +415,5 @@ finally{
  rmSync(join(output,'private-export.ndjson'),{force:true});
  await browser?.close();if(server)await new Promise(resolve=>server.close(resolve));
  if(worker?.pid){try{process.kill(-worker.pid,'SIGTERM');}catch{}}
- assert.ok(directory.startsWith(join(tmpdir(),'puptime-web-account-local-')));rmSync(directory,{recursive:true,force:true});
+ assert.ok(directory.startsWith(join(tmpdir(),'puptime-web-account-local-')));rmSync(directory,{recursive:true,force:true,maxRetries:10,retryDelay:100});
 }

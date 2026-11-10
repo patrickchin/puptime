@@ -9,6 +9,7 @@ dist/
 /dist-android/
 /dist-ios/
 /dist-web/
+/dist-web-app/
 /build/
 web-build/
 expo-env.d.ts

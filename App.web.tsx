@@ -6,6 +6,7 @@ import { WebsiteMetadata } from './src/web/WebsiteMetadata';
 import { openAnalyticsSettings, WebsiteAnalytics } from './src/web/WebsiteAnalytics';
 import { captureWebsiteEvent } from './src/web/telemetry';
 import { marketingStyles } from './src/web/marketing-styles';
+import { appHref } from './src/web/origins';
 
 const sourceUrl = 'https://github.com/patrickchin/puptime';
 const privacyUrl = `${sourceUrl}/blob/main/PRIVACY.md`;
@@ -43,7 +44,7 @@ function Header({ learning = false }: { learning?: boolean }) {
     <nav aria-label="Website">
       <a className="product-nav" href={learning ? '/#app' : '#app'}>The app</a>
       <a href="/puppy-care/">Puppy care</a>
-      <a href="/account">Account</a>
+      <a href={appHref('/account')}>Sign in</a>
     </nav>
   </header>;
 }
@@ -155,7 +156,7 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
         </div>
       </section>
 
-      <a className="account-chapter" href="/account">
+      <a className="account-chapter" href={appHref('/account')}>
         <p>Manage your sign-in methods and saved cloud data.</p>
         <span className="account-word">Account</span>
         <span className="account-arrow" aria-hidden="true">↗</span>
@@ -165,7 +166,7 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
       <p className="footer-wordmark" aria-hidden="true">Puptime</p>
       <div className="footer-bottom">
         <p>A little record of growing up.</p>
-        <nav aria-label="Footer"><SourceLink>GitHub</SourceLink><a href="/puppy-care/">Puppy care</a><a href="/account">Account</a><a href={privacyUrl}>Privacy</a><button type="button" onClick={openAnalyticsSettings}>Analytics settings</button><a href="#top">Back to top</a></nav>
+        <nav aria-label="Footer"><SourceLink>GitHub</SourceLink><a href="/puppy-care/">Puppy care</a><a href={appHref('/account')}>Sign in</a><a href={privacyUrl}>Privacy</a><button type="button" onClick={openAnalyticsSettings}>Analytics settings</button><a href="#top">Back to top</a></nav>
       </div>
     </footer>
   </div>;

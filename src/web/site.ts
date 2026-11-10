@@ -1,6 +1,7 @@
 import { careArticles } from '../puppy-care.ts';
 
-export const siteUrl = 'https://puptime.pages.dev';
+import { siteUrl } from './origins.ts';
+export { siteUrl } from './origins.ts';
 export const publicPaths = ['/', '/puppy-care/', ...careArticles.map(({ id }) => `/puppy-care/${id}`)];
 
 export function pageMetadata(path: string) {

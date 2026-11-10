@@ -13,6 +13,7 @@ export function checkResult<T>(result:{data:T;error:{status:number}|null}):T {
  if(result.error)throw new AccountError(result.error.status===409?'mismatch':result.error.status===429?'rate':result.error.status>=500?'service':result.error.status===401?'auth':'code');
  return result.data;
 }
+export const accountErrorMessages={email:'Couldn’t send a code. Check your email address and try again.',provider:'Sign-in wasn’t completed. Try again with your original sign-in method.',network:'Couldn’t reach Puptime. Check your connection and try again.',service:'The account service is unavailable. Try again shortly.',auth:'Sign in again to continue.',mismatch:'You’re signed into a different account. Return to your original account before continuing.',reauth:'Sign in again before deleting your cloud account.',code:'That code didn’t work. Check it or request another.',rate:'Too many attempts. Wait a moment, then try again.',unconfirmed:'The deletion response was lost. We haven’t confirmed whether your cloud account was deleted. Your iPhone’s local logs are kept.',storage:'Allow temporary session storage to continue with Apple or Google, or use an email code.'};
 // Browser credentials stay in the server's HttpOnly cookies. Native SecureStore
 // and the puppy synchronization controller deliberately are not imported here.
 export function createWebAccountClient(origin:string,customFetchImpl:typeof fetch=fetch){
