@@ -136,11 +136,11 @@ function CareEditor({kind,row,write,onClose}:{kind:'event'|'routine';row?:CareRo
   <div className="care-actions"><button className="primary" disabled={busy}>{busy?'Saving…':'Save'}</button><button type="button" onClick={onClose} disabled={busy}>Cancel</button>{row?<button type="button" className="danger" disabled={busy} onClick={()=>{if(deleting)void save(true);else setDeleting(true);}}>{deleting?'Confirm delete':'Delete'}</button>:null}</div>
  </form>;
 }
-function CareSignIn({onSignedIn}:{onSignedIn:(userId:string)=>void}){
+function CareSignIn({onSignedIn}:{onSignedIn:(sessionId:string)=>void}){
  const client=getWebAccountClient(),session=client.auth.useSession();
  const [email,setEmail]=useState(''),[sent,setSent]=useState<string|null>(null),[code,setCode]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[providers,setProviders]=useState<{apple:boolean;google:boolean;email:boolean}|null>(null);
  const locked=useRef(false);
- useEffect(()=>{if(session.data?.user)onSignedIn(session.data.user.id);},[session.data?.user.id,onSignedIn]);
+ useEffect(()=>{if(session.data?.session)onSignedIn(session.data.session.id);},[session.data?.session.id,onSignedIn]);
  useEffect(()=>{void client.config().then(value=>setProviders(value.providers)).catch(reason=>setError(problem(reason)));},[client]);
  async function signIn(provider?:'apple'|'google'){
   if(locked.current)return;locked.current=true;setBusy(true);setError('');
