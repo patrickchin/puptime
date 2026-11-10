@@ -41,9 +41,9 @@ export function createWebAccountClient(origin:string,customFetchImpl:typeof fetc
  }
  return {auth,origin,
   async config(){return cloudConfigSchema.parse(await json('/api/config'));},
-  async summary(expected:string){await sameUser(expected);const value=cloudAccountSchema.parse(await json('/api/account'));if(value.user.id!==expected)throw new AccountError('mismatch');return value;},
+  async summary(expected:string){const value=cloudAccountSchema.parse(await json('/api/account'));if(value.user.id!==expected)throw new AccountError('mismatch');return value;},
   async providers(expected:string){
-   await sameUser(expected);const rows=checkResult(await auth.listAccounts());
+   const rows=checkResult(await auth.listAccounts());
    const accounts=z.array(z.object({userId:z.string().min(1),providerId:z.string().min(1)})).parse(rows);
    if(accounts.some(account=>account.userId!==expected))throw new AccountError('mismatch');
    return [...new Set(accounts.map(account=>account.providerId).filter((provider):provider is Provider=>provider==='apple'||provider==='google'))];
