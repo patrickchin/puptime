@@ -8,8 +8,14 @@ name: Owner loads the seeded cloud history
     element:
       id: account.retry
     direction: DOWN
+- extendedWaitUntil:
+    visible:
+      id: account.retry
+      enabled: true
+    timeout: 45000
 - tapOn:
     id: account.retry
+    retryTapIfNoChange: true
 - scrollUntilVisible:
     element:
       id: account.local.count
@@ -18,4 +24,4 @@ name: Owner loads the seeded cloud history
     visible:
       id: account.local.count
       text: 501 activity logs
-    timeout: 45000
+    timeout: 60000

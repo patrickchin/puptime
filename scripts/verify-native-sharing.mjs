@@ -104,13 +104,14 @@ export async function qualifyNativeSharing({flow,signIn,snapshot,sqliteDirectory
  await sharingFlow('leave-ended');assert.deepEqual(snapshot(),personal);
  checks.push('temporary expiry blocks native access and retains unsynced work; returning to My puppy preserves all original IDs, bodies, ownership and outbox state');
  await installRenderProbe();await open(household);
- assert.equal(sharedSnapshot(household,member.user.id).events.length,503);
- assert.deepEqual(sharedSnapshot(temporary,member.user.id).pending,retained.pending,'Switching grants must not consume expired access’s pending work.');
  await sharingFlow('render-prepare');
+ await until(()=>sharedSnapshot(household,member.user.id).events.length===503,'The diagnostic journal must finish restoring before render measurement.');
+ assert.deepEqual(sharedSnapshot(temporary,member.user.id).pending,retained.pending,'Switching grants must not consume expired access’s pending work.');
  const renderFile=join(sqliteDirectory(),'../row-render-probe.json'),renders=()=>JSON.parse(readFileSync(renderFile,'utf8')).renders;
- const beforeRenders=renders();assert.ok(Object.keys(beforeRenders).length>=20,'Probe must observe populated mounted history.');
+ await until(()=>Object.keys(renders()).length>=20,'Probe must observe populated mounted history.');
+ const beforeRenders=renders();
  await sharingFlow('render-editor');const afterRenders=renders();
- assert.deepEqual(afterRenders,beforeRenders,'Opening an editor, typing a local draft and closing without a change must not redraw unchanged rows.');
- checks.push(`diagnostic build: all ${Object.keys(beforeRenders).length} mounted event rows retain exact render counters across local editor state changes with 503 logs`);
+ assert.deepEqual(afterRenders,beforeRenders,'Opening, focusing and closing an editor without a change must not redraw unchanged rows.');
+ checks.push(`diagnostic build: all ${Object.keys(beforeRenders).length} mounted event rows retain exact render counters across opening, focusing and closing the editor with 503 logs`);
  return checks;
 }

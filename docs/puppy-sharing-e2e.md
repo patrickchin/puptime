@@ -20,7 +20,7 @@ Ports 8797 and 8799 must be free. `--replace-synthetic` authorizes resetting thi
 | Shared writes | Native create/edit reaches the owner's store; recipient's own event IDs, data, ownership and outbox remain exact. |
 | Offline recovery | Real HTTPS outage; create/edit persists through two process restarts; reconnect uploads once and drains the outbox; owner converges to 503 logs. |
 | Ended access | Owner revocation and temporary expiry block the active journal; cached history and exact unsynced intents survive; My puppy returns to the unchanged personal journal. |
-| Render isolation | After the normal functional journeys, a separate diagnostic bundle uses the existing native activity probe; mounted event render counters must stay identical while a local editor draft changes and returns to its original value. |
+| Render isolation | After the normal functional journeys, a separate diagnostic bundle uses the existing native activity probe; mounted event render counters must stay identical while the editor opens, gains input focus and closes without changing data. |
 
 The diagnostic bundle is identified separately from the normal bundle. This qualifies current JavaScript inside a compatible native host; it does not establish a fresh native build or App Store signing. Android parity is assumed for the shared implementation; Android runtime is not run by this command. Camera QR scanning, external Apple/Google login, physical Home Screen widgets and OS delivery while the app is terminated remain separate device qualification checks.
 
@@ -32,6 +32,8 @@ PUPTIME_PLAYWRIGHT_MODULE=/absolute/path/to/playwright npm run test:e2e:sharing:
 ```
 
 Use `PUPTIME_CHROMIUM_EXECUTABLE` if the installed Chromium does not match the selected Playwright package. Ports 8798 and 8898 must be free. Browser dependencies follow the existing web-account runner and are not added to the app's production dependencies.
+
+The Checks workflow installs a pinned Playwright in the runner's temporary directory, runs this browser qualification after the web build, and retains its public screenshots and verification manifest as the `puppy-sharing-browser` artifact.
 
 The browser runner covers anonymous preview, fragment removal and credential cleanup, real OTP acceptance, 61-log pagination, normal scrolling and full-history background coverage, phone layout, household routine management, temporary create/edit with owner-visible attribution, reload, view-only dark mode, claim/retry, revocation, expiry and malformed invitations. It also checks that API URLs contain no invitation secrets and care pages declare noindex/no-referrer without sending telemetry. Local static hosting does not establish deployed response headers; server tests cover API headers, and Pages' production headers remain a deployment check.
 

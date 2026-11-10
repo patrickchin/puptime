@@ -9,12 +9,32 @@ name: Account preservation verify
     element:
       id: account.code.input
     direction: DOWN
+- extendedWaitUntil:
+    visible:
+      id: account.code.input
+      enabled: true
+    timeout: 30000
 - waitForAnimationToEnd
 - tapOn:
     id: account.code.input
     retryTapIfNoChange: true
 - waitForAnimationToEnd
 - inputText: ${MAESTRO_TEST_CODE}
+- repeat:
+    times: 2
+    commands:
+      - runFlow:
+          when:
+            notVisible:
+              id: account.code.input
+              text: ^[0-9]{6}$
+          commands:
+            - tapOn:
+                id: account.code.input
+                retryTapIfNoChange: true
+            - eraseText: 6
+            - inputText: ${MAESTRO_TEST_CODE}
+            - waitForAnimationToEnd
 - assertVisible:
     id: account.code.input
     text: ^[0-9]{6}$

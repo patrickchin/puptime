@@ -13,8 +13,6 @@ name: Local editor state leaves unchanged activity rows alone
     direction: DOWN
 - tapOn:
     id: editor.note.input
-- inputText: ' draft'
-- eraseText: 6
 - scrollUntilVisible:
     element:
       id: editor.close

@@ -19,6 +19,20 @@ jobs:
       - run: npm test
       - run: npm run test:web
       - run: npm run build:web
+      - name: Install browser qualification tools
+        run: |
+          npm install --prefix "$RUNNER_TEMP/puptime-playwright" --no-save --package-lock=false playwright@1.65.0
+          node "$RUNNER_TEMP/puptime-playwright/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Qualify puppy sharing in Chromium
+        run: npm run test:e2e:sharing:web
+        env:
+          PUPTIME_PLAYWRIGHT_MODULE: ${{ runner.temp }}/puptime-playwright/node_modules/playwright
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: puppy-sharing-browser
+          path: ~/Pictures/Screenshots/Codex/puptime-sharing-2c13/web/
+          if-no-files-found: ignore
       - run: npm run typecheck:server
       - run: npm run test:server
       - run: npx expo export --platform android --output-dir dist-android

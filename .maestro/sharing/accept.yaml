@@ -29,3 +29,8 @@ name: Recipient accepts invitation in the native app
     notVisible:
       id: screen.sharedPuppies
     timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: header.puppy
+      text: .*Biscuit.*
+    timeout: 30000
