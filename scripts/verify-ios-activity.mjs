@@ -120,6 +120,13 @@ try{
 - tapOn:
     id: editor.close
     retryTapIfNoChange: true
+- runFlow:
+    when:
+      visible:
+        id: editor.close
+    commands:
+      - tapOn:
+          id: editor.close
 - extendedWaitUntil:
     visible:
       id: event.pee.note
