@@ -15,6 +15,13 @@
       let props = try PuptimeWidgetJournal.reconcile(storedProps)
       guard props["canLog"] as? Bool != false else { return nil }
       if let expiry = props["expiresAt"] as? Double, expiry > 0, expiry <= Double(at) { return nil }
+      // A displayed button can outlive a configuration change or nap conflict.
+      let parts = (target ?? "").components(separatedBy: "|")
+      guard parts.count >= 2, parts[0] == "log" else { return nil }
+      let key = parts[1].removingPercentEncoding ?? parts[1]
+      if key == "nap", props["napConflict"] as? Bool == true { return nil }
+      let actions = props["actions"] as? [String] ?? ["pee", "poop", "meal"]
+      guard actions.contains(key) || (key == "nap" && props["openNap"] is [String: Any]) else { return nil }
       environment["target"] = target
       environment["interactionId"] = PuptimeWidgetJournal.newId("evt")
       environment["interactionAt"] = at
@@ -38,7 +45,7 @@
       newTimeline[entryIndex] = newEntry
       WidgetsStorage.set(newTimeline, forKey: "__expo_widgets_\(source)_timeline")
       WidgetsStorage.defaults?.synchronize()
-      return ["source": source, "target": target as Any, "timestamp": at,
+      return ["source": source, "scope": props["scope"] as? String ?? "owner", "target": target as Any, "timestamp": at,
               "eventId": eventId, "type": "ExpoWidgetsUserInteraction"]
     }
     if let eventData {

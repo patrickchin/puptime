@@ -1,5 +1,6 @@
 import {File,Paths} from 'expo-file-system';
 import {openLocalDatabase as originalOpen} from '../../src/local/open.native';
+import {readPurpose} from './sql-purpose';
 export async function openLocalDatabase(...args){
  const opened=await originalOpen(...args),original=opened.database;
  const file=new File(Paths.document,'sql-query-probe.json');
@@ -9,9 +10,9 @@ export async function openLocalDatabase(...args){
  function row(value){return value&&typeof value==='object'&&'source' in value?new Proxy(value,{get(target,key,receiver){if(key==='source'){state.decoded++;later();}return Reflect.get(target,key,receiver);}}):value;}
  function observe(sql){return new Proxy(sql,{get(target,key,receiver){
   if(key!=='getAllAsync'&&key!=='getFirstAsync')return Reflect.get(target,key,receiver);
-  return async(query,...values)=>{const start=Date.now(),result=await target[key](query,...values);
+  return async(query,...values)=>{const purpose=readPurpose(),start=Date.now(),result=await target[key](query,...values);
    if(/\b(?:FROM|JOIN) events\b/i.test(query)){
-    state.reads.push({sql:query,rows:Array.isArray(result)?result.length:result===null?0:1,ms:Date.now()-start});
+    state.reads.push({sql:query,purpose,rows:Array.isArray(result)?result.length:result===null?0:1,ms:Date.now()-start});
     if(state.reads.length>1000)state.reads.shift();later();
    }
    return Array.isArray(result)?result.map(row):row(result);

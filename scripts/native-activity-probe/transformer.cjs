@@ -8,7 +8,11 @@ function inject(src,name,marker,line){
 }
 module.exports={...upstream,transform(args){
  const file=require('node:path').resolve(root,args.filename);
- if(file===root+'/src/components/EventRow.tsx'){
+ if(file===root+'/src/local/backup-guard.ts'){
+  if(!args.src.includes('export async function readBackupData('))throw new Error('Backup observer target changed.');
+  const purpose=require('node:path').join(__dirname,'sql-purpose');
+  args={...args,src:'import {withBackupRead} from '+JSON.stringify(purpose)+';\n'+args.src.replace('export async function readBackupData(','async function readBackupDataImpl(')+'\nexport function readBackupData(sql:SqlExecutor,petId:string){return withBackupRead(()=>readBackupDataImpl(sql,petId));}\n'};
+ }else if(file===root+'/src/components/EventRow.tsx'){
   const marker='  const { activityColors, eventPastLabel, t } = useLocalization();';
   if(args.src.split(marker).length!==2)throw new Error('EventRow render observer target changed.');
   args={...args,src:'import {recordEventRow} from '+JSON.stringify(observer)+';\n'+args.src.replace(marker,'  recordEventRow(event.id);\n'+marker)};

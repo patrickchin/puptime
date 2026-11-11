@@ -8,11 +8,12 @@ import {DEFAULT_NOTIFICATION_PREFERENCES} from './notification-config.ts';
 type MockRequest = { identifier: string; content?: { title?: string; data?: Record<string, unknown> }; trigger?: { type?: string; date?: number; repeats?: boolean; seconds?: number }; [key: string]: unknown };
 const platform={OS:'ios'};
 (globalThis as typeof globalThis&{__puptimeNotificationPlatform:typeof platform}).__puptimeNotificationPlatform=platform;
-const state={expiresAt:null as number|null,ended:false,handler:null as null|{handleNotification:(value:{request:{content:{data:{kind:string}}}})=>Promise<{shouldShowBanner:boolean;shouldShowList:boolean;shouldPlaySound:boolean;shouldSetBadge:boolean}>},delivery:false,granted:true,exactAllowed:true,canAskAgain:true,answer:true,requests:0,writes:[] as boolean[],scheduled:[] as MockRequest[],cancelled:[] as string[],hold:null as null|(()=>Promise<void>),scheduleHold:null as null|(()=>Promise<void>),failure:null as null|'list'|'create'|'cancel',nextId:0};
+const state={expiresAt:null as number|null,ended:false,handler:null as null|{handleNotification:(value:{request:{content:{data:{kind:string}}}})=>Promise<{shouldShowBanner:boolean;shouldShowList:boolean;shouldPlaySound:boolean;shouldSetBadge:boolean}>},delivery:false,granted:true,exactAllowed:true,canAskAgain:true,answer:true,requests:0,writes:[] as boolean[],scheduled:[] as MockRequest[],cancelled:[] as string[],hold:null as null|(()=>Promise<void>),scheduleHold:null as null|(()=>Promise<void>),failure:null as null|'list'|'create'|'cancel',nextId:0,nativeSnapshots:[] as unknown[],nativeHold:null as null|(()=>Promise<void>)};
 (globalThis as typeof globalThis&{__puptimeNotificationTest:typeof state}).__puptimeNotificationTest=state;
 registerHooks({
  resolve(specifier,context,next){
   if(context.parentURL===new URL('./reminders.ts',import.meta.url).href){
+   if(specifier==='./widgets/sync')return {url:'puptime-test:widget',shortCircuit:true};
    if(specifier==='./care-access')return {url:'puptime-test:care',shortCircuit:true};
    if(specifier==='expo-notifications')return {url:'puptime-test:notifications',shortCircuit:true};
    if(specifier==='react-native')return {url:'puptime-test:platform',shortCircuit:true};
@@ -23,6 +24,7 @@ registerHooks({
   return next(specifier,context);
  },
  load(url,context,next){
+  if(url==='puptime-test:widget')return {format:'module',source:'const s=globalThis.__puptimeNotificationTest;export async function updateHomeWidget(events){if(s.nativeHold)await s.nativeHold();if(s.failure==="create")throw new Error("native reconciliation failed");s.nativeSnapshots.push(events);}',shortCircuit:true};
   if(url==='puptime-test:care')return {format:'module',source:'const s=globalThis.__puptimeNotificationTest;export async function getCareAccess(){return {scope:"owner",expiresAt:s.expiresAt,canLog:!s.ended,ended:s.ended};}',shortCircuit:true};
   if(url==='puptime-test:platform')return {format:'module',source:'export const Platform=globalThis.__puptimeNotificationPlatform;',shortCircuit:true};
   if(url==='puptime-test:exact')return {format:'module',source:'export async function refreshExactReminderScheduling(){return globalThis.__puptimeNotificationTest.exactAllowed;}',shortCircuit:true};
@@ -46,7 +48,7 @@ registerHooks({
 });
 const reminders=await import('./reminders.ts');
 const routine={id:'break',type:'pee' as const,minutes:420,reminder:true};
-function reset(){Object.assign(state,{expiresAt:null,ended:false,delivery:false,granted:true,exactAllowed:true,canAskAgain:true,answer:true,requests:0,writes:[],scheduled:[],cancelled:[],hold:null,scheduleHold:null,failure:null,nextId:0});}
+function reset(){Object.assign(state,{expiresAt:null,ended:false,delivery:false,granted:true,exactAllowed:true,canAskAgain:true,answer:true,requests:0,writes:[],scheduled:[],cancelled:[],hold:null,scheduleHold:null,failure:null,nextId:0,nativeSnapshots:[],nativeHold:null});}
 
 test('Android one-off reminders require exact access without blocking immediate widget confirmations',async()=>{
  reset();platform.OS='android';state.delivery=true;state.exactAllowed=false;
@@ -90,12 +92,14 @@ test('the OS scheduler applies independent signed meal and poop offsets',async()
 });
 
 test('device delivery off cancels only owned reminders even with granted permission and synced preferences',async()=>{
+ platform.OS='android';try{
  reset();state.scheduled=[{identifier:'puptime-routine-old'},{identifier:'puptime-activity-afterPee'},{identifier:'puptime-widget-keep'},{identifier:'another-request'}];
  const now=Date.now();
  assert.equal(await reminders.syncScheduleReminders([routine]),false);
  assert.equal(await reminders.syncPottyReminders([{id:'fresh',type:'pee',at:now,source:'app'}],DEFAULT_NOTIFICATION_PREFERENCES,'en',now),false);
  assert.deepEqual(state.scheduled.map(value=>value.identifier),['puptime-widget-keep','another-request']);
  assert.equal(state.requests,0);
+ }finally{platform.OS='ios';}
 });
 
 test('explicit opt-in is saved before allow deny or blocked permission actions',async()=>{
@@ -106,6 +110,7 @@ test('explicit opt-in is saved before allow deny or blocked permission actions',
 });
 
 test('delivery opt-in still requires current OS access and never replays old restored potty logs',async()=>{
+ platform.OS='android';try{
  reset();state.delivery=true;
  await reminders.syncScheduleReminders([routine]);assert.equal(state.scheduled.length,1);
  state.granted=false;assert.equal(await reminders.syncScheduleReminders([routine]),false);assert.equal(state.scheduled.length,0);
@@ -113,6 +118,7 @@ test('delivery opt-in still requires current OS access and never replays old res
  assert.equal(await reminders.syncPottyReminders([{id:'old',type:'pee',at:now-86400000,source:'app'}],DEFAULT_NOTIFICATION_PREFERENCES,'en',now),true);assert.equal(state.scheduled.length,0);
  assert.equal(await reminders.syncPottyReminders([{id:'fresh',type:'pee',at:now,source:'app'}],DEFAULT_NOTIFICATION_PREFERENCES,'en',now),true);assert.equal(state.scheduled.length,1);
  state.delivery=false;await reminders.syncPottyReminders([],DEFAULT_NOTIFICATION_PREFERENCES,'en',now);assert.equal(state.scheduled.length,0);
+ }finally{platform.OS='ios';}
 });
 
 test('turning delivery off wins over a notification write already in flight',async()=>{
@@ -246,8 +252,9 @@ test('potty replacement counts retained one-offs and routines before changing an
  assert.deepEqual(state.scheduled,before);assert.deepEqual(state.cancelled,[]);
 });
 
-test('normal routine and potty replacement can fill exactly64 slots while preserving one-offs and unrelated native markers',async()=>{
+test('iOS routine and Android potty replacement preserve one-offs and unrelated native markers',async()=>{
  for(const kind of ['routine','potty']){
+  platform.OS=kind==='routine'?'ios':'android';
   reset();state.delivery=true;await sixtyTimedReminders();
   const other=kind==='routine'?'puptime-activity-afterPee':'puptime-routine-keep';
   state.scheduled.push({identifier:other},{identifier:'foreign-version',content:{data:{app:'com.patrickchin.puptime',kind:'customTimedReminder',version:2}}});
@@ -262,6 +269,7 @@ test('normal routine and potty replacement can fill exactly64 slots while preser
   const replacementIds=kind==='routine'?['puptime-routine-routine-0','puptime-routine-routine-1']:['puptime-activity-afterPee','puptime-activity-afterMeal'];
   assert.deepEqual(state.scheduled.slice(62).map(item=>item.identifier),replacementIds);
  }
+ platform.OS='ios';
 });
 
 test('full native queues still cancel owned replacements when device delivery or OS access is off or plans are empty',async()=>{
@@ -273,7 +281,9 @@ test('full native queues still cancel owned replacements when device delivery or
   if(unavailable==='permission-off')state.granted=false;
   const now=Date.now(),expected=unavailable==='no-plans';
   assert.equal(await reminders.syncScheduleReminders(expected?[]:fiveRoutines),expected);
-  assert.equal(await reminders.syncPottyReminders(expected?[]:freshPottyEvents(now),DEFAULT_NOTIFICATION_PREFERENCES,'en',now),expected);
+  platform.OS='android';
+  try{assert.equal(await reminders.syncPottyReminders(expected?[]:freshPottyEvents(now),DEFAULT_NOTIFICATION_PREFERENCES,'en',now),expected);}
+  finally{platform.OS='ios';}
   assert.deepEqual(state.scheduled,retained);assert.deepEqual(state.cancelled,['puptime-routine-old','puptime-activity-old']);
  }
 });
@@ -302,4 +312,20 @@ test('temporary care reminders stop at the access deadline, including when the a
  assert.ok(state.scheduled.length>=2);assert.ok(state.scheduled.every(request=>request.trigger?.type==='date'&&Number(request.trigger.date)<state.expiresAt!));
  await assert.rejects(reminders.createCustomTimedReminder({petId:'shared',label:'Too late',at:state.expiresAt+1}),/before your access ends/);
  state.ended=true;await reminders.syncScheduleReminders([routine]);assert.equal(state.scheduled.length,0);
+});
+
+
+test('iOS potty sync awaits the shared native snapshot scheduler instead of adding a competing Expo request',async()=>{
+ reset();platform.OS='ios';state.delivery=true;
+ const events=freshPottyEvents(Date.now());
+ let entered!:()=>void,release!:()=>void,finished=false;
+ const ready=new Promise<void>(resolve=>{entered=resolve;}),gate=new Promise<void>(resolve=>{release=resolve;});
+ state.nativeHold=()=>{entered();return gate;};
+ const syncing=reminders.syncPottyReminders(events,DEFAULT_NOTIFICATION_PREFERENCES).then(result=>{finished=true;return result;});
+ await ready;assert.equal(finished,false);assert.equal(state.scheduled.length,0);
+ release();assert.equal(await syncing,true);assert.deepEqual(state.nativeSnapshots,[events]);assert.equal(state.scheduled.length,0);
+ state.nativeHold=null;state.failure='create';await assert.rejects(reminders.syncPottyReminders(events,DEFAULT_NOTIFICATION_PREFERENCES),/native reconciliation failed/);
+ state.failure=null;state.delivery=false;
+ assert.equal(await reminders.syncPottyReminders(events,DEFAULT_NOTIFICATION_PREFERENCES),false);
+ assert.equal(state.nativeSnapshots.length,2,'Opt-out still publishes a snapshot to cancel native reminders');
 });

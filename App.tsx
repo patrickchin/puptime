@@ -27,7 +27,6 @@ import {
 } from './src/localization';
 import {
   createEvent,
-  createNapEvent,
   activityKey,
   DEFAULT_WIDGET_ACTIONS,
   isOpenNap,
@@ -101,7 +100,7 @@ function ActiveJournal(){const session=useCareSession();return <PuptimeApp key={
 
 export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboarding?:boolean}={}) {
   const careSession=useCareSession(),care=careSession.selection;
-  const {appendEvents,completeOnboarding,loadActivityCustomizations,importEvents,loadEvents,loadCustomActivities,loadLanguagePreference,loadNotificationPreferences,loadSchedule,loadThemePreference,loadWidgetActions,removeEvent,saveSchedule,saveScheduleEntry,removeScheduleEntry,saveCustomActivity,saveLanguagePreference,saveNotificationPreferences,saveThemePreference,saveWidgetActions,shouldShowOnboarding,updateEvent}=careSession.runtime?.storage??defaultStorage;
+  const {appendEvents,appendWidgetEvents,toggleNap,completeOnboarding,loadActivityCustomizations,importEvents,loadEvents,loadCustomActivities,loadLanguagePreference,loadNotificationPreferences,loadSchedule,loadThemePreference,loadWidgetActions,removeEvent,saveSchedule,saveScheduleEntry,removeScheduleEntry,saveCustomActivity,saveLanguagePreference,saveNotificationPreferences,saveThemePreference,saveWidgetActions,shouldShowOnboarding,updateEvent}=careSession.runtime?.storage??defaultStorage;
   const getActivityData=careSession.runtime?async()=>careSession.runtime!.activity:defaultGetActivityData;
   const getActivityPetId=careSession.runtime?async()=>careSession.runtime!.petId:defaultGetActivityPetId;
   const getEventHistoryData=careSession.runtime?async()=>careSession.runtime!.history:defaultGetEventHistoryData;
@@ -189,7 +188,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     activityRef.current=data;
     const pending = await readPendingWidgetEvents();
     if (pending.length) {
-      await appendEvents(pending);
+      await appendWidgetEvents(pending);
       await acknowledgePendingWidgetEvents(pending);
     }
     let nextEvents:PuppyEvent[],count:number;
@@ -456,26 +455,18 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     if (!nativeApp && type === 'custom' && customLabel) setCustomActivities(await saveCustomActivity(customLabel));
     const now = Date.now();
     if (type === 'nap') {
-      const openNap = (activityRef.current?await activityRef.current.latestEvents():await loadEvents()).find(isOpenNap);
-      if (openNap) {
-        const event = { ...openNap, endedAt: Math.max(openNap.at, now) };
-        await updateEvent(openNap.id, { endedAt: event.endedAt });
-        productTelemetry.capture('app_log_action', { action: 'nap_end', activity_type: 'nap', source: 'app', result: 'success' });
-        setUndoState({ event, restore: openNap, message: translate(language, 'app.napEnded') });
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-        await refreshCommittedState();
-        return;
-      }
+      const {event,previous}=await toggleNap('app',now);
+      productTelemetry.capture('app_log_action',{action:previous?'nap_end':'create',activity_type:'nap',source:'app',result:'success'});
+      setUndoState({event,...(previous?{restore:previous}:{}),message:translate(language,previous?'app.napEnded':'app.napStarted')});
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(()=>undefined);
+      await refreshCommittedState();setShowSpotlight(false);return;
     }
-
-    const event = type === 'nap' ? createNapEvent('app', now) : createEvent(type, 'app', now, customLabel);
+    const event = createEvent(type, 'app', now, customLabel);
     await appendEvents([event],{restoreCustomActivities:type==='custom'});
     productTelemetry.capture('app_log_action', { action: 'create', activity_type: type, source: 'app', result: 'success' });
     setUndoState({
       event,
-      message: type === 'nap'
-        ? translate(language, 'app.napStarted')
-        : translate(language, 'app.logged', { activity: displayPastLabel(event) }),
+      message: translate(language, 'app.logged', { activity: displayPastLabel(event) }),
     });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
     await refreshCommittedState();

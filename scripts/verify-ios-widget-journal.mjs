@@ -38,6 +38,14 @@ let nap: [String: Any] = ["id": "evt_nap", "type": "nap", "at": 100]
 let closed = nap.merging(["endedAt": 100]) { _, new in new }
 let recovered = PuptimeWidgetJournal.reconcile(["pending": [nap], "openNap": nap], operations: [closed, nap])
 precondition(recovered["openNap"] as? Bool == false)
+let secondNap: [String: Any] = ["id": "evt_other_nap", "type": "nap", "at": 200]
+let conflicted = PuptimeWidgetJournal.reconcile(["pending": [], "openNap": nap, "actions": ["nap", "pee"]], operations: [secondNap])
+precondition(conflicted["napConflict"] as? Bool == true && conflicted["openNap"] as? Bool == false)
+precondition(conflicted["actions"] as? [String] == ["pee"])
+let stillConflicted = PuptimeWidgetJournal.reconcile(["pending": [], "napConflict": true, "openNap": false, "actions": ["nap", "pee"]], operations: [nap])
+precondition(stillConflicted["napConflict"] as? Bool == true && stillConflicted["openNap"] as? Bool == false)
+let oneRemaining = PuptimeWidgetJournal.reconcile(["pending": [], "openNap": nap], operations: [secondNap, closed])
+precondition((oneRemaining["openNap"] as? [String: Any])?["id"] as? String == "evt_other_nap")
 do {
   try PuptimeWidgetJournal.record(nap, in: files[0])
   fatalError("A failed journal write must throw before confirmation.")

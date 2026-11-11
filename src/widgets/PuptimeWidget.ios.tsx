@@ -21,10 +21,11 @@ import type { QuickEventTimes, ActivityKey, QuickEventType } from '../domain';
 export type WidgetPendingEvent = { scope?:string;id: string; type: QuickEventType | 'custom'; customLabel?: string; at: number; endedAt?: number };
 
 export type PuptimeWidgetProps = {
-  scope?:string;expiresAt?:number;canLog?:boolean;
+  scope?:string;expiresAt?:number;canLog?:boolean;canNotify?:boolean;
   pending: WidgetPendingEvent[];
   // iOS UserDefaults rejects null inside widget snapshots.
   openNap?: WidgetPendingEvent | false;
+  napConflict?: boolean;
   lastEventAt?: QuickEventTimes;
   actions?: ActivityKey[];
   actionDetails?: Record<string, { label: string; lightColor: string; darkColor: string }>;
@@ -33,6 +34,7 @@ export type PuptimeWidgetProps = {
     dark: { background: string; surface: string; controlRadius: number };
   };
   notificationConfirmations?: boolean;
+  notificationDelivery?: boolean;
   quietStatus?: { enabled: boolean; name: string; petId: string };
   pottyAfterPeeMinutes?: number;
   pottyAfterMealMinutes?: number;
@@ -43,7 +45,7 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
   'widget';
   const pending = props.pending ?? [];
   const configuredActions = props.actions ?? ['pee', 'poop', 'meal'];
-  const visibleActions = props.openNap && !configuredActions.includes('nap')
+  const visibleActions = props.napConflict ? configuredActions.filter(action=>action!=='nap') : props.openNap && !configuredActions.includes('nap')
     ? [...configuredActions.slice(0, 3), 'nap' as const]
     : configuredActions;
   const appearance = props.appearance?.[environment.colorScheme === 'dark' ? 'dark' : 'light']
@@ -51,19 +53,23 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
   const background = { type: 'linearGradient' as const, colors: [appearance.background, appearance.surface], startPoint: { x: 0, y: 0 }, endPoint: { x: 1, y: 1 } };
   const add = (type: ActivityKey): PuptimeWidgetProps => {
     if(props.canLog===false||props.expiresAt&&props.expiresAt<=Date.now())return props;
+    if(type==='nap'&&props.napConflict)return props;
+    if(!configuredActions.includes(type)&&!(type==='nap'&&props.openNap))return props;
     const interaction = environment as WidgetEnvironment & { interactionId?: string; interactionAt?: number };
     const at = interaction.interactionAt ?? Date.now();
     const customLabel = type.startsWith('custom:') ? props.actionDetails?.[type]?.label ?? type.slice(7) : undefined;
     if (type === 'nap' && props.openNap) {
       const completed = { ...props.openNap, endedAt: Math.max(props.openNap.at, at) };
       return {
-        scope:props.scope,expiresAt:props.expiresAt,canLog:props.canLog,
+        scope:props.scope,expiresAt:props.expiresAt,canLog:props.canLog,canNotify:props.canNotify,
         openNap: false,
+        napConflict: props.napConflict,
         lastEventAt: { ...props.lastEventAt, nap: at },
         actions: configuredActions,
         actionDetails: props.actionDetails,
         appearance: props.appearance,
         notificationConfirmations: props.notificationConfirmations,
+        notificationDelivery: props.notificationDelivery,
         quietStatus: props.quietStatus,
         pottyAfterPeeMinutes: props.pottyAfterPeeMinutes,
         pottyAfterMealMinutes: props.pottyAfterMealMinutes,
@@ -79,13 +85,15 @@ const PuptimeWidgetView = (props: PuptimeWidgetProps, environment: WidgetEnviron
       at,
     };
     return {
-      scope:props.scope,expiresAt:props.expiresAt,canLog:props.canLog,
+      scope:props.scope,expiresAt:props.expiresAt,canLog:props.canLog,canNotify:props.canNotify,
       openNap: type === 'nap' ? event : props.openNap ?? false,
+      napConflict: props.napConflict,
       lastEventAt: { ...props.lastEventAt, [type]: at },
       actions: configuredActions,
       actionDetails: props.actionDetails,
       appearance: props.appearance,
       notificationConfirmations: props.notificationConfirmations,
+      notificationDelivery: props.notificationDelivery,
       quietStatus: props.quietStatus,
       pottyAfterPeeMinutes: props.pottyAfterPeeMinutes,
       pottyAfterMealMinutes: props.pottyAfterMealMinutes,

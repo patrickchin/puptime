@@ -1,11 +1,12 @@
-import {memo,useCallback,useEffect,useRef,useState} from 'react';
+import {memo,useCallback,useEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
 import Head from 'expo-router/head';
 import {getWebAccountClient,checkResult} from './account-client';
-import {createCareClient,CareError,type CareClient,type CarePage as Page,type CarePreview,type CareRow} from './care-client';
-import {shareIdSchema,inviteTokenSchema,reuseCareRows as reuseRows,careEditPatch,type CareWrite} from '../sharing';
+import {createCareClient,CareError,type CareClient,type CarePreview,type CareRow} from './care-client';
+import {shareIdSchema,inviteTokenSchema,careEditPatch,type CareWrite} from '../sharing';
 import {entityId} from '../entity-id';
 import {eventTypes,type EventType} from '../domain';
 import {websiteStyles} from './brand';
+import {createCareHistory,loadCareRoutines} from './care-history';
 
 const activityNames:Record<EventType,string>={pee:'Pee',poop:'Poop',meal:'Meal',pottyTrip:'Potty break',walk:'Walk',nap:'Nap',custom:'Other activity'};
 const dateTime=(at:number)=>new Intl.DateTimeFormat(undefined,{dateStyle:'medium',timeStyle:'short'}).format(at);
@@ -33,51 +34,47 @@ export default function CarePage(){
  </div>;
 }
 function CareContent({client,id,token,clearToken}:{client:CareClient;id:string|null;token:string|null;clearToken:()=>void}){
- const [preview,setPreview]=useState<CarePreview|null>(null),[page,setPage]=useState<Page|null>(null),[routines,setRoutines]=useState<CareRow[]>([]),[puppies,setPuppies]=useState<{id:string;name:string;ownerName:string}[]|null>(null);
+ const [preview,setPreview]=useState<CarePreview|null>(null),[puppies,setPuppies]=useState<{id:string;name:string;ownerName:string}[]|null>(null);
  const [error,setError]=useState(''),[loading,setLoading]=useState(true),[accepting,setAccepting]=useState(false),[signedIn,setSignedIn]=useState<string|null>(null),[retry,setRetry]=useState(0),[needsSignIn,setNeedsSignIn]=useState(false);
  const generation=useRef(0),acceptLock=useRef(false);
- const [newLog,setNewLog]=useState(false),[newRoutine,setNewRoutine]=useState(false),[busy,setBusy]=useState(false);
+ const [newLog,setNewLog]=useState(false),[newRoutine,setNewRoutine]=useState(false);
+ const history=useMemo(()=>createCareHistory(client,id??''),[client,id]);
+ const historyState=useSyncExternalStore(history.subscribe,history.read,history.read);
+ const page='page' in historyState?historyState.page:null,routines='routines' in historyState?historyState.routines:[];
+ const busy=historyState.kind==='refreshing'||historyState.kind==='loading-more';
+ const shownError='problem' in historyState&&historyState.problem?problem(historyState.problem):error;
  const active=useRef(true);useEffect(()=>{active.current=true;return()=>{active.current=false;generation.current++;};},[]);
  useEffect(()=>{
-  const ticket=++generation.current;setLoading(true);setError('');setPage(null);setPreview(null);setNeedsSignIn(false);
+  const ticket=++generation.current;setLoading(true);setError('');history.reset();setPreview(null);setNeedsSignIn(false);
   void(async()=>{
    try{
     if(!id){const result=await client.puppies();if(ticket===generation.current)setPuppies(result.puppies);return;}
     try{
-     const [logs,routine]=await Promise.all([client.page(id),allRoutines(client,id)]);
-     if(ticket===generation.current){setPage(logs);setRoutines(routine);if(token)clearToken();}return;
+     const [logs,routine]=await Promise.all([client.page(id),loadCareRoutines(client,id)]);
+     if(ticket===generation.current){history.initialize(logs,routine);if(token)clearToken();}return;
     }catch(reason){if(!(reason instanceof CareError)||reason.status!==401||!token)throw reason;}
     const next=await client.preview(id,token);if(ticket===generation.current)setPreview(next);
    }catch(reason){if(ticket===generation.current){setError(problem(reason));setNeedsSignIn(reason instanceof CareError&&reason.status===401);}}
    finally{if(ticket===generation.current)setLoading(false);}
   })();
- },[client,id,retry,signedIn]);
- const refresh=useCallback(async()=>{
-  if(!id)return;const ticket=generation.current;
-  try{
-   const [logs,routine]=await Promise.all([client.page(id),allRoutines(client,id)]);
-   if(active.current&&ticket===generation.current){setPage(previous=>({...logs,records:reuseRows(previous?.records??[],logs.records)}));setRoutines(previous=>reuseRows(previous,routine));setError('');}
-  }catch(reason){if(active.current&&ticket===generation.current){setError(problem(reason));if(reason instanceof CareError&&[401,403,410].includes(reason.status)){setPage(null);setRoutines([]);}}}
- },[client,id]);
+  return()=>{generation.current++;history.reset();};
+ },[client,id,retry,signedIn,history]);
+ const refresh=useCallback(()=>history.refresh(),[history]);
  useEffect(()=>{
   if(!page||busy)return;
   const timer=setInterval(()=>{if(document.visibilityState==='visible')void refresh();},15000);
   return()=>clearInterval(timer);
  },[!!page,busy,refresh]);
- const write=useCallback(async(input:CareWrite)=>{if(!id)return;await client.write(id,input);await refresh();},[client,id,refresh]);
+ const write=useCallback(async(input:CareWrite)=>{if(!id)return;await client.write(id,input);await history.refreshAfterWrite();},[client,id,history]);
  async function accept(){
   if(!id||!token||acceptLock.current)return;acceptLock.current=true;setAccepting(true);setError('');
   try{await client.accept(id,token);clearToken();setRetry(value=>value+1);}
   catch(reason){setError(problem(reason));}finally{acceptLock.current=false;if(active.current)setAccepting(false);}
  }
- async function more(){
-  if(!id||!page?.nextCursor||busy)return;setBusy(true);const ticket=generation.current;
-  try{const next=await client.page(id,'event',page.nextCursor);if(active.current&&ticket===generation.current)setPage(current=>current?{...current,records:[...current.records,...next.records.filter(row=>!current.records.some(old=>old.record.id===row.record.id))],nextCursor:next.nextCursor}:current);}
-  catch(reason){setError(problem(reason));}finally{if(active.current)setBusy(false);}
- }
+ const more=()=>history.more();
  if(loading)return <p role="status">Loading puppy care…</p>;
  if(!id)return <><p className="eyebrow">YOUR HOUSEHOLD</p><h1>Shared puppies</h1>{error&&!needsSignIn?<p role="alert" className="care-error">{error}</p>:null}{puppies?<>{puppies.length?<ul className="puppy-list">{puppies.map(puppy=><li key={puppy.id}><a href={`/care?invite=${puppy.id}`}><strong>{puppy.name}</strong><span>Shared by {puppy.ownerName||'their owner'}</span></a></li>)}</ul>:<p>No puppies have been shared with this account yet. Open the invitation your household member sent you.</p>}<a href="/account">Your account</a></>:needsSignIn?<><p>Sign in to see puppies shared with you. For temporary care, open your invitation link.</p><CareSignIn onSignedIn={setSignedIn}/><button onClick={()=>setRetry(value=>value+1)}>Try again</button></>:<button onClick={()=>setRetry(value=>value+1)}>Try again</button>}</>;
- if(!page)return <>{error?<p role="alert" className="care-error">{error}</p>:null}{preview?<>
+ if(!page)return <>{shownError?<p role="alert" className="care-error">{shownError}</p>:null}{preview?<>
   <p className="eyebrow">SHARED BY {preview.ownerName||'THEIR OWNER'}</p><h1>You’re looking after {preview.puppyName}.</h1>
   <p>{preview.share.kind==='household'?'Use the full Puptime app with your own account. Your access continues until the owner removes it.':`Use the full Puptime app with your own account, including offline logging, reminders and widgets. Access ends ${dateTime(preview.share.expiresAt!)}.`}</p>
   <p><a className="primary" href={`puptime://care?invite=${id}#${token}`}>Open in Puptime</a></p>
@@ -89,8 +86,8 @@ function CareContent({client,id,token,clearToken}:{client:CareClient;id:string|n
   <p className="eyebrow">{household?'HOUSEHOLD MEMBER':'TEMPORARY CARE'} · {household?'UNTIL REMOVED':`ENDS ${dateTime(page.share.expiresAt!)}`}</p>
   <h1>{page.puppyName}</h1><p className="muted">Shared by {page.ownerName||'their owner'} · {page.actorName}</p>
   {<p><a href={`puptime://care?invite=${page.share.id}`}>Open in Puptime</a></p>}
-  {error?<p role="alert" className="care-error">{error}</p>:null}
-  <div className="care-actions">{canAdd?<button className="primary" onClick={()=>setNewLog(true)}>Log an activity</button>:<span className="care-pill">View only</span>}<button onClick={()=>{void refresh();}}>Refresh logs</button></div>
+  {shownError?<p role="alert" className="care-error">{shownError}</p>:null}
+  <div className="care-actions">{canAdd?<button className="primary" onClick={()=>setNewLog(true)}>Log an activity</button>:<span className="care-pill">View only</span>}<button disabled={busy} onClick={()=>{void refresh();}}>{historyState.kind==='refreshing'?'Refreshing…':'Refresh logs'}</button></div>
   {newLog?<CareEditor kind="event" write={write} onClose={()=>setNewLog(false)}/>:null}
   <section aria-labelledby="routine-heading"><div className="section-heading"><h2 id="routine-heading">Daily routine</h2>{household?<button onClick={()=>setNewRoutine(true)}>Add routine</button>:null}</div>
    {newRoutine?<CareEditor kind="routine" write={write} onClose={()=>setNewRoutine(false)}/>:null}
@@ -102,7 +99,6 @@ function CareContent({client,id,token,clearToken}:{client:CareClient;id:string|n
   </section>
  </>;
 }
-async function allRoutines(client:CareClient,id:string){const rows:CareRow[]=[];let after=0;do{const page=await client.page(id,'routine',after);rows.push(...page.records);if(page.nextCursor===null)return rows;after=page.nextCursor;}while(rows.length<1000);throw new Error('Too many routines to display.');}
 const CareLogRow=memo(function CareLogRow({row,write,allowEdit}:{row:CareRow;write:(input:CareWrite)=>Promise<void>;allowEdit:boolean}){
  const [editing,setEditing]=useState<CareRow|null>(null),record=row.record,data=record.data;
  if(record.kind!=='event'&&record.kind!=='routine'||!('type' in data))return null;

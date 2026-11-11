@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useEffect,useState } from 'react';
+import { useEffect,useRef,useState } from 'react';
 import { Alert,KeyboardAvoidingView,Linking,ScrollView,StyleSheet,Switch,Text,View } from 'react-native';
 import { Pressable } from '../components/TelemetryPressable';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +14,8 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
   const {t,locale}=useLocalization(),state=useAccountSnapshot(cloud.controller);
   const [localName,setLocalName]=useState<string|null>(null),[readFailed,setReadFailed]=useState(false);
   const [samePuppy,setSamePuppy]=useState(false);
+  const mounted=useRef(true);
+  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
   const account=state?.account,existing=account?.pets[0],busy=state?.busy??false;
   const status=accountStatus(state),errorKey=accountProblemKey(state?.problem??(readFailed?'local-storage':null));
   const enrolled=!!state?.sync?.accountId&&state.sync.state!=='local';
@@ -27,10 +29,13 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
   const shownName=name==='My puppy'||!name?t('account.defaultName'):name;
   const count=state?.local?.eventCount??eventCount;
   const countLabel=(value:number)=>t(value===1?'account.logsOne':'account.logsMany',{count:new Intl.NumberFormat(locale).format(value)});
-  const signOut=()=>Alert.alert(t('account.signOutTitle'),t('account.signOutBody',{count:state?.sync?.pending??0}),[
-    {text:t('account.cancel'),style:'cancel'},
-    {text:t('account.signOut'),style:'destructive',onPress:()=>{void cloud.controller?.signOut({confirmPending:true});}},
-  ]);
+  function signOut() {
+    const current=cloud.controller?.read(),confirmedThrough=current?.sync?.pendingThrough??0;
+    Alert.alert(t('account.signOutTitle'),t('account.signOutBody',{count:current?.sync?.pending??0}),[
+      {text:t('account.cancel'),style:'cancel'},
+      {text:t('account.signOut'),style:'destructive',onPress:()=>{void cloud.controller?.signOut({confirmPending:true,confirmedThrough}).then(result=>{if(mounted.current&&result==='pending-confirmation-required')signOut();});}},
+    ]);
+  }
   return <SafeAreaView style={[styles.root,{backgroundColor:theme.background}]} edges={['top','bottom']}>
     <KeyboardAvoidingView behavior="padding" style={styles.root}>
       <ScrollView testID="screen.account" keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>

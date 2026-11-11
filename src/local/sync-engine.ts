@@ -92,7 +92,7 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
     // reads and writes stay outside validation catches, so corruption rolls back.
     try {recordId=cloudRecordId(change.kind,change.kind==='accountPreferences'?null:pet.cloud_pet_id,change.kind==='puppy'?pet.cloud_pet_id!:change.localId);} catch {}
     const base=recordId?await mirrored(sql,current.generation,recordId):null;
-    const prior=await sql.getAllAsync<Outbox>('SELECT * FROM local_sync_outbox WHERE generation=? AND local_pet_id=? AND local_kind=? AND local_id=? AND mutation_json IS NOT NULL',current.generation,pet.pet_id,change.kind,change.localId);
+    const prior=await sql.getAllAsync<Outbox>('SELECT * FROM local_sync_outbox WHERE generation=? AND local_pet_id=? AND local_kind=? AND local_id=? AND mutation_json IS NOT NULL AND blocked_reason IS NULL',current.generation,pet.pet_id,change.kind,change.localId);
     const hasCreate=prior.some(row=>mutationSchema.parse(JSON.parse(row.mutation_json!)).intent==='create');
     const intent=change.after===null?'delete':restoreMissing&&change.before===null&&base?.deleted?'restore':!base&&!hasCreate?'create':'patch';
     if (intent==='delete'&&!base&&!hasCreate) {
@@ -478,12 +478,20 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
       if(result.changed)notifyLocalCommit(options.afterCommit);
       return result.event;
     },
-    async detach(input:Fence):Promise<void> {await database.write(async sql=>{await required(sql,input);await options.beforeChange?.(sql,'account-change');await sql.runAsync('DELETE FROM local_sync_owner WHERE generation=?',input.generation);await clearRestoreIntent(sql);});},
-    async status(petId:string):Promise<{state:'local'|'preparing'|'active'|'resyncing';generation:string|null;accountId:string|null;pending:number;blocked:number;cursor:number}> {
+    async detach(input:Fence&{confirmedThrough?:number}):Promise<boolean> {
+      const confirmedThrough=z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).parse(input.confirmedThrough??0);
+      return database.write(async sql=>{
+        await required(sql,input);
+        if(await sql.getFirstAsync('SELECT sequence FROM local_sync_outbox WHERE generation=? AND sequence>? LIMIT 1',input.generation,confirmedThrough))return false;
+        await options.beforeChange?.(sql,'account-change');
+        await sql.runAsync('DELETE FROM local_sync_owner WHERE generation=?',input.generation);await clearRestoreIntent(sql);return true;
+      });
+    },
+    async status(petId:string):Promise<{state:'local'|'preparing'|'active'|'resyncing';generation:string|null;accountId:string|null;pending:number;pendingThrough:number;blocked:number;cursor:number}> {
       return database.read(async sql=>{
         const current=await owner(sql),pet=await binding(sql,petId);
-        if (!current||!pet) return {state:'local',generation:null,accountId:null,pending:0,blocked:0,cursor:0};
-        const counts=(await sql.getFirstAsync<{pending:number;blocked:number}>('SELECT COUNT(*) pending,COALESCE(SUM(blocked_reason IS NOT NULL),0) blocked FROM local_sync_outbox WHERE generation=?',current.generation))!;
+        if (!current||!pet) return {state:'local',generation:null,accountId:null,pending:0,pendingThrough:0,blocked:0,cursor:0};
+        const counts=(await sql.getFirstAsync<{pending:number;pendingThrough:number;blocked:number}>('SELECT COUNT(*) pending,COALESCE(MAX(sequence),0) pendingThrough,COALESCE(SUM(blocked_reason IS NOT NULL),0) blocked FROM local_sync_outbox WHERE generation=?',current.generation))!;
         return {state:current.resyncing?'resyncing':pet.status,generation:current.generation,accountId:current.account_id,...counts,cursor:current.cursor};
       });
     },

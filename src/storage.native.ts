@@ -16,7 +16,9 @@ export const saveFirstLaunchStep = async (step:FirstLaunchStep) => (await storag
 export const saveFirstLaunchProfile = async (name:string) => (await storage()).saveFirstLaunchProfile(name);
 export const completeOnboarding = async (options?:FinishOnboardingOptions) => (await storage()).completeOnboarding(options);
 export const loadEvents = async () => (await storage()).loadEvents();
+export const toggleNap = async (source:PuppyEvent['source'],at?:number) => (await storage()).toggleNap(source,at);
 export const appendEvents = async (events: PuppyEvent[],options?:EventWriteOptions) => (await storage()).appendEvents(events,options);
+export const appendWidgetEvents = async (events: PuppyEvent[]) => (await storage()).appendWidgetEvents(events);
 export const importEvents = async (events: PuppyEvent[]) => (await storage()).importEvents(events);
 export const removeEvent = async (id: string) => (await storage()).removeEvent(id);
 export const updateEventTime = async (id: string, at: number) => (await storage()).updateEventTime(id, at);

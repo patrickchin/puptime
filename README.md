@@ -77,6 +77,8 @@ Enable **Notifications → Quiet puppy status** for a single silent quick-log ca
 
 Routine suggestions also stay on the device. Puptime checks the last 14 completed days and finds recurring time windows across distinct recorded days. The review shows typical variation and how many days support each pattern; extra taps and skipped early activities do not shift every later slot. These windows are guides, not deadlines. You review the full suggestion before replacing the current routine. Suggested reminders start off and use the window's central time if enabled.
 
+On iOS, the app and widget use one native potty-reminder scheduler. App snapshot updates await reconciliation against committed delivery settings, puppy access and the widget operation journal; widget targets do not carry scheduling authority. Plan-specific request IDs let late OS completions remove their own stale requests without cancelling a newer tap or another puppy’s reminder. Host-app reminder writes share one capacity queue. Run `node scripts/verify-ios-widget-reminders.mjs` on macOS to check the production Swift scheduler against delayed notification-center completions, opt-out, access expiry, puppy changes and capacity limits.
+
 See [How Puptime learns patterns](LEARNING.md) for the exact routine-learning, event-matching, missing-log, and nap-estimation algorithms and their limits.
 
 ## Run locally

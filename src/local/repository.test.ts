@@ -246,3 +246,35 @@ test('routine edits validate and roll back atomically while deletion touches onl
  assert.equal(await repository.removeScheduleEntry('first'),undefined);
  assert.deepEqual(await repository.loadSchedule(),[other]);
 });
+
+test('nap starts and reopen edits enforce one running nap without losing an existing log',async t=>{
+ const {repository}=await setup(t);
+ const nap:PuppyEvent={id:'nap-one',type:'nap',at:100,endedAt:null,source:'app'};
+ await repository.appendEvents([nap]);
+ await assert.rejects(repository.appendEvents([{...nap,id:'nap-two'}]),/running naps/);
+ const closed={...nap,id:'nap-old',endedAt:200};await repository.appendEvents([closed]);
+ await assert.rejects(repository.updateEvent(closed.id,{endedAt:null}),/running naps/);
+ assert.deepEqual((await repository.loadEvents()).sort((a,b)=>a.id.localeCompare(b.id)),[closed,nap].sort((a,b)=>a.id.localeCompare(b.id)));
+});
+
+test('two independent SQLite connections toggle a nap atomically and keep one identity',async t=>{
+ const {repository,path}=await setup(t),otherDb=await createLocalDatabase(sqliteTestConnection(path));t.after(()=>otherDb.close());
+ const other=createLocalRepository(otherDb,'pet-1');
+ const results=await Promise.all([repository.toggleNap('app',100),other.toggleNap('widget',200)]);
+ assert.equal(new Set(results.map(result=>result.event.id)).size,1);
+ const events=await repository.loadEvents();assert.equal(events.length,1);assert.equal(events[0].endedAt,200);
+ assert.equal(results.filter(result=>!!result.previous).length,1);
+});
+
+test('independently committed widget naps survive import as a reviewable conflict and can be corrected',async t=>{
+ const {repository,database}=await setup(t);
+ const first:PuppyEvent={id:'nap-app',type:'nap',at:100,endedAt:null,source:'app'},second:PuppyEvent={...first,id:'nap-widget',at:200,source:'widget'};
+ await repository.appendEvents([first]);await repository.appendWidgetEvents([second]);
+ await assert.rejects(repository.toggleNap('app',300),/running naps/);
+ const runtime=await createLocalRuntime(database,'pet-1');
+ assert.equal((await runtime.activity.latestEvents()).filter(event=>event.endedAt===null).length,2);
+ await repository.updateEvent(second.id,{endedAt:250});
+ const result=await repository.toggleNap('app',300);assert.equal(result.previous!.id,first.id);
+ assert.equal((await repository.loadEvents()).filter(event=>event.endedAt===null).length,0);
+ assert.equal((await repository.loadEvents()).length,2);
+});

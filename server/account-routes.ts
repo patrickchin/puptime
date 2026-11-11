@@ -12,6 +12,7 @@ import { createAuth } from './auth';
 import type { AppleRevocation } from './account-lifecycle';
 import { cloudAccess, getCloudAccount, type CloudAccess } from './cloud-access';
 import {legacyProfile,legacyProfileRevision} from './profile-compat';
+import {availableAccountSql,shareAccessSql} from './sharing-eligibility';
 
 export type AccountEnv = { Bindings: Cloudflare.Env; Variables: {
   user: { id: string; email: string; name: string }; sessionCreatedAt: number; sessionId: string;
@@ -53,8 +54,9 @@ async function sharedScope(context:Context<AccountEnv>){
   const expected=context.req.header('x-puptime-account');
   if(expected!==context.get('user').id)throw new HTTPException(409);
   const id=shareIdSchema.parse(value);
-  const grant=await context.env.AUTH_DB.prepare(`SELECT s.owner_id,s.pet_id FROM puppy_shares s JOIN user u ON u.id=s.owner_id LEFT JOIN cloud_accounts c ON c.account_id=u.id
-    WHERE s.id=? AND s.member_id=? AND s.revoked_at IS NULL AND (s.expires_at IS NULL OR s.expires_at>?) AND COALESCE(c.state,'')!='deleting'`).bind(id,expected,Date.now()).first<{owner_id:string;pet_id:string}>();
+  const grant=await context.env.AUTH_DB.prepare(`SELECT s.owner_id,s.pet_id FROM puppy_shares s
+    WHERE s.id=? AND s.member_id=? AND ${shareAccessSql('s')}
+    AND ${availableAccountSql('s.owner_id')} AND ${availableAccountSql('s.member_id')}`).bind(id,expected).first<{owner_id:string;pet_id:string}>();
   if(!grant)throw new HTTPException(410);
   return {...grant,id,actor:expected,store:getAccountStore(context.env,grant.owner_id)};
 }

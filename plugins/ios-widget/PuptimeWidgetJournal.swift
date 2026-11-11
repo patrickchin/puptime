@@ -87,14 +87,22 @@ enum PuptimeWidgetJournal {
     let pending = latest.values.sorted {
       instant($0) == instant($1) ? ($0["id"] as? String ?? "") < ($1["id"] as? String ?? "") : instant($0) < instant($1)
     }
+    var openNaps: [String: [String: Any]] = [:]
+    if let open = props["openNap"] as? [String: Any], let id = open["id"] as? String { openNaps[id] = open }
     for event in pending {
       guard let type = event["type"] as? String else { continue }
       let key = type == "custom" ? details.first(where: { $0.value["label"] as? String == event["customLabel"] as? String })?.key : type
       if let key { times[key] = max(times[key] ?? 0, instant(event)) }
-      if type == "nap", instant(event) >= (times["nap"] ?? 0) {
-        result["openNap"] = event["endedAt"] is NSNumber ? false : event as Any
+      if type == "nap", let id = event["id"] as? String {
+        if event["endedAt"] is NSNumber { openNaps.removeValue(forKey: id) }
+        else { openNaps[id] = event }
       }
     }
+    let conflict = props["napConflict"] as? Bool == true || openNaps.count > 1
+    result["napConflict"] = conflict
+    if !conflict, let open = openNaps.values.first { result["openNap"] = open }
+    else { result["openNap"] = false }
+    if conflict, let actions = props["actions"] as? [String] { result["actions"] = actions.filter { $0 != "nap" } }
     result["lastEventAt"] = times
     // Presentation is bounded; immutable operation files remain authoritative.
     result["pending"] = Array(pending.suffix(100))

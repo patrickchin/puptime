@@ -52,11 +52,12 @@ export function createIdentityAdapter(auth:SdkIdentityClient,{appleIdToken,googl
 export type AccountSnapshot={config:CloudConfig|null;account:CloudAccountSummary|null;linkedProviders:SocialProvider[]|null;linkingProvider:SocialProvider|null;local:{name:string;eventCount:number}|null;sync:SyncStatus|null;run:RunResult|null;problem:AccountProblem|null;codeSentTo:string|null;busy:boolean;exporting:boolean;running:boolean;active:boolean;online:boolean;lastSyncedAt:number|null};
 const defaultDefer=(fn:()=>void,delay:number)=>{const timer=setTimeout(fn,delay);return()=>clearTimeout(timer);};
 // Call only after pausing the owning controller, or when no client exists.
-export async function continueFirstLaunchLocally(runtime:Runtime,confirmPending=false):Promise<AccountActionResult> {
+export async function continueFirstLaunchLocally(runtime:Runtime,confirmPending=false,confirmedThrough?:number):Promise<AccountActionResult> {
   if(!await runtime.storage.loadFirstLaunch())return 'cancelled';
   const status=await runtime.sync.status(runtime.petId);
-  if(status.pending&&!confirmPending)return 'pending-confirmation-required';
-  if(status.generation&&status.accountId)await runtime.sync.detach({generation:status.generation,accountId:status.accountId});
+  const approved=confirmPending?(confirmedThrough??status.pendingThrough):0;
+  if(status.pendingThrough>approved)return 'pending-confirmation-required';
+  if(status.generation&&status.accountId&&!await runtime.sync.detach({generation:status.generation,accountId:status.accountId,confirmedThrough:approved}))return 'pending-confirmation-required';
   return 'ok';
 }
 export function createAccountController({runtime,api,identity,subscribeLocalWrites,defer=defaultDefer,changed,exportCloud,photos}:{runtime:Runtime;photos?:PhotoSync;exportCloud?:CloudExportAction;api:CloudApi;identity:IdentityAdapter;subscribeLocalWrites:(fn:()=>void)=>()=>void;defer?:(fn:()=>void,delay:number)=>()=>void;changed:()=>void}) {
@@ -325,14 +326,14 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
       if(!await canSignIn('email'))return 'error';
       await runtime.checkpoint('account-change');
       if(disposed)return 'cancelled';
-      const result=await outcome(()=>identity.verifyEmail(email,code));if(result.error)return fail(identityProblem(result.error,true));
+      const result=await outcome(()=>identity.verifyEmail(email,code));if(result.error)return fail(identityProblem(result.error,true));signOutUnfinished=false;
       if(!await loadAccount())return 'error';emit({codeSentTo:null});return await refreshLinkedProviders()?'ok':'error';
     });},
     signInSocial(provider:'apple'|'google') {return authenticate(async()=>{
       if(!await canSignIn(provider))return 'error';
       await runtime.checkpoint('account-change');
       if(disposed)return 'cancelled';
-      const result=await outcome(()=>identity.signInSocial(provider));if(result.cancelled)return 'cancelled';if(result.error){const problem=identityProblem(result.error);return fail(problem==='sign-in-failed'?'social-incomplete':problem);}
+      const result=await outcome(()=>identity.signInSocial(provider));if(result.cancelled)return 'cancelled';if(result.error){const problem=identityProblem(result.error);return fail(problem==='sign-in-failed'?'social-incomplete':problem);}signOutUnfinished=false;
       if(!await loadAccount())return disposed||snapshot.problem==='network'?'error':fail('social-incomplete');return await refreshLinkedProviders()?'ok':'error';
     });},
     connectProvider(provider:SocialProvider) {return authenticate(async()=>{
@@ -381,9 +382,9 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
       await runtime.sync.prepareAssociation({accountId:account.user.id,localPetId:runtime.petId,deviceId:runtime.deviceId,mode:associationMode,enrollment:{operationId,deviceId:runtime.deviceId,localPetId:runtime.petId,name:associationMode==='restore'?existing!.name:snapshot.local!.name,...(confirmedPetId?{confirmedPetId}:{})}});
       associationConfirmationNeeded=false;suspended=false;return 'ok';
     });},
-    continueLocally({confirmPending=false}:{confirmPending?:boolean}={}) {return perform(async()=>{
+    continueLocally({confirmPending=false,confirmedThrough}:{confirmPending?:boolean;confirmedThrough?:number}={}) {return perform(async()=>{
       if(!await runtime.storage.loadFirstLaunch())return 'cancelled';
-      await pauseTransport();const result=await continueFirstLaunchLocally(runtime,confirmPending);
+      await pauseTransport();const result=await continueFirstLaunchLocally(runtime,confirmPending,confirmedThrough);
       if(result!=='ok'){suspended=signOutUnfinished;if(result==='pending-confirmation-required')emit({problem:result});return result;}
       associationConfirmationNeeded=false;suspended=signOutUnfinished;emit({run:null,problem:null});return 'ok';
     });},
@@ -391,12 +392,18 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
       if(associationConfirmationNeeded){emit({problem:'confirmation-required'});return 'confirmation-required';}
       await pauseTransport();if(!await loadAccount())return 'error';if(!await refreshLinkedProviders())return 'error';suspended=signOutUnfinished;return 'ok';
     });},
-    signOut({confirmPending=false}:{confirmPending?:boolean}) {return perform(async()=>{
+    signOut({confirmPending=false,confirmedThrough}:{confirmPending?:boolean;confirmedThrough?:number}) {return perform(async()=>{
       const status=await runtime.sync.status(runtime.petId);
-      if(status.pending&&!confirmPending){emit({problem:'pending-confirmation-required'});return 'pending-confirmation-required';}
+      const approved=confirmPending?(confirmedThrough??status.pendingThrough):0;
+      const needConfirmation=():AccountActionResult=>{emit({problem:'pending-confirmation-required'});return 'pending-confirmation-required';};
+      if(status.pendingThrough>approved)return needConfirmation();
+      const wasSuspended=suspended;
       await pauseTransport();
       await runtime.checkpoint('account-change');
       if(disposed)return 'cancelled';
+      const latest=await runtime.sync.status(runtime.petId);
+      if(latest.generation!==status.generation||latest.accountId!==status.accountId)return fail('account-mismatch');
+      if(latest.pendingThrough>approved){suspended=wasSuspended||signOutUnfinished;return needConfirmation();}
       signOutUnfinished=true;
       const result=await outcome(()=>identity.signOut());
       if(result.error?.code==='NATIVE_SIGN_OUT_FAILED')return fail('sign-out-failed');
@@ -404,7 +411,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
       // Check the official SDK rather than preserving stale signed-in UI.
       try{if(await identity.hasCredentials())return fail('sign-out-failed');}catch{return fail('sign-out-failed');}
       emit({account:null,linkedProviders:null,run:null,codeSentTo:null});
-      if(status.generation&&status.accountId)await runtime.sync.detach({generation:status.generation,accountId:status.accountId});
+      if(status.generation&&status.accountId&&!await runtime.sync.detach({generation:status.generation,accountId:status.accountId,confirmedThrough:approved}))return needConfirmation();
       associationConfirmationNeeded=false;signOutUnfinished=false;emit({problem:result.error?'remote-sign-out-unconfirmed':null});return 'ok';
     });},
     // The identity action verifies its own browser return; a queued lifecycle

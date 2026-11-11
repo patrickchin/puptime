@@ -168,3 +168,12 @@ test('removed theme preferences fall back to default without touching activity d
     assert.equal(await storage.loadThemePreference(), theme);
   }
 });
+
+test('browser nap transitions reject duplicate starts and serialize rapid toggles without losing history',async()=>{
+ stored.clear();const first=createNapEvent('app',100);await storage.appendEvents([first]);
+ await assert.rejects(storage.appendEvents([{...first,id:'another'}]),/running naps/);
+ await storage.updateEvent(first.id,{endedAt:200});
+ const results=await Promise.all([storage.toggleNap('app',300),storage.toggleNap('widget',400)]);
+ assert.equal(results[0].event.id,results[1].event.id);assert.equal(results[1].event.endedAt,400);
+ assert.equal((await storage.loadEvents()).length,2);
+});

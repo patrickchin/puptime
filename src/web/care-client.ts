@@ -6,7 +6,8 @@ export type {CareRow,CarePage} from '../sharing.ts';
 const previewSchema=z.object({puppyName:z.string(),ownerName:z.string(),share:shareSchema});
 export type CarePreview=z.infer<typeof previewSchema>;
 export class CareError extends Error{
- constructor(public status:number){super(status===410?'This invitation has expired or access has ended.':status===401?'Sign in to accept this household invitation.':status===403?'Your access does not allow this change.':status===409?'This entry changed or the invitation was already accepted. Refresh and try again.':status===429?'Too many attempts. Wait a moment and try again.':'Couldn’t reach Puptime. Check your connection and try again.');}
+ readonly status:number;
+ constructor(status:number){super(status===410?'This invitation has expired or access has ended.':status===401?'Sign in to accept this household invitation.':status===403?'Your access does not allow this change.':status===409?'This entry changed or the invitation was already accepted. Refresh and try again.':status===429?'Too many attempts. Wait a moment and try again.':'Couldn’t reach Puptime. Check your connection and try again.');this.status=status;}
 }
 export function createCareClient(origin:string,transport:typeof fetch=fetch){
  async function call<T>(path:string,schema:z.ZodType<T>,body?:object):Promise<T>{

@@ -207,6 +207,17 @@ export function isOpenNap(event: PuppyEvent): boolean {
   return event.type === 'nap' && event.endedAt === null;
 }
 
+export type NapState = {kind:'idle'} | {kind:'running';event:PuppyEvent} | {kind:'conflict';events:PuppyEvent[]};
+export function resolveNapState(events:readonly PuppyEvent[]):NapState {
+  const open=[...new Map(events.filter(isOpenNap).map(event=>[event.id,event])).values()];
+  if(!open.length)return {kind:'idle'};
+  if(open.length===1)return {kind:'running',event:open[0]};
+  return {kind:'conflict',events:open.sort((a,b)=>a.at-b.at||a.id.localeCompare(b.id))};
+}
+export class NapConflictError extends Error {
+  constructor(){super('Review the running naps before starting or ending another nap.');this.name='NapConflictError';}
+}
+
 export function latestQuickEventTimes(events: readonly PuppyEvent[]): QuickEventTimes {
   const latest: QuickEventTimes = {};
   for (const event of events) {

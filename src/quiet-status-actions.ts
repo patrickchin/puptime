@@ -1,4 +1,4 @@
-import {EVENT_META,customActivityKey,isOpenNap,latestQuickEventTimes,widgetActionsForState,type QuickEventType} from './domain.ts';
+import {EVENT_META,customActivityKey,resolveNapState,latestQuickEventTimes,widgetActionsForState,type QuickEventType} from './domain.ts';
 import type {NotificationWidgetProps} from './quiet-status-config';
 
 // Match the approved notification preview while keeping the widget's activity hues.
@@ -10,8 +10,8 @@ const notificationColors={
 };
 
 export function notificationActions({events,actions,customActivities,petId,scope}:NotificationWidgetProps){
-  const sleeping=events.some(isOpenNap),last=latestQuickEventTimes(events);
-  return widgetActionsForState(actions,sleeping,customActivities).map(type=>{
+  const nap=resolveNapState(events),sleeping=nap.kind==='running',last=latestQuickEventTimes(events);
+  return widgetActionsForState(actions,sleeping,customActivities).filter(type=>nap.kind!=='conflict'||type!=='nap').map(type=>{
     const kind=type.startsWith('custom:')?'custom':type as QuickEventType;
     const meta=EVENT_META[kind],endingNap=type==='nap'&&sleeping;
     const colors=kind in notificationColors?notificationColors[kind as keyof typeof notificationColors]:meta;
