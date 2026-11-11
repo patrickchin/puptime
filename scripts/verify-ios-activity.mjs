@@ -110,8 +110,16 @@ try{
     id: editor.note.input
 - setClipboard: Native bounded edit
 - pasteText
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: editor.close
+    direction: UP
+    visibilityPercentage: 50
+- waitForAnimationToEnd
 - tapOn:
     id: editor.close
+    retryTapIfNoChange: true
 - extendedWaitUntil:
     visible:
       id: event.pee.note
