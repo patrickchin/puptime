@@ -52,13 +52,13 @@ test('quiet status defaults off, persists only on its device, and validates stor
  await assert.rejects(first.storage.loadQuietStatusEnabled());
 });
 
-test('device delivery preserves legacy completion and rejects corrupt flags without rewriting them',async t=>{
+test('device delivery requires an explicit flag and never infers consent from setup completion',async t=>{
  const {database,storage}=await setup(t);
  await database.write(sql=>sql.runAsync("DELETE FROM metadata WHERE key='notify_on_device'"));
- assert.equal(await storage.loadNotificationDelivery(),false);
+ await assert.rejects(storage.loadNotificationDelivery());
  await storage.completeOnboarding();
  await database.write(sql=>sql.runAsync("DELETE FROM metadata WHERE key='notify_on_device'"));
- assert.equal(await storage.loadNotificationDelivery(),true);
+ await assert.rejects(storage.loadNotificationDelivery());
  await assert.rejects(storage.saveNotificationDelivery('true' as never));
  await database.write(sql=>sql.runAsync("INSERT INTO metadata(key,value) VALUES ('notify_on_device','invalid')"));
  await assert.rejects(storage.loadNotificationDelivery());
@@ -103,7 +103,6 @@ test('first-launch profile failure preserves the previous name checkpoint and re
 test('first-launch completion rolls back on failure and cannot be reopened by stale callbacks',async t=>{
  const {database}=await setup(t),{storage}=await createLocalRuntime(database,'pet-1');
  await storage.saveFirstLaunchProfile('Biscuit');await storage.saveFirstLaunchStep('reminders');
- await database.write(sql=>sql.runAsync("DELETE FROM metadata WHERE key='notify_on_device'"));
  await database.write(sql=>sql.execAsync("CREATE TRIGGER fail_setup_completion BEFORE UPDATE OF value ON metadata WHEN OLD.key='show_onboarding' BEGIN SELECT RAISE(ABORT,'completion failure'); END;"));
  await assert.rejects(storage.completeOnboarding(),/completion failure/);
  assert.deepEqual(await storage.loadFirstLaunch(),{step:'reminders',puppyName:'Biscuit'});
@@ -117,12 +116,14 @@ test('first-launch completion rolls back on failure and cannot be reopened by st
  assert.equal((await database.read(sql=>sql.getFirstAsync<{value:string}>("SELECT value FROM metadata WHERE key='notify_on_device'")))!.value,'false');
 });
 
-test('first-launch default name and existing completed installation do not create another setup',async t=>{
+test('first-launch default name completes once and missing checkpoints reject',async t=>{
  const {database,storage}=await setup(t);
  await storage.saveFirstLaunchProfile('   ');
  assert.deepEqual(await storage.loadFirstLaunch(),{step:'account',puppyName:'My puppy'});
- await database.write(async sql=>{await sql.runAsync("DELETE FROM metadata WHERE key='first_launch_step'");await sql.runAsync("UPDATE metadata SET value='false' WHERE key='show_onboarding'");});
- assert.equal(await storage.loadFirstLaunch(),null);
+ await storage.completeOnboarding();assert.equal(await storage.loadFirstLaunch(),null);
+ await database.write(sql=>sql.runAsync("DELETE FROM metadata WHERE key='first_launch_step'"));
+ await assert.rejects(storage.loadFirstLaunch());
+ assert.equal(await storage.shouldShowOnboarding(),false);
 });
 
 test('first-launch corruption rejects without replacing the saved checkpoint',async t=>{
@@ -296,24 +297,24 @@ test('competing settings writers combine distinct additions without lost updates
   } finally {await otherDatabase.close();}
 });
 
-test('retired preferences fall back but malformed JSON cannot overwrite retained settings', async (t) => {
+test('invalid preferences and malformed JSON reject without overwriting retained settings', async (t) => {
   const {storage,database}=await setup(t);
   await database.write(async(sql)=> {
     await sql.runAsync('INSERT INTO settings(key,value) VALUES (?,?)','puptime.theme.v1','retired-theme');
     await sql.runAsync('INSERT INTO pet_settings(pet_id,key,value) VALUES (?,?,?)','pet-1','puptime.customActivities.v1','{broken');
   });
-  assert.equal(await storage.loadThemePreference(),'system');
+  await assert.rejects(storage.loadThemePreference());
   await assert.rejects(storage.saveCustomActivity('Overwrite'),/settings/i);
   assert.equal((await database.read((sql)=>sql.getFirstAsync<{value:string}>('SELECT value FROM pet_settings WHERE pet_id=? AND key=?','pet-1','puptime.customActivities.v1')))!.value,'{broken');
 });
 
-test('retired themes fall back to the device setting while preserving native history', async (t) => {
+test('unsupported themes reject while preserving native history', async (t) => {
   const {storage,database}=await setup(t);
   const event=createEvent('pee','app',100);
   await storage.appendEvents([event]);
   for (const theme of ['puppy-journal','soft-play','day-trails']) {
     await database.write(sql=>sql.runAsync('INSERT OR REPLACE INTO settings(key,value) VALUES (?,?)','puptime.theme.v1',theme));
-    assert.equal(await storage.loadThemePreference(),'system');
+    await assert.rejects(storage.loadThemePreference());
     assert.deepEqual(await storage.loadEvents(),[event]);
   }
 });

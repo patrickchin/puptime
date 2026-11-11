@@ -44,7 +44,7 @@ The screenshots, features, and Android installation instructions below describe 
 - See possible missing logs, including estimated nap spans, automatically faded on the timeline without adding them to history. Saved estimates stay labeled and do not influence learned routines or recorded statistics.
 - Export and import activity CSV backups with stable IDs, notes, exact timestamps, nap states, and estimate labels. Reimporting preserves existing edits.
 - Choose two to four Home Screen widget actions and optional confirmation notifications.
-- Use the default style in Light or Dark mode, or follow the device setting. Removed theme selections fall back to the device setting.
+- Use the default style in Light or Dark mode, or follow the device setting. Unsupported saved preferences fail visibly while preserving their stored values.
 - Manage appearance, language, widget actions, and activity data in Settings. Manage reminders and device delivery in Notifications.
 - Browse illustrated topic cards in **Learn**, with a short getting-started guide and 12 detailed puppy-care articles. Each article opens with an at-a-glance overview and links to its sections and sources, plus further reading and selected YouTube demonstrations. The same guides are on the website under **Puppy care**. Articles are currently in English; in-app navigation supports all app languages. Text and bundled English ElevenLabs narration work offline in the app; external resources need a browser and internet connection. Each guide has play/pause, 15-second skips, and playback speed controls.
 - Keep activity data on the device without an account, subscription, server or ads. Optional anonymous usage analytics are off by default and controlled in Settings.
@@ -127,7 +127,7 @@ See [Puppy care research](PUPPY_CARE_RESEARCH.md) for the source selection, evid
 
 - Expo SDK 57 / React Native 0.86 / React 19
 - TypeScript
-- Expo SQLite for the account-enabled iOS store; AsyncStorage for legacy storage and migration
+- Expo SQLite for the native activity store; AsyncStorage for browser activity and the active shared-puppy selection
 - `react-native-android-widget` on Android
 - Expo Widgets and SwiftUI on iOS
 

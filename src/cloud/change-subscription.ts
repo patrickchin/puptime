@@ -7,24 +7,37 @@ function ownerKey(state:AccountSnapshot):string|null {
   return JSON.stringify([state.account.user.id,state.sync.generation]);
 }
 export function watchAccountChanges({controller,open,defer=defaultDefer}:{controller:Controller;open:OpenChanges;defer?:(fn:()=>void,delay:number)=>()=>void}) {
-  type Connection={key:string;abort:AbortController;close:(()=>void)|null;cancelRetry:(()=>void)|null};
+  type Connection={key:string;abort:AbortController;state:
+    |{phase:'connecting'}
+    |{phase:'connected';close:()=>void}
+    |{phase:'waiting';cancelRetry:()=>void}
+    |{phase:'closed'}};
   let current:Connection|null=null,disposed=false;
-  function clear(){const old=current;current=null;old?.abort.abort();old?.cancelRetry?.();old?.close?.();}
+  function close(connection:Connection) {
+    const state=connection.state;connection.state={phase:'closed'};
+    connection.abort.abort();
+    if(state.phase==='connected')state.close();
+    if(state.phase==='waiting')state.cancelRetry();
+  }
+  function clear(){const old=current;current=null;if(old)close(old);}
   function connect(key:string,delay=1000) {
     clear();if(disposed||ownerKey(controller.read())!==key)return;
-    const connection:Connection={key,abort:new AbortController(),close:null,cancelRetry:null};current=connection;
+    const connection:Connection={key,abort:new AbortController(),state:{phase:'connecting'}};current=connection;
     let cursor=-1;
     const closed=()=>{
       if(disposed||current!==connection||connection.abort.signal.aborted)return;
-      connection.abort.abort();connection.close?.();
-      connection.cancelRetry=defer(()=>{connection.cancelRetry=null;connect(key,Math.min(delay*2,60000));},delay);
+      close(connection);
+      connection.state={phase:'waiting',cancelRetry:defer(()=>{
+        if(current!==connection||connection.state.phase!=='waiting')return;
+        connect(key,Math.min(delay*2,60000));
+      },delay)};
     };
     void open({signal:connection.abort.signal,onCursor:value=>{
       if(connection.abort.signal.aborted||current!==connection||!Number.isSafeInteger(value)||value<0||value<=cursor)return;
       cursor=value;controller.invalidate();
     },onClose:closed}).then(socket=>{
       if(disposed||current!==connection||connection.abort.signal.aborted){socket?.close();return;}
-      if(!socket){closed();return;}connection.close=()=>socket.close();
+      if(!socket){closed();return;}connection.state={phase:'connected',close:()=>socket.close()};
     }).catch(closed);
   }
   function update(){const key=ownerKey(controller.read());if(current?.key===key)return;if(!key)clear();else connect(key);}

@@ -36,7 +36,8 @@ export function CareSessionHost({children}:{children:ReactNode}){
   }
   await runtime.database.write(async sql=>{
    await sql.runAsync("UPDATE metadata SET value='false' WHERE key='show_onboarding'");
-   await sql.runAsync("DELETE FROM metadata WHERE key IN ('first_launch_step','care_blocked')");
+   await sql.runAsync("UPDATE metadata SET value='done' WHERE key='first_launch_step'");
+   await sql.runAsync("DELETE FROM metadata WHERE key='care_blocked'");
   });
   await show(selection);
  }

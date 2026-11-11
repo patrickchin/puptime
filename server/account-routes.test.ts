@@ -243,7 +243,7 @@ test('hibernation reconstruction restores only owner/session references and stil
  const user=await owner();await enroll(user);const response=await changes(user);expect(response.status).toBe(101);
  const socket=response.webSocket!,seen=observeSocket(socket);await settleSocket();
  try{
-  await runInDurableObject(env.ACCOUNTS.getByName(user.id),async(instance,state)=>{
+  await runInDurableObject(env.ACCOUNTS.getByName(user.id),async(_instance,state)=>{
    const attachment=state.getWebSockets()[0].deserializeAttachment() as Record<string,string>;
    expect(Object.keys(attachment).sort()).toEqual(['accountId','sessionId']);expect(attachment.accountId).toBe(user.id);expect(JSON.stringify(attachment)).not.toContain(user.cookie);
    const {AccountStore}=await import('./account-store');
@@ -252,7 +252,7 @@ test('hibernation reconstruction restores only owner/session references and stil
   });
   await settleSocket();expect(seen.messages).toEqual([{protocolVersion:1,cursor:0},{protocolVersion:1,cursor:1}]);
   await env.AUTH_DB.prepare('UPDATE session SET expiresAt=0 WHERE userId=?').bind(user.id).run();
-  await runInDurableObject(env.ACCOUNTS.getByName(user.id),async(instance,state)=>{
+  await runInDurableObject(env.ACCOUNTS.getByName(user.id),async(_instance,state)=>{
    const {AccountStore}=await import('./account-store');new AccountStore(state,settings).apply(event('later'));
   });
   await settleSocket();expect(seen.messages.length).toBe(2);expect(seen.closed).toBe(true);
@@ -294,28 +294,26 @@ test('authenticated cloud history validates for the client across merge delete r
  expect((await call(user,`records/${encodeURIComponent(recordId)}/history`)).status).toBe(401);
 });
 
-test('photo capability keeps legacy sync, name edits, history and exports compatible',async()=>{
+test('sync, history and both export routes retain profile photos without capability negotiation',async()=>{
  const user=await owner();await enroll(user);
- const photos={'x-puptime-profile-photos':'1'},photo='img_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+ const photo='img_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
  const mutation:Mutation={protocolVersion:1,operationId:'op_photo_create',deviceId:'test-device',recordId:'pet-1',petId:'pet-1',kind:'puppy',baseRevision:0,intent:'create',patch:{name:'Pip',photoId:photo}};
- const created=await call(user,'sync/push',{mutations:[mutation]},photos);
+ const created=await call(user,'sync/push',{mutations:[mutation]});
  expect(created.status).toBe(200);
  expect(await created.json()).toMatchObject({accepted:[{record:{data:{name:'Pip',photoId:photo}}}]});
- const legacy=await (await call(user,'sync/pull?after=0')).json<{changes:{data:object}[];cursor:number}>();
- expect(legacy.changes[0].data).toEqual({name:'Pip'});expect(legacy.cursor).toBe(1);
- const renamed=await call(user,'sync/push',{mutations:[{...mutation,operationId:'op_old_rename',baseRevision:1,intent:'patch',patch:{name:'Biscuit'}}]});
- expect(await renamed.json()).toMatchObject({accepted:[{record:{data:{name:'Biscuit'}}}]});
- const modern=await (await call(user,'sync/pull?after=0',undefined,photos)).json<{changes:{data:object}[]}>();
- expect(modern.changes.at(-1)?.data).toEqual({name:'Biscuit',photoId:photo});
- await call(user,'sync/push',{mutations:[{...mutation,operationId:'op_photo_remove',baseRevision:2,intent:'patch',patch:{photoId:null}}]},photos);
+ const renamed=await call(user,'sync/push',{mutations:[{...mutation,operationId:'op_rename',baseRevision:1,intent:'patch',patch:{name:'Biscuit'}}]});
+ expect(await renamed.json()).toMatchObject({accepted:[{record:{data:{name:'Biscuit',photoId:photo}}}]});
+ const page=await (await call(user,'sync/pull?after=0')).json<{changes:{data:object}[];cursor:number}>();
+ expect(page.changes.at(-1)?.data).toEqual({name:'Biscuit',photoId:photo});expect(page.cursor).toBe(2);
+ await call(user,'sync/push',{mutations:[{...mutation,operationId:'op_photo_remove',baseRevision:2,intent:'patch',patch:{photoId:null}}]});
  const history=await (await call(user,'records/pet-1/history')).json<{revisions:unknown[]}>();
- expect(JSON.stringify(history)).not.toContain('"photoId"');
+ expect(JSON.stringify(history)).toContain(photo);
  const {revisionSchema}=await import('../src/cloud/protocol');
  history.revisions.forEach(revision=>expect(revisionSchema.safeParse(revision).success).toBe(true));
- const oldExport=await (await call(user,'account/export')).text();
- expect(oldExport).not.toContain('"photoId"');
- const fullExport=await (await call(user,'account/export',undefined,photos)).text();
- expect(fullExport).toContain(photo);
+ const exported=await (await call(user,'account/export')).text();
+ expect(exported).toContain(photo);
+ const formExport=await worker.fetch(new Request('https://puptime.test/api/account/export',{method:'POST',headers:{cookie:user.cookie,origin:'https://puptime.test','content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({expectedAccount:user.id})}),settings);
+ expect(formExport.status).toBe(200);expect(await formExport.text()).toContain(photo);
 });
 
 test('private photo objects are binary, immutable, account-scoped and deleted with the account',async()=>{

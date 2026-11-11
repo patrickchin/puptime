@@ -3,7 +3,7 @@ import test from 'node:test';
 import { registerHooks } from 'node:module';
 import type { PuppyEvent } from './domain.ts';
 
-const state = { files: new Map<string, string>(), legacy: [] as unknown[], scope: 'owner' };
+const state = { files: new Map<string, string>(), snapshot: [] as unknown[], scope: 'owner' };
 (globalThis as typeof globalThis & { __iosWidgetTest: typeof state }).__iosWidgetTest = state;
 const target = new URL('./widgets/sync.ios.ts', import.meta.url).href;
 registerHooks({
@@ -33,8 +33,8 @@ registerHooks({
         }
         export class Directory {get exists(){return true;} list(){return [...s.files.keys()].map(name=>new File(name));}}`,
       'ios-widget:timeline': `export default {
-        async getTimeline(){return [{props:{pending:s.legacy}}];},
-        async updateSnapshot(props){s.legacy=props.pending;}
+        async getTimeline(){return [{props:{pending:s.snapshot}}];},
+        async updateSnapshot(props){s.snapshot=props.pending;}
       };`,
       'ios-widget:storage': `
         export async function loadLanguagePreference(){return 'en';}
@@ -51,10 +51,10 @@ const widget = await import('./widgets/sync.ios.ts');
 const event = (index: number): PuppyEvent => ({ id: `evt_widget_${index}`, type: 'pee', at: index + 100, source: 'widget' });
 const operation = (name: string, value: unknown) => state.files.set(`wop_${name}.json`, JSON.stringify(value));
 
-test('iOS imports beyond the presentation cap, deduplicates legacy snapshots, and acknowledges only the committed batch', async () => {
+test('iOS imports beyond the presentation cap, ignores presentation snapshots, and acknowledges only the committed batch', async () => {
   state.files.clear();
   const events = Array.from({ length: 250 }, (_, index) => event(index));
-  state.legacy = events.slice(-100);
+  state.snapshot = events.slice(-100);
   events.forEach((value, index) => operation(index.toString(16), value));
   state.files.set('unrelated.json', '{}');
   const pending = await widget.readPendingWidgetEvents();
@@ -64,6 +64,7 @@ test('iOS imports beyond the presentation cap, deduplicates legacy snapshots, an
   operation('abc123', event(251));
   await widget.acknowledgePendingWidgetEvents(pending);
   assert.deepEqual([...state.files.keys()].sort(), ['unrelated.json', 'wop_abc123.json']);
+  assert.deepEqual(await widget.readPendingWidgetEvents(), [event(251)], 'Acknowledged events must not reappear from a stale presentation snapshot.');
   await widget.updateHomeWidget(pending);
   assert.deepEqual(await widget.readPendingWidgetEvents(), [event(251)]);
 });
@@ -71,7 +72,7 @@ test('iOS imports beyond the presentation cap, deduplicates legacy snapshots, an
 test('a concurrent nap end survives acknowledgement and wins over an older open snapshot, including zero duration', async () => {
   state.files.clear();
   const nap = { id: 'evt_nap', type: 'nap', at: 100 };
-  state.legacy = [nap]; operation('1', nap);
+  state.snapshot = [nap]; operation('1', nap);
   const started = await widget.readPendingWidgetEvents();
   assert.equal(started[0].endedAt, null);
   operation('2', { ...nap, endedAt: 100 });
@@ -83,7 +84,7 @@ test('a concurrent nap end survives acknowledgement and wins over an older open 
 });
 
 test('corrupt operations fail visibly and remain available for recovery', async () => {
-  state.files.clear(); state.legacy = [];
+  state.files.clear(); state.snapshot = [];
   state.files.set('wop_bad.json', '{broken');
   await assert.rejects(widget.readPendingWidgetEvents());
   assert.equal(state.files.get('wop_bad.json'), '{broken');
@@ -91,7 +92,7 @@ test('corrupt operations fail visibly and remain available for recovery', async 
 
 
 test('widget actions remain with their original puppy when the active puppy changes',async()=>{
- state.files.clear();state.legacy=[];state.scope='shared-puppy';
+ state.files.clear();state.snapshot=[];state.scope='shared-puppy';
  operation('a',{...event(1),scope:'owner'});operation('b',{...event(2),scope:'shared-puppy'});
  const pending=await widget.readPendingWidgetEvents();assert.deepEqual(pending,[event(2)]);
  await widget.acknowledgePendingWidgetEvents(pending);assert.deepEqual([...state.files.keys()],['wop_a.json']);
@@ -100,6 +101,6 @@ test('widget actions remain with their original puppy when the active puppy chan
 
 
 test('a late journal refresh cannot publish one puppy’s events into another puppy’s widget',async()=>{
- state.files.clear();state.scope='owner';state.legacy=[event(9)];
- await widget.updateHomeWidget([], 'another-puppy');assert.deepEqual(state.legacy,[event(9)]);
+ state.files.clear();state.scope='owner';state.snapshot=[event(9)];
+ await widget.updateHomeWidget([], 'another-puppy');assert.deepEqual(state.snapshot,[event(9)]);
 });
