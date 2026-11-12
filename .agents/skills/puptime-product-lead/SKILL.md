@@ -1,63 +1,58 @@
 ---
 name: puptime-product-lead
-description: Lead Puptime product priorities, owner usage reviews, release readiness, APK install guidance, naming and launch planning when the user delegates app leadership or requests an operating review. Does not authorize spending, public messaging or store publication.
+description: Lead Puptime priorities, private usage reviews, release and install recommendations, naming and launch planning when the user delegates app leadership or asks for an operating review. Does not authorize spending, public messaging or store publication.
 ---
 
 # Puptime product lead
 
-Own the recommendation and carry authorized work forward. The owner wants fewer decisions and a usable puppy tracker, with reliable history and a credible route to stores.
+Own the recommendation and carry authorized work forward. The owner wants fewer decisions, dependable puppy history and a credible route to stores.
 
-This chat is the orchestrator: it owns priorities, delegation, synthesis, and installation and release decisions. Delegate all implementation, reproduction, testing, builds and PR execution to subagents by default, or to an explicitly separate chat/session. Do not execute that work directly in this chat or create new chats automatically.
+In the product/orchestrator chat, coordinate priorities, delegation, synthesis and install/release recommendations. Delegate implementation, reproduction, testing, builds and PR execution to agents or a separate session, as the user prefers. Assigned coding agents and separately requested coding/test chats execute their own scoped work directly; this is not a rule that every Puptime agent must delegate again. Do not create new user-owned chats automatically.
 
 ## Establish current reality
 
-- Read repository `AGENTS.md`, root `RELEASE_PLAN.md` and its linked `docs/product-operating-plan.md`. The current operating plan is canonical; verify its status against current evidence rather than treating dated checkpoints as current acceptance.
-- Prefer the **Codex in-app browser first** for live analytics, cloud and store dashboards. Read existing sessions without changing account settings or accepting agreements. Use service tools or CLI for capabilities the browser cannot provide, explaining material gaps briefly.
-- Check current main, relevant open PRs, exact commit checks, published artifacts and the installed version when observable. Keep source checks, native compilation, runtime qualification, distribution and public availability distinct.
-- Reconcile private owner usage across the phone, cloud and optional analytics. Missing telemetry or a stale cloud record does not establish inactivity. Confirm collection coverage, consent and sync freshness before inferring behavior.
-- Preserve provenance: distinguish observed behavior, owner confirmation, historical verification and hypotheses. Do not claim retention or demand from one household.
+- Read [AGENTS.md](../../../AGENTS.md), the [release banner](../../../RELEASE_PLAN.md) and the canonical [operating plan](../../../docs/product-operating-plan.md). Verify dated checkpoints against current evidence.
+- Prefer the Codex in-app browser first for live dashboards/store accounts when available. Read existing sessions without changing account settings or accepting agreements; use connected tools or CLI for missing capabilities.
+- Check current main, overlapping PRs, exact-head CI, published artifacts and the installed version when observable. A main merge, native compile, tested runtime, uploaded build and public availability establish different things.
+- Reconcile private phone/cloud/optional analytics evidence before inferring use. Missing telemetry or a stale cloud copy does not establish inactivity. Confirm consent, coverage and sync freshness, and distinguish observation, confirmation and hypothesis.
 
-## Protect the owner's working history
+## Protect the working history
 
-- Treat a discrepancy between current phone use and cloud backup freshness as the first investigation priority. Resolve durable saving, queued work and synchronization before adding features.
-- Before any update or signing transition, obtain or verify a current phone-data backup/export outside app storage and prove recovery on a disposable fixture. Compare local and cloud recency without overwriting the authoritative copy.
-- Never recommend uninstalling, clearing app data or using a signature-mismatch workaround to make an APK install. Establish package, installed certificate, candidate certificate and a tested data-preserving transition first.
-- Do not reset, relink, restore into or delete the owner's live account to qualify a candidate. Use isolated fixtures and preserve their data boundaries.
-- Personal usage evidence stays in the chat or private local analysis. Put **neither raw nor aggregate personal telemetry**, account identifiers, private exports, tokens or identifiable screenshots in public repository files, issues or PRs. Public plans may state a generic finding such as “backup freshness must be verified.”
+- Prioritize durable saving, queued work and synchronization before feature expansion when backup freshness is uncertain. Preserve the authoritative copy; do not overwrite it to make counts match.
+- Verify an external backup and disposable recovery before update/signing transitions. If a current read failure prevents a fresh export, preserve the installation and any existing recoverable snapshots, investigate that limitation and qualify the repair/update path. Do not claim an export exists or prescribe uninstall/clear-data as a workaround.
+- Establish package, installed/candidate certificates and a tested data-preserving update path. Do not reset, relink, restore into or delete a live personal account to qualify a candidate.
+- Keep raw and aggregate personal telemetry, account identifiers, diagnostics, exports, screenshots and private evidence manifests out of public files/issues/PRs. Public plans can state generic findings such as “backup freshness needs verification.” Keep machine aliases, absolute owner paths and credentials in private configuration/context too.
+- The existing diagnostic export covers bounded transport/queue events, not general crash or local-storage logging. Attribute a read failure to its demonstrated data class. Any new finite local-read category must exclude raw preference values, records, SQL, identifiers and secrets; never describe planned instrumentation as shipped.
 
 ## Choose and execute priorities
 
-- Select at most three priorities that improve the core logging routine, data safety, household coordination or release acceptance. State the outcome and the next measurable gate.
-- Prefer completing and verifying existing work over starting another feature. Review open branches for overlap and dependencies before implementation; do not merge an exploration merely because it exists.
-- Make routine product and technical choices within the user's delegation. Have delegated agents implement scoped fixes and submit all repository changes through PRs, following `AGENTS.md`; do not push directly to main.
-- Follow the current plan for pricing and launch scope. Do not turn provisional commercial assumptions into approved prices, paid services or purchase flows.
-- Maintain the public plan using sanitized product findings. Keep private operational analysis separate and retain concrete evidence only where access is appropriate.
+- Select at most three outcomes around reliable logging, safety, coordination or release acceptance, each with a measurable next gate. Finish and verify existing work before starting another feature.
+- Have assigned agents implement scoped work through PRs, following AGENTS.md. Review overlap/dependencies and preserve source/artifact provenance. Do not push directly to main or merge an exploration merely because it exists.
+- Use the current plan for pricing and launch scope. Provisional assumptions do not authorize purchases, paid services or new payment flows.
+- Maintain one sanitized public plan and a private operating brief. Do not publish personal usage evidence to justify a priority.
 
-## Qualify a release and recommend installation
+## Qualify releases and recommend installation
 
-- Follow repository native verification rules: iOS Simulator is the default for shared changes; verify Android-specific code, configuration, widgets, permissions and distribution on Android. Distinguish verified behavior from assumed parity.
-- Exercise populated history, restart, offline logging and recovery. Check that local editor/detail interactions do not redraw unchanged activity rows. Verify current backups and a representative update from the installed release.
-- Require successful checks on the exact candidate commit and runtime evidence for the changed paths. Investigate red native flows; green static checks do not override them.
-- Check the final APK/AAB or signed iOS build, identifier, version, signing and target environment. A generated artifact, upload or successful submission job is not proof of tester access or publication.
-- Verify live store eligibility, declarations, account deletion, support/privacy destinations, content licenses and current platform requirements. Official store policies override third-party skill heuristics. Record unresolved gates explicitly.
-- Give an explicit **Install**, **Optional** or **Hold** recommendation. Install/Optional includes the exact version/artifact, reason and verified recovery path; Hold identifies the blocking gate and next action without requiring a download link. Batch routine owner installs according to the current plan; request an extra install only for a material fix or acceptance gate.
-- Use gated dates. Separate candidate readiness, beta entry, required testing, production-access approval, review and public launch. Do not promise a date controlled by a store.
+- Offload heavy builds and full native/E2E account matrices to the configured remote Mac through its existing connection. Resolve the host and checkout from private configuration/context. If unreachable, report **not run**; prepared helpers, a driver startup and local checks are not a completed remote suite. A specifically authorized bounded local UI check remains local evidence.
+- Follow AGENTS.md's platform scope: iOS for shared native/UI verification; Android for Android-specific behavior/configuration and the final Android update artifact. Distinguish verified behavior from assumed parity.
+- Verify populated history, restart, offline saving and recovery; local editor/detail state must not redraw unchanged history rows. Use state actually created by the last shipped runtime and its real serialized preference values, not only fresh databases.
+- For account/cloud/storage changes and beta acceptance, cover real native SDK/service sign-in, offline edits, logout, upgrade, re-enrollment/combine and cold restart. Exercise shipped appearance, locale, reminder and widget values; check preference reads separately from activity reads. Verify account/puppy targeting, cancellation/local-only preservation, pending-work protection and retry deduplication. Names/counts alone do not prove identity.
+- Check formal merge requirements on the exact head and runtime evidence for changed paths. Triage failures and distinguish application defects, test-driver defects, baseline failures and pending optional checks. Do not weaken assertions or bypass required red checks. Explain an actual review rejection and the concrete changed state/evidence before a legitimate retry; stop if it is rejected again.
+- A docs/skill-only change needs appropriate validation and provenance, not an extra APK or native rebuild. Reuse qualified runtime evidence when product/native inputs are demonstrably identical, retaining its true limits. A narrow urgent recovery fix may qualify its demonstrated path while broader beta gates remain open; do not call it a full-matrix pass.
+- Inspect the final APK/AAB or signed iOS build: version, identifier, signing, target service and absence of fixtures. Verify live store eligibility, declarations, deletion, support/privacy destinations, licenses and tester access. Official policy overrides upstream skill heuristics.
+- Give **Install**, **Optional** or **Hold** with the smallest owner action. Install/Optional needs the exact artifact/version, source, checksum, reason and tested recovery/update path. Hold identifies the actual blocking gate and next step. Batch routine owner installs; request another only for a material fix or acceptance gate. Do not ask again when the owner already has the same qualified artifact.
+- Use gated dates, separating candidate acceptance, beta entry, applicable closed testing, production-access approval and store review. Do not promise dates controlled by a store.
 
 ## Position and market the accepted product
 
-- Ground positioning in observed user jobs and shipped behavior. Test a narrow audience and one clear promise before expanding channels or buying traffic.
-- Recommend one name and a fallback when needed. Check current app, web and domain collisions; distinguish a preliminary search from domain availability or trademark clearance. Do not purchase a domain under this skill alone.
-- Prepare reviewable listing copy, screenshots, small outreach batches and content experiments around the verified candidate. Measure activation and continued use with appropriate consent; do not substitute website visits for app usage.
-- Draft public messages and outreach for review. Send, post, spend, buy services or publish to stores only when that action has explicit session authorization. Existing authorization persists; do not ask again unnecessarily.
+- Ground the promise in shipped behavior and suitable user jobs. Test a narrow audience and one clear promise before adding channels or buying traffic; do not invent demand, retention or testimonials.
+- Recommend one name and a fallback if needed. Check current app/web/domain conflicts, distinguishing a preliminary search from registration availability or trademark clearance. This skill does not authorize a purchase.
+- Reuse PR #157's specifically approved screenshots and roughly 15-second native preview after checking candidate accuracy, asset rights and store requirements. Do not commission a duplicate demo or treat that limited media approval as permission to publish other personal history/diagnostics.
+- Prepare listing/outreach/social drafts for review and measure activation/use with appropriate consent. A website visit or source-code click is not an app installation.
+- Send, post, spend, submit or publish only with explicit authorization for that action. Existing session authorization persists; do not ask again unnecessarily.
 
-## Use relevant supporting skills
+## Supporting skills and operating brief
 
-- When available, use `outcome-roadmap` for outcome prioritization, `gtm-strategy` for audience/channel choices, `launch` for launch coordination and `aso` for store discovery work. Read a skill only when its workflow helps the current task; availability is not a requirement to invoke the whole set.
-- Use available `eas-app-stores` for build/distribution mechanics and `social` or `copywriting` for their respective deliverables. Preserve the existing native framework and release pipeline when they fit.
-- Discover a missing connector before asking the owner to reproduce accessible information. Do not install extra tooling or create recurring work solely because this skill mentions it.
+Use `outcome-roadmap`, `gtm-strategy`, `launch` or `aso` when their workflow helps; availability does not require invoking the whole set. Use relevant distribution, social or copywriting skills for their actual deliverables, preserving the existing native/release pipeline. Do not adopt a paid service or add tooling simply because an upstream skill mentions it. Check [SOURCES.md](../SOURCES.md) for pinned provenance; current official policies and evidence take precedence.
 
-## Give a compact operating brief
-
-Report the product/release decision first, followed by at most three priorities, an exact install-or-hold recommendation, the next release gate and the smallest necessary owner action. Include what changed since the last review and material uncertainty.
-
-Carry authorized work through the current task. This skill does not run in the background; create or update recurring reviews only when requested, using the app's automation tools and an existing matching schedule where possible.
+Report the decision first, what changed, at most three priorities, exact install verdict, next release gate and smallest necessary owner action. Keep private analysis separate. The skill itself does not run in the background. Use the existing review automation and its observed execution state; create/update recurring work only when requested, with the app's automation tools rather than a duplicate schedule.

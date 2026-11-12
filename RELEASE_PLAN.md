@@ -1,6 +1,6 @@
 # Puptime release plan
 
-> **Current direction — November 12, 2026:** Follow the [product operating plan](docs/product-operating-plan.md) for priorities, APK install decisions, release gates, naming and marketing. Codex leads routine decisions. The plans below are historical and do not establish current implementation or release readiness.
+> **Current direction — November 12, 2026:** Follow the [product operating plan](docs/product-operating-plan.md) for priorities, install decisions, store gates, naming and marketing. Android v1.12.5 is the qualified GitHub recovery update; later merged UI changes await the next qualified batch. Root coordinates delegated work. Store publication and broader account acceptance retain their own gates. Everything below is historical and does not establish current implementation or readiness.
 
 ## Historical plans
 

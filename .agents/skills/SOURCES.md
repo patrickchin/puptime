@@ -9,6 +9,6 @@ Reviewed and installed November 12, 2026. These instruction-only copies were sel
 | launch | [Pinned source](https://github.com/coreyhaines31/marketingskills/tree/1f837447b20bb6f0e72d87b80ece1c221c362c7d/skills/launch) | `e4cda379ce9956f3d052e6fd40899f4094b267d21f4297dba73de24a9c93fb73` |
 | aso | [Pinned source](https://github.com/coreyhaines31/marketingskills/tree/1f837447b20bb6f0e72d87b80ece1c221c362c7d/skills/aso) | `c70e259ce5b7e71399a331ac1c8a7bf5985d5c5342b3dc1d03b37fcfa6b5ff55` |
 
-`puptime-product-lead` is project-authored. The upstream copies are unchanged apart from adding licence files; optional upstream eval files are omitted.
+`puptime-product-lead` is project-authored under the repository MIT license. Its operating context is linked from the skill; private runner aliases, owner paths and personal evidence are not bundled. The upstream copies are unchanged apart from adding licence files; optional upstream eval files are omitted.
 
 Use official platform policies and current product evidence over upstream statistics, scorecards or examples. Referenced external tools are optional suggestions, not installed capabilities or authorization. Review updates before replacing these copies.
