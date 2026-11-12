@@ -69,10 +69,7 @@ name: iOS side navigation and notification preferences
     checked: false
 - tapOn:
     id: settings.notifications.deviceDelivery
-# The driver may already accept a configured system prompt; verify permission below.
-- tapOn:
-    text: ^Allow$
-    optional: true
+# The configured iOS driver accepts the permission prompt; verify the resulting state.
 - assertVisible:
     id: settings.notifications.deviceDelivery
     checked: true
