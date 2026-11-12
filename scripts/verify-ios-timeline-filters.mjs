@@ -70,7 +70,7 @@ function snapshot(name){
  simctl('io',udid,'screenshot',join(output,name+'.png'));
  return state;
 }
-flow('open',`- runFlow:\n    when:\n      notVisible:\n        id: timeline.filter.pee\n    commands:\n      - tapOn:\n          id: nav.open\n      - tapOn:\n          id: nav.timeline\n          retryTapIfNoChange: true\n- tapOn:\n    id: timeline.filter.pee\n- extendedWaitUntil:\n    notVisible:\n      id: activity.loading\n    timeout: 30000\n`);
+flow('open',`- runFlow:\n    when:\n      visible:\n        id: nav.close\n    commands:\n      - tapOn:\n          id: nav.close\n- runFlow:\n    when:\n      notVisible:\n        id: timeline.filter.pee\n    commands:\n      - tapOn:\n          id: nav.switch\n          retryTapIfNoChange: true\n- tapOn:\n    id: timeline.filter.pee\n- extendedWaitUntil:\n    notVisible:\n      id: activity.loading\n    timeout: 30000\n`);
 let baseline=snapshot('pee');
 assert.ok(baseline.gaps.length,'Populated history must collapse empty days even with saved routine windows.');
 assert.equal(baseline.gaps.length,1,'The five-day break must occupy one row.');
