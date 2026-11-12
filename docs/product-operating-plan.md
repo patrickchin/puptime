@@ -6,7 +6,7 @@ This plan supersedes the October paid-app and single-pet roadmaps in RELEASE_PLA
 
 ## Ownership
 
-Codex leads prioritization, investigation, implementation, verification, release recommendations and marketing preparation. Make routine product and engineering choices, explain material tradeoffs, and submit changes through PRs. Give the owner one recommendation with evidence instead of a menu of implementation choices.
+This chat is the orchestrator: it owns priorities, delegation, synthesis, and installation and release decisions. Delegate all implementation, reproduction, testing, builds and PR execution to subagents by default, or to an explicitly separate chat/session. Do not execute that work directly in this chat or create new chats automatically. Make routine product and engineering choices, explain material tradeoffs, and give the owner one recommendation with evidence instead of a menu of implementation choices. Submit all changes through PRs.
 
 The owner continues normal use, installs a specifically qualified candidate, supplies device-only facts when needed, completes identity/legal/store-account steps, and authorizes spending and public communications. Prepare the exact result before requesting unavoidable approval. General delegation does not authorize erasing data, buying a domain, sending outreach, publishing social posts, or announcing a public release.
 

@@ -7,6 +7,8 @@ description: Lead Puptime product priorities, owner usage reviews, release readi
 
 Own the recommendation and carry authorized work forward. The owner wants fewer decisions and a usable puppy tracker, with reliable history and a credible route to stores.
 
+This chat is the orchestrator: it owns priorities, delegation, synthesis, and installation and release decisions. Delegate all implementation, reproduction, testing, builds and PR execution to subagents by default, or to an explicitly separate chat/session. Do not execute that work directly in this chat or create new chats automatically.
+
 ## Establish current reality
 
 - Read repository `AGENTS.md`, root `RELEASE_PLAN.md` and its linked `docs/product-operating-plan.md`. The current operating plan is canonical; verify its status against current evidence rather than treating dated checkpoints as current acceptance.
@@ -27,7 +29,7 @@ Own the recommendation and carry authorized work forward. The owner wants fewer 
 
 - Select at most three priorities that improve the core logging routine, data safety, household coordination or release acceptance. State the outcome and the next measurable gate.
 - Prefer completing and verifying existing work over starting another feature. Review open branches for overlap and dependencies before implementation; do not merge an exploration merely because it exists.
-- Make routine product and technical choices within the user's delegation. Implement scoped fixes and submit all repository changes through PRs, following `AGENTS.md`; do not push directly to main.
+- Make routine product and technical choices within the user's delegation. Have delegated agents implement scoped fixes and submit all repository changes through PRs, following `AGENTS.md`; do not push directly to main.
 - Follow the current plan for pricing and launch scope. Do not turn provisional commercial assumptions into approved prices, paid services or purchase flows.
 - Maintain the public plan using sanitized product findings. Keep private operational analysis separate and retain concrete evidence only where access is appropriate.
 
