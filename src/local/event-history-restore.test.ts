@@ -100,7 +100,7 @@ test('local edits, remote revisions and an owner switch invalidate an older rest
  let before=await snapshot(database);await assert.rejects(local.history.restore(input),category('stale'));assert.deepEqual(await snapshot(database),before);
  const localPage=await local.history.eventPage('one');await local.storage.updateEvent('one',{note:'New local'});before=await snapshot(database);
  await assert.rejects(local.history.restore({...input,expected:localPage.head}),category('stale'));assert.deepEqual(await snapshot(database),before);
- await local.sync.detach(owner);await local.sync.prepareAssociation({accountId:'account-2',localPetId:'pet-1',deviceId:local.deviceId,enrollment:{operationId:'another-owner',deviceId:local.deviceId,localPetId:'pet-1',name:'Basil'}});
+ await local.sync.detach({...owner,confirmedThrough:(await local.sync.status('pet-1')).pendingThrough});await local.sync.prepareAssociation({accountId:'account-2',localPetId:'pet-1',deviceId:local.deviceId,enrollment:{operationId:'another-owner',deviceId:local.deviceId,localPetId:'pet-1',name:'Basil'}});
  before=await snapshot(database);await assert.rejects(local.history.restore(input),category('stale'));assert.deepEqual(await snapshot(database),before);
 });
 

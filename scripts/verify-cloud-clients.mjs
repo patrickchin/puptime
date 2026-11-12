@@ -164,7 +164,7 @@ try{
  assert.equal((await b.storage.loadEvents()).find(event=>event.id===events[0].id).note,'Pending edit survives complete resync');
  assert.equal((await remote.api.account()).pets[0].eventCount,1000);
  console.log(`PASS ${mode}:interrupted full resync/restart preserves visible history and pending edits without duplication.`);
- const attached=await b.sync.status(b.name);await b.sync.detach({generation:attached.generation,accountId:primary.id});
+ const attached=await b.sync.status(b.name);assert.equal(await b.sync.detach({generation:attached.generation,accountId:primary.id}),true,'The drained queue must detach without discarding new work.');
  assert.equal((await b.storage.loadEvents()).length,1000);
  await b.storage.appendEvents([{id:'detached-offline-event',type:'walk',at:1900000,source:'app'}]);
  await prepare(b,cloudPet);await drain(b);await drain(a);

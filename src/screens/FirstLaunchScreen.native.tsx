@@ -66,26 +66,28 @@ export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPerm
   const saved=await loadFirstLaunch();if(!saved)throw new Error('Setup is already complete.');
   if(mounted.current)setProgress(saved);
  }
- async function local(confirmPending=false) {
+ async function local(confirmPending=false,confirmedThrough?:number) {
   await act(async()=>{
-   const result=cloud.controller?await cloud.controller.continueLocally({confirmPending}):await continueFirstLaunchLocally(await getLocalRuntime(),confirmPending);
+   const result=cloud.controller?await cloud.controller.continueLocally({confirmPending,confirmedThrough}):await continueFirstLaunchLocally(await getLocalRuntime(),confirmPending,confirmedThrough);
    if(result==='pending-confirmation-required'){
-    Alert.alert(t('setup.localConfirmTitle'),t('setup.localConfirmBody'),[{text:t('account.cancel'),style:'cancel'},{text:t('setup.continueLocal'),onPress:()=>{void local(true);}}]);return;
+    const runtime=await getLocalRuntime(),approved=(await runtime.sync.status(runtime.petId)).pendingThrough;
+    Alert.alert(t('setup.localConfirmTitle'),t('setup.localConfirmBody'),[{text:t('account.cancel'),style:'cancel'},{text:t('setup.continueLocal'),onPress:()=>{void local(true,approved);}}]);return;
    }
    if(result==='cancelled'){await onFinish();return;}
    if(result!=='ok')return;
    await checkpoint('walkthrough');
   });
  }
- async function activate(mode:'restore'|'combine') {
+ async function activate(mode:'restore'|'combine',confirmedThrough?:number) {
   await act(async()=>{
    if(!cloud.controller)return;
-   if(mode==='combine'&&enrolled){if(await cloud.controller.continueLocally({confirmPending:true})!=='ok')return;}
+   if(mode==='combine'&&enrolled){if(await cloud.controller.continueLocally({confirmPending:true,confirmedThrough})!=='ok')return;}
    await cloud.controller.enableCloud({mode,...(existing?{confirmedPetId:existing.id}:{})});
   });
  }
  function combine() {
-  Alert.alert(t('account.combine'),t('account.combineBody'),[{text:t('account.cancel'),style:'cancel'},{text:t('account.combine'),onPress:()=>{void activate('combine');}}]);
+  const confirmedThrough=cloud.controller?.read().sync?.pendingThrough??0;
+  Alert.alert(t('account.combine'),t('account.combineBody'),[{text:t('account.cancel'),style:'cancel'},{text:t('account.combine'),onPress:()=>{void activate('combine',confirmedThrough);}}]);
  }
  function back() {
   if(working)return;

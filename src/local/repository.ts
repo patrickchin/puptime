@@ -1,4 +1,4 @@
-import { type EventWriteOptions, type PuppyEvent, type PuppyEventChanges, type ScheduleEntry } from '../domain.ts';
+import {createNapEvent,isOpenNap,resolveNapState,inferNapEnds,NapConflictError,type EventWriteOptions, type PuppyEvent, type PuppyEventChanges, type ScheduleEntry } from '../domain.ts';
 import { parseEvents, parseSchedule, EventDeletedError, EventsImportError, EventsStorageError } from '../storage-validation.ts';
 import type { LocalDatabase, SqlExecutor } from './database.ts';
 import { applyScheduleEntryEdit } from '../schedule-editor.ts';
@@ -70,12 +70,28 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
     if (changed) notifyLocalCommit(afterCommit);
     return result;
   }
-  async function writeEvent(sql:SqlExecutor,before:PuppyEvent|null,after:PuppyEvent|null):Promise<LocalChange[]> {
+  async function writeEvent(sql:SqlExecutor,before:PuppyEvent|null,after:PuppyEvent|null,preserveConflict=false):Promise<LocalChange[]> {
+    if(!preserveConflict&&after&&isOpenNap(after)&&(!before||!isOpenNap(before))) {
+      const other=await sql.getFirstAsync("SELECT id FROM events WHERE pet_id=? AND type='nap' AND end_state=1 AND id!=? LIMIT 1",petId,after.id);
+      if(other)throw new NapConflictError();
+    }
     return writeEventRecord(sql,petId,before,after);
   }
   async function eventLabels(sql:SqlExecutor,changes:LocalChange[],options:EventWriteOptions={}) {
     const labels=changes.flatMap(change=>change.after?.type==='custom'?[String(change.after.customLabel)]:[]);
     return [...changes,...await retainCustomActivities(sql,petId,labels,options.restoreCustomActivities)];
+  }
+  async function appendEvents(incoming:PuppyEvent[],options:EventWriteOptions={},preserveConflict=false):Promise<void> {
+    incoming=parseEvents(incoming);
+    await commit(async sql=>{
+      const changes:LocalChange[]=[];
+      for(const event of incoming) {
+        const before=await readEvent(sql,event.id);
+        const [after]=parseEvents([{...before,...event,...(before?.estimated?{estimated:true}:{})}]);
+        changes.push(...await writeEvent(sql,before,after,preserveConflict));
+      }
+      return {changes:await eventLabels(sql,changes,options),value:undefined};
+    });
   }
   async function updateEvent(id:string,changes:PuppyEventChanges,options:EventWriteOptions={}):Promise<void> {
     await commit(async sql=>{
@@ -102,18 +118,43 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
     return changes;
   }
   return {
-    async loadEvents() { return materialize(await database.read(readEvents)); },
-    async appendEvents(incoming:PuppyEvent[],options:EventWriteOptions={}):Promise<void> {
-      incoming=parseEvents(incoming);
-      await commit(async sql=>{
-        const changes:LocalChange[]=[];
-        for (const event of incoming) {
-          const before=await readEvent(sql,event.id);
-          const [after]=parseEvents([{...before,...event,...(before?.estimated?{estimated:true}:{})}]);
-          changes.push(...await writeEvent(sql,before,after));
+    async reconcileNaps():Promise<PuppyEvent[]> {
+      return commit(async sql=>{
+        const rows=await sql.getAllAsync<EventSqlRow&{id:string}>("SELECT * FROM events WHERE pet_id=? AND type='nap' AND end_state=1 ORDER BY at,id",petId);
+        if(rows.length<2)return {changes:[],value:[]};
+        if(await sql.getFirstAsync("SELECT value FROM metadata WHERE key='care_blocked' AND value='1'"))return {changes:[],value:[]};
+        const open=rows.map(eventFromRow),candidates=[...open];
+        for(let index=0;index<open.length-1;index++) {
+          const awake=await sql.getFirstAsync<EventSqlRow&{id:string}>("SELECT * FROM events WHERE pet_id=? AND at>? AND at<=? AND (type IN ('pee','poop','meal','pottyTrip','walk') OR (type='nap' AND end_state!=1)) AND estimated IS NOT 1 ORDER BY at,id LIMIT 1",petId,open[index].at,open[index+1].at);
+          if(awake)candidates.push(eventFromRow(awake));
         }
-        return {changes:await eventLabels(sql,changes,options),value:undefined};
+        const changes:LocalChange[]=[],corrected:PuppyEvent[]=[];
+        for(const event of inferNapEnds(candidates)) {
+          const locked=await sql.getFirstAsync("SELECT record_id FROM local_sync_records WHERE json_extract(body,'$.kind')='event' AND json_extract(record_id,'$[2]')=? AND json_extract(body,'$.editable')=0",event.id);
+          if(locked)continue;
+          changes.push(...await writeEvent(sql,open.find(nap=>nap.id===event.id)!,event));
+          corrected.push(event);
+        }
+        return {changes,value:corrected};
       });
+    },
+    async toggleNap(source:PuppyEvent['source'],at=Date.now()):Promise<{event:PuppyEvent;previous?:PuppyEvent}> {
+      return commit(async sql=>{
+        const rows=await sql.getAllAsync<EventSqlRow&{id:string}>("SELECT * FROM events WHERE pet_id=? AND type='nap' AND end_state=1 LIMIT 2",petId);
+        const state=resolveNapState(rows.map(eventFromRow));
+        if(state.kind==='conflict')throw new NapConflictError();
+        const previous=state.kind==='running'?state.event:undefined;
+        const event=previous?{...previous,endedAt:Math.max(previous.at,at)}:createNapEvent(source,at);
+        return {changes:await writeEvent(sql,previous??null,event),value:{event,...(previous?{previous}:{})}};
+      });
+    },
+    async loadEvents() { return materialize(await database.read(readEvents)); },
+    appendEvents:(incoming:PuppyEvent[],options?:EventWriteOptions)=>appendEvents(incoming,options),
+    appendWidgetEvents(incoming:PuppyEvent[]):Promise<void> {
+      // The extension committed these logs independently. Retain all of them
+      // so foreground reconciliation can infer earlier end times without losing logs.
+      if(incoming.some(event=>event.source!=='widget'))throw new Error('Expected committed widget events.');
+      return appendEvents(incoming,{},true);
     },
     async importEvents(incoming:PuppyEvent[]):Promise<{imported:number;skipped:number}> {
       incoming=parseEvents(incoming);

@@ -17,6 +17,8 @@ import { Pressable } from './TelemetryPressable';
 import { useLocalization } from '../localization-context';
 import { type Theme } from '../theme';
 
+type DictationPhase = 'idle' | 'permission' | 'starting' | 'listening' | 'finishing' | 'cancelling';
+
 export function NoteInput({
   autoFocus = false,
   active = true,
@@ -33,32 +35,35 @@ export function NoteInput({
   theme: Theme;
 }) {
   const { locale, t } = useLocalization();
-  const [listening, setListening] = useState(false);
+  const [phase, setPhaseState] = useState<DictationPhase>('idle');
+  const phaseRef = useRef<DictationPhase>('idle');
+  const setPhase = (next: DictationPhase) => { phaseRef.current = next; setPhaseState(next); };
+  const listening = phase === 'starting' || phase === 'listening' || phase === 'finishing';
   const baseNote = useRef('');
-  const listeningRef = useRef(false);
+  const valueRef = useRef(value);valueRef.current = value;
   const activeRef = useRef(active),permissionRequest = useRef(0);
   activeRef.current = active;
 
   useSpeechRecognitionEvent('start', () => {
-    if(!activeRef.current){ExpoSpeechRecognitionModule.abort();return;}
-    listeningRef.current = true;
-    setListening(true);
+    if(!activeRef.current || phaseRef.current !== 'starting'){ExpoSpeechRecognitionModule.abort();return;}
+    setPhase('listening');
     AccessibilityInfo.announceForAccessibility(t('note.listeningAnnouncement'));
   });
   useSpeechRecognitionEvent('end', () => {
-    listeningRef.current = false;
-    setListening(false);
+    setPhase('idle');
   });
   useSpeechRecognitionEvent('result', (event) => {
-    if(!activeRef.current)return;
+    if(!activeRef.current || !['starting','listening','finishing'].includes(phaseRef.current))return;
     const transcript = event.results[0]?.transcript.trim();
     if (!transcript) return;
     onChangeText([baseNote.current, transcript].filter(Boolean).join(' ').slice(0, 300));
   });
   useSpeechRecognitionEvent('error', (event) => {
-    listeningRef.current = false;
-    setListening(false);
-    if (event.error === 'aborted'||!activeRef.current) return;
+    const cancelled = phaseRef.current === 'cancelling';
+    // Native errors may be followed by `end`. Wait for that terminal event
+    // before allowing another recognizer session to consume the old results.
+    setPhase('cancelling');
+    if (cancelled || event.error === 'aborted'||!activeRef.current) return;
     Alert.alert(
       t('note.transcribeErrorTitle'),
       event.error === 'not-allowed'
@@ -67,9 +72,15 @@ export function NoteInput({
     );
   });
 
-  useEffect(()=>{
-    if(!active){permissionRequest.current++;listeningRef.current=false;setListening(false);ExpoSpeechRecognitionModule.abort();}
-  },[active]);
+  const cancelDictation = () => {
+    permissionRequest.current++;
+    if (phaseRef.current === 'permission') setPhase('idle');
+    else if (phaseRef.current !== 'idle' && phaseRef.current !== 'cancelling') {
+      setPhase('cancelling');
+      ExpoSpeechRecognitionModule.abort();
+    }
+  };
+  useEffect(()=>{if(!active)cancelDictation();},[active]);
 
   useEffect(() => {
     activeRef.current=active;
@@ -78,23 +89,29 @@ export function NoteInput({
 
   const toggleListening = async () => {
     if(!activeRef.current)return;
-    const request=++permissionRequest.current;
+    let request=permissionRequest.current;
     try {
-      if (listeningRef.current) {
+      if (phaseRef.current === 'listening') {
+        setPhase('finishing');
         ExpoSpeechRecognitionModule.stop();
         return;
       }
+      if (phaseRef.current !== 'idle') return;
+      request=++permissionRequest.current;
       if (!ExpoSpeechRecognitionModule.isRecognitionAvailable()) {
         Alert.alert(t('note.unavailableTitle'), t('note.unavailableBody'));
         return;
       }
+      setPhase('permission');
       const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
       if(!activeRef.current||request!==permissionRequest.current)return;
       if (!permission.granted) {
+        setPhase('idle');
         Alert.alert(t('note.permissionTitle'), t('note.permissionBody'));
         return;
       }
-      baseNote.current = value.trim();
+      baseNote.current = valueRef.current.trim();
+      setPhase('starting');
       ExpoSpeechRecognitionModule.start({
         lang: locale,
         interimResults: true,
@@ -104,6 +121,7 @@ export function NoteInput({
       });
     } catch {
       if(!activeRef.current||request!==permissionRequest.current)return;
+      setPhase('idle');
       Alert.alert(t('note.unavailableTitle'), t('note.startError'));
     }
   };
@@ -130,7 +148,7 @@ export function NoteInput({
           maxLength={300}
           multiline
           onBlur={onBlur}
-          onChangeText={onChangeText}
+          onChangeText={(next) => { cancelDictation(); onChangeText(next); }}
           placeholder={t('note.placeholder')}
           placeholderTextColor={theme.textMuted}
           textAlignVertical="top"
@@ -141,7 +159,7 @@ export function NoteInput({
           accessibilityRole="button"
           accessibilityLabel={listening ? t('note.stopDictating') : t('note.dictate')}
           accessibilityState={{ selected: listening }}
-          disabled={!active}
+          disabled={!active || ['permission','starting','finishing','cancelling'].includes(phase)}
           onPress={toggleListening}
           style={({ pressed }) => [
             styles.micButton,

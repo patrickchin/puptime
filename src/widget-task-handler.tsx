@@ -5,10 +5,9 @@ import type { WidgetTaskHandlerProps } from 'react-native-android-widget';
 
 import {
   createEvent,
-  createNapEvent,
   activityFromKey,
   customActivityKey,
-  isOpenNap,
+  resolveNapState,
   isQuickEventType,
   latestQuickEventTimes,
   type PuppyEvent,
@@ -43,14 +42,12 @@ function saveLog(key: ActivityKey, at: number, customActivities: string[],expect
     if((selection?runtime.petId:'owner')!==expectedScope)return null;
     if(notificationPetId&&(runtime.petId!==notificationPetId||!await runtime.storage.loadQuietStatusEnabled()||!await runtime.storage.loadNotificationDelivery()))return null;
     const activity = activityFromKey(key, customActivities);
-    const openNap = key === 'nap' ? (await runtime.activity.latestEvents()).find(isOpenNap) : undefined;
-    const event = openNap
-      ? { ...openNap, endedAt: Math.max(openNap.at, at) }
-      : key === 'nap'
-        ? createNapEvent('widget', at)
-        : createEvent(activity.type, 'widget', at, activity.customLabel);
-    if (openNap) await runtime.storage.updateEvent(openNap.id, { endedAt: event.endedAt });
-    else await runtime.storage.appendEvents([event]);
+    if(key==='nap') {
+      if(resolveNapState(await runtime.activity.latestEvents()).kind==='conflict')return null;
+      const {event}=await runtime.storage.toggleNap('widget',at);return {event,activity};
+    }
+    const event=createEvent(activity.type,'widget',at,activity.customLabel);
+    await runtime.storage.appendEvents([event]);
     return { event, activity };
   });
   logWrites = result.catch(() => undefined);
@@ -84,14 +81,14 @@ function refreshAfterTaps(preferences: NotificationPreferences, language: AppLan
 async function render(props: WidgetTaskHandlerProps, events: PuppyEvent[]) {
   const access=await getCareAccess();
   const compact = props.widgetInfo.height < 90;
-  const activeNap = events.some(isOpenNap);
+  const napState=resolveNapState(events),activeNap=napState.kind==='running';
   const customActivities = await loadCustomActivities(events);
   const actions = await loadWidgetActions(customActivities);
   const themePreference = await loadThemePreference();
   const lastEventAt = latestQuickEventTimes(events);
   props.renderWidget({
-    light: <QuickLogWidget scope={access.scope} canLog={access.canLog} compact={compact} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} />,
-    dark: <QuickLogWidget scope={access.scope} canLog={access.canLog} compact={compact} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} dark />,
+    light: <QuickLogWidget scope={access.scope} canLog={access.canLog} compact={compact} activeNap={activeNap} napConflict={napState.kind==='conflict'} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} />,
+    dark: <QuickLogWidget scope={access.scope} canLog={access.canLog} compact={compact} activeNap={activeNap} napConflict={napState.kind==='conflict'} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} dark />,
   });
 }
 

@@ -13,6 +13,7 @@ import {
   DEFAULT_WIDGET_ACTIONS,
   normalizeCustomActivities,
   isOpenNap,
+  resolveNapState,inferNapEnds,NapConflictError,createNapEvent,
   normalizeWidgetActions,
   STARTER_SCHEDULE,
   type PuppyEvent,
@@ -107,7 +108,32 @@ export function appendEvents(incoming: PuppyEvent[],_options?:EventWriteOptions)
       ...event,
       ...(byId.get(event.id)?.estimated ? { estimated: true } : {}),
     }));
-    return writeEvents([...byId.values()]);
+    const merged=[...byId.values()];
+    if(incoming.some(event=>isOpenNap(event)&&!current.some(old=>old.id===event.id&&isOpenNap(old)))&&resolveNapState(merged).kind==='conflict')throw new NapConflictError();
+    return writeEvents(merged);
+  });
+}
+
+export function toggleNap(source:PuppyEvent['source'],at=Date.now()):Promise<{event:PuppyEvent;previous?:PuppyEvent}> {
+  return queueEventWrite(async()=>{
+    const events=await loadEvents(),state=resolveNapState(events);
+    if(state.kind==='conflict')throw new NapConflictError();
+    const previous=state.kind==='running'?state.event:undefined;
+    const event=previous?{...previous,endedAt:Math.max(previous.at,at)}:createNapEvent(source,at);
+    await writeEvents([...events.filter(old=>old.id!==event.id),event]);
+    return {event,...(previous?{previous}:{})};
+  });
+}
+export const appendWidgetEvents=appendEvents;
+
+export function reconcileNaps():Promise<PuppyEvent[]> {
+  return queueEventWrite(async()=>{
+    const events=await loadEvents(),corrected=inferNapEnds(events);
+    if(corrected.length) {
+      const byId=new Map(corrected.map(event=>[event.id,event]));
+      await writeEvents(events.map(event=>byId.get(event.id)??event));
+    }
+    return corrected;
   });
 }
 
@@ -137,8 +163,11 @@ export function updateEvent(
   changes: PuppyEventChanges,
   _options?:EventWriteOptions,
 ): Promise<PuppyEvent[]> {
-  return queueEventWrite(async () => writeEvents((await loadEvents())
-    .map((event) => (event.id === id ? { ...event, ...changes } : event))));
+  return queueEventWrite(async () => {
+    const before=await loadEvents(),after=before.map(event=>event.id===id?{...event,...changes}:event);
+    if(after.some(event=>event.id===id&&isOpenNap(event))&&!before.some(event=>event.id===id&&isOpenNap(event))&&resolveNapState(after).kind==='conflict')throw new NapConflictError();
+    return writeEvents(after);
+  });
 }
 
 export async function loadSchedule(): Promise<ScheduleEntry[]> {

@@ -68,8 +68,14 @@ export function ScheduleScreen({
   const [pendingRemove, setPendingRemove] = useState<ScheduleEntry | null>(null);
   const [removing, setRemoving] = useState(false);
   const [removeFailed, setRemoveFailed] = useState(false);
-  const [requestingPermission, setRequestingPermission] = useState(false);
-  const [saving, setSaving] = useState(false);
+  type EditorOperation = {kind:'idle'} | {kind:'permission'|'saving';session:number};
+  const [editorOperation,setEditorOperation]=useState<EditorOperation>({kind:'idle'});
+  const operationRef=useRef<EditorOperation>({kind:'idle'}),editorSession=useRef(0);
+  const requestingPermission=editorOperation.kind==='permission',saving=editorOperation.kind==='saving';
+  const setOperation=(next:EditorOperation)=>{operationRef.current=next;setEditorOperation(next);};
+  const invalidateEditor=()=>{editorSession.current++;setOperation({kind:'idle'});};
+  const closeDraft=()=>{invalidateEditor();setDraft(null);setPreviewIds(null);setShowTimeSelector(false);};
+  useEffect(()=>()=>{editorSession.current++;},[]);
   const [reviewingSuggestion, setReviewingSuggestion] = useState(false);
   const [applyingSuggestion, setApplyingSuggestion] = useState(false);
   const [now, setNow] = useState(Date.now());
@@ -88,6 +94,7 @@ export function ScheduleScreen({
   const canSuggest = suggestion.entries.length > 0&&!window.loading&&!window.error;
 
   const editEntry=useCallback((entry:ScheduleEntry)=>{
+    invalidateEditor();
     originalDraft.current={...entry,reminder:Boolean(entry.reminder)};
     setDraft({...originalDraft.current,reminder:Boolean(entry.reminder)});
     setShowTimeSelector(false);
@@ -100,6 +107,7 @@ export function ScheduleScreen({
   const requestRemove=useCallback((entry:ScheduleEntry)=>{setRemoveFailed(false);setPendingRemove(entry);},[]);
 
   const openNew = () => {
+    invalidateEditor();
     const now = new Date();
     const rounded = Math.round((now.getHours() * 60 + now.getMinutes()) / 15) * 15;
     originalDraft.current=undefined;setDraft({ id: entityId('rtn'), type: 'pee', minutes: rounded % (24 * 60), reminder: false });
@@ -107,7 +115,8 @@ export function ScheduleScreen({
   };
 
   const save = async () => {
-    if (!draft || saving) return;
+    if (!draft || operationRef.current.kind!=='idle') return;
+    const session=editorSession.current;
     const entry: ScheduleEntry = {
       id: draft.id,
       type: draft.type,
@@ -116,27 +125,30 @@ export function ScheduleScreen({
       reminder: draft.reminder,
       ...(draft.toleranceMinutes === undefined ? {} : { toleranceMinutes: draft.toleranceMinutes }),
     };
-    setSaving(true);
+    setOperation({kind:'saving',session});
     try {
       await onSaveEntry(entry,originalDraft.current);
-      setDraft(null);
+      if(session===editorSession.current)closeDraft();
     } catch(error) {
-      Alert.alert(t(error instanceof ScheduleEntryDeletedError?'schedule.removedErrorTitle':'schedule.saveErrorTitle'), t(error instanceof ScheduleEntryDeletedError?'schedule.removedErrorBody':'schedule.saveErrorBody'));
+      if(session===editorSession.current)Alert.alert(t(error instanceof ScheduleEntryDeletedError?'schedule.removedErrorTitle':'schedule.saveErrorTitle'), t(error instanceof ScheduleEntryDeletedError?'schedule.removedErrorBody':'schedule.saveErrorBody'));
     } finally {
-      setSaving(false);
+      if(session===editorSession.current)setOperation({kind:'idle'});
     }
   };
 
   const toggleReminder = async (enabled: boolean) => {
-    if (!draft || requestingPermission) return;
+    if (!draft || operationRef.current.kind!=='idle') return;
+    const session=editorSession.current;
     if (!enabled) {
       setDraft({ ...draft, reminder: false });
       return;
     }
 
-    setRequestingPermission(true);
+    setOperation({kind:'permission',session});
     try {
-      if (await onRequestReminderPermission()) {
+      const granted=await onRequestReminderPermission();
+      if(session!==editorSession.current)return;
+      if (granted) {
         setDraft((current) => current ? { ...current, reminder: true } : null);
       } else {
         Alert.alert(
@@ -149,9 +161,9 @@ export function ScheduleScreen({
         );
       }
     } catch {
-      Alert.alert(t('schedule.reminderErrorTitle'), t('schedule.reminderErrorBody'));
+      if(session===editorSession.current)Alert.alert(t('schedule.reminderErrorTitle'), t('schedule.reminderErrorBody'));
     } finally {
-      setRequestingPermission(false);
+      if(session===editorSession.current)setOperation({kind:'idle'});
     }
   };
 
@@ -443,7 +455,7 @@ export function ScheduleScreen({
           focusedInput.blur();
           Keyboard.dismiss();
         } else if (showTimeSelector) setShowTimeSelector(false);
-        else setDraft(null);
+        else closeDraft();
       }}>
         <View testID="schedule.editor" accessibilityViewIsModal style={styles.scrim}>
           <ScrollView
@@ -459,7 +471,7 @@ export function ScheduleScreen({
               <Pressable
                 testID="schedule.editor.close"
                 accessibilityLabel={t('schedule.close')}
-                onPress={() => {setDraft(null);setPreviewIds(null);}}
+                onPress={closeDraft}
                 style={({ pressed }) => [styles.closeButton, pressed && { backgroundColor: theme.primarySoft }]}
               >
                 <MaterialCommunityIcons name="close" size={22} color={theme.text} />
@@ -487,6 +499,7 @@ export function ScheduleScreen({
                   <Pressable
                     key={customLabel ? customActivityKey(customLabel) : type}
                     testID={`schedule.editor.type.${type}`}
+                    disabled={saving}
                     accessibilityState={{ selected }}
                     onPress={() => draft && setDraft({ ...draft, type, customLabel, toleranceMinutes: selected ? draft.toleranceMinutes : undefined })}
                     style={({ pressed }) => [
@@ -508,6 +521,7 @@ export function ScheduleScreen({
             <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{t('schedule.time')}</Text>
             <Pressable
               testID="schedule.editor.time"
+              disabled={saving}
               accessibilityRole="button"
               accessibilityState={{ expanded: showTimeSelector }}
               onPress={() => setShowTimeSelector(true)}
@@ -527,6 +541,7 @@ export function ScheduleScreen({
                   <Text style={[styles.reminderCopy, styles.reminderTitle, { color: theme.text }]}>{t('schedule.expectedWindow')}</Text>
                   <Switch
                     testID="schedule.editor.window"
+                    disabled={saving}
                     accessibilityLabel={t('schedule.expectedWindow')}
                     ios_backgroundColor={theme.border}
                     trackColor={{ false: theme.border, true: theme.primary }}
@@ -541,6 +556,7 @@ export function ScheduleScreen({
                         <Pressable
                           key={minutes}
                           testID={`schedule.editor.window.${minutes}`}
+                          disabled={saving}
                           accessibilityRole="radio"
                           accessibilityLabel={t('schedule.windowSizeA11y', { minutes })}
                           accessibilityState={{ checked: draft.toleranceMinutes === minutes }}
@@ -575,7 +591,7 @@ export function ScheduleScreen({
               <Switch
                 testID="schedule.editor.reminder"
                 accessibilityLabel={t('schedule.reminderA11y')}
-                disabled={requestingPermission}
+                disabled={requestingPermission||saving}
                 ios_backgroundColor={theme.border}
                 onValueChange={toggleReminder}
                 trackColor={{ false: theme.border, true: theme.primary }}
@@ -586,8 +602,8 @@ export function ScheduleScreen({
             <Pressable
               testID="schedule.editor.save"
               accessibilityRole="button"
-              accessibilityState={{ busy: saving, disabled: saving }}
-              disabled={saving}
+              accessibilityState={{ busy: saving, disabled: saving||requestingPermission }}
+              disabled={saving||requestingPermission}
               onPress={save}
               style={({ pressed }) => [
                 styles.saveButton,
@@ -600,7 +616,7 @@ export function ScheduleScreen({
             </Pressable>
             </>}
           </ScrollView>
-          {showTimeSelector ? (
+          {showTimeSelector && !saving ? (
             <DateTimeSelector
               value={pickerDate}
               mode="time"

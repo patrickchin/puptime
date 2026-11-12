@@ -27,12 +27,11 @@ import {
 } from './src/localization';
 import {
   createEvent,
-  createNapEvent,
   activityKey,
   DEFAULT_WIDGET_ACTIONS,
-  isOpenNap,
   isQuickEventType,
   normalizeNote,
+  resolveNapState,
   type ActivityKey,
   type EventType,
   type PuppyEvent,
@@ -100,7 +99,7 @@ function ActiveJournal(){const session=useCareSession();return <PuptimeApp key={
 
 export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboarding?:boolean}={}) {
   const careSession=useCareSession(),care=careSession.selection;
-  const {appendEvents,completeOnboarding,loadActivityCustomizations,importEvents,loadEvents,loadCustomActivities,loadLanguagePreference,loadNotificationPreferences,loadSchedule,loadThemePreference,loadWidgetActions,removeEvent,saveSchedule,saveScheduleEntry,removeScheduleEntry,saveCustomActivity,saveLanguagePreference,saveNotificationPreferences,saveThemePreference,saveWidgetActions,shouldShowOnboarding,updateEvent}=careSession.runtime?.storage??defaultStorage;
+  const {appendEvents,appendWidgetEvents,toggleNap,reconcileNaps,completeOnboarding,loadActivityCustomizations,importEvents,loadEvents,loadCustomActivities,loadLanguagePreference,loadNotificationPreferences,loadSchedule,loadThemePreference,loadWidgetActions,removeEvent,saveSchedule,saveScheduleEntry,removeScheduleEntry,saveCustomActivity,saveLanguagePreference,saveNotificationPreferences,saveThemePreference,saveWidgetActions,shouldShowOnboarding,updateEvent}=careSession.runtime?.storage??defaultStorage;
   const getActivityData=careSession.runtime?async()=>careSession.runtime!.activity:defaultGetActivityData;
   const getActivityPetId=careSession.runtime?async()=>careSession.runtime!.petId:defaultGetActivityPetId;
   const getEventHistoryData=careSession.runtime?async()=>careSession.runtime!.history:defaultGetEventHistoryData;
@@ -142,6 +141,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
   languageRef.current = language;
   const [tab, setTab] = useState<AppTab>('log');
   const [events, setEvents] = useState<PuppyEvent[]>([]);
+  const [napAdjustments,setNapAdjustments]=useState<PuppyEvent[]>([]);
   const [activity,setActivity]=useState<ActivityQueries>();
   const [eventHistory,setEventHistory]=useState<EventHistoryData>();
   const [petId,setPetId]=useState<string>();
@@ -188,12 +188,20 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     activityRef.current=data;
     const pending = await readPendingWidgetEvents();
     if (pending.length) {
-      await appendEvents(pending);
+      await appendWidgetEvents(pending);
       await acknowledgePendingWidgetEvents(pending);
     }
     let nextEvents:PuppyEvent[],count:number;
     if(data){const [latest,summary]=await Promise.all([data.latestEvents(),data.summary()]);nextEvents=latest;count=summary.eventCount;}
     else{nextEvents=await loadEvents();count=nextEvents.length;}
+    if(careSession.isCurrent()&&resolveNapState(nextEvents).kind==='conflict'&&care?.permission!=='view'&&(!care?.expiresAt||care.expiresAt>Date.now())) {
+      const corrected=await reconcileNaps();
+      if(corrected.length&&careSession.isCurrent()) {
+        setNapAdjustments(previous=>[...previous.filter(event=>!corrected.some(next=>next.id===event.id)),...corrected]);
+      }
+      // Another refresh may have performed the same recovery first.
+      nextEvents=data?await data.latestEvents():await loadEvents();
+    }
     if(generation!==refreshGeneration.current)return nextEvents;
     setActivity(data);
     setEventHistory(history);
@@ -455,26 +463,18 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     if (!nativeApp && type === 'custom' && customLabel) setCustomActivities(await saveCustomActivity(customLabel));
     const now = Date.now();
     if (type === 'nap') {
-      const openNap = (activityRef.current?await activityRef.current.latestEvents():await loadEvents()).find(isOpenNap);
-      if (openNap) {
-        const event = { ...openNap, endedAt: Math.max(openNap.at, now) };
-        await updateEvent(openNap.id, { endedAt: event.endedAt });
-        productTelemetry.capture('app_log_action', { action: 'nap_end', activity_type: 'nap', source: 'app', result: 'success' });
-        setUndoState({ event, restore: openNap, message: translate(language, 'app.napEnded') });
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-        await refreshCommittedState();
-        return;
-      }
+      const {event,previous}=await toggleNap('app',now);
+      productTelemetry.capture('app_log_action',{action:previous?'nap_end':'create',activity_type:'nap',source:'app',result:'success'});
+      setUndoState({event,...(previous?{restore:previous}:{}),message:translate(language,previous?'app.napEnded':'app.napStarted')});
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(()=>undefined);
+      await refreshCommittedState();setShowSpotlight(false);return;
     }
-
-    const event = type === 'nap' ? createNapEvent('app', now) : createEvent(type, 'app', now, customLabel);
+    const event = createEvent(type, 'app', now, customLabel);
     await appendEvents([event],{restoreCustomActivities:type==='custom'});
     productTelemetry.capture('app_log_action', { action: 'create', activity_type: type, source: 'app', result: 'success' });
     setUndoState({
       event,
-      message: type === 'nap'
-        ? translate(language, 'app.napStarted')
-        : translate(language, 'app.logged', { activity: displayPastLabel(event) }),
+      message: translate(language, 'app.logged', { activity: displayPastLabel(event) }),
     });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
     await refreshCommittedState();
@@ -490,6 +490,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
 
   const deleteEvent = async (event: PuppyEvent) => {
     await removeEvent(event.id);
+    setNapAdjustments(previous=>previous.filter(nap=>nap.id!==event.id));
     productTelemetry.capture('app_log_action', { action: 'delete', activity_type: event.type, result: 'success' });
     await refreshCommittedState();
   };
@@ -527,6 +528,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
       setCustomActivities(await saveCustomActivity(changes.customLabel));
     }
     await updateEvent(event.id,changes,{restoreCustomActivities});
+    if('endedAt' in changes)setNapAdjustments(previous=>previous.filter(nap=>nap.id!==event.id));
     productTelemetry.capture('app_log_action', { action: 'update', activity_type: changes.type ?? event.type, result: 'success' });
     if (restoreCustomActivities && !customActivities.some(label => activityKey({ type: 'custom', customLabel: label }) === activityKey({ type: 'custom', customLabel: changes.customLabel }))) {
       productTelemetry.capture('app_log_action', { action: 'custom_activity_create', activity_type: 'custom', result: 'success' });
@@ -789,6 +791,8 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     }
     return (
       <LogScreen
+        napAdjustments={napAdjustments}
+        onDismissNapAdjustment={id=>setNapAdjustments(previous=>previous.filter(event=>event.id!==id))}
         canEditEvent={care?canEditEvent:undefined}
         readOnly={care?.permission==='view'}
         showHeader={!nativeApp}
@@ -817,6 +821,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     activityCustomizations,
     editRequest,
     events,
+    napAdjustments,
     activity,
     eventHistory,
     historyVisible,

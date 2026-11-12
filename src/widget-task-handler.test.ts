@@ -43,7 +43,7 @@ registerHooks({
       'widget-test:./local/runtime.native': `
         export function getCareSelection(){return s.scope==='owner'?null:{id:'shared'};}
         export const getRuntimeForCare=()=>getLocalRuntime();
-        export async function getLocalRuntime(){return {petId:s.scope,storage:{async loadQuietStatusEnabled(){return s.enabled;},async loadNotificationDelivery(){return s.delivery;},async appendEvents(events){await Promise.resolve();if(s.fail)throw Error('disk full');s.events.push(...events);},async updateEvent(id,changes){await Promise.resolve();s.events=s.events.map(e=>e.id===id?{...e,...changes}:e);}},activity:{async latestEvents(){s.reads++;await s.readHold;return [...s.events];}}};}`,
+        export async function getLocalRuntime(){return {petId:s.scope,storage:{async toggleNap(source,at){if(s.fail)throw Error('disk full');const previous=s.events.find(e=>e.type==='nap'&&e.endedAt===null);const event=previous?{...previous,endedAt:Math.max(previous.at,at)}:{id:'evt_mock_'+at,type:'nap',at,endedAt:null,source};s.events=[...s.events.filter(e=>e.id!==event.id),event];return {event,previous};},async loadQuietStatusEnabled(){return s.enabled;},async loadNotificationDelivery(){return s.delivery;},async appendEvents(events){await Promise.resolve();if(s.fail)throw Error('disk full');s.events.push(...events);},async updateEvent(id,changes){await Promise.resolve();s.events=s.events.map(e=>e.id===id?{...e,...changes}:e);}},activity:{async latestEvents(){s.reads++;await s.readHold;return [...s.events];}}};}`,
       'widget-test:./reminders': `
         export function configureReminderHandling(){}
         export async function showWidgetLogConfirmation(reference){s.confirmations.push(reference);return true;}
@@ -138,4 +138,11 @@ test('notification actions stay in the background and reject disabled or stale p
   state.delivery=true;await tap('pee',123459,false,{...notification,petId:'pet_old'});
   assert.equal(state.events.length,1);
   assert.equal(state.confirmations.length,1);
+});
+
+
+test('Android widgets refuse ambiguous nap toggles while retaining the committed naps',async()=>{
+ reset();state.events=[{id:'nap-a',type:'nap',at:100,endedAt:null,source:'app'},{id:'nap-b',type:'nap',at:200,endedAt:null,source:'app'}];
+ await tap('nap',300,true);assert.equal(state.events.filter(event=>event.endedAt===null).length,2);assert.equal(state.confirmations.length,0);assert.equal(state.renders,1);
+ await tap('pee',301);assert.equal(state.events.length,3);
 });

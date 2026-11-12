@@ -169,6 +169,25 @@ test('unsupported theme preferences reject without touching activity data', asyn
   }
 });
 
+test('browser nap transitions reject duplicate starts and serialize rapid toggles without losing history',async()=>{
+ stored.clear();const first=createNapEvent('app',100);await storage.appendEvents([first]);
+ await assert.rejects(storage.appendEvents([{...first,id:'another'}]),/running naps/);
+ await storage.updateEvent(first.id,{endedAt:200});
+ const results=await Promise.all([storage.toggleNap('app',300),storage.toggleNap('widget',400)]);
+ assert.equal(results[0].event.id,results[1].event.id);assert.equal(results[1].event.endedAt,400);
+ assert.equal((await storage.loadEvents()).length,2);
+});
+
+
+test('browser nap recovery persists inferred ends once and leaves the latest nap running',async()=>{
+ stored.clear();
+ const first={...createNapEvent('app',100),id:'nap-first'},second={...createNapEvent('widget',200),id:'nap-second'},awake={...createEvent('pee','app',150),id:'awake'};
+ stored.set(eventsKey,JSON.stringify([first,second,awake]));
+ assert.deepEqual(await storage.reconcileNaps(),[{...first,endedAt:150}]);
+ assert.deepEqual(await storage.reconcileNaps(),[]);
+ assert.deepEqual(await storage.loadEvents(),[second,awake,{...first,endedAt:150}]);
+});
+
 test('malformed browser settings reject before a write can replace retained values',async()=>{
  stored.clear();
  for (const raw of ['{broken', '', 'null', '{}', '[42]']) {

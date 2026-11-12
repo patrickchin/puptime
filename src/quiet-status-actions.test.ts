@@ -16,3 +16,8 @@ test('notification actions preserve widget selection, real event timers and scop
   const custom=notificationActions({...props,actions:['pee','custom:medicine'],customActivities:['Medicine']});
   assert.equal(custom[1].label,'Medicine');assert.equal(custom[1].icon,'custom');
 });
+
+test('conflicting naps never offer an ambiguous notification start/end action',()=>{
+ const actions=notificationActions({...props,actions:['nap','pee'],events:[{id:'one',type:'nap',at:100,endedAt:null,source:'app'},{id:'two',type:'nap',at:200,endedAt:null,source:'widget'}]});
+ assert.deepEqual(actions.map(action=>action.type),['pee']);
+});

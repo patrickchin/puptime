@@ -138,7 +138,7 @@ test('a delayed post-link provider list is fenced against a replacement local ge
  const {controller,runtime,state,identity}=await fixture(t);state.credentials=true;const owner=await enrollLocal(runtime);await runtime.storage.appendEvents([event]);await controller.refresh();
  let release!:(value:{data:{userId:string;providerId:string}[];error:null})=>void,started!:()=>void,count=0;const entered=new Promise<void>(resolve=>{started=resolve;});
  identity.listAccounts=async()=>{if(++count===1)return {data:[],error:null};started();return new Promise(resolve=>{release=resolve;});};
- const request=controller.connectProvider('google');await entered;await runtime.sync.detach(owner);await runtime.sync.prepareAssociation({accountId:'account-1',localPetId:runtime.petId,deviceId:runtime.deviceId,enrollment:{operationId:'new-list-generation',deviceId:runtime.deviceId,localPetId:runtime.petId,name:'My puppy'}});const before=await localTables(runtime);
+ const request=controller.connectProvider('google');await entered;await runtime.sync.detach({...owner,confirmedThrough:(await runtime.sync.status(runtime.petId)).pendingThrough});await runtime.sync.prepareAssociation({accountId:'account-1',localPetId:runtime.petId,deviceId:runtime.deviceId,enrollment:{operationId:'new-list-generation',deviceId:runtime.deviceId,localPetId:runtime.petId,name:'My puppy'}});const before=await localTables(runtime);
  release({data:[{userId:'account-1',providerId:'google'}],error:null});assert.equal(await request,'error');assert.equal(controller.read().problem,'account-mismatch');assert.equal(controller.read().linkedProviders,null);assert.deepEqual(await localTables(runtime),before);
 });
 
@@ -158,7 +158,7 @@ for(const change of ['session','owner','dispose','network','auth-expired'] as co
  identity.linkSocial=async()=>{started();await new Promise<void>(resolve=>{release=resolve;});state.linkedAccounts=[{userId:'account-1',providerId:'google'}];return {error:null};};
  const request=controller.connectProvider('google');await entered;
  if(change==='session')state.summary={...state.summary,user:{...state.summary.user,id:'account-2'}};
- if(change==='owner'){await runtime.sync.detach(owner);await runtime.sync.prepareAssociation({accountId:'account-1',localPetId:runtime.petId,deviceId:runtime.deviceId,enrollment:{operationId:'replacement-owner',deviceId:runtime.deviceId,localPetId:runtime.petId,name:'My puppy'}});}
+ if(change==='owner'){await runtime.sync.detach({...owner,confirmedThrough:(await runtime.sync.status(runtime.petId)).pendingThrough});await runtime.sync.prepareAssociation({accountId:'account-1',localPetId:runtime.petId,deviceId:runtime.deviceId,enrollment:{operationId:'replacement-owner',deviceId:runtime.deviceId,localPetId:runtime.petId,name:'My puppy'}});}
  if(change==='network')controller.setOnline(false);
  if(change==='auth-expired')state.credentials=false;
  let laterAccountCalls=0;const original=api.account;api.account=async()=>{laterAccountCalls++;return original();};
@@ -331,10 +331,86 @@ async function enrollLocal(runtime:Awaited<ReturnType<typeof createLocalRuntime>
  await runtime.sync.stageBaseline({...owner,page:{changes:[],cursor:0,hasMore:false}});await runtime.sync.completeAssociation({...owner,cloudPetId:runtime.petId});return owner;
 }
 
+async function enrollSyncedLocal(runtime:Awaited<ReturnType<typeof createLocalRuntime>>) {
+ const owner={...await runtime.sync.prepareAssociation({accountId:'account-1',localPetId:runtime.petId,deviceId:runtime.deviceId,enrollment:{operationId:'enroll-synced',deviceId:runtime.deviceId,localPetId:runtime.petId,name:'My puppy'}}),accountId:'account-1'};
+ await runtime.sync.stageBaseline({...owner,page:{changes:[{id:runtime.petId,petId:runtime.petId,kind:'puppy',revision:1,sequence:1,deleted:false,updatedAt:100,data:{name:'My puppy'}}],cursor:1,hasMore:false}});
+ await runtime.sync.completeAssociation({...owner,cloudPetId:runtime.petId});
+ const accepted=(await runtime.sync.nextBatch(owner)).map((mutation,index)=>{
+  const result=reconcileMutation(null,mutation,100),record={...result.record,revision:1,sequence:index+2};
+  return {operationId:mutation.operationId,record,sequence:record.sequence,reason:result.reason};
+ });
+ await runtime.sync.applySync({...owner,accepted,page:{changes:accepted.map(result=>result.record),cursor:accepted.at(-1)?.sequence??1,hasMore:false}});
+ assert.equal((await runtime.sync.status(runtime.petId)).pending,0);return owner;
+}
+
 test('pending sign-out needs explicit confirmation and keeps local history while detaching the cloud owner',async t=>{
  const {controller,runtime,state}=await fixture(t);state.credentials=true;await enrollLocal(runtime);await runtime.storage.appendEvents([event]);await controller.refresh();
  assert.equal(await controller.signOut({}),'pending-confirmation-required');assert.equal(state.signOutCalls,0);assert.equal((await runtime.sync.status('pet-1')).state,'active');
  assert.equal(await controller.signOut({confirmPending:true}),'ok');assert.equal(controller.read().account,null);assert.equal((await runtime.sync.status('pet-1')).state,'local');assert.deepEqual(await runtime.storage.loadEvents(),[event]);
+});
+
+for(const confirmPending of [false,true])test(`sign-out preserves new SQLite outbox work arriving while credentials clear (confirmed=${confirmPending})`,async t=>{
+ const {controller,runtime,state,identity,timers}=await fixture(t);state.credentials=true;const owner=await enrollSyncedLocal(runtime);
+ if(confirmPending)await runtime.storage.appendEvents([event]);
+ await controller.refresh();const confirmed=await runtime.sync.status('pet-1');
+ let entered!:()=>void,release!:()=>void;
+ const started=new Promise<void>(resolve=>{entered=resolve;}),waiting=new Promise<void>(resolve=>{release=resolve;});
+ identity.signOut=async()=>{state.signOutCalls++;entered();await waiting;state.credentials=false;return {error:null};};
+ const request=controller.signOut({confirmPending,confirmedThrough:confirmed.pendingThrough});await started;
+ const later={...event,id:'during-sign-out',at:200};await runtime.storage.appendEvents([later]);
+ const pending=await runtime.sync.nextBatch(owner);release();
+ assert.equal(await request,'pending-confirmation-required');assert.equal(state.credentials,false);assert.equal(controller.read().account,null);
+ assert.equal(controller.read().problem,'pending-confirmation-required');assert.deepEqual(await runtime.sync.nextBatch(owner),pending);
+ assert.equal((await runtime.sync.status('pet-1')).generation,owner.generation);assert.equal(timers.filter(timer=>!timer.cancelled).length,0);
+ assert.ok((await runtime.storage.loadEvents()).some(value=>value.id===later.id));
+ identity.signOut=async()=>{state.signOutCalls++;return {error:null};};
+ const latest=await runtime.sync.status('pet-1');
+ assert.equal(await controller.signOut({confirmPending:true,confirmedThrough:latest.pendingThrough}),'ok');
+ assert.equal((await runtime.sync.status('pet-1')).state,'local');assert.ok((await runtime.storage.loadEvents()).some(value=>value.id===later.id));
+});
+
+test('a fresh explicit sign-in resumes the owner retained after a raced sign-out',async t=>{
+ const {controller,runtime,state,identity,timers}=await fixture(t);state.credentials=true;const owner=await enrollSyncedLocal(runtime);await controller.refresh();
+ identity.signOut=async()=>{state.credentials=false;await runtime.storage.appendEvents([event]);return {error:null};};
+ assert.equal(await controller.signOut({}),'pending-confirmation-required');const pending=await runtime.sync.nextBatch(owner);
+ assert.equal(await controller.signInSocial('google'),'ok');assert.equal(controller.read().account!.user.id,'account-1');
+ controller.setActive(true);await controller.refresh();
+ assert.equal(timers.filter(timer=>!timer.cancelled).length,1);assert.deepEqual(await runtime.sync.nextBatch(owner),pending);
+});
+
+test('sign-out rechecks writes queued during the required checkpoint before changing credentials',async t=>{
+ let delay=false,entered!:()=>void,release!:()=>void;
+ const started=new Promise<void>(resolve=>{entered=resolve;}),waiting=new Promise<void>(resolve=>{release=resolve;});
+ const {controller,runtime,state,timers}=await fixture(t,{beforeChange:async(_sql,reason)=>{if(delay&&reason==='account-change'){entered();await waiting;}}});
+ state.credentials=true;const owner=await enrollSyncedLocal(runtime);controller.setActive(true);await controller.refresh();delay=true;
+ const request=controller.signOut({});await started;
+ const write=runtime.storage.appendEvents([event]);release();await write;
+ assert.equal(await request,'pending-confirmation-required');assert.equal(state.signOutCalls,0);assert.equal(state.credentials,true);
+ assert.equal((await runtime.sync.nextBatch(owner)).length,1);assert.deepEqual(await runtime.storage.loadEvents(),[event]);
+ assert.equal(timers.filter(timer=>!timer.cancelled).length,1);
+});
+
+test('a confirmation from before a new write cannot discard it on sign-out or first-launch local fallback',async t=>{
+ const {controller,runtime,state}=await fixture(t);state.credentials=true;const owner=await enrollSyncedLocal(runtime);await controller.refresh();
+ await runtime.storage.appendEvents([event]);const confirmed=await runtime.sync.status('pet-1');
+ await runtime.storage.updateEvent(event.id,{note:'after dialog opened'});const pending=await runtime.sync.nextBatch(owner);
+ assert.equal(await controller.signOut({confirmPending:true,confirmedThrough:confirmed.pendingThrough}),'pending-confirmation-required');
+ assert.equal(state.signOutCalls,0);assert.equal(state.credentials,true);
+ assert.equal(await controller.continueLocally({confirmPending:true,confirmedThrough:confirmed.pendingThrough}),'pending-confirmation-required');
+ assert.deepEqual(await runtime.sync.nextBatch(owner),pending);
+});
+
+for(const confirmPending of [false,true])test(`first-launch local fallback guards writes committed between status and detach (confirmed=${confirmPending})`,async t=>{
+ const {runtime}=await fixture(t);const owner=await enrollSyncedLocal(runtime);
+ if(confirmPending)await runtime.storage.appendEvents([event]);
+ const status=runtime.sync.status;let entered!:()=>void,release!:()=>void;
+ const started=new Promise<void>(resolve=>{entered=resolve;}),waiting=new Promise<void>(resolve=>{release=resolve;});
+ runtime.sync.status=async petId=>{const captured=await status(petId);entered();await waiting;return captured;};
+ const request=controllerModule.continueFirstLaunchLocally(runtime,confirmPending);await started;
+ const later={...event,id:'during-local-fallback',at:200};await runtime.storage.appendEvents([later]);
+ const pending=await runtime.sync.nextBatch(owner);runtime.sync.status=status;release();
+ assert.equal(await request,'pending-confirmation-required');assert.deepEqual(await runtime.sync.nextBatch(owner),pending);
+ assert.equal((await status('pet-1')).generation,owner.generation);assert.ok((await runtime.storage.loadEvents()).some(value=>value.id===later.id));
 });
 
 test('offline SDK sign-out that already cleared credentials detaches locally and reports unconfirmed server revocation',async t=>{
@@ -672,7 +748,7 @@ for(const action of ['sign-out','account-switch','generation-change','dispose'] 
  const request=controller.eventHistory('one');await Promise.race([entered,request.then(()=>assert.fail('The request must await its response.'))]);
  if(action==='sign-out')await controller.signOut({confirmPending:true});
  if(action==='account-switch'){state.summary={...state.summary,user:{...state.summary.user,id:'account-2'}};await controller.refresh();}
- if(action==='generation-change'){await runtime.sync.detach(owner);await runtime.sync.prepareAssociation({accountId:'account-1',localPetId:'pet-1',deviceId:runtime.deviceId,enrollment:{operationId:'new-generation',deviceId:runtime.deviceId,localPetId:'pet-1',name:'My puppy',confirmedPetId:'cloud-1'}});}
+ if(action==='generation-change'){await runtime.sync.detach({...owner,confirmedThrough:(await runtime.sync.status(runtime.petId)).pendingThrough});await runtime.sync.prepareAssociation({accountId:'account-1',localPetId:'pet-1',deviceId:runtime.deviceId,enrollment:{operationId:'new-generation',deviceId:runtime.deviceId,localPetId:'pet-1',name:'My puppy',confirmedPetId:'cloud-1'}});}
  if(action==='dispose')controller.stop();
  release({revisions:[historical]});await assert.rejects(request,error=>error instanceof CloudApiError&&error.category==='conflict');
  assert.equal((await runtime.storage.loadEvents())[0].note,'Second');
@@ -703,7 +779,7 @@ for(const change of ['account','generation','dispose','offline'] as const)test(`
  f.state.credentials=true;await enrollLocal(f.runtime);await f.runtime.storage.appendEvents([event]);await f.controller.refresh();
  const pending=f.controller.exportData();await started;
  if(change==='account')f.state.summary={...f.state.summary,user:{...f.state.summary.user,id:'account-2'}};
- if(change==='generation'){const owner=await f.runtime.sync.status('pet-1');await f.runtime.sync.detach({generation:owner.generation!,accountId:owner.accountId!});}
+ if(change==='generation'){const owner=await f.runtime.sync.status('pet-1');await f.runtime.sync.detach({generation:owner.generation!,accountId:owner.accountId!,confirmedThrough:owner.pendingThrough});}
  if(change==='dispose')f.controller.stop();if(change==='offline')f.controller.setOnline(false);
  const before=await localTables(f.runtime);release();assert.equal(await pending,'cancelled');assert.equal(shares,0);assert.deepEqual(await localTables(f.runtime),before);
  if(change==='dispose'||change==='offline')assert.equal(signal?.aborted,true);

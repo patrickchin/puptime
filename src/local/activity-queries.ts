@@ -55,8 +55,8 @@ export function createActivityQueries(database:LocalDatabase,petId:string){
      if(!row)continue;const event=materialize(row),key=activityKey(event),previous=latest.get(key);
      if(!previous||(event.endedAt??event.at)>(previous.endedAt??previous.at))latest.set(key,event);
     }
-    const open=await sql.getFirstAsync<Row>("SELECT * FROM events WHERE pet_id=? AND type='nap' AND end_state=1 ORDER BY at DESC,id DESC LIMIT 1",petId);
-    const events=[...latest.values()];if(open&&!events.some(event=>event.id===open.id))events.push(materialize(open));return events;
+    const open=await sql.getAllAsync<Row>("SELECT * FROM events WHERE pet_id=? AND type='nap' AND end_state=1 ORDER BY at DESC,id DESC",petId);
+    const events=[...latest.values()],ids=new Set(events.map(event=>event.id));for(const row of open)if(!ids.has(row.id))events.push(materialize(row));return events;
    });
   },
   async summary():Promise<{eventCount:number;earliestAt:number|null}>{

@@ -7,7 +7,7 @@ import { createLocalDatabase, initializeLocalDatabase } from './database.ts';
 import { sqliteTestConnection } from './sqlite-test-adapter.ts';
 import { createNativeStorage } from './native-storage.ts';
 import { cloudRecordId } from '../cloud/record-identity.ts';
-import type { CloudRecord } from '../cloud/protocol.ts';
+import {eventDataSchema,type CloudRecord} from '../cloud/protocol.ts';
 import * as engine from './sync-engine.ts';
 import { createEvent } from '../domain.ts';
 import { createLocalRuntime } from './runtime-factory.ts';
@@ -127,7 +127,7 @@ test('first-launch restore intent clears on cancel and detach without changing l
  assert.equal(await database.read(sql=>sql.getFirstAsync("SELECT value FROM metadata WHERE key='pending_restore_operation'")),null);
  saved=await sync.prepareAssociation({...request,enrollment:{...request.enrollment,operationId:'second'}});
  await sync.stageBaseline({generation:saved.generation,accountId:'account-1',page:{changes:[],cursor:0,hasMore:false}});
- await sync.detach({generation:saved.generation,accountId:'account-1'});
+ await sync.detach({generation:saved.generation,accountId:'account-1',confirmedThrough:(await sync.status('local-pet')).pendingThrough});
  assert.equal(await database.read(sql=>sql.getFirstAsync("SELECT value FROM metadata WHERE key='pending_restore_operation'")),null);
  saved=await sync.prepareAssociation({...input,enrollment:{...enrollment,operationId:'combine',confirmedPetId:'cloud-pet'}});
  assert.equal((await sync.enrollmentState())!.mode,undefined);await storage.appendEvents([event]);
@@ -181,7 +181,7 @@ test('explicit event label restoration shares event rollback revisions and uploa
 test('free writes and preparing enrollment never create upload work; activation is restartable',async t=>{
  const {sync,storage,path}=await setup(t);
  await storage.appendEvents([event]);
- assert.deepEqual(await sync.status('local-pet'),{state:'local',generation:null,accountId:null,pending:0,blocked:0,cursor:0});
+ assert.deepEqual(await sync.status('local-pet'),{state:'local',generation:null,accountId:null,pending:0,pendingThrough:0,blocked:0,cursor:0});
  const {generation}=await sync.prepareAssociation(input);
  assert.deepEqual(await sync.nextBatch({generation,accountId:'account-1'}),[]);
  await storage.updateEvent('event-1',{note:'after prepare'});
@@ -275,12 +275,29 @@ test('account detach keeps history, fences old responses and requires explicit o
  await storage.appendEvents([event]);
  await assert.rejects(sync.prepareAssociation({...input,accountId:'account-2',enrollment:{...enrollment,operationId:'other'}}),/detach|owner/i);
  await assert.rejects(sync.detach({...owner,accountId:'wrong'}),/owner/i);
- await sync.detach(owner);
+ await sync.detach({...owner,confirmedThrough:(await sync.status('local-pet')).pendingThrough});
  assert.equal((await storage.loadEvents()).length,1);
  assert.deepEqual(await sync.nextBatch(owner),[]);
  const next=await sync.prepareAssociation({...input,accountId:'account-2',enrollment:{...enrollment,operationId:'other'}});
  assert.notEqual(next.generation,owner.generation);
  assert.deepEqual(await sync.nextBatch(owner),[]);
+});
+
+test('detach atomically preserves work newer than the confirmed queue even when the pending count is unchanged',async t=>{
+ const {sync,storage,path}=await setup(t),owner=await activate(sync),server=replicaServer();
+ await cycle(sync,owner,server);await storage.appendEvents([event]);
+ const confirmed=await sync.status('local-pet');assert.equal(confirmed.pending,1);
+ await cycle(sync,owner,server);await storage.updateEvent(event.id,{note:'new work'});
+ const latest=await sync.status('local-pet'),batch=await sync.nextBatch(owner);
+ assert.equal(latest.pending,confirmed.pending);assert.ok(latest.pendingThrough>confirmed.pendingThrough);
+ assert.equal(await sync.detach(owner),false);
+ assert.equal(await sync.detach({...owner,confirmedThrough:confirmed.pendingThrough}),false);
+ assert.deepEqual(await sync.status('local-pet'),latest);assert.deepEqual(await sync.nextBatch(owner),batch);
+ const reopened=await createLocalDatabase(sqliteTestConnection(path));
+ try {const saved=engine.createLocalSync(reopened);assert.deepEqual(await saved.status('local-pet'),latest);assert.deepEqual(await saved.nextBatch(owner),batch);}
+ finally {await reopened.close();}
+ assert.equal(await sync.detach({...owner,confirmedThrough:latest.pendingThrough}),true);
+ assert.equal((await sync.status('local-pet')).state,'local');assert.equal((await storage.loadEvents())[0].note,'new work');
 });
 
 test('enrollment status is explicit and duplicate committed baseline pages resume safely',async t=>{
@@ -367,7 +384,7 @@ test('two puppy bindings share account ownership without mixing record IDs or du
  const events=batch.filter(value=>value.kind==='event');assert.equal(events.length,2);assert.notEqual(events[0].recordId,events[1].recordId);
  assert.equal(events.find(value=>value.petId==='pet-2')!.patch.note,'only second');
  assert.equal((await sync.status('local-pet')).pending,pending+2);
- await sync.detach(owner);assert.equal((await storage.loadEvents()).length,1);assert.equal((await other.loadEvents()).length,1);
+ await sync.detach({...owner,confirmedThrough:(await sync.status('local-pet')).pendingThrough});assert.equal((await storage.loadEvents()).length,1);assert.equal((await other.loadEvents()).length,1);
 });
 
 test('an empty page cannot invent cursor progress or complete another owner enrollment',async t=>{
@@ -465,7 +482,7 @@ test('a full resync stages replacement without erasing pending local edits',asyn
 test('a response from a detached owner cannot change the next account or its local copy',async t=>{
  const {sync,storage}=await setup(t);const owner=await activate(sync),server=replicaServer();
  await storage.appendEvents([event]);const accepted=server.push(await sync.nextBatch(owner)),page=server.pull(0);
- await sync.detach(owner);const next=await sync.prepareAssociation({...input,accountId:'account-2',enrollment:{...enrollment,operationId:'second-owner'}});
+ await sync.detach({...owner,confirmedThrough:(await sync.status('local-pet')).pendingThrough});const next=await sync.prepareAssociation({...input,accountId:'account-2',enrollment:{...enrollment,operationId:'second-owner'}});
  await storage.updateEvent(event.id,{note:'detached local edit'});
  await sync.applySync({...owner,accepted,page});
  assert.equal((await storage.loadEvents())[0].note,'detached local edit');assert.equal((await sync.status('local-pet')).generation,next.generation);
@@ -686,9 +703,9 @@ test('checkpoints protect account association, destructive cloud projections, re
  failed=true;await assert.rejects(sync.finishResync(owner),/Backup unavailable/);
  assert.equal((await sync.status('local-pet')).state,'resyncing');
  failed=false;await sync.finishResync(owner);
- failed=true;await assert.rejects(sync.detach(owner),/Backup unavailable/);
+ failed=true;await assert.rejects(sync.detach({...owner,confirmedThrough:(await sync.status('local-pet')).pendingThrough}),/Backup unavailable/);
  assert.equal((await sync.status('local-pet')).state,'active');
- failed=false;await sync.detach(owner);assert.equal((await sync.status('local-pet')).state,'local');
+ failed=false;await sync.detach({...owner,confirmedThrough:(await sync.status('local-pet')).pendingThrough});assert.equal((await sync.status('local-pet')).state,'local');
  assert.ok((await storage.loadEvents()).some(item=>item.id==='local-after-delete'));
 });
 
@@ -735,4 +752,42 @@ test('reopening a runtime resumes the exact partially staged enrollment',async t
  const reopened=await createLocalRuntime(database,'local-pet');
  assert.deepEqual(await reopened.sync.enrollmentState(),saved);
  assert.deepEqual(await reopened.storage.loadEvents(),[event]);
+});
+
+test('a conflicting offline nap blocks once, preserves both logs, and a corrected end time resumes upload',async t=>{
+ const {sync,storage,database}=await setup(t),fence=await activate(sync);
+ const local={id:'offline-nap',type:'nap' as const,at:200,endedAt:null,source:'app' as const};await storage.appendEvents([local]);
+ const start=(await sync.nextBatch(fence)).find(mutation=>mutation.kind==='event')!;
+ const remote:CloudRecord={id:cloudRecordId('event','local-pet','remote-nap'),petId:'local-pet',kind:'event',data:{type:'nap',at:100,endedAt:null,source:'widget'},revision:1,sequence:1,deleted:false,updatedAt:100};
+ await sync.applySync({...fence,accepted:[],rejected:[{operationId:start.operationId,error:'invalid_mutation'}],page:{changes:[remote],cursor:1,hasMore:false}});
+ assert.equal((await sync.status('local-pet')).blocked,1);assert.equal((await sync.nextBatch(fence)).filter(mutation=>mutation.kind==='event').length,0);
+ const runtime=await createLocalRuntime(database,'local-pet');
+ assert.equal((await runtime.activity.latestEvents()).filter(event=>event.endedAt===null).length,2);
+ await storage.updateEvent(local.id,{endedAt:250});
+ const corrected=(await sync.nextBatch(fence)).find(mutation=>mutation.kind==='event')!;
+ assert.equal(corrected.intent,'create');assert.equal(corrected.patch.endedAt,250);assert.equal((await sync.status('local-pet')).blocked,0);
+ const saved:CloudRecord={id:corrected.recordId,petId:'local-pet',kind:'event',data:eventDataSchema.parse(corrected.patch),revision:1,sequence:2,deleted:false,updatedAt:250};
+ await sync.applySync({...fence,accepted:[{operationId:corrected.operationId,record:saved,sequence:2,reason:'created'}],page:{changes:[saved],cursor:2,hasMore:false}});
+ assert.equal((await storage.loadEvents()).length,2);assert.equal((await storage.loadEvents()).filter(event=>event.endedAt===null).length,1);
+ assert.equal((await sync.nextBatch(fence)).filter(mutation=>mutation.kind==='event').length,0);
+});
+
+test('inferring the older cloud nap end requeues a rejected offline start after the correction',async t=>{
+ const {sync,storage}=await setup(t),fence=await activate(sync);
+ const local={id:'offline-nap',type:'nap' as const,at:200,endedAt:null,source:'app' as const};await storage.appendEvents([local]);
+ const start=(await sync.nextBatch(fence)).find(mutation=>mutation.kind==='event')!;
+ const remote:CloudRecord={id:cloudRecordId('event','local-pet','remote-nap'),petId:'local-pet',kind:'event',data:{type:'nap',at:100,endedAt:null,source:'widget'},revision:1,sequence:1,deleted:false,updatedAt:100};
+ await sync.applySync({...fence,accepted:[],rejected:[{operationId:start.operationId,error:'invalid_mutation'}],page:{changes:[remote],cursor:1,hasMore:false}});
+ assert.equal((await storage.reconcileNaps())[0].endedAt,200);
+ const batch=(await sync.nextBatch(fence)).filter(mutation=>mutation.kind==='event');
+ assert.equal(batch.length,2);assert.equal(batch[0].recordId,remote.id);assert.equal(batch[0].patch.endedAt,200);
+ assert.equal(batch[1].recordId,start.recordId);assert.equal(batch[1].intent,'create');assert.equal(batch[1].patch.endedAt,null);
+ assert.notEqual(batch[1].operationId,start.operationId);assert.equal((await sync.status('local-pet')).blocked,0);
+ const accepted=batch.map((mutation,index)=>{
+  const record:CloudRecord={id:mutation.recordId,petId:'local-pet',kind:'event',data:eventDataSchema.parse(index===0?{...remote.data,...mutation.patch}:mutation.patch),revision:index===0?2:1,sequence:index+2,deleted:false,updatedAt:200};
+  return {operationId:mutation.operationId,record,sequence:record.sequence,reason:(index===0?'updated':'created') as 'updated'|'created'};
+ });
+ await sync.applySync({...fence,accepted,page:{changes:accepted.map(result=>result.record),cursor:3,hasMore:false}});
+ assert.equal((await sync.nextBatch(fence)).filter(mutation=>mutation.kind==='event').length,0);assert.equal((await storage.loadEvents()).filter(event=>event.endedAt===null).length,1);
+ assert.deepEqual(await storage.reconcileNaps(),[]);
 });

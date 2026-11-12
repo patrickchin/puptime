@@ -295,3 +295,20 @@ test('one device can represent two pet boundaries without a one-pet schema const
   expect(summary.pets.find((pet) => pet.id === 'pet-1')?.eventCount).toBe(1);
   expect(summary.pets.find((pet) => pet.id === 'pet-2')?.eventCount).toBe(1);
 });
+
+test('competing device nap starts are rejected without endless conflict retries and retain their proposals',async()=>{
+ const account=await store(),first={...create('nap-one'),patch:{type:'nap',at:100,endedAt:null,source:'widget'}} as Mutation;
+ const second={...create('nap-two'),patch:{type:'nap',at:200,endedAt:null,source:'app'}} as Mutation;
+ const result=await account.push([first,second]);expect(result.accepted).toHaveLength(1);
+ expect(result.rejected).toEqual([{operationId:second.operationId,error:'invalid_mutation'}]);
+ expect((await account.pull(0)).changes.map(record=>record.id)).toEqual(['nap-one']);
+ // A correction preserves the second log with a supplied end time; no inferred timing.
+ const corrected=mutationSchema.parse({...second,operationId:'op_corrected_nap',patch:{...second.patch,endedAt:250}});
+ expect((await account.push([corrected])).accepted).toHaveLength(1);
+ const closed=await account.apply(edit(first,1,{endedAt:300}));
+ expect(closed.record.data).toMatchObject({endedAt:300});
+ expect((await account.push([first])).accepted[0].record.revision).toBe(1); // Exact retry stays idempotent.
+ const next=await account.push([{...second,recordId:'nap-three',operationId:'op_next_nap'}]);expect(next.accepted).toHaveLength(1);
+ const reopen=await account.push([edit(first,2,{endedAt:null})]);expect(reopen.rejected[0].error).toBe('invalid_mutation');
+ expect((await account.pull(0)).changes.filter(record=>record.id==='nap-one').at(-1)!.data).toMatchObject({endedAt:300});
+});

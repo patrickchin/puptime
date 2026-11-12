@@ -6,25 +6,21 @@ final class PuptimeWidgetNotificationBridge {
   func handle(_ event: [String: Any], refreshStatus: Bool = true) async {
     guard
       let target = event["target"] as? String,
-      let timestamp = event["timestamp"] as? Int
+      let timestamp = event["timestamp"] as? Int,
+      let source = event["source"] as? String
     else { return }
 
     let parts = target.split(separator: "|", maxSplits: 6, omittingEmptySubsequences: false).map(String.init)
     guard parts.count >= 4, parts[0] == "log" else { return }
     let type = parts[1].removingPercentEncoding ?? parts[1]
-    let language = parts[3]
     guard ["pee", "poop", "meal", "pottyTrip", "walk", "nap"].contains(type) || type.hasPrefix("custom:") else { return }
-
-    if parts[2] == "1" {
-      await showConfirmation(type, language, timestamp, parts.count > 6 ? parts[6].removingPercentEncoding : nil, event["eventId"] as? String)
+    let scope = event["scope"] as? String ?? "owner"
+    if let props = currentProps(source), canDeliver(props, scope: scope), props["canLog"] as? Bool == true, props["notificationConfirmations"] as? Bool == true {
+      await showConfirmation(type, props["language"] as? String ?? "en", timestamp, parts.count > 6 ? parts[6].removingPercentEncoding : nil, event["eventId"] as? String, source: source, scope: scope)
     }
-    await syncPottyReminder(
-      type,
-      parts.count > 4 ? Int(parts[4]) ?? 0 : 0,
-      parts.count > 5 ? Int(parts[5]) ?? 0 : 0,
-      language
-    )
-    if refreshStatus, let source = event["source"] as? String { await showStatus(source) }
+    do { try await syncPottyReminders(source, scope: scope) }
+    catch { print("[Puptime] Potty reminders could not be updated: \(error.localizedDescription)") }
+    if refreshStatus { await showStatus(source) }
   }
 
   private func showStatus(_ source: String) async {
@@ -66,7 +62,7 @@ final class PuptimeWidgetNotificationBridge {
     }
   }
 
-  private func showConfirmation(_ type: String, _ language: String, _ timestamp: Int, _ customLabel: String?, _ eventId: String?) async {
+  private func showConfirmation(_ type: String, _ language: String, _ timestamp: Int, _ customLabel: String?, _ eventId: String?, source: String, scope: String) async {
     let content = UNMutableNotificationContent()
     content.title = title(language)
     content.body = body(type, language, customLabel)
@@ -84,49 +80,104 @@ final class PuptimeWidgetNotificationBridge {
     )
     do {
       try await UNUserNotificationCenter.current().add(request)
+      if let props = currentProps(source), canDeliver(props, scope: scope), props["canLog"] as? Bool == true, props["notificationConfirmations"] as? Bool == true { return }
+      UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [request.identifier])
+      UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [request.identifier])
     } catch {
       print("[Puptime] Widget confirmation could not be scheduled: \(error.localizedDescription)")
     }
   }
 
-  private func syncPottyReminder(
-    _ type: String,
-    _ afterPeeMinutes: Int,
-    _ afterMealMinutes: Int,
-    _ language: String
-  ) async {
-    let center = UNUserNotificationCenter.current()
-    if type == "pee" {
-      center.removePendingNotificationRequests(withIdentifiers: [
-        "puptime-activity-afterPee", "puptime-activity-afterMeal"
-      ])
-      if afterPeeMinutes > 0 {
-        await schedulePottyReminder("afterPee", afterPeeMinutes, language)
-      }
-    } else if type == "meal" {
-      center.removePendingNotificationRequests(withIdentifiers: ["puptime-activity-afterMeal"])
-      if afterMealMinutes > 0 {
-        await schedulePottyReminder("afterMeal", afterMealMinutes, language)
-      }
+  private struct PottyPlan: Equatable {
+    let kind: String
+    let minutes: Int
+    let at: Double
+    let scope: String
+    let petId: String
+    let language: String
+    var identifier: String {
+      "puptime-activity-\(kind)-plan-\(scope)|\(petId)|\(Int(at))|\(minutes)|\(language)"
     }
   }
 
-  private func schedulePottyReminder(_ kind: String, _ minutes: Int, _ language: String) async {
-    let content = UNMutableNotificationContent()
-    content.title = pottyTitle(kind, language)
-    content.body = pottyBody(kind, minutes, language)
-    content.sound = .default
-    content.userInfo = ["kind": "pottyReminder", "sourceType": kind == "afterPee" ? "pee" : "meal"]
+  private func currentProps(_ source: String) -> [String: Any]? {
+    WidgetsStorage.defaults?.synchronize()
+    guard let entry = WidgetsStorage.getArray(forKey: "__expo_widgets_\(source)_timeline")?.first as? [String: Any],
+          let stored = entry["props"] as? [String: Any],
+          let props = try? PuptimeWidgetJournal.reconcile(stored) else { return nil }
+    return props
+  }
 
-    let request = UNNotificationRequest(
-      identifier: "puptime-activity-\(kind)",
-      content: content,
-      trigger: UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(minutes * 60), repeats: false)
-    )
-    do {
-      try await UNUserNotificationCenter.current().add(request)
-    } catch {
-      print("[Puptime] Potty reminder could not be scheduled: \(error.localizedDescription)")
+  private func canDeliver(_ props: [String: Any], scope: String? = nil) -> Bool {
+    let now = Date().timeIntervalSince1970 * 1000
+    let expiry = (props["expiresAt"] as? NSNumber)?.doubleValue ?? 0
+    return props["notificationDelivery"] as? Bool == true && props["canNotify"] as? Bool == true
+      && (expiry <= 0 || expiry > now) && (scope == nil || (props["scope"] as? String ?? "owner") == scope)
+  }
+
+  private func pottyPlans(_ source: String) -> [PottyPlan] {
+    guard let props = currentProps(source), canDeliver(props) else { return [] }
+    let now = Date().timeIntervalSince1970 * 1000
+    let expiry = (props["expiresAt"] as? NSNumber)?.doubleValue ?? 0
+    let times = props["lastEventAt"] as? [String: Double] ?? [:]
+    let pee = times["pee"], meal = times["meal"]
+    let scope = props["scope"] as? String ?? "owner"
+    let petId = (props["quietStatus"] as? [String: Any])?["petId"] as? String ?? scope
+    let language = props["language"] as? String ?? "en"
+    return [("afterPee", pee, "pottyAfterPeeMinutes"), ("afterMeal", meal, "pottyAfterMealMinutes")].compactMap { kind, time, key in
+      guard let time, let minutes = props[key] as? Int,
+            [15, 30, 45, 60, 120, 180, 240].contains(minutes),
+            kind != "afterMeal" || pee == nil || time > pee! else { return nil }
+      let at = time + Double(minutes) * 60_000
+      guard at > now, expiry <= 0 || at < expiry else { return nil }
+      return PottyPlan(kind: kind, minutes: minutes, at: at, scope: scope, petId: petId, language: language)
+    }
+  }
+
+  // Both host-app snapshots and extension logs use this one scheduler. Never
+  // hold the journal's cross-process lock across an awaited OS operation.
+  func syncPottyReminders(_ source: String, scope: String? = nil) async throws {
+    guard source == "PuptimeQuickLog" else { return }
+    let center = UNUserNotificationCenter.current()
+    let settings = await center.notificationSettings()
+    let allowed = settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional || settings.authorizationStatus == .ephemeral
+    let pending = await center.pendingNotificationRequests()
+    let candidates: [PottyPlan] = try PuptimeWidgetJournal.transaction {
+      let plans = allowed ? pottyPlans(source) : []
+      let retained = pending.filter { !$0.identifier.hasPrefix("puptime-activity-") }
+      guard retained.count + plans.count <= 64 else {
+        throw NSError(domain: "PuptimeReminders", code: 1, userInfo: [NSLocalizedDescriptionKey: "Remove a pending reminder before adding another."])
+      }
+      let wanted = Set(plans.map { $0.identifier })
+      center.removePendingNotificationRequests(withIdentifiers: pending.map { $0.identifier }.filter {
+        $0.hasPrefix("puptime-activity-") && !wanted.contains($0)
+      })
+      return plans.filter { scope == nil || $0.scope == scope }
+    }
+    for candidate in candidates {
+      guard try PuptimeWidgetJournal.transaction({ pottyPlans(source).contains(candidate) }) else { continue }
+      let content = UNMutableNotificationContent()
+      content.title = pottyTitle(candidate.kind, candidate.language)
+      content.body = pottyBody(candidate.kind, candidate.minutes, candidate.language)
+      content.sound = .default
+      content.userInfo = ["kind": "pottyReminder", "sourceType": candidate.kind == "afterPee" ? "pee" : "meal", "scope": candidate.scope]
+      let request = UNNotificationRequest(
+        identifier: candidate.identifier, content: content,
+        trigger: UNTimeIntervalNotificationTrigger(timeInterval: max(1, (candidate.at - Date().timeIntervalSince1970 * 1000) / 1000), repeats: false)
+      )
+      do {
+        try await center.add(request)
+      } catch {
+        // A policy change may have made an old failed request irrelevant.
+        if pottyPlans(source).contains(candidate) { throw error }
+      }
+      // Plan-specific IDs let an obsolete completion delete only its own add,
+      // without cancelling a newer tap's or another puppy's notification.
+      try PuptimeWidgetJournal.transaction {
+        if !pottyPlans(source).contains(candidate) {
+          center.removePendingNotificationRequests(withIdentifiers: [candidate.identifier])
+        }
+      }
     }
   }
 

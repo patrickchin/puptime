@@ -24,6 +24,25 @@ module.exports = function withIosWidgetNotifications(config) {
       .map(file => fs.readFileSync(path.join(__dirname, 'ios-widget', file), 'utf8')).join('\n');
     fs.writeFileSync(storagePath, `${storage}\n\n${marker}\n${native}\n`);
 
+    // Host snapshots and extension writes must share the same short transaction
+    // boundary; notification-center awaits happen after that boundary.
+    const widgetPath = path.join(library, 'ios/WidgetObject.swift');
+    let widget = fs.readFileSync(widgetPath, 'utf8');
+    const timelineWrite = '    WidgetsStorage.set(entries.map { $0.toDictionary() }, forKey: "__expo_widgets_\\(name)_timeline")';
+    if (!widget.includes('try PuptimeWidgetJournal.transaction')) {
+      if (!widget.includes(timelineWrite)) throw new Error('The Expo widget snapshot writer changed.');
+      widget = widget.replace(timelineWrite, `    try PuptimeWidgetJournal.transaction {\n  ${timelineWrite}\n    }`);
+      fs.writeFileSync(widgetPath, widget);
+    }
+    const modulePath = path.join(library, 'ios/WidgetsModule.swift');
+    let module = fs.readFileSync(modulePath, 'utf8');
+    if (!module.includes('AsyncFunction("syncPuptimePottyReminders")')) {
+      const anchor = '    Function("reloadAllWidgets") {';
+      if (!module.includes(anchor)) throw new Error('The Expo widget module changed.');
+      module = module.replace(anchor, '    AsyncFunction("syncPuptimePottyReminders") { (source: String) in\n      try await PuptimeWidgetNotificationBridge.shared.syncPottyReminders(source)\n    }\n\n' + anchor);
+      fs.writeFileSync(modulePath, module);
+    }
+
     const utilsPath = path.join(library, 'ios/Widgets/Utils.swift');
     let utils = fs.readFileSync(utilsPath, 'utf8');
     const recoveredProps = 'props: (try? PuptimeWidgetJournal.reconcile(props)) ?? props,';

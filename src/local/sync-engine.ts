@@ -92,7 +92,7 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
     // reads and writes stay outside validation catches, so corruption rolls back.
     try {recordId=cloudRecordId(change.kind,change.kind==='accountPreferences'?null:pet.cloud_pet_id,change.kind==='puppy'?pet.cloud_pet_id!:change.localId);} catch {}
     const base=recordId?await mirrored(sql,current.generation,recordId):null;
-    const prior=await sql.getAllAsync<Outbox>('SELECT * FROM local_sync_outbox WHERE generation=? AND local_pet_id=? AND local_kind=? AND local_id=? AND mutation_json IS NOT NULL',current.generation,pet.pet_id,change.kind,change.localId);
+    const prior=await sql.getAllAsync<Outbox>('SELECT * FROM local_sync_outbox WHERE generation=? AND local_pet_id=? AND local_kind=? AND local_id=? AND mutation_json IS NOT NULL AND blocked_reason IS NULL',current.generation,pet.pet_id,change.kind,change.localId);
     const hasCreate=prior.some(row=>mutationSchema.parse(JSON.parse(row.mutation_json!)).intent==='create');
     const intent=change.after===null?'delete':restoreMissing&&change.before===null&&base?.deleted?'restore':!base&&!hasCreate?'create':'patch';
     if (intent==='delete'&&!base&&!hasCreate) {
@@ -208,6 +208,16 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
           let target=pet;
           if (change.kind==='accountPreferences') target=(await sql.getFirstAsync<Binding>("SELECT * FROM local_sync_pets WHERE generation=? AND status='active' ORDER BY rowid LIMIT 1",current.generation))!;
           await enqueue(sql,current,target,change,options.restoreMissing&&change.kind==='event');
+        }
+        if(changes.some(change=>change.kind==='event'&&change.before?.type==='nap'&&change.before.endedAt===null&&typeof change.after?.endedAt==='number')) {
+          // A rejected offline start becomes valid after its older running nap
+          // is closed. Enqueue it after the correction with a fresh operation ID.
+          const starts=await sql.getAllAsync<Outbox>(`SELECT o.* FROM local_sync_outbox o JOIN events e ON e.pet_id=o.local_pet_id AND e.id=o.local_id
+            WHERE o.generation=? AND o.local_pet_id=? AND o.local_kind='event' AND o.blocked_reason='cloud_rejected'
+            AND json_extract(o.mutation_json,'$.intent')='create' AND json_extract(o.mutation_json,'$.patch.type')='nap'
+            AND json_extract(o.mutation_json,'$.patch.endedAt') IS NULL AND e.type='nap' AND e.end_state=1
+            AND NOT EXISTS(SELECT 1 FROM events other WHERE other.pet_id=e.pet_id AND other.type='nap' AND other.end_state=1 AND other.id!=e.id)`,current.generation,petId);
+          for(const start of starts)await enqueue(sql,current,pet,localChangeSchema.parse(JSON.parse(start.change_json)));
         }
       };
     },
@@ -478,12 +488,20 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
       if(result.changed)notifyLocalCommit(options.afterCommit);
       return result.event;
     },
-    async detach(input:Fence):Promise<void> {await database.write(async sql=>{await required(sql,input);await options.beforeChange?.(sql,'account-change');await sql.runAsync('DELETE FROM local_sync_owner WHERE generation=?',input.generation);await clearRestoreIntent(sql);});},
-    async status(petId:string):Promise<{state:'local'|'preparing'|'active'|'resyncing';generation:string|null;accountId:string|null;pending:number;blocked:number;cursor:number}> {
+    async detach(input:Fence&{confirmedThrough?:number}):Promise<boolean> {
+      const confirmedThrough=z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).parse(input.confirmedThrough??0);
+      return database.write(async sql=>{
+        await required(sql,input);
+        if(await sql.getFirstAsync('SELECT sequence FROM local_sync_outbox WHERE generation=? AND sequence>? LIMIT 1',input.generation,confirmedThrough))return false;
+        await options.beforeChange?.(sql,'account-change');
+        await sql.runAsync('DELETE FROM local_sync_owner WHERE generation=?',input.generation);await clearRestoreIntent(sql);return true;
+      });
+    },
+    async status(petId:string):Promise<{state:'local'|'preparing'|'active'|'resyncing';generation:string|null;accountId:string|null;pending:number;pendingThrough:number;blocked:number;cursor:number}> {
       return database.read(async sql=>{
         const current=await owner(sql),pet=await binding(sql,petId);
-        if (!current||!pet) return {state:'local',generation:null,accountId:null,pending:0,blocked:0,cursor:0};
-        const counts=(await sql.getFirstAsync<{pending:number;blocked:number}>('SELECT COUNT(*) pending,COALESCE(SUM(blocked_reason IS NOT NULL),0) blocked FROM local_sync_outbox WHERE generation=?',current.generation))!;
+        if (!current||!pet) return {state:'local',generation:null,accountId:null,pending:0,pendingThrough:0,blocked:0,cursor:0};
+        const counts=(await sql.getFirstAsync<{pending:number;pendingThrough:number;blocked:number}>('SELECT COUNT(*) pending,COALESCE(MAX(sequence),0) pendingThrough,COALESCE(SUM(blocked_reason IS NOT NULL),0) blocked FROM local_sync_outbox WHERE generation=?',current.generation))!;
         return {state:current.resyncing?'resyncing':pet.status,generation:current.generation,accountId:current.account_id,...counts,cursor:current.cursor};
       });
     },

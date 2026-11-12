@@ -1,5 +1,5 @@
 import {getCareAccess} from '../care-access';
-import { EVENT_META, customActivityKey, isOpenNap, latestQuickEventTimes, type PuppyEvent } from '../domain';
+import { EVENT_META, customActivityKey, resolveNapState, latestQuickEventTimes, type PuppyEvent } from '../domain';
 import { resolveLanguage } from '../localization';
 import { resolveTheme } from '../theme';
 import {
@@ -14,6 +14,10 @@ import { widgetsDirectory } from 'expo-widgets';
 import { Directory, File } from 'expo-file-system';
 import { parseEvents } from '../storage-validation';
 import { getLocalRuntime } from '../local/runtime.native';
+import { requireNativeModule } from 'expo-modules-core';
+import { updateNotifications } from '../notification-write-queue';
+
+const nativeReminders = requireNativeModule<{ syncPuptimePottyReminders(source:string):Promise<void> }>('ExpoWidgets');
 
 const importedOperations = new WeakMap<PuppyEvent[], File[]>();
 
@@ -50,13 +54,25 @@ export async function acknowledgePendingWidgetEvents(events: PuppyEvent[]): Prom
   importedOperations.delete(events);
 }
 
-export async function updateHomeWidget(events: PuppyEvent[],expectedPetId?:string): Promise<void> {
+let snapshotWrites:Promise<unknown>=Promise.resolve();
+export function updateHomeWidget(events: PuppyEvent[],expectedPetId?:string): Promise<void> {
+  // Read delivery/access inside the queue so an earlier refresh cannot publish
+  // an enabled snapshot after a later opt-out or puppy switch.
+  const next=snapshotWrites.then(()=>publishHomeWidget(events,expectedPetId));
+  snapshotWrites=next.catch(()=>undefined);return next;
+}
+
+async function publishHomeWidget(events: PuppyEvent[],expectedPetId?:string): Promise<void> {
   const access=await getCareAccess();if(expectedPetId&&access.petId!==expectedPetId)return;
-  const { storage, petId } = await getLocalRuntime();
+  const { storage, activity, petId } = await getLocalRuntime();
+  // Callers can retain an older render's events while a log commits. Read the
+  // bounded current rows here; native reconciliation adds unimported taps.
+  events=await activity.latestEvents();
   const [quietEnabled, delivery, name] = await Promise.all([
     storage.loadQuietStatusEnabled(), storage.loadNotificationDelivery(), storage.loadPuppyName(),
   ]);
-  const openNap = events.find(isOpenNap);
+  const napState = resolveNapState(events);
+  const openNap = napState.kind==='running'?napState.event:undefined;
   const customActivities = await loadCustomActivities(events);
   const [actions, themePreference, notificationPreferences, languagePreference] = await Promise.all([
     loadWidgetActions(customActivities),
@@ -81,12 +97,14 @@ export async function updateHomeWidget(events: PuppyEvent[],expectedPetId?:strin
   if(currentAccess.scope!==access.scope||currentAccess.petId!==petId)return;
   await PuptimeWidget.updateSnapshot({
     scope:access.scope,
-    expiresAt:access.expiresAt??0,
-    canLog:access.canLog,
+    expiresAt:currentAccess.expiresAt??0,
+    canLog:currentAccess.canLog,
+    canNotify:!currentAccess.ended,
     pending: [],
     openNap: openNap ? { scope:access.scope, id: openNap.id, type: 'nap', at: openNap.at } : false,
+    napConflict: napState.kind==='conflict',
     lastEventAt: latestQuickEventTimes(events),
-    actions,
+    actions:napState.kind==='conflict'?actions.filter(action=>action!=='nap'):actions,
     actionDetails,
     appearance: {
       light: {
@@ -101,13 +119,15 @@ export async function updateHomeWidget(events: PuppyEvent[],expectedPetId?:strin
       },
     },
     notificationConfirmations: notificationPreferences.widgetConfirmations,
-    quietStatus: { enabled: quietEnabled && delivery && access.canLog, name, petId },
-    pottyAfterPeeMinutes: notificationPreferences.pottyAfterPee.enabled
+    notificationDelivery: delivery,
+    quietStatus: { enabled: quietEnabled && delivery && currentAccess.canLog, name, petId },
+    pottyAfterPeeMinutes: delivery && !currentAccess.ended && notificationPreferences.pottyAfterPee.enabled
       ? notificationPreferences.pottyAfterPee.delayMinutes
       : 0,
-    pottyAfterMealMinutes: notificationPreferences.pottyAfterMeal.enabled
+    pottyAfterMealMinutes: delivery && !currentAccess.ended && notificationPreferences.pottyAfterMeal.enabled
       ? notificationPreferences.pottyAfterMeal.delayMinutes
       : 0,
     language: resolveLanguage(languagePreference),
   });
+  await updateNotifications(()=>nativeReminders.syncPuptimePottyReminders('PuptimeQuickLog'));
 }

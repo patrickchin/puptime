@@ -1,7 +1,7 @@
 import {getCareAccess} from '../care-access';
 import { requestWidgetUpdate } from 'react-native-android-widget';
 
-import { isOpenNap, latestQuickEventTimes, type PuppyEvent } from '../domain';
+import { resolveNapState, latestQuickEventTimes, type PuppyEvent } from '../domain';
 import { loadCustomActivities, loadThemePreference, loadWidgetActions } from '../storage';
 import { QuickLogWidget } from './QuickLogWidget.android';
 
@@ -13,7 +13,7 @@ export async function acknowledgePendingWidgetEvents(_events: PuppyEvent[]): Pro
 
 export async function updateHomeWidget(events: PuppyEvent[],expectedPetId?:string): Promise<void> {
   const access=await getCareAccess();if(expectedPetId&&access.petId!==expectedPetId)return;
-  const activeNap = events.some(isOpenNap);
+  const napState=resolveNapState(events),activeNap=napState.kind==='running';
   const lastEventAt = latestQuickEventTimes(events);
   const customActivities = await loadCustomActivities(events);
   const [actions, themePreference] = await Promise.all([
@@ -22,8 +22,8 @@ export async function updateHomeWidget(events: PuppyEvent[],expectedPetId?:strin
   await requestWidgetUpdate({
     widgetName: 'PuptimeQuickLog',
     renderWidget: ({ height }) => ({
-      light: <QuickLogWidget scope={access.scope} canLog={access.canLog} compact={height < 90} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} />,
-      dark: <QuickLogWidget scope={access.scope} canLog={access.canLog} compact={height < 90} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} customActivities={customActivities} themePreference={themePreference} dark />,
+      light: <QuickLogWidget scope={access.scope} canLog={access.canLog} compact={height < 90} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} napConflict={napState.kind==='conflict'} customActivities={customActivities} themePreference={themePreference} />,
+      dark: <QuickLogWidget scope={access.scope} canLog={access.canLog} compact={height < 90} activeNap={activeNap} lastEventAt={lastEventAt} actions={actions} napConflict={napState.kind==='conflict'} customActivities={customActivities} themePreference={themePreference} dark />,
     }),
   });
 }

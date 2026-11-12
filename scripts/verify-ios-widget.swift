@@ -85,6 +85,15 @@ let ended = invoke("__expoWidgetHandlePress", started, target: target("nap"))
 precondition(PropertyListSerialization.propertyList(ended, isValidFor: .binary), "Nap end returned invalid UserDefaults props")
 precondition(ended["openNap"] as? Bool == false, "Nap action did not end the nap")
 precondition((ended["pending"] as? [[String: Any]])?.last?["endedAt"] != nil, "Ended nap has no end time")
+var removedNap = napProps
+removedNap["actions"] = ["pee", "meal"]
+removedNap["openNap"] = false
+let ignoredNap = invoke("__expoWidgetHandlePress", removedNap, target: target("nap"))
+precondition(NSDictionary(dictionary: ignoredNap).isEqual(to: removedNap), "A stale removed nap action created a log")
+var conflictProps = napProps
+conflictProps["napConflict"] = true
+let ignoredConflict = invoke("__expoWidgetHandlePress", conflictProps, target: target("nap"))
+precondition(NSDictionary(dictionary: ignoredConflict).isEqual(to: conflictProps), "A conflicted nap action created a log")
 print("Widget snapshot, relative time, three rendered buttons, pee action, and nap start/end passed")
 
 if let scope = props["scope"] as? String {

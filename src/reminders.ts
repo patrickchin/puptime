@@ -7,6 +7,8 @@ import { localIdSchema } from './cloud/protocol';
 import {getNotificationDelivery,setNotificationDelivery} from './cloud/notification-delivery';
 import { refreshExactReminderScheduling } from './exact-reminders';
 import { QUIET_STATUS_KIND } from './quiet-status-config';
+import { updateHomeWidget } from './widgets/sync';
+import { updateNotifications as updateReminders } from './notification-write-queue';
 
 import type { ActivityKey, PuppyEvent, ScheduleEntry } from './domain';
 import { translate, type AppLanguage } from './localization';
@@ -27,13 +29,6 @@ const ROUTINE_CHANNEL_ID = 'puptime-routine';
 const POTTY_CHANNEL_ID = 'puptime-potty';
 const WIDGET_CHANNEL_ID = 'puptime-widget-log';
 const IOS_SCHEDULED_NOTIFICATION_LIMIT = 64;
-
-// Serialize replacement writes so disabling delivery also cancels requests
-// whose native scheduling call was already in flight.
-let reminderWrites:Promise<unknown>=Promise.resolve();
-function updateReminders<T>(action:()=>Promise<T>):Promise<T> {
-  const result=reminderWrites.then(action);reminderWrites=result.catch(()=>undefined);return result;
-}
 
 export const WIDGET_LOG_CATEGORY = 'puptimeWidgetLog';
 export const ADD_NOTE_ACTION = 'puptimeAddNote';
@@ -231,7 +226,7 @@ export async function syncPottyReminders(
   language: AppLanguage = 'en',
   now = Date.now(),
 ): Promise<boolean> {
-  return updateReminders(async()=>{
+  const result=await updateReminders(async()=>{
   await ensurePottyChannel();
 
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
@@ -242,6 +237,11 @@ export async function syncPottyReminders(
     && permissionAllowsNotifications(await Notifications.getPermissionsAsync());
   if (canDeliver && Platform.OS === 'ios' && scheduled.length - replacing.length + plans.length > IOS_SCHEDULED_NOTIFICATION_LIMIT) {
     throw new CustomTimedReminderLimitError();
+  }
+  if (Platform.OS === 'ios') {
+    // The app and extensions share one native scheduler. Publishing committed
+    // state also reconciles pending widget operations and awaits OS writes.
+    return {native:true,available:plans.length === 0 || canDeliver};
   }
   await Promise.all(replacing.map((notification) => Notifications.cancelScheduledNotificationAsync(notification.identifier)));
   if (plans.length === 0) return true;
@@ -270,6 +270,9 @@ export async function syncPottyReminders(
 
   return true;
   });
+  if(typeof result==='boolean')return result;
+  await updateHomeWidget([...events]);
+  return result.available;
 }
 
 export async function syncScheduleReminders(

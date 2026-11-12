@@ -11,11 +11,13 @@ import { entityId } from '../src/entity-id';
 import { customActivityKey } from '../src/domain';
 import { resourceKindSchema, resourceListSchema, resourceWriteSchema, type ResourceKind, type ResourceListQuery, type ResourceList, type ResourceWrite, type ResourceWriteResult } from './resource-types';
 import accountSchema from './account-schema.sql';
+import {shareAccessSql,availableAccountSql} from './sharing-eligibility';
 
 const cursorSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const pageSizeSchema = z.number().int().min(1).max(100);
 type JsonRow = { body: string };
 type RecordRow={id:string;pet_id:string|null;kind:CloudRecord['kind'];revision:number;sequence:number;deleted:number;updated_at:number;data_json:string|null};
+class RunningNapConflictError extends ReconciliationError {}
 
 export class AccountStore extends DurableObject<Cloudflare.Env> {
   constructor(ctx: DurableObjectState, env: Cloudflare.Env) {
@@ -79,6 +81,14 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
     return cloudRecordSchema.parse({id:row.id,petId:row.pet_id,kind:row.kind,revision:row.revision,sequence:row.sequence,deleted:row.deleted===1,updatedAt:row.updated_at,data});
   }
   #saveRecord(record:CloudRecord):void {
+    if(record.kind==='event'&&!record.deleted&&'type' in record.data&&record.data.type==='nap'&&'endedAt' in record.data&&record.data.endedAt===null) {
+      const before=this.#record(record.id);
+      const wasRunning=before&&!before.deleted&&before.kind==='event'&&'type' in before.data&&before.data.type==='nap'&&'endedAt' in before.data&&before.data.endedAt===null;
+      if(!wasRunning&&this.ctx.storage.sql.exec<{id:string}>(`SELECT r.id FROM records r JOIN record_events e ON e.record_id=r.id
+        WHERE r.pet_id=? AND r.deleted=0 AND e.type='nap' AND e.end_state=1 AND r.id!=? LIMIT 1`,record.petId,record.id).toArray().length) {
+        throw new RunningNapConflictError('Another nap is already running. End or correct it before starting another.');
+      }
+    }
     const core=record.kind==='event'||record.kind==='routine';
     this.ctx.storage.sql.exec('INSERT INTO records(id,pet_id,kind,revision,sequence,deleted,updated_at,data_json) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET pet_id=excluded.pet_id,kind=excluded.kind,revision=excluded.revision,sequence=excluded.sequence,deleted=excluded.deleted,updated_at=excluded.updated_at,data_json=excluded.data_json',
       record.id,record.petId,record.kind,record.revision,record.sequence,record.deleted?1:0,record.updatedAt,core?null:JSON.stringify(record.data));
@@ -197,10 +207,9 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
 
   async #careGrant(id:string,actorId:string){
     const grant=await this.env.AUTH_DB.prepare(`SELECT s.owner_id,s.pet_id,s.kind,s.permission,COALESCE(NULLIF(u.name,''),s.label) AS name
-      FROM puppy_shares s JOIN user owner ON owner.id=s.owner_id LEFT JOIN cloud_accounts c ON c.account_id=owner.id
-      JOIN user u ON u.id=s.member_id LEFT JOIN cloud_accounts m ON m.account_id=u.id
-      WHERE s.id=? AND s.member_id=? AND s.revoked_at IS NULL AND (s.expires_at IS NULL OR s.expires_at>?)
-      AND COALESCE(c.state,'')!='deleting' AND COALESCE(m.state,'')!='deleting'`).bind(id,actorId,Date.now()).first<{owner_id:string;pet_id:string;kind:'household'|'temporary';permission:'view'|'contribute';name:string}>();
+      FROM puppy_shares s JOIN user u ON u.id=s.member_id
+      WHERE s.id=? AND s.member_id=? AND ${shareAccessSql('s')}
+      AND ${availableAccountSql('s.owner_id')} AND ${availableAccountSql('s.member_id')}`).bind(id,actorId).first<{owner_id:string;pet_id:string;kind:'household'|'temporary';permission:'view'|'contribute';name:string}>();
     if(!grant||getAccountStore(this.env,grant.owner_id).id.toString()!==this.ctx.id.toString())throw new ReconciliationError('Shared access has ended.');
     this.#assertActive();return grant;
   }
@@ -271,7 +280,7 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
       this.ctx.storage.sql.exec('INSERT INTO enrolled_devices(id,pet_id) VALUES(?,?) ON CONFLICT(id,pet_id) DO NOTHING',actorId,grant.pet_id);
       const result=this.push([{...mutation,deviceId:actorId}]);
       accepted.push(...result.accepted.map(value=>({...value,record:this.#sharedEditable(value.record,actorId,household,true)})));
-      rejected.push(...result.rejected.map(value=>({operationId:value.operationId,error:'conflict' as const})));
+      rejected.push(...result.rejected.map(value=>({operationId:value.operationId,error:value.error==='invalid_mutation'?'invalid_mutation' as const:'conflict' as const})));
     }
     return {accepted,rejected};
   }
@@ -384,7 +393,7 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
     const rejected: { operationId: string; error: string }[] = [];
     for (const mutation of mutations) {
       try { accepted.push(this.apply(mutation)); }
-      catch (error) { rejected.push({ operationId: mutation.operationId, error: error instanceof ReconciliationError ? 'conflict' : error instanceof z.ZodError ? 'invalid_mutation' : 'retry_later' }); }
+      catch (error) { rejected.push({ operationId: mutation.operationId, error: error instanceof RunningNapConflictError ? 'invalid_mutation' : error instanceof ReconciliationError ? 'conflict' : error instanceof z.ZodError ? 'invalid_mutation' : 'retry_later' }); }
     }
     return { accepted, rejected };
   }

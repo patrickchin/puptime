@@ -47,6 +47,7 @@ type Props = {
   dark?: boolean;
   compact?: boolean;
   activeNap?: boolean;
+  napConflict?: boolean;
   lastEventAt?: QuickEventTimes;
   actions?: readonly ActivityKey[];
   customActivities?: readonly string[];
@@ -59,6 +60,7 @@ export function QuickLogWidget({
   dark = false,
   compact = false,
   activeNap = false,
+  napConflict = false,
   lastEventAt,
   actions: configuredActions = DEFAULT_WIDGET_ACTIONS,
   customActivities = [],
@@ -69,7 +71,7 @@ export function QuickLogWidget({
   const background = theme.background as `#${string}`;
   const surface = theme.surface as `#${string}`;
   const border = theme.border as `#${string}`;
-  const visibleTypes = widgetActionsForState(configuredActions, activeNap, customActivities);
+  const visibleTypes = widgetActionsForState(configuredActions, activeNap&&!napConflict, customActivities).filter(type=>!napConflict||type!=='nap');
   const visibleButtons = visibleTypes.map((type) => ({
     type,
     label: type.startsWith('custom:')

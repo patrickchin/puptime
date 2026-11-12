@@ -4,6 +4,7 @@ import {performance} from 'node:perf_hooks';
 import {createLocalDatabase,initializeLocalDatabase,type SqlValue} from './database.ts';
 import {sqliteTestConnection} from './sqlite-test-adapter.ts';
 import {createLocalRepository} from './repository.ts';
+import {applyLocalRecords} from './sync-projection.ts';
 import * as queries from './activity-queries.ts';
 import {monthlyActivityStats,activityFrequencyStats} from '../analytics.ts';
 import {latestQuickEventTimes,type PuppyEvent} from '../domain.ts';
@@ -50,15 +51,16 @@ test('invalid query limits, cursors and windows reject before SQL without a full
 });
 
 test('date windows include overlapping durations and exclude touching ends, points outside and other pets',async t=>{
- const {repository,activity,reads,database}=await setup(t);
- await repository.appendEvents([
+ const {activity,reads,database}=await setup(t);
+ // Query fixtures include independently committed overlapping naps.
+ await database.write(sql=>applyLocalRecords(sql,'pet-1',([
   event('before',99),event('start',100),event('last',199),event('after',200),
   {...event('point-nap',99),type:'nap'},
   {...event('touches-start',50),type:'nap',endedAt:100},
   {...event('overlap',50),type:'nap',endedAt:101},
   {...event('open',40),type:'nap',endedAt:null},
   {...event('future-open',200),type:'nap',endedAt:null},
- ]);
+ ] as PuppyEvent[]).map(({id,...data})=>({kind:'event' as const,localId:id,data})),[]));
  await database.write(sql=>sql.runAsync("INSERT INTO puppies(id,name) VALUES ('pet-2','Other')"));
  await createLocalRepository(database,'pet-2').appendEvents([event('foreign-point',100),{...event('foreign-open',40),type:'nap',endedAt:null},{...event('foreign-closed',50),type:'nap',endedAt:150}]);
  reads.length=0;

@@ -54,6 +54,7 @@ function expectedWindow(previousDays){
  return sql.prepare('SELECT COUNT(*) n FROM events WHERE pet_id=? AND at>=? AND at<?').get(petId,from.getTime(),until.getTime()).n;
 }
 const trace=()=>JSON.parse(readFileSync(join(documents,'sql-query-probe.json'),'utf8'));
+const activityReads=()=>trace().reads.filter(read=>read.purpose!=='backup');
 const renders=()=>JSON.parse(readFileSync(join(documents,'row-render-probe.json'),'utf8')).renders;
 const windows=()=>trace().reads.filter(read=>read.sql.includes('UNION ALL'));
 function flow(name,body,resume=true){
@@ -91,7 +92,9 @@ try{
     timeout: 30000
 `,false);
  assert.ok(trace().reads.some(read=>read.sql.includes('ORDER BY at DESC,id DESC LIMIT')&&read.rows===201));
- assert.ok(trace().reads.every(read=>read.rows<=201));
+ assert.ok(trace().reads.every(read=>typeof read.purpose==='string'),'Use the current purpose-aware diagnostic Metro config.');
+ assert.ok(activityReads().every(read=>read.rows<=201));
+ assert.ok(trace().reads.filter(read=>read.purpose==='backup').every(read=>read.rows===count),'Full backup snapshots retain the complete dataset.');
  const before=renders(),target=events.at(-1).id;
  assert.equal(Object.keys(before).length,200,'The actual EventRow body observer must be active.');
  console.log('PASS '+count+': actual initial history reads201 SQL rows and renders200 records. Rows/ms:',trace().reads.map(read=>[read.rows,read.ms]));
@@ -129,6 +132,14 @@ try{
     visibilityPercentage: 100
 - tapOn:
     id: editor.close
+    retryTapIfNoChange: true
+- runFlow:
+    when:
+      visible:
+        id: editor.close
+    commands:
+      - tapOn:
+          id: editor.close
 - extendedWaitUntil:
     visible:
       id: event.pee.note
@@ -155,7 +166,7 @@ try{
       text: .*400 loaded.*
     timeout: 30000
 `);
- assert.ok(trace().reads.every(read=>read.rows<=201));
+ assert.ok(activityReads().every(read=>read.rows<=201));
  assert.ok(trace().reads.some(read=>read.sql.includes('(at,id)<')&&read.rows===201));
  console.log('PASS '+count+': one edit rerenders only its row; load-more uses a second keyset page, with no whole-history read.');
  const timelineStart=windows().length;
@@ -216,7 +227,7 @@ try{
 `);
  assert.deepEqual(windows().slice(insightsStart).map(read=>read.rows),[expectedWindow(9)]);
  const exportStart=trace().reads.length;
- assert.ok(!trace().reads.some(read=>/^SELECT \* FROM events WHERE pet_id=\? ORDER BY at DESC,id DESC$/.test(read.sql)));
+ assert.ok(!activityReads().some(read=>/^SELECT \* FROM events WHERE pet_id=\? ORDER BY at DESC,id DESC$/.test(read.sql)));
  console.log('PASS '+count+': comparison/routine/frequency read only requested date windows; monthly summaries stay SQL aggregates. Windows rows/ms:',windows().map(read=>[read.rows,read.ms]));
  flow('explicit-full-export',`
 - tapOn:

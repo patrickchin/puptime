@@ -64,6 +64,7 @@ final class NotificationQuickLogModel: ObservableObject {
       props = try PuptimeWidgetJournal.transaction {
         var (timeline, current) = try snapshot()
         let configured = current["actions"] as? [String] ?? ["pee", "poop", "meal"]
+        if key == "nap", current["napConflict"] as? Bool == true { throw NSError(domain: "PuptimeQuickLog", code: 5) }
         let open = current["openNap"] as? [String: Any]
         guard configured.contains(key) || (key == "nap" && open != nil) else { throw NSError(domain: "PuptimeQuickLog", code: 2) }
         let now = Int(Date().timeIntervalSince1970 * 1000)
@@ -90,7 +91,7 @@ final class NotificationQuickLogModel: ObservableObject {
         var allowed = CharacterSet.urlQueryAllowed; allowed.remove(charactersIn: "|%")
         let encoded = key.addingPercentEncoding(withAllowedCharacters: allowed) ?? key
         let custom = (event["customLabel"] as? String ?? "").addingPercentEncoding(withAllowedCharacters: allowed) ?? ""
-        eventData = ["source": source, "target": "log|\(encoded)|\(confirmations)|\(language)|\(pee)|\(meal)|\(custom)", "timestamp": now, "eventId": event["id"] as? String ?? ""]
+        eventData = ["source": source, "scope": current["scope"] as? String ?? "owner", "target": "log|\(encoded)|\(confirmations)|\(language)|\(pee)|\(meal)|\(custom)", "timestamp": now, "eventId": event["id"] as? String ?? ""]
         return current
       }
       error = nil
@@ -116,6 +117,7 @@ struct NotificationQuickLogView: View {
 
   private var actions: [String] {
     let configured = model.props["actions"] as? [String] ?? ["pee", "poop", "meal"]
+    if model.props["napConflict"] as? Bool == true { return configured.filter { $0 != "nap" } }
     return model.props["openNap"] is [String: Any] && !configured.contains("nap") ? Array(configured.prefix(3)) + ["nap"] : configured
   }
   private var appearance: [String: Any] {
