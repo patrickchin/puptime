@@ -67,6 +67,8 @@ destination = root / 'fastlane/previews/en-US'
 destination.mkdir(parents=True, exist_ok=True)
 scenes = []
 tap_indicators = []
+transition_seconds = .2
+cue_lead = .6
 previous_end = 0
 with tempfile.TemporaryDirectory(prefix='puptime-store-preview-') as temporary:
     clips = []
@@ -86,30 +88,57 @@ with tempfile.TemporaryDirectory(prefix='puptime-store-preview-') as temporary:
             else:
                 scene_duration = float(subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', str(scene_raw)]))
         assert 0 <= start < end <= scene_duration
-        for touch in (reviewed_cuts[index].get('taps', []) if reviewed_cuts else []):
-            assert start <= touch['raw_at'] < end
-            assert 0 <= touch['x'] < 886 and 0 <= touch['y'] < 1920
-            at = sum(scene['edited_seconds'] for scene in scenes) + touch['raw_at'] - start
-            tap_indicators.append(dict(at=round(at, 3), x=touch['x'], y=touch['y'],
-                                       duration=round(min(.5, end-touch['raw_at']), 3), control=touch['control']))
-        # Keep real actions at normal speed. Remove setup/waiting and add no frozen frames.
+        segments = reviewed_cuts[index].get('segments', []) if reviewed_cuts else []
+        segments = segments or [dict(raw_start=start, raw_end=end, speed=1)]
+        last_end = start
+        expected_seconds = 0
+        filters = [f'[0:v]fps=30,scale=886:1920:flags=lanczos,setsar=1,split={len(segments)}' + ''.join(f'[raw{i}]' for i in range(len(segments)))]
+        for i, segment in enumerate(segments):
+            a, b, speed = segment['raw_start'], segment['raw_end'], segment['speed']
+            assert last_end <= a < b <= end and 0 < speed <= 1
+            last_end = b
+            expected_seconds += (b-a)/speed
+            # Normalize VFR before cutting, then slow actual interactions rather
+            # than adding frozen result frames or replaying long idle waits.
+            filters.append(f'[raw{i}]trim=start={a}:end={b},setpts=(PTS-STARTPTS)/{speed},fps=30[part{i}]')
+        filters.append(''.join(f'[part{i}]' for i in range(len(segments))) + f'concat=n={len(segments)}:v=1:a=0[scene]')
         clip = Path(temporary) / f'{index}.mp4'
         run('ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-i', str(scene_raw),
-            # Normalize the recorder's irregular frame durations before cutting;
-            # fps after trim can carry an old frame's long duration across the cut.
-            '-vf', f'fps=30,trim=start={start}:end={end},setpts=PTS-STARTPTS,scale=886:1920:flags=lanczos,setsar=1',
+            '-filter_complex', ';'.join(filters), '-map', '[scene]',
             '-an', '-c:v', 'libx264', '-preset', 'slow', '-profile:v', 'high', '-level:v', '4.0',
             '-b:v', '10M', '-maxrate', '12M', '-bufsize', '20M', '-pix_fmt', 'yuv420p', str(clip))
         clips.append(clip)
         length = float(subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', str(clip)]))
-        assert abs(length-(end-start)) < .1, 'A cut must not inherit idle duration from the raw recorder.'
-        scenes.append(dict(screen=stem, source_recording=scene_raw.parent.name + '/' + scene_raw.name, raw_start=round(start, 3), raw_end=round(end, 3), edited_seconds=length))
+        assert abs(length-expected_seconds) < .15*len(segments), 'Retimed footage must match the reviewed segment durations.'
+        scene_start = sum(scene['edited_seconds'] for scene in scenes) - transition_seconds*index
+        for touch in (reviewed_cuts[index].get('taps', []) if reviewed_cuts else []):
+            assert 0 <= touch['x'] < 886 and 0 <= touch['y'] < 1920
+            local = 0
+            for segment in segments:
+                if segment['raw_start'] <= touch['raw_at'] < segment['raw_end']:
+                    local += (touch['raw_at']-segment['raw_start'])/segment['speed']
+                    break
+                local += (segment['raw_end']-segment['raw_start'])/segment['speed']
+            else:
+                raise AssertionError(f'Tap {touch["control"]} was cut out of the footage.')
+            tap_at = scene_start + local
+            assert cue_lead <= local and local+.6 <= length
+            tap_indicators.append(dict(at=round(tap_at-cue_lead, 3), tap_at=round(tap_at, 3),
+                x=touch['x'], y=touch['y'], duration=1.2, control=touch['control']))
+        scenes.append(dict(screen=stem, source_recording=scene_raw.parent.name + '/' + scene_raw.name,
+            raw_start=round(start, 3), raw_end=round(end, 3), segments=segments, edited_seconds=length))
         previous_end = end
     output = destination / 'iPhone-6.3-preview.mp4'
     # Decode each cut independently and produce one continuous H.264 stream;
     # stream-copy concatenation introduced ghosted text across these cuts.
     inputs = [argument for clip in clips for argument in ('-i', str(clip))]
-    joined = ''.join(f'[{index}:v]' for index in range(len(clips))) + f'concat=n={len(clips)}:v=1:a=0[video]'
+    joined = ';'.join(f'[{i}:v]settb=AVTB,setpts=PTS-STARTPTS[view{i}]' for i in range(len(clips)))
+    current, elapsed = 'view0', scenes[0]['edited_seconds']
+    for i in range(1, len(clips)):
+        name = 'video' if i == len(clips)-1 else f'join{i}'
+        offset = elapsed-transition_seconds*i
+        joined += f';[{current}][view{i}]xfade=transition=fade:duration={transition_seconds}:offset={offset:.6f}[{name}]'
+        current, elapsed = name, elapsed+scenes[i]['edited_seconds']
     touch_input = []
     if tap_indicators:
         # A small transparent animation, shared by all recorded touch locations.
@@ -117,16 +146,18 @@ with tempfile.TemporaryDirectory(prefix='puptime-store-preview-') as temporary:
         encoder = subprocess.Popen(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y',
             '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', '96x96', '-r', '30', '-i', '-',
             '-an', '-c:v', 'qtrle', str(sprite)], stdin=subprocess.PIPE)
-        for frame_index in range(15):
-            progress = frame_index / 14
-            alpha = round(255 * (1-progress)**1.4)
-            radius = (18 + 14 * (1-(1-progress)**2)) * 4
+        for frame_index in range(36):
+            approaching = frame_index < 18
+            progress = frame_index/18 if approaching else (frame_index-18)/17
+            alpha = round(255*(.55+.35*progress if approaching else (1-progress)**1.4))
+            radius = ((32-16*progress) if approaching else (16+18*(1-(1-progress)**2))) * 4
             marker = Image.new('RGBA', (384, 384))
             draw = ImageDraw.Draw(marker)
             box = (192-radius, 192-radius, 192+radius, 192+radius)
             draw.ellipse(box, fill=(23,107,82,round(alpha*.12)), outline=(255,255,255,alpha), width=24)
             draw.ellipse(box, outline=(23,107,82,alpha), width=12)
-            draw.ellipse((176,176,208,208), fill=(23,107,82,alpha))
+            if not approaching:
+                draw.ellipse((172,172,212,212), fill=(23,107,82,alpha))
             encoder.stdin.write(marker.resize((96,96), Image.Resampling.LANCZOS).tobytes())
         encoder.stdin.close()
         assert encoder.wait() == 0, 'Touch animation encoding failed.'
@@ -142,7 +173,7 @@ with tempfile.TemporaryDirectory(prefix='puptime-store-preview-') as temporary:
         *touch_input,
         '-filter_complex', joined, '-map', '[video]', '-map', f'{len(clips)}:a:0',
         '-c:v', 'libx264', '-preset', 'slow', '-profile:v', 'high', '-level:v', '4.0',
-        '-g', '30', '-keyint_min', '30', '-sc_threshold', '0',
+        '-g', '30', '-keyint_min', '30', '-sc_threshold', '0', '-r', '30',
         '-b:v', '10M', '-maxrate', '12M', '-bufsize', '20M', '-pix_fmt', 'yuv420p',
         '-c:a', 'aac', '-b:a', '256k', '-shortest', '-movflags', '+faststart', str(output))
     run('ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-i', str(output), '-ss', '7', '-frames:v', '1', str(destination / 'poster.jpg'))
@@ -154,16 +185,18 @@ assert audio['codec_name'] == 'aac' and audio['channels'] == 2 and audio['sample
 assert 15 <= float(metadata['format']['duration']) <= 30
 assert output.stat().st_size < 500_000_000
 elapsed = 0
-for scene in scenes:
+for index, scene in enumerate(scenes):
     elapsed += scene['edited_seconds']
+    check_at = elapsed-transition_seconds*index-(transition_seconds if index<len(scenes)-1 else 0)-.08
     # Decode from the start: input-side fast seeking produced false text artifacts
     # in extracted frames, while continuous playback remained clean.
-    frame = subprocess.check_output(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-i', str(output), '-ss', str(elapsed-.05), '-frames:v', '1', '-vf', 'scale=120:262', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'])
+    frame = subprocess.check_output(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-i', str(output), '-ss', str(check_at), '-frames:v', '1', '-vf', 'scale=120:262', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'])
     actual = Image.frombytes('RGB', (120, 262), frame).crop((0, 30, 120, 240))
     reference_path = next(captures.rglob(f'takeScreenshot/{scene["screen"]}.png'))
     reference = Image.open(reference_path).convert('RGB').resize((120, 262), Image.Resampling.LANCZOS).crop((0, 30, 120, 240))
     difference = sum(ImageStat.Stat(ImageChops.difference(actual, reference)).mean)/3
     assert difference < 5, f'Exported {scene["screen"]} does not hold on its verified UI: {difference}'
 seconds = round(float(metadata['format']['duration']), 2)
-(destination / 'edit.json').write_text(json.dumps(dict(seconds=seconds, poster_seconds=7, source='Native simulator recording; original CSV history with personal notes omitted; one scripted logging/edit action', audio='Silent stereo AAC', playback_speed=1, frozen_padding_seconds=0, tap_indicators=tap_indicators, sha256=hashlib.sha256(output.read_bytes()).hexdigest(), scenes=scenes), indent=2) + '\n')
-print(f'PASS {seconds}-second H.264 preview with real actions and no frozen padding: {output}')
+assert abs(seconds-(sum(scene['edited_seconds'] for scene in scenes)-transition_seconds*(len(scenes)-1))) < .1
+(destination / 'edit.json').write_text(json.dumps(dict(seconds=seconds, poster_seconds=7, source='Native simulator recording; original CSV history with personal notes omitted; one scripted logging/edit action', audio='Silent stereo AAC', timing='Slower interaction footage with idle waits removed', transition_seconds=transition_seconds, frozen_padding_seconds=0, tap_indicators=tap_indicators, sha256=hashlib.sha256(output.read_bytes()).hexdigest(), scenes=scenes), indent=2) + '\n')
+print(f'PASS {seconds}-second H.264 preview with slower interactions, gentle dissolves and no frozen padding: {output}')

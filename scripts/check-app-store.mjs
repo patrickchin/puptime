@@ -42,14 +42,26 @@ assert.ok(video.length>0&&video.length<500_000_000);
 const edit=JSON.parse(read('fastlane/previews/en-US/edit.json'));
 assert.equal(createHash('sha256').update(video).digest('hex'),edit.sha256,'Preview differs from the verified export');
 assert.ok(edit.seconds>=15&&edit.seconds<=30);
-assert.equal(edit.playback_speed,1);
 assert.equal(edit.frozen_padding_seconds,0);
+assert.ok(Number.isFinite(edit.transition_seconds)&&edit.transition_seconds>0&&edit.transition_seconds<=.5);
 assert.ok(edit.poster_seconds>=0&&edit.poster_seconds<edit.seconds);
 assert.ok(Array.isArray(edit.tap_indicators)&&edit.tap_indicators.length>0,'Preview must show touch indicators');
 for(const tap of edit.tap_indicators){
  assert.ok(Number.isFinite(tap.at)&&Number.isFinite(tap.duration)&&tap.at>=0&&tap.duration>0&&tap.at+tap.duration<=edit.seconds);
  assert.ok(Number.isFinite(tap.x)&&Number.isFinite(tap.y)&&tap.x>=0&&tap.x<886&&tap.y>=0&&tap.y<1920);
  assert.ok(typeof tap.control==='string'&&tap.control.length>0);
+ assert.ok(Number.isFinite(tap.tap_at)&&tap.tap_at-tap.at>=.5&&tap.at+tap.duration-tap.tap_at>=.5,'A tap needs time to anticipate and register');
 }
-for(const scene of edit.scenes)assert.ok(Math.abs(scene.edited_seconds-(scene.raw_end-scene.raw_start))<.1,'A preview cut inherited idle time');
+for(const scene of edit.scenes){
+ assert.ok(Array.isArray(scene.segments)&&scene.segments.length>0);
+ let expected=0,last=scene.raw_start;
+ for(const segment of scene.segments){
+  assert.ok(Number.isFinite(segment.speed)&&segment.speed>0&&segment.speed<=1);
+  assert.ok(last<=segment.raw_start&&segment.raw_start<segment.raw_end&&segment.raw_end<=scene.raw_end);
+  expected+=(segment.raw_end-segment.raw_start)/segment.speed;last=segment.raw_end;
+ }
+ assert.ok(Math.abs(scene.edited_seconds-expected)<.15*scene.segments.length,'A retimed cut differs from its reviewed source ranges');
+}
+const expectedSeconds=edit.scenes.reduce((sum,scene)=>sum+scene.edited_seconds,0)-edit.transition_seconds*(edit.scenes.length-1);
+assert.ok(Math.abs(edit.seconds-expectedSeconds)<.1,'Transition timing differs from the export');
 console.log(`PASS metadata, 12 opaque screenshots, 2 creative assets and the verified preview with ${edit.tap_indicators.length} touch indicators and no padded holds.`);

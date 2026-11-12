@@ -1,90 +1,153 @@
 {
-  "seconds": 15.17,
+  "seconds": 17.37,
   "poster_seconds": 7,
   "source": "Native simulator recording; original CSV history with personal notes omitted; one scripted logging/edit action",
   "audio": "Silent stereo AAC",
-  "playback_speed": 1,
+  "timing": "Slower interaction footage with idle waits removed",
+  "transition_seconds": 0.2,
   "frozen_padding_seconds": 0,
   "tap_indicators": [
     {
-      "at": 0.133,
+      "at": 0.205,
+      "tap_at": 0.805,
       "x": 165,
       "y": 426,
-      "duration": 0.5,
+      "duration": 1.2,
       "control": "quick.pee"
     },
     {
-      "at": 3.129,
+      "at": 3.605,
+      "tap_at": 4.205,
       "x": 396,
       "y": 1138,
-      "duration": 0.5,
+      "duration": 1.2,
       "control": "editor.adjust.back.15"
     },
     {
-      "at": 5.833,
+      "at": 7.917,
+      "tap_at": 8.517,
       "x": 651,
       "y": 391,
-      "duration": 0.5,
+      "duration": 1.2,
       "control": "timeline.filter.poop-meal"
     },
     {
-      "at": 8.563,
+      "at": 9.602,
+      "tap_at": 10.202,
       "x": 262,
       "y": 1163,
-      "duration": 0.5,
+      "duration": 1.2,
       "control": "timeline.mark.point.2026-10-08.17"
     },
     {
-      "at": 13.566,
+      "at": 14.824,
+      "tap_at": 15.424,
       "x": 338,
       "y": 1279,
-      "duration": 0.5,
+      "duration": 1.2,
       "control": "schedule.editor.window.30"
     }
   ],
-  "sha256": "56e4cc6eb10c183c63fffdc49fe154ddea8e3d81a813e7044f1ba79627284e8c",
+  "sha256": "768b014a20c99f8e457c375f7f32a2d14f3fd86cb7f6171253639e1c3e804fd8",
   "scenes": [
     {
       "screen": "01-logged",
       "source_recording": "preview/preview.raw.mov",
-      "raw_start": 66.25,
-      "raw_end": 68.645,
-      "edited_seconds": 2.366667
+      "raw_start": 65.9,
+      "raw_end": 68.58,
+      "segments": [
+        {
+          "raw_start": 65.9,
+          "raw_end": 66.9,
+          "speed": 0.6
+        },
+        {
+          "raw_start": 68.1,
+          "raw_end": 68.58,
+          "speed": 0.35
+        }
+      ],
+      "edited_seconds": 3.0
     },
     {
       "screen": "02-edited",
       "source_recording": "preview/preview.raw.mov",
-      "raw_start": 70.038,
-      "raw_end": 72.2,
-      "edited_seconds": 2.166667
+      "raw_start": 70.238,
+      "raw_end": 71.6,
+      "segments": [
+        {
+          "raw_start": 70.238,
+          "raw_end": 71.6,
+          "speed": 0.4
+        }
+      ],
+      "edited_seconds": 3.4
     },
     {
       "screen": "03-timeline",
       "source_recording": "preview/preview.raw.mov",
-      "raw_start": 78.0,
-      "raw_end": 79.0,
-      "edited_seconds": 1.0
+      "raw_start": 78.137,
+      "raw_end": 80.1,
+      "segments": [
+        {
+          "raw_start": 78.137,
+          "raw_end": 80.1,
+          "speed": 1
+        }
+      ],
+      "edited_seconds": 1.966667
     },
     {
       "screen": "04-detail",
       "source_recording": "preview/preview.raw.mov",
       "raw_start": 80.1,
-      "raw_end": 84.6,
-      "edited_seconds": 4.5
+      "raw_end": 84.25,
+      "segments": [
+        {
+          "raw_start": 80.1,
+          "raw_end": 80.85,
+          "speed": 0.4
+        },
+        {
+          "raw_start": 82.85,
+          "raw_end": 84.25,
+          "speed": 0.5
+        }
+      ],
+      "edited_seconds": 4.7
     },
     {
       "screen": "05-insights",
       "source_recording": "preview/preview.raw.mov",
-      "raw_start": 88.03,
-      "raw_end": 90.08,
-      "edited_seconds": 2.033008
+      "raw_start": 88.175,
+      "raw_end": 90.175,
+      "segments": [
+        {
+          "raw_start": 88.175,
+          "raw_end": 90.175,
+          "speed": 1
+        }
+      ],
+      "edited_seconds": 2.0
     },
     {
       "screen": "06-routine",
       "source_recording": "routine-ending-v3/preview.raw.mov",
-      "raw_start": 38.4,
-      "raw_end": 41.5,
-      "edited_seconds": 3.1
+      "raw_start": 38.6,
+      "raw_end": 40.9,
+      "segments": [
+        {
+          "raw_start": 38.6,
+          "raw_end": 39.2,
+          "speed": 0.7
+        },
+        {
+          "raw_start": 39.65,
+          "raw_end": 40.9,
+          "speed": 0.5
+        }
+      ],
+      "edited_seconds": 3.3
     }
   ]
 }
