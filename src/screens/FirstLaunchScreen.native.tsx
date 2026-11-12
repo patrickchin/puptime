@@ -83,8 +83,7 @@ export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPerm
  async function activate(mode:'restore'|'combine',confirmedThrough?:number) {
   await act(async()=>{
    if(!cloud.controller||!account)return;
-   if(mode==='combine'&&enrolled){if(await cloud.controller.continueLocally({confirmPending:true,confirmedThrough})!=='ok')return;}
-   await cloud.controller.enableCloud({mode,expectedAccountId:account.user.id,...(existing?{confirmedPetId:existing.id}:{})});
+   await cloud.controller.enableCloud({mode,expectedAccountId:account.user.id,...(enrolled?{confirmedThrough}:{}),...(existing?{confirmedPetId:existing.id}:{})});
   });
  }
  function combine() {

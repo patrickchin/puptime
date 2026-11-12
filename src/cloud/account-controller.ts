@@ -410,21 +410,24 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
         }
       }
     });},
-    enableCloud({confirmedPetId,expectedAccountId,mode}:{confirmedPetId?:string;expectedAccountId?:string;mode?:'combine'|'restore'}) {return perform(async()=>{
+    enableCloud({confirmedPetId,expectedAccountId,confirmedThrough,mode}:{confirmedPetId?:string;expectedAccountId?:string;confirmedThrough?:number;mode?:'combine'|'restore'}) {return perform(async()=>{
       const associationMode=z.enum(['combine','restore']).parse(mode??'combine');
       await pauseTransport();if(!await loadAccount())return 'error';await localState();
       if(disposed)return 'error';
       const account=snapshot.account!,status=snapshot.sync!;
       if(expectedAccountId!==undefined&&expectedAccountId!==account.user.id)return fail('account-mismatch');
       if(status.accountId&&status.accountId!==account.user.id)return fail('account-mismatch');
-      if(status.state!=='local'){
-        if(associationConfirmationNeeded){emit({problem:'confirmation-required'});return 'confirmation-required';}
-        suspended=false;return 'ok';
-      }
+      if(status.state!=='local'&&!associationConfirmationNeeded){suspended=false;return 'ok';}
       const existing=account.pets[0];
       if((existing&&confirmedPetId!==existing.id)||(!existing&&confirmedPetId)) {emit({problem:'confirmation-required'});return 'confirmation-required';}
       if(associationMode==='restore'&&(!existing||!await runtime.sync.canRestoreSetup(runtime.petId))){emit({problem:'confirmation-required'});return 'confirmation-required';}
       if(!account.cloud.canSync)return fail('forbidden');
+      if(status.state!=='local'){
+        if(associationMode!=='combine'||confirmedThrough===undefined){emit({problem:'confirmation-required'});return 'confirmation-required';}
+        // Revalidate the named account and puppy before replacing a paused setup.
+        const result=await continueFirstLaunchLocally(runtime,true,confirmedThrough);
+        if(result!=='ok'){if(result==='pending-confirmation-required')emit({problem:result});return result;}
+      }
       if(disposed)return 'error';
       const operationId=await runtime.database.read(async sql=>(await sql.getFirstAsync<{id:string}>("SELECT 'op_' || lower(hex(randomblob(16))) id"))!.id);
       await runtime.sync.prepareAssociation({accountId:account.user.id,localPetId:runtime.petId,deviceId:runtime.deviceId,mode:associationMode,enrollment:{operationId,deviceId:runtime.deviceId,localPetId:runtime.petId,name:associationMode==='restore'?existing!.name:snapshot.local!.name,...(confirmedPetId?{confirmedPetId}:{})}});
