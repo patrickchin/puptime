@@ -48,7 +48,51 @@
       "control": "schedule.editor.window.30"
     }
   ],
-  "sha256": "768b014a20c99f8e457c375f7f32a2d14f3fd86cb7f6171253639e1c3e804fd8",
+  "step_labels": [
+    {
+      "step": 1,
+      "screen": "01-logged",
+      "title": "Log a potty break",
+      "at": 0.12,
+      "duration": 1.4
+    },
+    {
+      "step": 2,
+      "screen": "02-edited",
+      "title": "Correct the time",
+      "at": 2.92,
+      "duration": 1.4
+    },
+    {
+      "step": 3,
+      "screen": "03-timeline",
+      "title": "Compare days",
+      "at": 6.12,
+      "duration": 1.4
+    },
+    {
+      "step": 4,
+      "screen": "04-detail",
+      "title": "See the details",
+      "at": 7.887,
+      "duration": 1.4
+    },
+    {
+      "step": 5,
+      "screen": "05-insights",
+      "title": "Spot patterns",
+      "at": 12.387,
+      "duration": 1.4
+    },
+    {
+      "step": 6,
+      "screen": "06-routine",
+      "title": "Set your routine",
+      "at": 14.187,
+      "duration": 1.4
+    }
+  ],
+  "sha256": "b81a1c0417b911573431dc604582e3a61bf5a1f02de3090b311e485cb474e3fc",
   "scenes": [
     {
       "screen": "01-logged",
