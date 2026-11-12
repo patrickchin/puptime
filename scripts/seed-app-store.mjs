@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
-import {cpSync,existsSync,mkdirSync} from 'node:fs';
+import {cpSync,existsSync,mkdirSync,writeFileSync} from 'node:fs';
 import {join,resolve} from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
 import {createLocalDatabase,initializeLocalDatabase} from '../src/local/database.ts';
@@ -15,7 +15,7 @@ const [udid,csvPath]=process.argv.slice(2),app='com.patrickchin.puptime';
 assert.ok(csvPath,'Supply the original activity CSV; it stays outside version control.');
 const simctl=(...args)=>execFileSync('xcrun',['simctl',...args],{encoding:'utf8'}).trim();
 const devices=Object.values(JSON.parse(simctl('list','devices','available','-j')).devices).flat();
-assert.match(devices.find(device=>device.udid===udid)?.name??'',/^Puptime 459e App Store (iPhone|iPad) Real History$/);
+assert.match(devices.find(device=>device.udid===udid)?.name??'',/^Puptime 459e App Store (iPhone|iPad) 20261112$/);
 try{simctl('terminate',udid,app);}catch{}
 const directory=join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite');
 const target=join(directory,'puptime-v2.db');
@@ -52,6 +52,19 @@ await storage.appendEvents(events);
 const saved=await storage.loadEvents();
 assert.deepEqual([...saved].sort((a,b)=>a.id.localeCompare(b.id)),[...events].sort((a,b)=>a.id.localeCompare(b.id)));
 const anchor=Math.max(...events.map(event=>event.at))+10*60_000;
+// Keep the capture clock in ignored output; the release continues to use index.ts.
+writeFileSync(resolve('output/app-store/capture-entry.js'),`// Capture-only clock, generated from the CSV's latest activity.
+const RealDate=Date,started=RealDate.now(),anchor=${anchor};
+function CaptureDate(...args){
+ if(new.target)return Reflect.construct(RealDate,args.length?args:[anchor+RealDate.now()-started],new.target);
+ return new RealDate(anchor+RealDate.now()-started).toString();
+}
+Object.setPrototypeOf(CaptureDate,RealDate);
+CaptureDate.prototype=RealDate.prototype;
+CaptureDate.now=()=>anchor+RealDate.now()-started;
+global.Date=CaptureDate;
+require('../../index');
+`);
 const suggestion=suggestScheduleFromEvents(events,14,new Date(anchor));
 assert.ok(suggestion.entries.length>0);
 await storage.saveSchedule(suggestion.entries.map(entry=>({...entry,id:'rtn_'+randomBytes(16).toString('base64url'),reminder:false})));

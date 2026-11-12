@@ -14,6 +14,7 @@ jobs:
           node-version-file: .node-version
           cache: npm
       - run: npm ci
+      - run: npm run check:app-store
       - name: Old-source SQLite preference compatibility
         run: |
           git fetch --no-tags --depth=1 origin d3b291103f23a0e1e2ad14ce28810dc7572d0f02

@@ -29,7 +29,13 @@ commands = json.loads(commands[0].read_text())
 assert all(c['metadata']['status'] == 'COMPLETED' for c in commands)
 sequence = [('01-logged', 'quick.pee'), ('02-edited', 'event.pee.edit'),
             ('03-timeline', 'nav.switch'), ('04-detail', 'timeline.filter.poop-meal'),
+            ('05-insights', 'nav.insights'),
             ('06-routine', 'nav.schedule')]
+# A visual review can supply tighter native footage ranges to omit loading and
+# drawer waits. Keep these in the local recording JSON, not in app code.
+reviewed_cuts = recording.get('reviewed_cuts')
+if reviewed_cuts is not None:
+    assert [cut['screen'] for cut in reviewed_cuts] == [stem for stem, _ in sequence]
 timing = json.loads(subprocess.check_output(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'frame=best_effort_timestamp_time', '-of', 'json', str(raw)]))
 timestamps = [float(frame['best_effort_timestamp_time']) for frame in timing['frames']]
 decoded = subprocess.check_output(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-i', str(raw), '-vf', 'scale=120:262:flags=lanczos', '-fps_mode', 'passthrough', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'], stderr=subprocess.PIPE)
@@ -70,10 +76,18 @@ with tempfile.TemporaryDirectory(prefix='puptime-store-preview-') as temporary:
             start = layout_starts[stem] - .2
         start = max(start, previous_end)
         end = matched[stem] + (.65 if stem == '06-routine' else .4)
-        assert 0 <= start < end <= duration
+        scene_raw, scene_duration = raw, duration
+        if reviewed_cuts is not None:
+            start, end = reviewed_cuts[index]['raw_start'], reviewed_cuts[index]['raw_end']
+            scene_raw = Path(reviewed_cuts[index].get('raw', raw)).resolve()
+            if scene_raw == raw:
+                assert start >= previous_end, 'Reviewed cuts must preserve source order.'
+            else:
+                scene_duration = float(subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', str(scene_raw)]))
+        assert 0 <= start < end <= scene_duration
         # Keep real actions at normal speed. Remove setup/waiting and add no frozen frames.
         clip = Path(temporary) / f'{index}.mp4'
-        run('ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-i', str(raw),
+        run('ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-i', str(scene_raw),
             # Normalize the recorder's irregular frame durations before cutting;
             # fps after trim can carry an old frame's long duration across the cut.
             '-vf', f'fps=30,trim=start={start}:end={end},setpts=PTS-STARTPTS,scale=886:1920:flags=lanczos,setsar=1',
@@ -82,15 +96,21 @@ with tempfile.TemporaryDirectory(prefix='puptime-store-preview-') as temporary:
         clips.append(clip)
         length = float(subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', str(clip)]))
         assert abs(length-(end-start)) < .1, 'A cut must not inherit idle duration from the raw recorder.'
-        scenes.append(dict(screen=stem, raw_start=round(start, 3), raw_end=round(end, 3), edited_seconds=length))
+        scenes.append(dict(screen=stem, source_recording=scene_raw.parent.name + '/' + scene_raw.name, raw_start=round(start, 3), raw_end=round(end, 3), edited_seconds=length))
         previous_end = end
-    playlist = Path(temporary) / 'clips.txt'
-    playlist.write_text(''.join(f"file '{clip}'\n" for clip in clips))
     output = destination / 'iPhone-6.3-preview.mp4'
-    run('ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', str(playlist),
-        '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000', '-c:v', 'copy',
+    # Decode each cut independently and produce one continuous H.264 stream;
+    # stream-copy concatenation introduced ghosted text across these cuts.
+    inputs = [argument for clip in clips for argument in ('-i', str(clip))]
+    joined = ''.join(f'[{index}:v]' for index in range(len(clips))) + f'concat=n={len(clips)}:v=1:a=0[video]'
+    run('ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', *inputs,
+        '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000',
+        '-filter_complex', joined, '-map', '[video]', '-map', f'{len(clips)}:a:0',
+        '-c:v', 'libx264', '-preset', 'slow', '-profile:v', 'high', '-level:v', '4.0',
+        '-g', '30', '-keyint_min', '30', '-sc_threshold', '0',
+        '-b:v', '10M', '-maxrate', '12M', '-bufsize', '20M', '-pix_fmt', 'yuv420p',
         '-c:a', 'aac', '-b:a', '256k', '-shortest', '-movflags', '+faststart', str(output))
-    run('ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-ss', '6', '-i', str(output), '-frames:v', '1', str(destination / 'poster.jpg'))
+    run('ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-i', str(output), '-ss', '6', '-frames:v', '1', str(destination / 'poster.jpg'))
 metadata = json.loads(subprocess.check_output(['ffprobe', '-v', 'error', '-show_streams', '-show_format', '-of', 'json', str(output)]))
 video = next(s for s in metadata['streams'] if s['codec_type'] == 'video')
 audio = next(s for s in metadata['streams'] if s['codec_type'] == 'audio')
@@ -101,7 +121,9 @@ assert output.stat().st_size < 500_000_000
 elapsed = 0
 for scene in scenes:
     elapsed += scene['edited_seconds']
-    frame = subprocess.check_output(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-ss', str(elapsed-.05), '-i', str(output), '-frames:v', '1', '-vf', 'scale=120:262', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'])
+    # Decode from the start: input-side fast seeking produced false text artifacts
+    # in extracted frames, while continuous playback remained clean.
+    frame = subprocess.check_output(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-i', str(output), '-ss', str(elapsed-.05), '-frames:v', '1', '-vf', 'scale=120:262', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'])
     actual = Image.frombytes('RGB', (120, 262), frame).crop((0, 30, 120, 240))
     reference_path = next(captures.rglob(f'takeScreenshot/{scene["screen"]}.png'))
     reference = Image.open(reference_path).convert('RGB').resize((120, 262), Image.Resampling.LANCZOS).crop((0, 30, 120, 240))
