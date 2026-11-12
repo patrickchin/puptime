@@ -74,8 +74,6 @@ writeFileSync(flow, `appId: ${app}
     id: appearance.theme.dark
 - tapOn:
     id: appearance.theme.dark
-- tapOn:
-    id: appearance.close
 - assertVisible:
     id: settings.search
 - takeScreenshot: settings-search-dark
