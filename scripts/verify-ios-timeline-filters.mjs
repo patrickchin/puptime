@@ -45,6 +45,15 @@ assert.equal(db.prepare("SELECT count(*) n FROM routines WHERE id IN ('rtn_timel
 db.close();
 const output=join(homedir(),'Pictures/Screenshots/Codex/puptime-stable-timeline',process.argv[3]??'populated');mkdirSync(output,{recursive:true});
 const env={...process.env,MAESTRO_CLI_NO_ANALYTICS:'1'};
+const rect=value=>value.match(/-?\d+/g).map(Number);
+// XCTest may round a fractional row edge to the adjacent whole point.
+function assertBounds(actual,expected,message){
+ assert.deepEqual(Object.keys(actual),Object.keys(expected),message);
+ for(const id of Object.keys(expected)){
+  const before=rect(expected[id]),after=rect(actual[id]);
+  assert.ok(after.every((edge,index)=>Math.abs(edge-before[index])<=1),message+' ('+id+')');
+ }
+}
 function flow(name,body){
  const path=join(output,name+'.yaml');
  writeFileSync(path,`appId: ${app}\n---\n- launchApp:\n    stopApp: false\n    permissions: {}\n- waitForAnimationToEnd\n${body}`);
@@ -70,7 +79,7 @@ function snapshot(name){
  simctl('io',udid,'screenshot',join(output,name+'.png'));
  return state;
 }
-flow('open',`- runFlow:\n    when:\n      visible:\n        id: nav.close\n    commands:\n      - tapOn:\n          id: nav.close\n- runFlow:\n    when:\n      notVisible:\n        id: timeline.filter.pee\n    commands:\n      - tapOn:\n          id: nav.switch\n          retryTapIfNoChange: true\n- tapOn:\n    id: timeline.filter.pee\n- extendedWaitUntil:\n    notVisible:\n      id: activity.loading\n    timeout: 30000\n`);
+flow('open',`- runFlow:\n    when:\n      visible:\n        id: nav.close\n    commands:\n      - tapOn:\n          id: nav.close\n- runFlow:\n    when:\n      notVisible:\n        id: timeline.filter.pee\n    commands:\n      - tapOn:\n          id: nav.switch\n- extendedWaitUntil:\n    visible:\n      id: timeline.filter.pee\n    timeout: 30000\n- tapOn:\n    id: timeline.filter.pee\n- extendedWaitUntil:\n    notVisible:\n      id: activity.loading\n    timeout: 30000\n`);
 let baseline=snapshot('pee');
 assert.ok(baseline.gaps.length,'Populated history must collapse empty days even with saved routine windows.');
 assert.equal(baseline.gaps.length,1,'The five-day break must occupy one row.');
@@ -79,24 +88,24 @@ const gapRect=baseline.gaps[0].bounds.match(/-?\d+/g).map(Number);
 const dateRect=Object.entries(baseline.bounds).find(([id])=>id.startsWith('timeline.date.'))[1].match(/-?\d+/g).map(Number);
 assert.ok(Math.abs((gapRect[3]-gapRect[1])-(dateRect[3]-dateRect[1]))<=1,'A gap takes one normal day row, allowing native pixel rounding.');
 for(const [name,filter] of [['poop-meal','poop-meal'],['pee-return','pee']]){
- flow(name,`- tapOn:\n    id: timeline.filter.${filter}\n- assertVisible:\n    id: timeline.filter.${filter}\n`);
+ flow(name,`- tapOn:\n    id: timeline.filter.${filter}\n    retryTapIfNoChange: true\n- assertVisible:\n    id: timeline.filter.${filter}\n`);
  const state=snapshot(name);
- assert.deepEqual(state.bounds,baseline.bounds,'Filter changes must preserve grid, date positions and control bounds.');
+ assertBounds(state.bounds,baseline.bounds,'Filter changes must preserve grid, date positions and control bounds.');
  if(filter==='poop-meal')assert.notDeepEqual(state.marks,baseline.marks,'The shared timeline must update its marks to the selected activities.');
 }
 flow('scroll',`- swipe:\n    start: 80%,40%\n    end: 80%,75%\n    duration: 500\n`);
 baseline=snapshot('scrolled-pee');
-flow('scroll-filter',`- tapOn:\n    id: timeline.filter.poop-meal\n`);
+flow('scroll-filter',`- tapOn:\n    id: timeline.filter.poop-meal\n    retryTapIfNoChange: true\n`);
 const scrolled=snapshot('scrolled-poop-meal');
-assert.deepEqual(scrolled.bounds,baseline.bounds,'Filters must retain the user’s scrolled date position.');
-const rect=value=>value.match(/-?\d+/g).map(Number),listBounds=rect(scrolled.bounds['timeline.days']);
+assertBounds(scrolled.bounds,baseline.bounds,'Filters must retain the user’s scrolled date position.');
+const listBounds=rect(scrolled.bounds['timeline.days']);
 const target=scrolled.marks.find(id=>{const b=rect(scrolled.markBounds[id]);return b[1]>=listBounds[1]+20&&b[3]<=listBounds[3]-20;});
 assert.ok(target,'A populated visible mark is required for detail verification.');
 // Open and close details in one session; unchanged timeline rows must stay memoized.
 let verified=false;
 for(let attempt=0;attempt<3&&!verified;attempt++){
  const before=JSON.parse(readFileSync(join(documents,'timeline-render-probe.json'),'utf8'));
- flow('details-'+attempt,`- tapOn:\n    id: ${target}\n- assertVisible:\n    id: timeline.details\n- tapOn:\n    id: timeline.details.close\n- assertNotVisible:\n    id: timeline.details\n`);
+ flow('details-'+attempt,`- tapOn:\n    id: ${target}\n- extendedWaitUntil:\n    visible:\n      id: timeline.details\n    timeout: 10000\n- tapOn:\n    id: timeline.details.close\n- extendedWaitUntil:\n    notVisible:\n      id: timeline.details\n    timeout: 10000\n`);
  const after=JSON.parse(readFileSync(join(documents,'timeline-render-probe.json'),'utf8'));
  // A minute timer may tick during XCTest startup; retry outside that tick.
  verified=JSON.stringify(before.date)===JSON.stringify(after.date)&&JSON.stringify(before.track)===JSON.stringify(after.track);
