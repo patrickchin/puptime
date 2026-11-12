@@ -17,6 +17,7 @@ import { createPhotoTransfer } from './photo-transfer';
 import {createSharingApi} from './sharing-api';
 import {createAccountDeletionApi} from './account-deletion';
 import { clearCloudExportCache, createNativeCloudExport } from './export.native';
+import { recordCloudDiagnostic } from './diagnostics.native';
 
 // One SDK/storage adapter instance coordinates native secure credential access.
 // The caller initializes lazily; missing cloud configuration leaves local use intact.
@@ -26,7 +27,7 @@ export function createNativeCloudClient(care?:{id:string;accountId:string}) {
   if (!origin) return null;
   const auth=createAuthClient({baseURL:origin,fetchOptions:{customFetchImpl:expoFetch,timeout:15000,retry:0,redirect:'error'},plugins:[expoClient({scheme:'puptime',storagePrefix:'puptime.auth',storage:SecureStore}),emailOTPClient()]});
   const scopedHeaders=care?{'x-puptime-share':care.id,'x-puptime-account':care.accountId}:{};
-  const api=createCloudApi(createSdkRequest((url,options)=>auth.$fetch<unknown>(url,{...options,headers:{...options.headers,...scopedHeaders}}),origin));
+  const api=createCloudApi(createSdkRequest((url,options)=>auth.$fetch<unknown>(url,{...options,headers:{...options.headers,...scopedHeaders}}),origin),recordCloudDiagnostic);
   // React Native's installed WebSocket supports headers as the third argument;
   // the DOM declaration selected by the shared web tsconfig omits that overload.
   const NativeSocket=WebSocket as unknown as {new(url:string,protocols:string[],options:{headers:Record<string,string>}):WebSocket};
@@ -37,5 +38,5 @@ export function createNativeCloudClient(care?:{id:string;accountId:string}) {
   }):undefined;
   const googleIdToken=Platform.OS==='ios'?createGoogleIdTokenRequest(GoogleSignin):undefined;
   const nativeSignOut=Platform.OS==='ios'?async()=>{await GoogleSignin.signOut();if(GoogleSignin.hasPreviousSignIn())throw new Error('Google sign-out did not complete.');}:undefined;
-  return {identity:createIdentityAdapter(auth,{appleIdToken,googleIdToken,nativeSignOut}),api,deletion:createAccountDeletionApi((url,options)=>auth.$fetch<unknown>(url,options),origin),origin,sharing:createSharingApi(origin,(url,options)=>auth.$fetch<unknown>(url,options)),photoTransfer:createPhotoTransfer((url,options)=>auth.$fetch<unknown>(url,{...options,headers:{...options.headers,...scopedHeaders}}),origin),exportCloud:createNativeCloudExport(createCloudExportRequest((url,options)=>auth.$fetch<unknown>(url,options),origin)),openChanges:createChangeOpener({origin,getCookie:async()=>auth.getCookie(),createSocket:(url,options)=>new NativeSocket(url,[],options)})};
+  return {identity:createIdentityAdapter(auth,{appleIdToken,googleIdToken,nativeSignOut}),api,deletion:createAccountDeletionApi((url,options)=>auth.$fetch<unknown>(url,options),origin),origin,sharing:createSharingApi(origin,(url,options)=>auth.$fetch<unknown>(url,options)),photoTransfer:createPhotoTransfer((url,options)=>auth.$fetch<unknown>(url,{...options,headers:{...options.headers,...scopedHeaders}}),origin,15000,recordCloudDiagnostic),exportCloud:createNativeCloudExport(createCloudExportRequest((url,options)=>auth.$fetch<unknown>(url,options),origin)),openChanges:createChangeOpener({origin,getCookie:async()=>auth.getCookie(),createSocket:(url,options)=>new NativeSocket(url,[],options)})};
 }

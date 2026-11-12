@@ -4,10 +4,10 @@ import { Alert,KeyboardAvoidingView,Linking,ScrollView,StyleSheet,Switch,Text,Vi
 import { Pressable } from '../components/TelemetryPressable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { CloudHandle } from '../cloud/use-cloud';
-import {AccountButton,AccountSignIn,accountProblemKey} from '../components/AccountSignIn';
+import {AccountButton,AccountSignIn} from '../components/AccountSignIn';
 import { useAccountSnapshot } from '../cloud/use-account-snapshot';
 import {AccountDeletionPanel} from '../components/AccountDeletionPanel';
-import { accountStatus } from '../cloud/account-status';
+import { accountStatus,accountProblemKey } from '../cloud/account-status';
 import { useLocalization } from '../localization-context';
 import { spacing,surfaceTreatment,type Theme } from '../theme';
 
@@ -17,6 +17,8 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
   const [samePuppy,setSamePuppy]=useState(false);
   const mounted=useRef(true);
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
+  const [sharingDiagnostics,setSharingDiagnostics]=useState(false),[diagnosticsFailed,setDiagnosticsFailed]=useState(false);
+  const diagnosticsLocked=useRef(false);
   const account=state?.account,existing=account?.pets[0],busy=state?.busy??false;
   const status=accountStatus(state),errorKey=accountProblemKey(state?.problem??(readFailed?'local-storage':null));
   const enrolled=!!state?.sync?.accountId&&state.sync.state!=='local';
@@ -36,6 +38,12 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
       {text:t('account.cancel'),style:'cancel'},
       {text:t('account.signOut'),style:'destructive',onPress:()=>{void cloud.controller?.signOut({confirmPending:true,confirmedThrough}).then(result=>{if(mounted.current&&result==='pending-confirmation-required')signOut();});}},
     ]);
+  }
+  async function exportDiagnostics() {
+    if(!cloud.shareDiagnostics||diagnosticsLocked.current)return;
+    diagnosticsLocked.current=true;setSharingDiagnostics(true);setDiagnosticsFailed(false);
+    try{await cloud.shareDiagnostics();}catch{setDiagnosticsFailed(true);}
+    finally{diagnosticsLocked.current=false;setSharingDiagnostics(false);}
   }
   return <SafeAreaView style={[styles.root,{backgroundColor:theme.background}]} edges={['top','bottom']}>
     <KeyboardAvoidingView behavior="padding" style={styles.root}>
@@ -101,6 +109,11 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
         </View>):null}
         {!account&&state?.sync?.accountId?<AccountButton theme={theme} testID="account.signOut" label={t('account.signOut')} disabled={busy} onPress={signOut}/>:null}
         </>}
+        {cloud.shareDiagnostics?<View style={cardStyle}>
+          <AccountButton theme={theme} testID="account.diagnostics" label={t(sharingDiagnostics?'account.diagnosticsPreparing':'account.diagnostics')} icon="file-document-outline" disabled={sharingDiagnostics} loading={sharingDiagnostics} onPress={()=>{void exportDiagnostics();}}/>
+          <Text style={[styles.body,bodyStyle]}>{t('account.diagnosticsDetail')}</Text>
+          {diagnosticsFailed?<Text testID="account.diagnostics.error" accessibilityRole="alert" style={[styles.body,{color:theme.danger}]}>{t('account.diagnosticsError')}</Text>:null}
+        </View>:null}
         <Pressable accessibilityRole="link" accessibilityLabel={t('account.privacy')} onPress={()=>{void Linking.openURL('https://github.com/patrickchin/puptime/blob/main/PRIVACY.md').catch(()=>Alert.alert(t('learn.linkError'),t('learn.linkErrorBody')));}} style={styles.privacy}><Text style={[styles.body,{color:theme.primary,textDecorationLine:'underline'}]}>{t('account.privacy')}</Text></Pressable>
       </ScrollView>
     </KeyboardAvoidingView>

@@ -3,6 +3,7 @@ import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import ts from 'typescript';
 import {lightTheme} from './theme.ts';
+import {accountProblemKey} from './cloud/account-status.ts';
 
 test('the real iOS sign-in component uses official Apple and Google controls and guards disabled activation',async()=>{
  // Component/hook boundary only; this does not claim an actual system button or sheet.
@@ -10,6 +11,7 @@ test('the real iOS sign-in component uses official Apple and Google controls and
  const state={account:null,config:{providers:{apple:true,google:true,email:false}},busy:false,online:true,problem:null};
  const jsx=(type:unknown,props:any)=>({type,props}),nativeButton=Symbol('AppleAuthenticationButton'),googleButton=Object.assign(()=>{}, {Size:{Wide:2},Color:{Dark:'dark',Light:'light'}});
  const modules:Record<string,unknown>={
+  '../cloud/account-status':{accountProblemKey},
   './TelemetryPressable':{Pressable:'Pressable'},
   react:{useState:(value:unknown)=>{const i=cursor++;hooks[i]??={value};return [hooks[i].value,(next:unknown)=>{hooks[i].value=next;}];},useEffect:(effect:()=>void)=>{const i=cursor++;if(!hooks[i]){hooks[i]=true;effects.push(effect);}}},
   'react/jsx-runtime':{jsx,jsxs:jsx},'@expo/vector-icons':{MaterialCommunityIcons:'Icon'},

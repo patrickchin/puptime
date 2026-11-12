@@ -5,6 +5,7 @@ import { createSyncRunner,type RunResult,type PhotoSync } from './runner.ts';
 import type { createLocalRuntime } from '../local/runtime-factory.ts';
 import type { AppleIdToken } from './apple-native.ts';
 import type { GoogleIdToken } from './google-native.ts';
+import type {CloudDiagnosticInput,RecordCloudDiagnostic} from './sync-diagnostics.ts';
 
 type Runtime=Awaited<ReturnType<typeof createLocalRuntime>>;
 type SyncStatus=Awaited<ReturnType<Runtime['sync']['status']>>;
@@ -62,7 +63,7 @@ export async function continueFirstLaunchLocally(runtime:Runtime,confirmPending=
   if(status.generation&&status.accountId&&!await runtime.sync.detach({generation:status.generation,accountId:status.accountId,confirmedThrough:approved}))return 'pending-confirmation-required';
   return 'ok';
 }
-export function createAccountController({runtime,api,identity,subscribeLocalWrites,defer=defaultDefer,changed,exportCloud,photos,deletion}:{runtime:Runtime;photos?:PhotoSync;deletion?:AccountDeletionApi;exportCloud?:CloudExportAction;api:CloudApi;identity:IdentityAdapter;subscribeLocalWrites:(fn:()=>void)=>()=>void;defer?:(fn:()=>void,delay:number)=>()=>void;changed:()=>void}) {
+export function createAccountController({runtime,api,identity,subscribeLocalWrites,defer=defaultDefer,changed,exportCloud,photos,deletion,diagnose}:{runtime:Runtime;photos?:PhotoSync;deletion?:AccountDeletionApi;diagnose?:RecordCloudDiagnostic;exportCloud?:CloudExportAction;api:CloudApi;identity:IdentityAdapter;subscribeLocalWrites:(fn:()=>void)=>()=>void;defer?:(fn:()=>void,delay:number)=>()=>void;changed:()=>void}) {
   let snapshot:AccountSnapshot={config:null,account:null,linkedProviders:null,linkingProvider:null,local:null,sync:null,run:null,problem:null,codeSentTo:null,busy:false,exporting:false,running:false,active:false,online:true,lastSyncedAt:null};
   const listeners=new Set<()=>void>();
   let disposed=false,suspended=false,signOutUnfinished=false,rerun=false,associationConfirmationNeeded=false;
@@ -71,6 +72,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
   let exportAborter:AbortController|null=null;
   let refreshGeneration=0,refreshFailures=0,cancelRefreshScheduled:(()=>void)|null=null;
   const runner=createSyncRunner({sync:runtime.sync,api,photos,petId:runtime.petId,deviceId:runtime.deviceId,sessionAccountId:()=>snapshot.account?.user.id??null,changed});
+  function diagnostic(input:CloudDiagnosticInput) {try{diagnose?.(input);}catch{/* Diagnostics cannot interrupt sync. */}}
   function emit(patch:Partial<AccountSnapshot>) {
     if (disposed) return;snapshot={...snapshot,...patch};
     for(const listener of listeners)try{listener();}catch{/* A view cannot undo an account operation. */}
@@ -92,19 +94,22 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
   function runOnce() {
     if (!eligible()) return;if(running){rerun=true;return;}
     const controller=new AbortController();aborter=controller;rerun=false;emit({running:true});
+    diagnostic({event:'sync',result:'started',pending:snapshot.sync?.pending,blocked:snapshot.sync?.blocked});
     let nextDelay:number|null=null,confirmEnrollment=false;
     running=(async()=>{
       try {
         const result=await runner.run(controller.signal);
         if(controller.signal.aborted||disposed)return;
         await localState();
+        diagnostic({event:'sync',result:result.problem?'error':result.state==='synced'?'success':result.state==='idle'?'idle':'paused',state:result.state,...(result.problem&&result.problem!=='account-mismatch'&&result.problem!=='confirmation-required'?{category:result.problem}:{}),pending:result.pending,blocked:result.blocked});
         confirmEnrollment=result.problem==='confirmation-required';
         if(confirmEnrollment){associationConfirmationNeeded=true;cancelTimer();}
         emit({run:result,problem:result.problem,...(result.state==='synced'?{lastSyncedAt:Date.now()}:{}),...(result.state==='auth-required'?{account:null,linkedProviders:null}:{})});
         if(['auth-required','error'].includes(result.state))suspended=true;
         nextDelay=result.retryAfterMs;
-      }catch{if(!controller.signal.aborted&&!disposed)fail('local-storage');}
+      }catch{if(!controller.signal.aborted&&!disposed){diagnostic({event:'sync',result:'error',state:'error',category:'local-storage',pending:snapshot.sync?.pending,blocked:snapshot.sync?.blocked});fail('local-storage');}}
       finally{
+        if(controller.signal.aborted)diagnostic({event:'sync',result:'cancelled',pending:snapshot.sync?.pending,blocked:snapshot.sync?.blocked});
         running=null;aborter=null;emit({running:false});
         if(!controller.signal.aborted&&confirmEnrollment&&!disposed){
           // Refresh outside the runner promise: account-change handling may
@@ -280,7 +285,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
     await saveDeletion({...state,stage:'confirmed'});
     const status=await runtime.sync.status(runtime.petId);
     if(status.accountId&&status.accountId!==state.accountId)return fail('account-mismatch');
-    if(status.generation&&status.accountId)await runtime.sync.detach({generation:status.generation,accountId:status.accountId});
+    if(status.generation&&status.accountId&&!await runtime.sync.detach({generation:status.generation,accountId:status.accountId,confirmedThrough:status.pendingThrough}))return fail('deletion-unconfirmed');
     const result=await outcome(()=>identity.signOut());
     if(result.error?.code==='NATIVE_SIGN_OUT_FAILED'||await identity.hasCredentials())return fail('sign-out-failed');
     await runtime.database.write(sql=>sql.runAsync('DELETE FROM metadata WHERE key=?',deletionKey));

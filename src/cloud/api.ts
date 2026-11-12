@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { enrollmentSchema, identifierSchema, mutationSchema, pullPageSchema, pushResponseSchema, recordIdSchema, revisionSchema, type Enrollment, type Mutation, type Revision } from './protocol.ts';
 import {localRecordId} from './record-identity.ts';
+import type { CloudDiagnosticInput, RecordCloudDiagnostic } from './sync-diagnostics.ts';
 
 // React Native's maintained AbortController polyfill exposes aborted, but not
 // the newer throwIfAborted()/reason API. Preserve native and browser cancellation.
@@ -28,7 +29,7 @@ export class CloudApiError extends Error {
   constructor(category:CloudErrorCategory,status=0,retryAfterMs:number|null=null) {super(category);this.name='CloudApiError';this.category=category;this.status=status;this.retryAfterMs=retryAfterMs;}
 }
 type RequestOptions={method:'GET'|'POST';body?:object;signal?:AbortSignal;headers?:Record<string,string>};
-type RequestResult={data:unknown;error:{status:number}|null;retryAfter?:string|null};
+type RequestResult={data:unknown;error:{status:number}|null;retryAfter?:string|null;status?:number};
 export type CloudRequest=(path:string,options:RequestOptions)=>Promise<RequestResult>;
 type SdkOptions=RequestOptions&{params?:{recordId:string};redirect:'error';credentials:'omit';retry:0;timeout:number;onResponse:(context:{response:Response})=>void};
 const historyRecordId=recordIdSchema.refine(value=>value!=='.'&&value!=='..');
@@ -49,12 +50,12 @@ export function createSdkRequest(fetchClient:(url:string,options:SdkOptions)=>Pr
     const history=historyRoute(path,options);
     if (!/^\/api\/(?:config|account|cloud\/enroll|sync\/push|sync\/pull\?after=\d+)$/.test(path)&&!history) throw new CloudApiError('invalid-request',400);
     throwIfAborted(options.signal);
-    let retryAfter:string|null=null;
+    let retryAfter:string|null=null,status:number|undefined;
     // Better Auth encodes path parameters itself; a pre-encoded literal ID would
     // be encoded twice and silently query history for a different record.
     const sdkPath=history?`/api/records/:recordId/history${history.beforeRevision===undefined?'':`?beforeRevision=${history.beforeRevision}`}`:path;
-    const result=await fetchClient(`${base}${sdkPath}`,{...options,...(history?{params:{recordId:history.recordId}}:{}),redirect:'error',credentials:'omit',retry:0,timeout:15000,onResponse:({response})=>{retryAfter=response.headers.get('retry-after');}});
-    return {...result,retryAfter};
+    const result=await fetchClient(`${base}${sdkPath}`,{...options,...(history?{params:{recordId:history.recordId}}:{}),redirect:'error',credentials:'omit',retry:0,timeout:15000,onResponse:({response})=>{status=response.status;retryAfter=response.headers.get('retry-after');}});
+    return {...result,retryAfter,...(status===undefined?{}:{status})};
   };
 }
 export function retryDelay(value:string|null|undefined):number|null {
@@ -67,17 +68,32 @@ export function cloudErrorCategory(status:number):CloudErrorCategory {
   const categories:Record<number,CloudErrorCategory>={401:'auth-required',403:'forbidden',409:'conflict',410:'account-deleted',429:'rate-limited'};
   return categories[status]??(status>=500?'server-error':'invalid-request');
 }
-export function createCloudApi(request:CloudRequest) {
+export function createCloudApi(request:CloudRequest,diagnose?:RecordCloudDiagnostic) {
   async function call<Schema extends z.ZodType>(path:string,schema:Schema,body?:object,signal?:AbortSignal):Promise<z.infer<Schema>> {
-    throwIfAborted(signal);
-    let result:RequestResult;
-    try {result=await request(path,{method:body?'POST':'GET',...(body?{body}:{}),signal});}
-    catch {throwIfAborted(signal);throw new CloudApiError('network');}
-    throwIfAborted(signal);
-    if (result.error) throw new CloudApiError(cloudErrorCategory(result.error.status),result.error.status,retryDelay(result.retryAfter));
-    const parsed=schema.safeParse(result.data);
-    if (!parsed.success) throw new CloudApiError('invalid-response');
-    return parsed.data;
+    const started=Date.now(),method=body?'POST':'GET';
+    const route:CloudDiagnosticInput['route']=path==='/api/config'?'config':path==='/api/account'?'account':path==='/api/cloud/enroll'?'enroll':path==='/api/sync/push'?'push':path.startsWith('/api/sync/pull?')?'pull':'history';
+    const details={event:'request',route,method,batchCount:route==='push'?(body as {mutations:unknown[]}).mutations.length:undefined} as const;
+    let status:number|undefined;
+    function report(result:'success'|'error'|'cancelled',category?:CloudErrorCategory) {
+      try {diagnose?.({...details,result,status,durationMs:Math.max(0,Math.min(86_400_000,Date.now()-started)),...(category?{category}:{})});} catch { /* Support logging cannot affect transport. */ }
+    }
+    try {
+      throwIfAborted(signal);
+      let result:RequestResult;
+      try {result=await request(path,{method,...(body?{body}:{}),signal});}
+      catch(error) {throwIfAborted(signal);throw error instanceof CloudApiError?error:new CloudApiError('network');}
+      status=result.status;
+      throwIfAborted(signal);
+      if (result.error) throw new CloudApiError(cloudErrorCategory(result.error.status),result.error.status,retryDelay(result.retryAfter));
+      const parsed=schema.safeParse(result.data);
+      if (!parsed.success) throw new CloudApiError('invalid-response',status);
+      report('success');
+      return parsed.data;
+    } catch(error) {
+      if(error instanceof CloudApiError){status=error.status||status;report('error',error.category);}
+      else report(signal?.aborted?'cancelled':'error');
+      throw error;
+    }
   }
   return {
     config:(signal?:AbortSignal)=>call('/api/config',cloudConfigSchema,undefined,signal),

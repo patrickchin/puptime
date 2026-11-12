@@ -6,30 +6,10 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import {GoogleSigninButton} from '@react-native-google-signin/google-signin';
 import type {CloudHandle} from '../cloud/use-cloud';
 import {useAccountSnapshot} from '../cloud/use-account-snapshot';
-import type {AccountProblem} from '../cloud/account-controller';
+import {accountProblemKey} from '../cloud/account-status';
 import {useLocalization} from '../localization-context';
-import type {MessageKey} from '../localization';
 import type {Theme} from '../theme';
 
-export function accountProblemKey(problem:AccountProblem|null):MessageKey|null {
-  if(!problem||['confirmation-required','pending-confirmation-required','auth-required'].includes(problem))return null;
-  if(problem==='invalid-email')return 'account.error.email';
-  if(problem==='invalid-code')return 'account.error.code';
-  if(problem==='code-expired')return 'account.error.expiredCode';
-  if(problem==='too-many-attempts'||problem==='rate-limited')return 'account.error.attempts';
-  if(problem==='network')return 'account.error.network';
-  if(problem==='account-mismatch')return 'account.error.mismatch';
-  if(problem==='sign-out-failed')return 'account.error.signOut';
-  if(problem==='remote-sign-out-unconfirmed')return 'account.error.remoteSignOut';
-  if(problem==='deletion-unconfirmed')return 'account.delete.unconfirmed';
-  if(problem==='deletion-failed')return 'account.delete.failed';
-  if(problem==='export-failed')return 'account.error.export';
-  if(problem==='local-storage')return 'account.error.storage';
-  if(problem==='social-incomplete')return 'account.error.socialIncomplete';
-  if(problem==='link-incomplete')return 'account.error.linkIncomplete';
-  if(problem==='provider-unavailable'||problem==='server-error'||problem==='invalid-response'||problem==='account-deleted'||problem==='forbidden')return 'account.error.service';
-  return 'account.error.signIn';
-}
 export function AccountSignIn({cloud,theme,showError=true,showIntro=true,onEmailPress,emailOnly=false}:{cloud:CloudHandle;theme:Theme;showError?:boolean;showIntro?:boolean;onEmailPress?:()=>void;emailOnly?:boolean}) {
  const {t}=useLocalization(),state=useAccountSnapshot(cloud.controller);
  const [email,setEmail]=useState(''),[code,setCode]=useState(''),[editingEmail,setEditingEmail]=useState(false);
