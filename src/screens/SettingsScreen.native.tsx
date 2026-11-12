@@ -2,7 +2,7 @@ import { AnalyticsSettings } from '../components/AnalyticsSettings.native';
 import { useTelemetryOverlay } from '../telemetry';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Alert, Linking, Modal, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
+import { Alert, Keyboard, Linking, Modal, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
 import { Pressable } from '../components/TelemetryPressable';
 
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -11,6 +11,8 @@ import {PuppyIdentity} from '../components/PuppyIdentity';
 import { ActivityIcon } from '../components/ActivityIcon';
 import { ActivityCsvSettings } from '../components/ActivityCsvSettings';
 import { SettingsRow } from '../components/SettingsRow';
+import { SettingsSearch } from '../components/SettingsSearch';
+import { findSettings, type SettingSearchId } from '../settings-search';
 import { ActivityBackupSettings } from '../components/ActivityBackupSettings.native';
 import type { CloudHandle } from '../cloud/use-cloud';
 import { useLocalization } from '../localization-context';
@@ -80,6 +82,10 @@ export function SettingsScreen({
   const largeWidgetText=width/Math.min(fontScale,2)<300;
   const [widgetVisible,setWidgetVisible]=useState(false);
   useTelemetryOverlay('widget_settings', widgetVisible);
+  const [query, setQuery] = useState('');
+  const searchable: SettingSearchId[] = ['appearance', 'language', 'notifications', 'widget', 'backups', 'csv', 'analytics', 'guide', 'privacy'];
+  if (onOpenHistory) searchable.push('history');
+  const matches = findSettings(query, t, searchable);
   const [savingWidget, setSavingWidget] = useState(false);
   const [savingNotifications, setSavingNotifications] = useState(false);
 
@@ -140,7 +146,7 @@ export function SettingsScreen({
 
   return (
     <>
-    <ScrollView testID="screen.settings" keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
+    <ScrollView testID="screen.settings" keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={styles.content}>
       {showHeader?<View style={styles.header}>
         <Pressable
           testID="settings.back"
@@ -194,48 +200,52 @@ export function SettingsScreen({
         </Text>
       </View>:null}
 
+      <SettingsSearch theme={theme} query={query} onChange={setQuery} empty={matches.size === 0} />
+      {matches.has('appearance') || matches.has('language') ? <>
       <SectionLabel label={t('settings.preferences')} theme={theme} />
       <View style={[styles.card, surfaceTreatment(theme), { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
-        <SettingsRow
+        {matches.has('appearance') && <SettingsRow
           testID="settings.theme.open"
           icon="palette-outline"
           label={t('settings.theme')}
           detail={themeLabel}
           hint={t('settings.themeDetail')}
-          onPress={() => onOpenPicker('theme')}
+          onPress={() => { Keyboard.dismiss(); onOpenPicker('theme'); }}
           theme={theme}
-        />
-        <View style={[styles.divider, { backgroundColor: theme.border }]} />
-        <SettingsRow
+        />}
+        {matches.has('appearance') && matches.has('language') && <View style={[styles.divider, { backgroundColor: theme.border }]} />}
+        {matches.has('language') && <SettingsRow
           testID="settings.language.open"
           icon="translate"
           label={t('settings.language')}
           detail={languageLabel}
-          onPress={() => onOpenPicker('language')}
+          onPress={() => { Keyboard.dismiss(); onOpenPicker('language'); }}
           theme={theme}
-        />
+        />}
       </View>
+      </> : null}
 
-      <SectionLabel label={t('settings.notificationsWidgets')} theme={theme} />
-      <View style={[styles.card, surfaceTreatment(theme), {backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}>
+      {(matches.has('notifications') || matches.has('widget')) && <SectionLabel label={t('settings.notificationsWidgets')} theme={theme} />}
+      {matches.has('notifications') && <View style={[styles.card, surfaceTreatment(theme), {backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}>
         <SettingsRow testID="settings.notifications.open" icon="bell-outline" label={t('notifications.title')} detail={t('settings.notificationsDetail')} onPress={onOpenNotifications} theme={theme} wrap />
-      </View>
+      </View>}
 
-      <View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}>
-        <SettingsRow testID="settings.widget.open" icon="widgets-outline" label={t('settings.widgetTitle')} detail={t('settings.widgetDetail')} onPress={()=>setWidgetVisible(true)} theme={theme} wrap/>
-      </View>
+      {matches.has('widget') && <View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}>
+        <SettingsRow testID="settings.widget.open" icon="widgets-outline" label={t('settings.widgetTitle')} detail={t('settings.widgetDetail')} onPress={()=>{Keyboard.dismiss();setWidgetVisible(true);}} theme={theme} wrap/>
+      </View>}
 
-      <SectionLabel label={t('settings.data')} theme={theme} />
-      <ActivityBackupSettings theme={theme} onRestored={onBackupsRestored}/>
-      <ActivityCsvSettings theme={theme} eventCount={eventCount} onImport={onImport}/>
-      {onOpenHistory?<View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}><SettingsRow testID="settings.history.open" icon="history" label={t('history.recentTitle')} detail={t('history.recentDetail')} onPress={onOpenHistory} theme={theme} wrap/></View>:null}
-      <SectionLabel label={t('settings.helpPrivacy')} theme={theme}/>
-      <AnalyticsSettings theme={theme}/>
-      <View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}>
-        <SettingsRow testID="settings.guide.open" icon="compass-outline" label={t('settings.guide')} detail={t('settings.guideDetail')} onPress={onOpenGuide} theme={theme} wrap/>
-        <View style={[styles.divider,{backgroundColor:theme.border}]}/>
-        <SettingsRow testID="settings.privacy.open" icon="shield-outline" label={t('account.privacy')} detail={t('settings.privacyDetail')} onPress={()=>{void Linking.openURL('https://github.com/patrickchin/puptime/blob/main/PRIVACY.md').catch(()=>Alert.alert(t('learn.linkError'),t('learn.linkErrorBody')));}} theme={theme} wrap/>
-      </View>
+      {(matches.has('backups') || matches.has('csv') || matches.has('history')) && <SectionLabel label={t('settings.data')} theme={theme} />}
+      {/* Filtering must not reset an in-flight backup or file transfer. */}
+      <View style={!matches.has('backups') && styles.hidden}><ActivityBackupSettings theme={theme} onRestored={onBackupsRestored}/></View>
+      <View style={!matches.has('csv') && styles.hidden}><ActivityCsvSettings theme={theme} eventCount={eventCount} onImport={onImport}/></View>
+      {matches.has('history') && onOpenHistory?<View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}><SettingsRow testID="settings.history.open" icon="history" label={t('history.recentTitle')} detail={t('history.recentDetail')} onPress={onOpenHistory} theme={theme} wrap/></View>:null}
+      {(matches.has('analytics') || matches.has('guide') || matches.has('privacy')) && <SectionLabel label={t('settings.helpPrivacy')} theme={theme}/>}
+      <View style={!matches.has('analytics') && styles.hidden}><AnalyticsSettings theme={theme}/></View>
+      {matches.has('guide') || matches.has('privacy') ? <View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}>
+        {matches.has('guide') && <SettingsRow testID="settings.guide.open" icon="compass-outline" label={t('settings.guide')} detail={t('settings.guideDetail')} onPress={onOpenGuide} theme={theme} wrap/>}
+        {matches.has('guide') && matches.has('privacy') && <View style={[styles.divider,{backgroundColor:theme.border}]}/>}
+        {matches.has('privacy') && <SettingsRow testID="settings.privacy.open" icon="shield-outline" label={t('account.privacy')} detail={t('settings.privacyDetail')} onPress={()=>{void Linking.openURL('https://github.com/patrickchin/puptime/blob/main/PRIVACY.md').catch(()=>Alert.alert(t('learn.linkError'),t('learn.linkErrorBody')));}} theme={theme} wrap/>}
+      </View> : null}
     </ScrollView>
     <Modal visible={widgetVisible} presentationStyle="pageSheet" animationType="slide" onRequestClose={()=>setWidgetVisible(false)}>
       <SafeAreaView style={{flex:1,backgroundColor:theme.background}}>
@@ -348,6 +358,7 @@ function SectionLabel({ label, theme }: { label: string; theme: Theme }) {
 }
 
 const styles = StyleSheet.create({
+  hidden: { display: 'none' },
   content: {
     width: '100%',
     maxWidth: 720,

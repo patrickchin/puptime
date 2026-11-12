@@ -7,6 +7,8 @@ import { customActivityKey, quickEventTypes, type ActivityKey, type EventType } 
 import { ActivityIcon } from '../components/ActivityIcon';
 import { ActivityCsvSettings } from '../components/ActivityCsvSettings';
 import { SettingsRow } from '../components/SettingsRow';
+import { SettingsSearch } from '../components/SettingsSearch';
+import { findSettings, type SettingSearchId } from '../settings-search';
 import type { CloudHandle } from '../cloud/use-cloud';
 import { useAccountSnapshot } from '../cloud/use-account-snapshot';
 import { useLocalization } from '../localization-context';
@@ -81,6 +83,10 @@ export function SettingsScreen({
   eventCount: number;
 }) {
   const { activityColors, activityLabel, t } = useLocalization();
+  const [query, setQuery] = useState('');
+  const searchable: SettingSearchId[] = ['appearance', 'language', 'notifications', 'widget', 'csv', 'guide'];
+  if (cloudHandle?.available && onOpenAccount) searchable.push('account');
+  const matches = findSettings(query, t, searchable);
   const [savingWidget, setSavingWidget] = useState(false);
   const [savingNotifications, setSavingNotifications] = useState(false);
   const [savingDelivery,setSavingDelivery]=useState(false);
@@ -227,10 +233,12 @@ export function SettingsScreen({
         </Text>
       </View>
 
-      {cloudHandle?.available&&onOpenAccount?<AccountSettingsRow cloud={cloudHandle} theme={theme} onOpen={onOpenAccount}/>:null}
+      <SettingsSearch theme={theme} query={query} onChange={setQuery} empty={matches.size === 0} />
+      {matches.has('account') && cloudHandle?.available&&onOpenAccount?<AccountSettingsRow cloud={cloudHandle} theme={theme} onOpen={onOpenAccount}/>:null}
+      {matches.has('appearance') || matches.has('language') ? <>
       <SectionLabel label={t('settings.personalization')} theme={theme} />
       <View style={[styles.card, surfaceTreatment(theme), { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
-        <SettingsRow
+        {matches.has('appearance') && <SettingsRow
           testID="settings.theme.open"
           icon="palette-outline"
           label={t('settings.theme')}
@@ -238,18 +246,20 @@ export function SettingsScreen({
           hint={t('settings.themeDetail')}
           onPress={() => onOpenPicker('theme')}
           theme={theme}
-        />
-        <View style={[styles.divider, { backgroundColor: theme.border }]} />
-        <SettingsRow
+        />}
+        {matches.has('appearance') && matches.has('language') && <View style={[styles.divider, { backgroundColor: theme.border }]} />}
+        {matches.has('language') && <SettingsRow
           testID="settings.language.open"
           icon="translate"
           label={t('settings.language')}
           detail={languageLabel}
           onPress={() => onOpenPicker('language')}
           theme={theme}
-        />
+        />}
       </View>
+      </> : null}
 
+      {matches.has('widget') && <>
       <SectionLabel label={t('settings.widget')} theme={theme} />
       <View style={[styles.card, surfaceTreatment(theme), { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
         <Text
@@ -315,6 +325,8 @@ export function SettingsScreen({
         ) : null}
       </View>
 
+      </>}
+      {matches.has('notifications') && <>
       <SectionLabel label={t('settings.notifications')} theme={theme} />
       <View style={[styles.card, surfaceTreatment(theme), { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
         <Pressable
@@ -506,9 +518,12 @@ export function SettingsScreen({
           </View>
         </View>
       </View>
+      </>}
+      <View style={!matches.has('csv') && styles.hidden}>
       <SectionLabel label={t('settings.data')} theme={theme} />
       <ActivityCsvSettings theme={theme} eventCount={eventCount} onImport={onImport}/>
-
+      </View>
+      {matches.has('guide') && <>
       <SectionLabel label={t('settings.helpPrivacy')} theme={theme}/>
       <View style={[styles.card,{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}>
         <SettingsRow
@@ -520,6 +535,7 @@ export function SettingsScreen({
           theme={theme}
         />
       </View>
+      </>}
     </ScrollView>
   );
 }
@@ -629,6 +645,7 @@ function PottyReminderRule({
 }
 
 const styles = StyleSheet.create({
+  hidden: { display: 'none' },
   content: {
     width: '100%',
     maxWidth: 720,

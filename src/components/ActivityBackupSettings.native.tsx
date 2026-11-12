@@ -1,6 +1,6 @@
 import { useTelemetryOverlay } from '../telemetry';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Keyboard, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Pressable } from './TelemetryPressable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getLocalRuntime } from '../local/runtime.native';
@@ -58,7 +58,7 @@ export function ActivityBackupSettings({ theme, onRestored }: { theme: Theme; on
   return <>
     <View style={[styles.card, surfaceTreatment(theme), { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
       <SettingsRow testID="settings.backups.open" icon="backup-restore" label={t('backup.title')} detail={t('backup.detail')} wrap theme={theme}
-        onPress={() => { setSelectedPet(null);setVisible(true); void reload(); }} />
+        onPress={() => { Keyboard.dismiss(); setSelectedPet(null);setVisible(true); void reload(); }} />
     </View>
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { if (!busy) setVisible(false); }}>
       <SafeAreaView style={[styles.page, { backgroundColor: theme.surface }]}>
