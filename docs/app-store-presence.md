@@ -65,6 +65,39 @@ JavaScript bundle from this worktree. The captures are not a qualification of
 the uploaded App Store binary. Reconcile them with that exact build before
 submission and retake any changed screens.
 
+## Everyday logging video first
+
+The first-use-case review video is now
+`fastlane/previews/en-US/daily-logging-review.mp4`: check the last potty break,
+tap Pee once, see the confirmation and new history entry, then open the updated
+timeline. It demonstrates the primary quick-logging flow before secondary
+editing and routine features. This ordering reflects the product's core task,
+not measured usage analytics.
+
+This eight-second cut uses a fresh native recording with the new app animations.
+Actions run at normal speed. A 2.4-second unchanged-screen wait is removed; no
+screen transition is added. Two editorial aim/press/release cues identify the
+actual taps, with positions taken from the captured control bounds. Source
+ranges, tap timings, and the video hash are in `daily-logging-edit.json` beside
+the video. The cut was reviewed at the taps, result, idle splice, and native
+screen fade. The capture replaced only the previous scripted demo event; all
+338 original CSV records remain unchanged and personal notes remain omitted.
+
+This is the short opening-flow review cut, not a standalone App Store upload:
+it is below the store preview's 15-second minimum. The longer candidate listed
+above is unchanged. Use this common flow first when assembling the next store
+preview, then choose supporting features to meet the required duration.
+Native footage, screenshots, and visual checks are under
+`~/Pictures/Screenshots/Codex/puptime-app-store/20261112/daily-logging/`.
+To record this flow on the seeded task simulator:
+
+```sh
+python3 scripts/record-store-preview.py IPHONE_UDID NEW_CAPTURE_DIRECTORY fastlane/daily-logging.yaml
+```
+
+The flow adds one demonstration pee. Start with a disposable capture fixture;
+do not repeatedly add demonstrations to the owner's actual history.
+
 ## App animations and recording
 
 The app already animated the navigation drawer, theme picker, and some account
