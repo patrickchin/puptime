@@ -1,6 +1,6 @@
 # Puptime Privacy Policy
 
-Last updated: November 11, 2026
+Last updated: November 12, 2026
 
 Puptime is a puppy routine tracker developed by Patrick Chin. Local logging works without an account. This policy explains optional cloud accounts, the native app, and the public website.
 
@@ -35,6 +35,12 @@ Usage analytics are off by default. In builds configured for analytics, enable *
 Events use a random anonymous installation identifier that is separate from your account and puppy records, plus a session identifier, platform and app version. We do not send account/provider identifiers, puppy names or identifiers, log identifiers, activity timestamps, note contents, custom activity labels, photos, email addresses, codes, search terms, typed text, touch coordinates or raw errors. Automatic text/click capture, person profiles, session recordings, feature flags, surveys and automatic push tracking are disabled. Events request no GeoIP enrichment. Requests necessarily reach PostHog; see [PostHog's privacy policy](https://posthog.com/privacy).
 
 Your choice and anonymous identifier stay on this device and are not synced or included in activity exports. Turn the switch off to stop capture, discard queued events, abort pending analytics requests and remove the stored anonymous identifier. Turning it on again creates a new identifier. Events already received by PostHog are not erased by withdrawal. The event queue is bounded and kept in memory, so offline use works normally and unsent events may be lost when the app is closed. Analytics are optional and do not affect local logging or cloud access. App consent and website consent are separate. Earlier releases without this setting do not collect these app events.
+
+## Local sync diagnostics
+
+The app keeps up to 100 recent sync diagnostic entries on this device. They contain attempt times, API route categories, request methods, response status codes, durations, error categories and queue counts. They exclude puppy records, names, notes, photos, account or record identifiers, full URLs, credentials and raw error messages. New entries replace older entries. These diagnostics are separate from optional usage analytics and are not automatically sent to Puptime or PostHog.
+
+**My account → Export sync diagnostics** creates a JSON report with those entries and the app version, build and platform, then opens the system share sheet. One report remains in the app's temporary cache so the chosen destination can read it, and the next export replaces it. The operating system may clear this cache. The app or destination you choose handles saved copies under its own privacy practices.
 
 ## Public website
 

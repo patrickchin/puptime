@@ -71,7 +71,7 @@ test('SDK request adapter fixes the credential origin, disables redirects and SD
  assert.equal(typeof api.createSdkRequest,'function');
  const controller=new AbortController();let calls=0;
  const request=api.createSdkRequest(async(url,options)=>{calls++;assert.equal(url,'https://puptime.test/api/account');assert.equal(options.redirect,'error');assert.equal(options.retry,0);assert.equal(options.credentials,'omit');assert.equal(options.timeout,15000);assert.equal(options.signal,controller.signal);options.onResponse({response:new Response('{}',{headers:{'retry-after':'3','set-cookie':'better-auth.session_token=PRIVATE'}})});return {data:account,error:null};},'https://puptime.test');
- assert.deepEqual(await request('/api/account',{method:'GET',signal:controller.signal}),{data:account,error:null,retryAfter:'3'});
+ assert.deepEqual(await request('/api/account',{method:'GET',signal:controller.signal}),{data:account,error:null,retryAfter:'3',status:200});
  for(const path of ['https://other.example/api/account','//other.example/api/account','/api/../private','/api/auth/get-session','/api/account?url=https://other.example','/api/cloud/trial']) await assert.rejects(request(path,{method:'GET'}));
  await assert.rejects(request('/api/cloud/trial',{method:'POST',body:{}}),error=>error instanceof api.CloudApiError&&error.category==='invalid-request');
  assert.equal(calls,1);
@@ -132,4 +132,23 @@ test('profile responses need no capability headers',async()=>{
  let headers:Record<string,string>|undefined;
  const service=api.createCloudApi(async(_path,options)=>{headers=options.headers;return {data:{changes:[],cursor:0,hasMore:false},error:null};});
  await service.pull(0);assert.equal(headers,undefined);
+});
+
+test('request diagnostics preserve actual status and safe routes without retaining request contents',async()=>{
+ const events:import('./sync-diagnostics.ts').CloudDiagnosticInput[]=[];
+ const diagnostic=(entry:import('./sync-diagnostics.ts').CloudDiagnosticInput)=>{events.push(entry);};
+ const auth=createAuthClient({baseURL:'https://puptime.test',fetchOptions:{customFetchImpl:async()=>Response.json({private:'PRIVATE_RESPONSE'},{status:400})}});
+ const cloud=api.createCloudApi(api.createSdkRequest((url,options)=>auth.$fetch(url,options),'https://puptime.test'),diagnostic);
+ await assert.rejects(cloud.push([{...event,patch:{...event.patch,note:'PRIVATE_NOTE'}}]),error=>error instanceof api.CloudApiError&&error.status===400);
+ assert.equal(events.length,1);assert.equal(events[0].route,'push');assert.equal(events[0].status,400);assert.equal(events[0].batchCount,1);assert.equal(events[0].category,'invalid-request');
+ assert.ok(!JSON.stringify(events).includes('PRIVATE'));assert.ok(!JSON.stringify(events).includes('https://'));
+ const success=createAuthClient({baseURL:'https://puptime.test',fetchOptions:{customFetchImpl:async()=>Response.json(config,{status:201})}});
+ assert.deepEqual(await api.createCloudApi(api.createSdkRequest((url,options)=>success.$fetch(url,options),'https://puptime.test'),diagnostic).config(),config);
+ assert.equal(events.at(-1)?.result,'success');assert.equal(events.at(-1)?.status,201);
+ const malformed=api.createCloudApi(async()=>({data:{},error:null,status:202}),diagnostic);
+ await assert.rejects(malformed.account(),error=>error instanceof api.CloudApiError&&error.status===202&&error.category==='invalid-response');
+ const thrown=api.createCloudApi(async()=>{throw new api.CloudApiError('forbidden',403);},diagnostic);
+ await assert.rejects(thrown.account(),error=>error instanceof api.CloudApiError&&error.status===403);
+ assert.equal(events.at(-1)?.status,403);
+ assert.deepEqual(await api.createCloudApi(async()=>({data:config,error:null,status:200}),()=>{throw new Error('logger failure');}).config(),config);
 });

@@ -10,8 +10,10 @@ import {pushResponseSchema,type Revision} from './protocol.ts';
 import { reconcileMutation } from './reconcile.ts';
 import * as controllerModule from './account-controller.ts';
 import {AccountDeletionError,type AccountDeletionApi} from './account-deletion.ts';
+import {accountStatus,accountProblemKey} from './account-status.ts';
+import type {CloudDiagnosticInput,RecordCloudDiagnostic} from './sync-diagnostics.ts';
 const event={id:'one',type:'pee' as const,at:100,source:'app' as const};
-async function fixture(t:TestContext,{pristine=false,exportCloud,beforeChange,deletion}:{pristine?:boolean;exportCloud?:controllerModule.CloudExportAction;beforeChange?:BackupGuard;deletion?:AccountDeletionApi}={}) {
+async function fixture(t:TestContext,{pristine=false,exportCloud,beforeChange,deletion,diagnose}:{pristine?:boolean;exportCloud?:controllerModule.CloudExportAction;beforeChange?:BackupGuard;deletion?:AccountDeletionApi;diagnose?:RecordCloudDiagnostic}={}) {
  const database=await createLocalDatabase(sqliteTestConnection(':memory:'));t.after(()=>database.close());
  await initializeLocalDatabase(database,()=> 'pet-1');if(!pristine)await database.write(sql=>sql.runAsync('DELETE FROM routines'));
  const writes=new Set<()=>void>(),runtime=await createLocalRuntime(database,'pet-1',()=>{for(const fn of writes)fn();},beforeChange);
@@ -22,7 +24,7 @@ async function fixture(t:TestContext,{pristine=false,exportCloud,beforeChange,de
  const identity:controllerModule.IdentityAdapter={requestEmail:async(email:string)=>{state.requested.push(email);return {error:null};},verifyEmail:async(_email:string,code:string)=>{state.verifications++;if(code!=='123456')return {error:{status:400,code:'INVALID_OTP'}};state.credentials=true;return {error:null};},signInSocial:async()=>{state.credentials=true;return {error:null};},linkSocial:async provider=>{state.linkCalls++;state.linkedAccounts.push({userId:state.summary.user.id,providerId:provider});return {error:null};},listAccounts:async()=>{state.listCalls++;return {data:structuredClone(state.linkedAccounts),error:null};},signOut:async()=>{state.signOutCalls++;if(!state.storageFails)state.credentials=false;return {error:state.signOutFails?{status:503,code:'NETWORK_ERROR'}:null};},hasCredentials:async()=>{if(state.storageFails)throw new Error('secure storage failed');return state.credentials;}};
  const timers:Array<{fn:()=>void;delay:number;cancelled:boolean}>=[];
  assert.equal(typeof controllerModule.createAccountController,'function');
- const controller=controllerModule.createAccountController({runtime,api,identity,exportCloud,deletion,subscribeLocalWrites:(fn:()=>void)=>{writes.add(fn);return()=>{writes.delete(fn);};},defer:(fn:()=>void,delay:number)=>{const task={fn,delay,cancelled:false};timers.push(task);return()=>{task.cancelled=true;};},changed:()=>{}});
+ const controller=controllerModule.createAccountController({runtime,api,identity,exportCloud,deletion,diagnose,subscribeLocalWrites:(fn:()=>void)=>{writes.add(fn);return()=>{writes.delete(fn);};},defer:(fn:()=>void,delay:number)=>{const task={fn,delay,cancelled:false};timers.push(task);return()=>{task.cancelled=true;};},changed:()=>{}});
  t.after(()=>controller.stop());
  return {controller,runtime,state,api,identity,config,timers};
 }
@@ -868,4 +870,23 @@ test('confirmed native deletion resumes local cleanup after restart without anot
  assert.equal(await f.controller.confirmDeletion(f.controller.read().deletion!),'error');assert.equal(d.state.removals,1);assert.equal(f.controller.read().deletion!.stage,'confirmed');f.controller.stop();f.state.storageFails=false;
  const next=controllerModule.createAccountController({runtime:f.runtime,api:f.api,identity:f.identity,deletion:d.deletion,subscribeLocalWrites:()=>()=>{},changed:()=>{}});t.after(()=>next.stop());await next.refresh();await next.prepareDeletion();
  assert.equal(d.state.removals,1);assert.equal(next.read().deleted,'apple-manual');assert.deepEqual(await f.runtime.storage.loadEvents(),[event]);
+});
+
+for(const status of [400,409] as const)test(`a rejected ${status} upload preserves the signed-in queue and reports sync diagnostics even if logging fails`,async t=>{
+ const diagnostics:CloudDiagnosticInput[]=[];
+ const {controller,runtime,state,api,timers}=await fixture(t,{diagnose:input=>{diagnostics.push(input);throw new Error('Diagnostic storage unavailable');}});
+ state.credentials=true;state.linkedAccounts=[{userId:state.summary.user.id,providerId:'google'}];
+ await enrollLocal(runtime);
+ await runtime.storage.appendEvents(Array.from({length:75},(_,index)=>({...event,id:'evt_fixture_'+index,at:1000+index,source:'widget' as const})));
+ const pending=(await runtime.sync.status(runtime.petId)).pending;
+ api.push=async()=>{throw new CloudApiError(status===400?'invalid-request':'conflict',status);};
+ controller.setActive(true);await controller.refresh();await fireTimer(timers);
+ const snapshot=controller.read();
+ assert.equal(snapshot.account?.user.id,state.summary.user.id);assert.deepEqual(snapshot.linkedProviders,['google']);
+ assert.equal(snapshot.sync?.pending,pending);assert.equal((await runtime.storage.loadEvents()).length,75);assert.equal(state.signOutCalls,0);
+ assert.equal(accountStatus(snapshot),'paused');assert.equal(accountProblemKey(snapshot.problem),'account.error.sync');
+ assert.equal(accountProblemKey('sign-in-failed'),'account.error.signIn');
+ assert.equal(snapshot.run?.state,'error');
+ assert.deepEqual(diagnostics.at(-1),{event:'sync',result:'error',state:'error',category:status===400?'invalid-request':'conflict',pending,blocked:0});
+ assert.ok(!JSON.stringify(diagnostics).includes('person@example.com'));
 });
