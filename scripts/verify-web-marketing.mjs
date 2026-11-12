@@ -51,7 +51,7 @@ try {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `Horizontal overflow at ${width}px.`);
     await page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished)));
     await page.screenshot({ path: `${output}/${width}-hero.png` });
-    assert.equal(await page.locator('.site-brand img').getAttribute('src'), '/brand-icon.svg');
+    assert.equal(await page.locator('.site-brand img').getAttribute('src'), '/brand-icon.png');
     const heroBackground = await page.locator('.hero').evaluate(element => getComputedStyle(element).backgroundColor);
     assert.equal(heroBackground, 'rgb(23, 59, 48)', 'Keep the mascot forest green behind the hero.');
     assert.equal(await page.locator('.app-chapter').evaluate(element => getComputedStyle(element).backgroundColor), heroBackground, 'The app preview should continue the dark green background.');
