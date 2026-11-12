@@ -12,7 +12,7 @@ import subprocess
 import sys
 import tempfile
 
-from PIL import Image, ImageChops, ImageStat
+from PIL import Image, ImageChops, ImageDraw, ImageStat
 
 def run(*args):
     subprocess.run(args, check=True)
@@ -66,6 +66,7 @@ print('Verified raw screenshot frames:', matched, 'wall-clock offsets:', offsets
 destination = root / 'fastlane/previews/en-US'
 destination.mkdir(parents=True, exist_ok=True)
 scenes = []
+tap_indicators = []
 previous_end = 0
 with tempfile.TemporaryDirectory(prefix='puptime-store-preview-') as temporary:
     clips = []
@@ -85,6 +86,12 @@ with tempfile.TemporaryDirectory(prefix='puptime-store-preview-') as temporary:
             else:
                 scene_duration = float(subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', str(scene_raw)]))
         assert 0 <= start < end <= scene_duration
+        for touch in (reviewed_cuts[index].get('taps', []) if reviewed_cuts else []):
+            assert start <= touch['raw_at'] < end
+            assert 0 <= touch['x'] < 886 and 0 <= touch['y'] < 1920
+            at = sum(scene['edited_seconds'] for scene in scenes) + touch['raw_at'] - start
+            tap_indicators.append(dict(at=round(at, 3), x=touch['x'], y=touch['y'],
+                                       duration=round(min(.5, end-touch['raw_at']), 3), control=touch['control']))
         # Keep real actions at normal speed. Remove setup/waiting and add no frozen frames.
         clip = Path(temporary) / f'{index}.mp4'
         run('ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-i', str(scene_raw),
@@ -103,14 +110,42 @@ with tempfile.TemporaryDirectory(prefix='puptime-store-preview-') as temporary:
     # stream-copy concatenation introduced ghosted text across these cuts.
     inputs = [argument for clip in clips for argument in ('-i', str(clip))]
     joined = ''.join(f'[{index}:v]' for index in range(len(clips))) + f'concat=n={len(clips)}:v=1:a=0[video]'
+    touch_input = []
+    if tap_indicators:
+        # A small transparent animation, shared by all recorded touch locations.
+        sprite = Path(temporary) / 'tap.mov'
+        encoder = subprocess.Popen(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y',
+            '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', '96x96', '-r', '30', '-i', '-',
+            '-an', '-c:v', 'qtrle', str(sprite)], stdin=subprocess.PIPE)
+        for frame_index in range(15):
+            progress = frame_index / 14
+            alpha = round(255 * (1-progress)**1.4)
+            radius = (18 + 14 * (1-(1-progress)**2)) * 4
+            marker = Image.new('RGBA', (384, 384))
+            draw = ImageDraw.Draw(marker)
+            box = (192-radius, 192-radius, 192+radius, 192+radius)
+            draw.ellipse(box, fill=(23,107,82,round(alpha*.12)), outline=(255,255,255,alpha), width=24)
+            draw.ellipse(box, outline=(23,107,82,alpha), width=12)
+            draw.ellipse((176,176,208,208), fill=(23,107,82,alpha))
+            encoder.stdin.write(marker.resize((96,96), Image.Resampling.LANCZOS).tobytes())
+        encoder.stdin.close()
+        assert encoder.wait() == 0, 'Touch animation encoding failed.'
+        touch_input = ['-i', str(sprite)]
+        joined = joined.replace('[video]', '[base0]')
+        joined += f';[{len(clips)+1}:v]split={len(tap_indicators)}' + ''.join(f'[touch{i}]' for i in range(len(tap_indicators)))
+        for i, touch in enumerate(tap_indicators):
+            joined += (f';[touch{i}]trim=duration={touch["duration"]},setpts=PTS-STARTPTS+{touch["at"]}/TB[pulse{i}]'
+                       f';[base{i}][pulse{i}]overlay=x={touch["x"]-48}:y={touch["y"]-48}:eof_action=pass:repeatlast=0[base{i+1}]')
+        joined += f';[base{len(tap_indicators)}]null[video]'
     run('ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', *inputs,
         '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000',
+        *touch_input,
         '-filter_complex', joined, '-map', '[video]', '-map', f'{len(clips)}:a:0',
         '-c:v', 'libx264', '-preset', 'slow', '-profile:v', 'high', '-level:v', '4.0',
         '-g', '30', '-keyint_min', '30', '-sc_threshold', '0',
         '-b:v', '10M', '-maxrate', '12M', '-bufsize', '20M', '-pix_fmt', 'yuv420p',
         '-c:a', 'aac', '-b:a', '256k', '-shortest', '-movflags', '+faststart', str(output))
-    run('ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-i', str(output), '-ss', '6', '-frames:v', '1', str(destination / 'poster.jpg'))
+    run('ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-i', str(output), '-ss', '7', '-frames:v', '1', str(destination / 'poster.jpg'))
 metadata = json.loads(subprocess.check_output(['ffprobe', '-v', 'error', '-show_streams', '-show_format', '-of', 'json', str(output)]))
 video = next(s for s in metadata['streams'] if s['codec_type'] == 'video')
 audio = next(s for s in metadata['streams'] if s['codec_type'] == 'audio')
@@ -130,5 +165,5 @@ for scene in scenes:
     difference = sum(ImageStat.Stat(ImageChops.difference(actual, reference)).mean)/3
     assert difference < 5, f'Exported {scene["screen"]} does not hold on its verified UI: {difference}'
 seconds = round(float(metadata['format']['duration']), 2)
-(destination / 'edit.json').write_text(json.dumps(dict(seconds=seconds, poster_seconds=6, source='Native simulator recording; original CSV history with personal notes omitted; one scripted logging/edit action', audio='Silent stereo AAC', playback_speed=1, frozen_padding_seconds=0, sha256=hashlib.sha256(output.read_bytes()).hexdigest(), scenes=scenes), indent=2) + '\n')
+(destination / 'edit.json').write_text(json.dumps(dict(seconds=seconds, poster_seconds=7, source='Native simulator recording; original CSV history with personal notes omitted; one scripted logging/edit action', audio='Silent stereo AAC', playback_speed=1, frozen_padding_seconds=0, tap_indicators=tap_indicators, sha256=hashlib.sha256(output.read_bytes()).hexdigest(), scenes=scenes), indent=2) + '\n')
 print(f'PASS {seconds}-second H.264 preview with real actions and no frozen padding: {output}')
