@@ -1,5 +1,6 @@
 // Real native SDK + local Better Auth/D1/DO. No session injection or sync mocks.
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {spawn,execFileSync} from 'node:child_process';
 import {createServer,request} from 'node:http';
 import {createServer as secureServer,request as secureRequest} from 'node:https';
@@ -9,12 +10,16 @@ import {tmpdir,homedir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
 import {eventSqlColumns,eventDataFromSql} from '../src/record-sql.ts';
-import {localRecordId} from '../src/cloud/record-identity.ts';
+import {cloudRecordId,localRecordId} from '../src/cloud/record-identity.ts';
+import {createLocalDatabase} from '../src/local/database.ts';
+import {sqliteTestConnection} from '../src/local/sqlite-test-adapter.ts';
+import {createLocalRuntime} from '../src/local/runtime-factory.ts';
 
 const [platform,device,host,consent,destination='build/guest-account-'+platform,onboarding]=process.argv.slice(2);
 assert.ok(['ios','android'].includes(platform));
-assert.ok(onboarding===undefined||['--onboarding-sign-in','--account-deletion'].includes(onboarding));
-const android=platform==='android',deleting=onboarding==='--account-deletion',onboardingSignIn=onboarding==='--onboarding-sign-in';
+assert.ok(onboarding===undefined||['--onboarding-sign-in','--account-deletion','--puppy-comparison'].includes(onboarding));
+const android=platform==='android',deleting=onboarding==='--account-deletion',onboardingSignIn=onboarding==='--onboarding-sign-in',comparing=onboarding==='--puppy-comparison';
+assert.ok(!comparing||!android,'Puppy comparison uses the dedicated iOS verification path.');
 assert.equal(consent,'--replace-synthetic','Use PLATFORM DEVICE HOST --replace-synthetic [OUTPUT].');
 const frontPort=Number(process.env.PUPTIME_ACCOUNT_PORT??8797),backPort=frontPort+2;assert.ok(Number.isInteger(frontPort)&&frontPort>1024&&frontPort<65533);
 const app='com.patrickchin.puptime',output=resolve(destination),front='https://127.0.0.1:'+frontPort;
@@ -35,7 +40,7 @@ const config={...JSON.parse(readFileSync('wrangler.jsonc','utf8')),name:'puptime
 config.d1_databases=config.d1_databases.map(db=>({...db,migrations_dir:resolve(db.migrations_dir)}));
 writeFileSync(configPath,JSON.stringify(config),{mode:0o600});
 let worker,proxy,cookie='',code='',auth;
-const requests=new Set(),restoreNative=[];
+const requests=new Set(),restoreNative=[],requestCounts={enroll:0,push:0};
 let certificate;
 const codes=new Set(),checks=[];
 function run(binary,args,env=process.env,cwd=process.cwd()){
@@ -56,7 +61,7 @@ async function flow(name,env={}){
   try{
     await run('maestro',['--device',device,'test',...Object.entries({TEST_EMAIL:email,...env}).flatMap(([key,value])=>['-e',`${key}=${value}`]),resolve('.maestro/account-preservation',name+'.yaml'),'--test-output-dir',artifacts],
       {...process.env,MAESTRO_CLI_NO_ANALYTICS:'1',TEST_EMAIL:email,MAESTRO_TEST_CODE:code,...env});
-    const screenshots=['native-delete-confirmation.png','native-delete-verify.png','native-deleted-account.png','recovered-account-history.png','my-account-returned-log.png','my-account-signed-in.png','my-account-guest.png'];
+    const screenshots=['native-delete-confirmation.png','native-delete-verify.png','native-deleted-account.png','recovered-account-history.png','my-account-returned-log.png','my-account-signed-in.png','my-account-guest.png','same-name-summary.png','same-name-confirmation.png','mismatched-name-summary.png','mismatched-name-confirmation.png'];
     for(const path of readdirSync(artifacts,{recursive:true}).filter(path=>screenshots.some(name=>String(path).endsWith(name))))
       cpSync(join(artifacts,path),join(output,String(path).split('/').at(-1)));
     console.log('PASS native account phase: '+name);
@@ -90,13 +95,16 @@ function snapshot(){const db=database();try{return {
   owner:db.prepare('SELECT * FROM local_sync_owner').all(),pending:db.prepare('SELECT COUNT(*) n FROM local_sync_outbox').get().n,
 };}finally{db.close();}}
 async function remote(){
+  const changes=[];let after=0;
   assert.ok(cookie,'Use the actual SDK session observed by the local proxy.');
+  for(let pageNumber=0;pageNumber<100;pageNumber++){
   const page=await new Promise((resolvePage,reject)=>{
-    const req=secureRequest(front+'/api/sync/pull?after=0',{...(certificate?{ca:certificate}:{}),headers:{cookie,origin:front}},response=>{
+    const req=secureRequest(front+'/api/sync/pull?after='+after,{...(certificate?{ca:certificate}:{}),headers:{cookie,origin:front}},response=>{
       let body='';response.on('data',data=>{body+=data;});response.on('end',()=>{try{assert.equal(response.statusCode,200);resolvePage(JSON.parse(body));}catch(error){reject(error);}});
     });req.on('error',reject);req.end();
-  });assert.equal(page.hasMore,false);
-  return page.changes.filter(record=>record.kind==='event'&&!record.deleted).sort((a,b)=>localRecordId(a)<localRecordId(b)?-1:localRecordId(a)>localRecordId(b)?1:0);
+  });changes.push(...page.changes);if(!page.hasMore)break;assert.ok(page.cursor>after);after=page.cursor;assert.ok(pageNumber<99,'Bound the local fixture reader.');
+  }
+  return changes.filter(record=>record.kind==='event'&&!record.deleted).sort((a,b)=>localRecordId(a)<localRecordId(b)?-1:localRecordId(a)>localRecordId(b)?1:0);
 }
 async function assertCloud(events){
   const rows=await remote();assert.equal(rows.length,events.length);
@@ -110,6 +118,54 @@ async function signIn(){
   assert.match(code??'',/^\d{6}$/);codes.add(code);await flow('verify');code='';
   assert.deepEqual(snapshot(),before,'Sign-in itself must preserve every event and wait for explicit backup confirmation.');
 }
+// This fixture is deliberately independent of the phone's puppy identity. Only
+// the genuine native SDK's explicit confirmation may associate the two copies.
+async function fixturePost(path,body){
+ assert.ok(cookie);const encoded=JSON.stringify(body);
+ return new Promise((resolvePost,reject)=>{
+  const req=secureRequest(front+path,{method:'POST',...(certificate?{ca:certificate}:{}),headers:{cookie,origin:front,'content-type':'application/json','content-length':Buffer.byteLength(encoded)}},response=>{
+   let value='';response.on('data',part=>{value+=part;});response.on('end',()=>{try{assert.equal(response.statusCode,200,'Independent synthetic HTTP fixture must succeed.');resolvePost(JSON.parse(value));}catch(error){reject(error);}});
+  });req.on('error',reject);req.setTimeout(15000,()=>req.destroy(new Error('Local fixture request timed out.')));req.end(encoded);
+ });
+}
+function allLocalTables(){
+ const db=database();try{return Object.fromEntries(db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map(({name})=>{
+  assert.match(name,/^[A-Za-z0-9_]+$/);return [name,db.prepare(`SELECT * FROM ${name} ORDER BY rowid`).all().map(row=>({...row}))];
+ }));}finally{db.close();}
+}
+async function verifyPuppyComparison(){
+ await flow('prepare');await flow('add-logs',{BATCHES:'4',EXPECTED_COUNT:'12'});
+ simctl('terminate',device,app);
+ const db=database();let phoneId;try{phoneId=db.prepare('SELECT id FROM puppies').get().id;}finally{db.close();}
+ const local=await createLocalDatabase(sqliteTestConnection(join(sqliteDirectory(),'puptime-v2.db')));
+ try{
+  const runtime=await createLocalRuntime(local,phoneId);await runtime.storage.savePuppyName('Biscuit');
+  await runtime.storage.appendEvents(Array.from({length:108},(_,i)=>({id:'evt_comparison_phone_'+i,type:'pee',at:Date.now()-86400000-i*60000,source:'app',note:'Artificial comparison history'})));
+ }finally{await local.close();}
+ assert.equal(snapshot().events.length,120);await signIn();
+ const cloudId='pet_comparison_'+crypto.randomUUID().replaceAll('-',''),deviceId='dev_comparison_fixture';assert.notEqual(cloudId,phoneId);
+ const enrolled=await fixturePost('/api/cloud/enroll',{operationId:'op_comparison_enroll',deviceId,localPetId:cloudId,name:'Biscuit'});assert.equal(enrolled.petId,cloudId);
+ const mutations=Array.from({length:7},(_,i)=>({protocolVersion:1,operationId:'op_comparison_event_'+i,deviceId,recordId:cloudRecordId('event',cloudId,'evt_comparison_cloud_'+i),petId:cloudId,kind:'event',baseRevision:0,intent:'create',patch:{type:'poop',at:Date.now()-172800000-i*60000,source:'app',note:'Independent artificial cloud history'}}));
+ assert.deepEqual((await fixturePost('/api/sync/push',{mutations})).rejected,[]);
+ for(const [caseName,cloudName] of [['same-name','Biscuit'],['mismatched-name','Maple']]){
+  if(caseName==='mismatched-name')assert.deepEqual((await fixturePost('/api/sync/push',{mutations:[{protocolVersion:1,operationId:'op_comparison_rename',deviceId,recordId:cloudId,petId:cloudId,kind:'puppy',baseRevision:1,intent:'patch',patch:{name:cloudName}}]})).rejected,[]);
+  const before=allLocalTables(),counts={...requestCounts},cloudBefore=await remote();
+  await flow('comparison-preview',{PHONE_NAME:'Biscuit',CLOUD_NAME:cloudName,PHONE_COUNT:'120',CLOUD_COUNT:'7',COMPARISON_CASE:caseName});
+  assert.deepEqual(allLocalTables(),before,'Native Cancel and Continue without sync preserve every local table.');
+  assert.deepEqual(requestCounts,counts,'Reviewing, cancelling and staying local must not enroll or upload.');
+  assert.deepEqual(await remote(),cloudBefore,'The independent cloud history must remain unchanged.');
+  checks.push(caseName+': clearly labeled phone/cloud names and counts; native Cancel and Continue without sync preserve every local table and cloud event, with no enroll/push request; local fingerprint '+createHash('sha256').update(JSON.stringify(before)).digest('hex'));
+ }
+ const phoneBefore=snapshot().events,counts={...requestCounts};await flow('enable',{EXPECTED_COUNT:'127'});
+ const after=snapshot();assert.equal(after.events.length,127);assert.equal(after.pending,0);assert.equal(after.owner.length,1);
+ assert.deepEqual(after.events.filter(row=>phoneBefore.some(old=>old.id===row.id)),phoneBefore);
+ assert.equal(requestCounts.enroll,counts.enroll+1);assert.ok(requestCounts.push>counts.push);
+ const actual=database();try{assert.equal(actual.prepare('SELECT cloud_pet_id FROM local_sync_pets WHERE pet_id=?').get(phoneId).cloud_pet_id,cloudId);}finally{actual.close();}
+ const cloudBefore=await assertCloud(after.events);await flow('reopen',{EXPECTED_COUNT:'127'});
+ assert.deepEqual(snapshot().events,after.events);assert.deepEqual(await remote(),cloudBefore);
+ checks.push('Only explicit native confirmation combines the two distinct identities; all127 original events retain their IDs/bodies, cloud event revisions remain1, pending work drains, and cold restart causes no duplicate or cloud rewrite.');
+}
+
 const childEnv={...process.env,CI:'1',WRANGLER_SEND_METRICS:'false'};
 try{
   // Own both ports; never attach to another task's backend or account.
@@ -134,6 +190,8 @@ try{
   certificate=readFileSync(rootPath);if(!android)simctl('keychain',device,'add-root-cert',rootPath);
   const forward=(req,res)=>{
     requests.add(req.url);
+    if(req.method==='POST'&&req.url==='/api/cloud/enroll')requestCounts.enroll++;
+    if(req.method==='POST'&&req.url==='/api/sync/push')requestCounts.push++;
     if(req.headers.cookie)cookie=req.headers.cookie;
     const outgoing=request('http://127.0.0.1:'+backPort+req.url,{method:req.method,headers:req.headers},incoming=>{res.writeHead(incoming.statusCode,incoming.headers);incoming.pipe(res);});
     outgoing.on('error',()=>{res.writeHead(502);res.end();});req.pipe(outgoing);
@@ -201,7 +259,8 @@ try{
     assert.ok(!requests.has('/api/cloud/enroll')&&!requests.has('/api/sync/push'),'Sign-in must not enroll or upload.');
     checks.push('welcome email sign-in uses the real SDK, rejects a wrong code, resumes setup after verification and cold restart, and never enrolls or uploads');
   }
-  if(!onboardingSignIn&&!deleting){
+  if(comparing)await verifyPuppyComparison();
+  if(!onboardingSignIn&&!deleting&&!comparing){
   await flow('prepare');assert.equal(snapshot().events.length,0);
   assert.ok(requests.has('/api/config'),'The real app must reach this isolated backend before any sign-in attempt.');
   await flow('add-logs',{BATCHES:'4',EXPECTED_COUNT:'12'});const guest=snapshot();assert.equal(guest.events.length,12);assert.equal(guest.owner.length,0);
@@ -241,7 +300,7 @@ try{
   }
   rmSync(join(output,'failure-redacted.log'),{force:true});
   writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',checks,scope:android?'Android Debug native host with normal embedded release JS and isolated local HTTPS Better Auth/D1/SQLite DO; actual native email SDK and Keystore. Its temporary CA is trusted only in the ignored Debug source set, restored after the run. Production onboarding is tested separately in the Release APK. No real email, production account, session injection or mocked sync.':'Release bundle and actual native email SDK with isolated local HTTPS Better Auth/D1/SQLite DO. Simulator trusts the fixture certificate. No real email, production account, session injection or mocked sync.'},null,2)+'\n');
-  console.log('PASS '+(deleting?'native account deletion':onboardingSignIn?'welcome sign-in and session recovery':'guest account preservation and empty-device recovery')+': '+output);
+  console.log('PASS '+(deleting?'native account deletion':comparing?'named puppy comparison':onboardingSignIn?'welcome sign-in and session recovery':'guest account preservation and empty-device recovery')+': '+output);
 }finally{
   auth?.close();proxy?.close();for(const child of [worker])if(child?.pid)try{process.kill(-child.pid,'SIGTERM');}catch{}
   if(android)try{adb('reverse','--remove','tcp:'+frontPort);}catch{}
