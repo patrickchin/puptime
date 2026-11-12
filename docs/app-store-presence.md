@@ -22,7 +22,7 @@ rechecked in this refresh; neither establishes availability in other storefronts
 | iPhone screenshots | Six opaque 1206 × 2622 PNGs in `fastlane/screenshots/en-US/` |
 | iPad screenshots | Six opaque 2064 × 2752 PNGs in the same folder; actual tablet layout |
 | App preview | `fastlane/previews/en-US/iPhone-6.3-preview.mp4`, 15.17 seconds, 886 × 1920, 30 fps |
-| Poster frame | `fastlane/previews/en-US/poster.jpg`; select 6 seconds in Connect |
+| Poster frame | `fastlane/previews/en-US/poster.jpg`; select 7 seconds in Connect |
 | Optional header | `fastlane/creative-assets/en-US/header.png`, 3840 × 1646 |
 | Optional search art | `fastlane/creative-assets/en-US/search.png`, 1920 × 1280 |
 
@@ -33,7 +33,10 @@ not represent the current screen sequence. Current widget footage can be added
 after verifying the exact release's extension on a device.
 
 The preview shows a quick log, a 15-minute correction, timeline filtering and
-log details, insights, and a routine-window adjustment. Playback stays at normal
+log details, insights, and a routine-window adjustment. Five brief green touch
+ripples identify the visible taps, aligned to recorded control bounds and the
+native footage. They are editorial overlays; the app itself is unchanged.
+Playback stays at normal
 speed. Setup and waiting are trimmed; no frozen-frame padding is added. It uses
 H.264 High Level 4.0, a 10 Mbps encoder target, yuv420p, and silent 48 kHz stereo
 AAC. It works with audio muted. Only local features appear, so it does not
@@ -73,7 +76,7 @@ submission and retake any changed screens.
    the remote media set and remove superseded images in the draft deliberately
    so an old widget image cannot remain first.
 4. In the draft's English Product Page Information, add the preview to the
-   matching iPhone display slot. Choose the poster at 6 seconds and check
+   matching iPhone display slot. Choose the poster at 7 seconds and check
    processing succeeds. Use Apple's current display labels; the local file's
    `6.3` name describes the capture, not an API display-type identifier.
 5. Add the optional header/search images under Header and Search Results.
@@ -169,6 +172,12 @@ list of `{screen, raw_start, raw_end}` objects matching the six scene names in
 the editor. Use actual native footage ranges that omit loading and drawer waits.
 A cut may also specify `raw` to use a separately retaken native scene. The final
 scene ranges and recording names are recorded in the committed `edit.json`.
+Add `taps` to each reviewed cut for visible interactions: a list of
+`{raw_at, x, y, control}` objects. Time is in source-video seconds; coordinates
+are pixels in the 886 × 1920 export. Use the recorder's control bounds and review
+the corresponding native frames to align each pulse. Omit taps removed by the
+edit. The editor renders half-second fading rings and records their final
+timings in `edit.json`; the seven-second poster is clear of indicators.
 Original captures for this pass remain under
 `~/Pictures/Screenshots/Codex/puptime-app-store/`. The current native video source and timing JSON are in the `20261112/preview/`
 subdirectory; the retaken ending is in `20261112/routine-ending-v3/`. The earlier

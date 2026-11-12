@@ -1,11 +1,48 @@
 {
   "seconds": 15.17,
-  "poster_seconds": 6,
+  "poster_seconds": 7,
   "source": "Native simulator recording; original CSV history with personal notes omitted; one scripted logging/edit action",
   "audio": "Silent stereo AAC",
   "playback_speed": 1,
   "frozen_padding_seconds": 0,
-  "sha256": "854643bfb7425975b7079024007525ce740cd310df25e1ab04f0eb2128cf2a29",
+  "tap_indicators": [
+    {
+      "at": 0.133,
+      "x": 165,
+      "y": 426,
+      "duration": 0.5,
+      "control": "quick.pee"
+    },
+    {
+      "at": 3.129,
+      "x": 396,
+      "y": 1138,
+      "duration": 0.5,
+      "control": "editor.adjust.back.15"
+    },
+    {
+      "at": 5.833,
+      "x": 651,
+      "y": 391,
+      "duration": 0.5,
+      "control": "timeline.filter.poop-meal"
+    },
+    {
+      "at": 8.563,
+      "x": 262,
+      "y": 1163,
+      "duration": 0.5,
+      "control": "timeline.mark.point.2026-10-08.17"
+    },
+    {
+      "at": 13.566,
+      "x": 338,
+      "y": 1279,
+      "duration": 0.5,
+      "control": "schedule.editor.window.30"
+    }
+  ],
+  "sha256": "56e4cc6eb10c183c63fffdc49fe154ddea8e3d81a813e7044f1ba79627284e8c",
   "scenes": [
     {
       "screen": "01-logged",
