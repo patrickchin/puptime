@@ -4,7 +4,7 @@ import { createNativeStorage } from './native-storage.ts';
 import { createLocalSync } from './sync-engine.ts';
 import { createActivityQueries } from './activity-queries.ts';
 import { createEventHistoryQueries } from './event-history.ts';
-import { createLocalRepository, importEventRecords } from './repository.ts';
+import { importEventRecords } from './repository.ts';
 import type {EventHistoryRestore} from '../event-history.ts';
 import type { ActivityBackup, BackupGuard, BackupReason } from './activity-backups.ts';
 import type { PuppyEvent } from '../domain.ts';
@@ -12,17 +12,6 @@ import { parseEvents } from '../storage-validation.ts';
 import { notifyLocalCommit } from './sync-projection.ts';
 
 export async function createLocalRuntime(database:LocalDatabase,petId:string,afterCommit?:()=>void,beforeChange?:BackupGuard,care?:{kind:'household'|'temporary';permission:'view'|'contribute';expiresAt:number|null}) {
-  await database.write(async sql=>{
-    if(await sql.getFirstAsync("SELECT value FROM metadata WHERE key='profile_photos_v1'"))return;
-    // Older clients may already have consumed photo revisions as name-only
-    // records. Reuse the resumable baseline path to fill in the new field.
-    const owner=await sql.getFirstAsync<{generation:string}>('SELECT generation FROM local_sync_owner WHERE singleton=1');
-    if(owner){
-      await sql.runAsync('DELETE FROM local_sync_baseline WHERE generation=?',owner.generation);
-      await sql.runAsync('UPDATE local_sync_owner SET resyncing=CASE WHEN pending_pet_id IS NULL THEN 1 ELSE resyncing END,staging_cursor=0,staging_complete=0 WHERE singleton=1');
-    }
-    await sql.runAsync("INSERT INTO metadata(key,value) VALUES ('profile_photos_v1','1')");
-  });
   const deviceId=await database.write(async sql=>{
     await sql.runAsync("INSERT OR IGNORE INTO metadata(key,value) VALUES ('cloud_device_id','dev_' || lower(hex(randomblob(16))))");
     return identifierSchema.parse((await sql.getFirstAsync<{value:string}>("SELECT value FROM metadata WHERE key='cloud_device_id'"))!.value);
@@ -48,7 +37,6 @@ export async function createLocalRuntime(database:LocalDatabase,petId:string,aft
   };
   const storage=createNativeStorage(database,petId,changed,afterCommit,beforeChange);
   const history={...createEventHistoryQueries(database,petId),restore:(input:EventHistoryRestore)=>sync.restoreEventHistory({...input,petId})};
-  const recoverEvents=createLocalRepository(database,petId,care?changed:sync.changeSink(petId,{restoreMissing:true}),afterCommit,beforeChange?(sql)=>beforeChange(sql,'recovery'):undefined).importEvents;
   async function recoverBackup(events:PuppyEvent[],puppy:Pick<ActivityBackup,'petId'|'puppyName'>) {
     if(care)throw new Error('Restore backups from your own puppy profile.');
     const target=identifierSchema.parse(puppy.petId),profile=recordDataSchema('puppy').parse({name:puppy.puppyName}),incoming=parseEvents(events);
@@ -66,5 +54,5 @@ export async function createLocalRuntime(database:LocalDatabase,petId:string,aft
     return result;
   }
   const checkpoint=(reason:BackupReason)=>database.read(async sql=>{await beforeChange?.(sql,reason);});
-  return {database,petId,deviceId,sync,storage,recoverEvents,recoverBackup,checkpoint,activity:createActivityQueries(database,petId),history};
+  return {database,petId,deviceId,sync,storage,recoverBackup,checkpoint,activity:createActivityQueries(database,petId),history};
 }

@@ -32,7 +32,6 @@ import {
   DEFAULT_WIDGET_ACTIONS,
   isOpenNap,
   isQuickEventType,
-  normalizeCustomLabel,
   normalizeNote,
   type ActivityKey,
   type EventType,

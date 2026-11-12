@@ -58,10 +58,9 @@ export function createWebAccountClient(origin:string,customFetchImpl:typeof fetc
    await freshUser(expected);beforeDispatch();
    try{
     const value=await json('/api/account','DELETE',expected);
-    const parsed=z.object({success:z.literal(true),message:z.literal('User deleted'),appleRevocation:z.unknown().optional()}).safeParse(value);
+    const parsed=z.object({success:z.literal(true),message:z.literal('User deleted'),appleRevocation:z.enum(['not-linked','revoked','manual'])}).safeParse(value);
     if(!parsed.success)throw new AccountError('unconfirmed');
-    const outcome=z.enum(['not-linked','revoked','manual']).safeParse(parsed.data.appleRevocation);
-    return {appleRevocation:outcome.success?outcome.data:'manual' as const};
+    return {appleRevocation:parsed.data.appleRevocation};
    }catch(error){if(error instanceof AccountError&&['network','auth','service'].includes(error.kind))throw new AccountError('unconfirmed');throw error;}
   },sameUser,freshUser,
  };

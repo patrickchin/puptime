@@ -4,7 +4,7 @@ import { AccountError, createWebAccountClient } from './account-client.ts';
 const origin='https://puptime.test';
 function fixture(){
  const calls:{url:string;method:string;headers:Headers;credentials:RequestCredentials|undefined}[]=[];
- const state={userId:'owner-a',createdAt:Date.now(),throwDelete:false,deleteStatus:200,deleteBody:{success:true,message:'User deleted'} as object};
+ const state={userId:'owner-a',createdAt:Date.now(),throwDelete:false,deleteStatus:200,deleteBody:{success:true,message:'User deleted',appleRevocation:'not-linked'} as object};
  const client=createWebAccountClient(origin,async(input,init)=>{
   const url=String(input);calls.push({url,method:init?.method??'GET',headers:new Headers(init?.headers),credentials:init?.credentials});
   if(url.includes('/get-session'))return Response.json({session:{id:'session',userId:state.userId,createdAt:new Date(state.createdAt).toISOString(),expiresAt:new Date(Date.now()+3600000).toISOString()},user:{id:state.userId,email:'fixture@example.invalid',name:'Fixture'}});
@@ -52,7 +52,7 @@ test('deletion persistence runs after fresh verification and before dispatch, an
  await client.remove('owner-a',()=>{assert.equal(calls.some(call=>call.method==='DELETE'),false);saved=true;});assert.equal(saved,true);assert.equal(calls.filter(call=>call.method==='DELETE').length,1);
 });
 
-test('confirmed deletion exposes only the Apple outcome and uses manual guidance for older or unknown replies',async()=>{
+test('confirmed deletion requires a known Apple outcome and exposes only that outcome',async()=>{
  const {client,state}=fixture();
  for(const outcome of ['not-linked','revoked','manual'] as const){
   state.deleteBody={success:true,message:'User deleted',appleRevocation:outcome,accessToken:'synthetic-private-token'};
@@ -60,6 +60,6 @@ test('confirmed deletion exposes only the Apple outcome and uses manual guidance
  }
  for(const extra of [{},{appleRevocation:'unrecognized'},{appleRevocation:null}]){
   state.deleteBody={success:true,message:'User deleted',...extra};
-  assert.deepEqual(await client.remove('owner-a'),{appleRevocation:'manual'});
+  await assert.rejects(client.remove('owner-a'),error=>error instanceof AccountError&&error.kind==='unconfirmed');
  }
 });

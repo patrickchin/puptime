@@ -7,21 +7,18 @@ databases with separate initialization paths.
 | Database | SQL definition | Runner |
 | --- | --- | --- |
 | D1 `AUTH_DB` | Top-level `server/migrations/*.sql` | Wrangler D1 migrations; Worker tests use `readD1Migrations('server/migrations')` |
-| Per-account SQLite | `server/migrations/account/0003-account-store.sql`, then `0004-resource-api.sql` | `AccountStore` imports the SQL as Wrangler Text modules and executes initialization/upgrades inside its constructor's `transactionSync` |
+| Per-account SQLite | `server/account-schema.sql` | `AccountStore` imports the SQL as Wrangler Text modules and executes initialization inside its constructor's `transactionSync` |
 | Device SQLite | `src/local/database.ts`, with event/routine fields in `src/record-sql.ts` | `initializeLocalDatabase`, through the native SQLite connection |
 
 `wrangler d1 migrations apply AUTH_DB --local` applies only the D1 schema. Its
-default top-level `*.sql` discovery does not apply the nested account SQL. The
+default top-level `*.sql` discovery does not apply the account SQL. The
 same separation applies to the D1 test helper. Wrangler's `new_sqlite_classes`
 migration creates the Durable Object namespace; it does not execute account DDL.
 
-The account store's current schema is version 4. A new account atomically applies
-the version-3 typed baseline and the additive version-4 resource API migration.
-An existing version-3 account applies only `0004-resource-api.sql`, retaining its
-puppies, logs, revisions, enrollment records and operation receipts. Version-4
-startup validates the version/tables without replaying DDL. Unsupported or
-incomplete databases fail without silently deleting data. The API rollout does
-not require a database reset; existing recovered data must remain intact.
+The account store supports schema version 4. A new account applies the complete
+baseline atomically. Existing version-4 stores validate their version and tables
+without replaying DDL. Older, newer, or incomplete schemas fail without modifying
+the original data; automatic upgrades are not supported.
 
 ## Generated identifiers
 
@@ -182,8 +179,6 @@ staging bucket with `npx wrangler r2 bucket create puptime-photos-staging --juri
 keep public bucket access disabled. Local Wrangler/Vitest uses emulated R2 and
 does not create remote resources. Photo endpoints return 503 without a binding.
 
-Clients opt in to `photoId` with `x-puptime-profile-photos: 1` (browser exports use
-`profilePhotos=1`). Older clients receive name-only profile projections with the
-same revision identities and cursors. The persisted capability checkpoint
-refreshes a legacy baseline on upgrade without losing pending edits. No SQL
-schema migration is required.
+Profile responses always include `photoId` when present, across sync, history,
+and both account export routes. Clients use the current profile schema without
+capability headers, export form flags, or upgrade checkpoints.

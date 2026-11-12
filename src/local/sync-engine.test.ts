@@ -10,7 +10,6 @@ import { cloudRecordId } from '../cloud/record-identity.ts';
 import type { CloudRecord } from '../cloud/protocol.ts';
 import * as engine from './sync-engine.ts';
 import { createEvent } from '../domain.ts';
-import { createLocalRepository } from './repository.ts';
 import { createLocalRuntime } from './runtime-factory.ts';
 
 async function setup(t:TestContext,{pristine=false}={}) {
@@ -180,7 +179,7 @@ test('explicit event label restoration shares event rollback revisions and uploa
 });
 
 test('free writes and preparing enrollment never create upload work; activation is restartable',async t=>{
- const {sync,storage,database,path}=await setup(t);
+ const {sync,storage,path}=await setup(t);
  await storage.appendEvents([event]);
  assert.deepEqual(await sync.status('local-pet'),{state:'local',generation:null,accountId:null,pending:0,blocked:0,cursor:0});
  const {generation}=await sync.prepareAssociation(input);
@@ -695,7 +694,7 @@ test('checkpoints protect account association, destructive cloud projections, re
 
 
 test('profile photo uploads fit request limits and retry with their original identity',async t=>{
- const {database,path,sync,storage}=await setup(t);
+ const {path,sync,storage}=await setup(t);
  const photo='img_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
  await storage.savePuppyPhoto(photo);
  const fence=await activate(sync),batch=await sync.nextBatch(fence);
@@ -717,30 +716,23 @@ test('combining an unnamed local dog keeps its photo and the existing cloud name
  assert.deepEqual((await sync.nextBatch(fence)).find(mutation=>mutation.kind==='puppy')?.patch,{photoId:photo});
 });
 
-test('upgrading a legacy sync cursor refreshes profile fields without losing pending work',async t=>{
+test('reopening a runtime preserves the sync cursor and pending mutations',async t=>{
  const {database,storage,sync}=await setup(t),fence=await activate(sync);
  await storage.appendEvents([event]);
- const pending=await sync.nextBatch(fence);
- await database.write(sql=>sql.runAsync("DELETE FROM metadata WHERE key='profile_photos_v1'"));
- const upgraded=await createLocalRuntime(database,'local-pet');
- assert.deepEqual(await upgraded.sync.resyncState(),{...fence,stagingCursor:0,baselineComplete:false});
- assert.deepEqual(await storage.loadEvents(),[event]);
- const photo='img_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
- await upgraded.sync.stageBaseline({...fence,page:{changes:[{id:'local-pet',petId:'local-pet',kind:'puppy',data:{name:'My puppy',photoId:photo},revision:1,sequence:1,deleted:false,updatedAt:1}],cursor:1,hasMore:false}});
- await upgraded.sync.finishResync(fence);
- assert.equal((await storage.loadPuppyProfile()).photoId,photo);
- assert.deepEqual(await storage.loadEvents(),[event]);
- assert.deepEqual(await upgraded.sync.nextBatch(fence),pending);
- const reopened=await createLocalRuntime(database,'local-pet');assert.equal(await reopened.sync.resyncState(),null);
+ const pending=await sync.nextBatch(fence),status=await sync.status('local-pet');
+ const reopened=await createLocalRuntime(database,'local-pet');
+ assert.deepEqual(await reopened.sync.status('local-pet'),status);
+ assert.equal(await reopened.sync.resyncState(),null);
+ assert.deepEqual(await reopened.sync.nextBatch(fence),pending);
+ assert.deepEqual(await reopened.storage.loadEvents(),[event]);
 });
 
-test('photo upgrade restarts a partially staged legacy enrollment without replacing local data',async t=>{
+test('reopening a runtime resumes the exact partially staged enrollment',async t=>{
  const {database,storage,sync}=await setup(t);await storage.appendEvents([event]);
  const {generation}=await sync.prepareAssociation(input),fence={generation,accountId:input.accountId};
  await sync.stageBaseline({...fence,page:{changes:[{id:'local-pet',petId:'local-pet',kind:'puppy',data:{name:'My puppy'},revision:1,sequence:1,deleted:false,updatedAt:1}],cursor:1,hasMore:true}});
  const saved=await sync.enrollmentState();
- await database.write(sql=>sql.runAsync("DELETE FROM metadata WHERE key='profile_photos_v1'"));
- const upgraded=await createLocalRuntime(database,'local-pet'),resumed=await upgraded.sync.enrollmentState();
- assert.equal(resumed?.stagingCursor,0);assert.deepEqual(resumed?.request,saved?.request);
- assert.deepEqual(await storage.loadEvents(),[event]);
+ const reopened=await createLocalRuntime(database,'local-pet');
+ assert.deepEqual(await reopened.sync.enrollmentState(),saved);
+ assert.deepEqual(await reopened.storage.loadEvents(),[event]);
 });

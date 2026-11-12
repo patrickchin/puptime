@@ -154,17 +154,53 @@ test('event persistence keeps failed writes isolated and imports without losing 
 });
 
 
-test('removed theme preferences fall back to default without touching activity data', async () => {
+test('unsupported theme preferences reject without touching activity data', async () => {
   stored.clear();
   const events = JSON.stringify([createEvent('pee', 'app', 100)]);
   stored.set(eventsKey, events);
   for (const theme of ['puppy-journal', 'soft-play', 'day-trails', 'meadow', 'sunrise', 'midnight', 'paper', 'bubblegum', 'blueprint', 'trail', 'tide', 'plum', 'contrast']) {
     stored.set('puptime.theme.v1', theme);
-    assert.equal(await storage.loadThemePreference(), 'system');
+    await assert.rejects(storage.loadThemePreference());
     assert.equal(stored.get(eventsKey), events);
   }
   for (const theme of ['system', 'light', 'dark'] as const) {
     await storage.saveThemePreference(theme);
     assert.equal(await storage.loadThemePreference(), theme);
   }
+});
+
+test('malformed browser settings reject before a write can replace retained values',async()=>{
+ stored.clear();
+ for (const raw of ['{broken', '', 'null', '{}', '[42]']) {
+  const entries=[
+   ['puptime.schedule.v1',()=>storage.loadSchedule(),()=>storage.saveScheduleEntry({id:'new',type:'pee',minutes:100})],
+   ['puptime.customActivities.v1',()=>storage.loadCustomActivities([]),()=>storage.saveCustomActivity('Training')],
+   ['puptime.widgetActions.v1',()=>storage.loadWidgetActions([]),null],
+  ] as const;
+  for(const [key,read,write] of entries){
+   stored.clear();stored.set(key,raw);const before=writes;
+   await assert.rejects(read);if(write)await assert.rejects(write);
+   assert.equal(stored.get(key),raw);assert.equal(writes,before);
+  }
+ }
+ for(const [key,read] of [
+  ['puptime.activityCustomizations.v1',()=>storage.loadActivityCustomizations()],
+  ['puptime.notificationPreferences.v1',()=>storage.loadNotificationPreferences()],
+ ] as const){
+  for(const raw of ['{broken','','null','[]','42']){
+   stored.clear();stored.set(key,raw);await assert.rejects(read);assert.equal(stored.get(key),raw);
+  }
+ }
+ stored.clear();stored.set('puptime.theme.v1','retired-theme');await assert.rejects(storage.loadThemePreference());
+ stored.clear();stored.set('puptime.language.v1','unknown');await assert.rejects(storage.loadLanguagePreference());
+});
+
+
+test('custom activity edits validate all retained settings before changing deletion markers',async()=>{
+ stored.clear();stored.set('puptime.customActivities.v1','{broken');stored.set('puptime.deletedCustomActivities.v1','["custom:training"]');
+ let before=new Map(stored),count=writes;
+ await assert.rejects(storage.saveCustomActivity('Training'));assert.deepEqual(stored,before);assert.equal(writes,count);
+ stored.clear();stored.set('puptime.customActivities.v1','["Training"]');stored.set('puptime.activityCustomizations.v1','{broken');
+ before=new Map(stored);count=writes;
+ await assert.rejects(storage.deleteCustomActivity('Training'));assert.deepEqual(stored,before);assert.equal(writes,count);
 });
