@@ -1,0 +1,124 @@
+appId: com.patrickchin.puptime
+name: Account, puppy and settings navigation stays connected
+---
+# Use a dedicated, completed synthetic journal with a profile photo and history.
+# Pass --test-output-dir under ~/Pictures/Screenshots/Codex/ for screenshots.
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: nav.open
+    timeout: 90000
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.settings
+- assertVisible:
+    id: settings.account.open
+- assertVisible:
+    id: settings.pets.open
+- takeScreenshot: settings
+- tapOn:
+    id: settings.account.open
+- assertVisible:
+    id: account.local.summary
+- assertVisible:
+    id: puppy.photo.image
+- assertVisible:
+    id: account.pets.open
+- takeScreenshot: account
+- tapOn:
+    id: account.pets.open
+- assertVisible:
+    id: screen.pets
+- tapOn:
+    id: nav.back
+- assertVisible:
+    id: screen.settings
+- tapOn:
+    id: settings.account.open
+- tapOn:
+    id: account.back
+- assertVisible:
+    id: settings.pets.open
+- tapOn:
+    id: settings.pets.open
+- assertVisible:
+    id: screen.pets
+- assertVisible:
+    id: settings.puppy.photo.choose
+- assertVisible:
+    id: puppy.share
+- assertVisible:
+    id: puppy.shared
+- takeScreenshot: pets
+- tapOn:
+    id: puppy.share
+- assertVisible:
+    id: sharing.back
+- takeScreenshot: share
+- tapOn:
+    id: sharing.shared
+- assertVisible:
+    id: shared.back
+- takeScreenshot: shared
+- tapOn:
+    id: shared.back
+- assertVisible:
+    id: sharing.back
+- tapOn:
+    id: sharing.back
+- assertVisible:
+    id: puppy.shared
+- tapOn:
+    id: puppy.shared
+- assertVisible:
+    id: screen.sharedPuppies
+- tapOn:
+    id: shared.back
+- tapOn:
+    id: puppy.account
+- assertVisible:
+    id: account.pets.open
+- tapOn:
+    id: account.pets.open
+- assertVisible:
+    id: screen.pets
+- tapOn:
+    id: nav.back
+- assertVisible:
+    id: screen.settings
+- scrollUntilVisible:
+    element:
+      id: settings.history.open
+    direction: DOWN
+- tapOn:
+    id: settings.history.open
+- assertVisible:
+    id: screen.eventHistory
+- takeScreenshot: history
+- tapOn:
+    id: history\.recent\.[0-9]+
+    index: 0
+- assertVisible:
+    id: history.panel
+- takeScreenshot: history-detail
+- tapOn:
+    id: history.back
+- assertVisible:
+    id: screen.eventHistory
+- tapOn:
+    id: history.recent.back
+- assertVisible:
+    id: screen.settings
+- tapOn:
+    id: settings.back
+- assertVisible:
+    id: header.puppy
+- tapOn:
+    id: header.puppy
+- assertVisible:
+    id: screen.pets
+- tapOn:
+    id: nav.back
+- assertVisible:
+    id: nav.open

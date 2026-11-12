@@ -55,7 +55,7 @@ The starter routine is only an editable example, not veterinary guidance. Change
 
 Download the APK from the [latest GitHub release](https://github.com/patrickchin/puptime/releases/latest), open it on your phone, and allow installation from that source if Android asks.
 
-The top bar shows the current screen title. Use the labeled switch in Log and Timeline to move between them in one tap; the menu opens Insights, Schedule, Notifications, Puppy care, and Settings. Settings returns to the screen you came from.
+The top bar shows the current screen title. Use the labeled switch in Log and Timeline to move between them in one tap; the menu opens Insights, Schedule, Notifications, Puppy care, and Settings. Settings returns to the screen you came from. **Settings → My Account** manages sign-in, cloud backup and sync. **Settings → Pets** manages the puppy’s name, photo and sharing; the puppy avatar is a shortcut to the same Pets screen. **Share puppy** invites carers to your puppy, while **Shared puppies** opens puppies shared with you by other owners.
 
 Open Settings from the navigation menu to choose the two to four actions shown on your home screen. Pee, poop, and meals are the default; an active nap temporarily appears so it can always be ended from the widget.
 
