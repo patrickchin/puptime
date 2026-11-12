@@ -45,8 +45,6 @@ export function SettingsScreen({
   onRequestNotificationPermission,
   onOpenSystemSettings,
   onOpenGuide,
-  cloudHandle,
-  onOpenAccount,
   onOpenHistory,
   onBackupsRestored,
   onOpenNotifications,

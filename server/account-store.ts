@@ -1,4 +1,3 @@
-import {legacyProfileRevision} from './profile-compat';
 import { DurableObject } from 'cloudflare:workers';
 import { z } from 'zod';
 import { cloudRecordSchema,eventDataSchema,routineDataSchema,enrollmentSchema, identifierSchema, mutationSchema, recordIdSchema, type Enrollment, type CloudRecord, type Mutation, type MutationResult, type PullPage, type Revision } from '../src/cloud/protocol';
@@ -11,8 +10,7 @@ import {careWriteSchema,type CareWrite} from '../src/sharing';
 import { entityId } from '../src/entity-id';
 import { customActivityKey } from '../src/domain';
 import { resourceKindSchema, resourceListSchema, resourceWriteSchema, type ResourceKind, type ResourceListQuery, type ResourceList, type ResourceWrite, type ResourceWriteResult } from './resource-types';
-import accountSchema from './migrations/account/0003-account-store.sql';
-import resourceSchema from './migrations/account/0004-resource-api.sql';
+import accountSchema from './account-schema.sql';
 
 const cursorSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const pageSizeSchema = z.number().int().min(1).max(100);
@@ -26,15 +24,12 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
       const tables=ctx.storage.sql.exec<{name:string}>("SELECT name FROM sqlite_master WHERE type='table'").toArray().map(row=>row.name);
       if(tables.includes('schema_metadata')){
         const versions=ctx.storage.sql.exec<{version:number}>('SELECT version FROM schema_metadata').toArray();
-        if(versions.length!==1||![3,4].includes(versions[0].version))throw new Error('Unsupported development or newer account schema.');
-        if(['account_state','records','record_events','record_routines','revisions','operations','pets','enrollments','enrolled_devices'].some(name=>!tables.includes(name)))throw new Error('The account database schema is incomplete.');
-        if(versions[0].version===3)ctx.storage.sql.exec(resourceSchema);
-        else if(!tables.includes('api_requests'))throw new Error('The account database schema is incomplete.');
+        if(versions.length!==1||versions[0].version!==4)throw new Error('Unsupported development or newer account schema.');
+        if(['account_state','records','record_events','record_routines','revisions','operations','pets','enrollments','enrolled_devices','api_requests'].some(name=>!tables.includes(name)))throw new Error('The account database schema is incomplete.');
         return;
       }
       if(tables.some(name=>!name.startsWith('sqlite_')&&!name.startsWith('__cf_')))throw new Error('The existing account database schema is incomplete.');
       ctx.storage.sql.exec(accountSchema);
-      ctx.storage.sql.exec(resourceSchema);
     });
   }
 
@@ -156,9 +151,8 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
     const record = this.#record(id);
     if (record) return record.kind === kind && record.petId === petId ? record : null;
     if (kind !== 'puppy') return null;
-    // Older enrolled clients can have a puppy name without a profile revision.
-    // Expose that real saved profile at revision zero; the first edit creates its
-    // normal revision without rewriting history or changing GET's state.
+    // Enrollment saves the initial name before the device uploads its profile.
+    // Represent that pending profile at revision zero without writing during GET.
     const pet = this.ctx.storage.sql.exec<{ initial_name: string; created_at: number }>('SELECT initial_name,created_at FROM pets WHERE id=?', id).toArray()[0];
     return pet ? { id, petId: id, kind: 'puppy', data: { name: pet.initial_name }, revision: 0, sequence: 0, deleted: false, updatedAt: pet.created_at } : null;
   }
@@ -212,10 +206,10 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
   }
 
   async careList(shareId:string,actorId:string,kind:'event'|'routine',before:number) {
-    const grant=await this.#careGrant(shareId,actorId),petId=grant.pet_id,household=grant.kind==='household',since=undefined;
+    const grant=await this.#careGrant(shareId,actorId),petId=grant.pet_id,household=grant.kind==='household';
     this.#assertActive();identifierSchema.parse(petId);cursorSchema.parse(before);
     const puppy=this.resourceGet('puppy',petId,petId);if(!puppy)throw new ReconciliationError('Puppy does not exist.');
-    const rows=this.ctx.storage.sql.exec<{id:string;sequence:number}>(`SELECT r.id,r.sequence FROM records r ${kind==='event'?'JOIN record_events e ON e.record_id=r.id':''} WHERE r.pet_id=? AND r.kind=? AND r.deleted=0 AND r.sequence<? ${kind==='event'&&since!==undefined?'AND e.at>=?':''} ORDER BY r.sequence DESC LIMIT 51`,petId,kind,before||Number.MAX_SAFE_INTEGER,...(kind==='event'&&since!==undefined?[since]:[])).toArray();
+    const rows=this.ctx.storage.sql.exec<{id:string;sequence:number}>(`SELECT r.id,r.sequence FROM records r WHERE r.pet_id=? AND r.kind=? AND r.deleted=0 AND r.sequence<? ORDER BY r.sequence DESC LIMIT 51`,petId,kind,before||Number.MAX_SAFE_INTEGER).toArray();
     return {puppyName:'name' in puppy.data?puppy.data.name:'Puppy',records:rows.slice(0,50).map(row=>{
       const record=this.#record(row.id)!;
       const creator=this.ctx.storage.sql.exec<{body:string}>('SELECT body FROM revisions WHERE record_id=? ORDER BY revision LIMIT 1',row.id).toArray()[0];
@@ -317,11 +311,11 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
         if (petId !== null && !pet && !(request.kind === 'puppy' && request.intent === 'create')) {
           return { ok: false, error: 'not_found', message: 'Puppy does not exist.' };
         }
-        const legacyProfile = request.kind === 'puppy' && before?.revision === 0;
+        const enrolledProfile = request.kind === 'puppy' && before?.revision === 0;
         const mutation = mutationSchema.parse({ protocolVersion: 1, operationId: request.requestId, deviceId: request.actorId,
           kind: request.kind, petId, recordId, baseRevision: before?.revision ?? 0,
-          intent: legacyProfile ? 'create' : request.intent,
-          patch: request.intent === 'restore' || legacyProfile ? { ...before!.data, ...request.patch } : request.patch });
+          intent: enrolledProfile ? 'create' : request.intent,
+          patch: request.intent === 'restore' || enrolledProfile ? { ...before!.data, ...request.patch } : request.patch });
         const identityData = { ...before?.data, ...mutation.patch };
         if ((request.kind === 'customActivity' && (!('label' in identityData) || typeof identityData.label !== 'string' || customActivityKey(identityData.label) !== localId))
           || (request.kind === 'customization' && (!('activityKey' in identityData) || identityData.activityKey !== localId))) {
@@ -403,7 +397,7 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
     }
   }
 
-  exportStream(includeProfilePhotos=true): Response {
+  exportStream(): Response {
     // Capture both synchronously before returning. Later writes cannot enter this
     // history, and the HTTP Worker does not spend one RPC/JSON parse per page.
     const snapshot = { cursor: this.#cursor(), ...this.summary() }, encoder = new TextEncoder();
@@ -423,10 +417,7 @@ export class AccountStore extends DurableObject<Cloudflare.Env> {
             if (!row || row.sequence !== cursor + 1 || !row.body.startsWith('{') || !row.body.endsWith('}')) throw new Error('Incomplete snapshot.');
             cursor = row.sequence;
             // Stored bodies are validated Revision objects serialized at commit.
-            // Preserve their JSON bytes for current clients. Older clients need
-            // profile-only projection without modifying the stored history.
-            const body=includeProfilePhotos?row.body:JSON.stringify(legacyProfileRevision(JSON.parse(row.body)));
-            controller.enqueue(encoder.encode('{"type":"revision",' + body.slice(1) + '\n'));
+            controller.enqueue(encoder.encode('{"type":"revision",' + row.body.slice(1) + '\n'));
           } else {
             controller.enqueue(encoder.encode(JSON.stringify({ type: 'complete', cursor }) + '\n'));
             controller.close();

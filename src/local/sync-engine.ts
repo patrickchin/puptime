@@ -38,7 +38,7 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
     const shown=await sql.getFirstAsync<{value:string}>("SELECT value FROM metadata WHERE key='show_onboarding'");
     const step=await sql.getFirstAsync<{value:string}>("SELECT value FROM metadata WHERE key='first_launch_step'");
     const active=await sql.getFirstAsync<{value:string}>("SELECT value FROM metadata WHERE key='active_pet_id'");
-    if(shown?.value!=='true'||active?.value!==petId||!firstLaunchStepSchema.safeParse(step?.value??'welcome').success)return false;
+    if(shown?.value!=='true'||active?.value!==petId||!firstLaunchStepSchema.safeParse(step?.value).success)return false;
     if(await sql.getFirstAsync('SELECT id FROM events WHERE pet_id=? LIMIT 1',petId)
       ||await sql.getFirstAsync("SELECT sequence FROM local_revisions WHERE pet_id=? AND kind!='puppy' LIMIT 1",petId)
       ||await sql.getFirstAsync("SELECT pet_id FROM local_sync_pets WHERE status='active' LIMIT 1")

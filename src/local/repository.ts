@@ -123,7 +123,6 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
       });
     },
     updateEvent,
-    updateEventTime:(id:string,at:number)=>updateEvent(id,{at}),
     async removeEvent(id:string):Promise<void> {
       await commit(async sql=>{
         const before=await readEvent(sql,id);

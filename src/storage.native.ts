@@ -19,7 +19,6 @@ export const loadEvents = async () => (await storage()).loadEvents();
 export const appendEvents = async (events: PuppyEvent[],options?:EventWriteOptions) => (await storage()).appendEvents(events,options);
 export const importEvents = async (events: PuppyEvent[]) => (await storage()).importEvents(events);
 export const removeEvent = async (id: string) => (await storage()).removeEvent(id);
-export const updateEventTime = async (id: string, at: number) => (await storage()).updateEventTime(id, at);
 export const updateEvent = async (id: string, changes: PuppyEventChanges,options?:EventWriteOptions) => (await storage()).updateEvent(id, changes,options);
 export const loadSchedule = async () => (await storage()).loadSchedule();
 export const saveSchedule = async (schedule: ScheduleEntry[]) => (await storage()).saveSchedule(schedule);

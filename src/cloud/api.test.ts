@@ -128,8 +128,8 @@ test('installed React Native abort signals support requests and cancellation wit
  native.abort();await assert.rejects(cloud.account(signal),error=>error instanceof Error&&error.name==='AbortError');assert.equal(calls,1);
 });
 
-test('current clients explicitly request photo-capable profile responses',async()=>{
- let header:string|undefined;
- const service=api.createCloudApi(async(_path,options)=>{header=options.headers?.['x-puptime-profile-photos'];return {data:{changes:[],cursor:0,hasMore:false},error:null};});
- await service.pull(0);assert.equal(header,'1');
+test('profile responses need no capability headers',async()=>{
+ let headers:Record<string,string>|undefined;
+ const service=api.createCloudApi(async(_path,options)=>{headers=options.headers;return {data:{changes:[],cursor:0,hasMore:false},error:null};});
+ await service.pull(0);assert.equal(headers,undefined);
 });

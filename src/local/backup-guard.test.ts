@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
-import { createLocalDatabase, initializeLocalDatabase, type SqlExecutor } from './database.ts';
+import { createLocalDatabase, initializeLocalDatabase } from './database.ts';
 import { sqliteTestConnection } from './sqlite-test-adapter.ts';
 import { createLocalRuntime } from './runtime-factory.ts';
 import { checkpointBeforeUpgrade, createBackupGuard } from './backup-guard.ts';

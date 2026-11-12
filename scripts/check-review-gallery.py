@@ -61,7 +61,7 @@ with TemporaryDirectory(prefix='puptime-gallery-check-') as folder:
         server.server_close()
         thread.join()
     recording = Path(__file__).with_name('record-test-review.py')
-    result = subprocess.run([sys.executable, str(recording), str(root / '999-result.mp4'),
+    result = subprocess.run([sys.executable, str(recording), str(root / '999-result.log'),
         'Actual failed check', 'Fixture only', '--', sys.executable, '-c',
         'print("unique searchable output <script>"); raise SystemExit(7)'], capture_output=True, text=True)
     assert result.returncode == 7 and not (root / '999-result.mp4').exists()

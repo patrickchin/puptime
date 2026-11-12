@@ -1,5 +1,5 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
-import {Alert,Image,KeyboardAvoidingView,Linking,Platform,ScrollView,Share,StyleSheet,Text,TextInput,View} from 'react-native';
+import {Alert,Image,KeyboardAvoidingView,Platform,ScrollView,Share,StyleSheet,Text,TextInput,View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import qrcode from 'qrcode-generator';

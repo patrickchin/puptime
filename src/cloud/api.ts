@@ -71,7 +71,7 @@ export function createCloudApi(request:CloudRequest) {
   async function call<Schema extends z.ZodType>(path:string,schema:Schema,body?:object,signal?:AbortSignal):Promise<z.infer<Schema>> {
     throwIfAborted(signal);
     let result:RequestResult;
-    try {result=await request(path,{method:body?'POST':'GET',...(body?{body}:{}),signal,headers:{'x-puptime-profile-photos':'1'}});}
+    try {result=await request(path,{method:body?'POST':'GET',...(body?{body}:{}),signal});}
     catch {throwIfAborted(signal);throw new CloudApiError('network');}
     throwIfAborted(signal);
     if (result.error) throw new CloudApiError(cloudErrorCategory(result.error.status),result.error.status,retryDelay(result.retryAfter));

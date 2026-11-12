@@ -282,7 +282,7 @@ test('first-launch duplicate verification taps never replay a consumed code or r
 });
 
 test('first-launch duplicate social taps keep a successful account instead of reporting an account mismatch',async t=>{
- const {controller,state}=await fixture(t);await controller.refresh();
+ const {controller}=await fixture(t);await controller.refresh();
  assert.deepEqual(await Promise.all([controller.signInSocial('google'),controller.signInSocial('google')]),['ok','cancelled']);
  assert.equal(controller.read().account!.user.id,'account-1');assert.equal(controller.read().problem,null);
 });
@@ -643,7 +643,7 @@ async function historyFixture(t:TestContext){
 }
 
 test('cloud history resolves only the enrolled record and leaves local versions and account status alone',async t=>{
- const {controller,runtime,state,api}=await historyFixture(t),signal=new AbortController().signal;let requests=0;
+ const {controller,runtime,api}=await historyFixture(t),signal=new AbortController().signal;let requests=0;
  api.history=async(recordId,beforeRevision,received)=>{requests++;assert.equal(recordId,'["event","cloud-1","one"]');assert.equal(beforeRevision,2);assert.equal(received,signal);return {revisions:[historical]};};
  const local=await runtime.history.eventPage('one');assert.deepEqual(await controller.eventHistory('one',2,signal),{revisions:[historical]});
  assert.equal(requests,1);assert.equal(controller.read().problem,null);assert.deepEqual(await runtime.history.eventPage('one'),local);
