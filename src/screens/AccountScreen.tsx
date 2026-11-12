@@ -1,12 +1,13 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect,useRef,useState } from 'react';
-import { Alert,KeyboardAvoidingView,Linking,ScrollView,StyleSheet,Switch,Text,View } from 'react-native';
+import { Alert,KeyboardAvoidingView,Linking,ScrollView,StyleSheet,Text,View } from 'react-native';
 import { Pressable } from '../components/TelemetryPressable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { CloudHandle } from '../cloud/use-cloud';
 import {AccountButton,AccountSignIn} from '../components/AccountSignIn';
 import { useAccountSnapshot } from '../cloud/use-account-snapshot';
 import {AccountDeletionPanel} from '../components/AccountDeletionPanel';
+import {PuppyConnectionSummary} from '../components/PuppyConnectionSummary';
 import { accountStatus,accountProblemKey } from '../cloud/account-status';
 import { useLocalization } from '../localization-context';
 import { spacing,surfaceTreatment,type Theme } from '../theme';
@@ -14,7 +15,6 @@ import { spacing,surfaceTreatment,type Theme } from '../theme';
 export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cloud:CloudHandle;theme:Theme;eventCount:number;onBack:()=>void;onOpenActivity:()=>void}) {
   const {t,locale}=useLocalization(),state=useAccountSnapshot(cloud.controller);
   const [localName,setLocalName]=useState<string|null>(null),[readFailed,setReadFailed]=useState(false);
-  const [samePuppy,setSamePuppy]=useState(false);
   const mounted=useRef(true);
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
   const [sharingDiagnostics,setSharingDiagnostics]=useState(false),[diagnosticsFailed,setDiagnosticsFailed]=useState(false);
@@ -23,7 +23,6 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
   const status=accountStatus(state),errorKey=accountProblemKey(state?.problem??(readFailed?'local-storage':null));
   const enrolled=!!state?.sync?.accountId&&state.sync.state!=='local';
   useEffect(()=>{let mounted=true;cloud.getLocalName().then(name=>{if(mounted)setLocalName(name);}).catch(()=>{if(mounted)setReadFailed(true);});return()=>{mounted=false;};},[cloud.getLocalName]);
-  useEffect(()=>{setSamePuppy(false);},[account?.user.id,existing?.id]);
   useEffect(()=>()=>cloud.controller?.cancelExport(),[cloud.controller]);
   const titleStyle={color:theme.text,fontFamily:theme.presentation.headingFont,fontSize:20,lineHeight:28,fontWeight:theme.presentation.titleWeight};
   const bodyStyle={color:theme.textMuted};
@@ -37,6 +36,16 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
     Alert.alert(t('account.signOutTitle'),t('account.signOutBody',{count:current?.sync?.pending??0}),[
       {text:t('account.cancel'),style:'cancel'},
       {text:t('account.signOut'),style:'destructive',onPress:()=>{void cloud.controller?.signOut({confirmPending:true,confirmedThrough}).then(result=>{if(mounted.current&&result==='pending-confirmation-required')signOut();});}},
+    ]);
+  }
+  function connect() {
+    if(!account||!cloud.controller)return;
+    const expectedAccountId=account.user.id;
+    if(!existing){void cloud.controller.enableCloud({expectedAccountId});return;}
+    const confirmedPetId=existing.id;
+    Alert.alert(t('account.combineConfirmTitle'),t('account.combineConfirmBody',{phoneName:shownName,phoneCount:countLabel(count),cloudName:existing.name,cloudCount:countLabel(existing.eventCount)}),[
+      {text:t('account.cancel'),style:'cancel'},
+      {text:t('account.combine'),onPress:()=>{void cloud.controller!.enableCloud({expectedAccountId,confirmedPetId});}},
     ]);
   }
   async function exportDiagnostics() {
@@ -75,22 +84,22 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
           </View>:null}
         </>}
         <Text accessibilityRole="header" style={[styles.sectionTitle,{color:theme.text,fontFamily:theme.presentation.headingFont}]}>{t('account.backupTitle')}</Text>
-        <View testID="account.local.summary" style={cardStyle}>
+        {!(account&&existing&&!enrolled)?<View testID="account.local.summary" style={cardStyle}>
           <View style={styles.summaryHeader}><MaterialCommunityIcons name="dog-side" size={31} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no" /><Text maxFontSizeMultiplier={2} style={[styles.eyebrow,{color:theme.primary}]}>{t('account.onDevice')}</Text></View>
           <Text maxFontSizeMultiplier={2} style={[styles.puppy,{color:theme.text,fontFamily:theme.presentation.headingFont}]}>{shownName}</Text>
           <Text testID="account.local.count" style={[styles.body,bodyStyle]}>{readFailed?t('account.error.storage'):countLabel(count)}</Text>
           <Text testID="account.status" accessibilityLiveRegion="polite" style={[styles.status,{color:theme.primary}]}>{t(`account.status.${status}`)}</Text>
-        </View>
+        </View>:null}
         {account?(<View style={styles.stack}>
           {!enrolled?(<View style={cardStyle}>
-            <Text style={[styles.body,bodyStyle]}>{t('account.enrollBody')}</Text>
+            {existing?<>
+              <Text testID="account.status" accessibilityLiveRegion="polite" style={[styles.status,{color:theme.primary}]}>{t(`account.status.${status}`)}</Text>
+              <PuppyConnectionSummary phone={{name:shownName,eventCount:state?.local?.eventCount??null,lastActivityAt:state?.local?.lastActivityAt??null}} cloud={existing} email={account.user.email} theme={theme}/>
+              <Text style={[styles.body,bodyStyle]}>{t('account.compareBody')}</Text>
+            </>:<Text style={[styles.body,bodyStyle]}>{t('account.enrollBody')}</Text>}
             {!account.cloud.canSync?<Text style={[styles.body,bodyStyle]}>{t('account.pausedBody')}</Text>:null}
-            {existing?(<View style={styles.stack}>
-              <Text style={[styles.label,{color:theme.primary}]}>{t('account.cloudPuppy')}</Text><Text maxFontSizeMultiplier={2} style={[styles.puppy,{color:theme.text}]}>{existing.name}</Text><Text style={[styles.body,bodyStyle]}>{countLabel(existing.eventCount)}</Text>
-              <Text style={[styles.body,bodyStyle]}>{t('account.combineBody')}</Text>
-              <View style={styles.confirm}><Switch testID="account.samePuppy" accessibilityLabel={t('account.samePuppy')} value={samePuppy} onValueChange={setSamePuppy} disabled={busy} trackColor={{true:theme.primary,false:theme.border}}/><Text style={[styles.body,styles.grow,{color:theme.text}]}>{t('account.samePuppy')}</Text></View>
-            </View>):null}
-            <AccountButton theme={theme} testID="account.enable" label={t(existing?'account.combine':'account.enable')} primary disabled={busy||!state!.online||!account.cloud.canSync||!!existing&&!samePuppy} loading={busy} onPress={()=>{void cloud.controller!.enableCloud({...(existing?{confirmedPetId:existing.id}:{})});}}/>
+            <AccountButton theme={theme} testID="account.enable" label={t(existing?'account.combineReview':'account.enable')} primary disabled={busy||!state!.online||!account.cloud.canSync||!state?.local} loading={busy} onPress={connect}/>
+            {existing?<AccountButton theme={theme} testID="account.keepLocal" label={t('account.keepLocal')} disabled={busy} onPress={onBack}/>:null}
           </View>):(<View style={cardStyle}>
             {state!.lastSyncedAt!==null?<Text testID="account.lastSynced" style={[styles.body,bodyStyle]}>{t('account.lastSynced',{date:new Intl.DateTimeFormat(locale,{dateStyle:'medium',timeStyle:'short'}).format(state!.lastSyncedAt)})}</Text>:null}
             {state!.sync!.pending?<Text style={[styles.body,{color:theme.text}]}>{t('account.pending',{count:state!.sync!.pending})}</Text>:null}
@@ -120,6 +129,6 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
   </SafeAreaView>;
 }
 const styles=StyleSheet.create({
- root:{flex:1},content:{width:'100%',maxWidth:720,alignSelf:'center',padding:spacing.md,gap:spacing.md,paddingBottom:spacing.xl},sectionTitle:{fontSize:20,lineHeight:28,fontWeight:'700',marginTop:8},header:{flexDirection:'row',alignItems:'flex-start',gap:12},back:{width:48,height:48,alignItems:'center',justifyContent:'center'},title:{flex:1},card:{borderWidth:1,padding:spacing.md,gap:12},summaryHeader:{flexDirection:'row',alignItems:'center',gap:12},eyebrow:{fontSize:14,fontWeight:'700',flex:1},puppy:{fontSize:25,lineHeight:32,fontWeight:'700'},status:{fontSize:16,lineHeight:23,fontWeight:'700'},body:{fontSize:16,lineHeight:24},label:{fontSize:16,lineHeight:23,fontWeight:'700'},stack:{gap:12},notice:{fontSize:16,lineHeight:24,padding:14},confirm:{flexDirection:'row',alignItems:'center',gap:12},grow:{flex:1},privacy:{minHeight:48,justifyContent:'center',alignSelf:'flex-start'},
+ root:{flex:1},content:{width:'100%',maxWidth:720,alignSelf:'center',padding:spacing.md,gap:spacing.md,paddingBottom:spacing.xl},sectionTitle:{fontSize:20,lineHeight:28,fontWeight:'700',marginTop:8},header:{flexDirection:'row',alignItems:'flex-start',gap:12},back:{width:48,height:48,alignItems:'center',justifyContent:'center'},title:{flex:1},card:{borderWidth:1,padding:spacing.md,gap:12},summaryHeader:{flexDirection:'row',alignItems:'center',gap:12},eyebrow:{fontSize:14,fontWeight:'700',flex:1},puppy:{fontSize:25,lineHeight:32,fontWeight:'700'},status:{fontSize:16,lineHeight:23,fontWeight:'700'},body:{fontSize:16,lineHeight:24},label:{fontSize:16,lineHeight:23,fontWeight:'700'},stack:{gap:12},notice:{fontSize:16,lineHeight:24,padding:14},grow:{flex:1},privacy:{minHeight:48,justifyContent:'center',alignSelf:'flex-start'},
 
 });

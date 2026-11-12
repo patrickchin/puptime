@@ -52,7 +52,7 @@ export function createIdentityAdapter(auth:SdkIdentityClient,{appleIdToken,googl
   };
 }
 export type AccountDeletionState={accountId:string;email:string;stage:'confirm'|'verify'|'unconfirmed'|'confirmed';codeSent:boolean;unresolved:boolean;appleManual?:boolean};
-export type AccountSnapshot={deletion?:AccountDeletionState|null;deleted?:'done'|'apple-manual'|null;config:CloudConfig|null;account:CloudAccountSummary|null;linkedProviders:SocialProvider[]|null;linkingProvider:SocialProvider|null;local:{name:string;eventCount:number}|null;sync:SyncStatus|null;run:RunResult|null;problem:AccountProblem|null;codeSentTo:string|null;busy:boolean;exporting:boolean;running:boolean;active:boolean;online:boolean;lastSyncedAt:number|null};
+export type AccountSnapshot={deletion?:AccountDeletionState|null;deleted?:'done'|'apple-manual'|null;config:CloudConfig|null;account:CloudAccountSummary|null;linkedProviders:SocialProvider[]|null;linkingProvider:SocialProvider|null;local:{name:string;eventCount:number;lastActivityAt:number|null}|null;sync:SyncStatus|null;run:RunResult|null;problem:AccountProblem|null;codeSentTo:string|null;busy:boolean;exporting:boolean;running:boolean;active:boolean;online:boolean;lastSyncedAt:number|null};
 const defaultDefer=(fn:()=>void,delay:number)=>{const timer=setTimeout(fn,delay);return()=>clearTimeout(timer);};
 // Call only after pausing the owning controller, or when no client exists.
 export async function continueFirstLaunchLocally(runtime:Runtime,confirmPending=false,confirmedThrough?:number):Promise<AccountActionResult> {
@@ -79,8 +79,8 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
   }
   function fail(problem:AccountProblem):AccountActionResult {emit({problem});return 'error';}
   async function localState() {
-    const [sync,name,count]=await Promise.all([runtime.sync.status(runtime.petId),runtime.storage.loadPuppyName(),runtime.database.read(sql=>sql.getFirstAsync<{n:number}>('SELECT COUNT(*) n FROM events WHERE pet_id=?',runtime.petId))]);
-    emit({sync,local:{name,eventCount:count!.n}});
+    const [sync,name,history]=await Promise.all([runtime.sync.status(runtime.petId),runtime.storage.loadPuppyName(),runtime.database.read(sql=>sql.getFirstAsync<{n:number;lastActivityAt:number|null}>('SELECT COUNT(*) n,MAX(at) lastActivityAt FROM events WHERE pet_id=?',runtime.petId))]);
+    emit({sync,local:{name,eventCount:history!.n,lastActivityAt:history!.lastActivityAt}});
   }
   function cancelTimer() {cancelScheduled?.();cancelScheduled=null;}
   function cancelRefreshRecovery(reset=true) {cancelRefreshScheduled?.();cancelRefreshScheduled=null;refreshGeneration++;refreshing=null;if(reset)refreshFailures=0;}
@@ -410,11 +410,12 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
         }
       }
     });},
-    enableCloud({confirmedPetId,mode}:{confirmedPetId?:string;mode?:'combine'|'restore'}) {return perform(async()=>{
+    enableCloud({confirmedPetId,expectedAccountId,mode}:{confirmedPetId?:string;expectedAccountId?:string;mode?:'combine'|'restore'}) {return perform(async()=>{
       const associationMode=z.enum(['combine','restore']).parse(mode??'combine');
       await pauseTransport();if(!await loadAccount())return 'error';await localState();
       if(disposed)return 'error';
       const account=snapshot.account!,status=snapshot.sync!;
+      if(expectedAccountId!==undefined&&expectedAccountId!==account.user.id)return fail('account-mismatch');
       if(status.accountId&&status.accountId!==account.user.id)return fail('account-mismatch');
       if(status.state!=='local'){
         if(associationConfirmationNeeded){emit({problem:'confirmation-required'});return 'confirmation-required';}

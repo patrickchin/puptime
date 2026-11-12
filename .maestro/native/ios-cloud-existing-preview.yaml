@@ -19,23 +19,46 @@ name: iOS existing cloud puppy requires confirmation before combining history
     id: settings.account.open
 - extendedWaitUntil:
     visible:
-      id: account.samePuppy
+      id: account.connection.phone.name
     timeout: 30000
-- assertVisible:
-    id: account.samePuppy
-    checked: false
+- assertVisible: On this phone
+- scrollUntilVisible:
+    element:
+      id: account.connection.cloud.name
+    direction: DOWN
+    visibilityPercentage: 100
+- assertVisible: In your cloud account
+- scrollUntilVisible:
+    element:
+      id: account.enable
+    direction: DOWN
+    visibilityPercentage: 100
 - assertVisible:
     id: account.enable
-    enabled: false
+    text: Combine these histories…
+    enabled: true
+- tapOn:
+    id: account.enable
+- assertVisible: ^Combine these histories\?$
+- tapOn: ^Cancel$
+- assertNotVisible: ^Combine these histories\?$
+- scrollUntilVisible:
+    element:
+      id: account.back
+    direction: UP
+    visibilityPercentage: 100
 - tapOn:
     id: account.back
 - assertVisible:
     id: screen.settings
 - tapOn:
     id: settings.account.open
-- assertVisible:
-    id: account.samePuppy
-    checked: false
+- scrollUntilVisible:
+    element:
+      id: account.enable
+    direction: DOWN
+    visibilityPercentage: 100
 - assertVisible:
     id: account.enable
-    enabled: false
+    text: Combine these histories…
+    enabled: true
