@@ -8,6 +8,7 @@ import {useAccountSnapshot} from '../cloud/use-account-snapshot';
 import {accountProblemKey} from '../cloud/account-status';
 import {continueFirstLaunchLocally} from '../cloud/account-controller';
 import {PuppyConnectionSummary} from '../components/PuppyConnectionSummary';
+import {PuppyConnectionDialog,type PuppyConnectionProposal} from '../components/PuppyConnectionDialog';
 import {getLocalRuntime} from '../local/runtime.native';
 import {loadFirstLaunch,saveFirstLaunchProfile,saveFirstLaunchStep} from '../storage.native';
 import {useLocalization} from '../localization-context';
@@ -21,8 +22,9 @@ export {loadFirstLaunch as loadInitialSetup} from '../storage.native';
 const titles:Record<FirstLaunchStep,MessageKey>={welcome:'setup.welcomeTitle',profile:'setup.profileTitle',account:'setup.accountTitle',cloud:'setup.cloudTitle',walkthrough:'tour.logTitle',reminders:'setup.remindersTitle'};
 
 export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPermission,onAllowNotifications,onDisableNotifications,onOpenSystemSettings,onFinish}:FirstLaunchScreenProps) {
- const {t,locale}=useLocalization(),state=useAccountSnapshot(cloud.controller),{fontScale,height}=useWindowDimensions();
- const insets=useSafeAreaInsets();
+ const {t}=useLocalization(),state=useAccountSnapshot(cloud.controller),{fontScale,height}=useWindowDimensions();
+ const insets=useSafeAreaInsets(),combineTrigger=useRef<View>(null);
+ const [proposal,setProposal]=useState<PuppyConnectionProposal|null>(null);
  const [progress,setProgress]=useState(initial),[name,setName]=useState(initial.puppyName==='My puppy'?'':initial.puppyName);
  const [keyboardVisible,setKeyboardVisible]=useState(Keyboard.isVisible());
  const [busy,setBusy]=useState(false),[error,setError]=useState<string|null>(null),[ready,setReady]=useState(false),[pristine,setPristine]=useState<boolean|null>(null);
@@ -87,10 +89,14 @@ export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPerm
   });
  }
  function combine() {
-  const confirmedThrough=cloud.controller?.read().sync?.pendingThrough??0;
-  if(!existing)return;
-  const count=(value:number)=>t(value===1?'account.logsOne':'account.logsMany',{count:new Intl.NumberFormat(locale).format(value)});
-  Alert.alert(t('account.combineConfirmTitle'),t('account.combineConfirmBody',{phoneName:state?.local?.name??shownName,phoneCount:count(state?.local?.eventCount??0),cloudName:existing.name,cloudCount:count(existing.eventCount)}),[{text:t('account.cancel'),style:'cancel'},{text:t('account.combine'),onPress:()=>{void activate('combine',confirmedThrough);}}]);
+  const controller=cloud.controller;
+  if(!existing||!account||!controller)return;
+  const expectedAccountId=account.user.id,confirmedPetId=existing.id;
+  const confirmedThrough=controller.read().sync?.pendingThrough??0,wasEnrolled=enrolled;
+  setProposal({phone:{name:state?.local?.name??shownName,eventCount:state?.local?.eventCount??0},cloud:{name:existing.name,eventCount:existing.eventCount},confirm:()=>{
+   setProposal(null);
+   void act(()=>controller.enableCloud({mode:'combine',expectedAccountId,confirmedPetId,...(wasEnrolled?{confirmedThrough}:{})}));
+  }});
  }
  function back() {
   if(working)return;
@@ -100,7 +106,7 @@ export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPerm
  }
  const bodyStyle=[styles.body,{color:theme.textMuted}];
  const cardStyle=[styles.card,{backgroundColor:theme.surfaceRaised,borderColor:theme.border,borderRadius:theme.presentation.cardRadius}];
- const button=(testID:string,label:string,onPress:()=>void,primary=false,disabled=working,loading=false)=><AccountButton key={testID} testID={testID} theme={theme} label={label} onPress={onPress} primary={primary} disabled={disabled} loading={loading}/>;
+ const button=(testID:string,label:string,onPress:()=>void,primary=false,disabled=working,loading=false)=><AccountButton key={testID} testID={testID} buttonRef={testID==='setup.cloud.enable'?combineTrigger:undefined} theme={theme} label={label} onPress={onPress} primary={primary} disabled={disabled} loading={loading}/>;
  if(step==='walkthrough')return <View style={styles.root}>
   {error?<Text testID="setup.error" accessibilityRole="alert" style={[styles.body,{color:theme.danger,padding:16}]}>{error}</Text>:null}
   <OnboardingScreen theme={theme} mode="embedded" notificationPermission={notificationPermission} onAllowNotifications={onAllowNotifications} onOpenSystemSettings={onOpenSystemSettings} onFinish={()=>checkpoint('reminders')} onBack={()=>{void act(()=>checkpoint(account?'cloud':'account'));return true;}}/>
@@ -176,6 +182,7 @@ export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPerm
     {button('setup.finish',t('onboarding.start'),()=>{void act(()=>onFinish());},true,working,busy)}
    </>:null}
   </ScrollView>
+  <PuppyConnectionDialog proposal={proposal} theme={theme} disabled={working||!state?.online||!account?.cloud.canSync} returnFocusRef={combineTrigger} onCancel={()=>setProposal(null)}/>
  </KeyboardAvoidingView>;
 }
 const styles=StyleSheet.create({

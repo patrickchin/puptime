@@ -13,9 +13,11 @@ name: Account preservation enable
     id: account.enable
 - runFlow:
     when:
-      visible: ^Combine these histories\?$
+      visible:
+        id: account.combine.dialog
     commands:
-      - tapOn: ^Combine and sync$
+      - tapOn:
+          id: account.combine.confirm
 - scrollUntilVisible:
     element:
       id: account.status

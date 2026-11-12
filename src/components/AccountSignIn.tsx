@@ -1,5 +1,5 @@
 import {MaterialCommunityIcons} from '@expo/vector-icons';
-import {useEffect,useState} from 'react';
+import {useEffect,useState,type Ref} from 'react';
 import {ActivityIndicator,Keyboard,Platform,StyleSheet,Text,TextInput,View} from 'react-native';
 import { Pressable } from './TelemetryPressable';
 import * as AppleAuthentication from 'expo-apple-authentication';
@@ -64,9 +64,9 @@ export function AccountSignIn({cloud,theme,showError=true,showIntro=true,onEmail
   </>}
  </View>;
 }
-export function AccountButton({theme,label,onPress,testID,primary=false,disabled=false,loading=false,icon,danger=false}:{theme:Theme;label:string;onPress:()=>void;testID:string;primary?:boolean;disabled?:boolean;loading?:boolean;danger?:boolean;icon?:keyof typeof MaterialCommunityIcons.glyphMap}) {
+export function AccountButton({theme,label,onPress,testID,primary=false,disabled=false,loading=false,icon,danger=false,buttonRef}:{theme:Theme;label:string;onPress:()=>void;testID:string;primary?:boolean;disabled?:boolean;loading?:boolean;danger?:boolean;icon?:keyof typeof MaterialCommunityIcons.glyphMap;buttonRef?:Ref<View>}) {
   const color=disabled?theme.textMuted:danger?theme.danger:primary?theme.onPrimary:theme.primary;
-  return <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{disabled,busy:loading}} disabled={disabled} onPress={onPress} style={({pressed})=>[styles.button,{borderColor:theme.border,borderRadius:theme.presentation.controlRadius,backgroundColor:disabled?theme.surface:primary?(pressed?theme.primaryPressed:theme.primary):(pressed?theme.primarySoft:theme.surfaceRaised)}]}>
+  return <Pressable ref={buttonRef} testID={testID} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{disabled,busy:loading}} disabled={disabled} onPress={onPress} style={({pressed})=>[styles.button,{borderColor:theme.border,borderRadius:theme.presentation.controlRadius,backgroundColor:disabled?theme.surface:primary?(pressed?theme.primaryPressed:theme.primary):(pressed?theme.primarySoft:theme.surfaceRaised)}]}>
     {loading?<ActivityIndicator color={color}/>:icon?<MaterialCommunityIcons name={icon} size={22} color={color} accessibilityElementsHidden importantForAccessibility="no"/>:null}
     <Text style={[styles.buttonText,{color}]}>{label}</Text>
   </Pressable>;

@@ -8,6 +8,7 @@ import {AccountButton,AccountSignIn} from '../components/AccountSignIn';
 import { useAccountSnapshot } from '../cloud/use-account-snapshot';
 import {AccountDeletionPanel} from '../components/AccountDeletionPanel';
 import {PuppyConnectionSummary} from '../components/PuppyConnectionSummary';
+import {PuppyConnectionDialog,type PuppyConnectionProposal} from '../components/PuppyConnectionDialog';
 import { accountStatus,accountProblemKey } from '../cloud/account-status';
 import { useLocalization } from '../localization-context';
 import { spacing,surfaceTreatment,type Theme } from '../theme';
@@ -18,7 +19,8 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
   const mounted=useRef(true);
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
   const [sharingDiagnostics,setSharingDiagnostics]=useState(false),[diagnosticsFailed,setDiagnosticsFailed]=useState(false);
-  const diagnosticsLocked=useRef(false);
+  const diagnosticsLocked=useRef(false),combining=useRef(false),combineTrigger=useRef<View>(null);
+  const [proposal,setProposal]=useState<PuppyConnectionProposal|null>(null);
   const account=state?.account,existing=account?.pets[0],busy=state?.busy??false;
   const status=accountStatus(state),errorKey=accountProblemKey(state?.problem??(readFailed?'local-storage':null));
   const enrolled=!!state?.sync?.accountId&&state.sync.state!=='local';
@@ -39,14 +41,16 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
     ]);
   }
   function connect() {
-    if(!account||!cloud.controller)return;
+    const controller=cloud.controller;
+    if(!account||!controller||combining.current)return;
     const expectedAccountId=account.user.id;
-    if(!existing){void cloud.controller.enableCloud({expectedAccountId});return;}
+    if(!existing){void controller.enableCloud({expectedAccountId});return;}
     const confirmedPetId=existing.id;
-    Alert.alert(t('account.combineConfirmTitle'),t('account.combineConfirmBody',{phoneName:shownName,phoneCount:countLabel(count),cloudName:existing.name,cloudCount:countLabel(existing.eventCount)}),[
-      {text:t('account.cancel'),style:'cancel'},
-      {text:t('account.combine'),onPress:()=>{void cloud.controller!.enableCloud({expectedAccountId,confirmedPetId});}},
-    ]);
+    setProposal({phone:{name:shownName,eventCount:count},cloud:{name:existing.name,eventCount:existing.eventCount},confirm:()=>{
+      if(combining.current)return;
+      combining.current=true;setProposal(null);
+      void controller.enableCloud({expectedAccountId,confirmedPetId}).finally(()=>{combining.current=false;});
+    }});
   }
   async function exportDiagnostics() {
     if(!cloud.shareDiagnostics||diagnosticsLocked.current)return;
@@ -98,7 +102,7 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
               <Text style={[styles.body,bodyStyle]}>{t('account.compareBody')}</Text>
             </>:<Text style={[styles.body,bodyStyle]}>{t('account.enrollBody')}</Text>}
             {!account.cloud.canSync?<Text style={[styles.body,bodyStyle]}>{t('account.pausedBody')}</Text>:null}
-            <AccountButton theme={theme} testID="account.enable" label={t(existing?'account.combineReview':'account.enable')} primary disabled={busy||!state!.online||!account.cloud.canSync||!state?.local} loading={busy} onPress={connect}/>
+            <AccountButton theme={theme} testID="account.enable" buttonRef={combineTrigger} label={t(existing?'account.combineReview':'account.enable')} primary disabled={busy||!state!.online||!account.cloud.canSync||!state?.local} loading={busy} onPress={connect}/>
             {existing?<AccountButton theme={theme} testID="account.keepLocal" label={t('account.keepLocal')} disabled={busy} onPress={onBack}/>:null}
           </View>):(<View style={cardStyle}>
             {state!.lastSyncedAt!==null?<Text testID="account.lastSynced" style={[styles.body,bodyStyle]}>{t('account.lastSynced',{date:new Intl.DateTimeFormat(locale,{dateStyle:'medium',timeStyle:'short'}).format(state!.lastSyncedAt)})}</Text>:null}
@@ -126,6 +130,7 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
         <Pressable accessibilityRole="link" accessibilityLabel={t('account.privacy')} onPress={()=>{void Linking.openURL('https://github.com/patrickchin/puptime/blob/main/PRIVACY.md').catch(()=>Alert.alert(t('learn.linkError'),t('learn.linkErrorBody')));}} style={styles.privacy}><Text style={[styles.body,{color:theme.primary,textDecorationLine:'underline'}]}>{t('account.privacy')}</Text></Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
+    <PuppyConnectionDialog proposal={proposal} theme={theme} disabled={busy||!state?.online||!account?.cloud.canSync} returnFocusRef={combineTrigger} onCancel={()=>setProposal(null)}/>
   </SafeAreaView>;
 }
 const styles=StyleSheet.create({

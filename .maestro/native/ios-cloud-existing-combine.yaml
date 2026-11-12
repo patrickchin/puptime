@@ -10,8 +10,10 @@ name: iOS explicit named-history confirmation combines local and cloud history
     visibilityPercentage: 100
 - tapOn:
     id: account.enable
-- assertVisible: ^Combine these histories\?$
-- tapOn: ^Combine and sync$
+- assertVisible:
+    id: account.combine.dialog
+- tapOn:
+    id: account.combine.confirm
 - extendedWaitUntil:
     visible:
       id: account.status
