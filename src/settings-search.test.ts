@@ -34,5 +34,7 @@ test('settings search respects language, accents, word order, and real availabil
   assert.deepEqual(search('spaceship refrigerator'), []);
   assert.deepEqual(search('xyz'), []);
   assert.deepEqual(search('dark notifications'), []);
+  assert.ok(!search('routines').includes('csv'), 'Excluded data is not a searchable export feature.');
+  assert.ok(!search('account').includes('analytics'), 'Privacy exclusions must not advertise unrelated settings.');
   assert.deepEqual(search('灯', 'zh-Hans'), []);
 });
