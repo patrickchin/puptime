@@ -6,6 +6,7 @@ import test, { type TestContext } from 'node:test';
 import {createLocalDatabase,initializeLocalDatabase as initialize,type SqlConnection} from './database.ts';
 import { sqliteTestConnection } from './sqlite-test-adapter.ts';
 import { STARTER_SCHEDULE } from '../domain.ts';
+import {createLocalRuntime} from './runtime-factory.ts';
 
 async function setup(t:TestContext,wrap=(connection:SqlConnection)=>connection) {
   const directory=await mkdtemp(join(tmpdir(),'puptime-initialize-'));
@@ -50,6 +51,51 @@ test('fresh SQL initialization mints one prefixed puppy identity and retains it 
  assert.match(first.petId,/^pet_[a-f0-9]{32}$/);
  const reopened=await createLocalDatabase(sqliteTestConnection(path));
  try {assert.deepEqual(await initialize(reopened),first);}finally{await reopened.close();}
+});
+
+test('released pre-checkpoint journals reopen without changing activity, sync state or saved choices',async t=>{
+ for(const completed of [true,false]){
+  const {database,path}=await setup(t);
+  const {petId}=await initialize(database,()=> 'pet_upgrade');
+  const runtime=await createLocalRuntime(database,petId);
+  if(completed)await runtime.storage.completeOnboarding({puppyName:'Biscuit'});
+  await runtime.storage.appendEvents(Array.from({length:1000},(_,i)=>({id:`evt_upgrade_${i}`,type:'pee',at:1000+i,source:'app',note:`Keep ${i}`})));
+  const accountId='acct_upgrade';
+  const {generation}=await runtime.sync.prepareAssociation({accountId,localPetId:petId,deviceId:runtime.deviceId,enrollment:{operationId:'enr_upgrade',deviceId:runtime.deviceId,localPetId:petId,name:'Biscuit'}});
+  await runtime.sync.stageBaseline({generation,accountId,page:{changes:[],cursor:0,hasMore:false}});
+  await runtime.sync.completeAssociation({generation,accountId,cloudPetId:petId});
+  await database.write(sql=>sql.runAsync("DELETE FROM metadata WHERE key IN ('first_launch_step','notify_on_device')"));
+  const before=await snapshot(database);
+  const reopened=await createLocalDatabase(sqliteTestConnection(path));
+  try{
+   assert.deepEqual(await initialize(reopened),{petId});
+   const after=await snapshot(reopened);
+   const added=after.rows.metadata.filter(row=>!before.rows.metadata.some(old=>old.key===row.key));
+   assert.deepEqual(added,[{key:'first_launch_step',value:completed?'done':'welcome'},{key:'notify_on_device',value:'false'}]);
+   after.rows.metadata=after.rows.metadata.filter(row=>before.rows.metadata.some(old=>old.key===row.key));
+   assert.deepEqual(after,before);
+   const next=await createLocalRuntime(reopened,petId);
+   assert.equal((await next.storage.loadEvents()).length,1000);
+   assert.equal((await next.storage.loadFirstLaunch())?.step??null,completed?null:'welcome');
+   assert.equal(await next.storage.loadNotificationDelivery(),false);
+   await next.storage.saveNotificationDelivery(true);
+   const saved=await snapshot(reopened);
+   await initialize(reopened);assert.deepEqual(await snapshot(reopened),saved);
+  }finally{await reopened.close();}
+ }
+});
+
+test('upgrade metadata repair rolls back on failure and preserves invalid saved values',async t=>{
+ const {database}=await setup(t);await initialize(database,()=> 'pet_upgrade');
+ await database.write(sql=>sql.execAsync("DELETE FROM metadata WHERE key IN ('first_launch_step','notify_on_device'); CREATE TRIGGER fail_delivery_upgrade BEFORE INSERT ON metadata WHEN NEW.key='notify_on_device' BEGIN SELECT RAISE(ABORT,'upgrade failure'); END;"));
+ const before=await snapshot(database);
+ await assert.rejects(initialize(database),/upgrade failure/);
+ assert.deepEqual(await snapshot(database),before);
+ await database.write(sql=>sql.execAsync("DROP TRIGGER fail_delivery_upgrade; INSERT INTO metadata VALUES ('first_launch_step','unknown'),('notify_on_device','invalid');"));
+ const invalid=await snapshot(database);
+ await initialize(database);assert.deepEqual(await snapshot(database),invalid);
+ const {storage}=await createLocalRuntime(database,'pet_upgrade');
+ await assert.rejects(storage.loadFirstLaunch());await assert.rejects(storage.loadNotificationDelivery());
 });
 
 test('initialization failure rolls back and retries',async t=>{
