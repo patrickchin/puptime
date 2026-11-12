@@ -5,7 +5,6 @@ import {
   Alert,
   Keyboard,
   Linking,
-  Modal,
   ScrollView,
   StyleSheet,
   Switch,
@@ -14,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { Pressable } from '../components/TelemetryPressable';
+import {SheetModal} from '../components/Motion';
 
 import { scheduleStatusesForDay, suggestScheduleFromEvents } from '../analytics';
 import {activityWindowBounds,useActivityWindow,type ActivityViewProps} from '../activity-view';
@@ -331,10 +331,9 @@ export function ScheduleScreen({
         {!setupHeader&&schedule.length?suggestionCard:null}
       </ScrollView>
 
-      <Modal
+      <SheetModal
         visible={reviewingSuggestion}
         transparent
-        animationType="none"
         onRequestClose={() => setReviewingSuggestion(false)}
       >
         <View testID="schedule.suggestion" accessibilityViewIsModal style={styles.scrim}>
@@ -434,9 +433,9 @@ export function ScheduleScreen({
             </Pressable>
           </ScrollView>
         </View>
-      </Modal>
+      </SheetModal>
 
-      <Modal visible={draft !== null||previewIds!==null} supportedOrientations={['portrait','landscape-left','landscape-right']} transparent animationType="none" onRequestClose={() => {
+      <SheetModal visible={draft !== null||previewIds!==null} supportedOrientations={['portrait','landscape-left','landscape-right']} transparent onRequestClose={() => {
         if(previewIds!==null){setPreviewIds(null);return;}
         const focusedInput = TextInput.State.currentlyFocusedInput();
         if (focusedInput) {
@@ -611,7 +610,7 @@ export function ScheduleScreen({
             />
           ) : null}
         </View>
-      </Modal>
+      </SheetModal>
       <ConfirmDialog
         visible={pendingRemove !== null}
         title={t('schedule.removeTitle')}
@@ -654,7 +653,7 @@ const styles = StyleSheet.create({
   addButtonText: { fontSize: 16, fontWeight: '700' },
   empty: { borderWidth: 1, borderStyle: 'dashed', borderRadius: 20, padding: spacing.lg, marginTop: spacing.xl, alignItems: 'center' },
   emptyTitle: { fontSize: 17, fontWeight: '700' },
-  scrim: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.56)', justifyContent: 'flex-end' },
+  scrim: { flex: 1, justifyContent: 'flex-end' },
   sheet: {
     width: '100%',
     maxWidth: 640,

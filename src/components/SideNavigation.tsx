@@ -1,6 +1,7 @@
 import {MaterialCommunityIcons} from '@expo/vector-icons';
-import {useEffect,useState,type ReactNode} from 'react';
-import {AccessibilityInfo,AppState,Modal,Platform,ScrollView,StyleSheet,Text,View,useWindowDimensions} from 'react-native';
+import {type ReactNode} from 'react';
+import {Modal,Platform,ScrollView,StyleSheet,Text,View,useWindowDimensions} from 'react-native';
+import {useReducedMotion} from './Motion';
 import { Pressable } from './TelemetryPressable';
 import {Drawer} from 'react-native-drawer-layout';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -16,15 +17,7 @@ export function SideNavigation({open,enabled,tab,settingsVisible,theme,onOpen,on
  onOpen:()=>void;onClose:()=>void;onChange:(tab:AppTab)=>void;onSettings:()=>void;onAccount?:()=>void;children:ReactNode;
 }){
  const {t}=useLocalization(),{width}=useWindowDimensions(),insets=useSafeAreaInsets();
- const [reduceMotion,setReduceMotion]=useState(true);
- useEffect(()=>{
-  let active=true;
-  const refresh=()=>{void AccessibilityInfo.isReduceMotionEnabled().then(value=>{if(active)setReduceMotion(value);});};
-  refresh();
-  const subscription=AccessibilityInfo.addEventListener('reduceMotionChanged',setReduceMotion);
-  const foreground=AppState.addEventListener('change',state=>{if(state==='active')refresh();});
-  return()=>{active=false;subscription.remove();foreground.remove();};
- },[]);
+ const reduceMotion=useReducedMotion();
  if(Platform.OS==='web')return children;
  const item=(key:AppTab|'settings'|'account')=>{
   const selected=key==='settings'?settingsVisible:key==='account'?!settingsVisible&&tab==='account':!settingsVisible&&tab===key;

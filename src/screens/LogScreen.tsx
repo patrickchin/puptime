@@ -1,7 +1,8 @@
 import { useTelemetryOverlay } from '../telemetry';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, FlatList, Keyboard, KeyboardAvoidingView, Modal, Platform, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Keyboard, KeyboardAvoidingView, Platform, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import {SheetModal} from '../components/Motion';
 import { Pressable } from '../components/TelemetryPressable';
 
 import type {SpotlightRect} from '../components/OnboardingSpotlight';
@@ -583,7 +584,7 @@ export function LogScreen({
         ) : null}</>}
       /> : null}
 
-      <Modal visible={draft !== null} transparent animationType="none" onRequestClose={handleSystemClose}>
+      <SheetModal visible={draft !== null} transparent onRequestClose={handleSystemClose}>
         <KeyboardAvoidingView
           testID="editor"
           accessibilityViewIsModal
@@ -932,7 +933,7 @@ export function LogScreen({
           </ScrollView>
           {historyOpen&&history&&draft?<View style={[styles.sheet,styles.historySheet,{backgroundColor:theme.surfaceRaised,borderTopLeftRadius:theme.presentation.cardRadius+6,borderTopRightRadius:theme.presentation.cardRadius+6}]}><EventHistoryPanel data={history} eventId={draft.event.id} cloud={cloud} theme={theme} refreshToken={refreshToken} onBack={()=>{void returnFromHistory();}} onRestored={restoredHistory} onBusyChange={value=>{historyBusy.current=value;}}/></View>:null}
         </KeyboardAvoidingView>
-      </Modal>
+      </SheetModal>
 
       <ConfirmDialog
         visible={pendingDelete !== null}
@@ -989,7 +990,7 @@ const styles = StyleSheet.create({
   emptyDay: { fontSize: 14, lineHeight: 20, paddingHorizontal: 14, paddingVertical: spacing.md },
   loadMore: { minHeight: 48, alignItems: 'center', justifyContent: 'center', marginTop: spacing.md },
   loadMoreText: { fontSize: 14, fontWeight: '700' },
-  scrim: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.56)', justifyContent: 'flex-end' },
+  scrim: { flex: 1, justifyContent: 'flex-end' },
   sheet: {
     width: '100%',
     maxWidth: 640,

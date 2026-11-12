@@ -36,7 +36,8 @@ The preview shows a quick log, a 15-minute correction, timeline filtering and
 log details, insights, and a routine-window adjustment. Five green touch cues
 give viewers 0.6 seconds to locate each control before the press, then release
 in a fading ripple. They follow recorded control bounds and native footage.
-These are editorial overlays; the app itself is unchanged. Interaction footage
+These are editorial overlays. This candidate predates the native motion changes
+described below and has not been replaced with a recording of them. Interaction footage
 is slowed selectively, idle waits are removed, and 0.2-second dissolves connect
 screens. Results remain visible long enough to read without adding frozen-frame
 padding. Numbered step labels slide in and fade out below the status bar at each
@@ -63,6 +64,59 @@ The native runtime was an existing 1.12.0 simulator host with a fresh production
 JavaScript bundle from this worktree. The captures are not a qualification of
 the uploaded App Store binary. Reconcile them with that exact build before
 submission and retake any changed screens.
+
+## App animations and recording
+
+The app already animated the navigation drawer, theme picker, and some account
+and sharing presentations. The log and routine editors and timeline details
+previously appeared instantly, and changing the main screen swapped content
+immediately. A screen recording captures animations that the app actually runs;
+the old preview's tap rings, numbered labels, and dissolves were added in editing.
+
+`src/components/Motion.tsx` now supplies a shared sheet presentation for the log
+editor, routine editor/suggestions, timeline details, and theme picker. The
+sheet slides up over 280 ms and dismisses over 220 ms while a stationary backdrop
+fades independently. React Native's native driver runs the motion without
+per-frame React renders. The underlying `Modal` portal deliberately uses
+`animationType="none"` so its full-screen backdrop does not slide with the sheet.
+Dismissal retains the visible form values until the sheet exits. Main screen
+changes fade in over 180 ms without adding keyed remounts. System Reduce Motion
+disables these effects; the existing drawer uses the same preference hook.
+No new animation dependency is needed.
+
+The final iPhone verification used the dedicated task simulator, existing native
+host, fresh production JavaScript, and the populated CSV fixture. Log editing,
+timeline details, routine editing, keyboard dismissal, and system Reduce Motion
+passed. The diagnostic bundle's observers verified that opening/closing the
+editor left all 24 loaded event-row render counts unchanged. Three timeline detail
+checks left all 19 date labels and 19 tracks unchanged and retained one list
+instance; local reports are kept in
+`output/app-store/`. All 338 original records and the source CSV remain intact.
+Android type checking passed; Android runtime parity is assumed, not verified.
+The 510 unit tests, 10 web checks, and store asset validation passed.
+
+Fresh settled screenshots, animation phase frames, and a 7.2-second example are
+under `~/Pictures/Screenshots/Codex/puptime-app-store/20261112/native-app-motion-v2/`.
+`puptime-native-motion.mp4` contains three trimmed native interactions at normal
+speed, without added transitions, labels, tap rings, or motion interpolation.
+The earlier `native-app-motion/` experiment is superseded because its backdrop
+moved with the sheet. These local examples demonstrate app behavior; they do
+not qualify an uploaded release binary or replace the App Store candidate.
+
+Some simulator H.264 recordings have monotonic original presentation timestamps
+but incorrect decoder `best_effort_timestamp_time` values, including backward
+jumps. `scripts/video_timing.py` now restores the original presentation clock
+before the preview editor normalizes frame rate and trims scenes. This preserves
+captured motion instead of dropping frames at those jumps. It does not synthesize
+animation. Reviewed source cut/tap times must use the original presentation
+clock; re-review older cut JSON before using it with the corrected editor. The
+committed 17.37-second candidate has not been regenerated with this fix.
+
+For a read-only native animation capture on the seeded task simulator:
+
+```sh
+python3 scripts/record-store-preview.py IPHONE_UDID NEW_CAPTURE_DIRECTORY fastlane/app-motion.yaml
+```
 
 ## Upload and release
 

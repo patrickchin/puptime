@@ -1,0 +1,63 @@
+appId: com.patrickchin.puptime
+name: Native app motion with populated history
+---
+- launchApp
+- extendedWaitUntil:
+    visible: {id: screen.today}
+    timeout: 90000
+- waitForAnimationToEnd
+- takeScreenshot: 01-log
+- tapOn: {id: event.pee.edit, index: 0, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    visible: {id: editor.close}
+    timeout: 30000
+- waitForAnimationToEnd
+- takeScreenshot: 02-log-editor
+- tapOn: {id: editor.close}
+- extendedWaitUntil:
+    notVisible: {id: editor.close}
+    timeout: 30000
+- waitForAnimationToEnd
+- tapOn: {id: nav.switch}
+- extendedWaitUntil:
+    visible: {id: screen.timeline}
+    timeout: 30000
+- extendedWaitUntil:
+    notVisible: {id: activity.loading}
+    timeout: 30000
+- waitForAnimationToEnd
+- tapOn: {id: timeline.filter.poop-meal, retryTapIfNoChange: true}
+- waitForAnimationToEnd
+- tapOn: {id: timeline.mark.point.2026-10-08.*, index: 0, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    visible: {id: timeline.details}
+    timeout: 30000
+- waitForAnimationToEnd
+- takeScreenshot: 03-timeline-details
+- tapOn: {id: timeline.details.close}
+- extendedWaitUntil:
+    notVisible: {id: timeline.details}
+    timeout: 30000
+- waitForAnimationToEnd
+- tapOn: {id: nav.open, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    visible: {id: nav.close}
+    timeout: 30000
+- tapOn: {id: nav.schedule, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    notVisible: {id: nav.close}
+    timeout: 30000
+- extendedWaitUntil:
+    visible: {id: screen.schedule}
+    timeout: 30000
+- tapOn: {id: schedule.entry.meal, index: 0, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    visible: {id: schedule.editor}
+    timeout: 30000
+- waitForAnimationToEnd
+- takeScreenshot: 04-routine-editor
+- tapOn: {id: schedule.editor.close}
+- extendedWaitUntil:
+    notVisible: {id: schedule.editor}
+    timeout: 30000
+- waitForAnimationToEnd
