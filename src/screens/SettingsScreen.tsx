@@ -8,7 +8,7 @@ import { ActivityIcon } from '../components/ActivityIcon';
 import { ActivityCsvSettings } from '../components/ActivityCsvSettings';
 import { SettingsRow } from '../components/SettingsRow';
 import type { CloudHandle } from '../cloud/use-cloud';
-import { useAccountSnapshot } from '../cloud/use-account-snapshot';
+import { AccountSettingsRow } from '../components/AccountSettingsRow';
 import { useLocalization } from '../localization-context';
 import type { LanguagePreference } from '../localization';
 import {
@@ -54,6 +54,7 @@ export function SettingsScreen({
   onOpenGuide,
   cloudHandle,
   onOpenAccount,
+  onOpenPets,
   onImport,
   eventCount,
 }: {
@@ -77,6 +78,7 @@ export function SettingsScreen({
   onOpenGuide: () => void;
   cloudHandle?: CloudHandle;
   onOpenAccount?: () => void;
+  onOpenPets?: () => void;
   onImport: () => Promise<void>;
   eventCount: number;
 }) {
@@ -228,6 +230,7 @@ export function SettingsScreen({
       </View>
 
       {cloudHandle?.available&&onOpenAccount?<AccountSettingsRow cloud={cloudHandle} theme={theme} onOpen={onOpenAccount}/>:null}
+      {onOpenPets?<View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}><SettingsRow testID="settings.pets.open" icon="paw-outline" label={t('nav.pets')} detail={t('settings.petsDetail')} onPress={onOpenPets} theme={theme} wrap/></View>:null}
       <SectionLabel label={t('settings.personalization')} theme={theme} />
       <View style={[styles.card, surfaceTreatment(theme), { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
         <SettingsRow
@@ -531,14 +534,6 @@ function SectionLabel({ label, theme }: { label: string; theme: Theme }) {
     </Text>
   );
 }
-
-function AccountSettingsRow({cloud,theme,onOpen}:{cloud:CloudHandle;theme:Theme;onOpen:()=>void}) {
-  const {t}=useLocalization(),state=useAccountSnapshot(cloud.controller);
-  return <View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}>
-    <SettingsRow testID="settings.account.open" wrap icon="account-circle-outline" label={t('account.title')} detail={state?.account?.user.email??t(state?.sync?.accountId?'account.status.auth':'account.signIn')} onPress={onOpen} theme={theme}/>
-  </View>;
-}
-
 
 function PottyReminderRule({
   testID,

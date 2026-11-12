@@ -8,11 +8,14 @@ import {AccountButton,AccountSignIn} from '../components/AccountSignIn';
 import { useAccountSnapshot } from '../cloud/use-account-snapshot';
 import {AccountDeletionPanel} from '../components/AccountDeletionPanel';
 import {PuppyConnectionSummary} from '../components/PuppyConnectionSummary';
+import {PuppyIdentity} from '../components/PuppyIdentity';
+import {SettingsRow} from '../components/SettingsRow';
+import {ScreenHeader} from '../components/ScreenHeader';
 import { accountStatus,accountProblemKey } from '../cloud/account-status';
 import { useLocalization } from '../localization-context';
 import { spacing,surfaceTreatment,type Theme } from '../theme';
 
-export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cloud:CloudHandle;theme:Theme;eventCount:number;onBack:()=>void;onOpenActivity:()=>void}) {
+export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity,onOpenPets}:{cloud:CloudHandle;theme:Theme;eventCount:number;onBack:()=>void;onOpenActivity:()=>void;onOpenPets?:()=>void}) {
   const {t,locale}=useLocalization(),state=useAccountSnapshot(cloud.controller);
   const [localName,setLocalName]=useState<string|null>(null),[readFailed,setReadFailed]=useState(false);
   const mounted=useRef(true);
@@ -24,7 +27,6 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
   const enrolled=!!state?.sync?.accountId&&state.sync.state!=='local';
   useEffect(()=>{let mounted=true;cloud.getLocalName().then(name=>{if(mounted)setLocalName(name);}).catch(()=>{if(mounted)setReadFailed(true);});return()=>{mounted=false;};},[cloud.getLocalName]);
   useEffect(()=>()=>cloud.controller?.cancelExport(),[cloud.controller]);
-  const titleStyle={color:theme.text,fontFamily:theme.presentation.headingFont,fontSize:20,lineHeight:28,fontWeight:theme.presentation.titleWeight};
   const bodyStyle={color:theme.textMuted};
   const cardStyle=[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border,borderRadius:theme.presentation.cardRadius}];
   const name=state?.local?.name??localName;
@@ -56,16 +58,19 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
   }
   return <SafeAreaView style={[styles.root,{backgroundColor:theme.background}]} edges={['top','bottom']}>
     <KeyboardAvoidingView behavior="padding" style={styles.root}>
+        <ScreenHeader theme={theme} title={t('account.title')} testID="account.back" onBack={()=>{cloud.controller?.cancelExport();onBack();}} style={styles.header}/>
       <ScrollView testID="screen.account" keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Pressable testID="account.back" accessibilityRole="button" accessibilityLabel={t('account.back')} onPress={()=>{cloud.controller?.cancelExport();onBack();}} style={({pressed})=>[styles.back,{backgroundColor:pressed?theme.primarySoft:theme.surfaceRaised,borderRadius:theme.presentation.controlRadius}]}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no" />
-          </Pressable>
-          <Text accessibilityRole="header" maxFontSizeMultiplier={2} style={[styles.title,titleStyle]}>{t('account.title')}</Text>
-        </View>
         {errorKey&&errorKey!=='account.error.export'&&!(state?.deletion&&state.problem==='deletion-unconfirmed')?<Text testID="account.error" accessibilityRole="alert" style={[styles.notice,{color:theme.danger,backgroundColor:theme.dangerSoft,borderRadius:theme.presentation.controlRadius}]}>{t(errorKey)}</Text>:null}
         {state?.deleted?<View style={styles.stack}><Text testID="account.deleted" accessibilityRole="alert" style={[styles.body,{color:theme.primary}]}>{t('account.delete.done')}</Text>{state.deleted==='apple-manual'?<><Text style={[styles.body,bodyStyle]}>{t('account.delete.appleBody')}</Text><AccountButton theme={theme} testID="account.delete.apple" label={t('account.delete.apple')} onPress={()=>{void Linking.openURL('https://account.apple.com/').catch(()=>Alert.alert(t('learn.linkError'),t('learn.linkErrorBody')));}}/></>:null}</View>:null}
         {state?.deletion&&cloud.controller?<AccountDeletionPanel state={state} controller={cloud.controller} theme={theme}/>:<>
+        {!(account&&existing&&!enrolled)?<View testID="account.local.summary" style={cardStyle}>
+          <View style={styles.summaryHeader}><Text maxFontSizeMultiplier={2} style={[styles.eyebrow,{color:theme.primary}]}>{t('account.onDevice')}</Text></View>
+          <View style={styles.summaryHeader}><PuppyIdentity theme={theme}/><Text maxFontSizeMultiplier={2} style={[styles.puppy,styles.grow,{color:theme.text,fontFamily:theme.presentation.headingFont}]}>{shownName}</Text></View>
+          <Text testID="account.local.count" style={[styles.body,bodyStyle]}>{readFailed?t('account.error.storage'):countLabel(count)}</Text>
+          <Text testID="account.status" accessibilityLiveRegion="polite" style={[styles.status,{color:theme.primary}]}>{t(`account.status.${status}`)}</Text>
+        </View>:null}
+        {onOpenPets?<View style={cardStyle}><SettingsRow theme={theme} testID="account.pets.open" icon="paw-outline" label={t('nav.pets')} detail={t('settings.petsDetail')} onPress={onOpenPets} wrap/></View>:null}
+        <Text accessibilityRole="header" style={[styles.sectionTitle,{color:theme.text,fontFamily:theme.presentation.headingFont}]}>{t('account.backupTitle')}</Text>
         {!account?<AccountSignIn cloud={cloud} theme={theme} showError={false}/>:<>
           <View testID="account.identity" style={cardStyle}>
             <View style={styles.summaryHeader}>
@@ -83,13 +88,6 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
             </View>:<AccountButton key={provider} theme={theme} testID={`account.${provider}.connect`} label={t(provider==='apple'?'account.connectApple':'account.connectGoogle')} icon={provider} disabled={busy||!state.online} loading={state.linkingProvider===provider} onPress={()=>{void cloud.controller!.connectProvider(provider);}}/>)}
           </View>:null}
         </>}
-        <Text accessibilityRole="header" style={[styles.sectionTitle,{color:theme.text,fontFamily:theme.presentation.headingFont}]}>{t('account.backupTitle')}</Text>
-        {!(account&&existing&&!enrolled)?<View testID="account.local.summary" style={cardStyle}>
-          <View style={styles.summaryHeader}><MaterialCommunityIcons name="dog-side" size={31} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no" /><Text maxFontSizeMultiplier={2} style={[styles.eyebrow,{color:theme.primary}]}>{t('account.onDevice')}</Text></View>
-          <Text maxFontSizeMultiplier={2} style={[styles.puppy,{color:theme.text,fontFamily:theme.presentation.headingFont}]}>{shownName}</Text>
-          <Text testID="account.local.count" style={[styles.body,bodyStyle]}>{readFailed?t('account.error.storage'):countLabel(count)}</Text>
-          <Text testID="account.status" accessibilityLiveRegion="polite" style={[styles.status,{color:theme.primary}]}>{t(`account.status.${status}`)}</Text>
-        </View>:null}
         {account?(<View style={styles.stack}>
           {!enrolled?(<View style={cardStyle}>
             {existing?<>
@@ -129,6 +127,6 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
   </SafeAreaView>;
 }
 const styles=StyleSheet.create({
- root:{flex:1},content:{width:'100%',maxWidth:720,alignSelf:'center',padding:spacing.md,gap:spacing.md,paddingBottom:spacing.xl},sectionTitle:{fontSize:20,lineHeight:28,fontWeight:'700',marginTop:8},header:{flexDirection:'row',alignItems:'flex-start',gap:12},back:{width:48,height:48,alignItems:'center',justifyContent:'center'},title:{flex:1},card:{borderWidth:1,padding:spacing.md,gap:12},summaryHeader:{flexDirection:'row',alignItems:'center',gap:12},eyebrow:{fontSize:14,fontWeight:'700',flex:1},puppy:{fontSize:25,lineHeight:32,fontWeight:'700'},status:{fontSize:16,lineHeight:23,fontWeight:'700'},body:{fontSize:16,lineHeight:24},label:{fontSize:16,lineHeight:23,fontWeight:'700'},stack:{gap:12},notice:{fontSize:16,lineHeight:24,padding:14},grow:{flex:1},privacy:{minHeight:48,justifyContent:'center',alignSelf:'flex-start'},
+ root:{flex:1},header:{paddingHorizontal:spacing.md,paddingTop:spacing.md,paddingBottom:spacing.sm,width:'100%',maxWidth:720,alignSelf:'center'},content:{width:'100%',maxWidth:720,alignSelf:'center',padding:spacing.md,gap:spacing.md,paddingBottom:spacing.xl},sectionTitle:{fontSize:20,lineHeight:28,fontWeight:'700',marginTop:8},card:{borderWidth:1,padding:spacing.md,gap:12},summaryHeader:{flexDirection:'row',alignItems:'center',gap:12},eyebrow:{fontSize:14,fontWeight:'700',flex:1},puppy:{fontSize:25,lineHeight:32,fontWeight:'700'},status:{fontSize:16,lineHeight:23,fontWeight:'700'},body:{fontSize:16,lineHeight:24},label:{fontSize:16,lineHeight:23,fontWeight:'700'},stack:{gap:12},notice:{fontSize:16,lineHeight:24,padding:14},grow:{flex:1},privacy:{minHeight:48,justifyContent:'center',alignSelf:'flex-start'},
 
 });

@@ -11,6 +11,7 @@ import {PuppyIdentity} from '../components/PuppyIdentity';
 import { ActivityIcon } from '../components/ActivityIcon';
 import { ActivityCsvSettings } from '../components/ActivityCsvSettings';
 import { SettingsRow } from '../components/SettingsRow';
+import {AccountSettingsRow} from '../components/AccountSettingsRow';
 import { ActivityBackupSettings } from '../components/ActivityBackupSettings.native';
 import type { CloudHandle } from '../cloud/use-cloud';
 import { useLocalization } from '../localization-context';
@@ -45,6 +46,9 @@ export function SettingsScreen({
   onRequestNotificationPermission,
   onOpenSystemSettings,
   onOpenGuide,
+  cloudHandle,
+  onOpenAccount,
+  onOpenPets,
   onOpenHistory,
   onBackupsRestored,
   onOpenNotifications,
@@ -68,6 +72,7 @@ export function SettingsScreen({
   onOpenGuide: () => void;
   cloudHandle?: CloudHandle;
   onOpenAccount?: () => void;
+  onOpenPets?: () => void;
   onOpenHistory?: () => void;
   onBackupsRestored?: () => Promise<void>;
   onOpenNotifications: () => void;
@@ -194,6 +199,11 @@ export function SettingsScreen({
         </Text>
       </View>:null}
 
+      <SectionLabel label={t('settings.accountPets')} theme={theme}/>
+      {cloudHandle?.available&&onOpenAccount?<AccountSettingsRow cloud={cloudHandle} theme={theme} onOpen={onOpenAccount}/>:null}
+      {onOpenPets?<View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}>
+        <SettingsRow testID="settings.pets.open" icon="paw-outline" label={t('nav.pets')} detail={t('settings.petsDetail')} onPress={onOpenPets} theme={theme} wrap/>
+      </View>:null}
       <SectionLabel label={t('settings.preferences')} theme={theme} />
       <View style={[styles.card, surfaceTreatment(theme), { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
         <SettingsRow
