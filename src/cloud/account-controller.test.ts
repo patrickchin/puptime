@@ -925,3 +925,52 @@ for(const status of [400,409] as const)test(`a rejected ${status} upload preserv
  assert.deepEqual(diagnostics.at(-1),{event:'sync',result:'error',state:'error',category:status===400?'invalid-request':'conflict',pending,blocked:0});
  assert.ok(!JSON.stringify(diagnostics).includes('person@example.com'));
 });
+
+for(const cloud of [{id:'pet_unrelated',name:'Biscuit'},{id:'pet-1',name:'Maple'}])test(`named comparison still needs explicit confirmation for ${cloud.id}/${cloud.name}`,async t=>{
+ const f=await fixture(t);f.state.credentials=true;await f.runtime.storage.savePuppyName('Biscuit');
+ await f.runtime.storage.appendEvents(Array.from({length:120},(_,i)=>({...event,id:'evt_artificial_'+i,at:1000+i})));
+ f.state.summary.pets=[{...cloud,eventCount:95}];await f.controller.refresh();
+ assert.deepEqual(f.controller.read().local,{name:'Biscuit',eventCount:120,lastActivityAt:1119});
+ const before=await localTables(f.runtime);
+ assert.equal(await f.controller.enableCloud({expectedAccountId:'account-1'}),'confirmation-required');
+ assert.deepEqual(await localTables(f.runtime),before);assert.deepEqual([f.state.enrollCalls,f.state.pushCalls,f.state.pullCalls],[0,0,0]);
+ assert.equal(await f.controller.enableCloud({confirmedPetId:cloud.id,expectedAccountId:'account-1'}),'ok');
+ assert.equal((await f.runtime.sync.enrollmentState())!.request.confirmedPetId,cloud.id);
+ assert.deepEqual(await f.runtime.storage.loadEvents(),Array.from({length:120},(_,i)=>({...event,id:'evt_artificial_'+i,at:1000+i})).reverse());
+});
+
+test('a named-history confirmation cannot attach a newly authenticated account or a changed cloud puppy',async t=>{
+ const f=await fixture(t);f.state.credentials=true;await f.runtime.storage.appendEvents([event]);
+ f.state.summary.pets=[{id:'pet_cloud_reviewed',name:'Biscuit',eventCount:7}];await f.controller.refresh();
+ const before=await localTables(f.runtime);
+ f.state.summary.user={id:'account-2',email:'other@example.invalid',name:'Other account'};
+ assert.equal(await f.controller.enableCloud({expectedAccountId:'account-1',confirmedPetId:'pet_cloud_reviewed'}),'error');
+ assert.equal(f.controller.read().problem,'account-mismatch');
+ f.state.summary.user={id:'account-1',email:'person@example.com',name:'Person'};f.state.summary.pets=[{id:'pet_cloud_replaced',name:'Biscuit',eventCount:7}];
+ assert.equal(await f.controller.enableCloud({expectedAccountId:'account-1',confirmedPetId:'pet_cloud_reviewed'}),'confirmation-required');
+ assert.deepEqual(await localTables(f.runtime),before);assert.deepEqual([f.state.enrollCalls,f.state.pushCalls,f.state.pullCalls],[0,0,0]);
+});
+
+test('first-launch named confirmation revalidates identity before replacing a paused restore',async t=>{
+ const {controller,runtime,state,api,timers}=await fixture(t,{pristine:true});state.credentials=true;
+ state.summary.pets=[{id:'pet_cloud_reviewed',name:'Basil',eventCount:0}];await controller.refresh();
+ api.enroll=async()=>{state.enrollCalls++;return {petId:'pet_cloud_reviewed'};};
+ api.pull=async after=>{state.pullCalls++;await runtime.storage.appendEvents([event]);return {changes:[],cursor:after,hasMore:false};};
+ await controller.enableCloud({confirmedPetId:'pet_cloud_reviewed',mode:'restore'});controller.setActive(true);await controller.refresh();
+ const task=timers.find(timer=>!timer.cancelled)!;task.cancelled=true;task.fn();await tick();
+ assert.equal(controller.read().problem,'confirmation-required');controller.setActive(false);await tick();
+ const status=await runtime.sync.status(runtime.petId),before=await localTables(runtime);
+ const confirmation={mode:'combine' as const,expectedAccountId:'account-1',confirmedPetId:'pet_cloud_reviewed',confirmedThrough:status.pendingThrough};
+ state.summary.user={id:'account-2',email:'other@example.invalid',name:'Other account'};
+ assert.equal(await controller.enableCloud(confirmation),'error');assert.equal(controller.read().problem,'account-mismatch');assert.deepEqual(await localTables(runtime),before);
+ state.summary.user={id:'account-1',email:'person@example.com',name:'Person'};state.summary.pets=[{id:'pet_cloud_replaced',name:'Basil',eventCount:0}];
+ assert.equal(await controller.enableCloud(confirmation),'confirmation-required');assert.deepEqual(await localTables(runtime),before);
+ assert.deepEqual([state.enrollCalls,state.pushCalls,state.pullCalls],[1,0,1]);
+ state.summary.pets=[{id:'pet_cloud_reviewed',name:'Basil',eventCount:0}];
+ // A paused restore keeps later writes locally without an outbox; combining must retain them.
+ const newer={...event,id:'evt_after_confirmation',at:101};await runtime.storage.appendEvents([newer]);
+ assert.equal(await controller.enableCloud(confirmation),'ok');assert.deepEqual(await runtime.storage.loadEvents(),[newer,event]);
+ assert.equal((await runtime.sync.enrollmentState())!.request.confirmedPetId,'pet_cloud_reviewed');
+ assert.notEqual((await runtime.sync.status(runtime.petId)).generation,status.generation);
+ assert.deepEqual([state.enrollCalls,state.pushCalls,state.pullCalls],[1,0,1]);
+});

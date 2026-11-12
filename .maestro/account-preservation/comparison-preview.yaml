@@ -1,0 +1,76 @@
+appId: com.patrickchin.puptime
+name: Named phone and cloud comparison cancels and stays local
+---
+- launchApp:
+    permissions: {}
+- runFlow: ../helpers/open-account.yaml
+- scrollUntilVisible:
+    element:
+      id: account.connection.phone.name
+    direction: DOWN
+    visibilityPercentage: 100
+- assertVisible: On this phone
+- assertVisible:
+    id: account.connection.phone.name
+    text: ${PHONE_NAME}
+- assertVisible:
+    id: account.connection.phone.count
+    text: ${PHONE_COUNT} activity logs
+- scrollUntilVisible:
+    element:
+      id: account.connection.cloud.name
+    direction: DOWN
+    visibilityPercentage: 100
+- assertVisible: In your cloud account
+- assertVisible:
+    id: account.connection.cloud.name
+    text: ${CLOUD_NAME}
+- assertVisible:
+    id: account.connection.cloud.count
+    text: ${CLOUD_COUNT} activity logs
+- takeScreenshot: ${COMPARISON_CASE}-summary
+- scrollUntilVisible:
+    element:
+      id: account.enable
+    direction: DOWN
+    visibilityPercentage: 100
+- assertVisible:
+    id: account.enable
+    text: Combine these histories…
+    enabled: true
+- tapOn:
+    id: account.enable
+- assertVisible: ^Combine these histories\?$
+- assertVisible: '(?s)On this phone: ${PHONE_NAME}.*In your cloud account: ${CLOUD_NAME}.*'
+- takeScreenshot: ${COMPARISON_CASE}-confirmation
+- tapOn: ^Cancel$
+- assertNotVisible: ^Combine these histories\?$
+- scrollUntilVisible:
+    element:
+      id: account.keepLocal
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn:
+    id: account.keepLocal
+- assertVisible:
+    id: screen.today
+- launchApp:
+    permissions: {}
+- runFlow: ../helpers/open-account.yaml
+- scrollUntilVisible:
+    element:
+      id: account.status
+    direction: DOWN
+    visibilityPercentage: 100
+- assertVisible:
+    id: account.status
+    text: Signed in · cloud sync off
+- scrollUntilVisible:
+    element:
+      id: account.enable
+    direction: DOWN
+    visibilityPercentage: 100
+- assertVisible:
+    id: account.enable
+    text: Combine these histories…
+    enabled: true

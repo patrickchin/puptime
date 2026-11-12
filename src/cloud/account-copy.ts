@@ -1,4 +1,9 @@
 export const accountEnglish={
+ 'account.onPhone':'On this phone','account.inCloud':'In your cloud account','account.historyLoading':'Loading history…','account.latestActivity':'Latest activity: {date}',
+ 'account.compareBody':'Check both histories before connecting this phone. Nothing uploads until you choose to connect.',
+ 'account.keepLocal':'Continue without sync','account.combineReview':'Combine these histories…','account.combineConfirmTitle':'Combine these histories?',
+ 'account.combineConfirmBody':'On this phone: {phoneName} ({phoneCount}).\nIn your cloud account: {cloudName} ({cloudCount}).\n\nCombine only if these histories are for the same puppy. Changes will sync between them.',
+
  "account.delete.action":"Delete cloud account",
  "account.delete.title":"Delete cloud account?",
  "account.delete.body":"Delete the cloud account and its saved cloud history. Logs on this device are kept.",
@@ -29,13 +34,18 @@ export const accountEnglish={
  'account.loading':'Loading account…','account.unavailable':'Cloud sign-in isn’t available yet. Your logs stay on this device.','account.intro':'Sign in to back up your puppy’s history and use it across your devices. You choose when to upload after signing in.',
  'account.apple':'Continue with Apple','account.google':'Continue with Google','account.email':'Email address','account.sendCode':'Email me a code','account.code':'Sign-in code','account.codeSent':'Code sent to {email}','account.verify':'Continue','account.resend':'Resend code','account.changeEmail':'Change email',
  'account.enable':'Enable cloud sync','account.enrollBody':'Upload this puppy’s activity, routines and preferences to your account. Changes then sync between your devices.',
- 'account.cloudPuppy':'Already in your account','account.samePuppy':'These records are for the same puppy','account.combineBody':'Confirm this is the same puppy before combining histories. If it’s a different puppy, keep using this device locally or sign in with another account.','account.combine':'Combine histories and enable sync',
+ 'account.combine':'Combine and sync',
  'account.pending':'{count} changes waiting','account.blocked':'{count} changes need attention. They’re saved on this device.','account.viewLogs':'Open activity logs','account.retry':'Retry sync','account.refresh':'Refresh account','account.pausedBody':'Your local logs and cloud copy are kept while sync is paused.',
  'account.signOut':'Sign out','account.signOutTitle':'Sign out on this device?','account.signOutBody':'Local history and your cloud copy are kept. {count} pending changes will stay on this device.','account.cancel':'Cancel','account.privacy':'Privacy policy',
  'account.status.local':'Stored on this device','account.status.notEnabled':'Signed in · cloud sync off','account.status.auth':'Sign in again to sync','account.status.mismatch':'Connected to a different account','account.status.offline':'Offline · saved on this device','account.status.preparing':'Setting up cloud sync…','account.status.attention':'Some changes need attention','account.status.paused':'Sync paused','account.status.syncing':'Syncing…','account.status.pending':'Changes waiting to sync','account.status.synced':'Up to date','account.status.checking':'Waiting to check cloud sync',
  'account.error.email':'Enter a valid email address.','account.error.code':'That code didn’t work. Check the code or request a new one.','account.error.expiredCode':'This code has expired. Request a new one.','account.error.attempts':'Too many attempts. Wait a moment, then try again.','account.error.network':'Cloud isn’t responding. Your logs are saved on this device. Try again when connected.','account.error.service':'Cloud is unavailable right now. Your local logs are kept. Try again later.','account.error.mismatch':'This device is connected to another account. Sign out to keep the history locally before connecting a different account.','account.error.signOut':'Couldn’t finish signing out on this device. Sync is paused. Try signing out again.','account.error.remoteSignOut':'Signed out on this device. The server could not confirm ending the session.','account.error.storage':'Couldn’t read the local history. Your existing data has been kept. Try reopening Puptime.','account.error.signIn':'Couldn’t sign in. Try again or choose another sign-in method.',
 } as const;
 export const accountChinese:Record<keyof typeof accountEnglish,string>={
+ 'account.onPhone':'在这部手机上','account.inCloud':'在你的云端账户中','account.historyLoading':'正在读取历史记录…','account.latestActivity':'最近的活动：{date}',
+ 'account.compareBody':'连接这部手机前，请核对两边的记录。只有你选择连接后才会上传。',
+ 'account.keepLocal':'暂不开启同步','account.combineReview':'合并这两份记录…','account.combineConfirmTitle':'合并这两份记录？',
+ 'account.combineConfirmBody':'这部手机上：{phoneName}（{phoneCount}）。\n云端账户中：{cloudName}（{cloudCount}）。\n\n只有两份记录属于同一只幼犬时才合并。合并后，两边的更改会相互同步。',
+
  "account.delete.action":"删除云端账户",
  "account.delete.title":"删除云端账户？",
  "account.delete.body":"删除云端账户及其云端历史记录。此设备上的记录会保留。",
@@ -66,13 +76,18 @@ export const accountChinese:Record<keyof typeof accountEnglish,string>={
  'account.loading':'正在加载账户…','account.unavailable':'云端登录尚未开放。记录会保留在这台设备上。','account.intro':'登录后可备份幼犬的记录，并在多台设备上使用。你可以在登录后选择何时上传。',
  'account.apple':'使用 Apple 继续','account.google':'使用 Google 继续','account.email':'电子邮箱','account.sendCode':'发送邮箱验证码','account.code':'登录验证码','account.codeSent':'验证码已发送至 {email}','account.verify':'继续','account.resend':'重新发送验证码','account.changeEmail':'更换邮箱',
  'account.enable':'开启云同步','account.enrollBody':'将这只幼犬的活动、日程和偏好设置上传至你的账户。之后的更改会在设备间同步。',
- 'account.cloudPuppy':'账户中已有的幼犬','account.samePuppy':'这些记录属于同一只幼犬','account.combineBody':'合并记录前，请确认这是同一只幼犬。如果不是，请继续在本机记录，或使用另一个账户登录。','account.combine':'合并记录并开启同步',
+ 'account.combine':'合并并同步',
  'account.pending':'{count} 项更改等待同步','account.blocked':'{count} 项更改需要处理，已保存在这台设备上。','account.viewLogs':'查看活动记录','account.retry':'重试同步','account.refresh':'刷新账户','account.pausedBody':'同步暂停时，本地记录和云端副本都会保留。',
  'account.signOut':'退出登录','account.signOutTitle':'在这台设备上退出登录？','account.signOutBody':'本地记录和云端副本都会保留。{count} 项尚未同步的更改将保留在这台设备上。','account.cancel':'取消','account.privacy':'隐私政策',
  'account.status.local':'已保存在这台设备上','account.status.notEnabled':'已登录 · 云同步未开启','account.status.auth':'请重新登录以同步','account.status.mismatch':'已连接到另一个账户','account.status.offline':'离线 · 已保存在本机','account.status.preparing':'正在设置云同步…','account.status.attention':'部分更改需要处理','account.status.paused':'同步已暂停','account.status.syncing':'正在同步…','account.status.pending':'更改等待同步','account.status.synced':'已是最新状态','account.status.checking':'等待检查云同步',
  'account.error.email':'请输入有效的电子邮箱。','account.error.code':'验证码不正确，请检查或重新获取。','account.error.expiredCode':'验证码已过期，请重新获取。','account.error.attempts':'尝试次数过多，请稍后重试。','account.error.network':'暂时无法连接云端。记录已保存在这台设备上，请联网后重试。','account.error.service':'云服务暂时不可用。本地记录会保留，请稍后重试。','account.error.mismatch':'这台设备已连接到另一个账户。请先退出登录，将记录保留在本机，再连接其他账户。','account.error.signOut':'未能完成退出登录，同步已暂停。请再次尝试退出。','account.error.remoteSignOut':'已在这台设备上退出登录，但服务器尚未确认结束会话。','account.error.storage':'无法读取本地记录，原有数据已保留。请尝试重新打开 Puptime。','account.error.signIn':'无法登录，请重试或选择其他登录方式。',
 };
 export const accountSpanish:Record<keyof typeof accountEnglish,string>={
+ 'account.onPhone':'En este teléfono','account.inCloud':'En tu cuenta en la nube','account.historyLoading':'Cargando historial…','account.latestActivity':'Última actividad: {date}',
+ 'account.compareBody':'Revisa ambos historiales antes de conectar este teléfono. Nada se sube hasta que elijas conectarlo.',
+ 'account.keepLocal':'Continuar sin sincronizar','account.combineReview':'Combinar estos historiales…','account.combineConfirmTitle':'¿Combinar estos historiales?',
+ 'account.combineConfirmBody':'En este teléfono: {phoneName} ({phoneCount}).\nEn tu cuenta en la nube: {cloudName} ({cloudCount}).\n\nCombina solo si ambos historiales son del mismo cachorro. Después, los cambios se sincronizarán entre ambos.',
+
  "account.delete.action":"Eliminar cuenta en la nube",
  "account.delete.title":"¿Eliminar cuenta en la nube?",
  "account.delete.body":"Elimina la cuenta y su historial en la nube. Los registros de este dispositivo se conservan.",
@@ -103,7 +118,7 @@ export const accountSpanish:Record<keyof typeof accountEnglish,string>={
  'account.loading':'Cargando cuenta…','account.unavailable':'El acceso a la nube aún no está disponible. Tus registros se guardan en este dispositivo.','account.intro':'Inicia sesión para respaldar el historial de tu cachorro y usarlo en tus dispositivos. Después decides cuándo subirlo.',
  'account.apple':'Continuar con Apple','account.google':'Continuar con Google','account.email':'Correo electrónico','account.sendCode':'Enviarme un código','account.code':'Código de acceso','account.codeSent':'Código enviado a {email}','account.verify':'Continuar','account.resend':'Reenviar código','account.changeEmail':'Cambiar correo',
  'account.enable':'Activar sincronización','account.enrollBody':'Sube la actividad, las rutinas y las preferencias de este cachorro a tu cuenta. Los cambios se sincronizarán entre tus dispositivos.',
- 'account.cloudPuppy':'Ya está en tu cuenta','account.samePuppy':'Los registros son del mismo cachorro','account.combineBody':'Confirma que es el mismo cachorro antes de combinar historiales. Si es otro, sigue usando este dispositivo sin conexión a la cuenta o inicia sesión en otra cuenta.','account.combine':'Combinar historiales y sincronizar',
+ 'account.combine':'Combinar y sincronizar',
  'account.pending':'{count} cambios pendientes','account.blocked':'{count} cambios necesitan atención. Están guardados en este dispositivo.','account.viewLogs':'Abrir registros de actividad','account.retry':'Reintentar sincronización','account.refresh':'Actualizar cuenta','account.pausedBody':'Tus registros locales y la copia en la nube se conservan mientras se pausa la sincronización.',
  'account.signOut':'Cerrar sesión','account.signOutTitle':'¿Cerrar sesión en este dispositivo?','account.signOutBody':'Se conservan el historial local y la copia en la nube. {count} cambios pendientes se quedarán en este dispositivo.','account.cancel':'Cancelar','account.privacy':'Política de privacidad',
  'account.status.local':'Guardado en este dispositivo','account.status.notEnabled':'Sesión iniciada · nube desactivada','account.status.auth':'Inicia sesión de nuevo para sincronizar','account.status.mismatch':'Conectado a otra cuenta','account.status.offline':'Sin conexión · guardado en este dispositivo','account.status.preparing':'Configurando sincronización…','account.status.attention':'Algunos cambios necesitan atención','account.status.paused':'Sincronización en pausa','account.status.syncing':'Sincronizando…','account.status.pending':'Cambios pendientes de sincronizar','account.status.synced':'Al día','account.status.checking':'Pendiente de comprobar la nube',

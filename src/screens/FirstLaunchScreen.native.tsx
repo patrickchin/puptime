@@ -7,6 +7,7 @@ import {AccountButton,AccountSignIn} from '../components/AccountSignIn';
 import {useAccountSnapshot} from '../cloud/use-account-snapshot';
 import {accountProblemKey} from '../cloud/account-status';
 import {continueFirstLaunchLocally} from '../cloud/account-controller';
+import {PuppyConnectionSummary} from '../components/PuppyConnectionSummary';
 import {getLocalRuntime} from '../local/runtime.native';
 import {loadFirstLaunch,saveFirstLaunchProfile,saveFirstLaunchStep} from '../storage.native';
 import {useLocalization} from '../localization-context';
@@ -81,14 +82,15 @@ export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPerm
  }
  async function activate(mode:'restore'|'combine',confirmedThrough?:number) {
   await act(async()=>{
-   if(!cloud.controller)return;
-   if(mode==='combine'&&enrolled){if(await cloud.controller.continueLocally({confirmPending:true,confirmedThrough})!=='ok')return;}
-   await cloud.controller.enableCloud({mode,...(existing?{confirmedPetId:existing.id}:{})});
+   if(!cloud.controller||!account)return;
+   await cloud.controller.enableCloud({mode,expectedAccountId:account.user.id,...(enrolled?{confirmedThrough}:{}),...(existing?{confirmedPetId:existing.id}:{})});
   });
  }
  function combine() {
   const confirmedThrough=cloud.controller?.read().sync?.pendingThrough??0;
-  Alert.alert(t('account.combine'),t('account.combineBody'),[{text:t('account.cancel'),style:'cancel'},{text:t('account.combine'),onPress:()=>{void activate('combine',confirmedThrough);}}]);
+  if(!existing)return;
+  const count=(value:number)=>t(value===1?'account.logsOne':'account.logsMany',{count:new Intl.NumberFormat(locale).format(value)});
+  Alert.alert(t('account.combineConfirmTitle'),t('account.combineConfirmBody',{phoneName:state?.local?.name??shownName,phoneCount:count(state?.local?.eventCount??0),cloudName:existing.name,cloudCount:count(existing.eventCount)}),[{text:t('account.cancel'),style:'cancel'},{text:t('account.combine'),onPress:()=>{void activate('combine',confirmedThrough);}}]);
  }
  function back() {
   if(working)return;
@@ -138,12 +140,10 @@ export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPerm
    {step==='cloud'?<>
     {cloudError?<Text testID="setup.cloud.error" accessibilityRole="alert" style={[styles.body,{color:theme.danger}]}>{t(cloudError)}</Text>:null}
     {!account?<AccountSignIn cloud={cloud} theme={theme} showIntro={false} showError={false}/>:<>
-     <Text style={[styles.caption,{color:theme.textMuted}]}>{account.user.email}</Text>
+     {!existing?<Text style={[styles.caption,{color:theme.textMuted}]}>{account.user.email}</Text>:null}
      {existing?<View testID="setup.cloud.puppy" style={cardStyle}>
-      <Text style={[styles.label,{color:theme.primary}]}>{t('account.cloudPuppy')}</Text>
-      <Text style={[styles.puppyName,headingStyle(theme),{color:theme.text}]}>{existing.name}</Text>
-      <Text style={bodyStyle}>{t(existing.eventCount===1?'account.logsOne':'account.logsMany',{count:new Intl.NumberFormat(locale).format(existing.eventCount)})}</Text>
-      {!enrolled?<Text style={bodyStyle}>{t(pristine?'setup.restoreBody':'account.combineBody')}</Text>:null}
+      <PuppyConnectionSummary phone={{name:state?.local?.name??shownName,eventCount:state?.local?.eventCount??null,lastActivityAt:state?.local?.lastActivityAt??null}} cloud={existing} email={account.user.email} theme={theme}/>
+      {!enrolled?<Text style={bodyStyle}>{t(pristine?'setup.restoreBody':'account.compareBody')}</Text>:null}
      </View>:null}
      {!account.cloud.canSync?<Text style={bodyStyle}>{t('account.pausedBody')}</Text>:null}
      {active?<>
@@ -153,7 +153,7 @@ export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPerm
       {state?.running?<View style={styles.loading}><ActivityIndicator color={theme.primary}/><Text style={bodyStyle}>{t('setup.cloudLoading')}</Text></View>:null}
       {button('setup.cloud.retry',t('account.retry'),()=>{void cloud.controller?.retry();},false,working||!!state?.running||!state?.online)}
      </>:<>
-      {button('setup.cloud.enable',existing?t(pristine?'setup.restore':'account.combine'):t('account.enable'),()=>{if(existing&&!pristine)combine();else void activate(existing?'restore':'combine');},true,working||!state?.online||!account.cloud.canSync||!!existing&&pristine===null,working)}
+      {button('setup.cloud.enable',t(existing?(pristine?'setup.restore':'account.combineReview'):'account.enable'),()=>{if(existing&&!pristine)combine();else void activate(existing?'restore':'combine');},true,working||!state?.online||!account.cloud.canSync||!state?.local||!!existing&&pristine===null,working)}
      </>}
     </>}
     <View style={styles.space}/>

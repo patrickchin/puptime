@@ -1,18 +1,8 @@
 appId: com.patrickchin.puptime
-name: iOS confirmed same puppy combines local and cloud history
+name: iOS explicit named-history confirmation combines local and cloud history
 ---
 - launchApp:
     stopApp: false
-- scrollUntilVisible:
-    element:
-      id: account.samePuppy
-    direction: DOWN
-    visibilityPercentage: 100
-- tapOn:
-    id: account.samePuppy
-- assertVisible:
-    id: account.samePuppy
-    checked: true
 - scrollUntilVisible:
     element:
       id: account.enable
@@ -20,6 +10,8 @@ name: iOS confirmed same puppy combines local and cloud history
     visibilityPercentage: 100
 - tapOn:
     id: account.enable
+- assertVisible: ^Combine these histories\?$
+- tapOn: ^Combine and sync$
 - extendedWaitUntil:
     visible:
       id: account.status
