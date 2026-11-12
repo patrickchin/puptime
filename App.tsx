@@ -335,6 +335,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     setSettingsVisible(true);
   };
   const openTab = (nextTab: AppTab) => {
+    if (!settingsVisible && nextTab === tab) return;
     setNavigationHistory(history => [...history, settingsVisible ? 'settings' : tab]);
     setSettingsVisible(false);
     setTab(nextTab);
@@ -750,6 +751,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
           onBack={goBack}
           cloudHandle={cloud}
           onOpenAccount={()=>setAccountVisible(true)}
+          onOpenPets={()=>openTab('pets')}
           onOpenPicker={setPreferencePicker}
           onWidgetActionsChange={changeWidgetActions}
           onNotificationPreferencesChange={changeNotificationPreferences}
@@ -765,7 +767,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
         />
       );
     }
-    if(tab==='pets')return <PetsScreen theme={theme} cloud={cloud} eventCount={eventCount} shared={!!care} sharedName={care?.name} onShare={()=>setSharingKind('household')} onOpenShared={()=>setSharedView({})}/>;
+    if(tab==='pets')return <PetsScreen theme={theme} cloud={cloud} eventCount={eventCount} shared={!!care} sharedName={care?.name} onShare={()=>setSharingKind('household')} onOpenShared={()=>setSharedView({})} onOpenAccount={()=>setAccountVisible(true)}/>;
     if(tab==='notifications')return <NotificationsScreen theme={theme} petId={petId} notificationPreferences={notificationPreferences}
       notificationPermission={notificationPermission} notificationDelivery={notificationDelivery}
       quietStatusEnabled={quietStatusEnabled} onQuietStatusChange={nativeApp?changeQuietStatus:undefined}
@@ -943,7 +945,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
             onClose={() => setPreferencePicker(null)}
           />
           <Modal visible={accountVisible&&cloud.available} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={()=>setAccountVisible(false)}>
-            {accountVisible?<SafeAreaProvider><AccountScreen cloud={cloud} theme={theme} eventCount={eventCount} onBack={()=>setAccountVisible(false)} onOpenActivity={()=>{setAccountVisible(false);navigateToTab('log');}}/></SafeAreaProvider>:null}
+            {accountVisible?<SafeAreaProvider><AccountScreen cloud={cloud} theme={theme} eventCount={eventCount} onBack={()=>setAccountVisible(false)} onOpenPets={()=>{setAccountVisible(false);openTab('pets');}} onOpenActivity={()=>{setAccountVisible(false);navigateToTab('log');}}/></SafeAreaProvider>:null}
           </Modal>
           <Modal visible={sharingKind!==null&&onboardingVisible===false} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={()=>setSharingKind(null)}>
             {sharingKind?<SafeAreaProvider><SharePuppyScreen cloud={cloud} theme={theme} eventCount={eventCount} initialKind={sharingKind} onBack={()=>setSharingKind(null)}/></SafeAreaProvider>:null}

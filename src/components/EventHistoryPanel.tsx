@@ -1,3 +1,4 @@
+import {ScreenHeader} from './ScreenHeader';
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {ActivityIndicator,FlatList,ScrollView,StyleSheet,Text,View,useWindowDimensions} from 'react-native';
@@ -118,7 +119,7 @@ export function EventHistoryPanel({data,eventId,cloud,theme,onBack,onRestored,re
   if(selected){setSelected(null);selectedRef.current=null;setRestoreError(null);return;}
   onBack();
  };
- const text={color:theme.text},muted={color:theme.textMuted};
+ const muted={color:theme.textMuted};
  const notice=(key:MessageKey,id:string,danger=false)=><Text testID={id} accessibilityRole={danger?'alert':undefined} accessibilityLiveRegion="polite" style={[styles.notice,{color:danger?theme.danger:theme.text,backgroundColor:danger?theme.dangerSoft:theme.primarySoft,borderRadius:theme.presentation.controlRadius}]}>{t(key)}</Text>;
  const rows:HistoryRow[]=[];
  if(page?.head.owner&&page.head.cloudRecord){rows.push({kind:'cloud-controls'});for(const revision of cloudVersions)rows.push({kind:'cloud',revision});if(cloudNext)rows.push({kind:'cloud-more'});}
@@ -142,10 +143,7 @@ export function EventHistoryPanel({data,eventId,cloud,theme,onBack,onRestored,re
  };
  // Recreate stale native text layout after a live font-size change; keep panel state.
  return <View key={fontScale} testID="history.panel" style={[styles.root,{backgroundColor:theme.background}]}>
-  <View style={styles.header}>
-   <Pressable testID="history.back" accessibilityRole="button" accessibilityLabel={t('onboarding.back')} accessibilityState={{disabled:saving}} disabled={saving} onPress={back} style={({pressed})=>[styles.back,{backgroundColor:pressed?theme.primarySoft:theme.surfaceRaised,borderRadius:theme.presentation.controlRadius}]}><MaterialCommunityIcons name="arrow-left" size={24} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/></Pressable>
-   <Text accessibilityRole="header" maxFontSizeMultiplier={1.5} style={[styles.title,text,{fontFamily:theme.presentation.headingFont}]}>{t(confirm?'history.confirmTitle':'history.title')}</Text>
-  </View>
+  <ScreenHeader theme={theme} title={t(confirm?'history.confirmTitle':'history.title')} testID="history.back" disabled={saving} onBack={back} style={styles.header}/>
   {selected?<ScrollView key={confirm?'confirm':'detail'} testID={confirm?'history.confirm':'history.detail'} contentContainerStyle={styles.content}>
    {restored?notice('history.restored','history.restored'):null}
    {!restored&&page&&!page.head.event&&page.head.sequence!==null?notice('history.deleted','history.deleted'):null}
@@ -195,4 +193,4 @@ function Snapshot({event,theme,label,prefix}:{event:PuppyEvent|null;theme:Theme;
   </>}
  </View>;
 }
-const styles=StyleSheet.create({root:{flex:1},header:{padding:spacing.md,flexDirection:'row',alignItems:'flex-start',gap:12},back:{width:48,height:48,alignItems:'center',justifyContent:'center'},title:{flex:1,fontSize:20,lineHeight:28,fontWeight:'700'},content:{paddingHorizontal:spacing.md,paddingBottom:spacing.xl,gap:12},row:{minHeight:72,borderWidth:StyleSheet.hairlineWidth,padding:14,flexDirection:'row',alignItems:'center',gap:12},icon:{width:42,height:42,alignItems:'center',justifyContent:'center'},copy:{flex:1,gap:4},rowTitle:{fontSize:16,lineHeight:23,fontWeight:'700',flexShrink:1},small:{fontSize:14,lineHeight:21},body:{fontSize:16,lineHeight:24},notice:{fontSize:16,lineHeight:24,padding:14},snapshot:{padding:16,borderWidth:StyleSheet.hairlineWidth,gap:10},activity:{flexDirection:'row',alignItems:'center',gap:10},stack:{gap:12},loading:{flexDirection:'row',alignItems:'center',gap:12},cloudControls:{gap:12,marginTop:12}});
+const styles=StyleSheet.create({root:{flex:1},header:{padding:spacing.md,width:'100%',maxWidth:720,alignSelf:'center'},content:{width:'100%',maxWidth:720,alignSelf:'center',paddingHorizontal:spacing.md,paddingBottom:spacing.xl,gap:12},row:{minHeight:72,borderWidth:StyleSheet.hairlineWidth,padding:14,flexDirection:'row',alignItems:'center',gap:12},icon:{width:42,height:42,alignItems:'center',justifyContent:'center'},copy:{flex:1,gap:4},rowTitle:{fontSize:16,lineHeight:23,fontWeight:'700',flexShrink:1},small:{fontSize:14,lineHeight:21},body:{fontSize:16,lineHeight:24},notice:{fontSize:16,lineHeight:24,padding:14},snapshot:{padding:16,borderWidth:StyleSheet.hairlineWidth,gap:10},activity:{flexDirection:'row',alignItems:'center',gap:10},stack:{gap:12},loading:{flexDirection:'row',alignItems:'center',gap:12},cloudControls:{gap:12,marginTop:12}});

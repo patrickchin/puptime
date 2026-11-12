@@ -7,6 +7,7 @@ import {AccountButton} from '../components/AccountSignIn';
 import {Pressable} from '../components/TelemetryPressable';
 import {AccountScreen} from './AccountScreen';
 import {SharedPuppiesScreen} from './SharedPuppiesScreen';
+import {ScreenHeader} from '../components/ScreenHeader';
 import {useAccountSnapshot} from '../cloud/use-account-snapshot';
 import type {CloudHandle} from '../cloud/handle';
 import {entityId} from '../entity-id';
@@ -52,8 +53,8 @@ export function SharePuppyScreen({cloud,theme,eventCount,onBack,initialKind='hou
  if(shared)return <SharedPuppiesScreen cloud={cloud} theme={theme} onBack={()=>setShared(false)}/>;
  if(setup)return <AccountScreen cloud={cloud} theme={theme} eventCount={eventCount} onBack={()=>setSetup(false)} onOpenActivity={onBack}/>;
  return <SafeAreaView style={[styles.root,{backgroundColor:theme.background}]} edges={['top','bottom']}><KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':'height'} style={styles.root}>
+  <ScreenHeader theme={theme} title={t('sharing.title')} testID="sharing.back" onBack={onBack} style={styles.header}/>
  <ScrollView testID="screen.sharing" keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
-  <View style={styles.header}>{button('sharing.back',t('account.back'),onBack)}<Text accessibilityRole="header" style={[styles.title,headingStyle(theme),{color:theme.text}]}>{t('sharing.title')}</Text></View>
   {error?<Text accessibilityRole="alert" style={[styles.body,{color:theme.danger}]}>{error}</Text>:null}
   {!ready?<View style={styles.stack}><Text style={[styles.body,{color:theme.textMuted}]}>{t('sharing.setupBody')}</Text>{button('sharing.setup',t('sharing.setup'),()=>setSetup(true),true)}</View>:<>
    <View accessibilityRole="radiogroup" style={styles.stack}>{(['household','temporary'] as const).map(value=><View key={value}>
@@ -89,4 +90,4 @@ export function SharePuppyScreen({cloud,theme,eventCount,onBack,initialKind='hou
   {button('sharing.shared',t('sharing.openShared'),()=>setShared(true))}
  </ScrollView></KeyboardAvoidingView></SafeAreaView>;
 }
-const styles=StyleSheet.create({root:{flex:1},content:{width:'100%',maxWidth:620,alignSelf:'center',padding:spacing.md,gap:12,paddingBottom:32},header:{flexDirection:'row',alignItems:'center',gap:16},title:{flex:1,fontSize:25,lineHeight:32},body:{fontSize:16,lineHeight:24},label:{fontSize:16,lineHeight:23,fontWeight:'700'},section:{fontSize:21,lineHeight:28,marginTop:20},input:{minHeight:52,borderWidth:1,borderRadius:12,padding:14,fontSize:16},stack:{gap:12},options:{gap:8},choice:{minHeight:50,padding:14,borderRadius:12,borderWidth:1,flexDirection:'row',alignItems:'center',gap:12,marginBottom:8},card:{padding:16,borderWidth:1,borderRadius:16,gap:12},qr:{width:240,height:240,maxWidth:'100%',alignSelf:'center',backgroundColor:'white'}});
+const styles=StyleSheet.create({root:{flex:1},header:{paddingHorizontal:spacing.md,paddingTop:spacing.md,paddingBottom:spacing.sm,width:'100%',maxWidth:720,alignSelf:'center'},content:{width:'100%',maxWidth:720,alignSelf:'center',padding:spacing.md,gap:12,paddingBottom:32},body:{fontSize:16,lineHeight:24},label:{fontSize:16,lineHeight:23,fontWeight:'700'},section:{fontSize:21,lineHeight:28,marginTop:20},input:{minHeight:52,borderWidth:1,borderRadius:12,padding:14,fontSize:16},stack:{gap:12},options:{gap:8},choice:{minHeight:50,padding:14,borderRadius:12,borderWidth:1,flexDirection:'row',alignItems:'center',gap:12,marginBottom:8},card:{padding:16,borderWidth:1,borderRadius:16,gap:12},qr:{width:240,height:240,maxWidth:'100%',alignSelf:'center',backgroundColor:'white'}});
