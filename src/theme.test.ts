@@ -8,6 +8,7 @@ import {
   eventColors,
   isThemePreference,
   lightTheme,
+  readThemePreference,
   resolveTheme,
   themeChoices,
 } from './theme.ts';
@@ -35,6 +36,12 @@ test('accepts supported preferences and rejects removed themes', () => {
   for (const value of ['puppy-journal', 'soft-play', 'day-trails', 'meadow', 'sunrise', 'midnight', 'paper', 'bubblegum', 'blueprint', 'trail', 'tide', 'plum', 'contrast', 'unknown', null]) {
     assert.equal(isThemePreference(value), false);
   }
+});
+
+test('reads shipped cloud appearances as the current default while rejecting unknown stored values', () => {
+  for (const value of themeChoices) assert.equal(readThemePreference(value), value);
+  for (const value of [null, 'puppy-journal', 'soft-play', 'day-trails']) assert.equal(readThemePreference(value), 'system');
+  for (const value of ['retired-theme', 'unknown', '']) assert.throws(() => readThemePreference(value));
 });
 
 test('activity colors keep accessible contrast in chips and timeline tracks', () => {

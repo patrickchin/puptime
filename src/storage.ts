@@ -27,7 +27,7 @@ import {
   normalizeNotificationPreferences,
   type NotificationPreferences,
 } from './notification-config.ts';
-import { isThemePreference, type ThemePreference } from './theme.ts';
+import { readThemePreference, type ThemePreference } from './theme.ts';
 
 const EVENTS_KEY = storageKeys.events;
 const SCHEDULE_KEY = storageKeys.schedule;
@@ -195,10 +195,7 @@ export const saveScheduleEntry=(entry:ScheduleEntry,original?:ScheduleEntry)=>mu
 export const removeScheduleEntry=(id:string)=>mutateSchedule(current=>current.filter(entry=>entry.id!==id));
 
 export async function loadThemePreference(): Promise<ThemePreference> {
-  const stored = await AsyncStorage.getItem(THEME_KEY);
-  if (stored === null) return 'system';
-  if (!isThemePreference(stored)) throw new Error('Saved theme preference is invalid.');
-  return stored;
+  return readThemePreference(await AsyncStorage.getItem(THEME_KEY));
 }
 
 export function saveThemePreference(preference: ThemePreference): Promise<void> {

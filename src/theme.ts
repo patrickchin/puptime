@@ -134,6 +134,13 @@ export function isThemePreference(value: string | null): value is ThemePreferenc
   return value === 'system' || value === 'light' || value === 'dark';
 }
 
+export function readThemePreference(value: string | null): ThemePreference {
+  // These shipped cloud preferences use the current default appearance.
+  if (value === null || value === 'puppy-journal' || value === 'soft-play' || value === 'day-trails') return 'system';
+  if (!isThemePreference(value)) throw new Error('Saved theme preference is invalid.');
+  return value;
+}
+
 export function resolveTheme(
   preference: ThemePreference,
   colorScheme: 'light' | 'dark' | 'unspecified' | null | undefined,

@@ -2,7 +2,7 @@ import { normalizeActivityCustomizations, type ActivityCustomization } from '../
 import { customActivityKey, DEFAULT_WIDGET_ACTIONS, normalizeCustomActivities, normalizeWidgetActions, type ActivityKey, type PuppyEvent } from '../domain.ts';
 import { isLanguagePreference, type LanguagePreference } from '../localization.ts';
 import { DEFAULT_NOTIFICATION_PREFERENCES, normalizeNotificationPreferences, type NotificationPreferences } from '../notification-config.ts';
-import { isThemePreference, type ThemePreference } from '../theme.ts';
+import { readThemePreference, type ThemePreference } from '../theme.ts';
 import type { LocalDatabase, SqlExecutor } from './database.ts';
 import { petSettingKeys, storageKeys, type StorageKey } from './settings.ts';
 import { createLocalRepository } from './repository.ts';
@@ -143,7 +143,7 @@ export function createNativeStorage(database: LocalDatabase, petId: string, onCh
         await checkpoint(sql,'done');
       });
     },
-    loadThemePreference: () => database.read(async (sql) => { const value = await get(sql, storageKeys.theme); if (value === null) return 'system'; if (!isThemePreference(value)) throw new Error('Saved theme preference is invalid.'); return value; }),
+    loadThemePreference: () => database.read(async (sql) => readThemePreference(await get(sql, storageKeys.theme))),
     saveThemePreference: (value: ThemePreference) => settingsWrite((sql) => set(sql, storageKeys.theme, value)),
     loadLanguagePreference: () => database.read(async (sql) => { const value = await get(sql, storageKeys.language); if (value === null) return 'system'; if (!isLanguagePreference(value)) throw new Error('Saved language preference is invalid.'); return value; }),
     saveLanguagePreference: (value: LanguagePreference) => settingsWrite((sql) => set(sql, storageKeys.language, value)),
