@@ -1,0 +1,5 @@
+<button class="row" hover-class="pressed" bindtap="edit" aria-label="{{editLabel}}: {{event.label}}, {{event.time}}">
+  <text class="activity-dot {{event.type}}"></text>
+  <view class="body"><text class="label">{{event.label}}</text><text wx:if="{{event.note}}" class="note">{{event.note}}</text></view>
+  <text class="time">{{event.time}}</text><text class="chevron" aria-hidden="true">›</text>
+</button>

@@ -1,0 +1,11 @@
+:host { display: block; }
+.row { display: flex; gap: 12px; align-items: center; width: 100% !important; min-height: 64px; padding: 14px 16px !important; text-align: left; background: #FFFEFA; border: 0; border-radius: 0; font: inherit; color: #17231E; line-height: 1.5; margin: 0 !important; }
+.row::after { border: 0; }
+.pressed { background: #EDEFE8; }
+.activity-dot { width: 10px; height: 10px; flex: 0 0 10px; border-radius: 50%; background: #086B9B; }
+.poop { background: #B54E00; } .meal { background: #3B7827; }
+.body { flex: 1; min-width: 0; }
+.label { display: block; font-size: 16px; font-weight: 550; }
+.note { display: block; color: #56635D; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.time { font-size: 14px; color: #56635D; font-variant-numeric: tabular-nums; }
+.chevron { font-size: 22px; color: #56635D; }

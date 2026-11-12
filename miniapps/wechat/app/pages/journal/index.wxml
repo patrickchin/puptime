@@ -1,0 +1,48 @@
+<view class="page">
+  <view wx:if="{{demo}}" class="demo">{{t.demo}}</view>
+  <view class="profile">
+    <image src="/assets/scruffy.png" class="puppy" mode="aspectFit" aria-hidden="true" />
+    <view class="profile-title"><view class="subtitle">{{todayDate}}</view><view class="title">{{name}}</view></view>
+    <button class="plain-button" hover-class="pressed" bindtap="settings">{{t.settings}}</button>
+  </view>
+  <view wx:if="{{error}}" class="error" role="alert">{{error}}</view>
+  <block wx:if="{{ready}}">
+    <view class="section-head first"><text class="heading">{{t.quick}}</text><text class="subtitle">{{t.today}}</text></view>
+    <view class="quick-actions">
+      <button wx:for="{{actions}}" wx:key="type" class="quick {{item.type}}" data-type="{{item.type}}" bindtap="quickLog" hover-class="pressed" aria-label="{{item.label}}: {{item.count}}, {{item.last}}">
+        <view class="art art-{{item.type}}"><image src="/assets/activities.png" class="atlas" aria-hidden="true" /></view>
+        <view class="quick-name">{{item.label}}</view><view class="quick-count">{{item.count}}</view>
+        <view class="last">{{item.last}}</view>
+      </button>
+    </view>
+    <view class="section-head"><text class="heading">{{t.history}}</text></view>
+    <view wx:if="{{!groups.length}}" class="empty panel">
+      <view class="empty-title">{{t.empty}}</view><view class="subtitle">{{t.emptyBody}}</view>
+    </view>
+    <view wx:for="{{groups}}" wx:key="key" wx:for-item="group" class="day">
+      <view class="day-title"><text>{{group.label}}</text><text class="day-count">{{group.rows.length}}</text></view>
+      <view class="panel"><view wx:for="{{group.rows}}" wx:for-item="event" wx:key="id" class="event-wrap"><event-row event="{{event}}" edit-label="{{t.edit}}" bind:edit="edit" /></view></view>
+    </view>
+    <button wx:if="{{hasMore}}" class="plain-button more" hover-class="pressed" bindtap="loadMore">{{t.earlier}}</button>
+  </block>
+  <view class="notice">{{t.local}}</view>
+</view>
+<view wx:if="{{toast}}" class="toast" role="status"><text>{{toast}}</text><button class="undo-button" hover-class="pressed" bindtap="undo">{{t.undo}}</button></view>
+<view wx:if="{{editor}}" class="scrim" catchtap="cancelEdit">
+  <view class="sheet" catchtap="stopTap" role="dialog" aria-label="{{t.edit}}">
+    <view class="sheet-heading"><text class="heading">{{t.edit}}</text><button class="plain-button" hover-class="pressed" bindtap="cancelEdit">{{t.cancel}}</button></view>
+    <scroll-view scroll-y class="editor-body">
+      <view wx:if="{{editorError}}" class="error" role="alert">{{editorError}}</view>
+      <text class="field-label">{{t.type}}</text>
+      <picker mode="selector" range="{{types}}" value="{{typeIndex}}" bindchange="setType"><view class="field">{{types[typeIndex]}}<text class="picker-arrow">⌄</text></view></picker>
+      <view class="date-fields">
+        <view><text class="field-label">{{t.date}}</text><picker mode="date" value="{{editor.date}}" end="{{todayDate}}" bindchange="setDate"><view class="field">{{editor.date}}</view></picker></view>
+        <view><text class="field-label">{{t.time}}</text><picker mode="time" value="{{editor.time}}" bindchange="setTime"><view class="field">{{editor.time}}</view></picker></view>
+      </view>
+      <text class="field-label">{{t.note}}</text>
+      <textarea class="field note-input" value="{{editor.note}}" placeholder="{{t.noteHint}}" maxlength="500" bindinput="setNote" adjust-position="true" aria-label="{{t.note}}" />
+      <button class="delete" hover-class="pressed" bindtap="deleteEdit">{{t.remove}}</button>
+    </scroll-view>
+    <button class="primary" hover-class="pressed" bindtap="saveEdit">{{t.save}}</button>
+  </view>
+</view>
