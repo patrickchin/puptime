@@ -69,10 +69,7 @@ name: iOS side navigation and notification preferences
     checked: false
 - tapOn:
     id: settings.notifications.deviceDelivery
-# The driver may already accept a configured system prompt; verify permission below.
-- tapOn:
-    text: ^Allow$
-    optional: true
+# The configured iOS driver accepts the permission prompt; verify the resulting state.
 - assertVisible:
     id: settings.notifications.deviceDelivery
     checked: true
@@ -104,6 +101,13 @@ name: iOS side navigation and notification preferences
 - assertVisible:
     id: notifications.timing.pottyAfterPee.enabled
     checked: true
+- scrollUntilVisible:
+    element:
+      id: notifications.timing.pottyAfterPee.time
+    direction: DOWN
+    timeout: 60000
+    visibilityPercentage: 100
+    centerElement: true
 - tapOn:
     id: notifications.timing.pottyAfterPee.time
 - assertVisible:
@@ -225,6 +229,8 @@ name: iOS side navigation and notification preferences
       id: notifications.timing.pottyAfterPee.time
     direction: DOWN
     timeout: 60000
+    visibilityPercentage: 100
+    centerElement: true
 - tapOn:
     id: notifications.timing.pottyAfterPee.time
 - assertVisible:
@@ -245,6 +251,9 @@ name: iOS side navigation and notification preferences
 - takeScreenshot: notifications-restored-after-restart
 - tapOn:
     id: nav.open
+    retryTapIfNoChange: true
+- assertVisible:
+    id: nav.close
 - scrollUntilVisible:
     element:
       id: nav.settings
