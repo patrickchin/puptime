@@ -9,9 +9,9 @@ export function AppHandoffPage({ invitation=false }: { invitation?:boolean }) {
  useEffect(()=>{if(invitation){setHref(nativeCareLink(window.location.href));setReady(true);}},[invitation]);
  const invalid=ready&&!href;
  return <div className="marketing-site care-page app-handoff">
-  <Head><title>{`${invitation?'Shared puppy care':'Your account'} | Puptime`}</title><meta name="robots" content="noindex, nofollow"/><meta name="referrer" content="no-referrer"/><link rel="icon" href="/brand-icon.svg" type="image/svg+xml"/></Head>
+  <Head><title>{`${invitation?'Shared puppy care':'Your account'} | Puptime`}</title><meta name="robots" content="noindex, nofollow"/><meta name="referrer" content="no-referrer"/><link rel="icon" href="/brand-icon.png" type="image/png"/></Head>
   <style>{marketingStyles+css}</style>
-  <header className="site-header"><a className="site-brand" href="/"><img src="/brand-icon.svg" width="38" height="38" alt=""/>Puptime</a><nav aria-label="Website"><a href="/">Home</a><a href="/puppy-care/">Puppy care</a></nav></header>
+  <header className="site-header"><a className="site-brand" href="/"><img src="/brand-icon.png" width="38" height="38" alt=""/>Puptime</a><nav aria-label="Website"><a href="/">Home</a><a href="/puppy-care/">Puppy care</a></nav></header>
   <main className="handoff-content">
    <h1>{invalid?'Check your invitation':invitation?'Puppy care is in the app.':'Your account is in the app.'}</h1>
    <p>{invalid?'This invitation link is incomplete or invalid. Ask the puppy’s owner for the original link.':invitation?'Open Puptime to accept an invitation or see puppies shared with you.':'Sign in, manage cloud backup, and export your data in Puptime.'}</p>

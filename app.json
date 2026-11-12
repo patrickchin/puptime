@@ -27,14 +27,14 @@
         "android.permission.SYSTEM_ALERT_WINDOW"
       ],
       "adaptiveIcon": {
-        "backgroundColor": "#176B52",
+        "backgroundColor": "#234B3B",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": true
     },
     "web": {
-      "favicon": "./public/social-preview.png",
+      "favicon": "./assets/favicon.png",
       "output": "static"
     },
     "plugins": [

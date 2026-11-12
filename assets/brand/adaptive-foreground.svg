@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Keep the app paw inside Android's central 66/108 adaptive-icon safe zone. -->
+  <g transform="translate(128 128) scale(.75)">
+    <g fill="#FFF1D6">
+      <ellipse cx="378" cy="291" rx="107" ry="140" transform="rotate(-7 378 291)"/>
+      <ellipse cx="646" cy="291" rx="107" ry="140" transform="rotate(7 646 291)"/>
+      <ellipse cx="202" cy="476" rx="100" ry="125" transform="rotate(-16 202 476)"/>
+      <ellipse cx="822" cy="476" rx="100" ry="125" transform="rotate(16 822 476)"/>
+      <path d="M512 435c-75 0-130 65-190 137-59 70-101 126-89 190 17 100 83 122 174 79 43-21 76-27 105-27s62 6 105 27c91 43 157 21 174-79 12-64-30-120-89-190-60-72-115-137-190-137Z"/>
+    </g>
+    <path d="m484 654 112-108" fill="none" stroke="#EBAD43" stroke-width="58" stroke-linecap="round"/>
+    <circle cx="484" cy="654" r="48" fill="#EBAD43"/>
+  </g>
+</svg>

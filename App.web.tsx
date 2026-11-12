@@ -11,7 +11,7 @@ const sourceUrl = 'https://github.com/patrickchin/puptime';
 const privacyUrl = `${sourceUrl}/blob/main/PRIVACY.md`;
 // Metro supplies web images as URI objects; keep them in the asset pipeline.
 const assetUrl = (asset: string | { uri: string }): string => typeof asset === 'string' ? asset : asset.uri;
-const icon = '/brand-icon.svg';
+const icon = '/brand-icon.png';
 const puppy = assetUrl(require('./assets/mascots/scruffy-terrier.png'));
 const careImage = assetUrl(require('./assets/puppy-care/potty.jpg'));
 const timingImage = assetUrl(require('./assets/screenshots/insights-timeline.png'));
