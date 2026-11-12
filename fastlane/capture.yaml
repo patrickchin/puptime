@@ -7,43 +7,91 @@ name: English App Store capture sequence
     timeout: 90000
 - waitForAnimationToEnd
 - tapOn: {id: nav.open, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    visible: {id: nav.close}
+    timeout: 30000
 - waitForAnimationToEnd
-- tapOn: {id: nav.settings}
+- tapOn: {id: nav.settings, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    notVisible: {id: nav.close}
+    timeout: 30000
 - tapOn: {id: settings.theme.open}
-- tapOn: {id: appearance.theme.light}
+- tapOn: {id: appearance.theme.light, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    notVisible: {id: appearance.modal}
+    timeout: 30000
 - tapOn: {id: settings.back}
 - tapOn: {id: nav.open, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    visible: {id: nav.close}
+    timeout: 30000
 - waitForAnimationToEnd
-- tapOn: {id: nav.log}
+- tapOn: {id: nav.log, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    notVisible: {id: nav.close}
+    timeout: 30000
 - waitForAnimationToEnd
 - takeScreenshot: 01-log
 - tapOn: {id: nav.switch}
+- extendedWaitUntil:
+    visible: {id: screen.timeline}
+    timeout: 30000
 - waitForAnimationToEnd
 - takeScreenshot: 02-timeline
 - tapOn: {id: nav.open, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    visible: {id: nav.close}
+    timeout: 30000
 - waitForAnimationToEnd
-- tapOn: {id: nav.insights}
+- tapOn: {id: nav.insights, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    notVisible: {id: nav.close}
+    timeout: 30000
 - waitForAnimationToEnd
 - assertVisible: {id: screen.insights}
 - takeScreenshot: 03-insights
 - tapOn: {id: nav.open, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    visible: {id: nav.close}
+    timeout: 30000
 - waitForAnimationToEnd
-- tapOn: {id: nav.schedule}
+- tapOn: {id: nav.schedule, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    notVisible: {id: nav.close}
+    timeout: 30000
 - waitForAnimationToEnd
 - assertVisible: {id: screen.schedule}
 - takeScreenshot: 04-routine
 - tapOn: {id: nav.open, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    visible: {id: nav.close}
+    timeout: 30000
 - waitForAnimationToEnd
-- tapOn: {id: nav.log}
-- tapOn: {id: event.pee.edit, index: 0}
+- tapOn: {id: nav.log, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    notVisible: {id: nav.close}
+    timeout: 30000
+- tapOn: {id: event.pee.edit, index: 0, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    visible: {id: editor.close}
+    timeout: 30000
 - waitForAnimationToEnd
 - takeScreenshot: 05-details
 - tapOn: {id: editor.close}
 - tapOn: {id: nav.open, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    visible: {id: nav.close}
+    timeout: 30000
 - waitForAnimationToEnd
-- tapOn: {id: nav.settings}
+- tapOn: {id: nav.settings, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    notVisible: {id: nav.close}
+    timeout: 30000
 - tapOn: {id: settings.theme.open}
-- tapOn: {id: appearance.theme.dark}
+- tapOn: {id: appearance.theme.dark, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    notVisible: {id: appearance.modal}
+    timeout: 30000
 - tapOn: {id: settings.back}
 - waitForAnimationToEnd
 - takeScreenshot: 06-dark

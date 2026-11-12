@@ -1,10 +1,12 @@
 # English App Store presence
 
-Prepared October 27–28, 2026. These are candidate assets for Puptime 1.12.0, not a
-published listing or evidence of Apple approval. The broader localization work
-is deferred at the owner's request. App Store Connect requires sign-in in the
-available browser. Apple's US public lookup returned no record for 6813823575;
-that does not establish availability in other storefronts.
+Prepared October 27–28 and refreshed November 12, 2026 after rebasing onto
+`fb092d8`. These are candidate assets for Puptime 1.12.0, not a published listing
+or evidence of Apple approval. The broader localization work is deferred at the
+owner's request. During the October preparation, App Store Connect required
+sign-in and Apple's
+US public lookup returned no record for 6813823575. Neither observation has been
+rechecked in this refresh; neither establishes availability in other storefronts.
 
 ## Ready to review
 
@@ -19,7 +21,7 @@ that does not establish availability in other storefronts.
 | Icon | Existing 1024 × 1024 opaque PNG; retain the paw/clock identity |
 | iPhone screenshots | Six opaque 1206 × 2622 PNGs in `fastlane/screenshots/en-US/` |
 | iPad screenshots | Six opaque 2064 × 2752 PNGs in the same folder; actual tablet layout |
-| App preview | `fastlane/previews/en-US/iPhone-6.3-preview.mp4`, 15.13 seconds, 886 × 1920, 30 fps |
+| App preview | `fastlane/previews/en-US/iPhone-6.3-preview.mp4`, 15.17 seconds, 886 × 1920, 30 fps |
 | Poster frame | `fastlane/previews/en-US/poster.jpg`; select 6 seconds in Connect |
 | Optional header | `fastlane/creative-assets/en-US/header.png`, 3840 × 1646 |
 | Optional search art | `fastlane/creative-assets/en-US/search.png`, 1920 × 1280 |
@@ -31,7 +33,7 @@ not represent the current screen sequence. Current widget footage can be added
 after verifying the exact release's extension on a device.
 
 The preview shows a quick log, a 15-minute correction, timeline filtering and
-log details, and a routine-window adjustment. Playback stays at normal
+log details, insights, and a routine-window adjustment. Playback stays at normal
 speed. Setup and waiting are trimmed; no frozen-frame padding is added. It uses
 H.264 High Level 4.0, a 10 Mbps encoder target, yuv420p, and silent 48 kHz stereo
 AAC. It works with audio muted. Only local features appear, so it does not
@@ -130,14 +132,15 @@ editorial and not guaranteed.
 
 ## Reproduce the assets
 
-Use fresh task-owned simulators with the names in the provenance file, install
-a matching native host, and export a production-mode bundle with the isolated
-capture-only clock entry point into a copy of that host before re-signing and
-installing it. The clock entry point for this pass is retained in ignored
-`output/app-store-real/capture-entry.js`. Its anchor is ten minutes after the
-CSV’s latest timestamp. Keep the CSV, database and capture build outside Git.
-Never overwrite another simulator's database. `scripts/seed-app-store.mjs`
-checks the device name and refuses an existing database.
+Use fresh task-owned simulators with the names in the provenance file. Install a
+matching native host without launching it, then seed its fresh data container.
+The seeder generates the ignored `output/app-store/capture-entry.js` from the
+CSV, with an anchor ten minutes after its latest timestamp. Export a production
+bundle from that entry into a copy of the host, re-sign it, and install the copy
+over the same task-owned app without removing its seeded data. Keep the CSV,
+database and capture build outside Git. Never overwrite another simulator's
+database. `scripts/seed-app-store.mjs` checks the device name and refuses an
+existing database.
 
 ```sh
 TZ=Asia/Shanghai node scripts/seed-app-store.mjs IPHONE_UDID /path/to/owner-activity.csv
@@ -161,9 +164,15 @@ The renderer writes upload files and their SHA-256 manifest to `fastlane/`, and
 a contact sheet beside the source captures. Inspect every image and the final
 video after generation. The editor verifies that each exported scene ends on
 the corresponding captured UI; review the action and transitions visually too.
+For a tighter edit, add `reviewed_cuts` to the local recording JSON: an ordered
+list of `{screen, raw_start, raw_end}` objects matching the six scene names in
+the editor. Use actual native footage ranges that omit loading and drawer waits.
+A cut may also specify `raw` to use a separately retaken native scene. The final
+scene ranges and recording names are recorded in the committed `edit.json`.
 Original captures for this pass remain under
-`~/Pictures/Screenshots/Codex/puptime-app-store/`. The current native video source and timing JSON are in the `real-history/preview-v3/`
-subdirectory. Earlier synthetic captures remain local historical evidence and
+`~/Pictures/Screenshots/Codex/puptime-app-store/`. The current native video source and timing JSON are in the `20261112/preview/`
+subdirectory; the retaken ending is in `20261112/routine-ending-v3/`. The earlier
+CSV-based media is retained in `real-history/`. Earlier synthetic captures remain local historical evidence and
 are superseded by this CSV-based set.
 
 ## Later localization
