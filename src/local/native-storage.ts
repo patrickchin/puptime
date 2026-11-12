@@ -77,7 +77,7 @@ export function createNativeStorage(database: LocalDatabase, petId: string, onCh
     await sql.runAsync("INSERT INTO metadata(key,value) VALUES ('first_launch_step',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",step);
   }
   return {
-    loadEvents: repository.loadEvents, appendEvents: repository.appendEvents,appendWidgetEvents:repository.appendWidgetEvents, importEvents: repository.importEvents,toggleNap:repository.toggleNap,
+    loadEvents: repository.loadEvents, appendEvents: repository.appendEvents,appendWidgetEvents:repository.appendWidgetEvents, importEvents: repository.importEvents,toggleNap:repository.toggleNap,reconcileNaps:repository.reconcileNaps,
     removeEvent: repository.removeEvent, updateEvent: repository.updateEvent, updateEventTime: repository.updateEventTime,
     loadSchedule: repository.loadSchedule, saveSchedule: repository.saveSchedule,
     saveScheduleEntry:repository.saveScheduleEntry,removeScheduleEntry:repository.removeScheduleEntry,

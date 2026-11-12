@@ -266,15 +266,55 @@ test('two independent SQLite connections toggle a nap atomically and keep one id
  assert.equal(results.filter(result=>!!result.previous).length,1);
 });
 
-test('independently committed widget naps survive import as a reviewable conflict and can be corrected',async t=>{
- const {repository,database}=await setup(t);
- const first:PuppyEvent={id:'nap-app',type:'nap',at:100,endedAt:null,source:'app'},second:PuppyEvent={...first,id:'nap-widget',at:200,source:'widget'};
- await repository.appendEvents([first]);await repository.appendWidgetEvents([second]);
- await assert.rejects(repository.toggleNap('app',300),/running naps/);
+test('widget nap conflicts infer earlier ends atomically and remain editable without losing history',async t=>{
+ const {repository,database,reads}=await setup(t);
+ const first:PuppyEvent={id:'nap-app',type:'nap',at:100,endedAt:null,source:'app',note:'First nap'},second:PuppyEvent={...first,id:'nap-widget',at:200,source:'widget'},third:PuppyEvent={...second,id:'nap-third',at:300};
+ await repository.appendEvents([first,...Array.from({length:1000},(_,index)=>event(`history-${index}`,index+1000)),event('awake',150)]);
+ await repository.appendWidgetEvents([second,third]);
  const runtime=await createLocalRuntime(database,'pet-1');
- assert.equal((await runtime.activity.latestEvents()).filter(event=>event.endedAt===null).length,2);
- await repository.updateEvent(second.id,{endedAt:250});
- const result=await repository.toggleNap('app',300);assert.equal(result.previous!.id,first.id);
- assert.equal((await repository.loadEvents()).filter(event=>event.endedAt===null).length,0);
- assert.equal((await repository.loadEvents()).length,2);
+ reads.length=0;
+ assert.deepEqual(await runtime.storage.reconcileNaps(),[{...first,endedAt:150},{...second,endedAt:300}]);
+ assert.equal(reads.filter(read=>/\bFROM events\b/i.test(read.sql)).reduce((count,read)=>count+read.rows,0),4,'Recovery reads open naps and their first awake activity, not the full history.');
+ assert.deepEqual(await runtime.storage.reconcileNaps(),[]);
+ assert.equal((await runtime.activity.latestEvents()).filter(event=>event.endedAt===null).length,1);
+ await repository.updateEvent(first.id,{endedAt:140});
+ const result=await repository.toggleNap('app',400);assert.equal(result.previous!.id,third.id);
+ const events=await repository.loadEvents();
+ assert.equal(events.find(event=>event.id===first.id)!.endedAt,140);
+ assert.equal(events.filter(event=>event.endedAt===null).length,0);assert.equal(events.length,1004);
+ const revisions=await database.read(sql=>sql.getAllAsync<{local_id:string}>("SELECT local_id FROM local_revisions WHERE kind='event'"));
+ assert.deepEqual(revisions.map(row=>row.local_id),[first.id,second.id]);
+});
+
+test('failed nap recovery rolls back all inferred ends and a retry succeeds',async t=>{
+ const {repository,database}=await setup(t);
+ const first:PuppyEvent={id:'nap-a',type:'nap',at:100,endedAt:null,source:'widget'},second={...first,id:'nap-b',at:200};
+ await repository.appendWidgetEvents([first,second]);
+ const failing=createLocalRepository(database,'pet-1',async()=>{throw new Error('Failed to record sync work');});
+ await assert.rejects(failing.reconcileNaps(),/Failed to record sync work/);
+ assert.equal((await repository.loadEvents()).filter(event=>event.endedAt===null).length,2);
+ assert.deepEqual(await repository.reconcileNaps(),[{...first,endedAt:200}]);
+});
+
+test('nap inference respects shared record edit permissions and ended access',async t=>{
+ const {repository,database}=await setup(t);
+ const first:PuppyEvent={id:'nap-a',type:'nap',at:100,endedAt:null,source:'widget'},second={...first,id:'nap-b',at:200};
+ await repository.appendWidgetEvents([first,second]);
+ await database.write(sql=>sql.runAsync('INSERT INTO local_sync_owner(singleton,generation,account_id,device_id) VALUES (1,?,?,?)','gen_test','usr_test','dev_test'));
+ await database.write(sql=>sql.runAsync('INSERT INTO local_sync_records(generation,record_id,body) VALUES (?,?,?)','gen_test',JSON.stringify(['event','pet-1',first.id]),JSON.stringify({kind:'event',editable:false})));
+ assert.deepEqual(await repository.reconcileNaps(),[]);
+ await database.write(sql=>sql.runAsync('DELETE FROM local_sync_records'));
+ await database.write(sql=>sql.runAsync("INSERT INTO metadata(key,value) VALUES ('care_blocked','1')"));
+ assert.deepEqual(await repository.reconcileNaps(),[]);
+ assert.equal((await repository.loadEvents()).filter(event=>event.endedAt===null).length,2);
+});
+
+test('two foreground refreshes infer a forgotten nap end only once across SQLite connections',async t=>{
+ const {repository,path}=await setup(t),otherDb=await createLocalDatabase(sqliteTestConnection(path));t.after(()=>otherDb.close());
+ const other=createLocalRepository(otherDb,'pet-1');
+ const first:PuppyEvent={id:'nap-a',type:'nap',at:100,endedAt:null,source:'widget'},second={...first,id:'nap-b',at:200};
+ await repository.appendWidgetEvents([first,second]);
+ const results=await Promise.all([repository.reconcileNaps(),other.reconcileNaps()]);
+ assert.equal(results.flat().length,1);assert.equal(results.flat()[0].endedAt,200);
+ assert.equal((await repository.loadEvents()).filter(event=>event.endedAt===null).length,1);
 });

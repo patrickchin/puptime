@@ -22,7 +22,6 @@ import {
   formatDuration,
   formatTime,
   isOpenNap,
-  resolveNapState,
   normalizeCustomLabel,
   type EventType,
   type PuppyEvent,
@@ -91,6 +90,7 @@ function sectionTitle(
 }
 
 export function LogScreen({
+  napAdjustments=[],onDismissNapAdjustment,
   readOnly=false,canEditEvent,
   events:projectedEvents,
   activity,
@@ -111,6 +111,7 @@ export function LogScreen({
   onQuickActionsLayout,
   theme,
 }: {
+  napAdjustments?:PuppyEvent[];onDismissNapAdjustment?:(id:string)=>void;
   readOnly?:boolean;canEditEvent?:(event:PuppyEvent)=>boolean;
   events: PuppyEvent[];
   history?:EventHistoryData;
@@ -132,7 +133,7 @@ export function LogScreen({
   const { activityColors, activityLabel, eventPastLabel, locale, relativeTime, t } = useLocalization();
   const page=useActivityPages(activity,projectedEvents,refreshToken);
   const events=page.events;
-  const napState=resolveNapState(projectedEvents);
+  const napAdjustment=napAdjustments.find(event=>!readOnly&&(!canEditEvent||canEditEvent(event)));
   const requestHandled=useRef(onEditRequestHandled);requestHandled.current=onEditRequestHandled;
   const [requestAttempt,setRequestAttempt]=useState(0);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -169,7 +170,7 @@ export function LogScreen({
     }
   }, []);
 
-  const startEditing = useCallback((event: PuppyEvent, shouldFocusNote = false) => {
+  const startEditing = useCallback((event: PuppyEvent, shouldFocusNote = false, field:'start'|'end'='start') => {
 
     clearSaveTimer();
     sessionRef.current += 1;
@@ -183,7 +184,7 @@ export function LogScreen({
     setHistoryOpen(false);
     setFocusNote(shouldFocusNote);
     setCustomTouched(false);
-    const next = createDraft(event);
+    const next = {...createDraft(event),field};
     draftSaverRef.current=createEventEditor(event,changes=>onSaveRef.current(event,changes));
     draftRef.current = next;
     setDraft(next);
@@ -454,11 +455,6 @@ export function LogScreen({
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <>
-            {napState.kind==='conflict'?<View testID="log.napConflict" style={{padding:spacing.md,gap:8,borderWidth:1,borderColor:theme.border,borderRadius:theme.presentation.cardRadius,backgroundColor:theme.surface}}>
-              <Text accessibilityRole="header" style={{color:theme.text,fontSize:17,fontWeight:'700'}}>{t('log.napConflict')}</Text>
-              <Text style={{color:theme.textMuted,fontSize:15,lineHeight:22}}>{t('log.napConflictBody')}</Text>
-              {napState.events.filter(event=>!readOnly&&(!canEditEvent||canEditEvent(event))).map(event=><Pressable key={event.id} testID={`log.reviewNap.${event.id}`} accessibilityRole="button" onPress={()=>startEditing(event)} style={({pressed})=>({minHeight:44,justifyContent:'center',opacity:pressed?0.6:1})}><Text style={{color:theme.primary,fontSize:16,fontWeight:'600'}}>{t('log.reviewNap',{time:`${dateLabel(event.at,locale)} ${formatTime(event.at)}`})}</Text></Pressable>)}
-            </View>:null}
             {showHeader?<View style={styles.titleBlock}>
               <View
                 style={[
@@ -518,6 +514,14 @@ export function LogScreen({
               </View>
             </View>:null}
             {!readOnly?<QuickActions events={activity?projectedEvents:events} onLog={onLog} now={now} theme={theme} onLayout={onQuickActionsLayout} />:null}
+            {napAdjustment?<View testID="log.napAdjustment" style={{flexDirection:'row',alignItems:'center',gap:8}}>
+              <Pressable accessibilityRole="button" testID="log.adjustNap" onPress={()=>startEditing(events.find(event=>event.id===napAdjustment.id)??napAdjustment,false,'end')} style={({pressed})=>({flex:1,minHeight:44,justifyContent:'center',paddingVertical:8,opacity:pressed?0.6:1})}>
+                <Text style={{color:theme.textMuted,fontSize:14,lineHeight:20}}>{t('log.napEndedAround',{time:dateKey(napAdjustment.endedAt!)===dateKey(now)?formatTime(napAdjustment.endedAt!):`${dateLabel(napAdjustment.endedAt!,locale)} ${formatTime(napAdjustment.endedAt!)}`})} <Text style={{color:theme.primary,fontWeight:'600'}}>{t('log.adjustNap')}</Text></Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel={t('log.dismissNapAdjustment')} testID="log.dismissNapAdjustment" onPress={()=>onDismissNapAdjustment?.(napAdjustment.id)} style={({pressed})=>({minWidth:44,minHeight:44,alignItems:'center',justifyContent:'center',opacity:pressed?0.6:1})}>
+                <MaterialCommunityIcons accessible={false} name="close" size={18} color={theme.textMuted}/>
+              </Pressable>
+            </View>:null}
             <View style={styles.activityHeading}>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('log.activity')}</Text>
             </View>

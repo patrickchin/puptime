@@ -13,7 +13,7 @@ import {
   DEFAULT_WIDGET_ACTIONS,
   normalizeCustomActivities,
   isOpenNap,
-  resolveNapState,NapConflictError,createNapEvent,
+  resolveNapState,inferNapEnds,NapConflictError,createNapEvent,
   normalizeWidgetActions,
   STARTER_SCHEDULE,
   type PuppyEvent,
@@ -122,6 +122,17 @@ export function toggleNap(source:PuppyEvent['source'],at=Date.now()):Promise<{ev
   });
 }
 export const appendWidgetEvents=appendEvents;
+
+export function reconcileNaps():Promise<PuppyEvent[]> {
+  return queueEventWrite(async()=>{
+    const events=await loadEvents(),corrected=inferNapEnds(events);
+    if(corrected.length) {
+      const byId=new Map(corrected.map(event=>[event.id,event]));
+      await writeEvents(events.map(event=>byId.get(event.id)??event));
+    }
+    return corrected;
+  });
+}
 
 export function importEvents(incoming: PuppyEvent[]): Promise<{
   events: PuppyEvent[];

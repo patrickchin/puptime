@@ -1,4 +1,4 @@
-import {createNapEvent,isOpenNap,resolveNapState,NapConflictError,type EventWriteOptions, type PuppyEvent, type PuppyEventChanges, type ScheduleEntry } from '../domain.ts';
+import {createNapEvent,isOpenNap,resolveNapState,inferNapEnds,NapConflictError,type EventWriteOptions, type PuppyEvent, type PuppyEventChanges, type ScheduleEntry } from '../domain.ts';
 import { parseEvents, parseSchedule, EventDeletedError, EventsImportError, EventsStorageError } from '../storage-validation.ts';
 import type { LocalDatabase, SqlExecutor } from './database.ts';
 import { applyScheduleEntryEdit } from '../schedule-editor.ts';
@@ -118,6 +118,26 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
     return changes;
   }
   return {
+    async reconcileNaps():Promise<PuppyEvent[]> {
+      return commit(async sql=>{
+        const rows=await sql.getAllAsync<EventSqlRow&{id:string}>("SELECT * FROM events WHERE pet_id=? AND type='nap' AND end_state=1 ORDER BY at,id",petId);
+        if(rows.length<2)return {changes:[],value:[]};
+        if(await sql.getFirstAsync("SELECT value FROM metadata WHERE key='care_blocked' AND value='1'"))return {changes:[],value:[]};
+        const open=rows.map(eventFromRow),candidates=[...open];
+        for(let index=0;index<open.length-1;index++) {
+          const awake=await sql.getFirstAsync<EventSqlRow&{id:string}>("SELECT * FROM events WHERE pet_id=? AND at>? AND at<=? AND (type IN ('pee','poop','meal','pottyTrip','walk') OR (type='nap' AND end_state!=1)) AND estimated IS NOT 1 ORDER BY at,id LIMIT 1",petId,open[index].at,open[index+1].at);
+          if(awake)candidates.push(eventFromRow(awake));
+        }
+        const changes:LocalChange[]=[],corrected:PuppyEvent[]=[];
+        for(const event of inferNapEnds(candidates)) {
+          const locked=await sql.getFirstAsync("SELECT record_id FROM local_sync_records WHERE json_extract(body,'$.kind')='event' AND json_extract(record_id,'$[2]')=? AND json_extract(body,'$.editable')=0",event.id);
+          if(locked)continue;
+          changes.push(...await writeEvent(sql,open.find(nap=>nap.id===event.id)!,event));
+          corrected.push(event);
+        }
+        return {changes,value:corrected};
+      });
+    },
     async toggleNap(source:PuppyEvent['source'],at=Date.now()):Promise<{event:PuppyEvent;previous?:PuppyEvent}> {
       return commit(async sql=>{
         const rows=await sql.getAllAsync<EventSqlRow&{id:string}>("SELECT * FROM events WHERE pet_id=? AND type='nap' AND end_state=1 LIMIT 2",petId);
@@ -132,7 +152,7 @@ export function createLocalRepository(database: LocalDatabase, petId: string, on
     appendEvents:(incoming:PuppyEvent[],options?:EventWriteOptions)=>appendEvents(incoming,options),
     appendWidgetEvents(incoming:PuppyEvent[]):Promise<void> {
       // The extension committed these logs independently. Retain all of them
-      // and expose a conflict for explicit review instead of trapping startup.
+      // so foreground reconciliation can infer earlier end times without losing logs.
       if(incoming.some(event=>event.source!=='widget'))throw new Error('Expected committed widget events.');
       return appendEvents(incoming,{},true);
     },

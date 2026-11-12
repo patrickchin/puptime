@@ -779,3 +779,23 @@ test('a conflicting offline nap blocks once, preserves both logs, and a correcte
  assert.equal((await storage.loadEvents()).length,2);assert.equal((await storage.loadEvents()).filter(event=>event.endedAt===null).length,1);
  assert.equal((await sync.nextBatch(fence)).filter(mutation=>mutation.kind==='event').length,0);
 });
+
+test('inferring the older cloud nap end requeues a rejected offline start after the correction',async t=>{
+ const {sync,storage}=await setup(t),fence=await activate(sync);
+ const local={id:'offline-nap',type:'nap' as const,at:200,endedAt:null,source:'app' as const};await storage.appendEvents([local]);
+ const start=(await sync.nextBatch(fence)).find(mutation=>mutation.kind==='event')!;
+ const remote:CloudRecord={id:cloudRecordId('event','local-pet','remote-nap'),petId:'local-pet',kind:'event',data:{type:'nap',at:100,endedAt:null,source:'widget'},revision:1,sequence:1,deleted:false,updatedAt:100};
+ await sync.applySync({...fence,accepted:[],rejected:[{operationId:start.operationId,error:'invalid_mutation'}],page:{changes:[remote],cursor:1,hasMore:false}});
+ assert.equal((await storage.reconcileNaps())[0].endedAt,200);
+ const batch=(await sync.nextBatch(fence)).filter(mutation=>mutation.kind==='event');
+ assert.equal(batch.length,2);assert.equal(batch[0].recordId,remote.id);assert.equal(batch[0].patch.endedAt,200);
+ assert.equal(batch[1].recordId,start.recordId);assert.equal(batch[1].intent,'create');assert.equal(batch[1].patch.endedAt,null);
+ assert.notEqual(batch[1].operationId,start.operationId);assert.equal((await sync.status('local-pet')).blocked,0);
+ const accepted=batch.map((mutation,index)=>{
+  const record:CloudRecord={id:mutation.recordId,petId:'local-pet',kind:'event',data:eventDataSchema.parse(index===0?{...remote.data,...mutation.patch}:mutation.patch),revision:index===0?2:1,sequence:index+2,deleted:false,updatedAt:200};
+  return {operationId:mutation.operationId,record,sequence:record.sequence,reason:(index===0?'updated':'created') as 'updated'|'created'};
+ });
+ await sync.applySync({...fence,accepted,page:{changes:accepted.map(result=>result.record),cursor:3,hasMore:false}});
+ assert.equal((await sync.nextBatch(fence)).filter(mutation=>mutation.kind==='event').length,0);assert.equal((await storage.loadEvents()).filter(event=>event.endedAt===null).length,1);
+ assert.deepEqual(await storage.reconcileNaps(),[]);
+});

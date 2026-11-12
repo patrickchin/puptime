@@ -231,3 +231,17 @@ test('estimated activity cannot reset or suppress recorded potty reminders', () 
   );
   assert.deepEqual(pottyReminderPlans(estimates, DEFAULT_NOTIFICATION_PREFERENCES, now), []);
 });
+
+test('infers older nap ends from the first awake log, otherwise the next nap, keeping the latest running', async () => {
+  const {inferNapEnds}=await import('./domain.ts');
+  const first={...createNapEvent('app',100),id:'first',note:'Keep this note'},second={...createNapEvent('widget',200),id:'second'},third={...createNapEvent('app',300),id:'third'};
+  const awake={...createEvent('meal','app',150),id:'meal'};
+  const history=[third,{...awake,id:'earlier-estimate',at:120,estimated:true},second,{...awake,id:'custom',at:125,type:'custom' as const,customLabel:'Medication'},awake,first,{...awake,id:'later',at:175}];
+  assert.deepEqual(inferNapEnds(history),[{...first,endedAt:150},{...second,endedAt:300}]);
+  assert.equal(first.endedAt,null);
+  assert.deepEqual(inferNapEnds([first]),[]);
+  assert.deepEqual(inferNapEnds([{...first,endedAt:150},second]),[]);
+  assert.deepEqual(inferNapEnds([second,{...first,at:200}]),[{...first,at:200,endedAt:200}]);
+  assert.deepEqual(inferNapEnds([first,{...second,at:7*24*60*60_000}]),[{...first,endedAt:100+2*60*60_000}]);
+  assert.deepEqual(inferNapEnds([first,{...second,endedAt:250},third]),[{...first,endedAt:200}]);
+});

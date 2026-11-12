@@ -209,6 +209,16 @@ export function createLocalSync(database:LocalDatabase,options:{newId?:()=>strin
           if (change.kind==='accountPreferences') target=(await sql.getFirstAsync<Binding>("SELECT * FROM local_sync_pets WHERE generation=? AND status='active' ORDER BY rowid LIMIT 1",current.generation))!;
           await enqueue(sql,current,target,change,options.restoreMissing&&change.kind==='event');
         }
+        if(changes.some(change=>change.kind==='event'&&change.before?.type==='nap'&&change.before.endedAt===null&&typeof change.after?.endedAt==='number')) {
+          // A rejected offline start becomes valid after its older running nap
+          // is closed. Enqueue it after the correction with a fresh operation ID.
+          const starts=await sql.getAllAsync<Outbox>(`SELECT o.* FROM local_sync_outbox o JOIN events e ON e.pet_id=o.local_pet_id AND e.id=o.local_id
+            WHERE o.generation=? AND o.local_pet_id=? AND o.local_kind='event' AND o.blocked_reason='cloud_rejected'
+            AND json_extract(o.mutation_json,'$.intent')='create' AND json_extract(o.mutation_json,'$.patch.type')='nap'
+            AND json_extract(o.mutation_json,'$.patch.endedAt') IS NULL AND e.type='nap' AND e.end_state=1
+            AND NOT EXISTS(SELECT 1 FROM events other WHERE other.pet_id=e.pet_id AND other.type='nap' AND other.end_state=1 AND other.id!=e.id)`,current.generation,petId);
+          for(const start of starts)await enqueue(sql,current,pet,localChangeSchema.parse(JSON.parse(start.change_json)));
+        }
       };
     },
     canRestoreSetup:(petId:string)=>database.read(sql=>pristineSetup(sql,identifierSchema.parse(petId))),

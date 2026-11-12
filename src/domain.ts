@@ -214,6 +214,16 @@ export function resolveNapState(events:readonly PuppyEvent[]):NapState {
   if(open.length===1)return {kind:'running',event:open[0]};
   return {kind:'conflict',events:open.sort((a,b)=>a.at-b.at||a.id.localeCompare(b.id))};
 }
+export function inferNapEnds(events:readonly PuppyEvent[]):PuppyEvent[] {
+  const state=resolveNapState(events);
+  if(state.kind!=='conflict')return [];
+  return state.events.slice(0,-1).map((nap,index)=>{
+    // Cap the guess at two hours so a forgotten timer cannot become a multi-day nap.
+    const latestEnd=Math.min(state.events[index+1].at,nap.at+2*60*60_000);
+    const endedAt=events.reduce((end,event)=>!event.estimated&&['pee','poop','meal','pottyTrip','walk','nap'].includes(event.type)&&event.at>nap.at?Math.min(end,event.at):end,latestEnd);
+    return {...nap,endedAt};
+  });
+}
 export class NapConflictError extends Error {
   constructor(){super('Review the running naps before starting or ending another nap.');this.name='NapConflictError';}
 }

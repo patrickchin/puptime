@@ -177,3 +177,13 @@ test('browser nap transitions reject duplicate starts and serialize rapid toggle
  assert.equal(results[0].event.id,results[1].event.id);assert.equal(results[1].event.endedAt,400);
  assert.equal((await storage.loadEvents()).length,2);
 });
+
+
+test('browser nap recovery persists inferred ends once and leaves the latest nap running',async()=>{
+ stored.clear();
+ const first={...createNapEvent('app',100),id:'nap-first'},second={...createNapEvent('widget',200),id:'nap-second'},awake={...createEvent('pee','app',150),id:'awake'};
+ stored.set(eventsKey,JSON.stringify([first,second,awake]));
+ assert.deepEqual(await storage.reconcileNaps(),[{...first,endedAt:150}]);
+ assert.deepEqual(await storage.reconcileNaps(),[]);
+ assert.deepEqual(await storage.loadEvents(),[second,awake,{...first,endedAt:150}]);
+});
