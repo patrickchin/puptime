@@ -48,6 +48,15 @@ The checks cover persistence failures, sample/personal isolation, 501-log histor
 statistics reconciliation and row-scoped editor updates. Real WeChat rendering,
 permissions and QR previews require DevTools and your account.
 
+Verified on November 12, 2026 in official WeChat DevTools 2.02.2609250,
+WeChatLib 3.18.0, using its iPhone 12/13 (Pro) simulator profile: quick logging,
+note editing, persistence after a full recompile, the 501-log sample journal,
+and seven-day insights. A runtime probe found 162 history-row components:
+typing a note sent no history patches; saving sent only `groups[0].rows[0]`
+and changed exactly one component's event property. Four Node tests and the
+official WXML/WXSS compilers pass. Actual phone verification remains separate
+until the owner scans the preview code. No Android or Alipay runtime was tested.
+
 ## Design
 
 Native WeChat navigation, pickers, sheets and dialogs; device system type;
