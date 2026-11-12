@@ -21,7 +21,7 @@ rechecked in this refresh; neither establishes availability in other storefronts
 | Icon | Existing 1024 × 1024 opaque PNG; retain the paw/clock identity |
 | iPhone screenshots | Six opaque 1206 × 2622 PNGs in `fastlane/screenshots/en-US/` |
 | iPad screenshots | Six opaque 2064 × 2752 PNGs in the same folder; actual tablet layout |
-| App preview | `fastlane/previews/en-US/iPhone-6.3-preview.mp4`, 15.17 seconds, 886 × 1920, 30 fps |
+| App preview | `fastlane/previews/en-US/iPhone-6.3-preview.mp4`, 17.37 seconds, 886 × 1920, 30 fps |
 | Poster frame | `fastlane/previews/en-US/poster.jpg`; select 7 seconds in Connect |
 | Optional header | `fastlane/creative-assets/en-US/header.png`, 3840 × 1646 |
 | Optional search art | `fastlane/creative-assets/en-US/search.png`, 1920 × 1280 |
@@ -33,11 +33,13 @@ not represent the current screen sequence. Current widget footage can be added
 after verifying the exact release's extension on a device.
 
 The preview shows a quick log, a 15-minute correction, timeline filtering and
-log details, insights, and a routine-window adjustment. Five brief green touch
-ripples identify the visible taps, aligned to recorded control bounds and the
-native footage. They are editorial overlays; the app itself is unchanged.
-Playback stays at normal
-speed. Setup and waiting are trimmed; no frozen-frame padding is added. It uses
+log details, insights, and a routine-window adjustment. Five green touch cues
+give viewers 0.6 seconds to locate each control before the press, then release
+in a fading ripple. They follow recorded control bounds and native footage.
+These are editorial overlays; the app itself is unchanged. Interaction footage
+is slowed selectively, idle waits are removed, and 0.2-second dissolves connect
+screens. Results remain visible long enough to read without adding frozen-frame
+padding. It uses
 H.264 High Level 4.0, a 10 Mbps encoder target, yuv420p, and silent 48 kHz stereo
 AAC. It works with audio muted. Only local features appear, so it does not
 suggest that cloud access is included. An iPad preview is optional and has not
@@ -165,19 +167,23 @@ npm run check:app-store
 
 The renderer writes upload files and their SHA-256 manifest to `fastlane/`, and
 a contact sheet beside the source captures. Inspect every image and the final
-video after generation. The editor verifies that each exported scene ends on
-the corresponding captured UI; review the action and transitions visually too.
+video after generation. The editor verifies each settled screen before its
+outgoing dissolve against the captured UI; review the action and transitions
+visually too.
 For a tighter edit, add `reviewed_cuts` to the local recording JSON: an ordered
 list of `{screen, raw_start, raw_end}` objects matching the six scene names in
 the editor. Use actual native footage ranges that omit loading and drawer waits.
 A cut may also specify `raw` to use a separately retaken native scene. The final
 scene ranges and recording names are recorded in the committed `edit.json`.
+Use `segments: [{raw_start, raw_end, speed}, ...]` to remove idle intervals and
+slow actual interactions; speed must be greater than zero and at most one.
 Add `taps` to each reviewed cut for visible interactions: a list of
 `{raw_at, x, y, control}` objects. Time is in source-video seconds; coordinates
 are pixels in the 886 × 1920 export. Use the recorder's control bounds and review
 the corresponding native frames to align each pulse. Omit taps removed by the
-edit. The editor renders half-second fading rings and records their final
-timings in `edit.json`; the seven-second poster is clear of indicators.
+edit. The editor maps taps through the source segments and dissolves, renders
+1.2-second aim/press/release cues, and records their final timings in `edit.json`.
+The seven-second poster is clear of indicators.
 Original captures for this pass remain under
 `~/Pictures/Screenshots/Codex/puptime-app-store/`. The current native video source and timing JSON are in the `20261112/preview/`
 subdirectory; the retaken ending is in `20261112/routine-ending-v3/`. The earlier
