@@ -2,7 +2,7 @@ import { AnalyticsSettings } from '../components/AnalyticsSettings.native';
 import { useTelemetryOverlay } from '../telemetry';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Alert, Linking, Modal, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
+import { Alert, Keyboard, Linking, Modal, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
 import { Pressable } from '../components/TelemetryPressable';
 
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -210,7 +210,7 @@ export function SettingsScreen({
           label={t('settings.theme')}
           detail={themeLabel}
           hint={t('settings.themeDetail')}
-          onPress={() => onOpenPicker('theme')}
+          onPress={() => { Keyboard.dismiss(); onOpenPicker('theme'); }}
           theme={theme}
         />}
         {matches.has('appearance') && matches.has('language') && <View style={[styles.divider, { backgroundColor: theme.border }]} />}
@@ -219,7 +219,7 @@ export function SettingsScreen({
           icon="translate"
           label={t('settings.language')}
           detail={languageLabel}
-          onPress={() => onOpenPicker('language')}
+          onPress={() => { Keyboard.dismiss(); onOpenPicker('language'); }}
           theme={theme}
         />}
       </View>
@@ -231,7 +231,7 @@ export function SettingsScreen({
       </View>}
 
       {matches.has('widget') && <View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}>
-        <SettingsRow testID="settings.widget.open" icon="widgets-outline" label={t('settings.widgetTitle')} detail={t('settings.widgetDetail')} onPress={()=>setWidgetVisible(true)} theme={theme} wrap/>
+        <SettingsRow testID="settings.widget.open" icon="widgets-outline" label={t('settings.widgetTitle')} detail={t('settings.widgetDetail')} onPress={()=>{Keyboard.dismiss();setWidgetVisible(true);}} theme={theme} wrap/>
       </View>}
 
       {(matches.has('backups') || matches.has('csv') || matches.has('history')) && <SectionLabel label={t('settings.data')} theme={theme} />}
