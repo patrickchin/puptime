@@ -1,0 +1,18 @@
+{
+  "pages": [
+    "pages/journal/index",
+    "pages/insights/index",
+    "pages/timeline/index",
+    "pages/settings/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "Puptime",
+    "navigationBarBackgroundColor": "#F5F3EC",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#F5F3EC",
+    "backgroundTextStyle": "dark",
+    "navigationStyle": "custom"
+  },
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents"
+}

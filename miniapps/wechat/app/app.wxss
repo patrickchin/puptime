@@ -1,0 +1,26 @@
+page {
+  --ground: #F5F3EC; --surface: #FFFEFA; --ink: #17231E; --muted: #56635D;
+  --line: #DDE5DF; --green: #176B52; --green-soft: #DDEFE7; --danger: #B43A35;
+  background: var(--ground); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 16px; line-height: 1.5;
+}
+view, button, input, textarea { box-sizing: border-box; }
+button { font: inherit; color: inherit; margin: 0; padding: 0; border-radius: 16px; background: transparent; }
+button::after { border: 0; }
+.pressed { opacity: .65; }
+.page { max-width: 720px; padding: 16px 16px calc(112px + env(safe-area-inset-bottom)); margin: 0 auto; }
+.title { font-size: 28px; font-weight: 750; letter-spacing: -.5px; }
+.subtitle, .muted { color: var(--muted); }
+.subtitle { font-size: 14px; }
+.heading { font-size: 20px; font-weight: 700; }
+.section-head { display: flex; justify-content: space-between; align-items: center; margin: 28px 0 12px; }
+.plain-button { width: auto !important; min-height: 48px; min-width: 48px; padding: 8px 12px; font-size: 14px; color: var(--green); display: flex; align-items: center; justify-content: center; }
+.primary { width: 100% !important; background: var(--green); color: white; min-height: 48px; padding: 12px 20px; font-weight: 650; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 22px; overflow: hidden; }
+.demo { padding: 10px 14px; margin: 0 0 16px; background: #FFF0CE; color: #654B13; border-radius: 12px; font-size: 13px; }
+.notice { margin-top: 24px; font-size: 12px; text-align: center; color: var(--muted); }
+.error { background: #FBE5E2; color: #842A26; padding: 14px; border-radius: 12px; margin-bottom: 16px; }
+.field-label { display: block; font-weight: 600; margin: 16px 0 8px; font-size: 14px; }
+.field { background: var(--ground); border: 1px solid var(--line); border-radius: 12px; padding: 12px; min-height: 48px; width: 100%; }
+.view-switch { position: fixed; right: 20px; bottom: calc(16px + env(safe-area-inset-bottom)); width: auto !important; margin: 0 !important; min-height: 56px; padding: 12px 20px; border-radius: 28px; background: var(--green); color: white; display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; z-index: 4; }
+.view-switch image { width: 22px; height: 22px; }

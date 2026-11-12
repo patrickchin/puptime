@@ -1,0 +1,21 @@
+<page-shell screen="timeline" />
+<view wx:if="{{error}}" class="error">{{error}}</view>
+<view class="filters">
+  <button class="filter {{selected === 'pee' ? 'active-pee' : ''}}" data-view="pee" bindtap="choose" aria-pressed="{{selected === 'pee'}}"><image src="/assets/pee.png" aria-hidden="true" />{{t.pee}}<text class="check">{{selected === 'pee' ? '✓' : ''}}</text></button>
+  <button class="filter {{selected !== 'pee' ? 'active-combined' : ''}}" data-view="poop-meal" bindtap="choose" aria-pressed="{{selected !== 'pee'}}"><image src="/assets/poop.png" aria-hidden="true" /><image src="/assets/meal.png" aria-hidden="true" />{{t.poopAndMeal}}<text class="check">{{selected !== 'pee' ? '✓' : ''}}</text></button>
+</view>
+<view class="axis"><view class="date-axis"></view><view class="axis-track"><text wx:for="{{hours}}" wx:key="*this" class="hour {{item === 0 ? 'start-hour' : item === 24 ? 'end-hour' : ''}}" style="left: {{item / 24 * 100}}%">{{item}}</text></view></view>
+<scroll-view scroll-y style="height: {{height}}px" scroll-top="{{scrollTop}}" class="day-scroll">
+  <button wx:if="{{rows.length < 212}}" class="earlier" bindtap="loadEarlier">{{t.earlierTimeline}}</button>
+  <view wx:for="{{rows}}" wx:key="key" wx:for-item="day" class="timeline-day {{day.today ? 'today-row' : ''}}">
+    <view class="date-cell"><text class="weekday">{{day.dayLabel}}</text><text class="date">{{day.date}}</text></view>
+    <view class="track" bindtap="inspect" data-key="{{day.key}}" aria-label="{{day.key}}: {{day.events.length}} {{t.logs}}">
+      <view wx:for="{{grid}}" wx:key="*this" class="grid-line {{item % 3 === 0 ? 'major' : ''}}" style="left: {{item / 24 * 100}}%"></view>
+      <view wx:for="{{day.marks}}" wx:for-item="mark" wx:key="key" class="mark" style="left: {{mark.left}}%"><view wx:for="{{mark.types}}" wx:key="*this" class="mark-part {{item}}"></view></view>
+      <view wx:if="{{day.today}}" class="now" style="left: {{nowPosition}}%"></view>
+    </view>
+  </view>
+  <view class="timeline-clearance"></view>
+</scroll-view>
+<button class="view-switch" bindtap="log" hover-class="pressed"><image src="/assets/log-white.png" aria-hidden="true" />{{t.log}}</button>
+<view wx:if="{{selection}}" class="detail-backdrop" catchtap="close"><view class="details" catchtap="stopTap" role="dialog" aria-label="{{selection.label}}"><view class="details-heading"><text>{{selection.label}}</text><button class="close" bindtap="close" aria-label="{{t.close}}"><image src="/assets/close.png" aria-hidden="true" /></button></view><scroll-view scroll-y class="details-list"><button wx:for="{{selection.events}}" wx:key="id" class="detail-row" data-id="{{item.id}}" bindtap="edit" aria-label="{{t.edit}}: {{item.label}} {{item.time}}"><image src="/assets/{{item.type}}.png" aria-hidden="true" /><view class="detail-copy"><view>{{item.label}} · {{item.time}}</view><view wx:if="{{item.note}}" class="detail-note">{{item.note}}</view></view><image class="edit-icon" src="/assets/edit.png" aria-hidden="true" /></button></scroll-view></view></view>

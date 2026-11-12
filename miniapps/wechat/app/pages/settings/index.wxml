@@ -1,0 +1,9 @@
+<page-shell screen="settings" id="shell" />
+<view class="page">
+  <view wx:if="{{error}}" class="error">{{error}}</view>
+  <view class="settings-heading">{{t.localJournal}}</view>
+  <view class="panel settings-panel"><button class="setting-row" bindtap="rename"><text>{{t.rename}}</text><text class="setting-value">{{name}}</text><image src="/assets/edit.png" aria-hidden="true" /></button><button class="setting-row" bindtap="chooseLanguage"><text>{{t.language}}</text><text class="setting-value">{{languageName}}</text></button></view>
+  <view class="settings-heading">{{t.previewTitle}}</view>
+  <view class="panel settings-panel"><button class="setting-row" bindtap="switchSample"><text>{{demo ? t.own : t.sample}}</text><image src="/assets/chevron-down.png" aria-hidden="true" /></button><button class="setting-row" bindtap="about"><text>{{t.about}}</text></button></view>
+  <view class="notice">{{t.local}}</view>
+</view>

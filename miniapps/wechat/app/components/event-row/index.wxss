@@ -1,0 +1,17 @@
+:host { display: block; }
+.row { display: flex; gap: 12px; align-items: center; width: 100%; min-height: 72px; padding: 10px 0; box-sizing: border-box; text-align: left; background: white; color: #17231E; line-height: 1.5; }
+.row::after { border: 0; }
+.pressed { background: #EDEFE8; }
+.activity-icon { width: 42px; height: 42px; flex: 0 0 42px; border-radius: 15px; background: #DDF2FA; display: flex; align-items: center; justify-content: center; }
+.activity-image { width: 22px; height: 22px; }
+.poop { background: #FFF0DC; } .meal { background: #E8F4DF; }
+.body { flex: 1; min-width: 0; }
+.label { display: block; font-size: 16px; font-weight: 600; }
+.note-row { display: flex; align-items: flex-start; gap: 5px; margin-top: 6px; }
+.note-icon { width: 14px; height: 14px; flex-shrink: 0; margin-top: 2px; }
+.note { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; color: #17231E; font-size: 13px; line-height: 18px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.time { display: block; font-size: 12px; line-height: 17px; margin-top: 2px; color: #56635D; font-variant-numeric: tabular-nums; }
+.row-actions { display: flex; gap: 0; }
+.icon-button { width: 48px !important; height: 48px; display: flex; align-items: center; justify-content: center; margin: 0 !important; padding: 0 !important; background: transparent; border-radius: 16px; }
+.icon-button::after { border: 0; }
+.action-icon { width: 20px; height: 20px; }

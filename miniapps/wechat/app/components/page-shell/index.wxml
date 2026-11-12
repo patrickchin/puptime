@@ -1,0 +1,15 @@
+<view style="padding-top: {{top}}px" class="shell">
+  <view class="header">
+    <button class="menu" bindtap="open" hover-class="pressed" aria-label="{{t.openMenu}}"><image class="menu-icon" src="/assets/menu.png" aria-hidden="true" /></button>
+    <text class="screen-title" role="heading">{{t[screen]}}</text>
+    <text wx:if="{{demo}}" class="sample-label">{{t.sampleShort}}</text>
+  </view>
+</view>
+<slot />
+<view wx:if="{{drawer}}" class="backdrop" catchtap="close">
+  <view class="drawer" style="padding-top: {{top + 60}}px" catchtap="stopTap" role="dialog" aria-label="{{t.openMenu}}">
+    <view class="brand-row"><text class="brand">Puptime</text><button class="close" bindtap="close" aria-label="{{t.close}}"><image class="close-icon" src="/assets/close.png" aria-hidden="true" /></button></view>
+    <view class="destinations"><button wx:for="{{destinations}}" wx:key="key" class="destination {{screen === item.key ? 'selected' : ''}}" data-key="{{item.key}}" bindtap="navigate" aria-current="{{screen === item.key ? 'page' : ''}}"><image class="destination-icon" src="/assets/{{item.icon}}.png" aria-hidden="true" /><text>{{item.label}}</text></button></view>
+    <view class="local">{{t.local}}</view>
+  </view>
+</view>
