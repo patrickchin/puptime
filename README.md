@@ -1,6 +1,6 @@
 # Puptime
 
-Puptime is a puppy activity log for potty breaks, meals, walks, and daily routines. Local logging stays free without an account. Optional cloud backup and device sync are being qualified separately from existing offline releases. The website provides account management and consent-controlled analytics; see [Privacy](PRIVACY.md).
+Puptime is a puppy activity log for potty breaks, meals, walks, and daily routines. Local logging stays free without an account. Optional cloud backup and device sync are being qualified separately from existing offline releases. The public website provides puppy-care guides and consent-controlled analytics. Account actions stay in the native app; see [Privacy](PRIVACY.md).
 
 ## Existing offline release
 

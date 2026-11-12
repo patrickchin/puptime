@@ -1,1 +1,2 @@
-export { default } from '../src/web/AccountPage';
+import { AppHandoffPage } from '../src/web/AppHandoffPage';
+export default function Account(){return <AppHandoffPage/>;}

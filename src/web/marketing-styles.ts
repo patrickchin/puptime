@@ -79,12 +79,6 @@ body:has(.marketing-site){overflow-y:auto}
 .local-columns{display:grid;grid-template-columns:1fr 1fr;gap:48px}
 .local-columns p{font-size:var(--body);line-height:1.45;max-width:36ch}
 .local-columns .text-action{margin-top:28px}
-.account-chapter{display:flex;min-height:180px;background:var(--ochre);color:var(--ink);padding:40px var(--margin);position:relative;flex-direction:column;justify-content:space-between;overflow:clip}
-.account-chapter p{max-width:30ch;padding-right:40px}
-.account-word{font-family:'Red Hat Display',sans-serif;font-size:clamp(48px,6vw,80px);font-weight:900;letter-spacing:-.055em;line-height:1.1;margin-left:-.035em}
-.account-arrow{position:absolute;right:var(--margin);top:24px;font-size:var(--heading);line-height:1}
-.account-chapter:hover .account-arrow{transform:translate(6px,-6px)}
-.account-arrow{transition:transform 240ms var(--ease)}
 .site-footer{background:var(--paper);padding:40px var(--margin) 32px;border-top:1px solid var(--border);overflow:clip}
 .footer-wordmark{font-family:'Red Hat Display',sans-serif;font-size:32px;letter-spacing:-.065em;font-weight:900;line-height:.9;margin-left:-.04em}
 .footer-bottom{display:grid;grid-template-columns:1fr 1fr;gap:48px;margin-top:24px;align-items:start}

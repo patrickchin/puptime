@@ -10,7 +10,7 @@ export type ProductProperties = Record<string, string | number | boolean>;
 // several contain dates, custom labels, database IDs or other customer data.
 const staticControls = new Set([
   "account.apple", "account.back", "account.changeEmail", "account.enable", "account.export", "account.export.cancel",
-  "account.google", "account.manage", "account.methods.refresh", "account.open", "account.refresh", "account.resend",
+  "account.google", "account.methods.refresh", "account.open", "account.refresh", "account.resend",
   "account.retry", "account.sendCode", "account.signOut", "account.verify", "account.viewLogs", "activity.retry",
   "appearance.close", "backups.close", "backups.retry", "confirm.cancel", "confirm.delete", "date.nextMonth",
   "date.previousMonth", "editor.close", "editor.history", "editor.shareDeletedDraft", "history.back", "history.cloud.load",

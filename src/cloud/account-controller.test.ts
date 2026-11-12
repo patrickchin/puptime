@@ -9,8 +9,9 @@ import { CloudApiError,createCloudApi,createSdkRequest,type CloudApi,type CloudA
 import {pushResponseSchema,type Revision} from './protocol.ts';
 import { reconcileMutation } from './reconcile.ts';
 import * as controllerModule from './account-controller.ts';
+import {AccountDeletionError,type AccountDeletionApi} from './account-deletion.ts';
 const event={id:'one',type:'pee' as const,at:100,source:'app' as const};
-async function fixture(t:TestContext,{pristine=false,exportCloud,beforeChange}:{pristine?:boolean;exportCloud?:controllerModule.CloudExportAction;beforeChange?:BackupGuard}={}) {
+async function fixture(t:TestContext,{pristine=false,exportCloud,beforeChange,deletion}:{pristine?:boolean;exportCloud?:controllerModule.CloudExportAction;beforeChange?:BackupGuard;deletion?:AccountDeletionApi}={}) {
  const database=await createLocalDatabase(sqliteTestConnection(':memory:'));t.after(()=>database.close());
  await initializeLocalDatabase(database,()=> 'pet-1');if(!pristine)await database.write(sql=>sql.runAsync('DELETE FROM routines'));
  const writes=new Set<()=>void>(),runtime=await createLocalRuntime(database,'pet-1',()=>{for(const fn of writes)fn();},beforeChange);
@@ -21,7 +22,7 @@ async function fixture(t:TestContext,{pristine=false,exportCloud,beforeChange}:{
  const identity:controllerModule.IdentityAdapter={requestEmail:async(email:string)=>{state.requested.push(email);return {error:null};},verifyEmail:async(_email:string,code:string)=>{state.verifications++;if(code!=='123456')return {error:{status:400,code:'INVALID_OTP'}};state.credentials=true;return {error:null};},signInSocial:async()=>{state.credentials=true;return {error:null};},linkSocial:async provider=>{state.linkCalls++;state.linkedAccounts.push({userId:state.summary.user.id,providerId:provider});return {error:null};},listAccounts:async()=>{state.listCalls++;return {data:structuredClone(state.linkedAccounts),error:null};},signOut:async()=>{state.signOutCalls++;if(!state.storageFails)state.credentials=false;return {error:state.signOutFails?{status:503,code:'NETWORK_ERROR'}:null};},hasCredentials:async()=>{if(state.storageFails)throw new Error('secure storage failed');return state.credentials;}};
  const timers:Array<{fn:()=>void;delay:number;cancelled:boolean}>=[];
  assert.equal(typeof controllerModule.createAccountController,'function');
- const controller=controllerModule.createAccountController({runtime,api,identity,exportCloud,subscribeLocalWrites:(fn:()=>void)=>{writes.add(fn);return()=>{writes.delete(fn);};},defer:(fn:()=>void,delay:number)=>{const task={fn,delay,cancelled:false};timers.push(task);return()=>{task.cancelled=true;};},changed:()=>{}});
+ const controller=controllerModule.createAccountController({runtime,api,identity,exportCloud,deletion,subscribeLocalWrites:(fn:()=>void)=>{writes.add(fn);return()=>{writes.delete(fn);};},defer:(fn:()=>void,delay:number)=>{const task={fn,delay,cancelled:false};timers.push(task);return()=>{task.cancelled=true;};},changed:()=>{}});
  t.after(()=>controller.stop());
  return {controller,runtime,state,api,identity,config,timers};
 }
@@ -746,4 +747,49 @@ test('required account checkpoint precedes credentials and blocks sign-in/sign-o
  failed=false;
  assert.equal(await f.controller.signOut({confirmPending:true}),'ok');assert.equal(f.state.signOutCalls,1);
  assert.ok(calls>=5);
+});
+
+function deletionFixture(){
+ const state={stale:false,checks:0,codes:0,verifications:0,removals:0,lost:false,manual:false};
+ const api:AccountDeletionApi={check:async()=>{state.checks++;if(state.stale)throw new AccountDeletionError('reauth');},requestCode:async()=>{state.codes++;},verify:async(_id,code)=>{state.verifications++;if(code!=='123456')throw new AccountDeletionError('code');state.stale=false;},remove:async(_id,before)=>{await before();state.removals++;if(state.lost)throw new AccountDeletionError('unconfirmed');return {appleManual:state.manual};}};
+ return {deletion:api,state};
+}
+test('native deletion needs a current explicit confirmation and retains all populated local history',async t=>{
+ const d=deletionFixture(),f=await fixture(t,{deletion:d.deletion});f.state.credentials=true;await f.controller.refresh();
+ const events=Array.from({length:1000},(_,i)=>({...event,id:'local-'+i,at:100+i}));await f.runtime.storage.appendEvents(events);await f.controller.enableCloud({});
+ const before=await f.runtime.storage.loadEvents();await f.controller.prepareDeletion('account-1');const confirmation=f.controller.read().deletion!;
+ assert.equal(d.state.removals,0);await f.controller.cancelDeletion();assert.equal(await f.controller.confirmDeletion(confirmation),'cancelled');assert.equal(d.state.removals,0);
+ await f.controller.prepareDeletion('account-1');const fresh=f.controller.read().deletion!;
+ assert.deepEqual(await Promise.all([f.controller.confirmDeletion(fresh),f.controller.confirmDeletion(fresh)]),['ok','cancelled']);
+ assert.equal(d.state.removals,1);assert.equal(f.controller.read().deleted,'done');assert.equal(f.controller.read().account,null);assert.equal((await f.runtime.sync.status(f.runtime.petId)).accountId,null);assert.deepEqual(await f.runtime.storage.loadEvents(),before);assert.equal(f.state.pushCalls,0);assert.equal(await f.runtime.database.read(sql=>sql.getFirstAsync("SELECT value FROM metadata WHERE key='cloud_account_deletion'")),null);
+});
+test('native stale-auth deletion verifies the original account and requires a new confirmation',async t=>{
+ const d=deletionFixture(),f=await fixture(t,{deletion:d.deletion});f.state.credentials=true;await f.controller.refresh();d.state.stale=true;
+ await f.controller.prepareDeletion();assert.equal(f.controller.read().deletion!.stage,'verify');await f.controller.requestDeletionCode();assert.equal(d.state.codes,1);
+ await f.controller.verifyDeletionCode('000000');assert.equal(f.controller.read().problem,'invalid-code');assert.equal(f.controller.read().deletion!.stage,'verify');
+ await f.controller.verifyDeletionCode('123456');assert.equal(f.controller.read().deletion!.stage,'confirm');assert.equal(d.state.removals,0);
+ await f.controller.cancelDeletion();assert.equal(f.controller.read().deletion,null);assert.equal(d.state.removals,0);
+});
+test('an interrupted native deletion persists across controller recreation and fences every ordinary account action',async t=>{
+ const d=deletionFixture(),f=await fixture(t,{deletion:d.deletion});f.state.credentials=true;await f.controller.refresh();await f.runtime.storage.appendEvents([event]);await f.controller.enableCloud({});const before=await f.runtime.storage.loadEvents(),owner=await f.runtime.sync.status(f.runtime.petId);
+ d.state.lost=true;await f.controller.prepareDeletion();await f.controller.confirmDeletion(f.controller.read().deletion!);assert.equal(f.controller.read().deletion!.stage,'unconfirmed');assert.equal(d.state.removals,1);f.controller.stop();
+ const next=controllerModule.createAccountController({runtime:f.runtime,api:f.api,identity:f.identity,deletion:d.deletion,subscribeLocalWrites:()=>()=>{},changed:()=>{}});t.after(()=>next.stop());
+ f.api.account=async()=>{throw new Error('No account refresh during uncertain deletion');};await next.refresh();assert.equal(next.read().deletion!.accountId,'account-1');
+ for(const request of [()=>next.requestEmail('new@example.invalid'),()=>next.signInSocial('google'),()=>next.enableCloud({}),()=>next.signOut({confirmPending:true}),()=>next.connectProvider('google')])assert.equal(await request(),'error');
+ assert.deepEqual(await f.runtime.storage.loadEvents(),before);assert.equal((await f.runtime.sync.status(f.runtime.petId)).generation,owner.generation);assert.equal(f.state.requested.length,0);assert.equal(f.state.signOutCalls,0);
+ const check=d.deletion.check;d.deletion.check=async()=>{throw new AccountDeletionError('mismatch');};await next.prepareDeletion();assert.equal(next.read().problem,'deletion-unconfirmed');d.deletion.check=check;
+ d.state.lost=false;d.state.stale=true;await next.prepareDeletion();await next.requestDeletionCode();await next.verifyDeletionCode('123456');assert.equal(d.state.removals,1);await next.cancelDeletion();assert.equal(next.read().deletion!.stage,'unconfirmed');assert.equal(d.state.removals,1);
+});
+test('failed durable deletion storage and a changed local owner prevent native DELETE dispatch',async t=>{
+ const d=deletionFixture(),f=await fixture(t,{deletion:d.deletion});f.state.credentials=true;await f.controller.refresh();await f.controller.prepareDeletion();
+ const write=f.runtime.database.write;f.runtime.database.write=async()=>{throw new Error('Storage unavailable');};
+ assert.equal(await f.controller.confirmDeletion(f.controller.read().deletion!),'error');assert.equal(d.state.removals,0);f.runtime.database.write=write;
+ await f.controller.cancelDeletion();await f.controller.prepareDeletion();await f.runtime.sync.prepareAssociation({accountId:'other',localPetId:f.runtime.petId,deviceId:f.runtime.deviceId,enrollment:{operationId:'other-owner',deviceId:f.runtime.deviceId,localPetId:f.runtime.petId,name:'Other'}});
+ assert.equal(await f.controller.confirmDeletion(f.controller.read().deletion!),'error');assert.equal(d.state.removals,0);
+});
+test('confirmed native deletion resumes local cleanup after restart without another DELETE',async t=>{
+ const d=deletionFixture(),f=await fixture(t,{deletion:d.deletion});f.state.credentials=true;await f.controller.refresh();await f.runtime.storage.appendEvents([event]);await f.controller.enableCloud({});d.state.manual=true;await f.controller.prepareDeletion();f.state.storageFails=true;
+ assert.equal(await f.controller.confirmDeletion(f.controller.read().deletion!),'error');assert.equal(d.state.removals,1);assert.equal(f.controller.read().deletion!.stage,'confirmed');f.controller.stop();f.state.storageFails=false;
+ const next=controllerModule.createAccountController({runtime:f.runtime,api:f.api,identity:f.identity,deletion:d.deletion,subscribeLocalWrites:()=>()=>{},changed:()=>{}});t.after(()=>next.stop());await next.refresh();await next.prepareDeletion();
+ assert.equal(d.state.removals,1);assert.equal(next.read().deleted,'apple-manual');assert.deepEqual(await f.runtime.storage.loadEvents(),[event]);
 });

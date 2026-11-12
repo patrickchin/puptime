@@ -67,6 +67,6 @@ export async function setAnalyticsEnabled(enabled: boolean, path: string) {
   }
 }
 
-export function captureWebsiteEvent(event: WebsiteEvent, properties: { destination?: 'android_download' | 'source'; error_kind?: 'script' | 'unhandled_rejection' | 'render';action?:'sign_in'|'request_code'|'sign_out'|'link_provider'|'export'|'delete';result?:'started'|'success'|'error'|'cancelled' } = {}) {
+export function captureWebsiteEvent(event: WebsiteEvent, properties: { destination?: 'android_download' | 'source'; error_kind?: 'script' | 'unhandled_rejection' | 'render' } = {}) {
   if (allowed && !privacySignalActive(navigator)) client?.capture(event, { page, ...properties });
 }

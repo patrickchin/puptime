@@ -81,8 +81,8 @@ try {
   const originalId = events[0].properties.distinct_id;
   await page.goto(origin + '/puppy-care/toilet-training?email=private-query#private-fragment');
   await until(() => events.some(event => event.properties.page === '/puppy-care/toilet-training'));
-  await page.goto(origin + '/account?code=private-query#private-fragment');
-  await until(() => events.some(event => event.properties.page === '/account'));
+  await page.goto(origin + '/puppy-care/feeding?code=private-query#private-fragment');
+  await until(() => events.some(event => event.properties.page === '/puppy-care/feeding'));
   await page.evaluate(() => window.dispatchEvent(new ErrorEvent('error', { message: 'private raw error', error: new Error('private raw error') })));
   await until(() => events.some(event => event.event === 'website_error'));
   const keys = ['page', '$pathname', '$process_person_profile', '$geoip_disable', 'distinct_id', '$device_id', '$session_id', '$window_id', '$lib', '$lib_version', 'token', 'error_kind'];

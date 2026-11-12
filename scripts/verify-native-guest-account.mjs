@@ -13,10 +13,11 @@ import {localRecordId} from '../src/cloud/record-identity.ts';
 
 const [platform,device,host,consent,destination='build/guest-account-'+platform,onboarding]=process.argv.slice(2);
 assert.ok(['ios','android'].includes(platform));
-assert.ok(onboarding===undefined||onboarding==='--onboarding-sign-in');
-const android=platform==='android';
+assert.ok(onboarding===undefined||['--onboarding-sign-in','--account-deletion'].includes(onboarding));
+const android=platform==='android',deleting=onboarding==='--account-deletion',onboardingSignIn=onboarding==='--onboarding-sign-in';
 assert.equal(consent,'--replace-synthetic','Use PLATFORM DEVICE HOST --replace-synthetic [OUTPUT].');
-const app='com.patrickchin.puptime',output=resolve(destination),front='https://127.0.0.1:8797';
+const frontPort=Number(process.env.PUPTIME_ACCOUNT_PORT??8797),backPort=frontPort+2;assert.ok(Number.isInteger(frontPort)&&frontPort>1024&&frontPort<65533);
+const app='com.patrickchin.puptime',output=resolve(destination),front='https://127.0.0.1:'+frontPort;
 const simctl=(...args)=>execFileSync('xcrun',['simctl',...args],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
 const adb=(...args)=>execFileSync('adb',['-s',device,...args],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
 if(android){assert.match(adb('emu','avd','name'),/^Puptime_(Onboarding_2f17|SignIn_461a)/);assert.ok(existsSync(host),'Supply a debuggable native APK.');}
@@ -55,7 +56,7 @@ async function flow(name,env={}){
   try{
     await run('maestro',['--device',device,'test',...Object.entries({TEST_EMAIL:email,...env}).flatMap(([key,value])=>['-e',`${key}=${value}`]),resolve('.maestro/account-preservation',name+'.yaml'),'--test-output-dir',artifacts],
       {...process.env,MAESTRO_CLI_NO_ANALYTICS:'1',TEST_EMAIL:email,MAESTRO_TEST_CODE:code,...env});
-    const screenshots=['recovered-account-history.png','my-account-returned-log.png','my-account-signed-in.png','my-account-guest.png'];
+    const screenshots=['native-delete-confirmation.png','native-delete-verify.png','native-deleted-account.png','recovered-account-history.png','my-account-returned-log.png','my-account-signed-in.png','my-account-guest.png'];
     for(const path of readdirSync(artifacts,{recursive:true}).filter(path=>screenshots.some(name=>String(path).endsWith(name))))
       cpSync(join(artifacts,path),join(output,String(path).split('/').at(-1)));
     console.log('PASS native account phase: '+name);
@@ -112,7 +113,7 @@ async function signIn(){
 const childEnv={...process.env,CI:'1',WRANGLER_SEND_METRICS:'false'};
 try{
   // Own both ports; never attach to another task's backend or account.
-  for(const port of [8797,8799])await new Promise((resolveProbe,reject)=>{const server=createServer();server.once('error',reject);server.listen(port,'127.0.0.1',()=>server.close(resolveProbe));});
+  for(const port of [frontPort,backPort])await new Promise((resolveProbe,reject)=>{const server=createServer();server.once('error',reject);server.listen(port,'127.0.0.1',()=>server.close(resolveProbe));});
   if(android){adb('install','-r',resolve(host));adb('shell','run-as',app,'id');}
   else try{simctl('terminate',device,app);}catch{}
   const old=sqliteDirectory();
@@ -121,9 +122,9 @@ try{
     cpSync(old,join(privateDir,'previous-synthetic-sqlite'),{recursive:true});
   }
   await run('npx',['wrangler','d1','migrations','apply','AUTH_DB','--local','--config',configPath,'--persist-to',persist],childEnv);
-  worker=spawn('npx',['wrangler','dev','--local','--ip','127.0.0.1','--port','8799','--config',configPath,'--persist-to',persist],{env:childEnv,stdio:['ignore','pipe','pipe'],detached:true});
+  worker=spawn('npx',['wrangler','dev','--local','--ip','127.0.0.1','--port',String(backPort),'--config',configPath,'--persist-to',persist],{env:childEnv,stdio:['ignore','pipe','pipe'],detached:true});
   worker.stdout.resume();worker.stderr.resume();
-  for(let attempt=0;attempt<160;attempt++){try{if((await fetch('http://127.0.0.1:8799/health')).ok)break;}catch{}await new Promise(resolveWait=>setTimeout(resolveWait,250));}
+  for(let attempt=0;attempt<160;attempt++){try{if((await fetch('http://127.0.0.1:'+backPort+'/health')).ok)break;}catch{}await new Promise(resolveWait=>setTimeout(resolveWait,250));}
   const keyPath=join(privateDir,'localhost.key'),certPath=join(privateDir,'localhost.crt'),rootPath=join(privateDir,'root.crt'),rootKey=join(privateDir,'root.key'),csr=join(privateDir,'localhost.csr');
   if(!android)simctl('keychain',device,'reset');
   await run('openssl',['req','-x509','-newkey','rsa:2048','-nodes','-keyout',rootKey,'-out',rootPath,'-days','1','-subj','/CN=Puptime fixture CA','-addext','basicConstraints=critical,CA:TRUE']);
@@ -134,18 +135,18 @@ try{
   const forward=(req,res)=>{
     requests.add(req.url);
     if(req.headers.cookie)cookie=req.headers.cookie;
-    const outgoing=request('http://127.0.0.1:8799'+req.url,{method:req.method,headers:req.headers},incoming=>{res.writeHead(incoming.statusCode,incoming.headers);incoming.pipe(res);});
+    const outgoing=request('http://127.0.0.1:'+backPort+req.url,{method:req.method,headers:req.headers},incoming=>{res.writeHead(incoming.statusCode,incoming.headers);incoming.pipe(res);});
     outgoing.on('error',()=>{res.writeHead(502);res.end();});req.pipe(outgoing);
   };
   proxy=secureServer({key:readFileSync(keyPath),cert:Buffer.concat([readFileSync(certPath),certificate])},forward);
   proxy.on('tlsClientError',error=>writeFileSync(join(output,'fixture-tls-error.txt'),error.message));
   proxy.on('upgrade',(req,socket,head)=>{
-    const upstream=connect(8799,'127.0.0.1',()=>{
+    const upstream=connect(backPort,'127.0.0.1',()=>{
       upstream.write(`${req.method} ${req.url} HTTP/1.1\r\n${Object.entries(req.headers).map(([key,value])=>`${key}: ${value}`).join('\r\n')}\r\n\r\n`);
       if(head.length)upstream.write(head);socket.pipe(upstream).pipe(socket);
     });upstream.on('error',()=>socket.destroy());socket.on('error',()=>upstream.destroy());
   });
-  await new Promise(resolveProxy=>proxy.listen(8797,'127.0.0.1',resolveProxy));
+  await new Promise(resolveProxy=>proxy.listen(frontPort,'127.0.0.1',resolveProxy));
   for(const file of readdirSync(join(persist,'v3/d1'),{recursive:true}).filter(file=>String(file).endsWith('.sqlite'))){
     const db=new DatabaseSync(join(persist,'v3/d1',file),{readOnly:true});
     if(db.prepare("SELECT name FROM sqlite_master WHERE name='local_email_previews'").get()){auth=db;break;}db.close();
@@ -155,7 +156,7 @@ try{
   // backend URL rather than reuse transforms from the production build.
   const bundleEnv={...childEnv,CI:'false',EXPO_PUBLIC_CLOUD_API_URL:front};
   if(android){
-    adb('reverse','tcp:8797','tcp:8797');
+    adb('reverse','tcp:'+frontPort,'tcp:'+frontPort);
     assert.ok(process.env.ANDROID_HOME||process.env.ANDROID_SDK_ROOT,'Set ANDROID_HOME for the isolated native fixture build.');
     assert.equal(resolve(host),resolve('android/app/build/outputs/apk/debug/app-debug.apk'));
     // Expo's embedded Debug host does not load Metro. Build its normal release JS
@@ -190,7 +191,7 @@ try{
   await run('codesign',['--force','--deep','--sign','-',bundle]);
   simctl('install',device,bundle);
   }
-  if(onboarding){
+  if(onboardingSignIn){
     await flow('onboarding-request');
     code=auth.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(email)?.code;
     assert.match(code??'',/^\d{6}$/);codes.add(code);
@@ -200,7 +201,7 @@ try{
     assert.ok(!requests.has('/api/cloud/enroll')&&!requests.has('/api/sync/push'),'Sign-in must not enroll or upload.');
     checks.push('welcome email sign-in uses the real SDK, rejects a wrong code, resumes setup after verification and cold restart, and never enrolls or uploads');
   }
-  if(!onboarding){
+  if(!onboardingSignIn&&!deleting){
   await flow('prepare');assert.equal(snapshot().events.length,0);
   assert.ok(requests.has('/api/config'),'The real app must reach this isolated backend before any sign-in attempt.');
   await flow('add-logs',{BATCHES:'4',EXPECTED_COUNT:'12'});const guest=snapshot();assert.equal(guest.events.length,12);assert.equal(guest.owner.length,0);
@@ -226,12 +227,24 @@ try{
   await flow('reopen',{EXPECTED_COUNT:'21'});assert.deepEqual(snapshot().events,combined.events);assert.equal(snapshot().pending,0);
   checks.push('all 21 logs restore into an empty database and survive cold restart, with no remote mutation or outbound backlog');
   }
+  if(deleting){
+   await flow('prepare');await flow('add-logs',{BATCHES:'4',EXPECTED_COUNT:'12'});await signIn();await flow('enable',{EXPECTED_COUNT:'12'});
+   const before=snapshot(),owner=before.owner[0].account_id;
+   await flow('delete-cancel');assert.equal(auth.prepare('SELECT id FROM user WHERE id=?').all(owner).length,1);await assertCloud(before.events);
+   const mutate=statement=>{const path=join(privateDir,'private.sql');writeFileSync(path,statement,{mode:0o600});execFileSync('npx',['wrangler','d1','execute','AUTH_DB','--local','--config',configPath,'--persist-to',persist,'--file',path],{env:childEnv,stdio:['ignore','pipe','pipe']});rmSync(path,{force:true});};
+   mutate(`UPDATE session SET createdAt='1970-01-01T00:00:00.000Z' WHERE userId='${owner}'`);
+   await flow('delete-request');code=auth.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(email)?.code;assert.match(code??'',/^\d{6}$/);codes.add(code);
+   await flow('delete-verify');code='';assert.equal(auth.prepare('SELECT id FROM user WHERE id=?').all(owner).length,1);assert.deepEqual(snapshot().events,before.events);
+   const now=new Date().toISOString();mutate(`INSERT INTO account(id,accountId,providerId,userId,createdAt,updatedAt) VALUES('acc_native_delete_fixture','synthetic-apple-subject','apple','${owner}','${now}','${now}')`);
+   await flow('delete-confirm');assert.equal(auth.prepare('SELECT id FROM user WHERE id=?').all(owner).length,0);assert.deepEqual(snapshot().events,before.events);assert.equal(snapshot().owner.length,0);
+   checks.push('native system confirmation cancels safely; stale auth uses real same-account OTP and a new confirmation; confirmed deletion removes the actual account, retains all 12 logs and offers manual Apple cleanup for a tokenless synthetic link');
+  }
   rmSync(join(output,'failure-redacted.log'),{force:true});
   writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',checks,scope:android?'Android Debug native host with normal embedded release JS and isolated local HTTPS Better Auth/D1/SQLite DO; actual native email SDK and Keystore. Its temporary CA is trusted only in the ignored Debug source set, restored after the run. Production onboarding is tested separately in the Release APK. No real email, production account, session injection or mocked sync.':'Release bundle and actual native email SDK with isolated local HTTPS Better Auth/D1/SQLite DO. Simulator trusts the fixture certificate. No real email, production account, session injection or mocked sync.'},null,2)+'\n');
-  console.log('PASS '+(onboarding?'welcome sign-in and session recovery':'guest account preservation and empty-device recovery')+': '+output);
+  console.log('PASS '+(deleting?'native account deletion':onboardingSignIn?'welcome sign-in and session recovery':'guest account preservation and empty-device recovery')+': '+output);
 }finally{
   auth?.close();proxy?.close();for(const child of [worker])if(child?.pid)try{process.kill(-child.pid,'SIGTERM');}catch{}
-  if(android)try{adb('reverse','--remove','tcp:8797');}catch{}
+  if(android)try{adb('reverse','--remove','tcp:'+frontPort);}catch{}
   for(const [path,original] of restoreNative.reverse())if(original===null)rmSync(path,{force:true});else writeFileSync(path,original);
   // Retain only isolated synthetic state for failures; no auth data in public evidence.
 }
