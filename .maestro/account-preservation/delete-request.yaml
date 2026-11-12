@@ -1,0 +1,19 @@
+appId: com.patrickchin.puptime
+name: Native deletion same-account verification request
+---
+- scrollUntilVisible:
+    element:
+      id: account.delete
+    direction: DOWN
+- tapOn:
+    id: account.delete
+- extendedWaitUntil:
+    visible: Confirm it’s you
+    timeout: 15000
+- tapOn:
+    id: account.delete.sendCode
+- extendedWaitUntil:
+    visible:
+      id: account.delete.code
+    timeout: 15000
+- takeScreenshot: native-delete-verify

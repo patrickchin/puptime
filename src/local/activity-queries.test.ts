@@ -51,8 +51,8 @@ test('invalid query limits, cursors and windows reject before SQL without a full
 });
 
 test('date windows include overlapping durations and exclude touching ends, points outside and other pets',async t=>{
- const {repository,activity,reads,database}=await setup(t);
- // Preserve legacy cloud conflicts when qualifying date-window queries.
+ const {activity,reads,database}=await setup(t);
+ // Query fixtures include independently committed overlapping naps.
  await database.write(sql=>applyLocalRecords(sql,'pet-1',([
   event('before',99),event('start',100),event('last',199),event('after',200),
   {...event('point-nap',99),type:'nap'},

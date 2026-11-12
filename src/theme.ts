@@ -92,13 +92,11 @@ export const themeChoices = ['system', 'light', 'dark'] as const;
 const defaultIcons = {
   events: { pee: 'water-outline', poop: 'emoticon-poop-outline', meal: 'food-apple-outline', pottyTrip: 'door-open', walk: 'walk', nap: 'sleep', custom: 'tag-outline' },
   navigation: { log: 'home-variant-outline', timeline: 'timeline-clock-outline', insights: 'chart-line-variant', schedule: 'calendar-clock-outline', learn: 'book-open-page-variant-outline' },
-  more: 'plus-circle-outline', routine: 'calendar-clock-outline',
 };
 
 const defaultDarkIcons = {
   events: { pee: 'cup-water', poop: 'emoticon-poop-outline', meal: 'bowl-mix-outline', pottyTrip: 'door-open', walk: 'foot-print', nap: 'weather-night', custom: 'bookmark-outline' },
   navigation: { log: 'moon-waning-crescent', timeline: 'timeline-clock-outline', insights: 'chart-areaspline', schedule: 'calendar-month-outline', learn: 'book-open-page-variant-outline' },
-  more: 'plus-circle-multiple-outline', routine: 'calendar-month-outline',
 };
 
 export function headingStyle(theme: Theme) {
@@ -118,10 +116,6 @@ export function eventColors(theme: Theme, type: EventType) {
 
 export function navigationIcon(theme: Theme, tab: ThemeNavigationIcon): string {
   return (theme.isDark ? defaultDarkIcons : defaultIcons).navigation[tab];
-}
-
-export function supportingIcon(theme: Theme, icon: 'more' | 'routine'): string {
-  return (theme.isDark ? defaultDarkIcons : defaultIcons)[icon];
 }
 
 export function surfaceTreatment(theme: Theme) {

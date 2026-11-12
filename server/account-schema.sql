@@ -1,5 +1,5 @@
 -- AccountStore SQLite baseline, applied inside its constructor transaction.
--- This is not an AUTH_DB/D1 migration. Version 3 is the current typed layout.
+-- This is not an AUTH_DB/D1 migration. Version 4 is the supported typed layout.
 CREATE TABLE schema_metadata (version INTEGER NOT NULL);
 CREATE TABLE account_state (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
 CREATE TABLE pets (
@@ -61,4 +61,8 @@ CREATE TABLE enrolled_devices (
   PRIMARY KEY(id, pet_id)
 );
 CREATE INDEX records_by_pet_kind ON records(pet_id,kind,deleted);
-INSERT INTO schema_metadata(version) VALUES (3);
+CREATE TABLE api_requests (id TEXT PRIMARY KEY, payload TEXT NOT NULL, result TEXT NOT NULL);
+CREATE INDEX records_by_scope_sequence ON records(kind, pet_id, deleted, sequence);
+CREATE INDEX record_events_by_at ON record_events(at, record_id);
+CREATE INDEX record_events_by_type_at ON record_events(type, at, record_id);
+INSERT INTO schema_metadata(version) VALUES (4);

@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { CloudHandle } from '../cloud/use-cloud';
 import {AccountButton,AccountSignIn,accountProblemKey} from '../components/AccountSignIn';
 import { useAccountSnapshot } from '../cloud/use-account-snapshot';
+import {AccountDeletionPanel} from '../components/AccountDeletionPanel';
 import { accountStatus } from '../cloud/account-status';
 import { useLocalization } from '../localization-context';
 import { spacing,surfaceTreatment,type Theme } from '../theme';
@@ -45,7 +46,9 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
           </Pressable>
           <Text accessibilityRole="header" maxFontSizeMultiplier={2} style={[styles.title,titleStyle]}>{t('account.title')}</Text>
         </View>
-        {errorKey&&errorKey!=='account.error.export'?<Text testID="account.error" accessibilityRole="alert" style={[styles.notice,{color:theme.danger,backgroundColor:theme.dangerSoft,borderRadius:theme.presentation.controlRadius}]}>{t(errorKey)}</Text>:null}
+        {errorKey&&errorKey!=='account.error.export'&&!(state?.deletion&&state.problem==='deletion-unconfirmed')?<Text testID="account.error" accessibilityRole="alert" style={[styles.notice,{color:theme.danger,backgroundColor:theme.dangerSoft,borderRadius:theme.presentation.controlRadius}]}>{t(errorKey)}</Text>:null}
+        {state?.deleted?<View style={styles.stack}><Text testID="account.deleted" accessibilityRole="alert" style={[styles.body,{color:theme.primary}]}>{t('account.delete.done')}</Text>{state.deleted==='apple-manual'?<><Text style={[styles.body,bodyStyle]}>{t('account.delete.appleBody')}</Text><AccountButton theme={theme} testID="account.delete.apple" label={t('account.delete.apple')} onPress={()=>{void Linking.openURL('https://account.apple.com/').catch(()=>Alert.alert(t('learn.linkError'),t('learn.linkErrorBody')));}}/></>:null}</View>:null}
+        {state?.deletion&&cloud.controller?<AccountDeletionPanel state={state} controller={cloud.controller} theme={theme}/>:<>
         {!account?<AccountSignIn cloud={cloud} theme={theme} showError={false}/>:<>
           <View testID="account.identity" style={cardStyle}>
             <View style={styles.summaryHeader}>
@@ -92,10 +95,12 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
             <AccountButton theme={theme} testID="account.export" label={t(state?.exporting?'account.exporting':'account.export')} icon="download-outline" disabled={busy||!state!.online||!account.cloud.canExport} loading={state?.exporting} onPress={()=>{void cloud.controller!.exportData();}}/>
             {state?.exporting?<AccountButton theme={theme} testID="account.export.cancel" label={t('account.cancel')} onPress={()=>cloud.controller!.cancelExport()}/>:state?.sync?.pending?<Text style={[styles.body,bodyStyle]}>{t('account.exportPending')}</Text>:null}
           </View>
-          <AccountButton theme={theme} testID="account.manage" label={t('account.manage')} icon="open-in-new" onPress={()=>{void Linking.openURL('https://puptime.pages.dev/account').catch(()=>Alert.alert(t('learn.linkError'),t('learn.linkErrorBody')));}}/>
           <AccountButton theme={theme} testID="account.signOut" label={t('account.signOut')} disabled={busy} onPress={signOut}/>
+          <Text style={[styles.body,bodyStyle]}>{t('account.delete.body')}</Text>
+          <AccountButton theme={theme} testID="account.delete" label={t('account.delete.action')} icon="delete-outline" danger disabled={busy||!state!.online} onPress={()=>{void cloud.controller!.prepareDeletion(account.user.id);}}/>
         </View>):null}
         {!account&&state?.sync?.accountId?<AccountButton theme={theme} testID="account.signOut" label={t('account.signOut')} disabled={busy} onPress={signOut}/>:null}
+        </>}
         <Pressable accessibilityRole="link" accessibilityLabel={t('account.privacy')} onPress={()=>{void Linking.openURL('https://github.com/patrickchin/puptime/blob/main/PRIVACY.md').catch(()=>Alert.alert(t('learn.linkError'),t('learn.linkErrorBody')));}} style={styles.privacy}><Text style={[styles.body,{color:theme.primary,textDecorationLine:'underline'}]}>{t('account.privacy')}</Text></Pressable>
       </ScrollView>
     </KeyboardAvoidingView>

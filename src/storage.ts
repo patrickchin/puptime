@@ -74,14 +74,17 @@ async function writeEvents(events: PuppyEvent[]): Promise<PuppyEvent[]> {
   return sorted;
 }
 
-function parseArray<T>(value: string | null): T[] {
-  if (!value) return [];
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+function parseStrings(value: string | null): string[] {
+  if (value === null) return [];
+  const parsed: unknown = JSON.parse(value);
+  if (!Array.isArray(parsed) || parsed.some(item => typeof item !== 'string')) throw new Error('Saved settings contain an invalid collection.');
+  return parsed;
+}
+
+function parseObject(value: string): object {
+  const parsed: unknown = JSON.parse(value);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Saved settings contain an invalid object.');
+  return parsed;
 }
 
 export async function loadEvents(): Promise<PuppyEvent[]> {
@@ -155,10 +158,6 @@ export function removeEvent(id: string): Promise<PuppyEvent[]> {
   return queueEventWrite(async () => writeEvents((await loadEvents()).filter((event) => event.id !== id)));
 }
 
-export function updateEventTime(id: string, at: number): Promise<PuppyEvent[]> {
-  return updateEvent(id, { at });
-}
-
 export function updateEvent(
   id: string,
   changes: PuppyEventChanges,
@@ -177,7 +176,7 @@ export async function loadSchedule(): Promise<ScheduleEntry[]> {
     await AsyncStorage.setItem(SCHEDULE_KEY, JSON.stringify(STARTER_SCHEDULE));
     return STARTER_SCHEDULE;
   }
-  return parseArray<ScheduleEntry>(stored).sort((a, b) => a.minutes - b.minutes);
+  return parseSchedule(JSON.parse(stored)).sort((a, b) => a.minutes - b.minutes);
 }
 
 export async function saveSchedule(schedule: ScheduleEntry[]): Promise<void> {
@@ -197,7 +196,9 @@ export const removeScheduleEntry=(id:string)=>mutateSchedule(current=>current.fi
 
 export async function loadThemePreference(): Promise<ThemePreference> {
   const stored = await AsyncStorage.getItem(THEME_KEY);
-  return isThemePreference(stored) ? stored : 'system';
+  if (stored === null) return 'system';
+  if (!isThemePreference(stored)) throw new Error('Saved theme preference is invalid.');
+  return stored;
 }
 
 export function saveThemePreference(preference: ThemePreference): Promise<void> {
@@ -206,7 +207,9 @@ export function saveThemePreference(preference: ThemePreference): Promise<void> 
 
 export async function loadLanguagePreference(): Promise<LanguagePreference> {
   const stored = await AsyncStorage.getItem(LANGUAGE_KEY);
-  return isLanguagePreference(stored) ? stored : 'system';
+  if (stored === null) return 'system';
+  if (!isLanguagePreference(stored)) throw new Error('Saved language preference is invalid.');
+  return stored;
 }
 
 export function saveLanguagePreference(preference: LanguagePreference): Promise<void> {
@@ -214,44 +217,39 @@ export function saveLanguagePreference(preference: LanguagePreference): Promise<
 }
 
 export async function loadCustomActivities(events?: PuppyEvent[]): Promise<string[]> {
-  const stored = parseArray<string>(await AsyncStorage.getItem(CUSTOM_ACTIVITIES_KEY));
-  const deleted = parseArray<string>(await AsyncStorage.getItem(DELETED_CUSTOM_ACTIVITIES_KEY));
+  const stored = parseStrings(await AsyncStorage.getItem(CUSTOM_ACTIVITIES_KEY));
+  const deleted = parseStrings(await AsyncStorage.getItem(DELETED_CUSTOM_ACTIVITIES_KEY));
   const historical = (events ?? await loadEvents())
     .filter((event) => event.type === 'custom')
     .map((event) => event.customLabel);
-  const activities = normalizeCustomActivities([...stored, ...historical], deleted);
-  if (JSON.stringify(activities) !== JSON.stringify(stored)) {
-    await AsyncStorage.setItem(CUSTOM_ACTIVITIES_KEY, JSON.stringify(activities));
-  }
-  return activities;
+  return normalizeCustomActivities([...stored, ...historical], deleted);
 }
 
 export async function saveCustomActivity(label: string): Promise<string[]> {
   const key = customActivityKey(label);
-  const deleted = parseArray<string>(await AsyncStorage.getItem(DELETED_CUSTOM_ACTIVITIES_KEY));
-  if (deleted.includes(key)) await AsyncStorage.setItem(DELETED_CUSTOM_ACTIVITIES_KEY, JSON.stringify(deleted.filter((item) => item !== key)));
+  const deleted = parseStrings(await AsyncStorage.getItem(DELETED_CUSTOM_ACTIVITIES_KEY));
   const next = normalizeCustomActivities([...await loadCustomActivities(), label]);
+  if (deleted.includes(key)) await AsyncStorage.setItem(DELETED_CUSTOM_ACTIVITIES_KEY, JSON.stringify(deleted.filter((item) => item !== key)));
   await AsyncStorage.setItem(CUSTOM_ACTIVITIES_KEY, JSON.stringify(next));
   return next;
 }
 
 export async function deleteCustomActivity(label: string): Promise<string[]> {
   const key = customActivityKey(label);
-  const deleted = parseArray<string>(await AsyncStorage.getItem(DELETED_CUSTOM_ACTIVITIES_KEY));
-  await AsyncStorage.setItem(DELETED_CUSTOM_ACTIVITIES_KEY, JSON.stringify([...new Set([...deleted, key])]));
+  const deleted = parseStrings(await AsyncStorage.getItem(DELETED_CUSTOM_ACTIVITIES_KEY));
   const next = normalizeCustomActivities((await loadCustomActivities()).filter((item) => customActivityKey(item) !== key));
-  await AsyncStorage.setItem(CUSTOM_ACTIVITIES_KEY, JSON.stringify(next));
   const customizations = await loadActivityCustomizations();
   delete customizations[key];
+  await AsyncStorage.setItem(DELETED_CUSTOM_ACTIVITIES_KEY, JSON.stringify([...new Set([...deleted, key])]));
+  await AsyncStorage.setItem(CUSTOM_ACTIVITIES_KEY, JSON.stringify(next));
   await AsyncStorage.setItem(ACTIVITY_CUSTOMIZATIONS_KEY, JSON.stringify(customizations));
   return next;
 }
 
 export async function loadActivityCustomizations(): Promise<ActivityCustomizations> {
   const stored = await AsyncStorage.getItem(ACTIVITY_CUSTOMIZATIONS_KEY);
-  if (!stored) return {};
-  try { return normalizeActivityCustomizations(JSON.parse(stored)); }
-  catch { return {}; }
+  if (stored === null) return {};
+  return normalizeActivityCustomizations(parseObject(stored));
 }
 
 export async function saveActivityCustomization(key: ActivityKey, customization: ActivityCustomization): Promise<ActivityCustomizations> {
@@ -263,11 +261,7 @@ export async function saveActivityCustomization(key: ActivityKey, customization:
 export async function loadWidgetActions(customActivities?: string[]): Promise<ActivityKey[]> {
   const stored = await AsyncStorage.getItem(WIDGET_ACTIONS_KEY);
   if (stored === null) return [...DEFAULT_WIDGET_ACTIONS];
-  try {
-    return normalizeWidgetActions(JSON.parse(stored), customActivities ?? await loadCustomActivities());
-  } catch {
-    return [...DEFAULT_WIDGET_ACTIONS];
-  }
+  return normalizeWidgetActions(parseStrings(stored), customActivities ?? await loadCustomActivities());
 }
 
 export async function saveWidgetActions(actions: ActivityKey[]): Promise<void> {
@@ -277,11 +271,7 @@ export async function saveWidgetActions(actions: ActivityKey[]): Promise<void> {
 export async function loadNotificationPreferences(): Promise<NotificationPreferences> {
   const stored = await AsyncStorage.getItem(NOTIFICATION_PREFERENCES_KEY);
   if (stored === null) return { ...DEFAULT_NOTIFICATION_PREFERENCES };
-  try {
-    return normalizeNotificationPreferences(JSON.parse(stored));
-  } catch {
-    return { ...DEFAULT_NOTIFICATION_PREFERENCES };
-  }
+  return normalizeNotificationPreferences(parseObject(stored));
 }
 
 export async function saveNotificationPreferences(preferences: NotificationPreferences): Promise<void> {

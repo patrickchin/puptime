@@ -2,7 +2,6 @@
 """Capture a credential-free CLI check as searchable text, never a video.
 
 Usage: python record-test-review.py OUTPUT.log TITLE SCOPE -- COMMAND ARGS...
-Legacy OUTPUT.mp4 arguments also produce OUTPUT.log and OUTPUT.json only.
 Never pass a command that prints secrets.
 """
 import json
@@ -14,7 +13,8 @@ import time
 
 destination, title, scope, separator, *command = sys.argv[1:]
 assert separator == '--' and command
-destination = Path(destination).resolve().with_suffix('.log')
+destination = Path(destination).resolve()
+assert destination.suffix == '.log', 'Use a .log filename for CLI evidence.'
 destination.parent.mkdir(parents=True, exist_ok=True)
 assert not destination.exists() and not destination.with_suffix('.json').exists(), 'Choose a fresh evidence filename.'
 started = time.monotonic()

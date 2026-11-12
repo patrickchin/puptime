@@ -43,7 +43,6 @@ function Header({ learning = false }: { learning?: boolean }) {
     <nav aria-label="Website">
       <a className="product-nav" href={learning ? '/#app' : '#app'}>The app</a>
       <a href="/puppy-care/">Puppy care</a>
-      <a href="/account">Account</a>
     </nav>
   </header>;
 }
@@ -151,21 +150,16 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
         <h2 id="local-title" data-reveal>Local first.<br />Yours always.</h2>
         <div className="local-columns">
           <p data-reveal>Log for free, without an account. Keep notes, edit your history, and export your activity as CSV. The everyday record belongs to you.</p>
-          <div data-reveal><p>Cloud backup and device sync are optional. Use your account to manage sign-in methods and saved cloud data. Your saved cloud data stays yours when sync is paused.</p><SourceLink className="text-action" /></div>
+          <div data-reveal><p>Cloud backup and device sync are optional and managed in the Puptime app. Your saved cloud data stays yours when sync is paused.</p><SourceLink className="text-action" /></div>
         </div>
       </section>
 
-      <a className="account-chapter" href="/account">
-        <p>Manage your sign-in methods and saved cloud data.</p>
-        <span className="account-word">Account</span>
-        <span className="account-arrow" aria-hidden="true">↗</span>
-      </a>
     </main>}
     <footer className="site-footer">
       <p className="footer-wordmark" aria-hidden="true">Puptime</p>
       <div className="footer-bottom">
         <p>A little record of growing up.</p>
-        <nav aria-label="Footer"><SourceLink>GitHub</SourceLink><a href="/puppy-care/">Puppy care</a><a href="/account">Account</a><a href={privacyUrl}>Privacy</a><button type="button" onClick={openAnalyticsSettings}>Analytics settings</button><a href="#top">Back to top</a></nav>
+        <nav aria-label="Footer"><SourceLink>GitHub</SourceLink><a href="/puppy-care/">Puppy care</a><a href={privacyUrl}>Privacy</a><button type="button" onClick={openAnalyticsSettings}>Analytics settings</button><a href="#top">Back to top</a></nav>
       </div>
     </footer>
   </div>;

@@ -1,1 +1,2 @@
-export {default} from '../src/web/CarePage';
+import { AppHandoffPage } from '../src/web/AppHandoffPage';
+export default function Care(){return <AppHandoffPage invitation/>;}

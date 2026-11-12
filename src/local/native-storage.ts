@@ -64,10 +64,10 @@ export function createNativeStorage(database: LocalDatabase, petId: string, onCh
     const checkpoint=await sql.getFirstAsync<{value:string}>("SELECT value FROM metadata WHERE key='first_launch_step'");
     if(!shown||!['true','false'].includes(shown.value))throw new Error('Saved setup state is invalid.');
     if(shown.value==='false'){
-      if(checkpoint&&checkpoint.value!=='done')throw new Error('Saved setup completion is inconsistent.');
+      if(checkpoint?.value!=='done')throw new Error('Saved setup completion is inconsistent.');
       return null;
     }
-    const step=firstLaunchStepSchema.parse(checkpoint?.value??'welcome');
+    const step=firstLaunchStepSchema.parse(checkpoint?.value);
     const pet=await sql.getFirstAsync<{name:string}>('SELECT name FROM puppies WHERE id=?',petId);
     const puppy=recordDataSchema('puppy').parse({name:pet?.name});
     if(!('name' in puppy))throw new Error('The local puppy could not be found.');
@@ -78,7 +78,7 @@ export function createNativeStorage(database: LocalDatabase, petId: string, onCh
   }
   return {
     loadEvents: repository.loadEvents, appendEvents: repository.appendEvents,appendWidgetEvents:repository.appendWidgetEvents, importEvents: repository.importEvents,toggleNap:repository.toggleNap,reconcileNaps:repository.reconcileNaps,
-    removeEvent: repository.removeEvent, updateEvent: repository.updateEvent, updateEventTime: repository.updateEventTime,
+    removeEvent: repository.removeEvent, updateEvent: repository.updateEvent,
     loadSchedule: repository.loadSchedule, saveSchedule: repository.saveSchedule,
     saveScheduleEntry:repository.saveScheduleEntry,removeScheduleEntry:repository.removeScheduleEntry,
     loadPuppyName:()=>database.read(async sql=>{const pet=await sql.getFirstAsync<{name:string}>('SELECT name FROM puppies WHERE id=?',petId);if (!pet) throw new Error('The local puppy could not be found.');return pet.name;}),
@@ -99,8 +99,8 @@ export function createNativeStorage(database: LocalDatabase, petId: string, onCh
     loadFirstLaunch:()=>database.read(firstLaunch),
     loadNotificationDelivery:()=>database.read(async sql=>{
       const flag=await sql.getFirstAsync<{value:string}>("SELECT value FROM metadata WHERE key='notify_on_device'");
-      if(flag){if(!['true','false'].includes(flag.value))throw new Error('Saved device notification choice is invalid.');return flag.value==='true';}
-      return await firstLaunch(sql)===null;
+      if(!flag||!['true','false'].includes(flag.value))throw new Error('Saved device notification choice is invalid.');
+      return flag.value==='true';
     }),
     async saveNotificationDelivery(enabled:boolean) {
       if(typeof enabled!=='boolean')throw new TypeError('Invalid device notification choice.');
@@ -141,13 +141,11 @@ export function createNativeStorage(database: LocalDatabase, petId: string, onCh
         }
         await sql.runAsync("UPDATE metadata SET value='false' WHERE key='show_onboarding'");
         await checkpoint(sql,'done');
-        await sql.runAsync("INSERT OR IGNORE INTO metadata(key,value) VALUES ('notify_on_device','false')");
-        await set(sql, storageKeys.onboarding, 'done');
       });
     },
-    loadThemePreference: () => database.read(async (sql) => { const value = await get(sql, storageKeys.theme); return isThemePreference(value) ? value : 'system'; }),
+    loadThemePreference: () => database.read(async (sql) => { const value = await get(sql, storageKeys.theme); if (value === null) return 'system'; if (!isThemePreference(value)) throw new Error('Saved theme preference is invalid.'); return value; }),
     saveThemePreference: (value: ThemePreference) => settingsWrite((sql) => set(sql, storageKeys.theme, value)),
-    loadLanguagePreference: () => database.read(async (sql) => { const value = await get(sql, storageKeys.language); return isLanguagePreference(value) ? value : 'system'; }),
+    loadLanguagePreference: () => database.read(async (sql) => { const value = await get(sql, storageKeys.language); if (value === null) return 'system'; if (!isLanguagePreference(value)) throw new Error('Saved language preference is invalid.'); return value; }),
     saveLanguagePreference: (value: LanguagePreference) => settingsWrite((sql) => set(sql, storageKeys.language, value)),
     loadCustomActivities: (_events?: PuppyEvent[]) => database.read(activities),
     async saveCustomActivity(label: string) {

@@ -12,7 +12,6 @@ loses ownership of its original session.
 | Naps | New starts and reopen edits cannot add a second running nap. Local toggles are transactional. Previously committed cloud/widget conflicts retain every log. Foreground reconciliation ends older naps at the first recorded awake activity or subsequent nap start, capped at a two-hour estimate to avoid multi-day naps, and leaves the newest running. A dismissible suggestion opens the existing end-time editor; read-only logs are never changed. Semantic sync rejection blocks until corrected; closing the conflicting nap requeues a blocked start after that correction. | `src/domain.ts`, `src/local/repository.ts`, `server/account-store.ts` |
 | Routine editing | Save and permission results belong to an editor generation, including reopening the same record. Closing invalidates that generation. Saving locks draft inputs; permission completion cannot enable a replacement draft. | `src/screens/ScheduleScreen.tsx` |
 | Dictation | Permission, starting, listening, finishing and cancellation are explicit phases. Manual changes invalidate the transcription. A native session reaches `end` before another starts. | `src/components/NoteInput.tsx` |
-| Shared-care history | One queue owns refresh and pagination. Refresh reloads all loaded pages, reflects deletions and reuses unchanged rows. Identity changes invalidate outstanding responses. | `src/web/care-history.ts` |
 
 ## Review checklist
 

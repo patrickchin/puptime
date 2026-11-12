@@ -65,6 +65,20 @@ function flow(name,body,resume=true){
 }
 function screenshot(name){simctl('io',udid,'screenshot',join(output,name+'.png'));}
 try{
+ // The first launch intentionally reads the whole journal for its daily backup.
+ // Complete that checkpoint before measuring screen-query bounds on reopen.
+ flow('startup-backup',`
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 60000
+`,false);
+ const backupDirectory=join(documents,'activity-backups');
+ assert.ok(readdirSync(backupDirectory).filter(file=>/^bkp_.*\.json$/.test(file)).some(file=>{
+  const backup=JSON.parse(readFileSync(join(backupDirectory,file),'utf8'));
+  return backup.reason==='daily'&&backup.petId===petId&&backup.events.length===count;
+ }),'The startup backup must contain the complete synthetic journal.');
  flow('initial-page',`
 - launchApp
 - extendedWaitUntil:
@@ -87,6 +101,7 @@ try{
  flow('drawer-preserves-loaded-rows',`
 - tapOn:
     id: nav.open
+    retryTapIfNoChange: true
 - assertVisible:
     id: nav.log
     selected: true
@@ -110,13 +125,11 @@ try{
     id: editor.note.input
 - setClipboard: Native bounded edit
 - pasteText
-- hideKeyboard
 - scrollUntilVisible:
     element:
       id: editor.close
     direction: UP
-    visibilityPercentage: 50
-- waitForAnimationToEnd
+    visibilityPercentage: 100
 - tapOn:
     id: editor.close
     retryTapIfNoChange: true
@@ -160,6 +173,7 @@ try{
  flow('comparison-window',`
 - tapOn:
     id: nav.open
+    retryTapIfNoChange: true
 - tapOn:
     id: nav.timeline
     retryTapIfNoChange: true
@@ -178,6 +192,7 @@ try{
  flow('routine-window',`
 - tapOn:
     id: nav.open
+    retryTapIfNoChange: true
 - tapOn:
     id: nav.schedule
     retryTapIfNoChange: true
@@ -197,6 +212,7 @@ try{
  flow('insights-window',`
 - tapOn:
     id: nav.open
+    retryTapIfNoChange: true
 - tapOn:
     id: nav.insights
     retryTapIfNoChange: true
@@ -216,6 +232,7 @@ try{
  flow('explicit-full-export',`
 - tapOn:
     id: nav.open
+    retryTapIfNoChange: true
 - tapOn:
     id: nav.settings
 - scrollUntilVisible:

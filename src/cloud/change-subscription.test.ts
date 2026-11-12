@@ -52,3 +52,24 @@ test('pending official cookie lookup is fenced by cancellation before socket con
  const open=subscription.createChangeOpener({origin:'https://puptime.test',getCookie:()=>new Promise(resolve=>{release=resolve;}),createSocket:()=>{constructions++;throw new Error('must not construct');}});
  const abort=new AbortController();const pending=open({signal:abort.signal,onCursor:()=>{},onClose:()=>{}});abort.abort();release('old-owner-cookie');assert.equal(await pending,null);assert.equal(constructions,0);
 });
+
+test('closing while connecting enters one retry and closes a late socket',async()=>{
+ const f=fixture();let release:(value:{close:()=>void})=>void=()=>{},closes=0;
+ const open:subscription.OpenChanges=options=>{f.calls.push({...options,closed:0});return new Promise(resolve=>{release=resolve;});};
+ const stop=subscription.watchAccountChanges({controller:f.controller,open,defer:f.defer});
+ f.calls[0].onClose();f.calls[0].onClose();
+ assert.equal(f.timers.length,1);assert.equal(f.calls[0].signal.aborted,true);
+ release({close:()=>{closes++;}});await tick();assert.equal(closes,1);
+ stop();assert.equal(f.timers[0].cancelled,true);
+ // A timer callback already queued by the host cannot resurrect a stopped connection.
+ f.timers[0].fn();assert.equal(f.calls.length,1);
+});
+
+test('obsolete retry callbacks cannot replace the current owner connection',async()=>{
+ const f=fixture(),stop=subscription.watchAccountChanges({controller:f.controller,open:f.open,defer:f.defer});await tick();
+ f.calls[0].onClose();const obsolete=f.timers[0];
+ f.update({sync:{...f.controller.read().sync!,generation:'second'}});await tick();
+ assert.equal(obsolete.cancelled,true);assert.equal(f.calls.length,2);
+ obsolete.fn();assert.equal(f.calls.length,2);assert.equal(f.calls[1].signal.aborted,false);
+ stop();
+});

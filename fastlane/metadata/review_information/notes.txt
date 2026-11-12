@@ -2,7 +2,7 @@ Puptime tracks one puppy. Free local logging, editing, history, routines, and re
 
 Cloud accounts are optional. Use Backup and sync in Settings to sign in with the methods offered by the release, then explicitly enable cloud access. Signing in alone does not upload puppy records. Local data stays available when the network is unavailable or cloud access expires. Test the cloud path only against the release environment and review account supplied with the submitted build.
 
-Account management is available at https://puptime.pages.dev/account. After signing in, you can download cloud data, manage connected sign-in methods, sign out, or request cloud-account deletion. Deletion requires fresh verification and a separate confirmation. Cloud-account deletion leaves device-local records and previously downloaded files intact.
+Account management is in the native My account screen. After signing in, you can export cloud data, manage connected sign-in methods, sign out, or delete the cloud account. The public website has no sign-in. Deletion requires fresh verification and a separate confirmation. Cloud-account deletion leaves device-local records and previously downloaded files intact.
 
 For reminders, enable a reminder and allow notifications when prompted. Dictation requests Microphone and Speech Recognition only when used.
 

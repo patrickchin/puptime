@@ -1,0 +1,25 @@
+appId: com.patrickchin.puptime
+name: Native deletion verification requires a new confirmation
+---
+- tapOn:
+    id: account.delete.code
+- inputText: ${MAESTRO_TEST_CODE}
+- tapOn:
+    id: account.delete.verify
+- extendedWaitUntil:
+    visible: Delete cloud account?
+    timeout: 20000
+- assertNotVisible:
+    id: account.delete.code
+- waitForAnimationToEnd
+- tapOn:
+    text: ^Cancel$
+    below:
+      text: ^Delete cloud account$
+    retryTapIfNoChange: true
+- scrollUntilVisible:
+    element:
+      id: account.email
+    direction: UP
+- assertVisible:
+    id: account.email

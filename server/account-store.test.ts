@@ -65,7 +65,7 @@ test('unsupported account schema rejection preserves stored rows and table defin
   const account=await store();
   await account.apply(create());
   await runInDurableObject(account,(_instance,state)=>{
-    for(const version of [1,2,999]){
+    for(const version of [1,2,3,999]){
       state.storage.sql.exec('UPDATE schema_metadata SET version=?',version);
       const before=state.storage.sql.exec('SELECT name,sql FROM sqlite_master ORDER BY name').toArray();
       const records=state.storage.sql.exec('SELECT * FROM records').toArray();

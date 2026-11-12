@@ -30,7 +30,6 @@ import {
   activityKey,
   DEFAULT_WIDGET_ACTIONS,
   isQuickEventType,
-  normalizeCustomLabel,
   normalizeNote,
   resolveNapState,
   type ActivityKey,

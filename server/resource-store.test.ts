@@ -20,7 +20,7 @@ async function puppy(store: ReturnType<typeof account>, id = 'pet_test') {
   return saved(await store.resourceWrite(write({ kind: 'puppy', petId: id, localId: id, patch: { name: 'Pip' } })));
 }
 
-test('v3 upgrade retains typed data, history, operation retries and enrollments exactly', async () => {
+test('current schema reopens without changing typed data, history, operation retries or enrollments', async () => {
   const store = account();
   await store.enroll({ operationId: 'op_enroll', deviceId: 'dev_phone', localPetId: 'pet_test', name: 'Pip' });
   const mutation: Mutation = { protocolVersion: 1, operationId: 'op_mobile', deviceId: 'dev_phone',
@@ -28,7 +28,6 @@ test('v3 upgrade retains typed data, history, operation retries and enrollments 
     kind: 'event', baseRevision: 0, intent: 'create', patch: { type: 'meal', at: 100, source: 'app', note: 'Original' } };
   const original = await store.apply(mutation);
   await runInDurableObject(store, (_instance, state) => {
-    state.storage.sql.exec('DROP TABLE api_requests; DROP INDEX records_by_scope_sequence; DROP INDEX record_events_by_at; DROP INDEX record_events_by_type_at; UPDATE schema_metadata SET version=3;');
     const tables = ['records', 'record_events', 'record_routines', 'revisions', 'operations', 'pets', 'enrollments', 'enrolled_devices'];
     const snapshot = () => tables.map(table => state.storage.sql.exec(`SELECT * FROM ${table} ORDER BY rowid`).toArray());
     const before = snapshot(), reopened = new AccountStore(state, env);
@@ -43,7 +42,7 @@ test('v3 upgrade retains typed data, history, operation retries and enrollments 
   });
 });
 
-test('legacy enrollment profiles are readable without writes and first patch uses revision zero', async () => {
+test('enrollment profiles are readable without writes and first patch uses revision zero', async () => {
   const store = account();
   await store.enroll({ operationId: 'op_enroll', deviceId: 'dev_phone', localPetId: 'pet_test', name: 'Pip' });
   const before = await store.resourceGet('puppy', 'pet_test', 'pet_test');

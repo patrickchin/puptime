@@ -164,7 +164,7 @@ export function InsightsScreen({
   showHeader?: boolean;
   theme: Theme;
 }&ActivityViewProps) {
-  const { activityColors, activityLabel, language, t } = useLocalization();
+  const { t } = useLocalization();
   const [showAllMonths, setShowAllMonths] = useState(false);
   const now = new Date();
   const bounds=activityWindowBounds(now.getTime(),FREQUENCY_DAYS-1);
