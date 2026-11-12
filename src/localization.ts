@@ -1,3 +1,4 @@
+import { settingsSearchEnglish, settingsSearchChinese, settingsSearchSpanish } from './settings-search-copy.ts';
 import { accountEnglish,accountChinese,accountSpanish } from './cloud/account-copy.ts';
 import {sharingEnglish,sharingChinese,sharingSpanish} from './sharing-copy.ts';
 import type { EventType, PuppyEvent } from './domain';
@@ -8,6 +9,7 @@ export type LanguagePreference = 'system' | AppLanguage;
 export const languageChoices: readonly LanguagePreference[] = ['system', 'en', 'zh-Hans', 'es'];
 
 const english = {
+  ...settingsSearchEnglish,
   "notifications.quickLogTitle": "{name} · Quick log",
   "notifications.quickLogExpand": "Press and hold to log without opening Puptime.",
 
@@ -724,6 +726,7 @@ export type MessageKey = keyof typeof english;
 type Dictionary = Record<MessageKey, string>;
 
 const simplifiedChinese: Dictionary = {
+  ...settingsSearchChinese,
   "notifications.quickLogTitle": "{name} · 快捷记录",
   "notifications.quickLogExpand": "长按以记录活动，无需打开 Puptime。",
 
@@ -1437,6 +1440,7 @@ const simplifiedChinese: Dictionary = {
 };
 
 const spanish: Dictionary = {
+  ...settingsSearchSpanish,
   "notifications.quickLogTitle": "{name} · Registro rápido",
   "notifications.quickLogExpand": "Mantén pulsado para registrar sin abrir Puptime.",
 
