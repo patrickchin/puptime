@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRef } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useLocalization } from '../localization-context';
 import type { Theme } from '../theme';
 import { Pressable } from './TelemetryPressable';
@@ -16,7 +16,7 @@ export function SettingsSearch({ theme, query, onChange, empty }: {
   return <>
     <View style={[styles.field, { backgroundColor: theme.surfaceRaised, borderColor: theme.border, borderRadius: theme.presentation.controlRadius }]}>
       <MaterialCommunityIcons name="magnify" size={22} color={theme.textMuted} accessible={false} />
-      <TextInput ref={input} testID="settings.search" accessibilityLabel={t('settings.search')} accessibilityRole="search" placeholder={t('settings.search')}
+      <TextInput ref={input} testID="settings.search" accessibilityLabel={t('settings.search')} accessibilityRole={Platform.OS === 'web' ? undefined : 'search'} role={Platform.OS === 'web' ? 'searchbox' : undefined} placeholder={t('settings.search')}
         placeholderTextColor={theme.textMuted} value={query} onChangeText={onChange} autoCapitalize="none" autoCorrect={false}
         returnKeyType="search" keyboardAppearance={theme.isDark ? 'dark' : 'light'} onSubmitEditing={() => input.current?.blur()}
         style={[styles.input, { color: theme.text }]} />
