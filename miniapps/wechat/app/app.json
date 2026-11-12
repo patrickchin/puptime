@@ -1,21 +1,17 @@
 {
-  "pages": ["pages/journal/index", "pages/insights/index"],
+  "pages": [
+    "pages/journal/index",
+    "pages/insights/index",
+    "pages/timeline/index",
+    "pages/settings/index"
+  ],
   "window": {
     "navigationBarTitleText": "Puptime",
     "navigationBarBackgroundColor": "#F5F3EC",
     "navigationBarTextStyle": "black",
     "backgroundColor": "#F5F3EC",
-    "backgroundTextStyle": "dark"
-  },
-  "tabBar": {
-    "color": "#56635D",
-    "selectedColor": "#176B52",
-    "backgroundColor": "#FFFEFA",
-    "borderStyle": "white",
-    "list": [
-      { "pagePath": "pages/journal/index", "text": "Log" },
-      { "pagePath": "pages/insights/index", "text": "Insights" }
-    ]
+    "backgroundTextStyle": "dark",
+    "navigationStyle": "custom"
   },
   "style": "v2",
   "lazyCodeLoading": "requiredComponents"

@@ -1,9 +1,10 @@
 const journal = require('../../utils/journal');
-const { copy, updateTabs } = require('../../utils/copy');
+const { copy } = require('../../utils/copy');
 
 Page({
-  data: { t: {}, actions: [], groups: [], editor: null, error: '', toast: '', demo: false, hasMore: false, ready: false },
-  onShow() { this._limit = this._limit || 7; this.refresh(); this._clock = setInterval(() => this.refresh(), 60000); },
+  data: { collapsed: {}, t: {}, actions: [], groups: [], editor: null, error: '', toast: '', demo: false, hasMore: false, ready: false },
+  onLoad(options) { this._requestedId = options.event; },
+  onShow() { this._limit = this._limit || 7; this.refresh(); if (this._requestedId) { this.edit({ detail: { id: this._requestedId } }); this._requestedId = null; } this._clock = setInterval(() => this.refresh(), 60000); },
   onHide() { clearInterval(this._clock); clearTimeout(this._undoTimer); this._undoId = null; this.setData({ toast: '', editor: null }); },
   onUnload() { clearInterval(this._clock); clearTimeout(this._undoTimer); },
   refresh() {
@@ -14,7 +15,11 @@ Page({
       const patch = { t, name: view.name, todayDate: view.todayDate, demo: journal.isDemo(), ready: true, error: '', hasMore: view.hasMore };
       if (JSON.stringify(this.data.actions) !== JSON.stringify(view.actions)) patch.actions = view.actions;
       Object.assign(patch, journal.groupPatch(this.data.groups, view.groups));
-      this.setData(patch); updateTabs(t);
+      const collapsed = { ...this.data.collapsed };
+      let added = false;
+      view.groups.forEach(group => { if (!(group.key in collapsed)) { collapsed[group.key] = group.label !== t.today && group.label !== t.yesterday; added = true; } });
+      if (added) patch.collapsed = collapsed;
+      this.setData(patch);
     } catch (error) { this.setData({ t, ready: false, error: t[error.message] || t.readError }); }
   },
   fail(error) { const t = this.data.t; this.setData({ error: t[error.message] || t.writeError }); },
@@ -36,6 +41,12 @@ Page({
     try { journal.remove(this._state, this._undoId); this._undoId = null; clearTimeout(this._undoTimer); this.setData({ toast: '' }); this.refresh(); }
     catch (error) { this.fail(error); }
   },
+  toggleDay(event) {
+    const key = event.currentTarget.dataset.key;
+    this.setData({ collapsed: { ...this.data.collapsed, [key]: !this.data.collapsed[key] } });
+  },
+  timeline() { wx.redirectTo({ url: '/pages/timeline/index' }); },
+  deleteRow(event) { this._draft = { id: event.detail.id }; this.confirmDelete(true); },
   loadMore() { this._limit += 7; this.refresh(); },
   edit(event) {
     const item = this._state.events.find(row => row.id === event.detail.id);
@@ -45,7 +56,7 @@ Page({
   },
   cancelEdit() { this._draft = null; this.setData({ editor: null }); },
   stopTap() {},
-  setType(event) { const index = Number(event.detail.value); this._draft.type = journal.TYPES[index]; this.setData({ typeIndex: index }); },
+  setType(event) { const index = Number(event.currentTarget.dataset.index); this._draft.type = journal.TYPES[index]; this.setData({ typeIndex: index, 'editor.type': this._draft.type }); },
   setDate(event) { this._draft.date = event.detail.value; this.setData({ 'editor.date': event.detail.value }); },
   setTime(event) { this._draft.time = event.detail.value; this.setData({ 'editor.time': event.detail.value }); },
   setNote(event) { this._draft.note = event.detail.value; },
@@ -59,49 +70,14 @@ Page({
       this.cancelEdit(); this.refresh();
     } catch (error) { this.setData({ editorError: this.data.t[error.message] || this.data.t.writeError }); }
   },
-  deleteEdit() {
+  deleteEdit() { this.confirmDelete(false); },
+  confirmDelete(fromRow) {
     const t = this.data.t, id = this._draft && this._draft.id;
     if (!id) return;
     wx.showModal({ title: t.deleteTitle, content: t.deleteBody, confirmText: t.modalDelete, cancelText: t.modalCancel, confirmColor: '#B43A35', fail: () => this.fail(new Error('dialogError')), success: result => {
-      if (!result.confirm) return;
+      if (!result.confirm) { if (fromRow) this.cancelEdit(); return; }
       try { journal.remove(this._state, id); this.cancelEdit(); this.refresh(); }
-      catch (error) { this.setData({ editorError: t.writeError }); }
-    } });
-  },
-  settings() {
-    if (this._saving) return;
-    const t = this.data.t;
-    wx.showActionSheet({ itemList: [t.rename, t.language, this.data.demo ? t.own : t.sample, t.about], success: result => {
-      if (result.tapIndex === 0) this.rename();
-      if (result.tapIndex === 1) this.chooseLanguage();
-      if (result.tapIndex === 2) this.switchSample();
-      if (result.tapIndex === 3) wx.showModal({ title: t.about, content: t.aboutBody, showCancel: false, confirmText: t.done });
-    } });
-  },
-  rename() {
-    const t = this.data.t;
-    wx.showModal({ title: t.rename, editable: true, content: this._state ? this._state.name : '', placeholderText: t.nameHint, confirmText: t.save, cancelText: t.modalCancel, fail: () => this.fail(new Error('dialogError')), success: result => {
-      if (!result.confirm) return;
-      const name = (result.content || '').trim();
-      if (!name || name.length > 40) { this.setData({ error: t.minName }); return; }
-      try { journal.write({ ...journal.read(), name }); this.refresh(); } catch (error) { this.fail(error); }
-    } });
-  },
-  chooseLanguage() {
-    wx.showActionSheet({ itemList: ['English', '简体中文'], success: result => {
-      try { wx.setStorageSync('puptime.mini.language', result.tapIndex === 1 ? 'zh' : 'en'); this.refresh(); }
-      catch (error) { this.fail(error); }
-    } });
-  },
-  switchSample() {
-    if (this.data.demo) { try { journal.closeDemo(); this.refresh(); } catch (error) { this.fail(error); } return; }
-    const t = this.data.t;
-    wx.showModal({ title: t.sampleTitle, content: t.sampleBody, confirmText: t.openSample, cancelText: t.modalCancel, fail: () => this.fail(new Error('dialogError')), success: async result => {
-      if (!result.confirm || this._saving) return;
-      this._saving = true;
-      try { await journal.openDemo(); this._limit = 7; this.refresh(); }
-      catch (error) { this.fail(error); }
-      finally { this._saving = false; }
+      catch (error) { if (fromRow) this.fail(error); else this.setData({ editorError: t.writeError }); }
     } });
   },
 });

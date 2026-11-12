@@ -89,8 +89,65 @@ test('page editor keeps exact timestamp and sends no history changes while typin
     assert.ok(options.cancelText.length <= 4);
     opened = true;
   };
-  page.rename();
+  require('../app/pages/settings/index');
+  const settings = { ...definition, data: structuredClone(definition.data), setData(patch) { Object.assign(this.data, patch); } };
+  settings.refresh();
+  settings.rename();
   assert.equal(opened, true);
-  j.closeDemo(); page.refresh();
-  page.switchSample();
+  j.closeDemo(); settings.refresh();
+  settings.switchSample();
+});
+
+
+test('shared frequency uses recorded days, the 10-day window, and positive intervals', () => {
+  const { activityFrequencyStats, monthlyActivityStats } = require('../app/utils/analytics');
+  const now = new Date(2026, 10, 12, 15).getTime();
+  const at = (day, hour = 10) => new Date(2026, 10, day, hour).getTime();
+  const events = [{ type: 'pee', at: at(3) }, { type: 'pee', at: at(3, 12) },
+    { type: 'meal', at: at(4) }, { type: 'poop', at: at(12) },
+    { type: 'pee', at: at(2) }, { type: 'pee', at: at(13) }];
+  const f = activityFrequencyStats(events, ['pee', 'poop'], 10, new Date(now));
+  assert.equal(f.recordedDays, 3);
+  assert.equal(f.stats[0].total, 2);
+  assert.equal(f.stats[0].averagePerRecordedDay, 2 / 3);
+  assert.equal(f.stats[0].minimumPerRecordedDay, 0);
+  assert.equal(f.stats[0].medianIntervalMinutes, 120);
+  assert.equal(f.stats[1].medianIntervalMinutes, undefined);
+  const months = monthlyActivityStats(events);
+  assert.equal(months[0].total, events.length);
+  assert.equal(months[0].recordedDays, 5);
+});
+
+test('timeline keeps calendar days, filters, and all IDs when a bucket contains multiple logs', () => {
+  const { timeline } = require('../app/utils/timeline');
+  const now = new Date(2026, 10, 12, 15).getTime();
+  const events = [{ id: 'evt_one', type: 'pee', at: now - 60_000 }, { id: 'evt_two', type: 'pee', at: now - 120_000 },
+    { id: 'evt_three', type: 'meal', at: now - 60_000 }];
+  const rows = timeline({ events }, ['pee'], 14, now), today = rows.find(row => row.today);
+  assert.equal(rows.length, 16);
+  assert.equal(rows.at(-1).key, '2026-11-14');
+  assert.equal(today.events.length, 2);
+  assert.equal(today.marks.length, 1);
+  assert.deepEqual(today.marks[0].ids, ['evt_one', 'evt_two']);
+  assert.equal(timeline({ events }, ['poop', 'meal'], 14, now).find(row => row.today).events.length, 1);
+});
+
+test('row delete cancellation and storage failure keep the journal intact', async () => {
+  let definition;
+  global.Page = page => { definition = page; };
+  delete require.cache[require.resolve('../app/pages/journal/index')];
+  require('../app/pages/journal/index');
+  await j.add(j.read(), 'pee');
+  const page = { ...definition, data: structuredClone(definition.data), setData(patch) { Object.assign(this.data, patch); } };
+  page.refresh();
+  const id = j.read().events[0].id;
+  wx.showModal = options => options.success({ confirm: false });
+  page.deleteRow({ detail: { id } });
+  assert.equal(j.read().events.length, 1);
+  assert.equal(page.data.editor, null);
+  failWrites = true;
+  wx.showModal = options => options.success({ confirm: true });
+  page.deleteRow({ detail: { id } });
+  assert.equal(j.read().events.length, 1);
+  assert.equal(page.data.error, copy().writeError);
 });

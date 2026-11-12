@@ -1,9 +1,5 @@
+<page-shell screen="log" />
 <view class="page">
-  <view wx:if="{{demo}}" class="demo">{{t.demo}}</view>
-  <view class="profile">
-    <view class="title">{{t.log}}</view>
-    <button class="settings-button" hover-class="pressed" bindtap="settings" aria-label="{{t.settings}}"><image src="/assets/settings.png" aria-hidden="true" /></button>
-  </view>
   <view wx:if="{{error}}" class="error" role="alert">{{error}}</view>
   <block wx:if="{{ready}}">
     <view class="quick-actions">
@@ -18,21 +14,22 @@
       <view class="empty-title">{{t.empty}}</view><view class="subtitle">{{t.emptyBody}}</view>
     </view>
     <view wx:for="{{groups}}" wx:key="key" wx:for-item="group" class="day panel">
-      <view class="day-title"><text>{{group.label}}</text><text class="day-count">{{group.rows.length}}</text></view>
-      <view class="day-rows"><view wx:for="{{group.rows}}" wx:for-item="event" wx:key="id" class="event-wrap"><event-row class="event-row" event="{{event}}" edit-label="{{t.edit}}" source-label="{{t.source}}" bind:edit="edit" /></view></view>
+      <button class="day-title" hover-class="pressed" data-key="{{group.key}}" bindtap="toggleDay" aria-expanded="{{!collapsed[group.key]}}"><text>{{group.label}}</text><text class="day-count">{{group.rows.length}}</text><image src="/assets/chevron-{{collapsed[group.key] ? 'down' : 'up'}}.png" aria-hidden="true" /></button>
+      <view class="day-rows" hidden="{{collapsed[group.key]}}"><view wx:for="{{group.rows}}" wx:for-item="event" wx:key="id" class="event-wrap"><event-row class="event-row" event="{{event}}" edit-label="{{t.edit}}" source-label="{{t.source}}" bind:edit="edit" bind:remove="deleteRow" remove-label="{{t.remove}}" /></view></view>
     </view>
     <button wx:if="{{hasMore}}" class="plain-button more" hover-class="pressed" bindtap="loadMore">{{t.earlier}}</button>
   </block>
   <view class="notice">{{t.local}}</view>
 </view>
+<button class="view-switch" bindtap="timeline" hover-class="pressed"><image src="/assets/timeline-white.png" aria-hidden="true" />{{t.timeline}}</button>
 <view wx:if="{{toast}}" class="toast" role="status"><text>{{toast}}</text><button class="undo-button" hover-class="pressed" bindtap="undo">{{t.undo}}</button></view>
 <view wx:if="{{editor}}" class="scrim" catchtap="cancelEdit">
   <view class="sheet" catchtap="stopTap" role="dialog" aria-label="{{t.edit}}">
-    <view class="sheet-heading"><text class="heading">{{t.edit}}</text><button class="plain-button" hover-class="pressed" bindtap="cancelEdit">{{t.cancel}}</button></view>
+    <view class="sheet-heading"><view class="editor-icon {{editor.type}}"><image src="/assets/{{editor.type}}.png" aria-hidden="true" /></view><text class="heading">{{t.edit}}</text><button class="close-button" hover-class="pressed" bindtap="cancelEdit" aria-label="{{t.cancel}}"><image src="/assets/close.png" aria-hidden="true" /></button></view>
     <scroll-view scroll-y class="editor-body">
       <view wx:if="{{editorError}}" class="error" role="alert">{{editorError}}</view>
       <text class="field-label">{{t.type}}</text>
-      <picker mode="selector" range="{{types}}" value="{{typeIndex}}" bindchange="setType"><view class="field">{{types[typeIndex]}}<text class="picker-arrow">⌄</text></view></picker>
+      <view class="type-choices"><button wx:for="{{actions}}" wx:key="type" class="type-choice {{item.type}} {{typeIndex === index ? 'chosen' : ''}}" data-index="{{index}}" bindtap="setType" aria-pressed="{{typeIndex === index}}"><image src="/assets/{{item.type}}.png" aria-hidden="true" />{{item.label}}</button></view>
       <view class="date-fields">
         <view><text class="field-label">{{t.date}}</text><picker mode="date" value="{{editor.date}}" end="{{todayDate}}" bindchange="setDate"><view class="field">{{editor.date}}</view></picker></view>
         <view><text class="field-label">{{t.time}}</text><picker mode="time" value="{{editor.time}}" bindchange="setTime"><view class="field">{{editor.time}}</view></picker></view>

@@ -1,6 +1,3 @@
-.profile { display: flex; align-items: center; justify-content: space-between; min-height: 48px; margin-bottom: 20px; }
-.settings-button { display: flex; align-items: center; justify-content: center; width: 48px !important; height: 48px; margin: 0 !important; flex: 0 0 48px; background: var(--surface); border: 1px solid var(--line); }
-.settings-button image { width: 23px; height: 23px; }
 /* Match the native app's 112px QuickActions cards and 8px grid gap. */
 .quick-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .quick { width: 100% !important; min-width: 0; min-height: 112px; padding: 12px 4px; text-align: center; background: white; border: 1px solid var(--line); border-radius: 22px; line-height: 1.4; }
@@ -10,15 +7,16 @@
 .activity-icon image { width: 25px; height: 25px; }
 .poop .activity-icon { background: #FFF0DC; } .meal .activity-icon { background: #E8F4DF; }
 .day { margin-bottom: 8px; background: white; }
-.day-title { display: flex; gap: 10px; align-items: center; min-height: 52px; padding: 0 14px; font-size: 15px; font-weight: 700; color: var(--green); border-bottom: 1px solid var(--line); }
+.day-title { width: 100% !important; margin: 0 !important; background: transparent; border-radius: 0; text-align: left; display: flex; gap: 10px; align-items: center; min-height: 52px; padding: 0 14px; font-size: 15px; font-weight: 700; color: var(--green); border-bottom: 1px solid var(--line); }
 .day-title > text:first-child { flex: 1; }
+.day-title image { width: 22px; height: 22px; }
 .day-count { color: var(--muted); font-size: 13px; font-weight: 700; }
 .day-rows { padding: 0 14px; }
 .event-wrap + .event-wrap { border-top: 1px solid var(--line); }
 .empty { padding: 32px 20px; text-align: center; }
 .empty-title { font-size: 18px; font-weight: 650; margin-bottom: 6px; }
 .more { width: 100%; }
-.toast { position: fixed; bottom: 18px; left: 20px; right: 20px; display: flex; align-items: center; justify-content: space-between; min-height: 56px; padding: 0 8px 0 20px; background: var(--ink); color: white; border-radius: 16px; z-index: 3; }
+.toast { position: fixed; bottom: calc(88px + env(safe-area-inset-bottom)); left: 20px; right: 20px; display: flex; align-items: center; justify-content: space-between; min-height: 56px; padding: 0 8px 0 20px; background: var(--ink); color: white; border-radius: 16px; z-index: 3; }
 .undo-button { width: auto !important; color: #A3E4C7; padding: 12px 16px; min-height: 48px; }
 .scrim { position: fixed; inset: 0; background: rgba(12, 24, 18, .5); z-index: 10; display: flex; align-items: flex-end; }
 .sheet { background: var(--surface); border-radius: 24px 24px 0 0; width: 100%; padding: 12px 20px calc(20px + env(safe-area-inset-bottom)); }
@@ -28,3 +26,17 @@
 .note-input { height: 100px; }
 .picker-arrow { float: right; color: var(--muted); }
 .delete { color: var(--danger); font-size: 14px; min-height: 48px; width: 100% !important; text-align: left; padding: 12px 0; margin: 4px 0 12px; }
+
+.sheet-heading { gap: 12px; }
+.sheet-heading .heading { flex: 1; }
+.editor-icon { width: 46px; height: 46px; display: flex; align-items: center; justify-content: center; border-radius: 15px; background: #DDF2FA; }
+.editor-icon image { width: 23px; height: 23px; }
+.editor-icon.poop { background: #FFF0DC; } .editor-icon.meal { background: #E8F4DF; }
+.close-button { width: 48px !important; height: 48px; margin: 0 !important; display: flex; align-items: center; justify-content: center; }
+.close-button image { width: 22px; height: 22px; }
+.type-choices { display: flex; gap: 8px; }
+.type-choice { flex: 1; width: auto !important; margin: 0 !important; min-height: 48px; display: flex; justify-content: center; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--ground); font-size: 14px; border-radius: 16px; }
+.type-choice image { width: 20px; height: 20px; }
+.type-choice.chosen.pee { border-color: #086B9B; background: #DDF2FA; }
+.type-choice.chosen.poop { border-color: #B54E00; background: #FFF0DC; }
+.type-choice.chosen.meal { border-color: #3B7827; background: #E8F4DF; }

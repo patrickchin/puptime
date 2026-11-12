@@ -1,18 +1,18 @@
-<view class="page">
-  <view wx:if="{{demo}}" class="demo">{{t.demo}}</view>
-  <view class="subtitle">{{name}}</view><view class="title">{{t.sevenDays}}</view><view class="subtitle">{{t.statsBody}}</view>
+<page-shell screen="insights" />
+<view class="page insights-page">
   <view wx:if="{{error}}" class="error">{{error}}</view>
   <block wx:else>
-    <view class="headline"><text class="total">{{total}}</text><text class="muted">{{t.total}}</text><text class="active">{{activeDays}} {{t.days}}</text></view>
-    <view class="panel totals"><view wx:for="{{totals}}" wx:key="type" class="stat"><view class="stat-label">{{t[item.type]}}</view><view class="stat-value">{{item.count}}</view><view class="subtitle">{{item.average}} {{t.perDay}}</view></view></view>
-    <view class="section-head"><text class="heading">{{t.activityByDay}}</text></view>
-    <view class="panel chart-panel">
-      <view class="legend"><view><text class="dot pee"></text>{{t.pee}}</view><view><text class="dot poop"></text>{{t.poop}}</view><view><text class="dot meal"></text>{{t.meal}}</view></view>
-      <view class="chart"><view wx:for="{{days}}" wx:key="key" class="column" aria-label="{{item.key}}: {{t.pee}} {{item.pee}}, {{t.poop}} {{item.poop}}, {{t.meal}} {{item.meal}}">
-        <text class="bar-value">{{item.total}}</text><view class="bar-track"><view class="bar"><view class="meal" style="height: {{item.mealHeight}}px"></view><view class="poop" style="height: {{item.poopHeight}}px"></view><view class="pee" style="height: {{item.peeHeight}}px"></view></view></view><text class="bar-date">{{item.label}}</text>
-      </view></view>
-      <view wx:if="{{!total}}" class="chart-empty subtitle">{{t.statsEmpty}}</view>
+    <view class="insight-section">
+      <view class="section-heading"><image class="section-icon" src="/assets/timer.png" aria-hidden="true" /><view><view class="panel-title">{{t.frequency}}</view><view class="caption">{{caption}}</view></view></view>
+      <view wx:for="{{stats}}" wx:key="type" class="frequency-row">
+        <view class="activity-heading"><view class="activity-icon {{item.type}}"><image src="/assets/{{item.type}}.png" aria-hidden="true" /></view><text class="activity-name">{{item.label}}</text><text class="log-count">{{item.total}} {{t.logs}}</text></view>
+        <view class="metrics"><view class="metric"><view class="metric-value">{{item.daily}}</view><view class="metric-detail">{{item.detail}}</view></view><view class="divider"></view><view class="metric"><view class="metric-value">{{item.gap}}</view><view class="metric-label">{{t.typicalGap}}</view><view class="metric-detail">{{item.gapDetail}}</view></view></view>
+      </view>
+    </view>
+    <view wx:if="{{hasMonths}}" class="insight-section months-section">
+      <view class="section-heading"><image class="section-icon" src="/assets/calendar.png" aria-hidden="true" /><view class="panel-title">{{t.byMonth}}</view></view>
+      <view wx:for="{{months}}" wx:key="key" class="month {{item.current ? 'current-month' : ''}}"><view class="month-heading"><text>{{item.label}}</text><text>{{item.daily}}{{t.dailySuffix}}</text></view><view class="month-track"><view style="width: {{item.width}}%" class="month-bar"></view></view><view class="caption">{{item.total}} {{t.logs}} · {{item.days}} {{t.days}}</view></view>
+      <button wx:if="{{hasMoreMonths}}" class="plain-button months-toggle" bindtap="toggleMonths">{{allMonths ? t.recentMonths : t.allMonths}}</button>
     </view>
   </block>
-  <view class="notice">{{t.local}}</view>
 </view>

@@ -1,3 +1,4 @@
+const { formatDuration } = require('./analytics');
 const TYPES = ['pee', 'poop', 'meal'];
 const KEY = 'puptime.mini.journal';
 const DEMO_KEY = 'puptime.mini.demo';
@@ -78,7 +79,7 @@ function view(state, t, now = Date.now(), limit = 7) {
       const last = sorted.find(event => event.type === type);
       const minutes = last ? Math.max(0, Math.floor((now - last.at) / 60000)) : 0;
       return { type, label: t[type], count: state.events.filter(e => e.type === type && dateKey(e.at) === today).length,
-        last: last ? minutes < 1 ? t.now : minutes < 60 ? `${minutes}${t.minute}` : minutes < 1440 ? `${Math.floor(minutes / 60)}${t.hour}` : dateKey(last.at) : t.noLogs };
+        last: last ? minutes < 1 ? t.now : minutes < 60 ? `${minutes}${t.minute}` : minutes < 1440 ? formatDuration(minutes * 60000) + (t.hour === 'h ago' ? ' ago' : '前') : dateKey(last.at) : t.noLogs };
     }),
     groups: groups.slice(0, limit), hasMore: groups.length > limit,
   };

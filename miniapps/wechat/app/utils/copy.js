@@ -1,7 +1,7 @@
 const en = {
-  log: 'Log', insights: 'Insights', puppy: 'My puppy', settings: 'Settings', today: 'Today', yesterday: 'Yesterday',
+  timeline: 'Timeline', openMenu: 'Open navigation', close: 'Close', sampleShort: 'Sample', log: 'Log', insights: 'Insights', puppy: 'My puppy', settings: 'Settings', today: 'Today', yesterday: 'Yesterday',
   pee: 'Pee', poop: 'Poop', meal: 'Ate', peed: 'Peed', pooped: 'Pooped', ate: 'Ate a meal', source: 'Mini program',
-  quick: 'Quick log', history: 'Activity', earlier: 'Load earlier days', empty: 'A fresh start',
+  frequency: 'Frequency', dailySuffix: '/day', eachDay: 'on each recorded day', recordedDay: 'per recorded day', needAnother: 'Need another log', middleHalf: 'Middle half:', gapsObserved: 'gaps observed', logs: 'logs', typicalGap: 'TYPICAL GAP', byMonth: 'By month', thisMonth: 'This month', allMonths: 'Show all months', recentMonths: 'Show recent months', poopAndMeal: 'Poop & Ate', earlierTimeline: 'Load earlier days', localJournal: 'Local journal', previewTitle: 'WeChat prototype', quick: 'Quick log', history: 'Activity', earlier: 'Load earlier days', empty: 'A fresh start',
   emptyBody: 'Your puppy’s day starts with the first log.', noLogs: 'No logs yet',
   saved: 'Saved', undo: 'Undo', last: 'Last', now: 'Just now', minute: 'm ago', hour: 'h ago',
   local: 'Saved on this device · No cloud sync', demo: 'Sample journal · Your own logs are kept separately',
@@ -19,9 +19,9 @@ const en = {
   dialogError: 'Couldn’t open this dialog. Try again.',
 };
 const zh = {
-  log: '记录', insights: '统计', puppy: '我的小狗', settings: '设置', today: '今天', yesterday: '昨天',
+  timeline: '时间线', openMenu: '打开导航', close: '关闭', sampleShort: '示例', log: '记录', insights: '统计', puppy: '我的小狗', settings: '设置', today: '今天', yesterday: '昨天',
   pee: '尿尿', poop: '便便', meal: '吃饭', peed: '尿尿了', pooped: '便便了', ate: '吃饭了', source: '小程序',
-  quick: '快速记录', history: '活动记录', earlier: '加载更早记录', empty: '新的一天，从这里开始',
+  frequency: '频率', dailySuffix: '/天', eachDay: '次 / 每个记录日', recordedDay: '次 / 记录日', needAnother: '还需要一条记录', middleHalf: '中间一半：', gapsObserved: '个间隔', logs: '条记录', typicalGap: '典型间隔', byMonth: '按月查看', thisMonth: '本月', allMonths: '显示所有月份', recentMonths: '显示最近月份', poopAndMeal: '便便和吃饭', earlierTimeline: '加载更早记录', localJournal: '本地记录', previewTitle: '微信测试版', quick: '快速记录', history: '活动记录', earlier: '加载更早记录', empty: '新的一天，从这里开始',
   emptyBody: '记下小狗今天的第一件事。', noLogs: '暂无记录',
   saved: '已保存', undo: '撤销', last: '上次', now: '刚刚', minute: '分钟前', hour: '小时前',
   local: '仅保存在本机 · 未开启云同步', demo: '示例记录 · 你的个人记录单独保存',
@@ -44,8 +44,4 @@ function language() {
   return /^zh/i.test(wx.getAppBaseInfo().language) ? 'zh' : 'en';
 }
 function copy() { return language() === 'zh' ? zh : en; }
-function updateTabs(t) {
-  wx.setTabBarItem({ index: 0, text: t.log });
-  wx.setTabBarItem({ index: 1, text: t.insights });
-}
-module.exports = { copy, language, updateTabs };
+module.exports = { copy, language };
