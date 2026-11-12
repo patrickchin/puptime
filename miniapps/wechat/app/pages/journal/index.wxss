@@ -1,20 +1,19 @@
-.profile { display: flex; align-items: center; gap: 12px; min-height: 80px; }
-.puppy { width: 66px; height: 76px; flex-shrink: 0; }
-.profile-title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.profile .plain-button { width: auto !important; flex: 0 0 auto; padding-right: 0; }
-.first { margin-top: 24px; }
-/* At 375px: 335px content = 3 × 105px actions + 2 × 10px gaps. */
-.quick-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.quick { width: 100% !important; min-width: 0; min-height: 190px; padding: 16px 4px 14px; text-align: center; background: var(--surface); border: 1px solid var(--line); border-radius: 22px; line-height: 1.4; }
-.quick-count { font-size: 28px; font-weight: 650; font-variant-numeric: tabular-nums; margin: 4px 0; }
-.quick-name { font-size: 17px; font-weight: 650; }
-.last { font-size: 12px; color: var(--muted); }
-.art { position: relative; overflow: hidden; width: 56px; height: 56px; margin: 0 auto 8px; }
-.atlas { position: absolute; width: 168px; height: 56px; max-width: none; left: 0; top: 0; }
-.art-poop .atlas { left: -56px; } .art-meal .atlas { left: -112px; }
-.day { margin-bottom: 20px; }
-.day-title { display: flex; gap: 10px; align-items: baseline; font-size: 14px; font-weight: 650; margin: 0 4px 10px; }
-.day-count { color: var(--muted); font-size: 12px; font-weight: 400; }
+.profile { display: flex; align-items: center; justify-content: space-between; min-height: 48px; margin-bottom: 20px; }
+.settings-button { display: flex; align-items: center; justify-content: center; width: 48px !important; height: 48px; margin: 0 !important; flex: 0 0 48px; background: var(--surface); border: 1px solid var(--line); }
+.settings-button image { width: 23px; height: 23px; }
+/* Match the native app's 112px QuickActions cards and 8px grid gap. */
+.quick-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.quick { width: 100% !important; min-width: 0; min-height: 112px; padding: 12px 4px; text-align: center; background: white; border: 1px solid var(--line); border-radius: 22px; line-height: 1.4; }
+.quick-name { font-size: 15px; font-weight: 700; margin-top: 7px; line-height: 20px; }
+.last { font-size: 11px; line-height: 16px; margin-top: 1px; color: var(--muted); }
+.activity-icon { display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 15px; margin: 0 auto; background: #DDF2FA; }
+.activity-icon image { width: 25px; height: 25px; }
+.poop .activity-icon { background: #FFF0DC; } .meal .activity-icon { background: #E8F4DF; }
+.day { margin-bottom: 8px; background: white; }
+.day-title { display: flex; gap: 10px; align-items: center; min-height: 52px; padding: 0 14px; font-size: 15px; font-weight: 700; color: var(--green); border-bottom: 1px solid var(--line); }
+.day-title > text:first-child { flex: 1; }
+.day-count { color: var(--muted); font-size: 13px; font-weight: 700; }
+.day-rows { padding: 0 14px; }
 .event-wrap + .event-wrap { border-top: 1px solid var(--line); }
 .empty { padding: 32px 20px; text-align: center; }
 .empty-title { font-size: 18px; font-weight: 650; margin-bottom: 6px; }

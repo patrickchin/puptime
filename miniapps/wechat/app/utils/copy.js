@@ -1,6 +1,6 @@
 const en = {
   log: 'Log', insights: 'Insights', puppy: 'My puppy', settings: 'Settings', today: 'Today', yesterday: 'Yesterday',
-  pee: 'Pee', poop: 'Poop', meal: 'Meal', peed: 'Peed', pooped: 'Pooped', ate: 'Ate a meal',
+  pee: 'Pee', poop: 'Poop', meal: 'Ate', peed: 'Peed', pooped: 'Pooped', ate: 'Ate a meal', source: 'Mini program',
   quick: 'Quick log', history: 'Activity', earlier: 'Load earlier days', empty: 'A fresh start',
   emptyBody: 'Your puppy’s day starts with the first log.', noLogs: 'No logs yet',
   saved: 'Saved', undo: 'Undo', last: 'Last', now: 'Just now', minute: 'm ago', hour: 'h ago',
@@ -20,7 +20,7 @@ const en = {
 };
 const zh = {
   log: '记录', insights: '统计', puppy: '我的小狗', settings: '设置', today: '今天', yesterday: '昨天',
-  pee: '尿尿', poop: '便便', meal: '吃饭', peed: '尿尿了', pooped: '便便了', ate: '吃饭了',
+  pee: '尿尿', poop: '便便', meal: '吃饭', peed: '尿尿了', pooped: '便便了', ate: '吃饭了', source: '小程序',
   quick: '快速记录', history: '活动记录', earlier: '加载更早记录', empty: '新的一天，从这里开始',
   emptyBody: '记下小狗今天的第一件事。', noLogs: '暂无记录',
   saved: '已保存', undo: '撤销', last: '上次', now: '刚刚', minute: '分钟前', hour: '小时前',

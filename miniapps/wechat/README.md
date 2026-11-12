@@ -60,13 +60,16 @@ until the owner scans the preview code. No Android or Alipay runtime was tested.
 ## Design
 
 Native WeChat navigation, pickers, sheets and dialogs; device system type;
-Puptime's cream/forest palette and existing Scruffy/activity artwork. The app
+Puptime's cream/forest palette, current outline activity icons, compact 112px
+quick actions, and grouped activity cards. Rebased onto `main` at `b67bcfd`
+(November 12, 2026). WeChat retains its native navigation and two prototype tabs;
+the full native app's drawer and Timeline are outside this spike. The app
 design direction is accent-ladder (seed 1620646728), adapted to phone navigation.
 The journal answers “what happened today, and can I log it in one tap?”; Insights
 answers “how often did each activity happen over the last seven days?”. Activity
-colours identify pee/poop/meals consistently with Puptime. Assets are resized
-build derivatives of `assets/mascots/scruffy-terrier.png` and
-`assets/appearance/journal-activities.png` to stay below miniapp package limits.
+colours identify pee/poop/meals consistently with Puptime. The small PNG icons
+are rendered from the same bundled MaterialCommunityIcons font used by
+`src/components/ActivityIcon.tsx`; see `assets-LICENSE.txt`.
 
 Deliberately omitted: accounts/sync, sharing, routines, widgets, reminders,
 dictation, care articles, dark mode and Alipay. This folder adds no compatibility
