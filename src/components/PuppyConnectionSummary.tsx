@@ -2,23 +2,23 @@ import {Platform,StyleSheet,Text,View} from 'react-native';
 import {useLocalization} from '../localization-context';
 import type {Theme} from '../theme';
 
-export function PuppyConnectionSummary({phone,cloud,email,theme}:{phone:{name:string;eventCount:number|null;lastActivityAt:number|null};cloud:{name:string;eventCount:number};email:string;theme:Theme}) {
+export function PuppyConnectionSummary({phone,cloud,email,theme,testIDPrefix='account.connection'}:{phone:{name:string;eventCount:number|null;lastActivityAt:number|null};cloud:{name:string;eventCount:number};email?:string;theme:Theme;testIDPrefix?:string}) {
   const {t,locale}=useLocalization();
   const count=(value:number)=>t(value===1?'account.logsOne':'account.logsMany',{count:new Intl.NumberFormat(locale).format(value)});
   const name=phone.name==='My puppy'?t('account.defaultName'):phone.name;
   const body=[styles.body,{color:theme.textMuted}];
-  return <View testID="account.connection.summary" style={styles.stack}>
-    <View testID="account.connection.phone" style={styles.history}>
+  return <View testID={`${testIDPrefix}.summary`} style={styles.stack}>
+    <View testID={`${testIDPrefix}.phone`} style={styles.history}>
       <Text accessibilityRole="header" style={[styles.label,{color:theme.textMuted}]}>{t(Platform.OS==='ios'&&Platform.isPad?'account.onDevice':'account.onPhone')}</Text>
-      <Text testID="account.connection.phone.name" style={[styles.name,{color:theme.text,fontFamily:theme.presentation.headingFont}]}>{name}</Text>
-      <Text testID="account.connection.phone.count" style={body}>{phone.eventCount===null?t('account.historyLoading'):count(phone.eventCount)}</Text>
+      <Text testID={`${testIDPrefix}.phone.name`} style={[styles.name,{color:theme.text,fontFamily:theme.presentation.headingFont}]}>{name}</Text>
+      <Text testID={`${testIDPrefix}.phone.count`} style={body}>{phone.eventCount===null?t('account.historyLoading'):count(phone.eventCount)}</Text>
       {phone.lastActivityAt!==null?<Text style={body}>{t('account.latestActivity',{date:new Intl.DateTimeFormat(locale,{dateStyle:'medium',timeStyle:'short'}).format(phone.lastActivityAt)})}</Text>:null}
     </View>
-    <View testID="account.connection.cloud" style={[styles.history,styles.cloud,{borderColor:theme.border}]}>
+    <View testID={`${testIDPrefix}.cloud`} style={[styles.history,styles.cloud,{borderColor:theme.border}]}>
       <Text accessibilityRole="header" style={[styles.label,{color:theme.textMuted}]}>{t('account.inCloud')}</Text>
-      <Text testID="account.connection.cloud.name" style={[styles.name,{color:theme.text,fontFamily:theme.presentation.headingFont}]}>{cloud.name}</Text>
-      <Text testID="account.connection.cloud.count" style={body}>{count(cloud.eventCount)}</Text>
-      <Text style={body}>{email}</Text>
+      <Text testID={`${testIDPrefix}.cloud.name`} style={[styles.name,{color:theme.text,fontFamily:theme.presentation.headingFont}]}>{cloud.name}</Text>
+      <Text testID={`${testIDPrefix}.cloud.count`} style={body}>{count(cloud.eventCount)}</Text>
+      {email?<Text style={body}>{email}</Text>:null}
     </View>
   </View>;
 }

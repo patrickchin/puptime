@@ -2,7 +2,7 @@ export const accountEnglish={
  'account.onPhone':'On this phone','account.inCloud':'In your cloud account','account.historyLoading':'Loading history…','account.latestActivity':'Latest activity: {date}',
  'account.compareBody':'Check both histories before connecting this phone. Nothing uploads until you choose to connect.',
  'account.keepLocal':'Continue without sync','account.combineReview':'Combine these histories…','account.combineConfirmTitle':'Combine these histories?',
- 'account.combineConfirmBody':'On this phone: {phoneName} ({phoneCount}).\nIn your cloud account: {cloudName} ({cloudCount}).\n\nCombine only if these histories are for the same puppy. Changes will sync between them.',
+ 'account.combineConsequence':'Combine only if these histories are for the same puppy. Changes will sync between them.',
 
  "account.delete.action":"Delete cloud account",
  "account.delete.title":"Delete cloud account?",
@@ -44,7 +44,7 @@ export const accountChinese:Record<keyof typeof accountEnglish,string>={
  'account.onPhone':'在这部手机上','account.inCloud':'在你的云端账户中','account.historyLoading':'正在读取历史记录…','account.latestActivity':'最近的活动：{date}',
  'account.compareBody':'连接这部手机前，请核对两边的记录。只有你选择连接后才会上传。',
  'account.keepLocal':'暂不开启同步','account.combineReview':'合并这两份记录…','account.combineConfirmTitle':'合并这两份记录？',
- 'account.combineConfirmBody':'这部手机上：{phoneName}（{phoneCount}）。\n云端账户中：{cloudName}（{cloudCount}）。\n\n只有两份记录属于同一只幼犬时才合并。合并后，两边的更改会相互同步。',
+ 'account.combineConsequence':'只有两份记录属于同一只幼犬时才合并。合并后，两边的更改会相互同步。',
 
  "account.delete.action":"删除云端账户",
  "account.delete.title":"删除云端账户？",
@@ -86,7 +86,7 @@ export const accountSpanish:Record<keyof typeof accountEnglish,string>={
  'account.onPhone':'En este teléfono','account.inCloud':'En tu cuenta en la nube','account.historyLoading':'Cargando historial…','account.latestActivity':'Última actividad: {date}',
  'account.compareBody':'Revisa ambos historiales antes de conectar este teléfono. Nada se sube hasta que elijas conectarlo.',
  'account.keepLocal':'Continuar sin sincronizar','account.combineReview':'Combinar estos historiales…','account.combineConfirmTitle':'¿Combinar estos historiales?',
- 'account.combineConfirmBody':'En este teléfono: {phoneName} ({phoneCount}).\nEn tu cuenta en la nube: {cloudName} ({cloudCount}).\n\nCombina solo si ambos historiales son del mismo cachorro. Después, los cambios se sincronizarán entre ambos.',
+ 'account.combineConsequence':'Combina solo si ambos historiales son del mismo cachorro. Después, los cambios se sincronizarán entre ambos.',
 
  "account.delete.action":"Eliminar cuenta en la nube",
  "account.delete.title":"¿Eliminar cuenta en la nube?",

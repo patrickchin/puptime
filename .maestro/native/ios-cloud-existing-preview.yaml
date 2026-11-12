@@ -39,9 +39,12 @@ name: iOS existing cloud puppy requires confirmation before combining history
     enabled: true
 - tapOn:
     id: account.enable
-- assertVisible: ^Combine these histories\?$
-- tapOn: ^Cancel$
-- assertNotVisible: ^Combine these histories\?$
+- assertVisible:
+    id: account.combine.dialog
+- tapOn:
+    id: account.combine.cancel
+- assertNotVisible:
+    id: account.combine.dialog
 - scrollUntilVisible:
     element:
       id: account.back
