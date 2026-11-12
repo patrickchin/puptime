@@ -465,8 +465,8 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
     [events, estimates, historyDayCount, now, timelineEnd],
   );
   const todayKey = dateKey(now);
-  // Filtering changes marks, never the date grid or its scroll position.
-  const rows = useMemo(() => allExpectedWindows.length ? days : collapseEmptyTimelineDays(days, todayKey), [days, todayKey, allExpectedWindows]);
+  // Routine bands are expectations, not records. Filtering never changes the date grid.
+  const rows = useMemo(() => collapseEmptyTimelineDays(days, todayKey), [days, todayKey]);
   const savedEstimateIds = useMemo(() => new Set(events.filter((event) => event.estimated).map((event) => event.id)), [events]);
   const visibleMarkCount = days.flatMap((day) => day.marks.filter((mark) => selectedTypes.includes(activityKey({ type: mark.type, customLabel: mark.label })))).length;
   const hasSavedEstimates = days.some((day) => day.marks.some((mark) => savedEstimateIds.has(mark.id) && TIMELINE_TYPES.includes(activityKey({ type: mark.type, customLabel: mark.label }))));

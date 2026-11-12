@@ -41,6 +41,7 @@ const db=new DatabaseSync(join(documents,'SQLite/puptime-v2.db'),{readOnly:true}
 assert.equal(db.prepare('SELECT count(*) n FROM local_sync_owner').get().n,0);
 assert.equal(db.prepare("SELECT value FROM metadata WHERE key='qualification_fixture'").get()?.value,'timeline-filters-v1');
 assert.ok(db.prepare('SELECT count(*) n FROM events').get().n>=1000);
+assert.equal(db.prepare("SELECT count(*) n FROM routines WHERE id IN ('rtn_timeline_meal','rtn_timeline_poop') AND tolerance_minutes>0").get().n,2,'Saved routine windows must be present for the gap regression.');
 db.close();
 const output=join(homedir(),'Pictures/Screenshots/Codex/puptime-stable-timeline',process.argv[3]??'populated');mkdirSync(output,{recursive:true});
 const env={...process.env,MAESTRO_CLI_NO_ANALYTICS:'1'};
@@ -50,11 +51,12 @@ function flow(name,body){
  execFileSync(maestro,['--device',udid,'test',path,'--test-output-dir',join(output,name)],{stdio:'inherit',env});
 }
 function snapshot(name){
- const tree=JSON.parse(execFileSync(maestro,['--device',udid,'hierarchy','--no-ansi'],{encoding:'utf8',env,maxBuffer:16*1024*1024})),bounds={},marks=[],markBounds={};
+ const tree=JSON.parse(execFileSync(maestro,['--device',udid,'hierarchy','--no-ansi'],{encoding:'utf8',env,maxBuffer:16*1024*1024})),bounds={},marks=[],markBounds={},gaps=[];
  function visit(node){
   const attrs=node.attributes??{},id=attrs['resource-id'];
   if(id==='timeline.days'||id?.startsWith('timeline.date.')||id?.startsWith('timeline.gap.')||id?.startsWith('timeline.filter.'))bounds[id]=attrs.bounds;
   if(id?.startsWith('timeline.mark.')){marks.push(id);markBounds[id]=attrs.bounds;}
+  if(id?.startsWith('timeline.gap.'))gaps.push(attrs);
   assert.notEqual(id,'timeline.windows.edit','Expected daily row must be removed.');
   for(const child of node.children??[])visit(child);
  }
@@ -64,12 +66,18 @@ function snapshot(name){
  const probe=JSON.parse(readFileSync(join(documents,'timeline-render-probe.json'),'utf8'));
  assert.ok(probe.lists?.length,'Enable the timeline list identity observer.');
  assert.equal(new Set(probe.lists).size,1,'Every filter must use the original FlatList instance.');
- const state={bounds,marks,markBounds,probe};writeFileSync(join(output,name+'.json'),JSON.stringify(state,null,2));
+ const state={bounds,marks,markBounds,gaps,probe};writeFileSync(join(output,name+'.json'),JSON.stringify(state,null,2));
  simctl('io',udid,'screenshot',join(output,name+'.png'));
  return state;
 }
 flow('open',`- runFlow:\n    when:\n      notVisible:\n        id: timeline.filter.pee\n    commands:\n      - tapOn:\n          id: nav.open\n      - tapOn:\n          id: nav.timeline\n          retryTapIfNoChange: true\n- tapOn:\n    id: timeline.filter.pee\n- extendedWaitUntil:\n    notVisible:\n      id: activity.loading\n    timeout: 30000\n`);
 let baseline=snapshot('pee');
+assert.ok(baseline.gaps.length,'Populated history must collapse empty days even with saved routine windows.');
+assert.equal(baseline.gaps.length,1,'The five-day break must occupy one row.');
+assert.match(baseline.gaps[0].label,/5 days without logs/,'The gap must state how many dates it replaces.');
+const gapRect=baseline.gaps[0].bounds.match(/-?\d+/g).map(Number);
+const dateRect=Object.entries(baseline.bounds).find(([id])=>id.startsWith('timeline.date.'))[1].match(/-?\d+/g).map(Number);
+assert.ok(Math.abs((gapRect[3]-gapRect[1])-(dateRect[3]-dateRect[1]))<=1,'A gap takes one normal day row, allowing native pixel rounding.');
 for(const [name,filter] of [['poop-meal','poop-meal'],['pee-return','pee']]){
  flow(name,`- tapOn:\n    id: timeline.filter.${filter}\n- assertVisible:\n    id: timeline.filter.${filter}\n`);
  const state=snapshot(name);
