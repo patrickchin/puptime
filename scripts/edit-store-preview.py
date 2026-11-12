@@ -13,6 +13,7 @@ import sys
 import tempfile
 
 from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageStat
+from video_timing import recording_clock
 
 def run(*args):
     subprocess.run(args, check=True)
@@ -38,8 +39,8 @@ step_titles = ['Log a potty break', 'Correct the time', 'Compare days',
 reviewed_cuts = recording.get('reviewed_cuts')
 if reviewed_cuts is not None:
     assert [cut['screen'] for cut in reviewed_cuts] == [stem for stem, _ in sequence]
-timing = json.loads(subprocess.check_output(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'frame=best_effort_timestamp_time', '-of', 'json', str(raw)]))
-timestamps = [float(frame['best_effort_timestamp_time']) for frame in timing['frames']]
+timestamps, clock = recording_clock(raw)
+clocks = {raw: clock}
 decoded = subprocess.check_output(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-i', str(raw), '-vf', 'scale=120:262:flags=lanczos', '-fps_mode', 'passthrough', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'], stderr=subprocess.PIPE)
 frame_size = 120 * 262 * 3
 frames = [Image.frombytes('RGB', (120, 262), decoded[i:i+frame_size]).crop((0, 30, 120, 240)) for i in range(0, len(decoded), frame_size)]
@@ -91,11 +92,13 @@ with tempfile.TemporaryDirectory(prefix='puptime-store-preview-') as temporary:
             else:
                 scene_duration = float(subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', str(scene_raw)]))
         assert 0 <= start < end <= scene_duration
+        if scene_raw not in clocks:
+            _, clocks[scene_raw] = recording_clock(scene_raw)
         segments = reviewed_cuts[index].get('segments', []) if reviewed_cuts else []
         segments = segments or [dict(raw_start=start, raw_end=end, speed=1)]
         last_end = start
         expected_seconds = 0
-        filters = [f'[0:v]fps=30,scale=886:1920:flags=lanczos,setsar=1,split={len(segments)}' + ''.join(f'[raw{i}]' for i in range(len(segments)))]
+        filters = [f'[0:v]{clocks[scene_raw]}fps=30,scale=886:1920:flags=lanczos,setsar=1,split={len(segments)}' + ''.join(f'[raw{i}]' for i in range(len(segments)))]
         for i, segment in enumerate(segments):
             a, b, speed = segment['raw_start'], segment['raw_end'], segment['speed']
             assert last_end <= a < b <= end and 0 < speed <= 1

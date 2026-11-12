@@ -12,6 +12,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { BottomNav } from './src/components/BottomNav';
 import {SideNavigation,type AppTab} from './src/components/SideNavigation';
+import {ScreenTransition} from './src/components/Motion';
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import { ThemePicker } from './src/components/ThemePicker';
 import { Toast } from './src/components/Toast';
@@ -892,7 +893,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
             <Text testID="nav.title" accessibilityRole="header" maxFontSizeMultiplier={1.5} style={[styles.navigationTitle,{color:theme.text,minWidth:70}]}>{translate(language,settingsVisible?'settings.title':tab==='notifications'?'notifications.title':tab==='learn'?'learn.title':tab==='puppyProfile'?'pets.manageProfile':tab==='account'?'account.title':tab==='sharing'?'sharing.title':`nav.${tab}`)}</Text>
             {settingsVisible||(tab!=='pets'&&tab!=='puppyProfile')?<PuppyIdentity theme={theme} onPress={()=>openTab('pets')}/>:null}
           </View>:null}
-          <View style={styles.screen}>
+          <ScreenTransition screenKey={onboardingVisible?'onboarding':historyVisible?'history':settingsVisible?'settings':tab}>
             {onboardingVisible === null ? nativeApp?<View testID="setup.loading" style={styles.startup}>
               {startupFailed?<>
                 <Text testID="setup.loadError" accessibilityRole="alert" style={[styles.startupText,{color:theme.text}]}>{translate(language,'setup.loadError')}</Text>
@@ -931,7 +932,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
                 theme={theme}
               />
             ) : null}
-          </View>
+          </ScreenTransition>
           {!nativeApp&&onboardingVisible === false && !settingsVisible ? (
             <SafeAreaView edges={['bottom']} style={{ backgroundColor: theme.nav }}>
               <BottomNav tab={tab==='notifications'||tab==='pets'||tab==='account'||tab==='sharing'||tab==='puppyProfile'?'log':tab} onChange={navigateToTab} theme={theme} />

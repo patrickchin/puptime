@@ -1,5 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import {SheetModal} from './Motion';
 import { Pressable } from './TelemetryPressable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -57,8 +58,7 @@ export function ThemePicker({
   const { t } = useLocalization();
 
   return (
-    <Modal
-      animationType="slide"
+    <SheetModal
       onRequestClose={onClose}
       statusBarTranslucent
       transparent
@@ -68,7 +68,7 @@ export function ThemePicker({
         <Pressable
           accessibilityLabel={t('settings.closePicker')}
           onPress={onClose}
-          style={[StyleSheet.absoluteFill, styles.backdrop]}
+          style={StyleSheet.absoluteFill}
         />
         <SafeAreaView
           accessibilityViewIsModal
@@ -268,13 +268,12 @@ export function ThemePicker({
           </ScrollView>
         </SafeAreaView>
       </View>
-    </Modal>
+    </SheetModal>
   );
 }
 
 const styles = StyleSheet.create({
   modal: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { backgroundColor: 'rgba(0, 0, 0, 0.56)' },
   sheet: {
     width: '100%',
     maxWidth: 600,

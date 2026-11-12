@@ -3,7 +3,6 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition 
 import {
   ActivityIndicator,
   FlatList,
-  Modal,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   ScrollView,
@@ -13,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { Pressable } from '../components/TelemetryPressable';
+import {SheetModal} from '../components/Motion';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -736,10 +736,10 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
           </View>
         ) : null}
       </View>
-      <Modal
+      <SheetModal
         visible={selectedEvents.length > 0}
+        backdropOpacity={.42}
         transparent
-        animationType="none"
         presentationStyle="overFullScreen"
         statusBarTranslucent
         navigationBarTranslucent
@@ -808,7 +808,7 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
             </ScrollView>
           </View>
         </View>
-      </Modal>
+      </SheetModal>
     </View>
   );
 }
@@ -910,7 +910,7 @@ const styles = StyleSheet.create({
   },
   loadEarlierText: { fontSize: 11, lineHeight: 16, fontWeight: '700' },
   detailsModal: { flex: 1, justifyContent: 'flex-end' },
-  detailsBackdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0, 0, 0, 0.42)' },
+  detailsBackdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   detailsSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden' },
   detailsHeading: { minHeight: 64, paddingVertical: spacing.sm, marginHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth },
   detailsHeadingCopy: { flex: 1, gap: spacing.xs },
