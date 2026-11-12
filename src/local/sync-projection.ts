@@ -7,7 +7,7 @@ import { customActivityKey, DEFAULT_WIDGET_ACTIONS, normalizeCustomActivities, n
 import { isLanguagePreference } from '../localization.ts';
 import { normalizeNotificationPreferences } from '../notification-config.ts';
 import { parseEvents, parseSchedule } from '../storage-validation.ts';
-import { isThemePreference } from '../theme.ts';
+import { readThemePreference } from '../theme.ts';
 import type { SqlExecutor } from './database.ts';
 import { petSettingKeys, storageKeys, type StorageKey } from './settings.ts';
 
@@ -64,7 +64,7 @@ export async function readLocalSettingsRecords(sql:SqlExecutor,petId:string):Pro
     ...state.labels.map(label=>({kind:'customActivity' as const,localId:customActivityKey(label),data:{label}})),
     ...Object.entries(state.customizations).map(([activityKey,value])=>({kind:'customization' as const,localId:activityKey,data:{activityKey,...value}})),
     {kind:'accountPreferences',localId:'preferences',data:{
-      theme:isThemePreference(state.values.get(storageKeys.theme)??null)?state.values.get(storageKeys.theme):'system',
+      theme:readThemePreference(state.values.get(storageKeys.theme)??null),
       language:isLanguagePreference(state.values.get(storageKeys.language)??null)?state.values.get(storageKeys.language):'system',
       ...(n.mealReminderOffsetMinutes!==undefined?{mealReminderOffsetMinutes:n.mealReminderOffsetMinutes}:{}),
       ...(n.poopReminderOffsetMinutes!==undefined?{poopReminderOffsetMinutes:n.poopReminderOffsetMinutes}:{}),

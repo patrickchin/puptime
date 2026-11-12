@@ -154,11 +154,17 @@ test('event persistence keeps failed writes isolated and imports without losing 
 });
 
 
-test('unsupported theme preferences reject without touching activity data', async () => {
+test('shipped themes remain readable and unknown preferences reject without touching activity data', async () => {
   stored.clear();
   const events = JSON.stringify([createEvent('pee', 'app', 100)]);
   stored.set(eventsKey, events);
-  for (const theme of ['puppy-journal', 'soft-play', 'day-trails', 'meadow', 'sunrise', 'midnight', 'paper', 'bubblegum', 'blueprint', 'trail', 'tide', 'plum', 'contrast']) {
+  for (const theme of ['puppy-journal', 'soft-play', 'day-trails']) {
+    stored.set('puptime.theme.v1', theme);
+    assert.equal(await storage.loadThemePreference(), 'system');
+    assert.equal(stored.get('puptime.theme.v1'), theme);
+    assert.equal(stored.get(eventsKey), events);
+  }
+  for (const theme of ['meadow', 'sunrise', 'midnight', 'paper', 'bubblegum', 'blueprint', 'trail', 'tide', 'plum', 'contrast']) {
     stored.set('puptime.theme.v1', theme);
     await assert.rejects(storage.loadThemePreference());
     assert.equal(stored.get(eventsKey), events);

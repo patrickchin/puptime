@@ -84,6 +84,30 @@ test('first-launch restore resumes the exact cloud puppy without uploading local
  assert.equal(await database.read(sql=>sql.getFirstAsync("SELECT value FROM metadata WHERE key='pending_restore_operation'")),null);
 });
 
+for(const theme of ['puppy-journal','soft-play','day-trails'] as const)for(const cloudPetId of ['local-pet','cloud-pet'])test(`combining ${cloudPetId} with shipped ${theme} preferences preserves logs and readable settings across restart`,async t=>{
+ const {database,path,sync,storage}=await setup(t);
+ const shared={...event,id:'evt_shared'},localOnly={...event,id:'evt_local_only',type:'poop' as const,at:200,source:'widget' as const};
+ await storage.appendEvents([shared,localOnly]);await storage.saveThemePreference('dark');
+ assert.equal(await storage.loadThemePreference(),'dark');
+ const preference:CloudRecord={id:cloudRecordId('accountPreferences',null,'preferences'),petId:null,kind:'accountPreferences',data:{theme,language:'es'},revision:1,sequence:1,deleted:false,updatedAt:1};
+ const remoteOnly={...event,id:'evt_remote_only',type:'meal' as const,at:50};
+ const records:CloudRecord[]=[preference,{id:cloudPetId,petId:cloudPetId,kind:'puppy',data:{name:'Cloud puppy'},revision:1,sequence:2,deleted:false,updatedAt:1},
+  ...[shared,remoteOnly].map(({id,...data},index)=>({id:cloudRecordId('event',cloudPetId,id),petId:cloudPetId,kind:'event' as const,data,revision:1,sequence:index+3,deleted:false,updatedAt:1}))];
+ const request={...input,enrollment:{...enrollment,confirmedPetId:cloudPetId}},fence={...await sync.prepareAssociation(request),accountId:input.accountId};
+ await sync.stageBaseline({...fence,page:{changes:records,cursor:4,hasMore:false}});await sync.completeAssociation({...fence,cloudPetId});
+ assert.equal(await storage.loadThemePreference(),'system');assert.equal(await storage.loadLanguagePreference(),'es');
+ const events=await storage.loadEvents();assert.equal(events.length,3);for(const original of [shared,localOnly,remoteOnly])assert.deepEqual(events.find(value=>value.id===original.id),original);
+ assert.equal((await sync.status('local-pet')).state,'active');
+ const saved=await database.read(sql=>sql.getFirstAsync<{body:string}>('SELECT body FROM local_sync_records WHERE generation=? AND record_id=?',fence.generation,preference.id));
+ assert.deepEqual(JSON.parse(saved!.body),preference);
+ assert.equal((await database.read(sql=>sql.getFirstAsync<{value:string}>('SELECT value FROM settings WHERE key=?','puptime.theme.v1')))!.value,theme);
+ const pending=await sync.nextBatch(fence),history=await database.read(sql=>sql.getAllAsync('SELECT * FROM local_revisions ORDER BY sequence'));
+ const reopened=await createLocalDatabase(sqliteTestConnection(path));t.after(()=>reopened.close());
+ const nextStorage=createNativeStorage(reopened,'local-pet'),nextSync=engine.createLocalSync(reopened);
+ assert.equal(await nextStorage.loadThemePreference(),'system');assert.deepEqual(await nextStorage.loadEvents(),events);
+ assert.deepEqual(await nextSync.nextBatch(fence),pending);assert.deepEqual(await reopened.read(sql=>sql.getAllAsync('SELECT * FROM local_revisions ORDER BY sequence')),history);
+});
+
 test('first-launch restore rejects existing local work and rechecks before projecting a staged baseline',async t=>{
  const {database,sync,storage}=await setup(t,{pristine:true});
  const request={...input,mode:'restore' as const,enrollment:{...enrollment,name:'Basil',confirmedPetId:'cloud-pet'}};

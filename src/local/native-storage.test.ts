@@ -308,13 +308,16 @@ test('invalid preferences and malformed JSON reject without overwriting retained
   assert.equal((await database.read((sql)=>sql.getFirstAsync<{value:string}>('SELECT value FROM pet_settings WHERE pet_id=? AND key=?','pet-1','puptime.customActivities.v1')))!.value,'{broken');
 });
 
-test('unsupported themes reject while preserving native history', async (t) => {
+test('shipped cloud themes use the current appearance without rewriting native settings or history', async (t) => {
   const {storage,database}=await setup(t);
   const event=createEvent('pee','app',100);
   await storage.appendEvents([event]);
   for (const theme of ['puppy-journal','soft-play','day-trails']) {
     await database.write(sql=>sql.runAsync('INSERT OR REPLACE INTO settings(key,value) VALUES (?,?)','puptime.theme.v1',theme));
-    await assert.rejects(storage.loadThemePreference());
+    const before=await database.read(sql=>sql.getAllAsync('SELECT * FROM local_revisions ORDER BY sequence'));
+    assert.equal(await storage.loadThemePreference(),'system');
+    assert.equal((await database.read(sql=>sql.getFirstAsync<{value:string}>('SELECT value FROM settings WHERE key=?','puptime.theme.v1')))!.value,theme);
+    assert.deepEqual(await database.read(sql=>sql.getAllAsync('SELECT * FROM local_revisions ORDER BY sequence')),before);
     assert.deepEqual(await storage.loadEvents(),[event]);
   }
 });
