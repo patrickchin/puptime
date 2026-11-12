@@ -21,7 +21,7 @@
     </view>
     <view wx:for="{{groups}}" wx:key="key" wx:for-item="group" class="day">
       <view class="day-title"><text>{{group.label}}</text><text class="day-count">{{group.rows.length}}</text></view>
-      <view class="panel"><view wx:for="{{group.rows}}" wx:for-item="event" wx:key="id" class="event-wrap"><event-row event="{{event}}" edit-label="{{t.edit}}" bind:edit="edit" /></view></view>
+      <view class="panel"><view wx:for="{{group.rows}}" wx:for-item="event" wx:key="id" class="event-wrap"><event-row class="event-row" event="{{event}}" edit-label="{{t.edit}}" bind:edit="edit" /></view></view>
     </view>
     <button wx:if="{{hasMore}}" class="plain-button more" hover-class="pressed" bindtap="loadMore">{{t.earlier}}</button>
   </block>
