@@ -872,6 +872,41 @@ test('confirmed native deletion resumes local cleanup after restart without anot
  assert.equal(d.state.removals,1);assert.equal(next.read().deleted,'apple-manual');assert.deepEqual(await f.runtime.storage.loadEvents(),[event]);
 });
 
+test('acknowledged deletion detaches an active queue including widget work saved while the reply is pending',async t=>{
+ const d=deletionFixture(),f=await fixture(t,{deletion:d.deletion});f.state.credentials=true;
+ await enrollLocal(f.runtime);await f.runtime.storage.appendEvents([event]);await f.controller.refresh();
+ assert.equal((await f.runtime.sync.status(f.runtime.petId)).state,'active');
+ let entered!:()=>void,release!:()=>void;const started=new Promise<void>(resolve=>{entered=resolve;}),waiting=new Promise<void>(resolve=>{release=resolve;});
+ const remove=d.deletion.remove;d.deletion.remove=async(id,before)=>{const reply=await remove(id,before);entered();await waiting;return reply;};
+ await f.controller.prepareDeletion();const request=f.controller.confirmDeletion(f.controller.read().deletion!);await started;
+ const widget={...event,id:'evt_during_deletion',at:200,source:'widget' as const};await f.runtime.storage.appendEvents([widget]);
+ const before=await f.runtime.storage.loadEvents(),history=await f.runtime.database.read(sql=>sql.getAllAsync('SELECT * FROM local_revisions ORDER BY sequence'));release();assert.equal(await request,'ok');
+ assert.deepEqual(await f.runtime.storage.loadEvents(),before);assert.equal((await f.runtime.sync.status(f.runtime.petId)).state,'local');
+ assert.deepEqual(await f.runtime.database.read(sql=>sql.getAllAsync('SELECT * FROM local_revisions ORDER BY sequence')),history);
+ assert.equal(f.controller.read().deleted,'done');assert.equal(f.state.signOutCalls,1);assert.equal(f.state.pushCalls,0);assert.equal(d.state.removals,1);
+ assert.equal(await f.runtime.database.read(sql=>sql.getFirstAsync("SELECT value FROM metadata WHERE key='cloud_account_deletion'")),null);
+});
+
+test('a concurrent local write keeps confirmed deletion fenced until restart can finish detaching without another DELETE',async t=>{
+ const d=deletionFixture(),f=await fixture(t,{deletion:d.deletion});f.state.credentials=true;
+ await enrollLocal(f.runtime);await f.runtime.storage.appendEvents([event]);await f.controller.refresh();
+ const owner=await f.runtime.sync.status(f.runtime.petId),detach=f.runtime.sync.detach;
+ const widget={...event,id:'evt_after_deletion_snapshot',at:200,source:'widget' as const};
+ f.runtime.sync.detach=async input=>{await f.runtime.storage.appendEvents([widget]);return detach(input);};
+ await f.controller.prepareDeletion();assert.equal(await f.controller.confirmDeletion(f.controller.read().deletion!),'error');
+ const before=await f.runtime.storage.loadEvents(),status=await f.runtime.sync.status(f.runtime.petId),history=await f.runtime.database.read(sql=>sql.getAllAsync('SELECT * FROM local_revisions ORDER BY sequence'));
+ assert.equal(status.generation,owner.generation);assert.ok(status.pending>owner.pending);assert.equal(f.state.signOutCalls,0);
+ assert.equal(f.controller.read().deleted,undefined);assert.equal(f.controller.read().deletion!.stage,'confirmed');assert.equal(f.controller.read().problem,'deletion-unconfirmed');
+ const saved=await f.runtime.database.read(sql=>sql.getFirstAsync<{value:string}>("SELECT value FROM metadata WHERE key='cloud_account_deletion'"));assert.equal(JSON.parse(saved!.value).stage,'confirmed');
+ f.runtime.sync.detach=detach;f.controller.stop();
+ const next=controllerModule.createAccountController({runtime:f.runtime,api:f.api,identity:f.identity,deletion:d.deletion,subscribeLocalWrites:()=>()=>{},changed:()=>{}});t.after(()=>next.stop());
+ await next.refresh();assert.equal(await next.prepareDeletion(),'ok');
+ assert.equal(next.read().deleted,'done');assert.equal((await f.runtime.sync.status(f.runtime.petId)).state,'local');
+ assert.deepEqual(await f.runtime.storage.loadEvents(),before);assert.equal(d.state.removals,1);assert.equal(f.state.pushCalls,0);assert.equal(f.state.signOutCalls,1);
+ assert.deepEqual(await f.runtime.database.read(sql=>sql.getAllAsync('SELECT * FROM local_revisions ORDER BY sequence')),history);
+ assert.equal(await f.runtime.database.read(sql=>sql.getFirstAsync("SELECT value FROM metadata WHERE key='cloud_account_deletion'")),null);
+});
+
 for(const status of [400,409] as const)test(`a rejected ${status} upload preserves the signed-in queue and reports sync diagnostics even if logging fails`,async t=>{
  const diagnostics:CloudDiagnosticInput[]=[];
  const {controller,runtime,state,api,timers}=await fixture(t,{diagnose:input=>{diagnostics.push(input);throw new Error('Diagnostic storage unavailable');}});

@@ -285,7 +285,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
     await saveDeletion({...state,stage:'confirmed'});
     const status=await runtime.sync.status(runtime.petId);
     if(status.accountId&&status.accountId!==state.accountId)return fail('account-mismatch');
-    if(status.generation&&status.accountId)await runtime.sync.detach({generation:status.generation,accountId:status.accountId});
+    if(status.generation&&status.accountId&&!await runtime.sync.detach({generation:status.generation,accountId:status.accountId,confirmedThrough:status.pendingThrough}))return fail('deletion-unconfirmed');
     const result=await outcome(()=>identity.signOut());
     if(result.error?.code==='NATIVE_SIGN_OUT_FAILED'||await identity.hasCredentials())return fail('sign-out-failed');
     await runtime.database.write(sql=>sql.runAsync('DELETE FROM metadata WHERE key=?',deletionKey));
