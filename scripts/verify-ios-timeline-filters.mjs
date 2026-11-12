@@ -74,7 +74,7 @@ flow('open',`- runFlow:\n    when:\n      notVisible:\n        id: timeline.filt
 let baseline=snapshot('pee');
 assert.ok(baseline.gaps.length,'Populated history must collapse empty days even with saved routine windows.');
 assert.equal(baseline.gaps.length,1,'The five-day break must occupy one row.');
-assert.match(baseline.gaps[0].label,/5 days without logs/,'The gap must state how many dates it replaces.');
+assert.match(baseline.gaps[0].accessibilityText,/5 days without logs/,'The gap must state how many dates it replaces.');
 const gapRect=baseline.gaps[0].bounds.match(/-?\d+/g).map(Number);
 const dateRect=Object.entries(baseline.bounds).find(([id])=>id.startsWith('timeline.date.'))[1].match(/-?\d+/g).map(Number);
 assert.ok(Math.abs((gapRect[3]-gapRect[1])-(dateRect[3]-dateRect[1]))<=1,'A gap takes one normal day row, allowing native pixel rounding.');
