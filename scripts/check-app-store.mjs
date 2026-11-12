@@ -45,6 +45,13 @@ assert.ok(edit.seconds>=15&&edit.seconds<=30);
 assert.equal(edit.frozen_padding_seconds,0);
 assert.ok(Number.isFinite(edit.transition_seconds)&&edit.transition_seconds>0&&edit.transition_seconds<=.5);
 assert.ok(edit.poster_seconds>=0&&edit.poster_seconds<edit.seconds);
+assert.equal(edit.step_labels.length,edit.scenes.length,'Each scene needs an animated step label');
+for(const [index,label] of edit.step_labels.entries()){
+ assert.equal(label.step,index+1);assert.equal(label.screen,edit.scenes[index].screen);
+ assert.ok(typeof label.title==='string'&&label.title.length>0&&label.title.length<=28);
+ assert.ok(Number.isFinite(label.at)&&Number.isFinite(label.duration)&&label.at>=0&&label.duration>=1.2&&label.at+label.duration<=edit.seconds);
+ if(index)assert.ok(edit.step_labels[index-1].at+edit.step_labels[index-1].duration<=label.at,'Step labels must not overlap');
+}
 assert.ok(Array.isArray(edit.tap_indicators)&&edit.tap_indicators.length>0,'Preview must show touch indicators');
 for(const tap of edit.tap_indicators){
  assert.ok(Number.isFinite(tap.at)&&Number.isFinite(tap.duration)&&tap.at>=0&&tap.duration>0&&tap.at+tap.duration<=edit.seconds);

@@ -12,7 +12,7 @@ import subprocess
 import sys
 import tempfile
 
-from PIL import Image, ImageChops, ImageDraw, ImageStat
+from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageStat
 
 def run(*args):
     subprocess.run(args, check=True)
@@ -31,6 +31,8 @@ sequence = [('01-logged', 'quick.pee'), ('02-edited', 'event.pee.edit'),
             ('03-timeline', 'nav.switch'), ('04-detail', 'timeline.filter.poop-meal'),
             ('05-insights', 'nav.insights'),
             ('06-routine', 'nav.schedule')]
+step_titles = ['Log a potty break', 'Correct the time', 'Compare days',
+               'See the details', 'Spot patterns', 'Set your routine']
 # A visual review can supply tighter native footage ranges to omit loading and
 # drawer waits. Keep these in the local recording JSON, not in app code.
 reviewed_cuts = recording.get('reviewed_cuts')
@@ -67,6 +69,7 @@ destination = root / 'fastlane/previews/en-US'
 destination.mkdir(parents=True, exist_ok=True)
 scenes = []
 tap_indicators = []
+step_labels = []
 transition_seconds = .2
 cue_lead = .6
 previous_end = 0
@@ -111,6 +114,8 @@ with tempfile.TemporaryDirectory(prefix='puptime-store-preview-') as temporary:
         length = float(subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', str(clip)]))
         assert abs(length-expected_seconds) < .15*len(segments), 'Retimed footage must match the reviewed segment durations.'
         scene_start = sum(scene['edited_seconds'] for scene in scenes) - transition_seconds*index
+        step_labels.append(dict(step=index+1, screen=stem, title=step_titles[index],
+                                at=round(scene_start+.12, 3), duration=1.4))
         for touch in (reviewed_cuts[index].get('taps', []) if reviewed_cuts else []):
             assert 0 <= touch['x'] < 886 and 0 <= touch['y'] < 1920
             local = 0
@@ -168,9 +173,46 @@ with tempfile.TemporaryDirectory(prefix='puptime-store-preview-') as temporary:
             joined += (f';[touch{i}]trim=duration={touch["duration"]},setpts=PTS-STARTPTS+{touch["at"]}/TB[pulse{i}]'
                        f';[base{i}][pulse{i}]overlay=x={touch["x"]-48}:y={touch["y"]-48}:eof_action=pass:repeatlast=0[base{i+1}]')
         joined += f';[base{len(tap_indicators)}]null[video]'
+    # Animated editorial labels sit below the status bar, clear of tap targets.
+    labels_movie = Path(temporary) / 'steps.mov'
+    encoder = subprocess.Popen(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y',
+        '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', '886x88', '-r', '30', '-i', '-',
+        '-an', '-c:v', 'qtrle', str(labels_movie)], stdin=subprocess.PIPE)
+    font_path = '/System/Library/Fonts/Supplemental/Arial Bold.ttf'
+    title_font, number_font = ImageFont.truetype(font_path,64), ImageFont.truetype(font_path,48)
+    plates = []
+    for label in step_labels:
+        plate = Image.new('RGBA',(1100,136))
+        draw = ImageDraw.Draw(plate)
+        draw.rounded_rectangle((1,1,1098,134),radius=32,fill=(23,61,48,248),outline=(244,241,231,190),width=2)
+        draw.rounded_rectangle((24,24,152,112),radius=20,fill=(244,241,231,240))
+        draw.text((88,68),f'{label["step"]}/{len(step_labels)}',font=number_font,fill='#173D30',anchor='mm')
+        draw.text((184,68),label['title'],font=title_font,fill='#F4F1E7',anchor='lm')
+        plates.append(plate.resize((550,68),Image.Resampling.LANCZOS))
+    total_seconds = sum(scene['edited_seconds'] for scene in scenes)-transition_seconds*(len(scenes)-1)
+    for frame_index in range(round(total_seconds*30)+1):
+        t = frame_index/30
+        band = Image.new('RGBA',(886,88))
+        for label, plate in zip(step_labels,plates):
+            local = t-label['at']
+            if 0 <= local < label['duration']:
+                entering, leaving = min(1,local/.3), max(0,(local-label['duration']+.25)/.25)
+                opacity = min(1-(1-entering)**3,1-leaving**2)
+                shift = round(28*(1-entering)**3-20*leaving**2)
+                moving = plate.copy()
+                moving.putalpha(moving.getchannel('A').point([round(a*opacity) for a in range(256)]))
+                band.alpha_composite(moving,(168+shift,8))
+                break
+        encoder.stdin.write(band.tobytes())
+    encoder.stdin.close()
+    assert encoder.wait() == 0, 'Step-label animation encoding failed.'
+    label_input_index = len(clips)+1+bool(touch_input)
+    joined = joined.replace('[video]','[footage]')
+    joined += f';[footage][{label_input_index}:v]overlay=x=0:y=100:eof_action=pass:repeatlast=0[video]'
     run('ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', *inputs,
         '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000',
         *touch_input,
+        '-i', str(labels_movie),
         '-filter_complex', joined, '-map', '[video]', '-map', f'{len(clips)}:a:0',
         '-c:v', 'libx264', '-preset', 'slow', '-profile:v', 'high', '-level:v', '4.0',
         '-g', '30', '-keyint_min', '30', '-sc_threshold', '0', '-r', '30',
@@ -198,5 +240,5 @@ for index, scene in enumerate(scenes):
     assert difference < 5, f'Exported {scene["screen"]} does not hold on its verified UI: {difference}'
 seconds = round(float(metadata['format']['duration']), 2)
 assert abs(seconds-(sum(scene['edited_seconds'] for scene in scenes)-transition_seconds*(len(scenes)-1))) < .1
-(destination / 'edit.json').write_text(json.dumps(dict(seconds=seconds, poster_seconds=7, source='Native simulator recording; original CSV history with personal notes omitted; one scripted logging/edit action', audio='Silent stereo AAC', timing='Slower interaction footage with idle waits removed', transition_seconds=transition_seconds, frozen_padding_seconds=0, tap_indicators=tap_indicators, sha256=hashlib.sha256(output.read_bytes()).hexdigest(), scenes=scenes), indent=2) + '\n')
+(destination / 'edit.json').write_text(json.dumps(dict(seconds=seconds, poster_seconds=7, source='Native simulator recording; original CSV history with personal notes omitted; one scripted logging/edit action', audio='Silent stereo AAC', timing='Slower interaction footage with idle waits removed', transition_seconds=transition_seconds, frozen_padding_seconds=0, tap_indicators=tap_indicators, step_labels=step_labels, sha256=hashlib.sha256(output.read_bytes()).hexdigest(), scenes=scenes), indent=2) + '\n')
 print(f'PASS {seconds}-second H.264 preview with slower interactions, gentle dissolves and no frozen padding: {output}')

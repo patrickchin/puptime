@@ -39,7 +39,9 @@ in a fading ripple. They follow recorded control bounds and native footage.
 These are editorial overlays; the app itself is unchanged. Interaction footage
 is slowed selectively, idle waits are removed, and 0.2-second dissolves connect
 screens. Results remain visible long enough to read without adding frozen-frame
-padding. It uses
+padding. Numbered step labels slide in and fade out below the status bar at each
+screen change, giving the next action context without pausing the footage.
+They stay clear of the tap targets. It uses
 H.264 High Level 4.0, a 10 Mbps encoder target, yuv420p, and silent 48 kHz stereo
 AAC. It works with audio muted. Only local features appear, so it does not
 suggest that cloud access is included. An iPad preview is optional and has not
@@ -183,7 +185,9 @@ are pixels in the 886 × 1920 export. Use the recorder's control bounds and revi
 the corresponding native frames to align each pulse. Omit taps removed by the
 edit. The editor maps taps through the source segments and dissolves, renders
 1.2-second aim/press/release cues, and records their final timings in `edit.json`.
-The seven-second poster is clear of indicators.
+The editor also animates a short numbered label for each scene and records its
+title, timing, and sequence in `step_labels`. The seven-second poster is clear
+of touch indicators.
 Original captures for this pass remain under
 `~/Pictures/Screenshots/Codex/puptime-app-store/`. The current native video source and timing JSON are in the `20261112/preview/`
 subdirectory; the retaken ending is in `20261112/routine-ending-v3/`. The earlier
