@@ -1,0 +1,43 @@
+{
+  "seconds": 8.0,
+  "source": "Native iPhone simulator recording with populated owner CSV history; personal notes omitted; one demonstration pee",
+  "raw_start": 41.1,
+  "raw_end": 51.5,
+  "speed": 1,
+  "segments": [
+    {
+      "raw_start": 41.1,
+      "raw_end": 44.5,
+      "speed": 1
+    },
+    {
+      "raw_start": 46.9,
+      "raw_end": 51.5,
+      "speed": 1
+    }
+  ],
+  "idle_removed_seconds": 2.4,
+  "native_transitions": true,
+  "editorial_effects": "Two aim/press/release tap indicators only",
+  "tap_indicators": [
+    {
+      "raw_at": 42.88,
+      "x": 165,
+      "y": 428,
+      "control": "quick.pee",
+      "at": 1.18,
+      "press_at": 1.78,
+      "duration": 1.2
+    },
+    {
+      "raw_at": 49.0,
+      "x": 690,
+      "y": 1754,
+      "control": "nav.switch",
+      "at": 4.9,
+      "press_at": 5.5,
+      "duration": 1.2
+    }
+  ],
+  "sha256": "3ef714b7b661fc729dc5c11b4d04c78f23f85c26d7f13ea6cc20fbe8705e201b"
+}
