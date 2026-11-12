@@ -519,11 +519,10 @@ export function SettingsScreen({
         </View>
       </View>
       </>}
-      {matches.has('csv') && <>
+      <View style={!matches.has('csv') && styles.hidden}>
       <SectionLabel label={t('settings.data')} theme={theme} />
       <ActivityCsvSettings theme={theme} eventCount={eventCount} onImport={onImport}/>
-
-      </>}
+      </View>
       {matches.has('guide') && <>
       <SectionLabel label={t('settings.helpPrivacy')} theme={theme}/>
       <View style={[styles.card,{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}>
@@ -646,6 +645,7 @@ function PottyReminderRule({
 }
 
 const styles = StyleSheet.create({
+  hidden: { display: 'none' },
   content: {
     width: '100%',
     maxWidth: 720,

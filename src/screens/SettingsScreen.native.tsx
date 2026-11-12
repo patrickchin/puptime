@@ -235,11 +235,12 @@ export function SettingsScreen({
       </View>}
 
       {(matches.has('backups') || matches.has('csv') || matches.has('history')) && <SectionLabel label={t('settings.data')} theme={theme} />}
-      {matches.has('backups') && <ActivityBackupSettings theme={theme} onRestored={onBackupsRestored}/>}
-      {matches.has('csv') && <ActivityCsvSettings theme={theme} eventCount={eventCount} onImport={onImport}/>}
+      {/* Filtering must not reset an in-flight backup or file transfer. */}
+      <View style={!matches.has('backups') && styles.hidden}><ActivityBackupSettings theme={theme} onRestored={onBackupsRestored}/></View>
+      <View style={!matches.has('csv') && styles.hidden}><ActivityCsvSettings theme={theme} eventCount={eventCount} onImport={onImport}/></View>
       {matches.has('history') && onOpenHistory?<View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}><SettingsRow testID="settings.history.open" icon="history" label={t('history.recentTitle')} detail={t('history.recentDetail')} onPress={onOpenHistory} theme={theme} wrap/></View>:null}
       {(matches.has('analytics') || matches.has('guide') || matches.has('privacy')) && <SectionLabel label={t('settings.helpPrivacy')} theme={theme}/>}
-      {matches.has('analytics') && <AnalyticsSettings theme={theme}/>}
+      <View style={!matches.has('analytics') && styles.hidden}><AnalyticsSettings theme={theme}/></View>
       {matches.has('guide') || matches.has('privacy') ? <View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}>
         {matches.has('guide') && <SettingsRow testID="settings.guide.open" icon="compass-outline" label={t('settings.guide')} detail={t('settings.guideDetail')} onPress={onOpenGuide} theme={theme} wrap/>}
         {matches.has('guide') && matches.has('privacy') && <View style={[styles.divider,{backgroundColor:theme.border}]}/>}
@@ -357,6 +358,7 @@ function SectionLabel({ label, theme }: { label: string; theme: Theme }) {
 }
 
 const styles = StyleSheet.create({
+  hidden: { display: 'none' },
   content: {
     width: '100%',
     maxWidth: 720,
