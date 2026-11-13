@@ -44,6 +44,21 @@ test('reads shipped cloud appearances as the current default while rejecting unk
   for (const value of ['retired-theme', 'unknown', '']) assert.throws(() => readThemePreference(value));
 });
 
+test('theme text, primary actions and destructive labels retain accessible contrast', () => {
+  for (const theme of [lightTheme, darkTheme]) {
+    for (const surface of [theme.background, theme.surface, theme.surfaceRaised, theme.nav]) {
+      for (const ink of [theme.text, theme.textMuted, theme.primary, theme.danger]) {
+        assert.ok(contrastRatio(ink, surface) >= 4.5, `${ink} on ${surface}`);
+      }
+    }
+    for (const fill of [theme.primary, theme.primaryPressed]) {
+      assert.ok(contrastRatio(theme.onPrimary, fill) >= 4.5, `${theme.onPrimary} on ${fill}`);
+    }
+    assert.ok(contrastRatio(theme.primary, theme.primarySoft) >= 4.5);
+    assert.ok(contrastRatio(theme.danger, theme.dangerSoft) >= 4.5);
+  }
+});
+
 test('activity colors keep accessible contrast in chips and timeline tracks', () => {
   const activities = Object.entries(EVENT_META);
   assert.equal(new Set(activities.map(([, meta]) => meta.color)).size, activities.length);
