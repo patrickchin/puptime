@@ -46,7 +46,7 @@ export function NotificationTimingControls({theme,preferences,schedule,onChange,
     {rules.map(rule=>{const colors=activityColors(theme,rule.activity);
       const toggle=<Switch testID={`notifications.timing.${rule.id}.enabled`} accessibilityLabel={rule.label} value={rule.enabled}
         disabled={disabled||busy||!rule.available} onValueChange={enabled=>{void save(()=>rule.toggle(enabled));}}
-        trackColor={{false:theme.border,true:theme.isDark?'#73D3AD':theme.primary}} thumbColor={theme.isDark?'#FFFDF5':theme.surfaceRaised}/>;
+        trackColor={{false:theme.border,true:theme.primary}} thumbColor={theme.isDark?(rule.enabled?theme.onPrimary:theme.text):theme.surfaceRaised}/>;
       return <View key={rule.id} style={[styles.rule,{borderColor:theme.border}]}>
       <View style={styles.row}>
         {!largeText?<View style={[styles.icon,{backgroundColor:colors.softColor}]}><ActivityIcon activity={rule.activity} theme={theme} color={colors.color} size={24}/></View>:null}

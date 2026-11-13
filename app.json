@@ -92,7 +92,7 @@
         "expo-notifications",
         {
           "icon": "./assets/android-icon-monochrome.png",
-          "color": "#176B52",
+          "color": "#234B3B",
           "defaultChannel": "puptime-routine"
         }
       ],

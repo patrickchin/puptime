@@ -86,7 +86,7 @@ import {EventsImportError,EventsStorageError} from './src/storage';
 import {useAccountSnapshot} from './src/cloud/use-account-snapshot';
 import {CareSessionHost,useCareSession} from './src/care-session';
 
-import { resolveTheme, type ThemePreference } from './src/theme';
+import { lightTheme, resolveTheme, type ThemePreference } from './src/theme';
 import { acknowledgePendingWidgetEvents, readPendingWidgetEvents, updateHomeWidget } from './src/widgets/sync';
 import { requestExactReminderAccess, refreshExactReminderScheduling } from './src/exact-reminders';
 
@@ -856,7 +856,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     <SafeAreaProvider>
       <LocalizationProvider language={language} customizations={activityCustomizations}>
         <SafeAreaView
-          style={[styles.container, { backgroundColor: conversationalOnboarding&&onboardingVisible&&!guideOpenedFromSettings?'#176B52':theme.background }]}
+          style={[styles.container, { backgroundColor: conversationalOnboarding&&onboardingVisible&&!guideOpenedFromSettings?lightTheme.primary:theme.background }]}
           edges={conversationalOnboarding&&onboardingVisible&&!guideOpenedFromSettings?[]:nativeApp||settingsVisible||onboardingVisible ? ['top', 'bottom', 'left', 'right'] : ['top', 'left', 'right']}
         >
           <StatusBar style={theme.isDark ? 'light' : 'dark'} />

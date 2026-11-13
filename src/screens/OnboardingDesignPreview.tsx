@@ -14,7 +14,7 @@ import {DateTimeSelector} from '../components/DateTimeSelector';
 import {NotificationTimingControls} from '../components/NotificationTimingControls';
 import {DEFAULT_NOTIFICATION_PREFERENCES,type NotificationPreferences} from '../notification-config';
 import {starterPoopWindows,puppyAges,starterMealTimes,suggestedMealCount,type PuppyAge} from '../onboarding-preview';
-import {lightTheme,type Theme} from '../theme';
+import {darkTheme,lightTheme,type Theme} from '../theme';
 import {OnboardingPlanTimeline} from '../components/OnboardingPlanTimeline';
 import {AccountSignIn} from '../components/AccountSignIn';
 import {useAccountSnapshot} from '../cloud/use-account-snapshot';
@@ -24,12 +24,9 @@ import {translate} from '../localization';
 export type OnboardingDraft={puppyName:string;schedule:ScheduleEntry[];notifications:NotificationPreferences;showGuide:boolean;sharingKind?:'household'|'temporary'|null};
 export type ConversationalOnboardingProps={cloud:CloudHandle;onFinish:(draft:OnboardingDraft)=>Promise<void>;onAllowNotifications:()=>Promise<boolean>;onDisableNotifications:()=>Promise<void>;onOpenShared?:()=>void};
 
-const appTheme:Theme={...lightTheme,surface:'#FFFDF7',surfaceRaised:'#FFFDF7',
-  text:'#243D2E',textMuted:'#53685A',border:'#CDD8CF',primary:'#176B52',onPrimary:'#FFFDF5',
+const appTheme:Theme={...lightTheme,
   presentation:{...lightTheme.presentation,headingFont:'RedHatDisplayBold',titleWeight:'400',controlRadius:12,cardRadius:18}};
-const theme:Theme={...appTheme,isDark:true,background:appTheme.primary,
-  surface:'#216F59',surfaceRaised:'#2B7C64',text:'#FFFDF5',textMuted:'#DCE9DD',border:'#598E79',
-  primary:'#F7EBD2',onPrimary:'#1B503C',primaryPressed:'#E4D6B8',primarySoft:'#2B7C64',danger:'#FFB7A5'};
+const theme:Theme={...darkTheme,background:appTheme.primary,presentation:appTheme.presentation};
 const welcomeAccountTheme:Theme={...theme,surfaceRaised:appTheme.surface,primarySoft:appTheme.primarySoft};
 const mascots=[require('../../assets/mascots/scruffy-terrier.png'),
   require('../../assets/mascots/onboarding/scruffy-ball.png'),
