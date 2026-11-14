@@ -16,6 +16,7 @@ import {sqliteTestConnection} from '../src/local/sqlite-test-adapter.ts';
 import {createLocalRuntime} from '../src/local/runtime-factory.ts';
 import {pushResponseSchema,pullPageSchema,mutationSchema} from '../src/cloud/protocol.ts';
 import {nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeDrained,assertEmptyIosRestoreSources,capturedJson,nativeAuthUiFlags,nativeHttpBoundary,nativeTransportFailure,nativeBackendState,nativeBackendHealth} from './native-account-evidence.mjs';
+import {readNativeCommandState} from './native-command-evidence.mjs';
 import {assertArchivedSource,nativeCodeFingerprint} from './native-runtime-inputs.mjs';
 import {createSharingObserver,createSharingActors,readOwnerSharingRecords} from './native-sharing-adapters.mjs';
 import {verifyNativeSharing} from './verify-native-sharing.mjs';
@@ -107,6 +108,8 @@ async function flow(name,env={}){
     try{if(hierarchy&&statSync(join(artifacts,hierarchy)).size<=2097152)ui={inspected:true,fields:nativeAuthUiFlags(JSON.parse(readFileSync(join(artifacts,hierarchy),'utf8')),{email,code})};}catch{/* Keep the actual driver failure; record no unprojected value. */}
     const backendHealth=await nativeBackendHealth('http://127.0.0.1:'+backPort+'/health');
     writeFileSync(join(output,'fixture-auth-readiness.json'),JSON.stringify({phase:name,flowSequence,ui,responses:authResponses,backend:{controlProcess:nativeBackendState(worker,workerError),health:backendHealth}},null,2)+'\n');
+    const command=readNativeCommandState(artifacts);
+    writeFileSync(join(output,'fixture-command-state.json'),JSON.stringify({phase:name,flowSequence,command},null,2)+'\n');
     // These flows never enter a credential. Do not retain auth-code screenshots.
     if(!android&&['prepare','add-logs'].includes(name)){
       try{simctl('io',device,'screenshot',join(output,'failure-'+name+'.png'));}catch{}
