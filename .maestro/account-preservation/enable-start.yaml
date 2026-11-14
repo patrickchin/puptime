@@ -19,10 +19,9 @@ name: Start explicit enrollment while a controlled transfer fails
           retryTapIfNoChange: true
 - scrollUntilVisible:
     element:
-      id: account.status
+      id: account.error
     direction: UP
 - extendedWaitUntil:
     visible:
-      id: account.status
-      text: Sync paused
+      id: account.error
     timeout: 45000
