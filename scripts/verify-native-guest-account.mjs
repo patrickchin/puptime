@@ -351,10 +351,10 @@ async function verifyPuppyComparison(){
  assert.equal(snapshot().events.length,120);await signIn();
  const cloudId='pet_comparison_'+crypto.randomUUID().replaceAll('-',''),deviceId='dev_comparison_fixture';assert.notEqual(cloudId,phoneId);
  const enrolled=await fixturePost('/api/cloud/enroll',{operationId:'op_comparison_enroll',deviceId,localPetId:cloudId,name:'Biscuit'});assert.equal(enrolled.petId,cloudId);
- const mutations=Array.from({length:7},(_,i)=>({protocolVersion:1,operationId:'op_comparison_event_'+i,deviceId,recordId:cloudRecordId('event',cloudId,'evt_comparison_cloud_'+i),petId:cloudId,kind:'event',baseRevision:0,intent:'create',patch:{type:'poop',at:Date.now()-172800000-i*60000,source:'app',note:'Independent artificial cloud history'}}));
- assert.deepEqual((await fixturePost('/api/sync/push',{mutations})).rejected,[]);
+ const mutations=[{protocolVersion:1,operationId:'op_comparison_profile',deviceId,recordId:cloudId,petId:cloudId,kind:'puppy',baseRevision:0,intent:'create',patch:{name:'Biscuit'}},...Array.from({length:7},(_,i)=>({protocolVersion:1,operationId:'op_comparison_event_'+i,deviceId,recordId:cloudRecordId('event',cloudId,'evt_comparison_cloud_'+i),petId:cloudId,kind:'event',baseRevision:0,intent:'create',patch:{type:'poop',at:Date.now()-172800000-i*60000,source:'app',note:'Independent artificial cloud history'}}))];
+ const seeded=await fixturePost('/api/sync/push',{mutations});assert.deepEqual(seeded.rejected,[]);assert.equal(seeded.accepted.find(result=>result.operationId==='op_comparison_profile')?.record.revision,1);
  for(const [caseName,cloudName] of [['same-name','Biscuit'],['mismatched-name','Maple']]){
-  if(caseName==='mismatched-name')assert.deepEqual((await fixturePost('/api/sync/push',{mutations:[{protocolVersion:1,operationId:'op_comparison_rename',deviceId,recordId:cloudId,petId:cloudId,kind:'puppy',baseRevision:0,intent:'patch',patch:{name:cloudName}}]})).rejected,[]);
+  if(caseName==='mismatched-name')assert.deepEqual((await fixturePost('/api/sync/push',{mutations:[{protocolVersion:1,operationId:'op_comparison_rename',deviceId,recordId:cloudId,petId:cloudId,kind:'puppy',baseRevision:1,intent:'patch',patch:{name:cloudName}}]})).rejected,[]);
   const before=allLocalTables(),counts={...requestCounts},cloudBefore=await remote();
   await flow('comparison-preview',{PHONE_NAME:'Biscuit',CLOUD_NAME:cloudName,PHONE_COUNT:'120',CLOUD_COUNT:'7',COMPARISON_CASE:caseName});
   assert.deepEqual(allLocalTables(),before,'Native Cancel and Continue without sync preserve every local table.');

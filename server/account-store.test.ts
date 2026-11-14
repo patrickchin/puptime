@@ -123,6 +123,19 @@ test('accepted writes commit state, history, and an incrementing change cursor',
   expect(history[0].after.data).toEqual({ type: 'pee', at: 100, source: 'app', note: 'saved' });
 });
 
+test('sync creates an enrolled puppy profile before renaming it without changing its logs',async()=>{
+  const account=await store();
+  const profile=mutationSchema.parse({...create(),recordId:'pet-1',kind:'puppy',patch:{name:'Biscuit'}});
+  const events=Array.from({length:7},(_,index)=>create('comparison-event-'+index));
+  const seeded=await account.push([profile,...events]);
+  expect(seeded.rejected).toEqual([]);expect(seeded.accepted[0].record).toMatchObject({revision:1,data:{name:'Biscuit'}});
+  const renamed=await account.push([edit(profile,1,{name:'Maple'})]);
+  expect(renamed.rejected).toEqual([]);expect(renamed.accepted[0].record).toMatchObject({revision:2,data:{name:'Maple'}});
+  const saved=(await account.pull(0)).changes.filter(record=>record.kind==='event');
+  expect(saved).toHaveLength(7);expect(saved.every(record=>record.revision===1)).toBe(true);
+  expect((await account.summary()).pets[0]).toMatchObject({name:'Maple',eventCount:7});
+});
+
 test('identical retries return the original acknowledgment without another revision', async () => {
   const account = await store();
   const input = create();
