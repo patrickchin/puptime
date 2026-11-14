@@ -6,9 +6,30 @@ on:
       - main
   pull_request:
   workflow_dispatch:
+    inputs:
+      suite:
+        description: Test suite (PRs always retain the full suite)
+        type: choice
+        options: [full, accounts]
+        default: full
+      native_host_run_id:
+        description: Successful main iOS run supplying the unchanged native host
+        type: string
+        default: '43383649287'
+      account_case:
+        description: Isolated account case
+        type: choice
+        options: [all, baseline, comparison, offline, isolation, photos, deletion, upgrade]
+        default: all
+      upgrade_stage:
+        description: Original-runtime archive inspection or actual data-preserving replacement
+        type: choice
+        options: [inspect, exercise]
+        default: inspect
 
 jobs:
   build:
+    if: github.event_name != 'workflow_dispatch' || inputs.suite != 'accounts'
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v6
@@ -140,6 +161,7 @@ jobs:
             build/account-deletion-ios
           if-no-files-found: warn
           retention-days: 7
+
       - name: Capture App Store screenshots
         timeout-minutes: 20
         run: |
@@ -180,3 +202,100 @@ jobs:
             build/Puptime-iPad.png
           if-no-files-found: error
           retention-days: 7
+
+  native-accounts:
+    if: github.event_name == 'workflow_dispatch' && inputs.suite == 'accounts' && inputs.account_case != 'upgrade'
+    runs-on: macos-26
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: ${{ fromJSON(inputs.account_case == 'all' && '["baseline","comparison","offline","isolation","photos","deletion"]' || format('["{0}"]', inputs.account_case)) }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: npm ci
+      - name: Check native evidence assertions
+        run: node --test scripts/native-account-evidence.test.mjs
+      - name: Install existing Maestro driver
+        env:
+          MAESTRO_VERSION: '2.11.0'
+        run: |
+          curl -fsSL 'https://get.maestro.mobile.dev' | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Run isolated real-SDK account case
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUPTIME_NATIVE_HOST_RUN_ID: ${{ inputs.native_host_run_id }}
+          PUPTIME_ACCOUNT_SCENARIO: ${{ matrix.scenario }}
+          MAESTRO_CLI_NO_ANALYTICS: '1'
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: '180000'
+        run: node scripts/run-hosted-ios-account-case.mjs
+      - name: Upload bounded synthetic account receipts
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: native-account-${{ matrix.scenario }}-${{ github.run_id }}
+          path: build/isolated-native-account/${{ matrix.scenario }}
+          if-no-files-found: warn
+          retention-days: 3
+
+  native-runtime-upgrade:
+    name: Original iOS runtimes (${{ inputs.upgrade_stage }})
+    if: github.event_name == 'workflow_dispatch' && inputs.suite == 'accounts' && inputs.account_case == 'upgrade'
+    runs-on: macos-26
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check the preservation guard
+        run: node scripts/verify-ios-runtime-upgrade.mjs --self-check
+      - uses: actions/setup-java@v6
+        if: inputs.upgrade_stage == 'exercise'
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install existing Maestro driver
+        if: inputs.upgrade_stage == 'exercise'
+        env:
+          MAESTRO_VERSION: '2.11.0'
+        run: |
+          curl -fsSL 'https://get.maestro.mobile.dev' | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Inspect archives or exercise the original runtime replacement
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPGRADE_STAGE: ${{ inputs.upgrade_stage }}
+          MAESTRO_CLI_NO_ANALYTICS: '1'
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: '180000'
+        run: |
+          case "$UPGRADE_STAGE" in
+            inspect) node scripts/verify-ios-runtime-upgrade.mjs --inspect-only build/native-runtime-replacement ;;
+            exercise) node scripts/verify-ios-runtime-upgrade.mjs --replace-synthetic build/native-runtime-replacement ;;
+            *) exit 2 ;;
+          esac
+      - name: Upload bounded runtime receipts (inspection is not an upgrade pass)
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: native-runtime-${{ inputs.upgrade_stage }}-${{ github.run_id }}
+          path: build/native-runtime-replacement
+          if-no-files-found: warn
+          retention-days: 3

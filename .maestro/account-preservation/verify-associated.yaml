@@ -1,0 +1,43 @@
+appId: com.patrickchin.puptime
+name: Verify real native OTP while retaining a different enrolled account
+---
+- launchApp:
+    stopApp: false
+    permissions: {}
+- runFlow: ../helpers/open-account.yaml
+- scrollUntilVisible:
+    element:
+      id: account.code.input
+    direction: DOWN
+- waitForAnimationToEnd
+- tapOn:
+    id: account.code.input
+    retryTapIfNoChange: true
+- waitForAnimationToEnd
+- inputText: ${MAESTRO_TEST_CODE}
+- assertVisible:
+    id: account.code.input
+    text: ^[0-9]{6}$
+- tapOn: Sign-in code
+- scrollUntilVisible:
+    element:
+      id: account.verify
+    direction: DOWN
+- waitForAnimationToEnd
+- tapOn:
+    id: account.verify
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    notVisible:
+      id: account.code.input
+    timeout: 30000
+- assertNotVisible:
+    id: account.email.input
+- scrollUntilVisible:
+    element:
+      id: account.email
+    direction: UP
+- assertVisible:
+    id: account.email
+    text: ${TEST_EMAIL}
+- runFlow: assert-mismatch.yaml

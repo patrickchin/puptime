@@ -16,6 +16,7 @@ export function AppHandoffPage({ invitation=false }: { invitation?:boolean }) {
    <h1>{invalid?'Check your invitation':invitation?'Puppy care is in the app.':'Your account is in the app.'}</h1>
    <p>{invalid?'This invitation link is incomplete or invalid. Ask the puppy’s owner for the original link.':invitation?'Open Puptime to accept an invitation or see puppies shared with you.':'Sign in, manage cloud backup, and export your data in Puptime.'}</p>
    {href?<a className="primary-action" href={href}>Open Puptime <span aria-hidden="true">↗</span></a>:!ready?<p role="status">Checking invitation…</p>:null}
+   {!invitation&&<p className="handoff-help"><a href="/delete-account">Delete your cloud account on the web</a></p>}
    <p className="handoff-help"><a href="https://github.com/patrickchin/puptime">Get Puptime</a> · <a href="https://github.com/patrickchin/puptime/issues">Get help</a></p>
   </main>
  </div>;

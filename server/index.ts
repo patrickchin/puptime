@@ -32,8 +32,13 @@ app.use('/api/*', cors({
 }));
 app.get('/health', (context) => context.json({ service: 'puptime-api', status: 'ok', protocolVersion: 1 }));
 app.get('/api/config', (context) => context.json({ protocolVersion: 1, providers: configuredProviders(context.env) }));
+app.get('/api/account/deletion-options', context => context.json({existingAccountOnly:true,email:configuredProviders(context.env).email},200,{'Cache-Control':'no-store'}));
 app.on(['GET', 'POST'], '/api/auth/*', async (context) => {
-  const auth=createAuth(context.env),expected=context.req.header('x-puptime-account');
+  // This purpose only restricts the normal SDK handlers: a deletion page may
+  // authenticate an existing account, but must never create a replacement.
+  const deletionSignIn=context.req.method==='POST'&&context.req.header('x-puptime-purpose')==='account-deletion'
+    && ['/api/auth/email-otp/send-verification-otp','/api/auth/sign-in/email-otp'].includes(context.req.path);
+  const auth=createAuth(context.env,{disableEmailSignUp:deletionSignIn}),expected=context.req.header('x-puptime-account');
   if(context.req.method==='POST'&&context.req.path==='/api/auth/link-social'&&expected!==undefined){
     const session=await auth.api.getSession({headers:context.req.raw.headers});
     if(!session)return context.json({error:'unauthorized'},401);

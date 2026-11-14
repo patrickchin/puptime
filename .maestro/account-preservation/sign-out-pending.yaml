@@ -1,0 +1,43 @@
+appId: com.patrickchin.puptime
+name: Pending native logout requires an explicit cancel or confirmation
+---
+- assertTrue: ${ACTION === 'cancel' || ACTION === 'confirm'}
+- runFlow: ../helpers/open-account.yaml
+- scrollUntilVisible:
+    element:
+      id: account.signOut
+    direction: DOWN
+- tapOn:
+    id: account.signOut
+    enabled: true
+- assertVisible: ^Sign out on this device\?$
+- assertVisible: ${'Local history and your cloud copy are kept. ' + EXPECTED_PENDING + ' pending changes will stay on this device.'}
+- runFlow:
+    when:
+      true: ${ACTION === 'cancel'}
+    commands:
+      - tapOn: ^Cancel$
+      - assertNotVisible: ^Sign out on this device\?$
+      - assertVisible:
+          id: account.signOut
+      - takeScreenshot: pending-signout-cancelled
+- runFlow:
+    when:
+      true: ${ACTION === 'confirm'}
+    commands:
+      - tapOn:
+          text: (?i)^Sign out$
+          childOf:
+            containsChild:
+              text: (?i)^Cancel$
+          retryTapIfNoChange: true
+      - extendedWaitUntil:
+          notVisible:
+            id: account.identity
+          timeout: 30000
+      - scrollUntilVisible:
+          element:
+            id: account.email.input
+          direction: UP
+      - assertVisible:
+          id: account.email.input

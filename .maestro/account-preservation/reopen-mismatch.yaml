@@ -1,0 +1,8 @@
+appId: com.patrickchin.puptime
+name: Account mismatch guard survives native restart
+---
+- stopApp
+- launchApp:
+    permissions: {}
+- runFlow: ../helpers/open-account.yaml
+- runFlow: assert-mismatch.yaml

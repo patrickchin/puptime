@@ -1,0 +1,24 @@
+appId: com.patrickchin.puptime
+name: Expired server session retains enrolled local history
+---
+- stopApp
+- launchApp:
+    permissions: {}
+- runFlow: ../helpers/open-account.yaml
+- tapOn:
+    id: account.refresh
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: account.email.input
+    timeout: 45000
+- scrollUntilVisible:
+    element:
+      id: account.status
+    direction: DOWN
+- assertVisible:
+    id: account.status
+    text: Sign in again to sync
+- assertVisible:
+    id: account.local.count
+    text: ${EXPECTED_COUNT} activity logs

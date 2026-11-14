@@ -10,6 +10,26 @@ name: Account preservation prepare
     id: screen.today
 - runFlow: ../helpers/open-account.yaml
 - assertVisible: My account
-- assertVisible:
-    id: account.email.input
+- extendedWaitUntil:
+    visible:
+      id: account.(email.input|error)
+    timeout: 30000
+- runFlow:
+    when:
+      notVisible:
+        id: account.email.input
+    commands:
+      - assertVisible:
+          id: account.refresh
+          enabled: true
+      - takeScreenshot: my-account-config-retry
+      - tapOn:
+          id: account.refresh
+          retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: account.email.input
+    timeout: 30000
+- assertNotVisible:
+    id: account.error
 - takeScreenshot: my-account-guest

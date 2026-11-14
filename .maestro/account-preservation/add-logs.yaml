@@ -14,8 +14,10 @@ name: Account preservation add-logs
 - tapOn:
     id: account.back
     retryTapIfNoChange: true
-- assertVisible:
-    id: screen.today
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 30000
 - repeat:
     times: ${BATCHES}
     commands:

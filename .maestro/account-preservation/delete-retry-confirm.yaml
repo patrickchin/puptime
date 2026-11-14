@@ -1,0 +1,18 @@
+appId: com.patrickchin.puptime
+---
+- tapOn:
+    id: account.delete.review
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: ^Delete cloud account\?$
+    timeout: 15000
+- tapOn:
+    text: ^Delete cloud account$
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: account.deleted
+    timeout: 45000
+- assertVisible: Cloud account deleted. Your puppy logs are kept on this device.
+- assertNotVisible:
+    id: account.deletion

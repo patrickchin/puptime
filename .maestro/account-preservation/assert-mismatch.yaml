@@ -1,0 +1,15 @@
+appId: com.patrickchin.puptime
+name: Different signed-in account cannot retarget enrolled history
+---
+- scrollUntilVisible:
+    element:
+      id: account.status
+    direction: DOWN
+- assertVisible:
+    id: account.status
+    text: Connected to a different account
+- assertVisible:
+    id: account.local.count
+    text: ${EXPECTED_COUNT} activity logs
+- assertNotVisible:
+    id: account.enable

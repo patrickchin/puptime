@@ -8,7 +8,7 @@ export class AccountDeletionError extends Error {
 type Fetch=(url:string,options:{method:'GET'|'POST'|'DELETE';body?:object;headers?:Record<string,string>;query?:Record<string,boolean>;retry:0;redirect:'error';timeout:number})=>Promise<{data:unknown;error:{status:number;error?:unknown}|null}>;
 const sessionSchema=z.object({user:z.object({id:z.string().min(1),email:z.email()}),session:z.object({createdAt:z.coerce.date()})});
 
-// Uses the existing Expo/Better Auth SDK transport and SecureStore, never a browser cookie jar.
+// Uses the caller's official Better Auth SDK transport and credential storage.
 export function createAccountDeletionApi(fetch:Fetch,origin:string){
  const base=cloudBaseUrl(origin,true);if(!base)throw new Error('Cloud origin is missing.');
  async function call(path:string,method:'GET'|'POST'|'DELETE',expected?:string,body?:object){
