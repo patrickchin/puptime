@@ -146,6 +146,8 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: android-signing-safe-receipt
-          path: build/android-signing-safe/verification.json
+          path: |
+            build/android-signing-safe/verification.json
+            build/android-signing-safe/guest-seed-failure.png
           if-no-files-found: ignore
           retention-days: 7
