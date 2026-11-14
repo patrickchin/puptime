@@ -9,8 +9,18 @@ name: Account preservation enable
     element:
       id: account.enable
     direction: DOWN
+- extendedWaitUntil:
+    visible:
+      id: account.enable
+      enabled: true
+    timeout: 30000
 - tapOn:
     id: account.enable
+    enabled: true
+- extendedWaitUntil:
+    visible:
+      text: ^(Up to date|Combine these histories\?)$
+    timeout: 45000
 - runFlow:
     when:
       visible:
