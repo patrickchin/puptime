@@ -6,7 +6,7 @@ import {createRequire} from 'node:module';
 import {dirname,join,relative,resolve,sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {addReviewedNoticeFiles,assertCapturedSources,assertFinalNoticeEvidence,assertFinalSourceMap,assertPackagedNativeCoverage,assertSourceNoticePayload,capturedSource,digest,npmNoticeInputs,noticeText,publicNoticeReport,resolveNoticeCoverage,unreviewedOSSNoticeInputs} from './app-notices.mjs';
-import {gradleNoticeInputs,inspectNoticeArchive,podNoticeInputs,unionNoticeInputs} from './native-notice-inputs.mjs';
+import {gradleNoticeInputs,inspectNoticeArchive,podNoticeInputs,unionNoticeInputs,noticeInputStep,noticeFailureContext} from './native-notice-inputs.mjs';
 import {installTaskCleanup} from './native-task-cleanup.mjs';
 
 export const payloadPath='assets/notices/third_party_notices.json';
@@ -21,16 +21,21 @@ function nativeInputs(root,platform,gradleInput){return platform==='ios'?podNoti
 // Injecting paths permits meaningful fixture checks without starting a bundler.
 export function captureResolvedInputs(root,platform,paths,gradleInput){
  assert.ok(paths.length<=100000,'Metro graph exceeds the capture bound.');
- const ledger=readJSON(join(root,ledgerPath)),fonts=readJSON(join(root,fontPath)),unresolved=[],sources=[],physical=[];
- for(const path of new Set(paths)){
+ const [ledger,fonts]=noticeInputStep('review-inputs','review',()=>[readJSON(join(root,ledgerPath)),readJSON(join(root,fontPath))]),unresolved=[],sources=[],physical=[];
+ noticeInputStep('source-graph','metro',()=>{for(const path of new Set(paths)){
   if(path==='__prelude__'&&!Object.hasOwn(ledger.generatedSources??{},path)){unresolved.push({component:'metro:__prelude__',reason:'unreviewed-generated-source'});continue;}
   const value=capturedSource(root,path,ledger);sources.push(value);
   physical.push(join(root,value.generated?value.provider:value.path));
  }
- const native=nativeInputs(root,platform,gradleInput);
- const components=addReviewedNoticeFiles(root,unionNoticeInputs(npmNoticeInputs(root,physical),native.components),ledger,platform);
- assert.ok(components.length<=2048&&components.reduce((bytes,item)=>bytes+item.notices.reduce((sum,value)=>sum+Buffer.byteLength(value.body),0),0)<=16*1024*1024,'Notice inputs exceed the review bound.');
- const coverage=resolveNoticeCoverage(components,ledger,platform);coverage.unresolved.push(...unresolved,...native.unresolved);
+ });
+ const native=noticeInputStep('native-inputs',platform,()=>nativeInputs(root,platform,gradleInput));
+ const npm=noticeInputStep('npm-notices','npm',()=>npmNoticeInputs(root,physical));
+ const union=noticeInputStep('notice-union','review',()=>unionNoticeInputs(npm,native.components));
+ const components=noticeInputStep('reviewed-notices','review',()=>{
+  const result=addReviewedNoticeFiles(root,union,ledger,platform);
+  assert.ok(result.length<=2048&&result.reduce((bytes,item)=>bytes+item.notices.reduce((sum,value)=>sum+Buffer.byteLength(value.body),0),0)<=16*1024*1024,'Notice inputs exceed the review bound.');return result;
+ });
+ const coverage=noticeInputStep('coverage','review',()=>resolveNoticeCoverage(components,ledger,platform));coverage.unresolved.push(...unresolved,...native.unresolved);
  if(coverage.unresolved.length)coverage.status='INCOMPLETE';
  return {ledger,fonts,coverage,sources:sources.sort((a,b)=>a.path.localeCompare(b.path)),native,noticeInputs:components};
 }
@@ -131,8 +136,9 @@ export async function main(args=process.argv.slice(2)){
   if(mode==='collect'){console.log(`Notices discovery: INCOMPLETE (${capture.coverage.unresolved.length} unresolved inputs); no release payload generated.`);return;}
   stage='seal';write(join(out,'seal.json'),createNoticeSeal(root,platform,capture));
   console.log('Notices precompile verification: READY.');
- }catch{
-  write(join(out,'failure.json'),{schema:1,status:'INCOMPLETE',complete:false,sourceCommit,platform,stage});
+ }catch(error){
+  const native=noticeFailureContext(error);
+  write(join(out,'failure.json'),{schema:1,status:'INCOMPLETE',complete:false,sourceCommit,platform,stage,...(native?{native}:{})});
   console.error(`Notices verification failed closed at ${stage}; no completed payload or release qualification.`);process.exitCode=1;
  }
 }

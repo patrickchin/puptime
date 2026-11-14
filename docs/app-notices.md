@@ -39,6 +39,7 @@ umask 077
 mkdir -p build/notices/android/private
 (cd android && ./gradlew -I ../scripts/notices-runtime.init.gradle \
   :app:writeNoticeRuntimeInputs --no-daemon \
+  -PnoticeMainProjectRoot="$PWD" \
   -PnoticeInputsOutput="$PWD/../build/notices/android/private/runtime-inputs.json")
 node scripts/capture-app-notices.mjs collect android \
   --gradle-input build/notices/android/private/runtime-inputs.json
@@ -58,7 +59,23 @@ node scripts/capture-app-notices.mjs verify android \
 `collect` writes `build/notices/<platform>/discovery.json`, always
 `status: INCOMPLETE`, `complete: false`, `discoveryOnly: true`. Even fully mapped
 discovery inputs are not certified. It produces neither a payload nor a seal.
-Unexpected graph/source/archive errors still fail the command. Reports expose
+Unexpected graph/source/archive errors still fail the command. `failure.json`
+may add a `native` object containing fixed operation/component/category enums and
+an optional SHA-256 component identifier. It never includes raw errors, messages,
+causes, paths, notice bodies or environment values. The most specific failing
+Pod operation survives outer graph/union context. No bound is raised on failure.
+
+The Gradle init script requires an explicit absolute `noticeMainProjectRoot` and
+compares canonical project directories before registering its task. Other
+included builds are skipped; a missing `:app` on the selected root still fails.
+This uses Gradle's public [root project](https://docs.gradle.org/current/javadoc/org/gradle/api/invocation/Gradle.html#getRootProject())
+and [project directory](https://docs.gradle.org/current/javadoc/org/gradle/api/Project.html#getProjectDir()) APIs.
+The source-only root guard regression executes this actual init script through
+`groovy.ui.GroovyMain scripts/notices-runtime-root.test.groovy scripts/notices-runtime.init.gradle`
+with the installed Gradle distribution's `lib/*` on the Java classpath. It stubs
+Gradle callbacks/task registration only; it starts no build or resolver.
+
+Reports expose
 relative source names, versions, hashes and finite unresolved reasons, not cache
 paths, licence source bodies, raw maps, environment values or application data.
 

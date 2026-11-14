@@ -176,3 +176,22 @@ test('actual verify CLI derives final components from map/native inputs and reje
  const extra={...sourceMap,sources:[...sourceMap.sources,'node_modules/extra/index.js'],sourcesContent:[...sourceMap.sourcesContent,'module.exports=0;']};file('build/actual.map',extra);assert.equal(verify().status,1);
  file('build/actual.map',sourceMap);pack(true);assert.equal(verify().status,1,'Unmapped extensionless Mach-O must fail through the production CLI.');
 }));
+
+
+test('actual failure CLI retains only finite Pod context and no private path, body, environment or stack',()=>fixture(({root,file})=>{
+ const git=(...args)=>execFileSync('git',['-c','core.hooksPath=/dev/null','-c','commit.gpgsign=false',...args],{cwd:root,stdio:'pipe'});
+ file('.gitignore','build/\nnode_modules/\n');file('index.ts','export const fixture=1;');
+ file('package-lock.json',{packages:{}});file('node_modules/qa/package.json',{name:'qa',version:'1'});
+ file('scripts/app-notice-provenance.json',{schema:1,components:[]});file('scripts/font-icon-provenance.json',fonts);
+ file('ios/Podfile.lock','PODS:\n  - QA (1)\n');
+ file('ios/Pods/Target Support Files/Pods-QA/Pods-QA-acknowledgements.plist','PRIVATE_NOTICE_BODY\0');
+ git('init','--quiet');git('add','.');git('-c','user.name=Notice test','-c','user.email=notice-test@example.invalid','commit','--quiet','-m','Synthetic finite failure');
+ const sourceCommit=git('rev-parse','HEAD').toString().trim();
+ file('build/notices/ios/seal.json',{sourceCommit,platform:'ios',sources:[{path:'index.ts'}]});
+ const result=spawnSync(process.execPath,[fileURLToPath(new URL('./capture-app-notices.mjs',import.meta.url)),'verify','ios','--archive',join(root,'build/never-built.ipa')],{cwd:root,encoding:'utf8',timeout:30000,env:{...process.env,PRIVATE_NOTICE_ENV:'SECRET_ENV_VALUE'}});
+ assert.equal(result.status,1);
+ const failure=JSON.parse(readFileSync(join(root,'build/notices/ios/failure.json')));
+ assert.deepEqual(failure,{schema:1,status:'INCOMPLETE',complete:false,sourceCommit,platform:'ios',stage:'source',native:{operation:'pod-acknowledgements',component:'cocoapods',errorCategory:'invalid-utf8'}});
+ const output=JSON.stringify(failure)+result.stdout+result.stderr;
+ for(const secret of [root,'PRIVATE_NOTICE_BODY','SECRET_ENV_VALUE','stack','cause','at podNoticeInputs'])assert.ok(!output.includes(secret));
+}));

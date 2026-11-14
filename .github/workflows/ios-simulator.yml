@@ -364,6 +364,7 @@ jobs:
           mkdir -p build/notices/android/private
           (cd android && ./gradlew -I ../scripts/notices-runtime.init.gradle \
             :app:writeNoticeRuntimeInputs --no-daemon \
+            -PnoticeMainProjectRoot="$PWD" \
             -PnoticeInputsOutput="$PWD/../build/notices/android/private/runtime-inputs.json")
       - name: Collect Android notices (INCOMPLETE; no candidate)
         if: inputs.notice_platform == 'android'

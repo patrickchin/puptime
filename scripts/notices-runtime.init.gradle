@@ -5,6 +5,15 @@ import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.component.ProjectComponentIdentifier
 
 gradle.projectsEvaluated {
+    // Init scripts also observe included plugin builds. Bind the intended main
+    // directory explicitly; a missing :app on THAT build still fails closed.
+    def invocation = gradle
+    while (invocation.parent != null) invocation = invocation.parent
+    def requestedRoot = invocation.startParameter.projectProperties['noticeMainProjectRoot']
+    if (!requestedRoot || !new File(requestedRoot.toString()).isAbsolute()) throw new GradleException('Explicit absolute main Android root required')
+    def mainRoot = new File(requestedRoot.toString()).canonicalFile
+    if (!mainRoot.isDirectory()) throw new GradleException('Main Android root does not exist')
+    if (gradle.rootProject.projectDir.canonicalFile != mainRoot) return
     def app = gradle.rootProject.findProject(':app')
     if (app == null) throw new GradleException('Missing Android app project')
     app.tasks.register('writeNoticeRuntimeInputs') {

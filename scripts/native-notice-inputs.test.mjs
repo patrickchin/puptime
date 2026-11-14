@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createRequire} from 'node:module';
 import test from 'node:test';
-import {podNoticeInputs,gradleNoticeInputs,unionNoticeInputs,inspectNoticeArchive} from './native-notice-inputs.mjs';
+import {podNoticeInputs,gradleNoticeInputs,unionNoticeInputs,inspectNoticeArchive,noticeInputStep,noticeFailureContext} from './native-notice-inputs.mjs';
 import {assertPackagedNativeCoverage,assertSourceNoticePayload,digest,npmNoticeInputs,resolveNoticeCoverage} from './app-notices.mjs';
 const require=createRequire(import.meta.url),plist=require('@expo/plist');
 const mit=readFileSync(new URL('../node_modules/react-native/LICENSE',import.meta.url),'utf8');
@@ -135,4 +135,21 @@ test('the exact raw JSON resource has its own 16 MiB bound and is not counted ag
  const result=inspectNoticeArchive(path,'assets/third_party_notices.json');assert.equal(result.payload.sha256,digest(readFileSync(payload)));assert.equal(result.notices.length,1);
  execFileSync('python3',['-c',`import json,zipfile,sys\nwith zipfile.ZipFile(sys.argv[1],'w') as z:z.writestr('assets/third_party_notices.json',json.dumps([{'body':'x'*(17*1024*1024)}]))`,path]);
  assert.throws(()=>inspectNoticeArchive(path,'assets/third_party_notices.json'));
+}));
+
+
+test('finite native failure context preserves the innermost operation without raw error or component text',()=>fixture(({root,file})=>{
+ file('ios/Podfile.lock','PODS:\n  - QA (1)\n');
+ file('ios/Pods/Target Support Files/Pods-QA/Pods-QA-acknowledgements.plist',plist.default.build({PreferenceSpecifiers:[]}));
+ file('ios/Pods/QA/LICENSE',Buffer.from([0xff]));
+ let failed;
+ try{noticeInputStep('native-inputs','ios',()=>podNoticeInputs(root));}catch(error){failed=error;}
+ assert.deepEqual(noticeFailureContext(failed),{operation:'pod-source-scan',component:'cocoapods',errorCategory:'invalid-utf8',componentSHA256:digest('cocoapods:QA@1')});
+ for(const code of ['ENOENT','EACCES','ERR_ASSERTION',undefined]){
+  try{noticeInputStep('pod-source-scan','cocoapods',()=>{throw Object.assign(new Error('constructor '+root+' SECRET_BODY ENV_SECRET'),{code,cause:{password:'SECRET_AUTH'}});},'PRIVATE_COMPONENT');}catch(error){
+   const text=JSON.stringify(noticeFailureContext(error));for(const secret of [root,'SECRET','PRIVATE_COMPONENT','constructor','cause','password'])assert.ok(!text.includes(secret));
+   assert.ok(['missing-input','unreadable-input','invalid-input','unsupported-input'].includes(noticeFailureContext(error).errorCategory));
+  }
+ }
+ assert.equal(noticeFailureContext(Object.assign(new Error('private'),{native:{operation:'arbitrary'}})),undefined);
 }));

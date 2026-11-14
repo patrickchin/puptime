@@ -6,19 +6,38 @@ import {createRequire} from 'node:module';
 import {digest,nativeNoticeInput,npmNoticeInputs,nativeSourceNotices,noticeText} from './app-notices.mjs';
 
 const require=createRequire(import.meta.url),archiveReader=new URL('./notice-archive.py',import.meta.url);
+
+// Only finite diagnostics escape the CLI catch. Never serialize an Error,
+// message, cause, path or unvalidated dependency name into review artifacts.
+const operations=new Set(['review-inputs','source-graph','native-inputs','npm-notices','notice-union','reviewed-notices','coverage','pod-lock','pod-lock-entries','pod-acknowledgements','pod-source-scan','pod-notices']);
+const components=new Set(['review','metro','ios','android','npm','cocoapods']);
+const contexts=new WeakMap();
+const assertionCategories=new Map([['Notice must be readable UTF-8.','invalid-utf8'],['Native source link escapes its component.','source-boundary'],['Native source inventory exceeds its bound.','input-bound'],['Too many native source entries.','input-bound'],['Empty or oversized notice.','input-bound'],['Notice inputs exceed the review bound.','input-bound']]);
+export function noticeInputStep(operation,component,run,id){
+ assert.ok(operations.has(operation)&&components.has(component));
+ try{return run();}catch(thrown){
+  const error=thrown instanceof Error?thrown:new Error('Notice input failed.');
+  if(!contexts.has(error)){
+   const category=error.code==='ENOENT'?'missing-input':['EACCES','EPERM'].includes(error.code)?'unreadable-input':error instanceof SyntaxError?'invalid-format':error.code==='ERR_ASSERTION'?(assertionCategories.get(error.message)??'invalid-input'):Number.isInteger(error.status)?'subprocess-failed':'unsupported-input';
+   contexts.set(error,{operation,component,errorCategory:category,...(id?{componentSHA256:digest(id)}:{})});
+  }
+  throw error;
+ }
+}
+export function noticeFailureContext(error){const value=contexts.get(error);return value?{...value}:undefined;}
 export function inspectNoticeArchive(path,payloadPath,bundlePath){
  return JSON.parse(execFileSync('python3',[archiveReader.pathname,path,...(payloadPath?[payloadPath]:[]),...(bundlePath?[bundlePath]:[])],{encoding:'utf8',maxBuffer:32*1024*1024,timeout:60000,stdio:['ignore','pipe','pipe']}));
 }
 export function podNoticeInputs(root){
  const lockPath=join(root,'ios/Podfile.lock'),support=join(root,'ios/Pods/Target Support Files');
  if(!existsSync(lockPath)||!existsSync(support))return {components:[],unresolved:[{component:'native:ios',reason:'missing-resolved-pod-inputs'}],nativeFiles:[]};
- const lock=require('yaml').parse(noticeText(readFileSync(lockPath),16*1024*1024)),plist=require('@expo/plist').default,versions=new Map(),texts=new Map(),acknowledgements=[];
- for(const row of lock.PODS??[]){
+ const lock=noticeInputStep('pod-lock','cocoapods',()=>require('yaml').parse(noticeText(readFileSync(lockPath),16*1024*1024))),plist=require('@expo/plist').default,versions=new Map(),texts=new Map(),acknowledgements=[];
+ noticeInputStep('pod-lock-entries','cocoapods',()=>{for(const row of lock.PODS??[]){
   const value=typeof row==='string'?row:Object.keys(row)[0],match=value.match(/^([^\s(]+) \(([^\s)]+)/);assert.ok(match,'Unsupported resolved pod entry.');
   const name=match[1].split('/')[0],version=match[2];assert.ok(!versions.has(name)||versions.get(name)===version);versions.set(name,version);
  }
- assert.ok(versions.size,'Missing resolved pods.');
- for(const target of readdirSync(support).sort()){
+ assert.ok(versions.size,'Missing resolved pods.');});
+ noticeInputStep('pod-acknowledgements','cocoapods',()=>{for(const target of readdirSync(support).sort()){
   const path=join(support,target,target+'-acknowledgements.plist');if(!existsSync(path))continue;
   const bytes=readFileSync(path);acknowledgements.push({source:relative(root,path).split(sep).join('/'),sha256:digest(bytes)});
   for(const row of plist.parse(noticeText(bytes,16*1024*1024)).PreferenceSpecifiers??[]){
@@ -28,13 +47,14 @@ export function podNoticeInputs(root){
    texts.set(row.Title,list);
   }
  }
+ });
  const unresolved=[],components=[];
  for(const [name,version] of versions){
   const notices=texts.get(name)??[],external=lock['EXTERNAL SOURCES']?.[name]?.[':path'];let scan={vendors:[],vendorNotices:{},nativeInputs:{},notices:[]};
   const source=external?resolve(root,'ios',external):join(root,'ios/Pods',name);
   if(!existsSync(source))unresolved.push({component:`cocoapods:${name}@${version}`,reason:'missing-resolved-pod-source'});
-  else scan=nativeSourceNotices(root,source,`cocoapods:${name}`);
-  components.push(nativeNoticeInput({id:`cocoapods:${name}@${version}`,name,version,ecosystem:'cocoapods',...scan,notices:[...notices,...scan.notices].sort((a,b)=>a.source.localeCompare(b.source))}));
+  else scan=noticeInputStep('pod-source-scan','cocoapods',()=>nativeSourceNotices(root,source,`cocoapods:${name}`),`cocoapods:${name}@${version}`);
+  components.push(noticeInputStep('pod-notices','cocoapods',()=>nativeNoticeInput({id:`cocoapods:${name}@${version}`,name,version,ecosystem:'cocoapods',...scan,notices:[...notices,...scan.notices].sort((a,b)=>a.source.localeCompare(b.source))}),`cocoapods:${name}@${version}`));
  }
  return {components,unresolved,nativeFiles:[],inputHashes:{podLock:digest(readFileSync(lockPath)),podAcknowledgements:digest(JSON.stringify(acknowledgements))}};
 }

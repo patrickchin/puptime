@@ -87,6 +87,7 @@ jobs:
           mkdir -p build/notices/android/private
           (cd android && ./gradlew -I ../scripts/notices-runtime.init.gradle \
             :app:writeNoticeRuntimeInputs --no-daemon \
+            -PnoticeMainProjectRoot="$PWD" \
             -PnoticeInputsOutput="$PWD/../build/notices/android/private/runtime-inputs.json")
           node scripts/capture-app-notices.mjs seal android \
             --gradle-input build/notices/android/private/runtime-inputs.json
