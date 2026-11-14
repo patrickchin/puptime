@@ -4,6 +4,49 @@ Use the real iOS app and native BetterAuth SDK with the ephemeral local HTTPS se
 
 The ordinary pull-request workflow retains its full build and test path. Manual account runs can execute independently of the standard UI suite, reusing a successful main build whose native inputs match the selected source ref. Archive digests, native signatures, bundle identity and native-input checks fail closed.
 
+## Compiled hosts are test inputs, not release qualification
+
+The default `native_host_policy=full-suite-success` still requires a completed,
+successful main/push iOS workflow. There is no automatic fallback when that run
+fails. The explicit `compiled-for-testing` policy admits only a trusted main/push
+run whose actual native compile and early test-host upload steps both succeeded
+in the selected run attempt. This permits more isolated tests to run while the
+full suite is pending or red; those suite results remain visible and required
+for release qualification.
+
+The producer uploads the same single simulator ZIP with its existing seven-day
+retention immediately after successful compile/ZIP validation. Consumer checks
+retain exact native-input equality, artifact nonexpiry/whole digest, deep strict
+signatures, arm64 and fingerprints/signature verification of every embedded
+Mach-O. The upload must be unique and its timestamps must fall inside this
+attempt's successful upload step (a one-second envelope accounts for observed
+GitHub timestamp precision). Duplicate or stale artifacts fail closed; no
+artifact overwrite or deletion is introduced. The consumer rechecks run attempt,
+source and artifact metadata after download, before creating a simulator.
+
+Use the additional policy only deliberately:
+
+```sh
+gh workflow run ios-simulator.yml --ref <reviewed-test-source-ref> \
+  -f suite=accounts -f account_case=<one-case> \
+  -f native_host_run_id=<compiled-main-ios-run> \
+  -f native_host_policy=compiled-for-testing
+```
+
+`native-provenance.json` records the admission policy, actual observed full-run
+status/conclusion and selected attempt, alongside native hashes. Its
+`releaseQualified` is always false: a passing isolated test or a compiled
+simulator host is not a release certificate. Full standard/conversational,
+SQLite-fault, SDK, deletion and final candidate/provider/store gates remain
+separate requirements. Read the observation timestamp rather than treating an
+in-progress snapshot as the workflow's eventual result.
+
+The iOS Maestro **driver startup** bound is 300 seconds after a measured 180-second
+startup expiry occurred just before the driver's HTTP server became available.
+Application assertions, flow/command/overall deadlines, Android and private
+authentication handoff timers are unchanged. Original-runtime verification honors
+a supplied driver bound instead of forcing 180 seconds.
+
 ## Case selection
 
 | Manual case | Evidence |
