@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {createHash,randomBytes} from 'node:crypto';
 import {execFileSync,spawnSync} from 'node:child_process';
-import {createReadStream,createWriteStream,existsSync,lstatSync,mkdirSync,openSync,closeSync,readFileSync,readdirSync,writeFileSync,chmodSync} from 'node:fs';
+import {createReadStream,createWriteStream,existsSync,lstatSync,mkdirSync,openSync,closeSync,readFileSync,readdirSync,writeFileSync,chmodSync,readlinkSync,realpathSync,rmSync} from 'node:fs';
 import {join,resolve,isAbsolute} from 'node:path';
 import {Readable,Transform} from 'node:stream';
 import {pipeline} from 'node:stream/promises';
@@ -72,6 +72,7 @@ function widgetBinding(text){
  assert.ok(id&&host&&provider);return {id,host,provider};
 }
 function selfCheck(){
+ emulatorSelfCheck();
  assertWidgetSource();
  validateDriver('d'.repeat(40),'d'.repeat(40));assert.throws(()=>validateDriver('d'.repeat(40),'e'.repeat(40)));assert.throws(()=>validateDriver('short','short'));
  const change=path=>`:100644 100644 ${'a'.repeat(40)} ${'b'.repeat(40)} M\0${path}\0`;
@@ -93,7 +94,126 @@ function selfCheck(){
  const dump='\nWidgets:\n  [0] id=2\n    host=HostId{user:0, app:10001, hostId:1024, pkg:launcher}\n    provider=ProviderId{user:0, app:10002, cmp:ComponentInfo{'+app+'/'+app+'.widget.PuptimeQuickLog}}\n    views=random\nHosts:\n';assert.equal(widgetBinding(dump).id,'2');assert.throws(()=>widgetBinding(dump.replace(app+'/','other/')));assert.throws(()=>widgetBinding(dump.replace('    host=','    invalid=')));
  console.log('PASS signing QA source self-checks; no network, keys, signing or device operations.');
 }
-const [mode]=process.argv.slice(2);if(mode==='--self-check'){selfCheck();process.exit(0);}
+function emulatorSelfCheck(){
+ const base={alive:true,start:'42',executable:true,arguments:true,home:true,uid:true};
+ const stub=()=>{let now=0,alive=true;const calls=[],state={},io={name:'Puptime_Signing_QA_123',start:'42',inspect:()=>({...base,alive}),save:()=>{},now:()=>now,pause:()=>now+=1000,signal:signal=>{calls.push(signal);alive=false;},adb:args=>{calls.push(args.join(' '));return {status:0,stdout:args[0]==='root'?'restarting adbd as root\n':args[0]==='emu'?'Puptime_Signing_QA_123\nOK\n':args[1]==='id'?'0\n':'1\n',stderr:''};}};return {io,state,calls,exit:()=>alive=false};};
+ const closed={status:1,stdout:'',stderr:'adb: unable to connect for root: closed\n'};
+ for(const outcome of [{status:0,stdout:'restarting adbd as root\n',stderr:''},{status:0,stdout:'adbd is already running as root\n',stderr:''},closed]){
+  const t=stub(),adb=t.io.adb;let reads=0;t.io.adb=args=>args[0]==='root'?(t.calls.push('root'),outcome):args[1]==='id'&&reads++===0?{status:1,stdout:'',stderr:'closed'}:adb(args);emulatorRoot(t.io,t.state);assert.equal(t.state.rootReadback,'verified');assert.equal(t.calls.filter(c=>c==='root').length,1);
+ }
+ for(const outcome of [{status:1,stdout:'',stderr:'permission denied\n'},{status:0,stdout:'adbd cannot run as root in production builds\n',stderr:''},{status:null,stdout:'',stderr:''},{...closed,stderr:closed.stderr+'extra\n'}]){
+  const t=stub(),adb=t.io.adb;t.io.adb=args=>args[0]==='root'?(t.calls.push('root'),outcome):adb(args);assert.throws(()=>emulatorRoot(t.io,t.state));assert.equal(t.state.rootRequest,'refused');assert.equal(t.calls.filter(c=>c==='root').length,1);
+ }
+ for(const fault of ['nonroot','wrong-avd','dead','pid-reuse','wrong-executable']){
+  const t=stub(),adb=t.io.adb;let requested=false;t.io.adb=args=>{if(args[0]==='root'){t.calls.push('root');requested=true;return closed;}if(requested&&fault==='nonroot'&&args[1]==='id')return {status:0,stdout:'2000\n',stderr:''};if(requested&&fault==='wrong-avd'&&args[0]==='emu')return {status:0,stdout:'Foreign\nOK\n',stderr:''};return adb(args);};t.io.inspect=()=>({...base,...(requested?fault==='dead'?{alive:false}:fault==='pid-reuse'?{start:'99'}:fault==='wrong-executable'?{executable:false}:{}:{})});assert.throws(()=>emulatorRoot(t.io,t.state));assert.notEqual(t.state.rootReadback,'verified');assert.equal(t.calls.filter(c=>c==='root').length,1);
+ }
+ for(const field of ['start','executable','arguments','home','uid']){const t=stub();t.io.inspect=()=>({...base,[field]:field==='start'?'99':false});assert.equal(stopEmulator(t.io,t.state),false);assert.equal(t.state.cleanup,'ownership-refused');assert.deepEqual(t.calls,[]);}
+ {const t=stub();t.exit();assert.equal(stopEmulator(t.io,t.state),true);assert.equal(t.state.cleanup,'already-exited');assert.deepEqual(t.calls,[]);}
+ {const t=stub(),adb=t.io.adb;t.io.adb=args=>{const value=adb(args);if(args[1]==='kill')t.exit();return value;};assert.equal(stopEmulator(t.io,t.state),true);assert.equal(t.state.cleanup,'console-exit');assert.ok(!t.calls.includes('SIGTERM'));}
+ for(const required of ['SIGTERM','SIGKILL']){const t=stub();t.io.adb=()=>closed;t.io.signal=signal=>{t.calls.push(signal);if(signal===required)t.exit();};assert.equal(stopEmulator(t.io,t.state),true);assert.equal(t.state.cleanup,required==='SIGTERM'?'term-exit':'kill-exit');assert.deepEqual(t.calls,required==='SIGTERM'?['SIGTERM']:['SIGTERM','SIGKILL']);}
+ {const t=stub();t.io.adb=()=>closed;t.io.signal=signal=>t.calls.push(signal);assert.equal(stopEmulator(t.io,t.state),false);assert.equal(t.state.cleanup,'still-alive');assert.deepEqual(t.calls,['SIGTERM','SIGKILL']);}
+ {const t=stub();let replaced=false;t.io.adb=()=>closed;t.io.signal=signal=>{t.calls.push(signal);replaced=true;};t.io.inspect=()=>({...base,start:replaced?'99':'42'});assert.equal(stopEmulator(t.io,t.state),false);assert.equal(t.state.cleanup,'ownership-refused');assert.deepEqual(t.calls,['SIGTERM']);}
+
+ const stat='123 (qemu with spaces) S '+Array(18).fill('0').join(' ')+' 42 0',expected={executables:['/sdk/emulator/emulator','/sdk/emulator/qemu/linux-x86_64/qemu-system-x86_64','/sdk/emulator/qemu/linux-x86_64/qemu-system-x86_64-headless'],arguments:['-avd','Puptime_Signing_QA_123','-port','5588','-no-window','-no-audio','-no-snapshot','-gpu','swiftshader_indirect'],home:'/private/qa/avd',uid:'1001'};
+ const files={stat,afterStat:stat,exe:expected.executables[0],cmdline:[expected.executables[0],...expected.arguments].join('\0')+'\0',environ:'UNRELATED=private-not-retained\0ANDROID_AVD_HOME='+expected.home+'\0',status:'Name:\tqemu\nUid:\t1001\t1001\t1001\t1001\n'};
+ for(const exe of expected.executables)assert.ok(ownedProcess(processIdentity({...files,exe,cmdline:[exe,...expected.arguments].join('\0')+'\0'},expected),'42'),'Accept same-PID launcher→QEMU exec with unchanged tail args.');
+ for(const patch of [{exe:'/foreign/qemu'},{afterStat:stat.replace(') S ',') Z ')},{cmdline:files.cmdline.replace('/sdk/emulator/emulator','/foreign/argv0')},{cmdline:files.cmdline.replace('QA_123','QA_999')},{cmdline:files.cmdline+'-extra\0'},{environ:'ANDROID_AVD_HOME=/foreign\0'},{environ:'OTHER_ANDROID_AVD_HOME='+expected.home+'\0'},{status:files.status.replaceAll('1001','1002')},{status:files.status.replace('1001\t1001','1001\t0')},{environ:files.environ+'ANDROID_AVD_HOME=/foreign\0'},{stat:stat.replace(' 42 ',' 99 '),afterStat:stat.replace(' 42 ',' 99 ')}])assert.ok(!ownedProcess(processIdentity({...files,...patch},expected),'42'));
+ assert.throws(()=>processIdentity({...files,afterStat:stat.replace(' 42 ',' 99 ')},expected));
+ {const t=stub();let reads=0;t.io.inspect=()=>({...base,executable:reads++>1});recordOwnedEmulator(t.io,t.state);assert.equal(t.state.liveness,'owned');assert.ok(t.io.now()<5000);}
+ for(const fault of [{executable:false},{start:'99'},{alive:false}]){const t=stub();t.io.inspect=()=>({...base,...fault});assert.throws(()=>recordOwnedEmulator(t.io,t.state));assert.notEqual(t.state.liveness,'owned');assert.deepEqual(t.calls,[]);assert.ok(t.io.now()<=5000);}
+ assert.deepEqual(safeHostState({liveness:'owned',argv:'PRIVATE',path:'PRIVATE',pid:123}),{liveness:'owned'});assert.throws(()=>safeHostState({liveness:'PRIVATE'}));
+ assert.deepEqual(processStart('123 (qemu with spaces) S '+Array(18).fill('0').join(' ')+' 42 0'),{start:'42',alive:true});assert.equal(processStart('123 (qemu) Z '+Array(18).fill('0').join(' ')+' 42 0').alive,false);assert.throws(()=>processStart('invalid'));
+ console.log('PASS bounded one-request root/readback, process ownership/PID reuse, and console/TERM/KILL cleanup stubs. No processes, adb or emulator invoked.');
+}
+
+// Host-only setup/cleanup. Root is requested once; a closed transport is not proof
+// of success. AOSP documents adbd's restart: docs/dev/root.md in packages/modules/adb.
+function processStart(stat){const fields=stat.slice(stat.lastIndexOf(')')+2).trim().split(/\s+/);assert.match(fields[19]??'',/^\d+$/);return {start:fields[19],alive:!['Z','X'].includes(fields[0])};}
+function safeHostState(value){
+ const allowed={liveness:['not-started','owned','identity-mismatch','exited'],boot:['not-started','pending','complete'],rootRequest:['not-issued','acknowledged','closed-transport','refused'],rootReadback:['not-attempted','pending','verified','timeout','identity-mismatch'],cleanup:['not-attempted','already-exited','console-exit','term-exit','kill-exit','ownership-refused','still-alive'],setup:['failed']},safe={};
+ for(const [key,values] of Object.entries(allowed))if(key in value){assert.ok(values.includes(value[key]));safe[key]=value[key];}
+ if('privateMaterialRemoved' in value){assert.equal(typeof value.privateMaterialRemoved,'boolean');safe.privateMaterialRemoved=value.privateMaterialRemoved;}return safe;
+}
+function ownedProcess(value,start){return !!value?.alive&&value.start===start&&value.executable&&value.arguments&&value.home&&value.uid;}
+function processIdentity(files,expected){
+ const stat=processStart(files.stat);if(!stat.alive)return stat;
+ const after=processStart(files.afterStat);assert.equal(after.start,stat.start,'Process changed during /proc read.');
+ const argv=files.cmdline.split('\0').filter(Boolean),uids=files.status.match(/^Uid:\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/m)?.slice(1);
+ return {...stat,alive:after.alive,executable:expected.executables.includes(files.exe),arguments:expected.executables.includes(argv[0])&&JSON.stringify(argv.slice(1))===JSON.stringify(expected.arguments),home:JSON.stringify(files.environ.split('\0').filter(value=>value.startsWith('ANDROID_AVD_HOME=')))===JSON.stringify(['ANDROID_AVD_HOME='+expected.home]),uid:!!uids&&uids.every(value=>value===expected.uid)};
+}
+function recordOwnedEmulator(io,state){
+ const until=io.now()+5000;do{const value=io.inspect();if(ownedProcess(value,io.start)){state.liveness='owned';io.save(state);return;}if(!value?.alive||value.start!==io.start)break;io.pause();}while(io.now()<until);
+ state.liveness=io.inspect()?.alive?'identity-mismatch':'exited';io.save(state);throw new Error('Launcher did not become the exact owned SDK process within five seconds.');
+}
+function emulatorRoot(io,state){
+ const live=()=>{const value=io.inspect();state.liveness=value?.alive?(ownedProcess(value,io.start)?'owned':'identity-mismatch'):'exited';io.save(state);assert.equal(state.liveness,'owned','Recorded emulator process is not live and owned.');};
+ const poll=(seconds,read)=>{const until=io.now()+seconds*1000;do{live();if(read())return true;io.pause();}while(io.now()<until);return false;};
+ const name=()=>{const result=io.adb(['emu','avd','name']);if(result.status!==0)return false;if(result.stdout.replaceAll('\r','').trim()!==io.name+'\nOK'){state.rootReadback='identity-mismatch';io.save(state);throw new Error('Unexpected emulator console identity.');}return true;};
+ state.boot='pending';io.save(state);
+ assert.ok(poll(180,()=>{if(!name())return false;const boot=io.adb(['shell','getprop','sys.boot_completed']);return boot.status===0&&boot.stdout.trim()==='1';}),'Owned emulator boot readback timed out.');state.boot='complete';
+ const result=io.adb(['root'],20000),text=result.stdout+result.stderr;
+ state.rootRequest=result.status===0&&['','adbd is already running as root\n','restarting adbd as root\n'].includes(text.replaceAll('\r',''))?'acknowledged':result.status===1&&result.stdout===''&&result.stderr.replaceAll('\r','')==='adb: unable to connect for root: closed\n'?'closed-transport':'refused';io.save(state);
+ assert.notEqual(state.rootRequest,'refused','Root request failed outside the observed closed-transport case.');
+ state.rootReadback='pending';io.save(state);
+ const ready=poll(60,()=>{
+  if(!name())return false;
+  const boot=io.adb(['shell','getprop','sys.boot_completed']),uid=io.adb(['shell','id','-u']);
+  return boot.status===0&&boot.stdout.trim()==='1'&&uid.status===0&&uid.stdout.trim()==='0';
+ });state.rootReadback=ready?'verified':'timeout';io.save(state);assert.ok(ready,'Root UID/boot/owned-AVD readback timed out; no second root request.');
+}
+function stopEmulator(io,state){
+ const inspect=()=>{const value=io.inspect();if(!value?.alive)return 'exited';return ownedProcess(value,io.start)?'owned':'identity-mismatch';};
+ const wait=seconds=>{const until=io.now()+seconds*1000;do{const value=inspect();if(value!=='owned')return value;io.pause();}while(io.now()<until);return inspect();};
+ const finish=value=>{state.cleanup=value;io.save(state);return !['ownership-refused','still-alive'].includes(value);};
+ let current=inspect();if(current==='exited')return finish('already-exited');if(current!=='owned')return finish('ownership-refused');
+ const name=io.adb(['emu','avd','name']);
+ if(name.status===0&&name.stdout.replaceAll('\r','').trim()===io.name+'\nOK'){
+  io.adb(['emu','kill']);current=wait(10);if(current==='exited')return finish('console-exit');if(current!=='owned')return finish('ownership-refused');
+ }
+ for(const [signal,seconds,label] of [['SIGTERM',10,'term-exit'],['SIGKILL',5,'kill-exit']]){
+  current=inspect();if(current==='exited')return finish('already-exited');if(current!=='owned')return finish('ownership-refused');
+  io.signal(signal);current=wait(seconds);if(current==='exited')return finish(label);if(current!=='owned')return finish('ownership-refused');
+ }
+ return finish('still-alive');
+}
+function emulatorHost(mode){
+ assert.equal(process.env.GITHUB_ACTIONS,'true');assert.equal(process.env.RUNNER_OS,'Linux');validateDriver(process.env.PUPTIME_EXPECTED_DRIVER,process.env.GITHUB_SHA);process.umask(0o077);
+ const {PUPTIME_SIGNING_PRIVATE:privatePath,RUNNER_TEMP,GITHUB_RUN_ID:run,GITHUB_RUN_ATTEMPT:attempt,ANDROID_HOME:sdk}=process.env;
+ assert.match(run??'',/^[1-9]\d*$/);assert.match(attempt??'',/^[1-9]\d*$/);assert.ok(RUNNER_TEMP&&privatePath&&sdk);
+ const folder=resolve(privatePath);assert.equal(folder,join(resolve(RUNNER_TEMP),'puptime-signing-'+run+'-'+attempt));assert.ok(!lstatSync(folder).isSymbolicLink());assert.equal(lstatSync(folder).mode&0o777,0o700);assert.equal(readFileSync(join(folder,'NOT-FOR-RELEASE'),'utf8'),process.env.PUPTIME_EXPECTED_SOURCE);
+ try{
+ const name='Puptime_Signing_QA_'+run,ownerFile=join(folder,'emulator-owner.json'),stateFile=join(folder,'emulator-host-state.json');
+ const state=existsSync(stateFile)?JSON.parse(readFileSync(stateFile)): {liveness:'not-started',boot:'not-started',rootRequest:'not-issued',rootReadback:'not-attempted',cleanup:'not-attempted'};
+ const save=value=>writeFileSync(stateFile,JSON.stringify(safeHostState(value)),{mode:0o600});
+ const pidFile=join(folder,'emulator.pid');let owner=existsSync(ownerFile)?JSON.parse(readFileSync(ownerFile)):null;
+ const pid=owner?.pid??(existsSync(pidFile)?Number(readFileSync(pidFile,'utf8').trim()):null);if(pid!==null)assert.ok(Number.isSafeInteger(pid)&&pid>1);
+ const executables=[join(sdk,'emulator/emulator'),join(sdk,'emulator/qemu/linux-x86_64/qemu-system-x86_64'),join(sdk,'emulator/qemu/linux-x86_64/qemu-system-x86_64-headless')].filter(existsSync).map(path=>realpathSync(path));
+ const inspect=()=>{
+  if(pid===null)return null;
+  try{
+   const proc='/proc/'+pid,stat=processStart(readFileSync(join(proc,'stat'),'utf8'));if(!stat.alive)return stat;
+   return processIdentity({stat:readFileSync(join(proc,'stat'),'utf8'),exe:readlinkSync(join(proc,'exe')),cmdline:readFileSync(join(proc,'cmdline'),'utf8'),environ:readFileSync(join(proc,'environ'),'utf8'),status:readFileSync(join(proc,'status'),'utf8'),afterStat:readFileSync(join(proc,'stat'),'utf8')},{executables,arguments:['-avd',name,'-port','5588','-no-window','-no-audio','-no-snapshot','-gpu','swiftshader_indirect'],home:join(folder,'avd'),uid:String(process.getuid())});
+  }catch(error){if(error.code==='ENOENT'||error.code==='ESRCH')return null;throw error;}
+ };
+ const io={name,start:owner?.start,inspect,save,now:Date.now,pause:()=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,1000),signal:signal=>{try{process.kill(pid,signal);}catch(error){if(error.code!=='ESRCH')throw error;}},adb:(args,timeout=3000)=>{const value=spawnSync(join(sdk,'platform-tools/adb'),['-s','emulator-5588',...args],{encoding:'utf8',timeout,maxBuffer:65536,stdio:['ignore','pipe','pipe']});return {status:value.status,stdout:value.stdout??'',stderr:value.stderr??''};}};
+ if(mode==='--emulator-record'){
+  assert.equal(owner,null);assert.ok(pid);const value=processStart(readFileSync('/proc/'+pid+'/stat','utf8'));assert.ok(value.alive);owner={pid,start:value.start};writeFileSync(ownerFile,JSON.stringify(owner),{flag:'wx',mode:0o600});io.start=value.start;recordOwnedEmulator(io,state);
+ }else if(mode==='--emulator-root'){
+  assert.ok(owner);try{emulatorRoot(io,state);}catch(error){state.setup='failed';save(state);throw error;}
+ }else{
+  let stopped=false;
+  try{stopped=stopEmulator(io,state);}finally{
+   if(stopped){rmSync(folder,{recursive:true});state.privateMaterialRemoved=true;}else state.privateMaterialRemoved=false;
+   const receiptPath=resolve('build/android-signing-safe/verification.json');
+   if(existsSync(receiptPath)){const receipt=JSON.parse(readFileSync(receiptPath));receipt.emulatorHost=safeHostState(state);writeFileSync(receiptPath,JSON.stringify(receipt,null,2),{mode:0o600});}
+  }
+  assert.ok(stopped,'Owned emulator exit could not be confirmed; cleanup is incomplete.');
+ }
+ console.log('PASS host-only '+mode.slice(2)+'; no keys or app operations.');
+ }catch(error){if(existsSync(folder))writeFileSync(join(folder,'emulator-host-failure.txt'),String(error.stack),{mode:0o600});throw error;}
+}
+
+const [mode]=process.argv.slice(2);if(['--emulator-record','--emulator-root','--emulator-cleanup'].includes(mode)){try{emulatorHost(mode);process.exit(0);}catch{console.error('FAIL host-only '+mode.slice(2)+'; raw process/error evidence remains private.');process.exit(1);}}if(mode==='--self-check'){selfCheck();process.exit(0);}
 assert.ok(['--preflight','--exercise'].includes(mode));assert.equal(process.env.GITHUB_ACTIONS,'true');assert.equal(process.env.RUNNER_OS,'Linux');process.umask(0o077);
 const root=resolve(process.env.PUPTIME_SIGNING_PRIVATE??'');assert.ok(process.env.RUNNER_TEMP&&root.startsWith(resolve(process.env.RUNNER_TEMP)+'/puptime-signing-'));
 const source=process.env.PUPTIME_EXPECTED_SOURCE,driverSource=process.env.PUPTIME_EXPECTED_DRIVER;assert.match(source??'',/^[a-f0-9]{40}$/);validateDriver(driverSource,process.env.GITHUB_SHA);assertWidgetSource();
