@@ -1,0 +1,144 @@
+appId: com.patrickchin.puptime
+name: Original runtime preferences are written or read without clearing history
+---
+# Called only on the owned runtime-replacement simulator after history exists.
+- assertTrue: ${PREF_ACTION === 'seed' || PREF_ACTION === 'verify'}
+- launchApp:
+    permissions: {}
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- tapOn:
+    id: nav.open
+    retryTapIfNoChange: true
+- assertVisible:
+    id: nav.close
+- tapOn:
+    id: nav.notifications
+    retryTapIfNoChange: true
+- assertVisible:
+    id: screen.notifications
+- scrollUntilVisible:
+    element:
+      id: settings.notifications.lead.15
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      true: ${PREF_ACTION === 'seed'}
+    commands:
+      - tapOn:
+          id: settings.notifications.lead.15
+          retryTapIfNoChange: true
+- assertVisible:
+    id: settings.notifications.lead.15
+    text: radio button, checked
+- tapOn:
+    id: nav.open
+    retryTapIfNoChange: true
+- assertVisible:
+    id: nav.close
+- tapOn:
+    id: nav.settings
+    retryTapIfNoChange: true
+- assertVisible:
+    id: screen.settings
+- tapOn:
+    id: settings.widget.open
+    retryTapIfNoChange: true
+- scrollUntilVisible:
+    element:
+      id: settings.widget.action.walk
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      true: ${PREF_ACTION === 'seed'}
+    commands:
+      - assertVisible:
+          id: settings.widget.action.walk
+          text: checkbox, unchecked
+      - tapOn:
+          id: settings.widget.action.walk
+- assertVisible:
+    id: settings.widget.action.walk
+    text: checkbox, checked
+- tapOn:
+    id: settings.widget.close
+    retryTapIfNoChange: true
+- scrollUntilVisible:
+    element:
+      id: settings.theme.open
+    direction: UP
+    visibilityPercentage: 100
+    centerElement: true
+- waitForAnimationToEnd
+- tapOn:
+    id: settings.theme.open
+    retryTapIfNoChange: true
+- assertVisible:
+    id: appearance.theme.dark
+- runFlow:
+    when:
+      true: ${PREF_ACTION === 'seed'}
+    commands:
+      - tapOn:
+          id: appearance.theme.dark
+          retryTapIfNoChange: true
+- runFlow:
+    when:
+      true: ${PREF_ACTION === 'verify'}
+    commands:
+      - assertVisible:
+          id: appearance.theme.dark
+          text: radio button, checked
+      - tapOn:
+          id: appearance.close
+          retryTapIfNoChange: true
+- tapOn:
+    id: settings.language.open
+    retryTapIfNoChange: true
+- assertVisible:
+    id: appearance.language.es
+- runFlow:
+    when:
+      true: ${PREF_ACTION === 'seed'}
+    commands:
+      - tapOn:
+          id: appearance.language.es
+          retryTapIfNoChange: true
+- runFlow:
+    when:
+      true: ${PREF_ACTION === 'verify'}
+    commands:
+      - assertVisible:
+          id: appearance.language.es
+          text: radio button, checked
+      - tapOn:
+          id: appearance.close
+          retryTapIfNoChange: true
+- scrollUntilVisible:
+    element:
+      id: settings.back
+    direction: UP
+    visibilityPercentage: 100
+- tapOn:
+    id: settings.back
+    retryTapIfNoChange: true
+- tapOn:
+    id: nav.open
+    retryTapIfNoChange: true
+- assertVisible:
+    id: nav.close
+- tapOn:
+    id: nav.log
+    retryTapIfNoChange: true
+- assertVisible:
+    id: screen.today
+- takeScreenshot: persisted-preferences
+- stopApp

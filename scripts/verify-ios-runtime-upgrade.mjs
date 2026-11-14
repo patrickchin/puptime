@@ -30,6 +30,11 @@ function assertPreserved(before,after,{paletteChange=false}={}){
  })]))});
  assert.deepEqual(protectedState(after),protectedState(before),'Preserve every table/row/sequence counter, saved file, photo and widget activity field.');
 }
+function assertPreferences(settings){
+ const value=key=>{const row=settings.find(row=>row.key===key);assert.ok(row,'The older UI must persist each nondefault preference.');return row.value;};
+ assert.equal(value('puptime.theme.v1'),'dark');assert.equal(value('puptime.language.v1'),'es');
+ assert.ok(JSON.parse(value('puptime.widgetActions.v1')).includes('walk'));assert.equal(JSON.parse(value('puptime.notificationPreferences.v1')).reminderLeadMinutes,15);
+}
 function selfCheck(){
  const before={tables:Object.fromEntries(nativeTables.map(table=>[table,[]])),files:{'dog-photos/img_test.jpg':'original-bytes'},widgetTimelines:{quick:[{pending:[],lastEventAt:{pee:123},appearance:{light:{background:'old',surface:'old',controlRadius:12},dark:{background:'dark',surface:'dark',controlRadius:12}}}]}};
  const after=structuredClone(before);after.widgetTimelines.quick[0].appearance.light.background='new';after.widgetTimelines.quick[0].appearance.dark.surface='new';
@@ -37,6 +42,8 @@ function selfCheck(){
  for(const mutate of [value=>value.tables.events.push({id:'changed'}),value=>value.files['dog-photos/img_test.jpg']='changed',value=>value.widgetTimelines.quick[0].pending.push({id:'unexpected'}),value=>value.widgetTimelines.quick[0].lastEventAt.pee=999,value=>value.widgetTimelines.quick[0].appearance.light.controlRadius=99,value=>value.widgetTimelines.quick[0].appearance.dark.unknown='unexpected']){
   const changed=structuredClone(after);mutate(changed);assert.throws(()=>assertPreserved(before,changed,{paletteChange:true}));
  }
+ const settings=[['puptime.theme.v1','dark'],['puptime.language.v1','es'],['puptime.widgetActions.v1','["pee","poop","meal","walk"]'],['puptime.notificationPreferences.v1','{"reminderLeadMinutes":15}']].map(([key,value])=>({key,value}));
+ assertPreferences(settings);assert.throws(()=>assertPreferences(settings.filter(row=>row.key!=='puptime.language.v1')));assert.throws(()=>assertPreferences(settings.map(row=>row.key==='puptime.theme.v1'?{...row,value:'"dark"'}:row)));
  console.log('PASS runtime preservation guard: only the explicit widget palette change is allowed.');
 }
 async function verify(){
@@ -94,13 +101,13 @@ async function verify(){
  assert.equal(command('git',['ls-files','--others','--exclude-standard','--',...nativeInputs]),'','Review untracked native inputs before reusing a frozen artifact.');
  assert.equal(cuts[0].group,cuts[1].group);assert.deepEqual(cuts[0].entitlements,cuts[1].entitlements,'Preserve the actual storage/keychain/AppGroup signing boundary.');
  assert.notEqual(cuts[0].provenance.javaScriptSHA256,cuts[1].provenance.javaScriptSHA256,'Use two genuinely different original app runtimes.');
- const provenance={stage:'archive-inspection',upgradeExecuted:false,driverSource:source,driverScriptSHA256:hash(new URL(import.meta.url)),runtimes:cuts.map(cut=>cut.provenance),originalArchivesUnmodified:true,preferenceCoverage:'Exact actual older-runtime first-open/default preference rows; nondefault appearance/locale/reminder/widget UI selection is not yet exercised.',scope:'Original older full app to original newer full app, same native1.12.0/build1; not numeric/store upgrade, old-JS injection, production-account or prior-aa4 legacy-format qualification.'};
+ const provenance={stage:'archive-inspection',upgradeExecuted:false,driverSource:source,driverScriptSHA256:hash(new URL(import.meta.url)),runtimes:cuts.map(cut=>cut.provenance),originalArchivesUnmodified:true,exercisePreferenceContract:{theme:'dark',language:'es',reminderLeadMinutes:15,widgetActionAdded:'walk',creation:'Original older Settings UI only'},scope:'Original older full app to original newer full app, same native1.12.0/build1; not numeric/store upgrade, old-JS injection, production-account or prior-aa4 legacy-format qualification.'};
  writeFileSync(join(output,'native-provenance.json'),JSON.stringify(provenance,null,2)+'\n');
  writeFileSync(join(output,'inspection.json'),JSON.stringify({status:'passed',...provenance},null,2)+'\n');
  if(mode==='--inspect-only'){console.log('PASS original-runtime archive inspection: '+output);return;}
 
  assert.equal(command('git',['status','--porcelain','--','scripts/verify-ios-runtime-upgrade.mjs','scripts/native-account-evidence.mjs','.maestro']),'','Commit the exact test driver/fixtures/flows before native execution.');
- const fixture=resolve('.maestro/fixtures/profile-test.jpg'),selectPhoto=resolve('.maestro/account-preservation/choose-photo.yaml');
+ const fixture=resolve('.maestro/fixtures/profile-test.jpg'),selectPhoto=resolve('.maestro/account-preservation/choose-photo.yaml'),preferenceFlow=resolve('.maestro/runtime-upgrade/preferences.yaml');
  assert.equal(hash(fixture),'41a3b20216a5ac7400ef8f64eb2b0dd869ef0504c97ab27f31dd32782e40b308');
  assert.ok(existsSync(selectPhoto),'Use the committed, verified real UIKit selection flow.');
  function decode(path,label){
@@ -112,12 +119,13 @@ async function verify(){
  const runtimes=JSON.parse(simctl('list','runtimes','-j')).runtimes;
  const runtime=runtimes.filter(value=>value.isAvailable&&value.identifier.includes('iOS-26')).at(-1);assert.ok(runtime);
  const device=simctl('create','Puptime Runtime Replacement '+Date.now(),'com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro',runtime.identifier);
- provenance.device={udid:device,runtime:runtime.identifier};provenance.photoFixtureSHA256=hash(fixture);provenance.photoSelectionFlowSHA256=hash(selectPhoto);
+ provenance.device={udid:device,runtime:runtime.identifier};provenance.photoFixtureSHA256=hash(fixture);provenance.photoSelectionFlowSHA256=hash(selectPhoto);provenance.preferenceFlowSHA256=hash(preferenceFlow);
  writeFileSync(join(output,'native-provenance.json'),JSON.stringify(provenance,null,2)+'\n');
  const flow=(name,body)=>{
   const path=join(privateDir,name+'.yaml');writeFileSync(path,`appId: ${app}\nname: ${name}\n---\n${body}`);
   execFileSync(process.env.MAESTRO_BIN??'maestro',['--device',device,'test',path,'--test-output-dir',join(output,name)],{timeout:600000,stdio:'inherit',env:{...process.env,MAESTRO_CLI_NO_ANALYTICS:'1',MAESTRO_DRIVER_STARTUP_TIMEOUT:'180000'}});
  };
+ const preferences=action=>`- runFlow:\n    file: ${JSON.stringify(preferenceFlow)}\n    env:\n      PREF_ACTION: ${action}\n`;
  const openProfile=`- runFlow: ${JSON.stringify(resolve('.maestro/helpers/open-account.yaml'))}\n- scrollUntilVisible:\n    element:\n      id: account.back\n    direction: UP\n    visibilityPercentage: 100\n- tapOn:\n    id: account.back\n    retryTapIfNoChange: true\n- extendedWaitUntil:\n    visible:\n      id: screen.today\n    timeout: 30000\n- tapOn:\n    id: header.puppy\n    retryTapIfNoChange: true\n- extendedWaitUntil:\n    visible:\n      id: screen.pets\n    timeout: 30000\n`;
  const showPhoto=`${openProfile}- assertVisible:\n    id: settings.puppy.photo.remove\n- assertNotVisible:\n    id: settings.puppy.photo.error\n- assertVisible: Runtime QA Maple\n- takeScreenshot: profile-photo\n- stopApp\n`;
  const files=directory=>Object.fromEntries((existsSync(directory)?readdirSync(directory,{recursive:true,withFileTypes:true}):[]).filter(entry=>entry.isFile()).map(entry=>{
@@ -128,6 +136,7 @@ async function verify(){
   const db=new DatabaseSync(join(documents,'SQLite/puptime-v2.db'),{readOnly:true});let tables;
   try{assert.equal(db.prepare('PRAGMA integrity_check').get().integrity_check,'ok');assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);tables=nativeSnapshot(db);}finally{db.close();}
   assert.deepEqual(tables.local_sync_owner,[]);assert.deepEqual(tables.local_sync_outbox,[]);assert.equal(tables.events.length,12);
+  assertPreferences(tables.settings);
   const photo=tables.pet_settings.find(row=>row.key==='puptime.puppyPhoto.v1');assert.ok(photo&&/^img_[a-f0-9]{32}$/.test(photo.value));
   const image=join(documents,'dog-photos',photo.value+'.jpg'),jpeg=readFileSync(image),decoded=decode(image,'saved-photo');assert.equal(jpeg.subarray(0,3).toString('hex'),'ffd8ff');assert.equal(jpeg.subarray(-2).toString('hex'),'ffd9');assert.equal(decoded.width,512);assert.equal(decoded.height,512);
   const preferences=join(shared,'Library/Preferences',cuts[0].group+'.plist');assert.ok(existsSync(preferences),'Inspect actual shared widget state.');
@@ -142,13 +151,15 @@ async function verify(){
   simctl('install',device,cuts[0].host);installed(cuts[0]);simctl('addmedia',device,fixture);
   flow('older-created-history',`- runFlow: ${JSON.stringify(resolve('.maestro/account-preservation/prepare.yaml'))}\n- runFlow:\n    file: ${JSON.stringify(resolve('.maestro/account-preservation/add-logs.yaml'))}\n    env:\n      BATCHES: '4'\n      EXPECTED_COUNT: '12'\n`);
   flow('older-created-photo',`- runFlow: ${JSON.stringify(selectPhoto)}\n`);
-  flow('older-created-profile',`${openProfile}- tapOn:\n    id: settings.puppy.name\n- tapOn:\n    id: settings.puppy.name.input\n- eraseText\n- inputText: Runtime QA Maple\n- tapOn:\n    id: settings.puppy.name.save\n- assertNotVisible:\n    id: settings.puppy.name.editor\n- assertVisible:\n    id: settings.puppy.photo.remove\n- assertNotVisible:\n    id: settings.puppy.photo.error\n- takeScreenshot: original-older-photo\n- stopApp\n`);
+  flow('older-created-profile',`${openProfile}- tapOn:\n    id: settings.puppy.name\n    retryTapIfNoChange: true\n- tapOn:\n    id: settings.puppy.name.input\n    retryTapIfNoChange: true\n- eraseText\n- inputText: Runtime QA Maple\n- tapOn:\n    id: settings.puppy.name.save\n    retryTapIfNoChange: true\n- assertNotVisible:\n    id: settings.puppy.name.editor\n- assertVisible:\n    id: settings.puppy.photo.remove\n- assertNotVisible:\n    id: settings.puppy.photo.error\n- takeScreenshot: original-older-photo\n- stopApp\n`);
+  flow('older-created-preferences',preferences('seed'));
   flow('older-cold-restart',`- launchApp:\n    permissions: {}\n${showPhoto}`);
+  flow('older-verifies-preferences',preferences('verify'));
   const before=snapshot();assert.ok(before.tables.events.some(row=>row.note==='Saved before and after sign-in'));assert.equal(before.tables.puppies[0].name,'Runtime QA Maple');
   simctl('install',device,cuts[1].host);installed(cuts[1]);assertPreserved(before,snapshot());
-  flow('newer-preserves-photo',`- launchApp:\n    permissions: {}\n${showPhoto}`);assertPreserved(before,snapshot(),{paletteChange:true});
-  flow('newer-cold-restart',`- launchApp:\n    permissions: {}\n${showPhoto}`);const after=snapshot();assertPreserved(before,after,{paletteChange:true});
-  writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',...provenance,stage:'runtime-replacement',upgradeExecuted:true,checks:['Older original app UI created12 logs, note, profile name and a genuine UIKit-selected decoded512px JPEG.','Installing the original newer app without uninstall preserved all14 tables, file bytes, photo ID/decoded bytes and widget activity state before launch.','Newer launch and cold restart preserved every protected field; only widget appearance is an explicitly allowed palette change.'],photoInput:{sha256:hash(fixture),...input},photoSaved:after.photo,protectedStateSHA256:createHash('sha256').update(JSON.stringify(before)).digest('hex'),productionAccountsUsed:false},null,2)+'\n');
+  flow('newer-preserves-photo',`- launchApp:\n    permissions: {}\n${showPhoto}`);flow('newer-preserves-preferences',preferences('verify'));assertPreserved(before,snapshot(),{paletteChange:true});
+  flow('newer-cold-restart',`- launchApp:\n    permissions: {}\n${showPhoto}`);flow('newer-cold-preferences',preferences('verify'));const after=snapshot();assertPreserved(before,after,{paletteChange:true});
+  writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',...provenance,stage:'runtime-replacement',upgradeExecuted:true,checks:['Older original app UI created12 logs, note, profile name and a genuine UIKit-selected decoded512px JPEG.','Older original Settings UI persisted dark appearance, Spanish,15-minute reminder lead and walk widget action; each was verified after old/new cold restarts.','Installing the original newer app without uninstall preserved all14 tables, file bytes, photo ID/decoded bytes and widget activity state before launch.','Newer launch and cold restart preserved every protected field; only widget background/surface colours are explicitly allowed palette changes.'],photoInput:{sha256:hash(fixture),...input},photoSaved:after.photo,protectedStateSHA256:createHash('sha256').update(JSON.stringify(before)).digest('hex'),productionAccountsUsed:false},null,2)+'\n');
   console.log('PASS original iOS runtime replacement: '+output);
  }finally{try{simctl('delete',device);}catch{/* Only the owned fresh simulator. */}}
 }
