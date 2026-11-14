@@ -2,11 +2,13 @@
 import assert from 'node:assert/strict';
 import {createHash,randomBytes} from 'node:crypto';
 import {execFileSync,spawnSync} from 'node:child_process';
-import {createReadStream,createWriteStream,existsSync,lstatSync,mkdirSync,openSync,closeSync,readFileSync,readdirSync,writeFileSync,chmodSync,readlinkSync,realpathSync,rmSync} from 'node:fs';
+import {createReadStream,createWriteStream,existsSync,lstatSync,mkdirSync,openSync,closeSync,mkdtempSync,readFileSync,readdirSync,writeFileSync,chmodSync,readlinkSync,realpathSync,rmSync} from 'node:fs';
 import {join,resolve,isAbsolute} from 'node:path';
 import {Readable,Transform} from 'node:stream';
 import {pipeline} from 'node:stream/promises';
 import {DatabaseSync} from 'node:sqlite';
+import {tmpdir} from 'node:os';
+import {readNativeCommandState} from './native-command-evidence.mjs';
 
 const app='com.patrickchin.puptime',oldSHA='82fa41075db35d747360183a2c3ff364e5c4fb4813519135d7a5eb076249a927';
 const oldCert='fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c';
@@ -14,6 +16,7 @@ const keySHA='221e0a3106aa4c3ccc154e0a418b55020b3f9ea6e84f92e8749cd9e2f39f5e58';
 const caps={'installed data':true,'shared UID':false,permission:false,rollback:false,auth:false};
 const hash=value=>createHash('sha256').update(value).digest('hex');
 const exerciseStages=['exercise-preconditions','original-artifact-validation','bridge-input-validation','later-input-validation','public-template-validation','qa-key-creation','qa-certificate-readback','lineage-creation','lineage-inspection','plain6-sign','plain6-verify','bridge6-sign','bridge6-verify','plain7-sign','plain7-verify','bridge-lineage-inspection','plain6-lineage-absence','plain7-lineage-absence','bridge-v31-validation','native-evidence-imports','original-install','original-launch','guest-seed','reminder-preference-seed','widget-binding','widget-first-save','snapshot-old-created','original-state-validation','plain-B-reject','snapshot-plain-B-rejected','plain-B-preservation','bridge-install','snapshot-bridge-before-launch','bridge-before-launch-preservation','bridge-launch','bridge-visible','snapshot-bridge-launched','bridge-state-validation','bridge-widget-save','snapshot-bridge-widget','bridge-widget-validation','higher-A-reject','snapshot-higher-A-rollback-rejected','higher-A-preservation','later-install','snapshot-later-before-launch','later-before-launch-preservation','later-launch','later-visible','snapshot-later-launched','later-state-validation','later-cold-restart','snapshot-later-cold','later-cold-preservation','exercise-finalize'];
+const exerciseFlows=['old-ui-seed','old-reminder-lead','bind-real-launcher-widget','bridge-visible','bridge-cold','later-visible','later-cold'];
 const commandFailures=new WeakMap();
 function commandFailure(error,result){
  const value={class:result.error?.code==='ETIMEDOUT'?'timeout':result.error?.code==='ENOENT'?'missing-tool':'command-failed'};
@@ -22,10 +25,16 @@ function commandFailure(error,result){
 }
 function finiteFailure(error){return commandFailures.get(error)??{class:error?.code==='ERR_ASSERTION'?'assertion':'other'};}
 function exerciseRecorder(save){
- const history=[],active=[];let failure;
- const snapshot=()=>({phase:active.at(-1)??history.at(-1)?.phase??'exercise-preconditions',state:failure?'failed':active.length?'started':'completed',history:history.map(({phase,state})=>({phase,state})),...(failure?{failure:{...failure}}:{})});
+ const history=[],active=[];let failure,nativeCommand;
+ const snapshot=()=>({phase:active.at(-1)??history.at(-1)?.phase??'exercise-preconditions',state:failure?'failed':active.length?'started':'completed',history:history.map(({phase,state})=>({phase,state})),...(failure?{failure:{...failure}}:{}),...(nativeCommand?{nativeCommand:{...nativeCommand}}:{})});
  const event=(phase,state)=>{assert.ok(exerciseStages.includes(phase));assert.ok(['started','completed','failed'].includes(state));assert.ok(history.length<256);history.push({phase,state});};
- return {begin(phase){event(phase,'started');active.push(phase);save(snapshot());},end(phase){assert.equal(active.at(-1),phase);event(phase,'completed');active.pop();save(snapshot());},persist(){save(snapshot());},fail(error){failure=finiteFailure(error);event(active.at(-1)??history.at(-1)?.phase??'exercise-preconditions','failed');save(snapshot());}};
+ return {phase:()=>active.at(-1),flowFailure(flow,directory){assert.ok(exerciseFlows.includes(flow));const stage=active.at(-1);assert.ok(exerciseStages.includes(stage));const {status,kind,targetId,sequence}=readNativeCommandState(directory);nativeCommand={flow,stage,status,kind,targetId,sequence};save(snapshot());},begin(phase){event(phase,'started');active.push(phase);save(snapshot());},end(phase){assert.equal(active.at(-1),phase);event(phase,'completed');active.pop();save(snapshot());},persist(){save(snapshot());},fail(error){failure=finiteFailure(error);event(active.at(-1)??history.at(-1)?.phase??'exercise-preconditions','failed');save(snapshot());}};
+}
+// Only this fresh/offline guest flow may produce an image. Capture is best-effort
+// and must never replace the original Maestro failure or enter an auth flow.
+function guestSeedFailureImage(flow,stage,io){
+ if(flow!=='old-ui-seed'||stage!=='guest-seed')return false;
+ try{if(!io.owned())return false;const bytes=io.capture();if(!Buffer.isBuffer(bytes)||bytes.length<8||bytes.length>8*1024*1024||!bytes.subarray(0,8).equals(Buffer.from('89504e470d0a1a0a','hex')))return false;io.save(bytes);return true;}catch{return false;}
 }
 function exerciseEvidenceSelfCheck(){
  const secret='PRIVATE token=password key=/private/secret.pem stdout stderr stack';let saved;const make=()=>exerciseRecorder(value=>saved=JSON.parse(JSON.stringify(value)));
@@ -35,19 +44,37 @@ function exerciseEvidenceSelfCheck(){
  for(const {error,expected} of errors){const record=make();record.begin('original-artifact-validation');record.fail(error);assert.equal(saved.phase,'original-artifact-validation');assert.equal(saved.state,'failed');assert.deepEqual(saved.failure,expected);assert.deepEqual(saved.history,[{phase:'original-artifact-validation',state:'started'},{phase:'original-artifact-validation',state:'failed'}]);const text=JSON.stringify(saved);for(const key of ['PRIVATE','password','argv','stdout','stderr','stack','token','path'])assert.ok(!text.includes(key));}
  for(const status of [-1,256,NaN,'17',null])assert.deepEqual(finiteFailure(commandFailure(rich(),{status})),{class:'command-failed'});
  const record=make();record.begin('plain-B-preservation');record.begin('snapshot-plain-B-rejected');record.end('snapshot-plain-B-rejected');assert.equal(saved.phase,'plain-B-preservation');record.end('plain-B-preservation');assert.equal(saved.state,'completed');record.persist();assert.ok(!('failure' in saved));assert.throws(()=>record.begin(secret));assert.ok(!JSON.stringify(saved).includes(secret));
+ const directory=mkdtempSync(join(tmpdir(),'puptime-command-state-'));chmodSync(directory,0o700);
+ try{
+  mkdirSync(join(directory,'timestamp','flow'),{recursive:true,mode:0o700});const file=join(directory,'timestamp','flow','commands.json');
+  const leaf={command:{tapOnElement:{selector:{idRegex:'screen.today',text:secret},input:secret}},metadata:{status:'FAILED',sequenceNumber:23,error:secret,stack:secret}};
+  writeFileSync(file,JSON.stringify([leaf]),{mode:0o600});const record=make();record.begin('guest-seed');record.flowFailure('old-ui-seed',directory);record.fail(errors[2].error);
+  assert.deepEqual(saved.nativeCommand,{flow:'old-ui-seed',stage:'guest-seed',status:'FAILED',kind:'tap',targetId:'screen.today',sequence:23});assert.deepEqual(saved.failure,{class:'command-failed',status:17});assert.ok(!JSON.stringify(saved).includes(secret));
+  for(const records of [[{...leaf,command:{inputTextCommand:{text:secret}}}],[{...leaf,command:{tapOnElement:{selector:{idRegex:secret}}}}],[leaf,{...leaf,metadata:{status:'RUNNING',sequenceNumber:24}}]]){
+   writeFileSync(file,JSON.stringify(records));record.flowFailure('old-ui-seed',directory);assert.equal(saved.nativeCommand.targetId,null);assert.ok(!JSON.stringify(saved).includes(secret));
+  }
+  assert.equal(saved.nativeCommand.status,'UNKNOWN');assert.equal(saved.nativeCommand.sequence,0);assert.throws(()=>record.flowFailure(secret,directory));assert.ok(!JSON.stringify(saved).includes(secret));
+ }finally{rmSync(directory,{recursive:true});}
+ const png=Buffer.from('89504e470d0a1a0a','hex');let captures=0,saves=0;const io={owned:()=>true,capture:()=>{captures++;return png;},save:value=>{assert.deepEqual(value,png);saves++;}};
+ assert.equal(guestSeedFailureImage('old-ui-seed','guest-seed',io),true);assert.equal(captures,1);assert.equal(saves,1);
+ for(const [flow,stage] of [['later-visible','later-visible'],['old-ui-seed','qa-key-creation'],[secret,'guest-seed']])assert.equal(guestSeedFailureImage(flow,stage,io),false);assert.equal(captures,1);
+ assert.equal(guestSeedFailureImage('old-ui-seed','guest-seed',{...io,owned:()=>false}),false);assert.equal(captures,1);
+ for(const patch of [{owned:()=>{throw rich();}},{capture:()=>{throw rich();}},{capture:()=>Buffer.from(secret)},{capture:()=>Buffer.alloc(8*1024*1024+1)},{save:()=>{throw rich();}}])assert.equal(guestSeedFailureImage('old-ui-seed','guest-seed',{...io,...patch}),false);
+ const original=errors[2].error;let caught;try{try{throw original;}catch(error){guestSeedFailureImage('old-ui-seed','guest-seed',{...io,capture:()=>{throw rich();}});throw error;}}catch(error){caught=error;}assert.equal(caught,original);assert.deepEqual(finiteFailure(caught),{class:'command-failed',status:17});
  console.log('PASS finite exercise stage/error/status evidence and secret-rich negative checks; no command, keys or device operations.');
 }
 
 const toolingPaths=['.github/workflows/android-signing-proof.yml','scripts/verify-android-signing-upgrade.mjs'];
+const nativeCommandPath='scripts/native-command-evidence.mjs';
 function validateDriver(expected,actual){assert.match(expected??'',/^[a-f0-9]{40}$/);assert.equal(actual,expected,'Pin the reviewed driver SHA separately from artifact source.');}
 function equivalentChanges(raw){
  if(!raw)return [];
  assert.ok(raw.endsWith('\0'));const fields=raw.slice(0,-1).split('\0');assert.equal(fields.length%2,0);
  const changes=[];
  for(let i=0;i<fields.length;i+=2){
-  const match=fields[i].match(/^:100644 100644 ([a-f0-9]{40}) ([a-f0-9]{40}) M$/),path=fields[i+1];
-  assert.ok(match,'Only same-mode regular-file tooling edits are allowed.');assert.ok(toolingPaths.includes(path),'App/native/lock/other paths must be blob-and-mode identical.');
-  assert.ok(!changes.some(value=>value.path===path));changes.push({path,mode:'100644',sourceBlob:match[1],driverBlob:match[2]});
+  const modified=fields[i].match(/^:100644 100644 ([a-f0-9]{40}) ([a-f0-9]{40}) M$/),added=fields[i].match(/^:000000 100644 (0{40}) ([a-f0-9]{40}) A$/),path=fields[i+1];
+  assert.ok(modified&&toolingPaths.includes(path)||added&&path===nativeCommandPath&&added[2]!=='0'.repeat(40),'Only two same-mode tooling edits and the exact new regular-file command helper are allowed.');
+  const match=modified??added;assert.ok(!changes.some(value=>value.path===path));changes.push({path,mode:'100644',sourceBlob:match[1],driverBlob:match[2],...(added?{changeType:'A'}:{})});
  }
  return changes;
 }
@@ -104,6 +131,10 @@ function selfCheck(){
  validateDriver('d'.repeat(40),'d'.repeat(40));assert.throws(()=>validateDriver('d'.repeat(40),'e'.repeat(40)));assert.throws(()=>validateDriver('short','short'));
  const change=path=>`:100644 100644 ${'a'.repeat(40)} ${'b'.repeat(40)} M\0${path}\0`;
  assert.equal(equivalentChanges(toolingPaths.map(change).join('')).length,2);assert.deepEqual(equivalentChanges(''),[]);
+ const addition=path=>`:000000 100644 ${'0'.repeat(40)} ${'c'.repeat(40)} A\0${path}\0`;assert.equal(equivalentChanges(toolingPaths.map(change).join('')+addition(nativeCommandPath)).length,3);assert.deepEqual(equivalentChanges(addition(nativeCommandPath)),[{path:nativeCommandPath,mode:'100644',sourceBlob:'0'.repeat(40),driverBlob:'c'.repeat(40),changeType:'A'}]);
+ for(const path of ['App.tsx','package-lock.json','plugins/native.js','scripts/other.mjs',...toolingPaths])assert.throws(()=>equivalentChanges(addition(path)));
+ for(const raw of [change(nativeCommandPath),addition(nativeCommandPath).replace('000000','100644'),addition(nativeCommandPath).replace('100644','100755'),addition(nativeCommandPath).replace('100644','120000'),addition(nativeCommandPath).replace(' A\0',' D\0'),addition(nativeCommandPath).replace('0'.repeat(40),'a'.repeat(40)),addition(nativeCommandPath).replace('c'.repeat(40),'0'.repeat(40)),addition(nativeCommandPath)+addition(nativeCommandPath)])assert.throws(()=>equivalentChanges(raw));
+
  for(const path of ['App.tsx','package-lock.json','plugins/native.js','server/auth.ts','.github/workflows/android-apk.yml'])assert.throws(()=>equivalentChanges(change(path)));
  for(const raw of [change(toolingPaths[0]).replace('100644','100755'),change(toolingPaths[0]).replace(' M\0',' D\0'),change(toolingPaths[0]).slice(0,-1)])assert.throws(()=>equivalentChanges(raw));
  const repo='example/qa',source='a'.repeat(40),run={id:1,repository:{full_name:repo},head_repository:{full_name:repo},head_sha:source,path:'.github/workflows/android-apk.yml',event:'workflow_dispatch',status:'completed',conclusion:'success'},jobs=[{name:'build',conclusion:'success'},{name:'publish',conclusion:'skipped'}];
@@ -251,6 +282,8 @@ function emulatorHost(mode){
    return processIdentity({stat:readFileSync(join(proc,'stat'),'utf8'),exe:readlinkSync(join(proc,'exe')),cmdline:readFileSync(join(proc,'cmdline'),'utf8'),environ:readFileSync(join(proc,'environ'),'utf8'),status:readFileSync(join(proc,'status'),'utf8'),afterStat:readFileSync(join(proc,'stat'),'utf8')},{executables,arguments:['-avd',name,'-port','5588','-no-window','-no-audio','-no-snapshot','-gpu','swiftshader_indirect'],home:join(folder,'avd'),uid:String(process.getuid())});
   }catch(error){if(error.code==='ENOENT'||error.code==='ESRCH')return null;throw error;}
  };
+ // Read-only use of the same exact PID/start/SDK executable/args/home/UID guard.
+ if(mode==='--emulator-owned')return !!owner&&ownedProcess(inspect(),owner.start);
  const io={name,start:owner?.start,inspect,save,now:Date.now,pause:()=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,1000),signal:signal=>{try{process.kill(pid,signal);}catch(error){if(error.code!=='ESRCH')throw error;}},adb:(args,timeout=3000)=>{const value=spawnSync(join(sdk,'platform-tools/adb'),['-s','emulator-5588',...args],{encoding:'utf8',timeout,maxBuffer:256*1024,stdio:['ignore','pipe','pipe']});return {status:value.status,stdout:value.stdout??'',stderr:value.stderr??''};}};
  if(mode==='--emulator-record'){
   assert.equal(owner,null);assert.ok(pid);const value=processStart(readFileSync('/proc/'+pid+'/stat','utf8'));assert.ok(value.alive);owner={pid,start:value.start};writeFileSync(ownerFile,JSON.stringify(owner),{flag:'wx',mode:0o600});io.start=value.start;recordOwnedEmulator(io,state);
@@ -352,7 +385,15 @@ exerciseEvidence.begin('bridge-v31-validation');const bridgeVerification=command
 exerciseEvidence.begin('native-evidence-imports');const {nativeSnapshot,assertNativeTransition}=await import('./native-account-evidence.mjs');
 const {eventDataFromSql}=await import('../src/record-sql.ts');exerciseEvidence.end('native-evidence-imports');
 const phases=[];function pass(phase,state){phases.push({phase,protectedStateSHA256:hash(JSON.stringify(state))});writeFileSync(join(output,'verification.json'),JSON.stringify({status:'in-progress',source,driverSource,sourceEquivalence,artifacts:inputs.artifacts,phases,scope:'Guest-only API36 x86; no credential or Play acceptance.'},null,2));exerciseEvidence.persist();console.log('PASS signing QA phase: '+phase);}
-function flow(name,steps){const path=join(root,name+'.yaml');writeFileSync(path,`appId: ${app}\n---\n${steps}\n`);command('maestro',['--device',device,'test',path,'--test-output-dir',join(root,name+'-driver')],{timeout:240000});}
+function flow(name,steps){
+ const path=join(root,name+'.yaml');writeFileSync(path,`appId: ${app}\n---\n${steps}\n`);
+ try{command('maestro',['--device',device,'test',path,'--test-output-dir',join(root,name+'-driver')],{timeout:240000});}
+ catch(error){
+  try{exerciseEvidence.flowFailure(name,join(root,name+'-driver'));}catch{}
+  guestSeedFailureImage(name,exerciseEvidence.phase(),{owned:()=>emulatorHost('--emulator-owned'),capture:()=>command('adb',['-s','emulator-5588','exec-out','screencap','-p'],{binaryOutput:true,timeout:5000}),save:bytes=>writeFileSync(resolve('build/android-signing-safe/guest-seed-failure.png'),bytes,{mode:0o600})});
+  throw error;
+ }
+}
 const tap=id=>`- tapOn: {id: ${id}}\n`,scroll=id=>`- scrollUntilVisible:\n    element: {id: ${id}}\n    direction: DOWN\n    visibilityPercentage: 100\n    centerElement: true\n`;
 const settings=tap('nav.open')+'- assertVisible: {id: nav.close}\n'+tap('nav.settings')+'- assertVisible: {id: screen.settings}\n';
 function launch(){adb('shell','am','start','-W','-n',app+'/.MainActivity');}
