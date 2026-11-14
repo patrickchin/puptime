@@ -1,0 +1,8 @@
+appId: com.patrickchin.puptime
+---
+- scrollUntilVisible:
+    element: {id: event.pee}
+    direction: DOWN
+    visibilityPercentage: 100
+- assertNotVisible: {id: event.pee.edit}
+- assertNotVisible: {id: event.pee.delete}

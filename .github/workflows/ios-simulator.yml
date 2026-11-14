@@ -19,7 +19,7 @@ on:
       account_case:
         description: Isolated account case
         type: choice
-        options: [all, baseline, comparison, offline, isolation, photos, deletion, upgrade]
+        options: [all, baseline, comparison, offline, isolation, photos, deletion, upgrade, sharing-household, sharing-temporary]
         default: all
       upgrade_stage:
         description: Original-runtime archive inspection or actual data-preserving replacement

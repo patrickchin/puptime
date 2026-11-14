@@ -1,0 +1,8 @@
+appId: com.patrickchin.puptime
+# SECRET PHASE: the adapter discards all artifacts, including failures.
+---
+- runFlow:
+    when:
+      visible: '^Open$'
+    commands:
+      - tapOn: '^Open$'

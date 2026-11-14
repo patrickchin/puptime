@@ -1,0 +1,35 @@
+appId: com.patrickchin.puptime
+# SECRET PHASE: discard ALL Maestro output, including implicit failure images.
+---
+- assertTrue: ${KIND == 'household' || KIND == 'temporary'}
+- runFlow: open-sharing.yaml
+- tapOn: {id: 'sharing.kind.${KIND}'}
+- scrollUntilVisible:
+    element: {id: sharing.label}
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn: {id: sharing.label}
+- inputText: ${LABEL}
+- hideKeyboard
+- runFlow:
+    when:
+      true: ${KIND == 'temporary'}
+    commands:
+      - tapOn: {id: sharing.permission.contribute}
+- scrollUntilVisible:
+    element: {id: sharing.create}
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn: {id: sharing.create}
+- extendedWaitUntil:
+    visible: {id: sharing.send}
+    timeout: 30000
+- scrollUntilVisible:
+    element: {id: sharing.send}
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn: {id: sharing.send}
+- extendedWaitUntil:
+    visible: '^Copy$'
+    timeout: 15000
+- tapOn: '^Copy$'

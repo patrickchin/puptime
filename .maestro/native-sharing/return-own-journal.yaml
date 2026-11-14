@@ -1,0 +1,9 @@
+appId: com.patrickchin.puptime
+---
+- tapOn: {id: shared.leaveEnded}
+- extendedWaitUntil:
+    visible: {id: screen.today}
+    timeout: 30000
+- assertNotVisible: {id: shared.leaveEnded}
+- runFlow: ../helpers/open-account.yaml
+- assertNotVisible: {id: account.email.input}

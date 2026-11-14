@@ -11,7 +11,7 @@ const repository=process.env.GITHUB_REPOSITORY,runId=process.env.PUPTIME_NATIVE_
 assert.equal(repository,'patrickchin/puptime','Run only in the intended repository.');
 assert.match(runId??'',/^\d+$/);
 const scenario=process.env.PUPTIME_ACCOUNT_SCENARIO;
-assert.ok(['baseline','comparison','offline','isolation','photos','deletion','enrolled-upgrade'].includes(scenario));
+assert.ok(['baseline','comparison','offline','isolation','photos','deletion','enrolled-upgrade','sharing-household','sharing-temporary'].includes(scenario));
 const output=resolve('build/isolated-native-account',scenario);mkdirSync(output,{recursive:true});
 const privateDirectory=mkdtempSync(join(tmpdir(),'puptime-native-host-'));
 const command=(binary,args,options={})=>execFileSync(binary,args,{encoding:'utf8',timeout:120000,stdio:['ignore','pipe','pipe'],...options}).trim();
@@ -79,8 +79,8 @@ try{
   writeFileSync(join(output,'simulator-boot-failure.json'),JSON.stringify({stage:'simulator-boot',appInstalled:false,elapsedMs:Date.now()-bootStarted,category:error.code==='ETIMEDOUT'?'timeout':'command-failed',state},null,2)+'\n');throw error;
  }
  command('xcrun',['simctl','install',device,initialHost]);
- const mode={baseline:[],comparison:['--puppy-comparison'],offline:['--offline-lifecycle'],isolation:['--account-isolation'],photos:['--photo-lifecycle'],deletion:['--deletion-faults'],'enrolled-upgrade':['--enrolled-runtime-upgrade']}[scenario];
+ const mode={baseline:[],comparison:['--puppy-comparison'],offline:['--offline-lifecycle'],isolation:['--account-isolation'],photos:['--photo-lifecycle'],deletion:['--deletion-faults'],'enrolled-upgrade':['--enrolled-runtime-upgrade'],'sharing-household':['--sharing-household'],'sharing-temporary':['--sharing-temporary']}[scenario];
  const args=['scripts/verify-ios-guest-account.mjs',device,initialHost,'--replace-synthetic',output,...mode];
  await new Promise((resolveCase,reject)=>{const child=spawn(process.execPath,args,{stdio:'inherit',detached:true,env:{...process.env,CI:'1'}});stopCaseChild=ownProcess(child,{graceMs:120000});child.once('error',reject);child.once('close',async code=>{const stopped=await stopCaseChild();code===0&&stopped?resolveCase():reject(new Error(`Native ${scenario} case failed (${code}).`));});});
- assert.equal(JSON.parse(readFileSync(join(output,'verification.json'),'utf8')).status,'passed');assert.equal(task.signal,null);completed=true;
+ assert.equal(JSON.parse(readFileSync(join(output,'verification.json'),'utf8')).status,scenario.startsWith('sharing-')?'awaiting-attribution-visual-review':'passed');assert.equal(task.signal,null);completed=true;
 }finally{await task.run();task.dispose();}

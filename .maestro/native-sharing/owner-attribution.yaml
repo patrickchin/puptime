@@ -1,0 +1,32 @@
+appId: com.patrickchin.puptime
+---
+- scrollUntilVisible:
+    element:
+      id: event.walk.note
+      text: '(?s)${NOTE}.*'
+    direction: DOWN
+    visibilityPercentage: 100
+- takeScreenshot: native-owner-attribution-row
+- scrollUntilVisible:
+    element: {id: event.walk.edit}
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn: {id: event.walk.edit, index: 0}
+- scrollUntilVisible:
+    element: {id: editor.note.input}
+    direction: DOWN
+    visibilityPercentage: 100
+# Capture actual glyphs before the strict assertion, including a red case.
+- takeScreenshot: native-owner-attribution-detail
+- assertVisible:
+    id: editor.note.input
+    text: '(?s)${NOTE}\s+Logged by ${ATTRIBUTION}'
+# The assertion above reads accessibility content. A reviewer MUST inspect the
+# detail image for actual visible actor glyphs; the two-line Log row can clip it.
+# No tap/type/selection in the note input: this is a read-only inspection.
+- scrollUntilVisible:
+    element: {id: editor.close}
+    direction: UP
+    visibilityPercentage: 100
+- tapOn: {id: editor.close}
+- assertVisible: {id: screen.today}

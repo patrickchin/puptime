@@ -1,0 +1,8 @@
+appId: com.patrickchin.puptime
+---
+- stopApp
+- launchApp:
+    permissions: {}
+- extendedWaitUntil:
+    visible: {id: screen.today}
+    timeout: 60000
