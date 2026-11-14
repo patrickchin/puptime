@@ -47,7 +47,7 @@ const temporaryDevices=[];
 const requests=new Set(),restoreNative=[],requestCounts={enroll:0,push:0};
 // Backend results can be deliberately withheld. Only the native SQLite ack
 // assertion below establishes that the SDK persisted a received result.
-const wireAccepted=[],wirePages=[],wirePushes=[],receipts=[];
+const wireAccepted=[],wirePages=[],wirePushes=[],receipts=[],changeSockets=new Set();
 let fault='online',activeForwarded=0,wireParseErrors=0;
 let certificate;
 const codes=new Set(),checks=[];
@@ -173,7 +173,10 @@ async function until(ready,message,timeout=45000){
  while(Date.now()<deadline){if(await ready())return;await new Promise(done=>setTimeout(done,200));}
  assert.fail(message);
 }
-async function transport(mode){fault=mode;await until(()=>activeForwarded===0,'Settle prior local proxy requests before capturing a transition.');}
+async function transport(mode){fault=mode;if(mode==='offline')for(const socket of changeSockets)socket.destroy();await until(()=>activeForwarded===0,'Settle prior local proxy requests before capturing a transition.');}
+async function inspectSession(sessionCookie){
+ return new Promise((resolveSession,reject)=>{const req=request('http://127.0.0.1:'+backPort+'/api/account',{headers:{cookie:sessionCookie}},response=>{let body='';response.on('data',part=>{body+=part;});response.on('end',()=>{try{resolveSession({status:response.statusCode,body:JSON.parse(body)});}catch(error){reject(error);}});});req.on('error',reject);req.setTimeout(15000,()=>req.destroy(new Error('Bound the synthetic session inspection.')));req.end();});
+}
 function drainReceipt(before,acceptedStart,pageStart){
  assert.equal(wireParseErrors,0,'Every captured sync response must be readable.');
  const pending=new Set(before.tables.local_sync_outbox.map(row=>row.operation_id)),accepted=new Map();
@@ -207,7 +210,7 @@ async function verifyOfflineLifecycle(){
  await transport('offline');await flow('add-logs',{BATCHES:'1',EXPECTED_COUNT:'21'});await until(()=>snapshot().pending===3,'Capture unsent changes before pending logout.');
  const beforeCancel=snapshot(),cloudBefore=await remote({inspectBehindFault:true});
  await flow('sign-out-pending',{ACTION:'cancel',EXPECTED_PENDING:'3'});assertNativeTransition(beforeCancel.tables,snapshot().tables);assert.deepEqual(await remote({inspectBehindFault:true}),cloudBefore);
- await transport('push-offline');await flow('sign-out-pending',{ACTION:'confirm',EXPECTED_PENDING:'3'});assertNativeDetached(beforeCancel.tables,snapshot().tables);assert.deepEqual(snapshot().events,beforeCancel.events);
+ await transport('push-offline');const oldSession=cookie;await flow('sign-out-pending',{ACTION:'confirm',EXPECTED_PENDING:'3'});assertNativeDetached(beforeCancel.tables,snapshot().tables);assert.deepEqual(snapshot().events,beforeCancel.events);assert.equal((await inspectSession(oldSession)).status,401,'The real backend must invalidate the old native SDK session when online logout succeeds.');
  await transport('online');await signIn();await flow('enable',{EXPECTED_COUNT:'21'});assert.deepEqual(snapshot().events,beforeCancel.events);assert.equal(snapshot().pending,0);await assertCloud(beforeCancel.events);
  checks.push('Cancelling logout with three unsent writes preserves every table and remote event; explicit logout detaches only expected association rows, keeps all21 logs, and same-account rejoin uploads the missing history without rewriting existing cloud records.');
 }
@@ -310,10 +313,12 @@ try{
   proxy=secureServer({key:readFileSync(keyPath),cert:Buffer.concat([readFileSync(certPath),certificate])},forward);
   proxy.on('tlsClientError',error=>writeFileSync(join(output,'fixture-tls-error.txt'),error.message));
   proxy.on('upgrade',(req,socket,head)=>{
+    if(fault==='offline'){socket.destroy();return;}
+    changeSockets.add(socket);socket.once('close',()=>changeSockets.delete(socket));
     const upstream=connect(backPort,'127.0.0.1',()=>{
       upstream.write(`${req.method} ${req.url} HTTP/1.1\r\n${Object.entries({...req.headers,host:'127.0.0.1:'+backPort}).map(([key,value])=>`${key}: ${value}`).join('\r\n')}\r\n\r\n`);
       if(head.length)upstream.write(head);socket.pipe(upstream).pipe(socket);
-    });upstream.on('error',()=>socket.destroy());socket.on('error',()=>upstream.destroy());
+    });changeSockets.add(upstream);upstream.once('close',()=>changeSockets.delete(upstream));upstream.on('error',()=>socket.destroy());socket.on('error',()=>upstream.destroy());
   });
   await new Promise(resolveProxy=>proxy.listen(frontPort,'127.0.0.1',resolveProxy));
   for(const file of readdirSync(join(persist,'v3/d1'),{recursive:true}).filter(file=>String(file).endsWith('.sqlite'))){
@@ -415,6 +420,7 @@ try{
   writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',checks,receipts,scope:android?'Android Debug native host with normal embedded release JS and isolated local HTTPS Better Auth/D1/SQLite DO; actual native email SDK and Keystore. Its temporary CA is trusted only in the ignored Debug source set, restored after the run. Production onboarding is tested separately in the Release APK. No real email, production account, session injection or mocked sync.':'Release bundle and actual native email SDK with isolated local HTTPS Better Auth/D1/SQLite DO. Simulator trusts the fixture certificate. No real email, production account, session injection or mocked sync.'},null,2)+'\n');
   console.log('PASS '+(offline?'offline writes, replay and pending logout':deleting?'native account deletion':comparing?'named puppy comparison':onboardingSignIn?'welcome sign-in and session recovery':android?'guest account preservation and empty-database recovery':'guest account preservation and inspected empty-device recovery')+': '+output);
 }finally{
+  for(const socket of changeSockets)socket.destroy();
   auth?.close();proxy?.close();for(const child of [worker])if(child?.pid)try{process.kill(-child.pid,'SIGTERM');}catch{}
   if(android)try{adb('reverse','--remove','tcp:'+frontPort);}catch{}
   for(const [path,original] of restoreNative.reverse())if(original===null)rmSync(path,{force:true});else writeFileSync(path,original);
