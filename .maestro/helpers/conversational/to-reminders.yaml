@@ -33,9 +33,30 @@ name: Skip optional answers to reminder setup
     id: preview.poopTimes
 - assertNotVisible:
     id: preview.poopMealTime.0
-- waitForAnimationToEnd
-- tapOn:
-    id: preview.skip
+# A changed hierarchy did not prove arrival in the failed hosted run. Retry
+# only this source/target transition, at most once plus two retries.
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: preview.poopTimes
+          commands:
+            - waitForAnimationToEnd
+            - runFlow:
+                when:
+                  notVisible:
+                    id: preview.planTimeline
+                commands:
+                  - assertVisible:
+                      id: preview.poopTimes
+                  - tapOn:
+                      id: preview.skip
+                      text: ^Skip for now$
+                      enabled: true
+      - assertVisible:
+          id: preview.planTimeline
 - assertVisible:
     id: preview.planTimeline
 - waitForAnimationToEnd
