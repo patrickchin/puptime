@@ -76,6 +76,16 @@ Android discovery setup uses a best-effort ERR trap to call the existing CLI's
 It neither interprets raw command output nor guesses the cause. The trap always
 exits with the original nonzero setup status, including if metadata writing
 fails. The fixed metadata upload remains separate from public notice bodies.
+If reached, the existing Gradle collector adds only a fixed root-binding,
+task-registration, runtime-resolution or artifact-collection phase and a closed
+public/base Throwable class. It reads no exception message or stack and always
+rethrows the same Throwable; a failed/outside-workspace metadata write is ignored.
+The shell writer retains this context only after exact schema, source and enum
+validation, then reconstructs the finite report. Failures before these callbacks
+or during other Gradle/plugin configuration still have only the generic setup
+phase; absence of collector context is not evidence the collector caused them.
+No listener, service, configuration-cache setting, resolution or task gate is added.
+
 This uses Gradle's public [root project](https://docs.gradle.org/current/javadoc/org/gradle/api/invocation/Gradle.html#getRootProject())
 and [project directory](https://docs.gradle.org/current/javadoc/org/gradle/api/Project.html#getProjectDir()) APIs.
 The source-only root guard regression executes this actual init script through
@@ -162,7 +172,7 @@ component ID. This is a technical generated-source mapping, not reviewed notice
 coverage; the component ledger remains empty. Other virtual IDs are not accepted
 by a NUL/path wildcard. Final native files not identified from resolved AARs require an exact
 platform/path `packagedNative` mapping with covered `components` and a pinned
-`review` reference. These mappings are intentionally empty until discovery.
+`review` reference. Packaged-native mappings remain empty until reviewed discovery.
 
 Metro inputs are selected files, not every declared or installed package. Nested
 packages have their own licence boundary. CocoaPods inputs include resolved pod

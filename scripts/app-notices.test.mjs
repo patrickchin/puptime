@@ -271,3 +271,18 @@ test('virtual provider mapping rejects modified bytes, wrong path/owner/version 
   assert.throws(()=>capturedSource(root,unknown,{generatedSources:{[unknown]:record}}),'An arbitrary virtual ID cannot reuse an allowed provider.');
  }
 }));
+
+test('setup failure CLI retains only matching finite Gradle collector context and strips every untrusted record',()=>fixture(({root,file})=>{
+ const git=(...args)=>execFileSync('git',['-c','core.hooksPath=/dev/null','-c','commit.gpgsign=false',...args],{cwd:root,stdio:'pipe'});
+ file('fixture.txt','synthetic');git('init','--quiet');git('add','.');git('-c','user.name=Notice test','-c','user.email=notice-test@example.invalid','commit','--quiet','-m','Synthetic collector metadata');
+ const sourceCommit=git('rev-parse','HEAD').toString().trim(),path='build/notices/android/failure.json';
+ const generic={schema:1,status:'INCOMPLETE',complete:false,sourceCommit,platform:'android',stage:'setup',setup:{phase:'gradle-resolution',errorCategory:'command-failed'}};
+ const known={...generic,setup:{...generic.setup,collector:{phase:'runtime-resolution',errorClass:'ResolveException'}}};
+ const cli=phase=>spawnSync(process.execPath,[fileURLToPath(new URL('./capture-app-notices.mjs',import.meta.url)),'setup-failure','android','--phase',phase],{cwd:root,encoding:'utf8',timeout:30000});
+ file(path,known);assert.equal(cli('gradle-resolution').status,0);assert.deepEqual(JSON.parse(readFileSync(join(root,path))),known);
+ for(const changed of [{...known,sourceCommit:'b'.repeat(40)},{...known,privateMessage:'PRIVATE_BODY'},{...known,setup:{...known.setup,collector:{phase:'PRIVATE_PHASE',errorClass:'ResolveException'}}},{...known,setup:{...known.setup,collector:{phase:'runtime-resolution',errorClass:'PRIVATE_CLASS'}}},'PRIVATE_BODY'.repeat(500)]){
+  file(path,changed);const result=cli('gradle-resolution');assert.equal(result.status,0);
+  const value=JSON.parse(readFileSync(join(root,path)));assert.deepEqual(value,generic);assert.ok(!(JSON.stringify(value)+result.stdout+result.stderr).includes('PRIVATE'));
+ }
+ file(path,known);assert.equal(cli('prebuild').status,0);assert.deepEqual(JSON.parse(readFileSync(join(root,path))),{...generic,setup:{phase:'prebuild',errorCategory:'command-failed'}});
+}));

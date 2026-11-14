@@ -4,24 +4,53 @@ import java.security.MessageDigest
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.component.ProjectComponentIdentifier
 
+// Diagnostic output is optional and finite. Never serialize Throwable text.
+def recordNoticeFailure = { File mainRoot, String phase, Throwable failure ->
+    try {
+        def workspaceValue = gradle.providers.environmentVariable('GITHUB_WORKSPACE').orNull
+        def source = gradle.providers.environmentVariable('GITHUB_SHA').orNull
+        if (!workspaceValue || !(source ==~ /[a-f0-9]{40}/) || mainRoot == null) return
+        def workspace = new File(workspaceValue).canonicalFile
+        if (mainRoot != new File(workspace, 'android').canonicalFile) return
+        def output = new File(workspace, 'build/notices/android/failure.json')
+        if (output.canonicalFile != output.absoluteFile) return
+        def kind = failure instanceof org.gradle.api.artifacts.ResolveException ? 'ResolveException' : failure instanceof GradleException ? 'GradleException' : failure instanceof IOException ? 'IOException' : failure instanceof IllegalArgumentException ? 'IllegalArgumentException' : failure instanceof IllegalStateException ? 'IllegalStateException' : failure instanceof SecurityException ? 'SecurityException' : failure instanceof Error ? 'Error' : 'Throwable'
+        output.parentFile.mkdirs()
+        output.text = JsonOutput.toJson([schema: 1, status: 'INCOMPLETE', complete: false, sourceCommit: source, platform: 'android', stage: 'setup', setup: [phase: 'gradle-resolution', errorCategory: 'command-failed', collector: [phase: phase, errorClass: kind]]])
+    } catch (Throwable ignored) { }
+}
+
 gradle.projectsEvaluated {
+    File mainRoot
+    def reported = Collections.newSetFromMap(new IdentityHashMap<Throwable, Boolean>())
+    def observed = { String phase, Closure action ->
+        try { return action.call() } catch (Throwable failure) { if (reported.add(failure)) recordNoticeFailure(mainRoot, phase, failure); throw failure }
+    }
+    def app = observed('root-binding') {
     // Init scripts also observe included plugin builds. Bind the intended main
     // directory explicitly; a missing :app on THAT build still fails closed.
     def invocation = gradle
     while (invocation.parent != null) invocation = invocation.parent
     def requestedRoot = invocation.startParameter.projectProperties['noticeMainProjectRoot']
     if (!requestedRoot || !new File(requestedRoot.toString()).isAbsolute()) throw new GradleException('Explicit absolute main Android root required')
-    def mainRoot = new File(requestedRoot.toString()).canonicalFile
+    mainRoot = new File(requestedRoot.toString()).canonicalFile
     if (!mainRoot.isDirectory()) throw new GradleException('Main Android root does not exist')
-    if (gradle.rootProject.projectDir.canonicalFile != mainRoot) return
-    def app = gradle.rootProject.findProject(':app')
-    if (app == null) throw new GradleException('Missing Android app project')
-    app.tasks.register('writeNoticeRuntimeInputs') {
+    if (gradle.rootProject.projectDir.canonicalFile != mainRoot) return null
+    def selectedApp = gradle.rootProject.findProject(':app')
+    if (selectedApp == null) throw new GradleException('Missing Android app project')
+    return selectedApp
+    }
+    if (app == null) return
+    observed('task-registration') { app.tasks.register('writeNoticeRuntimeInputs') {
         doLast {
-            def requested = app.findProperty('noticeInputsOutput')
+            def requested, configuration, artifacts
+            observed('runtime-resolution') {
+            requested = app.findProperty('noticeInputsOutput')
             if (!requested) throw new GradleException('Explicit private notice output required')
-            def configuration = app.configurations.getByName('releaseRuntimeClasspath')
-            def artifacts = configuration.resolvedConfiguration.resolvedArtifacts
+            configuration = app.configurations.getByName('releaseRuntimeClasspath')
+            artifacts = configuration.resolvedConfiguration.resolvedArtifacts
+            }
+            observed('artifact-collection') {
             def metadataOnly = []
             def components = configuration.incoming.resolutionResult.allComponents.collect { component ->
                 def id = component.id
@@ -53,6 +82,7 @@ gradle.projectsEvaluated {
             def output = new File(requested.toString())
             output.parentFile.mkdirs()
             output.text = JsonOutput.toJson([schema: 1, configuration: 'releaseRuntimeClasspath', components: components, metadataOnly: metadataOnly])
+            }
         }
-    }
+    } }
 }

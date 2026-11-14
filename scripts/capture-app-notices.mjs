@@ -112,6 +112,18 @@ function finalNoticeProof(root,platform,seal,capture,payload,options){
  return {schema:1,scope:'final-artifact-verification',status:'READY',sourceCommit:seal.sourceCommit,platform,payloadSHA256:digest(payload),archiveSHA256:digest(readFileSync(options['--archive'])),bundleSHA256:archive.bundle.sha256,sourceMapSHA256:digest(readFileSync(options['--source-map'])),mapEvidence,native,inventory:{observedComponents,resolvedBuildOnly,independentFinalComponentInventory:false,postPackageResolvedInputReinspection:true,postBuildResolutionRegenerated:false},complete:true};
 }
 
+function retainedCollectorFailure(path,sourceCommit,phase){
+ try{
+  if(phase!=='gradle-resolution'||!existsSync(path)||statSync(path).size>4096)return;
+  const value=JSON.parse(noticeText(readFileSync(path),4096)),setup=value.setup,collector=setup?.collector;
+  assert.deepEqual(Object.keys(value).sort(),['schema','status','complete','sourceCommit','platform','stage','setup'].sort());
+  assert.equal(value.schema,1);assert.equal(value.status,'INCOMPLETE');assert.equal(value.complete,false);assert.equal(value.sourceCommit,sourceCommit);assert.equal(value.platform,'android');assert.equal(value.stage,'setup');
+  assert.deepEqual(Object.keys(setup).sort(),['phase','errorCategory','collector'].sort());assert.equal(setup.phase,phase);assert.equal(setup.errorCategory,'command-failed');
+  assert.deepEqual(Object.keys(collector).sort(),['phase','errorClass'].sort());assert.ok(['root-binding','task-registration','runtime-resolution','artifact-collection'].includes(collector.phase));assert.ok(['ResolveException','GradleException','IOException','IllegalArgumentException','IllegalStateException','SecurityException','Error','Throwable'].includes(collector.errorClass));
+  return {phase:collector.phase,errorClass:collector.errorClass};
+ }catch{return;}
+}
+
 export async function main(args=process.argv.slice(2)){
  const [mode,platform,...tail]=args;assert.ok(['collect','seal','verify','setup-failure'].includes(mode)&&['ios','android'].includes(platform),'Use collect|seal|verify ios|android, or setup-failure android.');
  const options={};assert.equal(tail.length%2,0);
@@ -119,7 +131,8 @@ export async function main(args=process.argv.slice(2)){
  const root=realpathSync(process.cwd()),out=outputDirectory(root,platform),sourceCommit=git(root,'rev-parse','HEAD').toString().trim();let stage='metro';
  if(mode==='setup-failure'){
   assert.equal(platform,'android');assert.deepEqual(Object.keys(options),['--phase']);assert.ok(['prebuild','gradle-resolution'].includes(options['--phase']));
-  write(join(out,'failure.json'),{schema:1,status:'INCOMPLETE',complete:false,sourceCommit,platform,stage:'setup',setup:{phase:options['--phase'],errorCategory:'command-failed'}});
+  const collector=retainedCollectorFailure(join(out,'failure.json'),sourceCommit,options['--phase']);
+  write(join(out,'failure.json'),{schema:1,status:'INCOMPLETE',complete:false,sourceCommit,platform,stage:'setup',setup:{phase:options['--phase'],errorCategory:'command-failed',...(collector?{collector}:{})}});
   console.error('Notices setup failed; finite metadata only, no collection or qualification.');return;
  }
  assert.ok(!Object.hasOwn(options,'--phase'));
