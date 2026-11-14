@@ -5,9 +5,9 @@ import {join} from 'node:path';
 const unknown=()=>({status:'UNKNOWN',kind:'unknown',targetId:null,sequence:0});
 // Fixed command kinds/targets only. The structured file stays private; do not
 // inspect text, input, evaluated commands, errors, paths or stack traces here.
-const commandKinds={assertConditionCommand:'assert',tapOnElement:'tap',scrollUntilVisibleCommand:'scroll',inputTextCommand:'input',launchAppCommand:'launch',stopAppCommand:'stop',waitForAnimationToEndCommand:'animation',takeScreenshotCommand:'screenshot',eraseTextCommand:'erase',backPressCommand:'back',applyConfigurationCommand:'configuration',defineVariablesCommand:'variables'};
+const commandKinds={assertConditionCommand:'assert',tapOnElement:'tap',scrollUntilVisible:'scroll',inputTextCommand:'input',launchAppCommand:'launch',stopAppCommand:'stop',waitForAnimationToEndCommand:'animation',takeScreenshotCommand:'screenshot',eraseTextCommand:'erase',backPressCommand:'back',applyConfigurationCommand:'configuration',defineVariablesCommand:'variables'};
 const commandContainers=new Set(['runFlowCommand','repeatCommand','retryCommand']);
-const commandTargets=new Set(['screen.today','nav.open','nav.close','nav.settings','screen.settings','settings.theme.open','appearance.theme.light','appearance.theme.dark','appearance.theme.system','appearance.modal','settings.search','settings.fontLicenses.open','screen.fontLicenses','fontLicenses.body','fontLicenses.red-hat','fontLicenses.material-community-icons','fontLicenses.apache-2','fontLicenses.expo-vector-icons','fontLicenses.react-native-vector-icons','fontLicenses.close','settings.search.clear','settings.back','account.email.input','account.code.input','account.sendCode','account.verify','account.refresh','account.error','account.identity','account.signOut']);
+const commandTargets=new Set(['screen.today','nav.open','nav.close','nav.settings','screen.settings','settings.theme.open','appearance.theme.light','appearance.theme.dark','appearance.theme.system','appearance.modal','settings.search','settings.fontLicenses.open','screen.fontLicenses','fontLicenses.body','fontLicenses.red-hat','fontLicenses.material-community-icons','fontLicenses.apache-2','fontLicenses.expo-vector-icons','fontLicenses.react-native-vector-icons','fontLicenses.close','settings.search.clear','settings.back','screen.account','nav.account','account.enable','account.status','account.local.count','account.combine.dialog','account.combine.confirm','account.email.input','account.code.input','account.sendCode','account.verify','account.refresh','account.error','account.identity','account.signOut']);
 export function nativeCommandState(records){
  if(!Array.isArray(records)||records.length>10000)return unknown();
  const candidates=records.map(record=>{
@@ -19,7 +19,7 @@ export function nativeCommandState(records){
  const {status,command,key,sequence}=candidates[0];
  if(!Object.hasOwn(commandKinds,key)||!Number.isSafeInteger(sequence)||sequence<0)return unknown();
  const value=command[key];let id;
- if(key==='tapOnElement'||key==='scrollUntilVisibleCommand')id=value?.selector?.idRegex;
+ if(key==='tapOnElement'||key==='scrollUntilVisible')id=value?.selector?.idRegex;
  if(key==='assertConditionCommand'){
   const condition=value?.condition,selectors=[condition?.visible,condition?.notVisible].filter(value=>value!==undefined);
   if(selectors.length===1)id=selectors[0]?.idRegex;
