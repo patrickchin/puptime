@@ -86,7 +86,8 @@ jobs:
           done
           test -x "$ANDROID_HOME/emulator/emulator"
           printf 'Android executable: %s\n' "$ANDROID_HOME/emulator/emulator"
-          puptime_dependency_report="$PUPTIME_SIGNING_PRIVATE/host-dependencies.txt"
+          # The launcher may supply bundled SDK library paths; ldd is diagnostic only.
+          puptime_dependency_report="$PUPTIME_SIGNING_PRIVATE/loader-dependencies.txt"
           : > "$puptime_dependency_report"
           puptime_loader_failed=0
           for puptime_binary in "$ANDROID_HOME/emulator/emulator" "$ANDROID_HOME/emulator/qemu/linux-x86_64/qemu-system-x86_64"; do
@@ -96,12 +97,11 @@ jobs:
           done
           puptime_missing_libraries=$(awk '$2=="=>" && $3=="not" && $4=="found" {print $1}' "$puptime_dependency_report" | sort -u)
           if [[ -n "$puptime_missing_libraries" || "$puptime_loader_failed" != 0 ]]; then
-            printf 'Missing emulator host libraries:\n%s\n' "$puptime_missing_libraries"
+            printf 'Unresolved emulator ELF libraries (diagnostic; launcher may supply SDK paths):\n%s\n' "$puptime_missing_libraries"
             if [[ "$puptime_loader_failed" != 0 ]]; then
-              printf 'Host dependency inspection failed:\n'
+              printf 'ELF inspection diagnostic; launcher and boot checks remain mandatory:\n'
               sed -n '1,40p' "$puptime_dependency_report"
             fi
-            exit 1
           fi
           timeout 30 emulator -version | sed -n '1,4p'
           export ANDROID_AVD_HOME="$PUPTIME_SIGNING_PRIVATE/avd"
