@@ -13,6 +13,18 @@ const oldCert='fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c'
 const keySHA='221e0a3106aa4c3ccc154e0a418b55020b3f9ea6e84f92e8749cd9e2f39f5e58';
 const caps={'installed data':true,'shared UID':false,permission:false,rollback:false,auth:false};
 const hash=value=>createHash('sha256').update(value).digest('hex');
+// These Android widget files/lock are identical in the original125 source and
+// the reviewed candidate. English accessibility labels do not follow app locale.
+// RNWidgetProvider persists only WIDGET_SIZES width/height; palette is rendered
+// into RemoteViews/derived images, not SharedPreferences. Keep every pref strict.
+const widgetSourceBlobs={
+ 'src/widgets/QuickLogWidget.android.tsx':'3bc44bcf181856800d23afa68f354c76c994e9a7',
+ 'src/widgets/sync.android.tsx':'de2ba1d976628045c7d04eac04223bfa0b6e7547',
+ 'src/widget-task-handler.tsx':'163f9b022061fc878858c903b3c7e1c39adf235b',
+ 'package-lock.json':'8f50766ef2f6e7c671d02b2c959147e124e94c9c',
+};
+function assertWidgetSource(){for(const [name,blob] of Object.entries(widgetSourceBlobs)){const bytes=readFileSync(name);assert.equal(createHash('sha1').update('blob '+bytes.length+'\0').update(bytes).digest('hex'),blob,'Re-review widget serialization/selectors if '+name+' changes.');}}
+
 async function fileHash(path){const digest=createHash('sha256');for await(const chunk of createReadStream(path))digest.update(chunk);return digest.digest('hex');}
 function validateRun(run,jobs,repo,source,id){
  assert.equal(run.id,Number(id));assert.equal(run.repository.full_name,repo);assert.equal(run.head_repository.full_name,repo);
@@ -47,6 +59,7 @@ function widgetBinding(text){
  assert.ok(id&&host&&provider);return {id,host,provider};
 }
 function selfCheck(){
+ assertWidgetSource();
  const repo='example/qa',source='a'.repeat(40),run={id:1,repository:{full_name:repo},head_repository:{full_name:repo},head_sha:source,path:'.github/workflows/android-apk.yml',event:'workflow_dispatch',status:'completed',conclusion:'success'},jobs=[{name:'build',conclusion:'success'},{name:'publish',conclusion:'skipped'}];
  validateRun(run,jobs,repo,source,'1');for(const patch of [{head_sha:'b'.repeat(40)},{event:'push'},{repository:{full_name:'other/repo'}},{path:'different.yml'},{conclusion:'failure'}])assert.throws(()=>validateRun({...run,...patch},jobs,repo,source,'1'));
  assert.throws(()=>validateRun(run,[jobs[0],{name:'publish',conclusion:'success'}],repo,source,'1'));
@@ -65,7 +78,7 @@ function selfCheck(){
 const [mode]=process.argv.slice(2);if(mode==='--self-check'){selfCheck();process.exit(0);}
 assert.ok(['--preflight','--exercise'].includes(mode));assert.equal(process.env.GITHUB_ACTIONS,'true');assert.equal(process.env.RUNNER_OS,'Linux');process.umask(0o077);
 const root=resolve(process.env.PUPTIME_SIGNING_PRIVATE??'');assert.ok(process.env.RUNNER_TEMP&&root.startsWith(resolve(process.env.RUNNER_TEMP)+'/puptime-signing-'));
-const source=process.env.PUPTIME_EXPECTED_SOURCE;assert.match(source??'',/^[a-f0-9]{40}$/);assert.equal(process.env.GITHUB_SHA,source,'Freeze driver and artifact source together.');
+const source=process.env.PUPTIME_EXPECTED_SOURCE;assert.match(source??'',/^[a-f0-9]{40}$/);assert.equal(process.env.GITHUB_SHA,source,'Freeze driver and artifact source together.');assertWidgetSource();
 const repo=process.env.GITHUB_REPOSITORY;assert.equal(repo,'patrickchin/puptime');
 function command(binary,args,{ok=[0],binaryOutput=false,timeout=120000}={}){
  const result=spawnSync(binary,args,{encoding:binaryOutput?undefined:'utf8',timeout,maxBuffer:256*1024*1024,stdio:['ignore','pipe','pipe']});
@@ -161,11 +174,11 @@ await install(join(root,'original125.apk'));launch();
 flow('old-ui-seed',`- runFlow: ${JSON.stringify(resolve('.maestro/helpers/skip-onboarding.yaml'))}\n- assertVisible: {id: screen.today}\n- repeat:\n    times: 4\n    commands:\n      - tapOn: {id: quick.pee}\n      - tapOn: {id: quick.poop}\n      - tapOn: {id: quick.meal}\n- tapOn: {id: event.meal.edit, index: 0}\n${scroll('editor.note.input')+tap('editor.note.input')}- inputText: Signing QA note\n- pressKey: Back\n- scrollUntilVisible:\n    element: {id: editor.close}\n    direction: UP\n${tap('editor.close')+settings}${tap('settings.widget.open')+scroll('settings.widget.action.walk')+tap('settings.widget.action.walk')+tap('settings.widget.close')+tap('settings.theme.open')+tap('appearance.theme.dark')+tap('settings.language.open')+tap('appearance.language.es')}- stopApp\n`);
 launch();
 flow('old-reminder-lead','- extendedWaitUntil:\n    visible: {id: screen.today}\n    timeout: 90000\n'+settings+scroll('settings.notifications.open')+tap('settings.notifications.open')+scroll('settings.notifications.lead.15')+tap('settings.notifications.lead.15')+'- pressKey: Home\n');
-flow('bind-real-launcher-widget',`- longPressOn:\n    id: '.*:id/workspace'\n- tapOn: '^Widgets$'\n- scrollUntilVisible:\n    element: {text: '^Puptime$'}\n    direction: DOWN\n- tapOn: '^Puptime$'\n- tapOn: '^Puptime Quick Log$'\n- tapOn: '^Add$'\n- extendedWaitUntil:\n    visible: 'Log pee,.*'\n    timeout: 30000\n- tapOn: 'Log pee,.*'\n`);
+flow('bind-real-launcher-widget',`- longPressOn:\n    id: '.*:id/workspace'\n- tapOn: '^Widgets$'\n- scrollUntilVisible:\n    element: {text: '^Puptime$'}\n    direction: DOWN\n- tapOn: '^Puptime$'\n- tapOn: '^Puptime Quick Log$'\n- tapOn: '^Add$'\n- extendedWaitUntil:\n    visible: '^Log pee, last logged .+$'\n    timeout: 30000\n- tapOn: '^Log pee, last logged .+$'\n`);
 await waitWidgetCount(1);const before=snapshot('old-created');assert.equal(before.tables.events.length,13);assert.ok(before.tables.events.some(row=>row.note==='Signing QA note'));assert.equal(before.tables.events.filter(row=>row.source==='widget').length,1);assert.deepEqual(before.tables.local_sync_owner,[]);assert.deepEqual(before.tables.local_sync_outbox,[]);
 assert.equal(before.tables.metadata.find(row=>row.key==='backup_app_version')?.value,'1.12.5/1012005');const prefs=Object.fromEntries(before.tables.settings.map(row=>[row.key,row.value]));assert.equal(prefs['puptime.theme.v1'],'dark');assert.equal(prefs['puptime.language.v1'],'es');assert.ok(JSON.parse(prefs['puptime.widgetActions.v1']).includes('walk'));assert.equal(JSON.parse(prefs['puptime.notificationPreferences.v1']).reminderLeadMinutes,15);pass('original125-created-state',before);
 rejectUpdate(join(root,'plain6.apk'),before,'plain-B-rejected');await install(join(root,'bridge6.apk'),true);equal(before,snapshot('bridge-before-launch'));launch();flow('bridge-visible','- extendedWaitUntil:\n    visible: {id: screen.today}\n    timeout: 90000\n');const bridge=snapshot('bridge-launched');launched(before,bridge,'1.12.6/1012006');
-launch();flow('bridge-cold','- extendedWaitUntil:\n    visible: {id: screen.today}\n    timeout: 90000\n- pressKey: Home\n- assertVisible: Log pee,.*\n- tapOn: Log pee,.*\n');await waitWidgetCount(2);const widget=snapshot('bridge-widget');
+launch();flow('bridge-cold','- extendedWaitUntil:\n    visible: {id: screen.today}\n    timeout: 90000\n- pressKey: Home\n- assertVisible: ^Log pee, last logged .+$\n- tapOn: ^Log pee, last logged .+$\n');await waitWidgetCount(2);const widget=snapshot('bridge-widget');
 const added=widget.tables.events.filter(row=>!bridge.tables.events.some(old=>old.id===row.id));assert.equal(added.length,1);assert.equal(added[0].type,'pee');assert.equal(added[0].source,'widget');const revisions=widget.tables.local_revisions.slice(bridge.tables.local_revisions.length);assert.equal(revisions.length,1);assert.equal(revisions[0].local_id,added[0].id);assert.equal(revisions[0].kind,'event');assert.equal(revisions[0].sequence,Math.max(0,...bridge.tables.local_revisions.map(row=>row.sequence))+1);assert.equal(revisions[0].pet_id,added[0].pet_id);assert.equal(revisions[0].source,'local');assert.ok(Number.isSafeInteger(revisions[0].created_at)&&revisions[0].created_at>=added[0].at);assert.equal(revisions[0].before_data,null);assert.deepEqual(JSON.parse(revisions[0].after_data),eventDataFromSql(added[0]));
 assertNativeTransition(bridge.tables,widget.tables,{events:[...bridge.tables.events,added[0]],local_revisions:[...bridge.tables.local_revisions,revisions[0]],sqlite_sequence:bridge.tables.sqlite_sequence.map(row=>row.name==='local_revisions'?{...row,seq:row.seq+1}:row)});assert.equal(widget.uid,bridge.uid);assert.deepEqual(widget.widgets,bridge.widgets);protectedFiles(bridge.files,widget.files,'1.12.6/1012006',bridge.tables.events,eventDataFromSql,bridge.tables.puppies[0].name);pass('bridge-and-existing-widget-save',widget);
 rejectUpdate(join(root,'later/input.apk'),widget,'higher-A-rollback-rejected');await install(join(root,'plain7.apk'),true);equal(widget,snapshot('later-before-launch'));launch();flow('later-visible','- extendedWaitUntil:\n    visible: {id: screen.today}\n    timeout: 90000\n');const later=snapshot('later-launched');launched(widget,later,'1.12.7/1012007');launch();flow('later-cold','- extendedWaitUntil:\n    visible: {id: screen.today}\n    timeout: 90000\n');equal(later,snapshot('later-cold'));pass('later-B-update-and-cold-restart',later);
