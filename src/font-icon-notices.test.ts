@@ -7,7 +7,8 @@ const root=new URL('../',import.meta.url);
 const read=(path:string)=>readFileSync(new URL(path,root));
 const hash=(value:Uint8Array|string)=>createHash('sha256').update(value).digest('hex');
 const provenance=JSON.parse(read('scripts/font-icon-provenance.json').toString());
-const notices=JSON.parse(read('src/font-icon-notices.json').toString()) as {id:string;body:string;androidOnly?:boolean}[];
+const notices=(JSON.parse(read('assets/notices/third_party_notices.json').toString()) as {id:string;body:string;androidOnly?:boolean}[])
+ .filter(section=>Object.hasOwn(provenance.notices,section.id));
 
 test('font bytes, glyphs, pinned dependencies and verbatim license copies require deliberate notice review on change',()=>{
  const lock=JSON.parse(read('package-lock.json').toString());

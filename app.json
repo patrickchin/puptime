@@ -97,6 +97,12 @@
         }
       ],
       "expo-font",
+      [
+        "expo-asset",
+        {
+          "assets": ["./assets/notices/third_party_notices.json"]
+        }
+      ],
       "./plugins/withAndroidWorkManager",
       "expo-sharing",
       [

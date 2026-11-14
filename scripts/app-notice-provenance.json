@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "scope": "INCOMPLETE preparation only. Collect actual Metro/native inputs and commit reviewed platform-union text and mappings before sealing. Empty mappings deliberately fail strict verification; discovery never writes a release payload.",
+  "components": {},
+  "generatedSources": {},
+  "packagedNative": {"ios": {}, "android": {}},
+  "knownLicenseSources": [
+    {"component":"react-native@0.86.3","source":"node_modules/react-native/LICENSE","sha256":"da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93","upstream":"https://github.com/react/react-native/blob/v0.86.3/LICENSE"},
+    {"component":"expo@57.0.24","source":"node_modules/expo/LICENSE","sha256":"fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4","upstream":"https://github.com/expo/expo/blob/sdk-57/LICENSE"},
+    {"component":"posthog-react-native@4.84.1","source":"node_modules/posthog-react-native/LICENSE","sha256":"d3fb92ac01f0bef4078f89aac9f20f76da3383ad45becf6204abdf5495f43f8f","note":"Actual LICENSE includes Apache/Mixpanel text despite MIT package metadata; preserve actual files and review vendored sources."},
+    {"component":"better-auth@1.7.12","source":"node_modules/better-auth/LICENSE.md","sha256":"7a07f7d9085cb3157e4377d944988c9712933141b0f7201955ceccfac92abde4"}
+  ],
+  "retainedAndroidResources": {
+    "META-INF/androidx/annotation/annotation/LICENSE.txt":"809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0",
+    "META-INF/androidx/collection/collection-ktx/LICENSE.txt":"809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0",
+    "META-INF/androidx/collection/collection/LICENSE.txt":"809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0",
+    "META-INF/androidx/glance/glance-appwidget-external-protobuf/LICENSE.txt":"a01b712fbb30f80b86851468b6fa58e80eab68f69f325e88bbc7ddf47cf1b063",
+    "META-INF/androidx/glance/glance-appwidget-proto/LICENSE.txt":"809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0",
+    "META-INF/androidx/lifecycle/lifecycle-common-java8/LICENSE.txt":"809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0",
+    "META-INF/androidx/lifecycle/lifecycle-common/LICENSE.txt":"809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0",
+    "META-INF/androidx/room/room-common/LICENSE.txt":"809fa1ed21450f59827d1e9aec720bbc4b687434fa22283c6cb5dd82a47ab9c0",
+    "okhttp3/internal/publicsuffix/NOTICE":"8a9c58fbded5ea3474315e4a9824ca8b1486098a1a03e897e0b19419d5e1876a"
+  }
+}

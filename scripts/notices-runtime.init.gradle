@@ -1,0 +1,45 @@
+// Discovery only: resolve selected release inputs, never compile or publish.
+import groovy.json.JsonOutput
+import java.security.MessageDigest
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+import org.gradle.api.artifacts.component.ProjectComponentIdentifier
+
+gradle.projectsEvaluated {
+    def app = gradle.rootProject.findProject(':app')
+    if (app == null) throw new GradleException('Missing Android app project')
+    app.tasks.register('writeNoticeRuntimeInputs') {
+        doLast {
+            def requested = app.findProperty('noticeInputsOutput')
+            if (!requested) throw new GradleException('Explicit private notice output required')
+            def configuration = app.configurations.getByName('releaseRuntimeClasspath')
+            def artifacts = configuration.resolvedConfiguration.resolvedArtifacts
+            def metadataOnly = []
+            def components = configuration.incoming.resolutionResult.allComponents.collect { component ->
+                def id = component.id
+                if (id instanceof ModuleComponentIdentifier) {
+                    def files = artifacts.findAll { it.id.componentIdentifier == id }.collect { artifact ->
+                        def sum = MessageDigest.getInstance('SHA-256')
+                        artifact.file.withInputStream { stream ->
+                            byte[] buffer = new byte[65536]; int count
+                            while ((count = stream.read(buffer)) != -1) sum.update(buffer, 0, count)
+                        }
+                        [file: artifact.file.absolutePath, sha256: sum.digest().encodeHex().toString()]
+                    }
+                    // BOM/constraint metadata contributes no packaged artifact.
+                    if (files.isEmpty()) { metadataOnly.add([group: id.group, name: id.module, version: id.version]); return null }
+                    return [group: id.group, name: id.module, version: id.version, artifacts: files]
+                }
+                if (id instanceof ProjectComponentIdentifier && id.projectPath != ':app') {
+                    def project = gradle.rootProject.findProject(id.projectPath)
+                    if (project == null) throw new GradleException('Unresolved native project input')
+                    return [projectBuildFile: project.buildFile.absolutePath]
+                }
+                if (id instanceof ProjectComponentIdentifier && id.projectPath == ':app') return null
+                throw new GradleException('Unknown release component input')
+            }.findAll { it != null }
+            def output = new File(requested.toString())
+            output.parentFile.mkdirs()
+            output.text = JsonOutput.toJson([schema: 1, configuration: 'releaseRuntimeClasspath', components: components, metadataOnly: metadataOnly])
+        }
+    }
+}
