@@ -12,6 +12,35 @@ import {DatabaseSync} from 'node:sqlite';
 import {nativeSnapshot} from './native-account-evidence.mjs';
 import {createProductionAuthFence} from './production-auth-fence.mjs';
 
+function privateGuestFlow(text){
+ const tap='- tapOn:\n    id: preview.guest\n    enabled: true\n    retryTapIfNoChange: true\n';
+ assert.equal(text.split(tap).length,2,'Patch only the known first historical guest tap.');
+ return text.replace(tap,`- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: preview.welcome
+          commands:
+            - runFlow:
+                when:
+                  notVisible:
+                    id: preview.profile
+                commands:
+                  - tapOn:
+                      id: preview.guest
+                      enabled: true
+                      retryTapIfNoChange: true
+                  - waitForAnimationToEnd:
+                      timeout: 5000
+      - extendedWaitUntil:
+          visible:
+            id: preview.profile
+          timeout: 5000
+`);
+}
+
 const source='aacd58fd0a7102a629b92dbf8813496870aec21c',digest='2e889cd3b6eea1b0ce5b878665a8d259af002a68f54e1f77a3bdf7cf13003865',app='com.patrickchin.puptime';
 const [mode,configFile,hostInput,proofInput,destination]=process.argv.slice(2),compatible=mode==='--prepare-compatible-private';
 assert.ok(['--prepare-private','--prepare-compatible-private'].includes(mode),'Usage: MODE PRIVATE_CONFIG [ORIGINAL_NEWER_OUTER_ZIP INSPECTION_JSON | COMPATIBLE_HOST BUILD_MANIFEST] FRESH_PRIVATE_DIRECTORY');
@@ -67,6 +96,9 @@ async function main(){
  const googleSource=command('git',['show',source+':src/cloud/google-native.ts']),googleClient=googleSource.match(/iosClientId:'([^']+)'/)[1];assert.ok(info.CFBundleURLTypes.some(entry=>entry.CFBundleURLSchemes.includes(googleClient.split('.').reverse().join('.'))));
  const codeFile=compatible?'Puptime.debug.dylib':info.CFBundleExecutable,textSHA=nativeSection(join(original,codeFile),'__text'),capabilitySHA=nativeSection(binary,'__entitlements'),checkout=join(output,'source');mkdirSync(checkout,{mode:0o700});
  command('git',['archive','--format=tar','--output='+join(output,'source.tar'),source]);command('tar',['-xf',join(output,'source.tar'),'-C',checkout]);
+ const guestPath=join(checkout,'.maestro/helpers/conversational/to-reminders.yaml'),guestOriginal=readFileSync(guestPath,'utf8');
+ writeFileSync(guestPath,privateGuestFlow(guestOriginal),{mode:0o600});
+ const guestAutomation={sourceSHA256:createHash('sha256').update(guestOriginal).digest('hex'),preparedSHA256:hash(guestPath),maxAttempts:3,profileRequired:true};
  const authPath=join(checkout,'src/cloud/auth.native.ts'),authOriginal=readFileSync(authPath,'utf8');
  assert.ok(readFileSync(join(checkout,'.env'),'utf8').includes('EXPO_PUBLIC_CLOUD_API_URL='+config.origin));
  const nonce=randomBytes(32).toString('hex');
@@ -139,7 +171,7 @@ export function denyNativeAction(){void fence.then(async value=>{try{value.denyS
  });
  assert.ok(!settled,'No authentication or rejected operation is permitted during preparation.');assert.ok(configReads>0,'Prove the owned app loaded this exact hard-fenced overlay before handoff.');before=snapshot();save(join(output,'native-before-private.json'),before);phase='awaiting-devicehub-confirmation';
  const marker=join(output,'begin-private-handoff');assert.ok(!existsSync(marker),'Confirm DeviceHub only after the private Account view is ready.');
- save(join(output,'ready-private.json'),{status:'ready-awaiting-devicehub-confirmation',handoffMarker:marker,authClockStarted:false,device,source,driverSource:command('git',['rev-parse','HEAD']),nativeHost:provenance,capabilities,googleClient,originalAuthSourceSHA256:createHash('sha256').update(authOriginal).digest('hex'),overlayAuthSourceSHA256:hash(authPath),fenceSourceSHA256:hash(resolve('scripts/production-auth-fence.mjs')),originalJavaScriptSHA256:provenance.javaScriptSHA256,overlayJavaScriptSHA256:hash(join(host,'main.jsbundle')),nativeTextSHA256:textSHA,nativeCapabilitySHA256:capabilitySHA,scope:'Instrumented aacd full app; no authentication started; not original/current release qualification.'});
+ save(join(output,'ready-private.json'),{status:'ready-awaiting-devicehub-confirmation',handoffMarker:marker,authClockStarted:false,device,source,driverSource:command('git',['rev-parse','HEAD']),nativeHost:provenance,capabilities,googleClient,guestAutomation,originalAuthSourceSHA256:createHash('sha256').update(authOriginal).digest('hex'),overlayAuthSourceSHA256:hash(authPath),fenceSourceSHA256:hash(resolve('scripts/production-auth-fence.mjs')),originalJavaScriptSHA256:provenance.javaScriptSHA256,overlayJavaScriptSHA256:hash(join(host,'main.jsbundle')),nativeTextSHA256:textSHA,nativeCapabilitySHA256:capabilitySHA,scope:'Instrumented aacd full app; no authentication started; not original/current release qualification.'});
  console.log('Prepared dedicated simulator and Account view; authentication remains blocked pending private DeviceHub confirmation.');
  while(!settled&&!existsSync(marker))await new Promise(resolveMarker=>setTimeout(resolveMarker,500));
  if(settled)return await completion;

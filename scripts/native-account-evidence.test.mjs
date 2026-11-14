@@ -121,3 +121,23 @@ test('auth failure diagnostics retain readiness categories only, never secrets o
   assert.equal(flags.valueCategory,category);assert.equal(flags.exactExpectedMatch,false);
  }
 });
+
+test('sign-out diagnostics expose only fixed control flags and public confirmation booleans',()=>{
+ const email='private-synthetic@example.invalid',code='739201',secret='private response body '+email+' '+code;
+ const button={attributes:{'resource-id':'account.signOut',enabled:'false',focused:'true',text:'Sign out',value:secret},children:[{attributes:{text:'Sign out'}}]};
+ const absent={titleVisible:false,cancelVisible:false,actionVisible:false};
+ const initial=nativeAuthUiFlags({children:[button,{attributes:{'resource-id':'unknown-'+email,text:secret}}]},{email,code});
+ assert.deepEqual(initial['account.signOut'],{present:true,enabled:false,focused:true});
+ assert.deepEqual(initial.signOutConfirmation,absent);
+ for(const [title,cancel,action] of [['Sign out on this device?','Cancel','Sign out'],['¿Cerrar sesión en este dispositivo?','Cancelar','Cerrar sesión'],['在这台设备上退出登录？','取消','退出登录']]){
+  const dialog={children:[{attributes:{text:title}},{attributes:{accessibilityText:cancel}},{attributes:{text:action}},{attributes:{text:secret,value:code}}]};
+  const result=nativeAuthUiFlags({children:[button,dialog]},{email,code});
+  assert.deepEqual(result.signOutConfirmation,{titleVisible:true,cancelVisible:true,actionVisible:true});
+  for(const value of [email,code,secret,'unknown-',title,cancel,action])assert.ok(!JSON.stringify(result).includes(value));
+  assert.deepEqual(nativeAuthUiFlags({...dialog,attributes:{visible:'false'}}).signOutConfirmation,absent);
+  assert.deepEqual(nativeAuthUiFlags({...dialog,attributes:{displayed:false}}).signOutConfirmation,absent);
+ }
+ const titleOnly=nativeAuthUiFlags({children:[button,{attributes:{text:'Sign out on this device?'}}]});
+ assert.deepEqual(titleOnly.signOutConfirmation,{titleVisible:true,cancelVisible:false,actionVisible:false});
+ assert.deepEqual(nativeAuthUiFlags({attributes:{text:'Sign out on this device? '+secret}}).signOutConfirmation,absent);
+});

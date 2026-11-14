@@ -6,6 +6,8 @@ import {existsSync,mkdirSync,mkdtempSync,readFileSync,realpathSync,statSync,writ
 import {tmpdir} from 'node:os';
 import {dirname,isAbsolute,join,resolve} from 'node:path';
 import {deleteOwnedSimulator,installTaskCleanup,ownProcess} from './native-task-cleanup.mjs';
+import {nativeCodeFingerprint} from './native-runtime-inputs.mjs';
+import {assertNativeHostRun,assertNativeHostPolicy,assertSameHostAttempt} from './native-host-policy.mjs';
 
 const repository=process.env.GITHUB_REPOSITORY,runId=process.env.PUPTIME_NATIVE_HOST_RUN_ID;
 assert.equal(repository,'patrickchin/puptime','Run only in the intended repository.');
@@ -18,23 +20,21 @@ const command=(binary,args,options={})=>execFileSync(binary,args,{encoding:'utf8
 const api=path=>JSON.parse(command('gh',['api',`repos/${repository}/${path}`]));
 const source=command('git',['rev-parse','HEAD']);
 const run=api(`actions/runs/${runId}`);
-assert.equal(run.status,'completed');assert.equal(run.conclusion,'success');
-assert.equal(run.head_repository?.full_name,repository);assert.equal(run.head_branch,'main');
-assert.equal(run.event,'push','Use a main push artifact; a pull-request head is not its compiled merge checkout.');
-assert.equal(run.path,'.github/workflows/ios-simulator.yml');
-assert.match(run.head_sha,/^[a-f0-9]{40}$/);
+const policy=process.env.PUPTIME_NATIVE_HOST_POLICY??'full-suite-success';
+assertNativeHostRun(run,policy,repository);
 command('git',['fetch','--no-tags','--depth=1','origin',run.head_sha]);
 // These produce the compiled native host. Candidate JavaScript is re-bundled by
 // the existing account runner, so it is identified separately in the receipt.
 const nativeInputs=['package.json','package-lock.json','app.json','app.config.*','eas.json','.npmrc','plugins','patches','assets','ios'];
 const changedNativeInputs=command('git',['diff','--name-only',run.head_sha,source,'--',...nativeInputs]);
 assert.equal(changedNativeInputs,'','Native inputs changed: use a newly qualified native host.');
-const artifacts=api(`actions/runs/${runId}/artifacts`).artifacts.filter(artifact=>artifact.name==='puptime-ios-simulator');
-assert.equal(artifacts.length,1);const artifact=artifacts[0];assert.equal(artifact.expired,false);
-assert.match(artifact.digest??'',/^sha256:[a-f0-9]{64}$/);
+const artifacts=api(`actions/runs/${runId}/artifacts?per_page=100`);
+const jobs=policy==='compiled-for-testing'?api(`actions/runs/${runId}/attempts/${run.run_attempt}/jobs?per_page=100`):undefined;
+const {artifact}=assertNativeHostPolicy({policy,run,artifacts,jobs,repository});
 const archive=process.env.PUPTIME_NATIVE_HOST_ARCHIVE?readFileSync(resolve(process.env.PUPTIME_NATIVE_HOST_ARCHIVE))
  :execFileSync('gh',['api',`repos/${repository}/actions/artifacts/${artifact.id}/zip`],{timeout:180000,maxBuffer:256*1024*1024,stdio:['ignore','pipe','pipe']});
 assert.equal('sha256:'+createHash('sha256').update(archive).digest('hex'),artifact.digest,'Verify the downloaded artifact bytes.');
+assert.equal(archive.length,artifact.size_in_bytes);
 const archivePath=join(privateDirectory,'host-artifact.zip');writeFileSync(archivePath,archive);
 command('unzip',['-q',archivePath,'-d',privateDirectory]);
 const appArchive=join(privateDirectory,'Puptime-iOS-Simulator.zip');assert.ok(existsSync(appArchive));
@@ -44,7 +44,13 @@ command('codesign',['--verify','--deep','--strict',host]);
 assert.equal(command('plutil',['-extract','CFBundleIdentifier','raw','-o','-',join(host,'Info.plist')]),'com.patrickchin.puptime');
 assert.match(command('lipo',['-archs',join(host,'Puptime')]),/\barm64\b/);
 const hash=path=>createHash('sha256').update(readFileSync(path)).digest('hex');
-const provenance={scenario,candidateSource:source,nativeSource:run.head_sha,nativeHostRunId:runId,artifactId:artifact.id,artifactDigest:artifact.digest,archiveSource:process.env.PUPTIME_NATIVE_HOST_ARCHIVE?'verified-local-cache':'download',nativeInputsUnchanged:true,nativeExecutableSHA256:hash(join(host,'Puptime')),scope:scenario==='enrolled-upgrade'?'Driver source with privately prepared historical native/source inputs; the successful-main artifact is a reference attestation, and the prepared older native host is installed first. Actual native email SDK and isolated local HTTPS service; controlled-origin runtime qualification only.':'Actual native email SDK + ephemeral local HTTPS Better Auth/D1/SQLite DO; synthetic identity and history only; no production or provider OAuth qualification.'};
+const nativeCode=nativeCodeFingerprint(host,mkdtempSync(join(privateDirectory,'native-code-')));assert.equal(nativeCode.Puptime?.fileSHA256,hash(join(host,'Puptime')));
+for(const name of Object.keys(nativeCode))command('codesign',['--verify','--strict',join(host,name)]);
+// A rerun must not silently substitute an older attempt while bytes download.
+const currentRun=api(`actions/runs/${runId}`);assertSameHostAttempt(run,currentRun);
+const currentArtifact=api(`actions/artifacts/${artifact.id}`);assert.equal(currentArtifact.digest,artifact.digest);
+const {proof}=assertNativeHostPolicy({policy,run:currentRun,artifacts:{total_count:1,artifacts:[currentArtifact]},jobs,repository});
+const provenance={...proof,scenario,candidateSource:source,nativeSource:run.head_sha,nativeHostRunId:runId,artifactId:artifact.id,artifactDigest:artifact.digest,archiveSource:process.env.PUPTIME_NATIVE_HOST_ARCHIVE?'verified-local-cache':'download',nativeInputsUnchanged:true,nativeExecutableSHA256:hash(join(host,'Puptime')),nativeCode,scope:scenario==='enrolled-upgrade'?'Driver source with privately prepared historical native/source inputs; the selected-main artifact is a reference attestation, and the prepared older native host is installed first. Actual native email SDK and isolated local HTTPS service; controlled-origin runtime qualification only.':'Actual native email SDK + ephemeral local HTTPS Better Auth/D1/SQLite DO; synthetic identity and history only; no production, provider OAuth or release qualification.'};
 let initialHost=host;
 if(scenario==='enrolled-upgrade'){
  const path=process.env.PUPTIME_ENROLLED_RUNTIME_INPUTS;assert.ok(path&&isAbsolute(path));assert.equal(realpathSync(path),path);assert.equal(statSync(path).mode&0o777,0o600);assert.equal(statSync(dirname(path)).mode&0o777,0o700);assert.ok(statSync(path).size<2097152);

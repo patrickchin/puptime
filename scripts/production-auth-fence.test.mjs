@@ -1,11 +1,21 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
 import {createFetch} from '@better-fetch/fetch';
 import {createProductionAuthFence} from './production-auth-fence.mjs';
 
 const config={origin:'https://qa.example.invalid',provider:'google',email:'qa@example.invalid',protectedEmails:['tracking@example.invalid']};
 const user={id:'usr_test_inventory',email:config.email},google={type:'success',data:{user:{email:config.email},idToken:'private-provider-token'}};
+test('private guest retries require the destination and preserve every original setup assertion',()=>{
+ const source=readFileSync(new URL('./prepare-ios-production-auth-inventory.mjs',import.meta.url),'utf8'),start=source.indexOf('function privateGuestFlow('),end=source.indexOf('\nconst source=',start);
+ const prepare=runInNewContext('('+source.slice(start,end)+')',{assert});
+ const original=readFileSync(new URL('../.maestro/helpers/conversational/to-reminders.yaml',import.meta.url),'utf8'),patched=prepare(original);
+ const tap='- tapOn:\n    id: preview.guest\n    enabled: true\n    retryTapIfNoChange: true\n',before=original.indexOf(tap),after=before+tap.length;
+ assert.equal(patched.slice(0,before),original.slice(0,before));assert.ok(patched.endsWith(original.slice(after)));
+ assert.match(patched,/maxRetries: 2/);assert.match(patched,/visible:\n\s+id: preview.welcome/);assert.match(patched,/notVisible:\n\s+id: preview.profile/);assert.match(patched,/extendedWaitUntil:\n\s+visible:\n\s+id: preview.profile\n\s+timeout: 5000/);
+ assert.throws(()=>prepare(original.replace(tap,'')));assert.throws(()=>prepare(original+tap));
+});
 function authenticated(options={}){
  const fence=createProductionAuthFence({...config,...options});fence.googleNative(google);
  const request=fence.authorize(config.origin+'/api/auth/sign-in/social',{method:'POST',body:JSON.stringify({provider:'google',idToken:{token:'private-provider-token'}})});
