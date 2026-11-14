@@ -40,6 +40,7 @@ function selfCheck(){
 async function verify(){
  assert.equal(process.env.GITHUB_REPOSITORY??repository,repository);
  const output=resolve(destination);mkdirSync(output,{recursive:true});
+ assert.ok(!existsSync(join(output,'verification.json'))&&!existsSync(join(output,'inspection.json')),'Use a fresh receipt directory; never mix inspection with an earlier runtime result.');
  const privateDir=mkdtempSync(join(tmpdir(),'puptime-runtime-upgrade-'));
  const cache=process.env.PUPTIME_RUNTIME_ARTIFACT_CACHE?resolve(process.env.PUPTIME_RUNTIME_ARTIFACT_CACHE):privateDir;
  mkdirSync(cache,{recursive:true});
@@ -85,8 +86,9 @@ async function verify(){
  assert.equal(command('git',['ls-files','--others','--exclude-standard','--',...nativeInputs]),'','Review untracked native inputs before reusing a frozen artifact.');
  assert.equal(cuts[0].group,cuts[1].group);assert.deepEqual(cuts[0].entitlements,cuts[1].entitlements,'Preserve the actual storage/keychain/AppGroup signing boundary.');
  assert.notEqual(cuts[0].provenance.javaScriptSHA256,cuts[1].provenance.javaScriptSHA256,'Use two genuinely different original app runtimes.');
- const provenance={driverSource:source,driverScriptSHA256:hash(new URL(import.meta.url)),runtimes:cuts.map(cut=>cut.provenance),originalArchivesUnmodified:true,preferenceCoverage:'Exact actual older-runtime first-open/default preference rows; nondefault appearance/locale/reminder/widget UI selection is not yet exercised.',scope:'Original older full app to original newer full app, same native1.12.0/build1; not numeric/store upgrade, old-JS injection, production-account or prior-aa4 legacy-format qualification.'};
+ const provenance={stage:'archive-inspection',upgradeExecuted:false,driverSource:source,driverScriptSHA256:hash(new URL(import.meta.url)),runtimes:cuts.map(cut=>cut.provenance),originalArchivesUnmodified:true,preferenceCoverage:'Exact actual older-runtime first-open/default preference rows; nondefault appearance/locale/reminder/widget UI selection is not yet exercised.',scope:'Original older full app to original newer full app, same native1.12.0/build1; not numeric/store upgrade, old-JS injection, production-account or prior-aa4 legacy-format qualification.'};
  writeFileSync(join(output,'native-provenance.json'),JSON.stringify(provenance,null,2)+'\n');
+ writeFileSync(join(output,'inspection.json'),JSON.stringify({status:'passed',...provenance},null,2)+'\n');
  if(mode==='--inspect-only'){console.log('PASS original-runtime archive inspection: '+output);return;}
 
  assert.equal(command('git',['status','--porcelain','--','scripts/verify-ios-runtime-upgrade.mjs','scripts/native-account-evidence.mjs','.maestro']),'','Commit the exact test driver/fixtures/flows before native execution.');
@@ -138,7 +140,7 @@ async function verify(){
   simctl('install',device,cuts[1].host);installed(cuts[1]);assertPreserved(before,snapshot());
   flow('newer-preserves-photo',`- launchApp:\n    permissions: {}\n${showPhoto}`);assertPreserved(before,snapshot(),{paletteChange:true});
   flow('newer-cold-restart',`- launchApp:\n    permissions: {}\n${showPhoto}`);const after=snapshot();assertPreserved(before,after,{paletteChange:true});
-  writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',...provenance,checks:['Older original app UI created12 logs, note, profile name and a genuine UIKit-selected decoded512px JPEG.','Installing the original newer app without uninstall preserved all14 tables, file bytes, photo ID/decoded bytes and widget activity state before launch.','Newer launch and cold restart preserved every protected field; only widget appearance is an explicitly allowed palette change.'],photoInput:{sha256:hash(fixture),...input},photoSaved:after.photo,protectedStateSHA256:createHash('sha256').update(JSON.stringify(before)).digest('hex'),productionAccountsUsed:false},null,2)+'\n');
+  writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',...provenance,stage:'runtime-replacement',upgradeExecuted:true,checks:['Older original app UI created12 logs, note, profile name and a genuine UIKit-selected decoded512px JPEG.','Installing the original newer app without uninstall preserved all14 tables, file bytes, photo ID/decoded bytes and widget activity state before launch.','Newer launch and cold restart preserved every protected field; only widget appearance is an explicitly allowed palette change.'],photoInput:{sha256:hash(fixture),...input},photoSaved:after.photo,protectedStateSHA256:createHash('sha256').update(JSON.stringify(before)).digest('hex'),productionAccountsUsed:false},null,2)+'\n');
   console.log('PASS original iOS runtime replacement: '+output);
  }finally{try{simctl('delete',device);}catch{/* Only the owned fresh simulator. */}}
 }
