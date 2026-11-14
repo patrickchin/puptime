@@ -145,7 +145,7 @@ async function verify(){
  };
  const preferences=action=>`- runFlow:\n    file: ${JSON.stringify(preferenceFlow)}\n    env:\n      PREF_ACTION: ${action}\n`;
  const openProfile=`- runFlow: ${JSON.stringify(resolve('.maestro/helpers/open-account.yaml'))}\n- scrollUntilVisible:\n    element:\n      id: account.back\n    direction: UP\n    visibilityPercentage: 100\n- tapOn:\n    id: account.back\n    retryTapIfNoChange: true\n- extendedWaitUntil:\n    visible:\n      id: screen.today\n    timeout: 30000\n- tapOn:\n    id: header.puppy\n    retryTapIfNoChange: true\n- extendedWaitUntil:\n    visible:\n      id: screen.pets\n    timeout: 30000\n`;
- const showPhoto=`${openProfile}- assertVisible:\n    id: settings.puppy.photo.remove\n- assertNotVisible:\n    id: settings.puppy.photo.error\n- assertVisible: Runtime QA Maple\n- takeScreenshot: profile-photo\n- stopApp\n`;
+ const showPhoto=`${openProfile}- assertVisible:\n    id: settings.puppy.photo.remove\n- assertNotVisible:\n    id: settings.puppy.photo.error\n- assertVisible:\n    id: settings.puppy.name\n    text: ^.*Runtime QA Maple$\n- takeScreenshot: profile-photo\n- stopApp\n`;
  const files=directory=>Object.fromEntries((existsSync(directory)?readdirSync(directory,{recursive:true,withFileTypes:true}):[]).filter(entry=>entry.isFile()).map(entry=>{
   const parent=entry.parentPath??entry.path,path=join(parent,entry.name);return [path.slice(directory.length+1),hash(path)];
  }).sort(([left],[right])=>left.localeCompare(right)));
