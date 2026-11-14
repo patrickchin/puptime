@@ -1,0 +1,65 @@
+appId: com.patrickchin.puptime
+name: Save an imported synthetic JPEG through the real iOS picker and crop
+---
+- runFlow: ../helpers/open-account.yaml
+- scrollUntilVisible:
+    element:
+      id: account.back
+    direction: UP
+- tapOn:
+    id: account.back
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 30000
+- tapOn:
+    id: header.puppy
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: screen.pets
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: settings.puppy.photo.choose
+    direction: DOWN
+- tapOn:
+    id: settings.puppy.photo.choose
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: Photos
+    timeout: 30000
+# simctl addmedia imported the owned synthetic fixture last, so it is first.
+- tapOn:
+    id: PXGGridLayout-Info
+    index: 0
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: ^Choose$
+    timeout: 30000
+- tapOn:
+    text: ^Choose$
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: settings.puppy.photo.(remove|error)
+    timeout: 90000
+- assertVisible:
+    id: settings.puppy.photo.remove
+- assertNotVisible:
+    id: settings.puppy.photo.error
+- takeScreenshot: native-photo-saved
+- scrollUntilVisible:
+    element:
+      id: nav.back
+    direction: UP
+- tapOn:
+    id: nav.back
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 30000
+- runFlow: ../helpers/open-account.yaml

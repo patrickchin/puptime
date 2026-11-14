@@ -1,0 +1,27 @@
+appId: com.patrickchin.puptime
+---
+- assertTrue: ${OFFLINE === 'true' || OFFLINE === 'false'}
+- stopApp
+- launchApp:
+    permissions: {}
+- runFlow: ../helpers/open-account.yaml
+- runFlow:
+    when:
+      true: ${OFFLINE === 'false'}
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: account.email.input
+            enabled: true
+          timeout: 30000
+      - assertNotVisible:
+          id: account.error
+- assertNotVisible:
+    id: account.identity
+- scrollUntilVisible:
+    element:
+      id: account.local.count
+    direction: DOWN
+- assertVisible:
+    id: account.local.count
+    text: ${EXPECTED_COUNT} activity logs

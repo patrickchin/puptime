@@ -1,0 +1,13 @@
+appId: com.patrickchin.puptime
+---
+- extendedWaitUntil:
+    visible:
+      id: account.deletion
+    timeout: 45000
+- assertVisible: Deletion hasn’t been confirmed. Sync is paused. Retry using the original account or get help; a new account won’t be created automatically.
+- assertVisible:
+    id: account.delete.review
+- assertNotVisible:
+    id: account.deleted
+- assertNotVisible:
+    id: account.email.input

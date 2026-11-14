@@ -1,0 +1,29 @@
+appId: com.patrickchin.puptime
+name: Retry actual native sync after restoring the fixture transport
+---
+- runFlow: ../helpers/open-account.yaml
+- runFlow:
+    when:
+      visible:
+        id: account.refresh
+    commands:
+      - tapOn:
+          id: account.refresh
+          enabled: true
+- runFlow:
+    when:
+      visible:
+        id: account.retry
+    commands:
+      - tapOn:
+          id: account.retry
+          enabled: true
+- scrollUntilVisible:
+    element:
+      id: account.status
+    direction: UP
+- extendedWaitUntil:
+    visible:
+      id: account.status
+      text: Up to date
+    timeout: 60000

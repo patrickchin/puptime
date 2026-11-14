@@ -1,0 +1,18 @@
+appId: com.patrickchin.puptime
+name: Enrolled history survives a controlled transport outage and restart
+---
+- stopApp
+- launchApp:
+    permissions: {}
+- runFlow: ../helpers/open-account.yaml
+- scrollUntilVisible:
+    element:
+      id: account.local.count
+    direction: DOWN
+- assertVisible:
+    id: account.local.count
+    text: ${EXPECTED_COUNT} activity logs
+- assertNotVisible:
+    id: account.status
+    text: Up to date
+- takeScreenshot: offline-preserved-history

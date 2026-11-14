@@ -1,0 +1,27 @@
+appId: com.patrickchin.puptime
+name: Start explicit enrollment while a controlled transfer fails
+---
+- runFlow: ../helpers/open-account.yaml
+- scrollUntilVisible:
+    element:
+      id: account.enable
+    direction: DOWN
+- tapOn:
+    id: account.enable
+    retryTapIfNoChange: true
+- runFlow:
+    when:
+      visible:
+        id: account.combine.dialog
+    commands:
+      - tapOn:
+          id: account.combine.confirm
+          retryTapIfNoChange: true
+- scrollUntilVisible:
+    element:
+      id: account.error
+    direction: UP
+- extendedWaitUntil:
+    visible:
+      id: account.error
+    timeout: 45000

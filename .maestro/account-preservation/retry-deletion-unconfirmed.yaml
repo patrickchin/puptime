@@ -1,0 +1,6 @@
+appId: com.patrickchin.puptime
+---
+- tapOn:
+    id: account.delete.review
+    retryTapIfNoChange: true
+- runFlow: assert-deletion-unconfirmed.yaml

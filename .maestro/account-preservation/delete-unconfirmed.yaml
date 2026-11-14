@@ -1,0 +1,18 @@
+appId: com.patrickchin.puptime
+name: Controlled deletion failure preserves the unresolved safety barrier
+---
+- runFlow: ../helpers/open-account.yaml
+- scrollUntilVisible:
+    element:
+      id: account.delete
+    direction: DOWN
+- tapOn:
+    id: account.delete
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: ^Delete cloud account\?$
+    timeout: 15000
+- tapOn:
+    text: ^Delete cloud account$
+    retryTapIfNoChange: true
+- runFlow: assert-deletion-unconfirmed.yaml

@@ -10,6 +10,11 @@ name: Account preservation verify
       id: account.code.input
     direction: DOWN
 - waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: account.code.input
+      enabled: true
+    timeout: 30000
 - tapOn:
     id: account.code.input
     retryTapIfNoChange: true

@@ -27,10 +27,9 @@ name: Account preservation sign-out
 - tapOn:
     retryTapIfNoChange: true
     text: (?i)^Sign out$
-    above:
-      id: account.signOut
-    rightOf:
-      text: (?i)^Cancel$
+    childOf:
+      containsChild:
+        text: (?i)^Cancel$
 - extendedWaitUntil:
     notVisible:
       id: account.identity
