@@ -2,12 +2,13 @@
 
 These flows, `scripts/verify-native-sharing.mjs` and the source-tested
 `scripts/native-sharing-adapters.mjs` are preparation for a separate test PR.
-They are not wired into the account runner or a workflow.
+They are wired into the account runner's local `sharing-household` and
+`sharing-temporary` scenarios, with no hosted workflow selection or native run.
 No native pass, sharing feature fix, production-provider result or release
 readiness follows from the small Node checks.
 
-After the account-evidence PR is frozen, a thin runner adapter can call
-`verifyNativeSharing` twice: household and temporary contributor, each with
+The thin runner adapter calls `verifyNativeSharing` for household or temporary
+contributor, each with
 its own fresh pair of synthetic accounts/devices. Reuse the existing installed
 Better Auth SDK, local HTTPS Worker/D1/DO service, native host and evidence
 helpers. Do not copy the account runner or introduce another service/client.
@@ -20,7 +21,7 @@ This module never clears application state, inserts history, edits SecureStore
 or seeds a cloud association. No genuine provider identity or owner record is
 needed or allowed.
 
-The future adapter contract is:
+The adapter contract is:
 
 - `activate(actor)`: stop/suspend the former actor before changing the current
   SDK/session/device binding. Two task-owned simulators retain separate real
@@ -66,8 +67,7 @@ member labels, secret-safe sharing flows, clipboard/deep-link handoff, serial
 actor binding and paginated owner inspection. Its Node checks use real SQLite
 and synthetic service/driver inputs; no native case has executed.
 
-The lifecycle runner still needs only these injected hooks (no copied service
-or SDK):
+The lifecycle runner supplies these injected hooks (no copied service or SDK):
 
 - `bridge.activate({previous,device,email})` must terminate the previous app,
   settle forwarded requests, switch the owned simulator and bind the runner's
@@ -96,8 +96,14 @@ or SDK):
   `observer.membership`, so the expected display actor is server-observed,
   never guessed from an ID. Retain only the scenario's finite aggregate result.
 
-The initial A/B UI preparation and thin proxy/CLI integration remain pending.
-No source check qualifies native sharing, actor isolation or OS handoff.
+The CLI now creates A's and B's separate histories and signs each in through
+the existing real UI/SDK helpers. Only A explicitly enables personal cloud;
+B's journal stays local before accepting care. The proxy observes request-time
+identity and scope, and private owner inspection bypasses it. Both scenarios
+remain **unexecuted**. Existing native-host/artifact checks still apply; do not
+remove a native-input rejection to run a later source on an older artifact.
+An automated completion is `awaiting-attribution-visual-review`, never a final
+native pass. No source check qualifies sharing, actor isolation or OS handoff.
 
 Secret phases include invitation creation (its QR encodes the token), Share,
 Copy, initial open/accept, revocation and stale-link acceptance. Discard every

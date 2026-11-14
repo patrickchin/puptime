@@ -121,7 +121,7 @@ export function createSharingActors({devices,emails,observer,bridge,output,prote
     get accountId(){return observer.actor(name).accountId;},get attribution(){return observer.actor(name).attribution;},
     cookie:()=>observer.actor(name).cookie,
     async snapshot({care=false}={}){const observed=observer.actor(name);return readSharingSnapshot(await bridge.dataDirectory(devices[name]),{care,accountId:observed.accountId,shareId:observed.shareId});},
-    flow:(path,env,options)=>{assert.equal(active,name);return runSharingFlow({device:devices[name],name:path,env,...options,execute:bridge.execute,output});},
+    async flow(path,env,options){assert.equal(active,name);await bridge.launch(devices[name]);return runSharingFlow({device:devices[name],name:path,env,...options,execute:bridge.execute,output});},
     async nativeShareCopy(){assert.equal(active,name);try{const value=await bridge.simctl(['pbpaste',devices[name]]);protectSecret(value);return value;}catch{throw new Error('Native sharing clipboard read failed.');}finally{try{await bridge.simctl(['pbcopy',devices[name]],'');}catch{throw new Error('Native sharing clipboard clearing failed.');}}},
     async openURL(value){
       assert.equal(active,name);const url=new URL(value);assert.equal(url.protocol,'puptime:');assert.equal(url.hostname,'care');

@@ -17,13 +17,16 @@ import {createLocalRuntime} from '../src/local/runtime-factory.ts';
 import {pushResponseSchema,pullPageSchema,mutationSchema} from '../src/cloud/protocol.ts';
 import {nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeDrained,assertEmptyIosRestoreSources,capturedJson,nativeAuthUiFlags} from './native-account-evidence.mjs';
 import {assertArchivedSource,nativeCodeFingerprint} from './native-runtime-inputs.mjs';
+import {createSharingObserver,createSharingActors,readOwnerSharingRecords} from './native-sharing-adapters.mjs';
+import {verifyNativeSharing} from './verify-native-sharing.mjs';
 
 const [platform,initialDevice,host,consent,destination='build/guest-account-'+platform,onboarding]=process.argv.slice(2);
 let device=initialDevice;
 assert.ok(['ios','android'].includes(platform));
-assert.ok(onboarding===undefined||['--onboarding-sign-in','--account-deletion','--puppy-comparison','--offline-lifecycle','--account-isolation','--photo-lifecycle','--deletion-faults','--enrolled-runtime-upgrade'].includes(onboarding));
+assert.ok(onboarding===undefined||['--onboarding-sign-in','--account-deletion','--puppy-comparison','--offline-lifecycle','--account-isolation','--photo-lifecycle','--deletion-faults','--enrolled-runtime-upgrade','--sharing-household','--sharing-temporary'].includes(onboarding));
 const android=platform==='android',deleting=onboarding==='--account-deletion',onboardingSignIn=onboarding==='--onboarding-sign-in',comparing=onboarding==='--puppy-comparison',offline=onboarding==='--offline-lifecycle',isolating=onboarding==='--account-isolation',photographing=onboarding==='--photo-lifecycle',deletionFaults=onboarding==='--deletion-faults',upgrading=onboarding==='--enrolled-runtime-upgrade';
-assert.ok(!(comparing||offline||isolating||photographing||deletionFaults||upgrading)||!android,'Extended lifecycle cases use the dedicated iOS verification path.');
+const sharingKind=onboarding==='--sharing-household'?'household':onboarding==='--sharing-temporary'?'temporary':null;
+assert.ok(!(comparing||offline||isolating||photographing||deletionFaults||upgrading||sharingKind)||!android,'Extended lifecycle cases use the dedicated iOS verification path.');
 assert.equal(consent,'--replace-synthetic','Use PLATFORM DEVICE HOST --replace-synthetic [OUTPUT].');
 const frontPort=Number(process.env.PUPTIME_ACCOUNT_PORT??8797),backPort=frontPort+2;assert.ok(Number.isInteger(frontPort)&&frontPort>1024&&frontPort<65533);
 const app='com.patrickchin.puptime',output=resolve(destination),front='https://127.0.0.1:'+frontPort;
@@ -56,6 +59,9 @@ let runtimeInputs;const runtimeBundles=new Map(),runtimeProvenance=[];
 const authResponses=[];
 const authRoutes={'/api/auth/get-session':'session','/api/auth/email-otp/send-verification-otp':'send-code','/api/auth/sign-in/email-otp':'verify-code','/api/auth/sign-out':'sign-out','/api/account':'account'};
 const codes=new Set(),checks=[];
+const sharingSecrets=new Set(),protectSharingSecret=value=>{assert.equal(typeof value,'string');sharingSecrets.add(value);};
+const ownerSharingEmail='native-sharing-owner-'+crypto.randomUUID()+'@example.invalid',carerSharingEmail='native-sharing-carer-'+crypto.randomUUID()+'@example.invalid';
+const sharingObserver=sharingKind?createSharingObserver({ownerEmail:ownerSharingEmail,carerEmail:carerSharingEmail,protectSecret:protectSharingSecret}):null;
 function wireFailure(phase,route,encoding,bytes){
  wireParseErrors++;
  const safeEncoding=['gzip','deflate','br','identity'].includes(encoding??'identity')?(encoding??'identity'):'other';
@@ -63,10 +69,10 @@ function wireFailure(phase,route,encoding,bytes){
  writeFileSync(join(output,'wire-parse-failures.json'),JSON.stringify(wireFailures.slice(0,32),null,2)+'\n');
 }
 function redacted(value){
-  for(const secret of [...codes,config.vars.AUTH_SECRET,cookie,...cookie.split(';').map(part=>part.trim().split('=').slice(1).join('='))].filter(Boolean))value=value.replaceAll(secret,'[REDACTED]');
+  for(const secret of [...codes,...sharingSecrets,config.vars.AUTH_SECRET,cookie,...cookie.split(';').map(part=>part.trim().split('=').slice(1).join('='))].filter(Boolean))value=value.replaceAll(secret,'[REDACTED]');
   return value;
 }
-function run(binary,args,env=process.env,cwd=process.cwd()){
+function run(binary,args,env=process.env,cwd=process.cwd(),discardFailureOutput=false){
   return new Promise((resolveRun,reject)=>{
     const child=spawn(binary,args,{env,cwd,stdio:['ignore','pipe','pipe']});let raw='';
     child.stdout.on('data',data=>{raw+=data;});child.stderr.on('data',data=>{raw+=data;});
@@ -74,7 +80,7 @@ function run(binary,args,env=process.env,cwd=process.cwd()){
     const timer=setTimeout(()=>child.kill('SIGTERM'),binary==='maestro'?600000:240000);
     child.once('error',reject);child.once('close',status=>{clearTimeout(timer);if(status===0)resolveRun(raw);else{
       raw=redacted(raw);
-      writeFileSync(join(output,'failure-redacted.log'),raw,{mode:0o600});reject(new Error(`${binary} failed (${status}); see redacted log.`));
+      if(!discardFailureOutput)writeFileSync(join(output,'failure-redacted.log'),raw,{mode:0o600});reject(new Error(`${binary} failed (${status})${discardFailureOutput?'.':'; see redacted log.'}`));
     }});
   });
 }
@@ -116,7 +122,7 @@ async function flow(name,env={}){
     rmSync(artifacts,{recursive:true,force:true});
   }
 }
-let email='native-'+crypto.randomUUID()+'@example.invalid';
+let email=sharingKind?ownerSharingEmail:'native-'+crypto.randomUUID()+'@example.invalid';
 const androidSnapshot=join(privateDir,'android-snapshot');
 function sqliteDirectory(){
   if(!android)return join(simctl('get_app_container',device,app,'data'),'Documents/SQLite');
@@ -382,6 +388,50 @@ async function verifyEnrolledRuntimeUpgrade(){
  receipts.push({phase:'enrolled-runtime-replacement',oldLocalEvents:15,oldRemoteEvents:12,pendingPreserved:3,all14TablesChecked:true,savedSdkIdentityVerified:true,noReauthenticationOrEnrollment:true,finalCloudEvents:15,finalRestartExact14Tables:true});
  checks.push('Exact historical old/new sources on their separately attested native hosts, rebuilt only for the same temporary HTTPS origin; real old UI/SDK enrolls12logs and leaves3offline writes. Without uninstall/reset/re-auth, installing newer preserves every table/payload/generation, actual newer SDK drains3exact acknowledgements under the original account, and15cloud records/revisions plus all14tables survive cold restart. Controlled origin/ad-hoc resign, not untouched-original, numeric store, provider or current-candidate qualification.');
 }
+async function verifySharingLifecycle(){
+ // Both identities and their journals are created through the same production
+ // UI/SDK as the baseline case. Only A explicitly enables personal cloud.
+ const ownerDevice=device;
+ await flow('prepare');await flow('add-logs',{BATCHES:'1',EXPECTED_COUNT:'3'});await signIn();await flow('enable',{EXPECTED_COUNT:'3'});
+ assert.equal(sharingObserver.actor('owner').accountId,snapshot().owner[0].account_id);
+ await freshIosRestoreDevice();email=carerSharingEmail;cookie='';code='';
+ await flow('prepare');await flow('add-logs',{BATCHES:'1',EXPECTED_COUNT:'3'});await signIn();
+ assert.ok(sharingObserver.actor('carer').accountId);assert.equal(snapshot().owner.length,0);
+ const carerDevice=device,owned=new Set([ownerDevice,carerDevice]);
+ const state=id=>Object.values(JSON.parse(simctl('list','devices','available','-j')).devices).flat().find(row=>row.udid===id)?.state;
+ const bridge={
+  async activate({device:next,email:nextEmail}){
+   assert.ok(owned.has(next)&&owned.has(device));
+   if(next!==device){
+    if(state(device)==='Booted'){try{simctl('terminate',device,app);}catch{}simctl('shutdown',device);}
+    await until(()=>activeForwarded===0,'Settle the stopped actor’s forwarded requests before switching devices.');
+    if(state(next)==='Shutdown'){simctl('boot',next);await run('xcrun',['simctl','bootstatus',next,'-b']);}
+   }
+   device=next;email=nextEmail;code='';
+   // This cookie is only for independent inspector reads, never injected into native storage.
+   cookie=sharingObserver.actor(next===ownerDevice?'owner':'carer').cookie??'';
+  },
+  async launch(id){assert.ok(owned.has(id)&&id===device);simctl('launch',id,app);},
+  async dataDirectory(id){assert.ok(owned.has(id));return simctl('get_app_container',id,app,'data');},
+  async execute(binary,args,env){await run(binary,args,{...childEnv,...env},process.cwd(),true);},
+  async simctl(args,input){
+   assert.ok(['pbpaste','pbcopy','openurl'].includes(args[0])&&args[1]===device&&owned.has(args[1]));
+   return execFileSync('xcrun',['simctl',...args],{encoding:'utf8',timeout:30000,input,stdio:[input===undefined?'ignore':'pipe','pipe','pipe']}).trim();
+  },
+ };
+ const actors=createSharingActors({devices:{owner:ownerDevice,carer:carerDevice},emails:{owner:ownerSharingEmail,carer:carerSharingEmail},observer:sharingObserver,bridge,output,protectSecret:protectSharingSecret});
+ const ownerGet=path=>new Promise((resolveGet,reject)=>{
+  assert.ok(path.startsWith('/api/sync/pull?after=')||path.startsWith('/api/records/')||path.startsWith('/api/sharing?petId='));
+  const req=request('http://127.0.0.1:'+backPort+path,{headers:{cookie:actors.owner.cookie(),origin:front}},response=>{
+   let body='';response.on('data',part=>{body+=part;if(Buffer.byteLength(body)>16777216)req.destroy(new Error('Bound owner fixture inspection.'));});
+   response.on('error',reject);response.on('end',()=>{try{assert.equal(response.statusCode,200);resolveGet(JSON.parse(body));}catch{reject(new Error('Owner fixture inspection failed.'));}});
+  });req.on('error',()=>reject(new Error('Owner fixture inspection failed.')));req.setTimeout(15000,()=>req.destroy());req.end();
+ });
+ const result=await verifyNativeSharing({kind:sharingKind,...actors,readOwnerRecords:({historyFor})=>readOwnerSharingRecords({get:ownerGet,historyFor,observer:sharingObserver}),transport,
+  wire:()=>{assert.equal(wireParseErrors,0);return structuredClone({accepted:wireAccepted,pages:wirePages,pushes:wirePushes,responses:sharingObserver.responses()});},protectSecret:protectSharingSecret,fixtureOrigin:front});
+ // Successful automated assertions still require a separate rendered-glyph review.
+ receipts.push(result);checks.push('Synthetic native sharing assertions executed; rendered attribution remains awaiting independent visual review.');
+}
 function deletionState(tables){const row=tables.metadata.find(row=>row.key==='cloud_account_deletion');assert.ok(row);const state=JSON.parse(row.value);assert.equal(state.stage,'unconfirmed');return state;}
 async function verifyDeletionFaults(){
  await flow('prepare');await flow('add-logs',{BATCHES:'4',EXPECTED_COUNT:'12'});await signIn();await flow('enable',{EXPECTED_COUNT:'12'});
@@ -484,6 +534,8 @@ try{
   const forward=(req,res)=>{
     requests.add(req.url);
     const pathname=new URL(req.url,front).pathname,route=Object.hasOwn(authRoutes,pathname)?authRoutes[pathname]:undefined;
+    let sharingTicket;
+    if(sharingObserver)try{sharingTicket=sharingObserver.begin({method:req.method,url:req.url,headers:req.headers});}catch{wireFailure('request','sharing',null,0);req.resume();res.writeHead(500).end();return;}
     if(req.method==='POST'){if(route==='send-code')identityRequests.sendCode++;if(route==='verify-code')identityRequests.verifyCode++;if(route==='sign-out')identityRequests.signOut++;}
     if(route&&['GET','POST'].includes(req.method)){
       const entry={phase:activeFlow,flowSequence,route,method:req.method,status:null,state:'pending'};
@@ -502,15 +554,18 @@ try{
     if(photoRequest&&req.method==='GET'&&photoFault==='download-corrupt'){corruptPhotoDownloads++;res.writeHead(200,{'content-type':'image/jpeg'}).end('invalid JPEG');return;}
     if(fault==='offline'){req.socket.destroy();return;}
     if(fault==='push-offline'&&pushing){req.resume();res.writeHead(503,{'content-type':'application/json'}).end('{"error":"controlled_transport_outage"}');return;}
-    const body=[];if(pushing||photoRequest&&req.method==='POST'){req.on('data',part=>body.push(part));if(pushing)req.on('end',()=>{try{const bytes=Buffer.concat(body),parsed=capturedJson(bytes,req.headers['content-encoding']);wirePushes.push({mutations:parsed.mutations.map(value=>mutationSchema.parse(value))});}catch{wireFailure('request','push',req.headers['content-encoding'],Buffer.concat(body).length);}});}
+    const sharingBody=sharingObserver&&req.method==='POST'&&['/api/sharing','/api/care/accept'].includes(pathname);
+    const body=[];if(pushing||photoRequest&&req.method==='POST'||sharingBody){req.on('data',part=>body.push(part));if(pushing||sharingBody)req.on('end',()=>{try{const bytes=Buffer.concat(body),parsed=capturedJson(bytes,req.headers['content-encoding']);if(pushing)wirePushes.push({mutations:parsed.mutations.map(value=>mutationSchema.parse(value))});if(sharingBody)sharingObserver.requestBody(sharingTicket,parsed);}catch{wireFailure('request',sharingBody?'sharing':'push',req.headers['content-encoding'],Buffer.concat(body).length);}});}
     const newerNativePush=upgrading&&runtimePhase==='newer'&&pushing;
     const dropping=pushing&&fault==='drop-push-response-once'||deletingRequest&&deleteFault==='lost';activeForwarded++;
     let finished=false;const finish=()=>{if(!finished){finished=true;activeForwarded--;}};
     // Wrangler rewrites a matching Origin using the upstream scheme. Forwarding
     // the actual backend Host keeps the original HTTPS Origin intact.
     const outgoing=request('http://127.0.0.1:'+backPort+req.url,{method:req.method,headers:{...req.headers,host:'127.0.0.1:'+backPort}},incoming=>{
-      const chunks=[];if(pushing||pulling||photoRequest||deletingRequest)incoming.on('data',part=>chunks.push(part));
+      const sharingReply=sharingObserver&&['/api/account','/api/auth/get-session','/api/care/accept'].includes(pathname);
+      const chunks=[];if(pushing||pulling||photoRequest||deletingRequest||sharingReply)incoming.on('data',part=>chunks.push(part));
       incoming.on('end',()=>{
+        if(sharingObserver)try{sharingObserver.finish(sharingTicket,incoming.statusCode,sharingReply&&incoming.statusCode===200?capturedJson(Buffer.concat(chunks),incoming.headers['content-encoding']):undefined);}catch{wireFailure('response','sharing',incoming.headers['content-encoding'],Buffer.concat(chunks).length);}
         if(newerNativePush&&incoming.statusCode===200&&typeof req.headers.cookie==='string')newerSdkCookie=req.headers.cookie;
         if(incoming.statusCode===200&&(pushing||pulling))try{const bytes=Buffer.concat(chunks),parsed=capturedJson(bytes,incoming.headers['content-encoding']);if(pushing)wireAccepted.push(...pushResponseSchema.parse(parsed).accepted);else wirePages.push(pullPageSchema.parse(parsed));}catch{wireFailure('response',pushing?'push':'pull',incoming.headers['content-encoding'],Buffer.concat(chunks).length);}
         if(photoRequest)photoTransfers.push({method:req.method,path:req.url,status:incoming.statusCode,...(req.method==='POST'?{requestSHA256:createHash('sha256').update(Buffer.concat(body)).digest('hex')}:{responseSHA256:createHash('sha256').update(Buffer.concat(chunks)).digest('hex')})});
@@ -612,7 +667,8 @@ try{
   if(photographing)await verifyPhotoLifecycle();
   if(deletionFaults)await verifyDeletionFaults();
   if(upgrading)await verifyEnrolledRuntimeUpgrade();
-  if(!onboardingSignIn&&!deleting&&!comparing&&!offline&&!isolating&&!photographing&&!deletionFaults&&!upgrading){
+  if(sharingKind)await verifySharingLifecycle();
+  if(!onboardingSignIn&&!deleting&&!comparing&&!offline&&!isolating&&!photographing&&!deletionFaults&&!upgrading&&!sharingKind){
   await flow('prepare');assert.equal(snapshot().events.length,0);
   assert.ok(requests.has('/api/config'),'The real app must reach this isolated backend before any sign-in attempt.');
   await flow('add-logs',{BATCHES:'4',EXPECTED_COUNT:'12'});const guest=snapshot();assert.equal(guest.events.length,12);assert.equal(guest.owner.length,0);
@@ -652,8 +708,8 @@ try{
    checks.push('native system confirmation cancels safely; stale auth uses real same-account OTP and a new confirmation; confirmed deletion removes the actual account, retains all 12 logs and offers manual Apple cleanup for a tokenless synthetic link');
   }
   rmSync(join(output,'failure-redacted.log'),{force:true});
-  writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',checks,receipts,...(upgrading?{stage:'controlled-origin-enrolled-runtime-replacement',upgradeExecuted:true,originModified:true,originalInstalledBytes:false,runtimes:runtimeProvenance}:{}),scope:upgrading?'Exact historical source/native pairs with controlled-origin release JS and ad-hoc signing; actual native SDK and isolated local HTTPS Better Auth/D1/SQLite DO. No credential injection, owner data, provider OAuth, untouched-original, numeric store or final current-candidate qualification.':android?'Android Debug native host with normal embedded release JS and isolated local HTTPS Better Auth/D1/SQLite DO; actual native email SDK and Keystore. Its temporary CA is trusted only in the ignored Debug source set, restored after the run. Production onboarding is tested separately in the Release APK. No real email, production account, session injection or mocked sync.':'Release bundle and actual native email SDK with isolated local HTTPS Better Auth/D1/SQLite DO. Simulator trusts the fixture certificate. No real email, production account, session injection or mocked sync.'},null,2)+'\n');
-  console.log('PASS '+(upgrading?'controlled-origin enrolled runtime replacement':deletionFaults?'pending native deletion cancellation, retries and lost response':photographing?'native profile photo failure, roundtrip and restore':isolating?'expired session and account isolation':offline?'offline writes, replay and pending logout':deleting?'native account deletion':comparing?'named puppy comparison':onboardingSignIn?'welcome sign-in and session recovery':android?'guest account preservation and empty-database recovery':'guest account preservation and inspected empty-device recovery')+': '+output);
+  writeFileSync(join(output,'verification.json'),JSON.stringify({status:sharingKind?'awaiting-attribution-visual-review':'passed',checks,receipts,...(upgrading?{stage:'controlled-origin-enrolled-runtime-replacement',upgradeExecuted:true,originModified:true,originalInstalledBytes:false,runtimes:runtimeProvenance}:{}),scope:sharingKind?'Synthetic native sharing through the actual SDK/local HTTPS service; automated assertions and explicit attribution images require independent rendered-glyph review before qualification. No provider, owner or production data.':upgrading?'Exact historical source/native pairs with controlled-origin release JS and ad-hoc signing; actual native SDK and isolated local HTTPS Better Auth/D1/SQLite DO. No credential injection, owner data, provider OAuth, untouched-original, numeric store or final current-candidate qualification.':android?'Android Debug native host with normal embedded release JS and isolated local HTTPS Better Auth/D1/SQLite DO; actual native email SDK and Keystore. Its temporary CA is trusted only in the ignored Debug source set, restored after the run. Production onboarding is tested separately in the Release APK. No real email, production account, session injection or mocked sync.':'Release bundle and actual native email SDK with isolated local HTTPS Better Auth/D1/SQLite DO. Simulator trusts the fixture certificate. No real email, production account, session injection or mocked sync.'},null,2)+'\n');
+  console.log((sharingKind?'COMPLETE sharing assertions; attribution visual review pending':('PASS '+(upgrading?'controlled-origin enrolled runtime replacement':deletionFaults?'pending native deletion cancellation, retries and lost response':photographing?'native profile photo failure, roundtrip and restore':isolating?'expired session and account isolation':offline?'offline writes, replay and pending logout':deleting?'native account deletion':comparing?'named puppy comparison':onboardingSignIn?'welcome sign-in and session recovery':android?'guest account preservation and empty-database recovery':'guest account preservation and inspected empty-device recovery')))+': '+output);
 }finally{
   for(const socket of changeSockets)socket.destroy();
   auth?.close();proxy?.close();for(const child of [worker])if(child?.pid)try{process.kill(-child.pid,'SIGTERM');}catch{}
