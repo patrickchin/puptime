@@ -1,0 +1,17 @@
+appId: com.patrickchin.puptime
+---
+- stopApp
+- launchApp:
+    permissions: {}
+- runFlow: ../helpers/open-account.yaml
+- assertVisible:
+    id: account.email.input
+- assertNotVisible:
+    id: account.identity
+- scrollUntilVisible:
+    element:
+      id: account.local.count
+    direction: DOWN
+- assertVisible:
+    id: account.local.count
+    text: ${EXPECTED_COUNT} activity logs

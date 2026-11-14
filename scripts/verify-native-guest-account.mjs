@@ -20,9 +20,9 @@ import {nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeD
 const [platform,initialDevice,host,consent,destination='build/guest-account-'+platform,onboarding]=process.argv.slice(2);
 let device=initialDevice;
 assert.ok(['ios','android'].includes(platform));
-assert.ok(onboarding===undefined||['--onboarding-sign-in','--account-deletion','--puppy-comparison','--offline-lifecycle','--account-isolation','--photo-lifecycle'].includes(onboarding));
-const android=platform==='android',deleting=onboarding==='--account-deletion',onboardingSignIn=onboarding==='--onboarding-sign-in',comparing=onboarding==='--puppy-comparison',offline=onboarding==='--offline-lifecycle',isolating=onboarding==='--account-isolation',photographing=onboarding==='--photo-lifecycle';
-assert.ok(!(comparing||offline||isolating||photographing)||!android,'Extended lifecycle cases use the dedicated iOS verification path.');
+assert.ok(onboarding===undefined||['--onboarding-sign-in','--account-deletion','--puppy-comparison','--offline-lifecycle','--account-isolation','--photo-lifecycle','--deletion-faults'].includes(onboarding));
+const android=platform==='android',deleting=onboarding==='--account-deletion',onboardingSignIn=onboarding==='--onboarding-sign-in',comparing=onboarding==='--puppy-comparison',offline=onboarding==='--offline-lifecycle',isolating=onboarding==='--account-isolation',photographing=onboarding==='--photo-lifecycle',deletionFaults=onboarding==='--deletion-faults';
+assert.ok(!(comparing||offline||isolating||photographing||deletionFaults)||!android,'Extended lifecycle cases use the dedicated iOS verification path.');
 assert.equal(consent,'--replace-synthetic','Use PLATFORM DEVICE HOST --replace-synthetic [OUTPUT].');
 const frontPort=Number(process.env.PUPTIME_ACCOUNT_PORT??8797),backPort=frontPort+2;assert.ok(Number.isInteger(frontPort)&&frontPort>1024&&frontPort<65533);
 const app='com.patrickchin.puptime',output=resolve(destination),front='https://127.0.0.1:'+frontPort;
@@ -48,7 +48,7 @@ const requests=new Set(),restoreNative=[],requestCounts={enroll:0,push:0};
 // Backend results can be deliberately withheld. Only the native SQLite ack
 // assertion below establishes that the SDK persisted a received result.
 const wireAccepted=[],wirePages=[],wirePushes=[],photoTransfers=[],receipts=[],changeSockets=new Set();
-let fault='online',photoFault='online',failedPhotoUploads=0,corruptPhotoDownloads=0,activeForwarded=0,wireParseErrors=0;
+let fault='online',photoFault='online',deleteFault='online',failedDeletes=0,acceptedDeletes=0,failedPhotoUploads=0,corruptPhotoDownloads=0,activeForwarded=0,wireParseErrors=0;
 let certificate;
 const codes=new Set(),checks=[];
 function redacted(value){
@@ -240,6 +240,13 @@ async function verifyOfflineLifecycle(){
  await transport('push-offline');const oldSession=cookie;await flow('sign-out-pending',{ACTION:'confirm',EXPECTED_PENDING:'3'});assertNativeDetached(beforeCancel.tables,snapshot().tables);assert.deepEqual(snapshot().events,beforeCancel.events);assert.equal((await inspectSession(oldSession)).status,401,'The real backend must invalidate the old native SDK session when online logout succeeds.');
  await transport('online');await signIn();await flow('enable',{EXPECTED_COUNT:'21'});assert.deepEqual(snapshot().events,beforeCancel.events);assert.equal(snapshot().pending,0);await assertCloud(beforeCancel.events);
  checks.push('Cancelling logout with three unsent writes preserves every table and remote event; explicit logout detaches only expected association rows, keeps all21 logs, and same-account rejoin uploads the missing history without rewriting existing cloud records.');
+ await transport('offline');await flow('add-logs',{BATCHES:'1',EXPECTED_COUNT:'24'});const fullyOffline=snapshot(),unconfirmedCookie=cookie;assert.equal(fullyOffline.pending,3);
+ await flow('sign-out-pending',{ACTION:'confirm',EXPECTED_PENDING:'3'});assertNativeDetached(fullyOffline.tables,snapshot().tables);assert.equal((await inspectSession(unconfirmedCookie)).status,200,'Offline local signout cannot claim server-side session revocation.');
+ await flow('reopen-guest',{EXPECTED_COUNT:'24'});assertNativeDetached(fullyOffline.tables,snapshot().tables);
+ await transport('online');await signIn();await flow('enable',{EXPECTED_COUNT:'24'});assert.deepEqual(snapshot().events,fullyOffline.events);assert.deepEqual(snapshot().tables.local_revisions,fullyOffline.tables.local_revisions);assert.equal(snapshot().pending,0);await assertCloud(fullyOffline.events);
+ const rejoined=snapshot();await flow('reopen',{EXPECTED_COUNT:'24'});assertNativeTransition(rejoined.tables,snapshot().tables);
+ receipts.push({phase:'fully-offline-logout',localCredentialsCleared:true,serverSessionExplicitlyUnconfirmed:true,retainedEvents:24,pendingBefore:3,sameAccountRejoined:true});
+ checks.push('Fully disconnected native logout clears local credentials and detaches only expected association rows while preserving24logs/revisions; backend independently confirms remote session is still unrevoked, so no server-signout claim is made. Guest coldrestart and explicit same-account rejoin recover the unsent writes without duplicates.');
 }
 function nativePhoto(){
  const tables=snapshot().tables,id=tables.pet_settings.find(row=>row.key==='puptime.puppyPhoto.v1')?.value;
@@ -277,6 +284,34 @@ async function verifyPhotoLifecycle(){
  await flow('reopen',{EXPECTED_COUNT:'12'});assert.deepEqual(snapshot().events,original.events);assert.deepEqual(nativePhoto().bytes,photo.bytes);
  receipts.push({phase:'native-photo-roundtrip',sourceJPEG:true,uiPickerAndCrop:true,width:512,height:512,bytes:photo.bytes.length,sha256:photo.sha256,failedUploads:failedPhotoUploads,rejectedCorruptDownloads:corruptPhotoDownloads,freshDeviceRestore:true,exactRestoredBytes:true});
  checks.push('Real UIKit selection/crop saves a decodable512px JPEG; actual native SDK upload failure keeps its reference/queue safe through restart, retry sends exact JPEG bytes to localR2; corrupt download leaves no partial file or applied history, then retry restores byte-identical photo plus12 original logs on a genuinely fresh device and cold restart.');
+}
+function deletionState(tables){const row=tables.metadata.find(row=>row.key==='cloud_account_deletion');assert.ok(row);const state=JSON.parse(row.value);assert.equal(state.stage,'unconfirmed');return state;}
+async function verifyDeletionFaults(){
+ await flow('prepare');await flow('add-logs',{BATCHES:'4',EXPECTED_COUNT:'12'});await signIn();await flow('enable',{EXPECTED_COUNT:'12'});
+ await transport('offline');await flow('add-logs',{BATCHES:'1',EXPECTED_COUNT:'15'});await transport('push-offline');
+ const pending=snapshot(),accountA=pending.owner[0].account_id,oldSession=cookie,cloud=await remote();assert.equal(pending.pending,3);
+ await flow('delete-cancel');assertNativeTransition(pending.tables,snapshot().tables);assert.deepEqual(await remote(),cloud);
+ deleteFault='before';await flow('delete-unconfirmed',{RETRY:'false'});assert.ok(failedDeletes>0);assert.equal(auth.prepare('SELECT id FROM user WHERE id=?').all(accountA).length,1);
+ const unresolved=snapshot(),marker=deletionState(unresolved.tables);assert.equal(marker.accountId,accountA);
+ assertNativeTransition(pending.tables,unresolved.tables,{metadata:unresolved.tables.metadata});assert.deepEqual(unresolved.tables.metadata.filter(row=>row.key!=='cloud_account_deletion'),pending.tables.metadata);
+ await flow('reopen-deletion');assertNativeTransition(unresolved.tables,snapshot().tables);const fenced={...requestCounts};
+ await flow('add-logs-paused');const beforeRetry=snapshot();assert.equal(beforeRetry.events.length,18);assert.equal(beforeRetry.pending,6);assert.deepEqual(requestCounts,fenced);assert.deepEqual(await remote(),cloud);
+ deleteFault='online';await flow('delete-retry-confirm');const after=snapshot();
+ assertNativeDetached({...beforeRetry.tables,metadata:beforeRetry.tables.metadata.filter(row=>row.key!=='cloud_account_deletion')},after.tables);
+ assert.equal(auth.prepare('SELECT id FROM user WHERE id=?').all(accountA).length,0);assert.equal((await inspectSession(oldSession)).status,401);assert.deepEqual(after.events,beforeRetry.events);
+ await flow('reopen-guest',{EXPECTED_COUNT:'18'});assertNativeTransition(after.tables,snapshot().tables);
+ checks.push('Cancelling deletion with pending writes preserves all14tables; request failure before server commit persists only an unresolved marker, retains history/queue across restart and additional local logging, and explicit retry deletes the disposable account while preserving all18logs/revisions locally.');
+ // A different disposable identity provides the independent accepted-but-lost branch.
+ await transport('online');email='native-delete-lost-'+crypto.randomUUID()+'@example.invalid';await signIn();await flow('enable',{EXPECTED_COUNT:'18'});
+ await transport('offline');await flow('add-logs',{BATCHES:'1',EXPECTED_COUNT:'21'});await transport('push-offline');
+ const beforeLost=snapshot(),accountB=beforeLost.owner[0].account_id,lostSession=cookie;deleteFault='lost';await flow('delete-unconfirmed',{RETRY:'false'});
+ assert.ok(acceptedDeletes>0,'Observe the real backend successful deletion before deliberately losing its response.');assert.equal(auth.prepare('SELECT id FROM user WHERE id=?').all(accountB).length,0);assert.equal((await inspectSession(lostSession)).status,401);
+ const lost=snapshot();assert.equal(deletionState(lost.tables).accountId,accountB);assertNativeTransition(beforeLost.tables,lost.tables,{metadata:lost.tables.metadata});assert.deepEqual(lost.tables.metadata.filter(row=>row.key!=='cloud_account_deletion'),beforeLost.tables.metadata);
+ const afterLostRequests={...requestCounts},users=auth.prepare('SELECT id FROM user ORDER BY id').all();await flow('reopen-deletion');assertNativeTransition(lost.tables,snapshot().tables);
+ deleteFault='online';await flow('retry-deletion-unconfirmed');assertNativeTransition(lost.tables,snapshot().tables);assert.deepEqual(auth.prepare('SELECT id FROM user ORDER BY id').all(),users);assert.deepEqual(requestCounts,afterLostRequests);
+ await flow('add-logs-paused');assert.equal(snapshot().events.length,24);assert.equal(snapshot().pending,6);const final=snapshot();await flow('reopen-deletion');assertNativeTransition(final.tables,snapshot().tables);
+ receipts.push({phase:'pending-deletion-faults',cancelExact14Tables:true,preCommitFailureRetriesSafely:true,successfulDeletionLocalEvents:18,acceptedLostResponseRetainsUnresolvedState:true,unconfirmedLocalEvents:24,noAutomaticReplacementIdentity:true});
+ checks.push('A server-accepted deletion with lost response leaves the original unresolved barrier/queue intact across restart/retry while local logging remains usable; no automatic replacement account/enrollment or queued upload occurs. Recovery remains explicitly unconfirmed/help-required rather than falsely reported deleted.');
 }
 // This fixture is deliberately independent of the phone's puppy identity. Only
 // the genuine native SDK's explicit confirmation may associate the two copies.
@@ -353,22 +388,25 @@ try{
     if(req.method==='POST'&&req.url==='/api/cloud/enroll')requestCounts.enroll++;
     if(req.method==='POST'&&req.url==='/api/sync/push')requestCounts.push++;
     if(req.headers.cookie)cookie=req.headers.cookie;
+    const deletingRequest=req.method==='DELETE'&&req.url==='/api/account';
+    if(deletingRequest&&deleteFault==='before'){failedDeletes++;req.resume();res.writeHead(503,{'content-type':'application/json'}).end('{"error":"controlled_delete_outage"}');return;}
     const pushing=req.method==='POST'&&req.url==='/api/sync/push',pulling=req.url.startsWith('/api/sync/pull'),photoRequest=req.url.startsWith('/api/photos/');
     if(photoRequest&&req.method==='POST'&&photoFault==='upload-offline'){failedPhotoUploads++;req.resume();res.writeHead(503,{'content-type':'application/json'}).end('{"error":"controlled_photo_outage"}');return;}
     if(photoRequest&&req.method==='GET'&&photoFault==='download-corrupt'){corruptPhotoDownloads++;res.writeHead(200,{'content-type':'image/jpeg'}).end('invalid JPEG');return;}
     if(fault==='offline'){req.socket.destroy();return;}
     if(fault==='push-offline'&&pushing){req.resume();res.writeHead(503,{'content-type':'application/json'}).end('{"error":"controlled_transport_outage"}');return;}
     const body=[];if(pushing||photoRequest&&req.method==='POST'){req.on('data',part=>body.push(part));if(pushing)req.on('end',()=>{try{const parsed=JSON.parse(Buffer.concat(body).toString());wirePushes.push({mutations:parsed.mutations.map(value=>mutationSchema.parse(value))});}catch{wireParseErrors++;}});}
-    const dropping=pushing&&fault==='drop-push-response-once';activeForwarded++;
+    const dropping=pushing&&fault==='drop-push-response-once'||deletingRequest&&deleteFault==='lost';activeForwarded++;
     let finished=false;const finish=()=>{if(!finished){finished=true;activeForwarded--;}};
     // Wrangler rewrites a matching Origin using the upstream scheme. Forwarding
     // the actual backend Host keeps the original HTTPS Origin intact.
     const outgoing=request('http://127.0.0.1:'+backPort+req.url,{method:req.method,headers:{...req.headers,host:'127.0.0.1:'+backPort}},incoming=>{
-      const chunks=[];if(pushing||pulling||photoRequest)incoming.on('data',part=>chunks.push(part));
+      const chunks=[];if(pushing||pulling||photoRequest||deletingRequest)incoming.on('data',part=>chunks.push(part));
       incoming.on('end',()=>{
         if(incoming.statusCode===200&&(pushing||pulling))try{const parsed=JSON.parse(Buffer.concat(chunks).toString());if(pushing)wireAccepted.push(...pushResponseSchema.parse(parsed).accepted);else wirePages.push(pullPageSchema.parse(parsed));}catch{wireParseErrors++;}
         if(photoRequest)photoTransfers.push({method:req.method,path:req.url,status:incoming.statusCode,...(req.method==='POST'?{requestSHA256:createHash('sha256').update(Buffer.concat(body)).digest('hex')}:{responseSHA256:createHash('sha256').update(Buffer.concat(chunks)).digest('hex')})});
-        if(dropping&&incoming.statusCode===200){fault='push-offline';res.destroy();}
+        if(deletingRequest&&incoming.statusCode===200){const reply=JSON.parse(Buffer.concat(chunks).toString());assert.equal(reply.success,true);acceptedDeletes++;}
+        if(dropping&&incoming.statusCode===200){if(pushing)fault='push-offline';res.destroy();}
         else if(dropping){res.writeHead(incoming.statusCode,incoming.headers);res.end(Buffer.concat(chunks));}
         finish();
       });
@@ -446,7 +484,8 @@ try{
   if(offline)await verifyOfflineLifecycle();
   if(isolating)await verifyAccountIsolation();
   if(photographing)await verifyPhotoLifecycle();
-  if(!onboardingSignIn&&!deleting&&!comparing&&!offline&&!isolating&&!photographing){
+  if(deletionFaults)await verifyDeletionFaults();
+  if(!onboardingSignIn&&!deleting&&!comparing&&!offline&&!isolating&&!photographing&&!deletionFaults){
   await flow('prepare');assert.equal(snapshot().events.length,0);
   assert.ok(requests.has('/api/config'),'The real app must reach this isolated backend before any sign-in attempt.');
   await flow('add-logs',{BATCHES:'4',EXPECTED_COUNT:'12'});const guest=snapshot();assert.equal(guest.events.length,12);assert.equal(guest.owner.length,0);
@@ -487,7 +526,7 @@ try{
   }
   rmSync(join(output,'failure-redacted.log'),{force:true});
   writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',checks,receipts,scope:android?'Android Debug native host with normal embedded release JS and isolated local HTTPS Better Auth/D1/SQLite DO; actual native email SDK and Keystore. Its temporary CA is trusted only in the ignored Debug source set, restored after the run. Production onboarding is tested separately in the Release APK. No real email, production account, session injection or mocked sync.':'Release bundle and actual native email SDK with isolated local HTTPS Better Auth/D1/SQLite DO. Simulator trusts the fixture certificate. No real email, production account, session injection or mocked sync.'},null,2)+'\n');
-  console.log('PASS '+(photographing?'native profile photo failure, roundtrip and restore':isolating?'expired session and account isolation':offline?'offline writes, replay and pending logout':deleting?'native account deletion':comparing?'named puppy comparison':onboardingSignIn?'welcome sign-in and session recovery':android?'guest account preservation and empty-database recovery':'guest account preservation and inspected empty-device recovery')+': '+output);
+  console.log('PASS '+(deletionFaults?'pending native deletion cancellation, retries and lost response':photographing?'native profile photo failure, roundtrip and restore':isolating?'expired session and account isolation':offline?'offline writes, replay and pending logout':deleting?'native account deletion':comparing?'named puppy comparison':onboardingSignIn?'welcome sign-in and session recovery':android?'guest account preservation and empty-database recovery':'guest account preservation and inspected empty-device recovery')+': '+output);
 }finally{
   for(const socket of changeSockets)socket.destroy();
   auth?.close();proxy?.close();for(const child of [worker])if(child?.pid)try{process.kill(-child.pid,'SIGTERM');}catch{}

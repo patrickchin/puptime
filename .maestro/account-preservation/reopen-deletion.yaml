@@ -1,0 +1,7 @@
+appId: com.patrickchin.puptime
+---
+- stopApp
+- launchApp:
+    permissions: {}
+- runFlow: ../helpers/open-account.yaml
+- runFlow: assert-deletion-unconfirmed.yaml

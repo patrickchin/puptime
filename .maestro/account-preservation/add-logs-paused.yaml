@@ -1,0 +1,25 @@
+appId: com.patrickchin.puptime
+name: Unconfirmed deletion keeps the local journal usable
+---
+- scrollUntilVisible:
+    element:
+      id: account.back
+    direction: UP
+- tapOn:
+    id: account.back
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 30000
+- tapOn:
+    id: quick.pee
+    retryTapIfNoChange: true
+- tapOn:
+    id: quick.poop
+    retryTapIfNoChange: true
+- tapOn:
+    id: quick.meal
+    retryTapIfNoChange: true
+- runFlow: ../helpers/open-account.yaml
+- runFlow: assert-deletion-unconfirmed.yaml
