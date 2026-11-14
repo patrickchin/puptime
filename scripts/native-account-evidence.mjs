@@ -141,7 +141,7 @@ export function nativeAuthUiFlags(hierarchy,{email='',code=''}={}){
     const value=ambiguous?undefined:a.value??a.text;
     flags.valueCategory=ambiguous?'ambiguous':typeof value!=='string'?'unavailable':value===''?'empty':id==='account.email.input'?'nonempty':/^\d{6}$/.test(value)?'six-digits':/^\d{1,5}$/.test(value)?'partial-digits':'other';
     const expected=id==='account.email.input'?email:code;
-    flags.exactExpectedMatch=typeof value==='string'&&expected!==''?value===expected:null;
+    flags.exactExpectedMatch=typeof value==='string'&&typeof expected==='string'&&expected!==''?value===expected:null;
    }
    fields[id]=flags;
   }

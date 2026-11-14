@@ -140,6 +140,10 @@ test('auth readiness keeps missing or unsupported input attributes unknown',()=>
  }
  const observed=nativeAuthUiFlags({attributes:{'resource-id':'account.email.input',value:email}})['account.email.input'];
  assert.equal(observed.valueCategory,'nonempty');assert.equal(observed.exactExpectedMatch,null,'Missing expected value cannot establish a mismatch.');
+ for(const expected of [undefined,'',null,false,0,123456])for(const [id,key,value] of [['account.email.input','email',email],['account.code.input','code','654321']]){
+  const result=nativeAuthUiFlags({attributes:{'resource-id':id,value}},{[key]:expected})[id];
+  assert.equal(result.exactExpectedMatch,null,'Expected values must be nonempty strings before comparison.');
+ }
 });
 
 test('auth readiness treats every duplicate ID as ambiguous in either order without retaining secrets',()=>{
