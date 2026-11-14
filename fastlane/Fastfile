@@ -34,6 +34,10 @@ platform :ios do
   lane :submit do
     build_number = ENV.fetch("APP_STORE_BUILD_NUMBER").strip
     UI.user_error!("APP_STORE_BUILD_NUMBER must identify the verified uploaded build") if build_number.empty?
+    ipa_path = ENV.fetch("APP_STORE_IPA_PATH", "").strip
+    UI.user_error!("APP_STORE_IPA_PATH must identify the exact candidate IPA") if ipa_path.empty?
+    sh("python3", "scripts/check-store-audio.py", ipa_path,
+       "--ios-version", PUPTIME_APP_VERSION, "--ios-build", build_number)
 
     deliver(
       api_key: connect_api_key,
@@ -52,10 +56,6 @@ platform :ios do
         email_address: ENV.fetch("APP_REVIEW_EMAIL"),
         phone_number: ENV.fetch("APP_REVIEW_PHONE"),
         notes: File.read("./fastlane/metadata/review_information/notes.txt")
-      },
-      submission_information: {
-        content_rights_contains_third_party_content: false,
-        export_compliance_uses_encryption: false
       }
     )
   end

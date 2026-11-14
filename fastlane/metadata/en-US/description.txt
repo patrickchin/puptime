@@ -2,7 +2,7 @@ Keep track of potty breaks and meals while you learn your puppy's routine. Tap P
 
 Build an editable routine and choose reminders that suit your day. Timeline helps you spot patterns. Estimated entries stay labelled and count separately from recorded activity.
 
-Local logging is free and works offline without an account. Optional cloud backup and device sync let you keep the same puppy history across your devices. Sign in and choose to enable cloud access before any puppy data is uploaded. Cloud access is a separate service; the available plan and any trial are shown before you choose it.
+Local logging is free and works offline without an account. Optional cloud backup and device sync let you keep the same puppy history across your devices. Sign in and choose to enable cloud access before any puppy data is uploaded.
 
 Export an activity CSV from Insights, or import a backup to recover missing entries while keeping your current edits. CSV backups include activity times, notes, custom activity names, and estimate labels. Routines and settings are not included in the activity CSV.
 

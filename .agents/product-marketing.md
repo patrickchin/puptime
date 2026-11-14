@@ -1,6 +1,6 @@
 # Puptime marketing context
 
-Updated November 12, 2026. Read `docs/product-operating-plan.md` for current release gates and operating decisions. A GitHub recovery APK is not a store launch; later merged UI work is not necessarily in that APK.
+Store/trial guidance clarified November 14, 2026. Read `docs/product-operating-plan.md` for current release gates and operating decisions. A GitHub recovery APK is not a store launch; later merged UI work is not necessarily in that APK.
 
 Puptime is a native puppy activity log. Local logging stays free without an account. Optional accounts, cloud backup/device sync and sharing require release qualification; planned paid cloud services are a later phase. Do not market development access as a paid or permanently free production offer.
 
@@ -14,4 +14,4 @@ The owner has little time. The root chat coordinates routine priorities and reco
 
 Copy should be plain, specific and warm. Use verified product behavior and real feedback with consent. Do not invent testimonials, clinical outcomes, prediction accuracy, retention or market demand. Keep diagnostics, raw exports and personal usage analysis private. The owner specifically approved PR #157's screenshots/native preview using their history for store/launch media; this approval applies only to that package and does not authorize publishing other history or support reports.
 
-Prepare outreach/social/listing drafts for review. Do not send, post, purchase, submit or announce without the action's explicit session authorization. Do not advertise in communities that prohibit promotion, including r/puppy101. See the plan for independent-household beta gates; treat them as provisional decision thresholds rather than external benchmarks.
+Prepare outreach/social/listing drafts for review. Do not send, post, purchase, submit or announce without the action's explicit session authorization. Do not advertise in communities that prohibit promotion, including r/puppy101. The proposed five-household product trial and activation targets are optional learning suggestions, not owner-agreed release gates. Keep any applicable store-mandated testing separate; see the current plan and store-readiness checklist.
