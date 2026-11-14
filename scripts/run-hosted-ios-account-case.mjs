@@ -30,7 +30,8 @@ assert.equal(changedNativeInputs,'','Native inputs changed: use a newly qualifie
 const artifacts=api(`actions/runs/${runId}/artifacts`).artifacts.filter(artifact=>artifact.name==='puptime-ios-simulator');
 assert.equal(artifacts.length,1);const artifact=artifacts[0];assert.equal(artifact.expired,false);
 assert.match(artifact.digest??'',/^sha256:[a-f0-9]{64}$/);
-const archive=execFileSync('gh',['api',`repos/${repository}/actions/artifacts/${artifact.id}/zip`],{timeout:180000,maxBuffer:256*1024*1024,stdio:['ignore','pipe','pipe']});
+const archive=process.env.PUPTIME_NATIVE_HOST_ARCHIVE?readFileSync(resolve(process.env.PUPTIME_NATIVE_HOST_ARCHIVE))
+ :execFileSync('gh',['api',`repos/${repository}/actions/artifacts/${artifact.id}/zip`],{timeout:180000,maxBuffer:256*1024*1024,stdio:['ignore','pipe','pipe']});
 assert.equal('sha256:'+createHash('sha256').update(archive).digest('hex'),artifact.digest,'Verify the downloaded artifact bytes.');
 const archivePath=join(privateDirectory,'host-artifact.zip');writeFileSync(archivePath,archive);
 command('unzip',['-q',archivePath,'-d',privateDirectory]);
@@ -41,7 +42,7 @@ command('codesign',['--verify','--deep','--strict',host]);
 assert.equal(command('plutil',['-extract','CFBundleIdentifier','raw','-o','-',join(host,'Info.plist')]),'com.patrickchin.puptime');
 assert.match(command('lipo',['-archs',join(host,'Puptime')]),/\barm64\b/);
 const hash=path=>createHash('sha256').update(readFileSync(path)).digest('hex');
-const provenance={scenario,candidateSource:source,nativeSource:run.head_sha,nativeHostRunId:runId,artifactId:artifact.id,artifactDigest:artifact.digest,nativeInputsUnchanged:true,nativeExecutableSHA256:hash(join(host,'Puptime')),scope:'Actual native email SDK + ephemeral local HTTPS Better Auth/D1/SQLite DO; synthetic identity and history only; no production or provider OAuth qualification.'};
+const provenance={scenario,candidateSource:source,nativeSource:run.head_sha,nativeHostRunId:runId,artifactId:artifact.id,artifactDigest:artifact.digest,archiveSource:process.env.PUPTIME_NATIVE_HOST_ARCHIVE?'verified-local-cache':'download',nativeInputsUnchanged:true,nativeExecutableSHA256:hash(join(host,'Puptime')),scope:'Actual native email SDK + ephemeral local HTTPS Better Auth/D1/SQLite DO; synthetic identity and history only; no production or provider OAuth qualification.'};
 writeFileSync(join(output,'native-provenance.json'),JSON.stringify(provenance,null,2)+'\n');
 const runtimes=JSON.parse(command('xcrun',['simctl','list','runtimes','-j'])).runtimes;
 const runtime=runtimes.filter(item=>item.isAvailable&&item.identifier.includes('iOS-26')).at(-1);assert.ok(runtime);
