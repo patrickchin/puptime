@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,symlinkSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createRequire} from 'node:module';
 import test from 'node:test';
-import {podNoticeInputs,gradleNoticeInputs,unionNoticeInputs,inspectNoticeArchive,noticeInputStep,noticeFailureContext} from './native-notice-inputs.mjs';
-import {assertPackagedNativeCoverage,assertSourceNoticePayload,digest,npmNoticeInputs,resolveNoticeCoverage} from './app-notices.mjs';
+import {podNoticeInputs,gradleNoticeInputs,unionNoticeInputs,inspectNoticeArchive,noticeInputStep,noticeFailureContext,podLinkedSources} from './native-notice-inputs.mjs';
+import {assertPackagedNativeCoverage,assertSourceNoticePayload,digest,npmNoticeInputs,resolveNoticeCoverage,nativeSourceNotices} from './app-notices.mjs';
 const require=createRequire(import.meta.url),plist=require('@expo/plist');
 const mit=readFileSync(new URL('../node_modules/react-native/LICENSE',import.meta.url),'utf8');
 const approval=(item,platform='ios')=>({schema:1,components:[{platform,component:item.id,reviewedVendors:item.vendors,nativeInputs:item.nativeInputs??{},notices:item.notices.map(({source,sha256})=>({source,sha256})),upstream:'https://example.invalid/pinned/native',sectionSHA256:digest([...item.notices].sort((a,b)=>a.source.localeCompare(b.source)).map(value=>value.body).join('\n\n'))}]});
@@ -176,3 +176,30 @@ test('source diagnostics keep ReferenceError finite and snapshot changing or thr
   assert.equal(counts[throwing],1);assert.ok(Object.values(counts).every(count=>count<=1));
  }
 });
+
+
+test('Pods follow only exact selected frameworks into the locked podspec package and still require vendor notices',()=>fixture(({root,file})=>{
+ const pkg='node_modules/qa-sdk',pod='ios/Pods/QA',list='ios/Pods/Target Support Files/QA/QA-xcframeworks-input-files.xcfilelist';
+ const lock={PODS:['QA (1)'],'EXTERNAL SOURCES':{QA:{':podspec':'../node_modules/qa-sdk/ios/QA.podspec'}}},packages={packages:{[pkg]:{version:'1'}}};
+ file('package-lock.json',packages);file(pkg+'/package.json',{name:'qa-sdk',version:'1'});file(pkg+'/LICENSE',mit);file(pkg+'/ios/QA.podspec','public synthetic podspec');file('ios/Podfile.lock',lock);
+ file('ios/Pods/Target Support Files/Pods-QA/Pods-QA-acknowledgements.plist',plist.default.build({PreferenceSpecifiers:[{Title:'QA',FooterText:mit}]}));file(pod+'/LICENSE',mit);
+ const target=pkg+'/prebuilds/spm-deps/Shared/debug/Shared.xcframework',binary=target+'/Shared',link=join(root,pod,'Shared.xcframework');file(binary,Buffer.from([0xcf,0xfa,0xed,0xfe,1]));symlinkSync(join(root,target),link);
+ const input='${PODS_ROOT}/Target Support Files/QA/QA-xcframeworks.sh\n${PODS_ROOT}/QA/Shared.xcframework\n';file(list,input);
+ const initial=podNoticeInputs(root).components[0],fingerprint=initial.nativeInputs['cocoapods:QA'];
+ assert.deepEqual(fingerprint.linkedSources,[{source:'Shared.xcframework',target,packagePath:pkg,component:'npm:qa-sdk@1'}]);assert.equal(fingerprint.frameworkInputList.sha256,digest(input));assert.equal(fingerprint.externalPodspec.component,'npm:qa-sdk@1');assert.equal(fingerprint.externalPodspec.sha256,digest('public synthetic podspec'));
+ assert.ok(!JSON.stringify(initial).includes(root));assert.ok(initial.vendors.includes('Shared.xcframework'));assert.deepEqual(initial.vendorNotices['Shared.xcframework'],[]);
+ assert.equal(resolveNoticeCoverage([initial],approval(initial)).unresolved[0].reason,'missing-vendored-notice','The owning package and Pod acknowledgement cannot license a separate vendor.');
+ file(target+'/LICENSE','Distinct vendor licence\n');const complete=podNoticeInputs(root).components[0],reviewed=approval(complete);assert.equal(resolveNoticeCoverage([complete],reviewed).status,'READY');
+ file(binary,Buffer.from([0xcf,0xfa,0xed,0xfe,2]));assert.equal(resolveNoticeCoverage(podNoticeInputs(root).components,reviewed).unresolved[0].reason,'native-source-digest-mismatch');file(binary,Buffer.from([0xcf,0xfa,0xed,0xfe,1]));
+ file(list,input+'\n');assert.equal(resolveNoticeCoverage(podNoticeInputs(root).components,reviewed).unresolved[0].reason,'native-source-digest-mismatch');file(list,input);
+ file(pkg+'/ios/QA.podspec','changed public synthetic podspec');assert.equal(resolveNoticeCoverage(podNoticeInputs(root).components,reviewed).unresolved[0].reason,'native-source-digest-mismatch');file(pkg+'/ios/QA.podspec','public synthetic podspec');
+ const descriptor=podLinkedSources(root,'QA',join(root,pod),lock['EXTERNAL SOURCES'].QA).linkedSources[0];
+ assert.throws(()=>nativeSourceNotices(root,join(root,pod),'cocoapods:QA'),'Undeclared boundary crossing is not generally accepted.');
+ const guarded=nativeSourceNotices(root,join(root,pod),'cocoapods:QA',{linkedSources:[{...descriptor,privateBody:'PRIVATE_BODY'}]});assert.ok(!JSON.stringify(guarded).includes('PRIVATE_BODY'));
+ for(const text of ['${PODS_ROOT}/QA/*.xcframework\n','${PODS_ROOT}/QA/Missing.xcframework\n','${PODS_ROOT}/QA/../Shared.xcframework\n']){file(list,text);assert.throws(()=>podLinkedSources(root,'QA',join(root,pod),lock['EXTERNAL SOURCES'].QA));}file(list,'${PODS_ROOT}/Target Support Files/QA/QA-xcframeworks.sh\n');assert.throws(()=>podNoticeInputs(root));file(list,input);
+ file('node_modules/other/package.json',{name:'other',version:'1'});file('node_modules/other/LICENSE',mit);file('node_modules/other/ios/Other.podspec','other');file('node_modules/other/Other.xcframework/Other','private');file('package-lock.json',{packages:{...packages.packages,'node_modules/other':{version:'1'}}});
+ rmSync(link);symlinkSync(join(root,'node_modules/other/Other.xcframework'),link);assert.throws(()=>podNoticeInputs(root),'A selected link cannot leave its exact podspec-owning package.');rmSync(link);symlinkSync(join(root,target),link);
+ file('ios/Podfile.lock',{...lock,'EXTERNAL SOURCES':{QA:{':podspec':'../node_modules/other/ios/Other.podspec'}}});assert.throws(()=>podNoticeInputs(root));file('ios/Podfile.lock',lock);
+ file(pkg+'/package.json',{name:'qa-sdk',version:'2'});assert.throws(()=>podNoticeInputs(root),'An installed owner differing from package-lock cannot qualify the link.');file(pkg+'/package.json',{name:'qa-sdk',version:'1'});
+ file(pkg+'/outside/NOTICE','Not inside the selected vendor root');symlinkSync(join(root,pkg,'outside'),join(root,target,'outside'));assert.throws(()=>podNoticeInputs(root),'Nested links cannot escape even into another part of the owner package.');
+}));

@@ -1,7 +1,7 @@
 // Build-time notice evidence. Importing never starts Metro, a device or a build.
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {closeSync,existsSync,openSync,readFileSync,readSync,readdirSync,realpathSync,statSync} from 'node:fs';
+import {closeSync,existsSync,openSync,readFileSync,readSync,readdirSync,realpathSync,statSync,lstatSync} from 'node:fs';
 import {dirname,isAbsolute,join,relative,resolve,sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {isDeepStrictEqual} from 'node:util';
@@ -38,21 +38,32 @@ function nearbyNotices(boundary,start,prefix){
 
 // Shared native-source boundary walk. Generated Gradle output is excluded only
 // through the actual project build-directory metadata, never a vendor wildcard.
-export function nativeSourceNotices(root,supplied,prefix,{excluded=[]}={}){
+export function nativeSourceNotices(root,supplied,prefix,{excluded=[],linkedSources=[]}={}){
  const boundary=realpathSync(supplied),project=realpathSync(root),modules=existsSync(join(root,'node_modules'))?realpathSync(join(root,'node_modules')):null;
  assert.ok((modules&&inside(modules,boundary))||boundary.startsWith(join(project,'ios/Pods')+sep)||boundary.startsWith(join(project,'modules')+sep),'Native source must be an identified package/Pod/local module, not arbitrary project data.');
  const canonicalFuture=path=>{path=resolve(path);let ancestor=path;while(!existsSync(ancestor))ancestor=dirname(ancestor);return resolve(realpathSync(ancestor),relative(ancestor,path));};
+ const links=new Map();
+ for(const value of linkedSources){
+  const {source,packagePath,component,target:logicalTarget}=value,name=safeRelative(source),packageName=safeRelative(packagePath),targetName=safeRelative(logicalTarget);assert.ok(name.endsWith('.xcframework')&&!links.has(name),'Native source link escapes its component.');
+  const link=join(boundary,name),owner=npmNoticeInputs(root,[join(root,packageName,'package.json')])[0];
+  assert.ok(owner?.packagePath===packageName&&owner.id===component&&lstatSync(link).isSymbolicLink(),'Native source link escapes its component.');
+  const packageRoot=realpathSync(join(root,packageName)),target=realpathSync(join(root,targetName));
+  assert.ok(inside(packageRoot,target)&&realpathSync(link)===target&&statSync(target).isDirectory(),'Native source link escapes its component.');
+  links.set(name,{source:name,target:targetName,packagePath:owner.packagePath,component:owner.id,targetRoot:target});
+ }
  const omitted=new Set(excluded.map(canonicalFuture)),files=[],notices=[],vendors=new Set(),visited=new Set();let count=0,total=0;
- function walk(folder,logical=''){
-  const canonical=realpathSync(folder);assert.ok(inside(boundary,canonical),'Native source link escapes its component.');
+ function walk(folder,logical='',scope=boundary){
+  const canonical=realpathSync(folder);assert.ok(inside(scope,canonical),'Native source link escapes its component.');
   if(visited.has(canonical))return;visited.add(canonical);
   for(const entry of readdirSync(folder,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))){
    assert.ok(++count<=100000,'Too many native source entries.');
    const path=join(folder,entry.name),name=logical?logical+'/'+entry.name:entry.name;
    if(entry.name==='.git'||omitted.has(resolve(path)))continue;
-   const actual=realpathSync(path);assert.ok(inside(boundary,actual),'Native source link escapes its component.');const info=statSync(path);
+   const actual=realpathSync(path),link=links.get(name);let nextScope=scope;
+   if(!inside(scope,actual)){assert.ok(link&&link.targetRoot===actual,'Native source link escapes its component.');nextScope=actual;}
+   const info=statSync(path);
    if(vendorName.test(entry.name)||(info.isDirectory()&&vendorName.test(logical.split('/').at(-1)??''))||/\.(?:xcframework|framework|a|so|jar|aar)$/.test(entry.name))vendors.add(name);
-   if(info.isDirectory()){walk(path,name);continue;}
+   if(info.isDirectory()){walk(path,name,nextScope);continue;}
    assert.ok(info.isFile()&&info.size<=512*1024*1024&&(total+=info.size)<=2*1024*1024*1024,'Native source inventory exceeds its bound.');
    files.push({path:name,sha256:fileDigest(path)});
    if(name.split('/').some(part=>noticeName.test(part)))notices.push(candidate(boundary,path,prefix+'/'+name));
@@ -60,7 +71,7 @@ export function nativeSourceNotices(root,supplied,prefix,{excluded=[]}={}){
  }
  walk(boundary);
  const vendorNotices=Object.fromEntries([...vendors].sort().map(value=>[value,notices.filter(item=>item.source.startsWith(prefix+'/'+value+'/')).map(item=>item.source)]));
- return {notices,vendors:[...vendors].sort(),vendorNotices,nativeInputs:{[prefix]:{sha256:digest(JSON.stringify(files)),files:files.length,excludedBuildPaths:[...omitted].filter(path=>inside(boundary,path)).map(path=>safeRelative(relative(boundary,path))).sort()}}};
+ return {notices,vendors:[...vendors].sort(),vendorNotices,nativeInputs:{[prefix]:{sha256:digest(JSON.stringify(files)),files:files.length,excludedBuildPaths:[...omitted].filter(path=>inside(boundary,path)).map(path=>safeRelative(relative(boundary,path))).sort(),...(links.size?{linkedSources:[...links.values()].map(({targetRoot,...value})=>value).sort((a,b)=>a.source.localeCompare(b.source))}:{})}}};
 }
 
 // Use the actual Metro-selected files, not all installed/declared dependencies.

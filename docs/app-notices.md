@@ -184,7 +184,13 @@ Metro inputs are selected files, not every declared or installed package. Nested
 packages have their own licence boundary. CocoaPods inputs include resolved pod
 versions, generated acknowledgements, actual source notice files and vendored
 framework/library names. Raw Pod lock/plist/notice bytes must be valid UTF-8;
-invalid bytes are rejected before decoding, never repaired. Gradle inputs are the
+invalid bytes are rejected before decoding, never repaired. A framework symlink
+may cross a Pod sandbox only when its exact literal path appears in the hashed
+CocoaPods xcframework input list and its target belongs to the locked external
+podspec's installed npm package. The link target, owning package, podspec and
+selected target bytes are fingerprinted. Undeclared links, targets outside that
+package and nested links escaping the selected framework remain rejected; a
+declared link does not supply the vendor's licence. Gradle inputs are the
 actual release runtime resolution and artifact hashes. A shared bounded scanner
 walks Pods and autolinked Gradle native subtrees, fingerprints source files, and
 finds source-only `vendor`/`third_party` children as well as binary vendors.

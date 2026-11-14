@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {existsSync,readFileSync,readdirSync,realpathSync} from 'node:fs';
+import {existsSync,readFileSync,readdirSync,realpathSync,lstatSync,statSync} from 'node:fs';
 import {basename,dirname,join,relative,resolve,sep} from 'node:path';
 import {createRequire} from 'node:module';
-import {digest,nativeNoticeInput,npmNoticeInputs,nativeSourceNotices,noticeText} from './app-notices.mjs';
+import {digest,nativeNoticeInput,npmNoticeInputs,nativeSourceNotices,noticeText,capturedSource,safeRelative} from './app-notices.mjs';
 
 const require=createRequire(import.meta.url),archiveReader=new URL('./notice-archive.py',import.meta.url);
 
@@ -31,6 +31,28 @@ export function noticeFailureContext(error){const value=contexts.get(error);retu
 export function inspectNoticeArchive(path,payloadPath,bundlePath){
  return JSON.parse(execFileSync('python3',[archiveReader.pathname,path,...(payloadPath?[payloadPath]:[]),...(bundlePath?[bundlePath]:[])],{encoding:'utf8',maxBuffer:32*1024*1024,timeout:60000,stdio:['ignore','pipe','pipe']}));
 }
+// Only CocoaPods-selected literal frameworks may cross a Pod sandbox, and
+// only into the exact installed package owning its locked external podspec.
+export function podLinkedSources(root,name,source,external){
+ const list=join(root,'ios/Pods/Target Support Files',safeRelative(name),name+'-xcframeworks-input-files.xcfilelist');
+ if(!external?.[':podspec']||!existsSync(list))return {linkedSources:[]};
+ const bytes=readFileSync(list),text=noticeText(bytes,1024*1024),prefix='${PODS_ROOT}/'+name+'/',selected=[];
+ for(const line of text.split(/\r?\n/).filter(Boolean)){
+  if(!line.endsWith('.xcframework'))continue;
+  assert.ok(line.startsWith(prefix),'Native source link escapes its component.');
+  const item=safeRelative(line.slice(prefix.length));assert.ok(!/[*?{}$]/.test(item),'Native source link escapes its component.');selected.push(item);
+ }
+ const candidates=[],boundary=realpathSync(source),frameworkInputList={source:safeRelative(relative(root,list)),sha256:digest(bytes)};
+ for(const item of new Set(selected)){
+  const path=join(source,item);assert.ok(existsSync(path)&&statSync(path).isDirectory(),'Native source link escapes its component.');if(!lstatSync(path).isSymbolicLink())continue;
+  const target=realpathSync(path);if(target===boundary||target.startsWith(boundary+sep))continue;candidates.push({source:item,target});
+ }
+ if(!candidates.length)return {linkedSources:[],frameworkInputList};
+ const spec=resolve(root,'ios',external[':podspec']),owner=npmNoticeInputs(root,[spec])[0];assert.ok(owner,'Native source link escapes its component.');
+ const modules=realpathSync(join(root,'node_modules')),linkedSources=candidates.map(value=>({source:value.source,target:'node_modules/'+safeRelative(relative(modules,value.target)),packagePath:owner.packagePath,component:owner.id}));
+ return {linkedSources,frameworkInputList,externalPodspec:capturedSource(root,spec)};
+}
+
 export function podNoticeInputs(root){
  const lockPath=join(root,'ios/Podfile.lock'),support=join(root,'ios/Pods/Target Support Files');
  if(!existsSync(lockPath)||!existsSync(support))return {components:[],unresolved:[{component:'native:ios',reason:'missing-resolved-pod-inputs'}],nativeFiles:[]};
@@ -53,10 +75,13 @@ export function podNoticeInputs(root){
  });
  const unresolved=[],components=[];
  for(const [name,version] of versions){
-  const notices=texts.get(name)??[],external=lock['EXTERNAL SOURCES']?.[name]?.[':path'];let scan={vendors:[],vendorNotices:{},nativeInputs:{},notices:[]};
-  const source=external?resolve(root,'ios',external):join(root,'ios/Pods',name);
+  const notices=texts.get(name)??[],external=lock['EXTERNAL SOURCES']?.[name];let scan={vendors:[],vendorNotices:{},nativeInputs:{},notices:[]};
+  const source=external?.[':path']?resolve(root,'ios',external[':path']):join(root,'ios/Pods',name);
   if(!existsSync(source))unresolved.push({component:`cocoapods:${name}@${version}`,reason:'missing-resolved-pod-source'});
-  else scan=noticeInputStep('pod-source-scan','cocoapods',()=>nativeSourceNotices(root,source,`cocoapods:${name}`),`cocoapods:${name}@${version}`);
+  else scan=noticeInputStep('pod-source-scan','cocoapods',()=>{
+   const {linkedSources,...metadata}=podLinkedSources(root,name,source,external),value=nativeSourceNotices(root,source,`cocoapods:${name}`,{linkedSources});
+   Object.assign(value.nativeInputs[`cocoapods:${name}`],metadata);return value;
+  },`cocoapods:${name}@${version}`);
   components.push(noticeInputStep('pod-notices','cocoapods',()=>nativeNoticeInput({id:`cocoapods:${name}@${version}`,name,version,ecosystem:'cocoapods',...scan,notices:[...notices,...scan.notices].sort((a,b)=>a.source.localeCompare(b.source))}),`cocoapods:${name}@${version}`));
  }
  return {components,unresolved,nativeFiles:[],inputHashes:{podLock:digest(readFileSync(lockPath)),podAcknowledgements:digest(JSON.stringify(acknowledgements))}};
