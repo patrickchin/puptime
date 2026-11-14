@@ -19,7 +19,7 @@ on:
       account_case:
         description: Isolated account case
         type: choice
-        options: [all, baseline, comparison, offline, isolation]
+        options: [all, baseline, comparison, offline, isolation, photos]
         default: all
 
 jobs:
@@ -208,7 +208,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scenario: ${{ fromJSON(inputs.account_case == 'all' && '["baseline","comparison","offline","isolation"]' || format('["{0}"]', inputs.account_case)) }}
+        scenario: ${{ fromJSON(inputs.account_case == 'all' && '["baseline","comparison","offline","isolation","photos"]' || format('["{0}"]', inputs.account_case)) }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
