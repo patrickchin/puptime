@@ -1,0 +1,197 @@
+{
+  "seconds": 17.37,
+  "poster_seconds": 7,
+  "source": "Native simulator recording; original CSV history with personal notes omitted; one scripted logging/edit action",
+  "audio": "Silent stereo AAC",
+  "timing": "Slower interaction footage with idle waits removed",
+  "transition_seconds": 0.2,
+  "frozen_padding_seconds": 0,
+  "tap_indicators": [
+    {
+      "at": 0.205,
+      "tap_at": 0.805,
+      "x": 165,
+      "y": 426,
+      "duration": 1.2,
+      "control": "quick.pee"
+    },
+    {
+      "at": 3.605,
+      "tap_at": 4.205,
+      "x": 396,
+      "y": 1138,
+      "duration": 1.2,
+      "control": "editor.adjust.back.15"
+    },
+    {
+      "at": 7.917,
+      "tap_at": 8.517,
+      "x": 651,
+      "y": 391,
+      "duration": 1.2,
+      "control": "timeline.filter.poop-meal"
+    },
+    {
+      "at": 9.602,
+      "tap_at": 10.202,
+      "x": 262,
+      "y": 1163,
+      "duration": 1.2,
+      "control": "timeline.mark.point.2026-10-08.17"
+    },
+    {
+      "at": 14.824,
+      "tap_at": 15.424,
+      "x": 338,
+      "y": 1279,
+      "duration": 1.2,
+      "control": "schedule.editor.window.30"
+    }
+  ],
+  "step_labels": [
+    {
+      "step": 1,
+      "screen": "01-logged",
+      "title": "Log a potty break",
+      "at": 0.12,
+      "duration": 1.4
+    },
+    {
+      "step": 2,
+      "screen": "02-edited",
+      "title": "Correct the time",
+      "at": 2.92,
+      "duration": 1.4
+    },
+    {
+      "step": 3,
+      "screen": "03-timeline",
+      "title": "Compare days",
+      "at": 6.12,
+      "duration": 1.4
+    },
+    {
+      "step": 4,
+      "screen": "04-detail",
+      "title": "See the details",
+      "at": 7.887,
+      "duration": 1.4
+    },
+    {
+      "step": 5,
+      "screen": "05-insights",
+      "title": "Spot patterns",
+      "at": 12.387,
+      "duration": 1.4
+    },
+    {
+      "step": 6,
+      "screen": "06-routine",
+      "title": "Set your routine",
+      "at": 14.187,
+      "duration": 1.4
+    }
+  ],
+  "sha256": "b81a1c0417b911573431dc604582e3a61bf5a1f02de3090b311e485cb474e3fc",
+  "scenes": [
+    {
+      "screen": "01-logged",
+      "source_recording": "preview/preview.raw.mov",
+      "raw_start": 65.9,
+      "raw_end": 68.58,
+      "segments": [
+        {
+          "raw_start": 65.9,
+          "raw_end": 66.9,
+          "speed": 0.6
+        },
+        {
+          "raw_start": 68.1,
+          "raw_end": 68.58,
+          "speed": 0.35
+        }
+      ],
+      "edited_seconds": 3.0
+    },
+    {
+      "screen": "02-edited",
+      "source_recording": "preview/preview.raw.mov",
+      "raw_start": 70.238,
+      "raw_end": 71.6,
+      "segments": [
+        {
+          "raw_start": 70.238,
+          "raw_end": 71.6,
+          "speed": 0.4
+        }
+      ],
+      "edited_seconds": 3.4
+    },
+    {
+      "screen": "03-timeline",
+      "source_recording": "preview/preview.raw.mov",
+      "raw_start": 78.137,
+      "raw_end": 80.1,
+      "segments": [
+        {
+          "raw_start": 78.137,
+          "raw_end": 80.1,
+          "speed": 1
+        }
+      ],
+      "edited_seconds": 1.966667
+    },
+    {
+      "screen": "04-detail",
+      "source_recording": "preview/preview.raw.mov",
+      "raw_start": 80.1,
+      "raw_end": 84.25,
+      "segments": [
+        {
+          "raw_start": 80.1,
+          "raw_end": 80.85,
+          "speed": 0.4
+        },
+        {
+          "raw_start": 82.85,
+          "raw_end": 84.25,
+          "speed": 0.5
+        }
+      ],
+      "edited_seconds": 4.7
+    },
+    {
+      "screen": "05-insights",
+      "source_recording": "preview/preview.raw.mov",
+      "raw_start": 88.175,
+      "raw_end": 90.175,
+      "segments": [
+        {
+          "raw_start": 88.175,
+          "raw_end": 90.175,
+          "speed": 1
+        }
+      ],
+      "edited_seconds": 2.0
+    },
+    {
+      "screen": "06-routine",
+      "source_recording": "routine-ending-v3/preview.raw.mov",
+      "raw_start": 38.6,
+      "raw_end": 40.9,
+      "segments": [
+        {
+          "raw_start": 38.6,
+          "raw_end": 39.2,
+          "speed": 0.7
+        },
+        {
+          "raw_start": 39.65,
+          "raw_end": 40.9,
+          "speed": 0.5
+        }
+      ],
+      "edited_seconds": 3.3
+    }
+  ]
+}

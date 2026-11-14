@@ -1,0 +1,94 @@
+appId: com.patrickchin.puptime
+name: App Store action preview
+---
+- launchApp
+- extendedWaitUntil:
+    visible: {id: screen.today}
+    timeout: 90000
+- tapOn: {id: nav.open, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    visible: {id: nav.close}
+    timeout: 30000
+- waitForAnimationToEnd
+- tapOn: {id: nav.settings, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    notVisible: {id: nav.close}
+    timeout: 30000
+- waitForAnimationToEnd
+- tapOn: {id: settings.theme.open}
+- waitForAnimationToEnd
+- tapOn: {id: appearance.theme.light, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    notVisible: {id: appearance.modal}
+    timeout: 30000
+- tapOn: {id: settings.back}
+- tapOn: {id: nav.open, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    visible: {id: nav.close}
+    timeout: 30000
+- waitForAnimationToEnd
+- tapOn: {id: nav.log, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    notVisible: {id: nav.close}
+    timeout: 30000
+- waitForAnimationToEnd
+- tapOn: {id: quick.pee}
+- waitForAnimationToEnd
+- takeScreenshot: 01-logged
+- tapOn: {id: event.pee.edit, index: 0, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    visible: {id: editor.close}
+    timeout: 30000
+- waitForAnimationToEnd
+- tapOn: {id: editor.adjust.back.15}
+- waitForAnimationToEnd
+- takeScreenshot: 02-edited
+- tapOn: {id: editor.close}
+- tapOn: {id: nav.switch}
+- extendedWaitUntil:
+    visible: {id: screen.timeline}
+    timeout: 30000
+- waitForAnimationToEnd
+- takeScreenshot: 03-timeline
+- tapOn: {id: timeline.filter.poop-meal, retryTapIfNoChange: true}
+- waitForAnimationToEnd
+- tapOn: {id: timeline.mark.point.2026-10-08.*, index: 0, retryTapIfNoChange: true}
+- waitForAnimationToEnd
+- assertVisible: {id: timeline.details}
+- takeScreenshot: 04-detail
+- tapOn: {id: timeline.details.close}
+- tapOn: {id: nav.open, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    visible: {id: nav.close}
+    timeout: 30000
+- waitForAnimationToEnd
+- tapOn: {id: nav.insights, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    notVisible: {id: nav.close}
+    timeout: 30000
+- waitForAnimationToEnd
+- assertVisible: {id: screen.insights}
+- takeScreenshot: 05-insights
+- tapOn: {id: nav.open, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    visible: {id: nav.close}
+    timeout: 30000
+- waitForAnimationToEnd
+- tapOn: {id: nav.schedule, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    notVisible: {id: nav.close}
+    timeout: 30000
+- waitForAnimationToEnd
+- assertVisible: {id: screen.schedule}
+- tapOn: {id: schedule.entry.meal, index: 0, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    visible: {id: schedule.editor}
+    timeout: 30000
+- waitForAnimationToEnd
+- tapOn: {id: schedule.editor.window.30, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    visible: {id: schedule.editor.window.range, text: "8:30.*AM.*9:30.*AM"}
+    timeout: 30000
+- waitForAnimationToEnd
+- takeScreenshot: 06-routine
+- waitForAnimationToEnd
