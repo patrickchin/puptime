@@ -53,6 +53,7 @@ name: Skip optional answers to reminder setup
                       id: preview.poopTimes
                   - tapOn:
                       id: preview.skip
+                      text: ^Skip for now$
                       enabled: true
       - assertVisible:
           id: preview.planTimeline
