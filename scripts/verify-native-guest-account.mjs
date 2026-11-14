@@ -20,9 +20,9 @@ import {nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeD
 const [platform,initialDevice,host,consent,destination='build/guest-account-'+platform,onboarding]=process.argv.slice(2);
 let device=initialDevice;
 assert.ok(['ios','android'].includes(platform));
-assert.ok(onboarding===undefined||['--onboarding-sign-in','--account-deletion','--puppy-comparison','--offline-lifecycle'].includes(onboarding));
-const android=platform==='android',deleting=onboarding==='--account-deletion',onboardingSignIn=onboarding==='--onboarding-sign-in',comparing=onboarding==='--puppy-comparison',offline=onboarding==='--offline-lifecycle';
-assert.ok(!(comparing||offline)||!android,'Extended lifecycle cases use the dedicated iOS verification path.');
+assert.ok(onboarding===undefined||['--onboarding-sign-in','--account-deletion','--puppy-comparison','--offline-lifecycle','--account-isolation'].includes(onboarding));
+const android=platform==='android',deleting=onboarding==='--account-deletion',onboardingSignIn=onboarding==='--onboarding-sign-in',comparing=onboarding==='--puppy-comparison',offline=onboarding==='--offline-lifecycle',isolating=onboarding==='--account-isolation';
+assert.ok(!(comparing||offline||isolating)||!android,'Extended lifecycle cases use the dedicated iOS verification path.');
 assert.equal(consent,'--replace-synthetic','Use PLATFORM DEVICE HOST --replace-synthetic [OUTPUT].');
 const frontPort=Number(process.env.PUPTIME_ACCOUNT_PORT??8797),backPort=frontPort+2;assert.ok(Number.isInteger(frontPort)&&frontPort>1024&&frontPort<65533);
 const app='com.patrickchin.puptime',output=resolve(destination),front='https://127.0.0.1:'+frontPort;
@@ -97,7 +97,7 @@ async function flow(name,env={}){
     rmSync(artifacts,{recursive:true,force:true});
   }
 }
-const email='native-'+crypto.randomUUID()+'@example.invalid';
+let email='native-'+crypto.randomUUID()+'@example.invalid';
 const androidSnapshot=join(privateDir,'android-snapshot');
 function sqliteDirectory(){
   if(!android)return join(simctl('get_app_container',device,app,'data'),'Documents/SQLite');
@@ -162,11 +162,37 @@ async function assertCloud(events){
   assert.ok(rows.every(row=>row.revision===1),'Rejoining must not rewrite existing logs.');
   return rows;
 }
-async function signIn(){
+async function signIn({associated=false}={}){
   const before=snapshot();await flow('request');
   code=auth.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(email)?.code;
-  assert.match(code??'',/^\d{6}$/);codes.add(code);await flow('verify');code='';
+  assert.match(code??'',/^\d{6}$/);codes.add(code);await flow(associated?'verify-associated':'verify',{EXPECTED_COUNT:String(before.events.length)});code='';
   assert.deepEqual(snapshot(),before,'Sign-in itself must preserve every event and wait for explicit backup confirmation.');
+}
+function mutateAuth(statement){
+ const path=join(privateDir,'private.sql');writeFileSync(path,statement,{mode:0o600});
+ try{execFileSync('npx',['wrangler','d1','execute','AUTH_DB','--local','--config',configPath,'--persist-to',persist,'--file',path],{env:childEnv,stdio:['ignore','pipe','pipe']});}finally{rmSync(path,{force:true});}
+}
+async function verifyAccountIsolation(){
+ await flow('prepare');await flow('add-logs',{BATCHES:'4',EXPECTED_COUNT:'12'});await signIn();await flow('enable',{EXPECTED_COUNT:'12'});
+ const accountA=snapshot().owner[0].account_id,emailA=email,cookieA=cookie,remoteA=await remote();
+ await transport('offline');await flow('add-logs',{BATCHES:'1',EXPECTED_COUNT:'15'});const pending=snapshot();assert.equal(pending.pending,3);
+ // Expire only this disposable identity's real server session. No native token injection.
+ assert.match(accountA,/^[A-Za-z0-9_-]+$/);mutateAuth(`UPDATE session SET expiresAt='1970-01-01T00:00:00.000Z' WHERE userId='${accountA}'`);
+ assert.equal((await inspectSession(cookieA)).status,401);
+ await transport('online');await flow('auth-expired',{EXPECTED_COUNT:'15'});assertNativeTransition(pending.tables,snapshot().tables);
+ email='native-other-'+crypto.randomUUID()+'@example.invalid';await signIn({associated:true});
+ const accountB=await inspectSession(cookie);assert.equal(accountB.status,200);assert.notEqual(accountB.body.user.id,accountA);
+ const cookieB=cookie;assert.equal((await remote()).length,0,'A newly authenticated second account must receive none of account A’s records.');
+ assertNativeTransition(pending.tables,snapshot().tables);await flow('assert-mismatch',{EXPECTED_COUNT:'15'});
+ await flow('sign-out-pending',{ACTION:'cancel',EXPECTED_PENDING:'3'});assertNativeTransition(pending.tables,snapshot().tables);
+ await flow('reopen-mismatch',{EXPECTED_COUNT:'15'});assertNativeTransition(pending.tables,snapshot().tables);assert.equal((await remote()).length,0);
+ await flow('sign-out-pending',{ACTION:'confirm',EXPECTED_PENDING:'3'});assertNativeDetached(pending.tables,snapshot().tables);assert.equal((await inspectSession(cookieB)).status,401);
+ email=emailA;await signIn();await flow('enable',{EXPECTED_COUNT:'15'});assert.equal(snapshot().owner[0].account_id,accountA);assert.deepEqual(snapshot().events,pending.events);await assertCloud(pending.events);
+ // Existing records retain their identity/revision; the old cookie stays expired.
+ assert.equal((await inspectSession(cookieA)).status,401);const final=await remote();for(const prior of remoteA)assert.deepEqual(final.find(record=>record.id===prior.id),prior);
+ await flow('reopen',{EXPECTED_COUNT:'15'});assert.deepEqual(snapshot().events,pending.events);assert.equal(snapshot().pending,0);
+ receipts.push({phase:'expired-session-account-isolation',accountCount:2,preservedEvents:15,pendingBefore:3,wrongAccountEvents:0,all14TablesChecked:true,oldSessionsRejected:true});
+ checks.push('Expired real server session retains A’s exact14-table history/queue; actual native OTP sign-in to distinct B cannot sync or retarget it through restart/cancel; explicit logout preserves history, and signing back into A merges pending records without changing old cloud revisions.');
 }
 async function until(ready,message,timeout=45000){
  const deadline=Date.now()+timeout;
@@ -377,7 +403,8 @@ try{
   }
   if(comparing)await verifyPuppyComparison();
   if(offline)await verifyOfflineLifecycle();
-  if(!onboardingSignIn&&!deleting&&!comparing&&!offline){
+  if(isolating)await verifyAccountIsolation();
+  if(!onboardingSignIn&&!deleting&&!comparing&&!offline&&!isolating){
   await flow('prepare');assert.equal(snapshot().events.length,0);
   assert.ok(requests.has('/api/config'),'The real app must reach this isolated backend before any sign-in attempt.');
   await flow('add-logs',{BATCHES:'4',EXPECTED_COUNT:'12'});const guest=snapshot();assert.equal(guest.events.length,12);assert.equal(guest.owner.length,0);
@@ -418,7 +445,7 @@ try{
   }
   rmSync(join(output,'failure-redacted.log'),{force:true});
   writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',checks,receipts,scope:android?'Android Debug native host with normal embedded release JS and isolated local HTTPS Better Auth/D1/SQLite DO; actual native email SDK and Keystore. Its temporary CA is trusted only in the ignored Debug source set, restored after the run. Production onboarding is tested separately in the Release APK. No real email, production account, session injection or mocked sync.':'Release bundle and actual native email SDK with isolated local HTTPS Better Auth/D1/SQLite DO. Simulator trusts the fixture certificate. No real email, production account, session injection or mocked sync.'},null,2)+'\n');
-  console.log('PASS '+(offline?'offline writes, replay and pending logout':deleting?'native account deletion':comparing?'named puppy comparison':onboardingSignIn?'welcome sign-in and session recovery':android?'guest account preservation and empty-database recovery':'guest account preservation and inspected empty-device recovery')+': '+output);
+  console.log('PASS '+(isolating?'expired session and account isolation':offline?'offline writes, replay and pending logout':deleting?'native account deletion':comparing?'named puppy comparison':onboardingSignIn?'welcome sign-in and session recovery':android?'guest account preservation and empty-database recovery':'guest account preservation and inspected empty-device recovery')+': '+output);
 }finally{
   for(const socket of changeSockets)socket.destroy();
   auth?.close();proxy?.close();for(const child of [worker])if(child?.pid)try{process.kill(-child.pid,'SIGTERM');}catch{}

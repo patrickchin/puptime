@@ -10,7 +10,7 @@ const repository=process.env.GITHUB_REPOSITORY,runId=process.env.PUPTIME_NATIVE_
 assert.equal(repository,'patrickchin/puptime','Run only in the intended repository.');
 assert.match(runId??'',/^\d+$/);
 const scenario=process.env.PUPTIME_ACCOUNT_SCENARIO;
-assert.ok(['baseline','comparison','offline'].includes(scenario));
+assert.ok(['baseline','comparison','offline','isolation'].includes(scenario));
 const output=resolve('build/isolated-native-account',scenario);mkdirSync(output,{recursive:true});
 const privateDirectory=mkdtempSync(join(tmpdir(),'puptime-native-host-'));
 const command=(binary,args,options={})=>execFileSync(binary,args,{encoding:'utf8',timeout:120000,stdio:['ignore','pipe','pipe'],...options}).trim();
@@ -49,7 +49,7 @@ const device=command('xcrun',['simctl','create',`Puptime Account ${scenario} CI 
 try{
  command('xcrun',['simctl','boot',device]);command('xcrun',['simctl','bootstatus',device,'-b']);
  command('xcrun',['simctl','install',device,host]);
- const mode={baseline:[],comparison:['--puppy-comparison'],offline:['--offline-lifecycle']}[scenario];
+ const mode={baseline:[],comparison:['--puppy-comparison'],offline:['--offline-lifecycle'],isolation:['--account-isolation']}[scenario];
  const args=['scripts/verify-ios-guest-account.mjs',device,host,'--replace-synthetic',output,...mode];
  await new Promise((resolveCase,reject)=>{const child=spawn(process.execPath,args,{stdio:'inherit',env:{...process.env,CI:'1'}});child.once('error',reject);child.once('close',code=>code===0?resolveCase():reject(new Error(`Native ${scenario} case failed (${code}).`)));});
  assert.equal(JSON.parse(readFileSync(join(output,'verification.json'),'utf8')).status,'passed');
