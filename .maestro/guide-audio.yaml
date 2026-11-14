@@ -1,5 +1,5 @@
 appId: com.patrickchin.puptime
-name: Puppy guide audio controls
+name: Puppy written guides without restricted narration
 tags:
   - android
   - ios
@@ -28,36 +28,27 @@ tags:
           id: learn.back
 - tapOn:
     id: learn.article.getting-started
-- assertVisible: Play
-- assertVisible: Your first days · elevenlabs.io
-- tapOn:
-    id: learn.audio.forward
-- assertVisible: 0:15 / 1:23
-- tapOn:
-    id: learn.audio.back
-- assertVisible: 0:00 / 1:23
-- tapOn:
-    id: learn.audio.seek
-- assertVisible: '0:4[12] / 1:23'
-- tapOn:
-    id: learn.audio.speed
-- tapOn:
-    id: learn.audio.speed.1.25
-- assertVisible: 'Playback speed: 1.25 times'
-- tapOn:
-    id: learn.audio.mute
-- assertVisible: Unmute
-- tapOn:
-    id: learn.audio.mute
-- assertVisible: Mute
-- swipe:
-    start: 50%,45%
-    end: 50%,20%
-    duration: 400
-- assertVisible:
+- assertVisible: Your first days
+- assertVisible: 'Potty: little and often'
+- assertNotVisible:
+    id: learn.audio
+- assertNotVisible:
     id: learn.audio.play
-- assertVisible:
-    id: learn.audio.seek
+- scrollUntilVisible:
+    element:
+      id: learn.sources.toggle
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn:
+    id: learn.sources.toggle
+- scrollUntilVisible:
+    element:
+      text: RSPCA.*
+    direction: DOWN
+    visibilityPercentage: 100
+- assertVisible: RSPCA.*
+- assertNotVisible:
+    id: learn.audio
 - runFlow:
     when:
       platform: iOS
