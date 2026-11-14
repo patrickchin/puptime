@@ -4,26 +4,39 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Release version (for example 1.12.0); leave blank for the next patch
+        description: Artifact version (for example 1.12.0); leave blank for the next patch
         required: false
         type: string
+      publish:
+        description: Publish a GitHub release and create its tag if needed
+        required: false
+        type: boolean
+        default: false
   push:
     tags:
       - "v*"
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: puptime-release
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    concurrency:
-      group: puptime-release
-      cancel-in-progress: false
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+      base_tag: ${{ steps.release.outputs.base_tag }}
+      apk_sha256: ${{ steps.verify.outputs.apk_sha256 }}
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - name: Choose release version
         id: release
         shell: bash
@@ -49,10 +62,12 @@ jobs:
             echo "Unsupported release tag: $tag" >&2
             exit 1
           fi
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
-          echo "base_tag=$base_tag" >> "$GITHUB_OUTPUT"
-      - name: Set APK version
+          {
+            echo "tag=$tag"
+            echo "version=${tag#v}"
+            echo "base_tag=$base_tag"
+          } >> "$GITHUB_OUTPUT"
+      - name: Set artifact version
         env:
           PUPTIME_VERSION: ${{ steps.release.outputs.version }}
         run: |
@@ -76,47 +91,102 @@ jobs:
       - run: npx expo prebuild --platform android --no-install
         env:
           CI: "1"
-      - run: ./gradlew assembleRelease --no-daemon
+      - run: ./gradlew assembleRelease bundleRelease --no-daemon
         env:
           EXPO_PUBLIC_APP_POSTHOG_KEY: ${{ vars.EXPO_PUBLIC_APP_POSTHOG_KEY }}
           EXPO_PUBLIC_APP_POSTHOG_HOST: ${{ vars.EXPO_PUBLIC_APP_POSTHOG_HOST || 'https://eu.i.posthog.com' }}
         working-directory: android
-      - name: Verify APK signature and archive
+      - name: Verify artifacts and record qualification metadata
+        id: verify
+        shell: bash
         run: |
+          mkdir qualification
           puptime_apksigner=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)
           test -n "$puptime_apksigner"
-          "$puptime_apksigner" verify --verbose --print-certs android/app/build/outputs/apk/release/app-release.apk
+          "$puptime_apksigner" verify --verbose --print-certs android/app/build/outputs/apk/release/app-release.apk | tee qualification/APK-SIGNING.txt
           unzip -tq android/app/build/outputs/apk/release/app-release.apk
-      - name: Prepare release files
-        env:
-          PUPTIME_VERSION: ${{ steps.release.outputs.version }}
-        run: |
-          mkdir release
-          cp android/app/build/outputs/apk/release/app-release.apk "release/Puptime-${PUPTIME_VERSION}.apk"
-          cd release
-          sha256sum "Puptime-${PUPTIME_VERSION}.apk" > SHA256SUMS.txt
+          unzip -tq android/app/build/outputs/bundle/release/app-release.aab
+          jarsigner -verify android/app/build/outputs/bundle/release/app-release.aab > qualification/AAB-SIGNATURE-VERIFICATION.txt
+          keytool -printcert -jarfile android/app/build/outputs/bundle/release/app-release.aab > qualification/AAB-SIGNING.txt
+          keytool -printcert -rfc -jarfile android/app/build/outputs/bundle/release/app-release.aab > qualification/AAB-CERTIFICATE.pem
+          grep -q -- '-----BEGIN CERTIFICATE-----' qualification/AAB-CERTIFICATE.pem
+          puptime_apkanalyzer=$(find "$ANDROID_HOME/cmdline-tools" -type f -name apkanalyzer | sort -V | tail -n 1)
+          test -n "$puptime_apkanalyzer"
+          "$puptime_apkanalyzer" manifest print android/app/build/outputs/apk/release/app-release.apk > qualification/APK-MANIFEST.xml
+          unzip -p android/app/build/outputs/bundle/release/app-release.aab base/manifest/AndroidManifest.xml > qualification/AAB-MANIFEST.pb
+          test -s qualification/AAB-MANIFEST.pb
+          python3 scripts/check-store-audio.py android/app/build/outputs/apk/release/app-release.apk
+          python3 scripts/check-store-audio.py android/app/build/outputs/bundle/release/app-release.aab
+          (cd android/app/build/outputs/apk/release && sha256sum app-release.apk) > qualification/SHA256SUMS.txt
+          (cd android/app/build/outputs/bundle/release && sha256sum app-release.aab) >> qualification/SHA256SUMS.txt
+          echo "apk_sha256=$(sha256sum android/app/build/outputs/apk/release/app-release.apk | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const {expo} = require('./app.json');
+          fs.writeFileSync('qualification/BUILD-INFO.json', JSON.stringify({
+            sourceCommit: process.env.GITHUB_SHA,
+            runId: process.env.GITHUB_RUN_ID,
+            configuredPackage: expo.android.package,
+            configuredVersion: expo.version,
+            configuredVersionCode: expo.android.versionCode,
+          }, null, 2) + '\n');
+          NODE
       - uses: actions/upload-artifact@v6
         with:
           name: puptime-android-apk
           path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
+      - uses: actions/upload-artifact@v6
+        with:
+          name: puptime-android-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v6
+        with:
+          name: puptime-android-qualification
+          path: qualification/
+          if-no-files-found: error
+
+  publish:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true }}
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          name: puptime-android-apk
+          path: release
+      - name: Prepare release files
+        env:
+          PUPTIME_APK_SHA256: ${{ needs.build.outputs.apk_sha256 }}
+          PUPTIME_VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          printf '%s  %s\n' "$PUPTIME_APK_SHA256" release/app-release.apk | sha256sum --check -
+          mv release/app-release.apk "release/Puptime-${PUPTIME_VERSION}.apk"
+          cd release
+          sha256sum "Puptime-${PUPTIME_VERSION}.apk" > SHA256SUMS.txt
       - name: Publish GitHub release
-        if: github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
-          PUPTIME_BASE_TAG: ${{ steps.release.outputs.base_tag }}
-          PUPTIME_RELEASE_TAG: ${{ steps.release.outputs.tag }}
-          PUPTIME_VERSION: ${{ steps.release.outputs.version }}
+          PUPTIME_BASE_TAG: ${{ needs.build.outputs.base_tag }}
+          PUPTIME_RELEASE_TAG: ${{ needs.build.outputs.tag }}
+          PUPTIME_VERSION: ${{ needs.build.outputs.version }}
+          PUPTIME_BUILD_COMMIT: ${{ github.sha }}
         run: |
           if gh release view "$PUPTIME_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "$PUPTIME_RELEASE_TAG is already published"
             exit 0
           fi
+          puptime_notes=()
+          if [[ -n "$PUPTIME_BASE_TAG" ]]; then
+            puptime_notes=(--notes-start-tag "$PUPTIME_BASE_TAG")
+          fi
           gh release create "$PUPTIME_RELEASE_TAG" \
             "release/Puptime-${PUPTIME_VERSION}.apk#Puptime-${PUPTIME_VERSION}.apk" \
             "release/SHA256SUMS.txt#SHA256SUMS.txt" \
             --repo "$GITHUB_REPOSITORY" \
-            --target "$(git rev-parse HEAD)" \
+            --target "$PUPTIME_BUILD_COMMIT" \
             --title "Puptime $PUPTIME_RELEASE_TAG" \
-            --generate-notes \
-            --notes-start-tag "$PUPTIME_BASE_TAG"
+            --generate-notes "${puptime_notes[@]}"
