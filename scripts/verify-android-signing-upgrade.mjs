@@ -114,7 +114,7 @@ function emulatorSelfCheck(){
  {const t=stub();t.io.adb=()=>closed;t.io.signal=signal=>t.calls.push(signal);assert.equal(stopEmulator(t.io,t.state),false);assert.equal(t.state.cleanup,'still-alive');assert.deepEqual(t.calls,['SIGTERM','SIGKILL']);}
  {const t=stub();let replaced=false;t.io.adb=()=>closed;t.io.signal=signal=>{t.calls.push(signal);replaced=true;};t.io.inspect=()=>({...base,start:replaced?'99':'42'});assert.equal(stopEmulator(t.io,t.state),false);assert.equal(t.state.cleanup,'ownership-refused');assert.deepEqual(t.calls,['SIGTERM']);}
 
- const stat='123 (qemu with spaces) S '+Array(18).fill('0').join(' ')+' 42 0',expected={executables:['/sdk/emulator/emulator','/sdk/emulator/qemu/linux-x86_64/qemu-system-x86_64'],arguments:['-avd','Puptime_Signing_QA_123','-port','5588','-no-window','-no-audio','-no-snapshot','-gpu','swiftshader_indirect'],home:'/private/qa/avd',uid:'1001'};
+ const stat='123 (qemu with spaces) S '+Array(18).fill('0').join(' ')+' 42 0',expected={executables:['/sdk/emulator/emulator','/sdk/emulator/qemu/linux-x86_64/qemu-system-x86_64','/sdk/emulator/qemu/linux-x86_64/qemu-system-x86_64-headless'],arguments:['-avd','Puptime_Signing_QA_123','-port','5588','-no-window','-no-audio','-no-snapshot','-gpu','swiftshader_indirect'],home:'/private/qa/avd',uid:'1001'};
  const files={stat,afterStat:stat,exe:expected.executables[0],cmdline:[expected.executables[0],...expected.arguments].join('\0')+'\0',environ:'UNRELATED=private-not-retained\0ANDROID_AVD_HOME='+expected.home+'\0',status:'Name:\tqemu\nUid:\t1001\t1001\t1001\t1001\n'};
  for(const exe of expected.executables)assert.ok(ownedProcess(processIdentity({...files,exe,cmdline:[exe,...expected.arguments].join('\0')+'\0'},expected),'42'),'Accept same-PID launcher→QEMU exec with unchanged tail args.');
  for(const patch of [{exe:'/foreign/qemu'},{afterStat:stat.replace(') S ',') Z ')},{cmdline:files.cmdline.replace('/sdk/emulator/emulator','/foreign/argv0')},{cmdline:files.cmdline.replace('QA_123','QA_999')},{cmdline:files.cmdline+'-extra\0'},{environ:'ANDROID_AVD_HOME=/foreign\0'},{environ:'OTHER_ANDROID_AVD_HOME='+expected.home+'\0'},{status:files.status.replaceAll('1001','1002')},{status:files.status.replace('1001\t1001','1001\t0')},{environ:files.environ+'ANDROID_AVD_HOME=/foreign\0'},{stat:stat.replace(' 42 ',' 99 '),afterStat:stat.replace(' 42 ',' 99 ')}])assert.ok(!ownedProcess(processIdentity({...files,...patch},expected),'42'));
@@ -187,7 +187,7 @@ function emulatorHost(mode){
  const save=value=>writeFileSync(stateFile,JSON.stringify(safeHostState(value)),{mode:0o600});
  const pidFile=join(folder,'emulator.pid');let owner=existsSync(ownerFile)?JSON.parse(readFileSync(ownerFile)):null;
  const pid=owner?.pid??(existsSync(pidFile)?Number(readFileSync(pidFile,'utf8').trim()):null);if(pid!==null)assert.ok(Number.isSafeInteger(pid)&&pid>1);
- const executables=[join(sdk,'emulator/emulator'),join(sdk,'emulator/qemu/linux-x86_64/qemu-system-x86_64')].filter(existsSync).map(path=>realpathSync(path));
+ const executables=[join(sdk,'emulator/emulator'),join(sdk,'emulator/qemu/linux-x86_64/qemu-system-x86_64'),join(sdk,'emulator/qemu/linux-x86_64/qemu-system-x86_64-headless')].filter(existsSync).map(path=>realpathSync(path));
  const inspect=()=>{
   if(pid===null)return null;
   try{
