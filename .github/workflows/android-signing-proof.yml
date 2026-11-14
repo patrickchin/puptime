@@ -67,7 +67,7 @@ jobs:
           puptime_sdkmanager=$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)
           test -n "$puptime_sdkmanager"
           puptime_cmdline_bin=$(dirname "$puptime_sdkmanager")
-          for puptime_tool in "$puptime_cmdline_bin/sdkmanager" "$puptime_cmdline_bin/avdmanager" "$ANDROID_HOME/platform-tools/adb" "$ANDROID_HOME/emulator/emulator"; do
+          for puptime_tool in "$puptime_cmdline_bin/sdkmanager" "$puptime_cmdline_bin/avdmanager" "$ANDROID_HOME/platform-tools/adb"; do
             test -x "$puptime_tool"
             printf 'Android executable: %s\n' "$puptime_tool"
           done
@@ -75,8 +75,10 @@ jobs:
           printf '%s\n' "$puptime_cmdline_bin" "$ANDROID_HOME/platform-tools" "$ANDROID_HOME/emulator" >> "$GITHUB_PATH"
           timeout 30 sdkmanager --version | sed -n '1,4p'
           timeout 30 adb version | sed -n '1,4p'
+          sdkmanager 'emulator' 'build-tools;36.0.0' 'system-images;android-36;google_apis;x86_64'
+          test -x "$ANDROID_HOME/emulator/emulator"
+          printf 'Android executable: %s\n' "$ANDROID_HOME/emulator/emulator"
           timeout 30 emulator -version | sed -n '1,4p'
-          sdkmanager 'build-tools;36.0.0' 'system-images;android-36;google_apis;x86_64'
           export ANDROID_AVD_HOME="$PUPTIME_SIGNING_PRIVATE/avd"
           mkdir -m 700 "$ANDROID_AVD_HOME"
           echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
