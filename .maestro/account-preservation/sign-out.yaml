@@ -19,8 +19,12 @@ name: Account preservation sign-out
       id: account.signOut
     direction: DOWN
 - waitForAnimationToEnd
+- assertVisible:
+    id: account.signOut
+    enabled: true
 - tapOn:
     id: account.signOut
+    enabled: true
     retryTapIfNoChange: true
 - assertVisible: ${ACCOUNT_SIGN_OUT_TITLE || "^Sign out on this device\\?$"}
 - waitForAnimationToEnd
