@@ -73,6 +73,7 @@ function widgetBinding(text){
 }
 function selfCheck(){
  emulatorSelfCheck();
+ offlineSelfCheck();
  assertWidgetSource();
  validateDriver('d'.repeat(40),'d'.repeat(40));assert.throws(()=>validateDriver('d'.repeat(40),'e'.repeat(40)));assert.throws(()=>validateDriver('short','short'));
  const change=path=>`:100644 100644 ${'a'.repeat(40)} ${'b'.repeat(40)} M\0${path}\0`;
@@ -94,6 +95,35 @@ function selfCheck(){
  const dump='\nWidgets:\n  [0] id=2\n    host=HostId{user:0, app:10001, hostId:1024, pkg:launcher}\n    provider=ProviderId{user:0, app:10002, cmp:ComponentInfo{'+app+'/'+app+'.widget.PuptimeQuickLog}}\n    views=random\nHosts:\n';assert.equal(widgetBinding(dump).id,'2');assert.throws(()=>widgetBinding(dump.replace(app+'/','other/')));assert.throws(()=>widgetBinding(dump.replace('    host=','    invalid=')));
  console.log('PASS signing QA source self-checks; no network, keys, signing or device operations.');
 }
+function offlineSnapshot({airplane,wifiPreference,wifiStatus,connectivity,mobilePreference}){
+ const text=connectivity.replaceAll('\r',''),defaults=text.match(/^[ \t]*Active default network: [^\n]*$/gm)??[],starts=text.match(/^[ \t]*Current Networks:[ \t]*$/gm)??[],ends=text.match(/^[ \t]*Status for known UIDs:[ \t]*$/gm)??[],section=text.match(/^[ \t]*Current Networks:[ \t]*\n([\s\S]*?)^[ \t]*Status for known UIDs:[ \t]*$/m);
+ return {airplaneEnabled:airplane.trim()==='1',wifiPreferenceDisabled:wifiPreference.trim()==='0',wifiDisabled:wifiStatus.replaceAll('\r','').split('\n')[0].trim()==='Wifi is disabled',noDefaultNetwork:defaults.length===1&&defaults[0].trim()==='Active default network: none',noRegisteredNetworks:starts.length===1&&ends.length===1&&!!section&&section[1].trim()==='',mobileDataPreference:({'0':'disabled','1':'enabled',null:'unset'})[mobilePreference.trim()]??'other'};
+}
+const offlineReady=value=>['airplaneEnabled','wifiPreferenceDisabled','wifiDisabled','noDefaultNetwork','noRegisteredNetworks'].every(key=>value[key]===true);
+function readOffline(adb){
+ const read=(...args)=>{const result=adb(['shell',...args],5000);assert.equal(result.status,0,'Offline readback command failed.');return result.stdout;};
+ return offlineSnapshot({airplane:read('settings','get','global','airplane_mode_on'),wifiPreference:read('settings','get','global','wifi_on'),wifiStatus:read('cmd','wifi','status'),connectivity:read('dumpsys','connectivity'),mobilePreference:read('settings','get','global','mobile_data')});
+}
+function emulatorOffline(io,state){
+ state.offline='pending';io.save(state);const until=io.now()+30000;
+ do{
+  assert.ok(ownedProcess(io.inspect(),io.start),'Offline setup requires the same live owned emulator.');Object.assign(state,readOffline(io.adb));
+  if(offlineReady(state)){state.offline='verified';io.save(state);return;}io.save(state);io.pause();
+ }while(io.now()<until);
+ state.offline='timeout';io.save(state);throw new Error('Actual offline connectivity readback timed out.');
+}
+function offlineSelfCheck(){
+ const empty='Active default network: none\n\nCurrent network preferences: \n\nCurrent Networks:\n\nStatus for known UIDs:\n',fixture={airplane:'1\n',wifiPreference:'0\n',wifiStatus:'Wifi is disabled\nWifi scanning is always available\n',connectivity:empty,mobilePreference:'1\n'};
+ const good=offlineSnapshot(fixture);assert.ok(offlineReady(good));assert.equal(good.mobileDataPreference,'enabled','A saved preference is diagnostic, never connectivity proof.');
+ for(const patch of [{airplane:'0'},{wifiPreference:'1'},{wifiStatus:'Wifi is enabled\n'},{wifiStatus:'unknown\n'},{connectivity:empty.replace('network: none','network: 100')},{connectivity:empty.replace('Current Networks:\n','Current Networks:\n  NetworkAgentInfo{cellular connected}\n')},{connectivity:empty.replace('Active default network: none','')},{connectivity:empty+'Active default network: none\n'},{connectivity:empty.replace('Status for known UIDs:','Unknown:')},{connectivity:empty+'Current Networks:\n'},{connectivity:'permission denied'}])assert.ok(!offlineReady(offlineSnapshot({...fixture,mobilePreference:'0',...patch})),'Saved preference0 cannot hide missing/ambiguous/live network evidence.');
+ const responses={'settings get global airplane_mode_on':fixture.airplane,'settings get global wifi_on':fixture.wifiPreference,'cmd wifi status':fixture.wifiStatus,'dumpsys connectivity':empty,'settings get global mobile_data':'1'};let time=0,reads=0;const state={},calls=[],io={start:'42',inspect:()=>({alive:true,start:'42',executable:true,arguments:true,home:true,uid:true}),save:()=>{},now:()=>time,pause:()=>time+=1000,adb:args=>{calls.push(args.join(' '));return {status:0,stdout:responses[args.slice(1).join(' ')],stderr:''};}};
+ assert.deepEqual(readOffline(io.adb),good);io.adb=args=>({status:0,stdout:args[1]==='dumpsys'&&reads++===0?empty.replace('network: none','network: 100'):responses[args.slice(1).join(' ')],stderr:''});emulatorOffline(io,state);assert.equal(state.offline,'verified');assert.equal(time,1000);
+ time=0;io.adb=args=>({status:0,stdout:args[1]==='dumpsys'?empty.replace('Current Networks:\n','Current Networks:\n  nondefault active network\n'):responses[args.slice(1).join(' ')],stderr:''});assert.throws(()=>emulatorOffline(io,state));assert.equal(state.offline,'timeout');assert.equal(time,30000);
+ for(const status of [1,null])assert.throws(()=>readOffline(()=>({status,stdout:'',stderr:'private failure'})));
+ io.inspect=()=>null;assert.throws(()=>emulatorOffline(io,state));assert.ok(calls.every(value=>!value.includes(' root')&&!value.includes(' put ')));
+ console.log('PASS actual offline production-parser/command/readiness stubs; saved mobile-data preference never substitutes for absent connectivity.');
+}
+
 function emulatorSelfCheck(){
  const base={alive:true,start:'42',executable:true,arguments:true,home:true,uid:true};
  const stub=()=>{let now=0,alive=true;const calls=[],state={},io={name:'Puptime_Signing_QA_123',start:'42',inspect:()=>({...base,alive}),save:()=>{},now:()=>now,pause:()=>now+=1000,signal:signal=>{calls.push(signal);alive=false;},adb:args=>{calls.push(args.join(' '));return {status:0,stdout:args[0]==='root'?'restarting adbd as root\n':args[0]==='emu'?'Puptime_Signing_QA_123\nOK\n':args[1]==='id'?'0\n':'1\n',stderr:''};}};return {io,state,calls,exit:()=>alive=false};};
@@ -130,9 +160,9 @@ function emulatorSelfCheck(){
 // of success. AOSP documents adbd's restart: docs/dev/root.md in packages/modules/adb.
 function processStart(stat){const fields=stat.slice(stat.lastIndexOf(')')+2).trim().split(/\s+/);assert.match(fields[19]??'',/^\d+$/);return {start:fields[19],alive:!['Z','X'].includes(fields[0])};}
 function safeHostState(value){
- const allowed={liveness:['not-started','owned','identity-mismatch','exited'],boot:['not-started','pending','complete'],rootRequest:['not-issued','acknowledged','closed-transport','refused'],rootReadback:['not-attempted','pending','verified','timeout','identity-mismatch'],cleanup:['not-attempted','already-exited','console-exit','term-exit','kill-exit','ownership-refused','still-alive'],setup:['failed']},safe={};
+ const allowed={liveness:['not-started','owned','identity-mismatch','exited'],boot:['not-started','pending','complete'],rootRequest:['not-issued','acknowledged','closed-transport','refused'],rootReadback:['not-attempted','pending','verified','timeout','identity-mismatch'],cleanup:['not-attempted','already-exited','console-exit','term-exit','kill-exit','ownership-refused','still-alive'],setup:['failed'],offline:['pending','verified','timeout'],mobileDataPreference:['enabled','disabled','unset','other']},safe={};
  for(const [key,values] of Object.entries(allowed))if(key in value){assert.ok(values.includes(value[key]));safe[key]=value[key];}
- if('privateMaterialRemoved' in value){assert.equal(typeof value.privateMaterialRemoved,'boolean');safe.privateMaterialRemoved=value.privateMaterialRemoved;}return safe;
+ for(const key of ['privateMaterialRemoved','airplaneEnabled','wifiPreferenceDisabled','wifiDisabled','noDefaultNetwork','noRegisteredNetworks','offlinePreKey'])if(key in value){assert.equal(typeof value[key],'boolean');safe[key]=value[key];}return safe;
 }
 function ownedProcess(value,start){return !!value?.alive&&value.start===start&&value.executable&&value.arguments&&value.home&&value.uid;}
 function processIdentity(files,expected){
@@ -195,11 +225,11 @@ function emulatorHost(mode){
    return processIdentity({stat:readFileSync(join(proc,'stat'),'utf8'),exe:readlinkSync(join(proc,'exe')),cmdline:readFileSync(join(proc,'cmdline'),'utf8'),environ:readFileSync(join(proc,'environ'),'utf8'),status:readFileSync(join(proc,'status'),'utf8'),afterStat:readFileSync(join(proc,'stat'),'utf8')},{executables,arguments:['-avd',name,'-port','5588','-no-window','-no-audio','-no-snapshot','-gpu','swiftshader_indirect'],home:join(folder,'avd'),uid:String(process.getuid())});
   }catch(error){if(error.code==='ENOENT'||error.code==='ESRCH')return null;throw error;}
  };
- const io={name,start:owner?.start,inspect,save,now:Date.now,pause:()=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,1000),signal:signal=>{try{process.kill(pid,signal);}catch(error){if(error.code!=='ESRCH')throw error;}},adb:(args,timeout=3000)=>{const value=spawnSync(join(sdk,'platform-tools/adb'),['-s','emulator-5588',...args],{encoding:'utf8',timeout,maxBuffer:65536,stdio:['ignore','pipe','pipe']});return {status:value.status,stdout:value.stdout??'',stderr:value.stderr??''};}};
+ const io={name,start:owner?.start,inspect,save,now:Date.now,pause:()=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,1000),signal:signal=>{try{process.kill(pid,signal);}catch(error){if(error.code!=='ESRCH')throw error;}},adb:(args,timeout=3000)=>{const value=spawnSync(join(sdk,'platform-tools/adb'),['-s','emulator-5588',...args],{encoding:'utf8',timeout,maxBuffer:256*1024,stdio:['ignore','pipe','pipe']});return {status:value.status,stdout:value.stdout??'',stderr:value.stderr??''};}};
  if(mode==='--emulator-record'){
   assert.equal(owner,null);assert.ok(pid);const value=processStart(readFileSync('/proc/'+pid+'/stat','utf8'));assert.ok(value.alive);owner={pid,start:value.start};writeFileSync(ownerFile,JSON.stringify(owner),{flag:'wx',mode:0o600});io.start=value.start;recordOwnedEmulator(io,state);
- }else if(mode==='--emulator-root'){
-  assert.ok(owner);try{emulatorRoot(io,state);}catch(error){state.setup='failed';save(state);throw error;}
+ }else if(mode==='--emulator-root'||mode==='--emulator-offline'){
+  assert.ok(owner);try{if(mode==='--emulator-root')emulatorRoot(io,state);else emulatorOffline(io,state);}catch(error){state.setup='failed';save(state);throw error;}
  }else{
   let stopped=false;
   try{stopped=stopEmulator(io,state);}finally{
@@ -213,7 +243,7 @@ function emulatorHost(mode){
  }catch(error){if(existsSync(folder))writeFileSync(join(folder,'emulator-host-failure.txt'),String(error.stack),{mode:0o600});throw error;}
 }
 
-const [mode]=process.argv.slice(2);if(['--emulator-record','--emulator-root','--emulator-cleanup'].includes(mode)){try{emulatorHost(mode);process.exit(0);}catch{console.error('FAIL host-only '+mode.slice(2)+'; raw process/error evidence remains private.');process.exit(1);}}if(mode==='--self-check'){selfCheck();process.exit(0);}
+const [mode]=process.argv.slice(2);if(['--emulator-record','--emulator-root','--emulator-offline','--emulator-cleanup'].includes(mode)){try{emulatorHost(mode);process.exit(0);}catch{console.error('FAIL host-only '+mode.slice(2)+'; raw process/error evidence remains private.');process.exit(1);}}if(mode==='--self-check'){selfCheck();process.exit(0);}
 assert.ok(['--preflight','--exercise'].includes(mode));assert.equal(process.env.GITHUB_ACTIONS,'true');assert.equal(process.env.RUNNER_OS,'Linux');process.umask(0o077);
 const root=resolve(process.env.PUPTIME_SIGNING_PRIVATE??'');assert.ok(process.env.RUNNER_TEMP&&root.startsWith(resolve(process.env.RUNNER_TEMP)+'/puptime-signing-'));
 const source=process.env.PUPTIME_EXPECTED_SOURCE,driverSource=process.env.PUPTIME_EXPECTED_DRIVER;assert.match(source??'',/^[a-f0-9]{40}$/);validateDriver(driverSource,process.env.GITHUB_SHA);assertWidgetSource();
@@ -266,7 +296,9 @@ const inputs=JSON.parse(readFileSync(join(root,'inputs.json')));assert.equal(inp
 for(const [i,name] of ['bridge','later'].entries())assert.equal(await fileHash(join(root,name,'input.apk')),inputs.artifacts[i].sha256);
 const device='emulator-5588',adb=(...args)=>command('adb',['-s',device,...args]);assert.equal(adb('emu','avd','name').trim().split(/\r?\n/)[0],'Puptime_Signing_QA_'+process.env.GITHUB_RUN_ID);assert.equal(adb('shell','getprop','ro.build.version.sdk').trim(),'36');
 assert.equal(adb('shell','settings','get','global','airplane_mode_on').trim(),'1');assert.equal(adb('shell','id','-u').trim(),'0');assert.equal(command('adb',['-s',device,'shell','pm','path',app],{ok:[1]}),'','The task emulator must not contain any pre-existing Puptime installation.');
-assert.equal(adb('shell','settings','get','global','wifi_on').trim(),'0');assert.equal(adb('shell','settings','get','global','mobile_data').trim(),'0');
+assert.equal(adb('shell','settings','get','global','wifi_on').trim(),'0');
+// Saved mobile_data may target a different/no subscription. Require actual network absence.
+const offline=readOffline((args,timeout)=>({status:0,stdout:command('adb',['-s',device,...args],{timeout})}));writeFileSync(join(root,'emulator-host-state.json'),JSON.stringify(safeHostState({...JSON.parse(readFileSync(join(root,'emulator-host-state.json'))),...offline,offlinePreKey:offlineReady(offline)})),{mode:0o600});assert.ok(offlineReady(offline),'Pre-key actual offline readback failed.');
 const tools=join(process.env.ANDROID_HOME,'build-tools/36.0.0'),signer=join(tools,'apksigner'),aapt=join(tools,'aapt2');
 function artifact(path,code,cert){const verified=command(signer,['verify','--verbose','--print-certs',path]);assert.ok(verified.includes('certificate SHA-256 digest: '+cert));const manifest=command(aapt,['dump','badging',path]).split('\n').slice(0,3);assert.ok(manifest[0].includes(`name='${app}' versionCode='${code}'`));assert.equal(manifest[1],"minSdkVersion:'24'");assert.equal(manifest[2],"targetSdkVersion:'36'");}
 artifact(join(root,'original125.apk'),1012005,oldCert);for(const [i,name] of ['bridge','later'].entries())artifact(join(root,name,'input.apk'),1012006+i,oldCert);
