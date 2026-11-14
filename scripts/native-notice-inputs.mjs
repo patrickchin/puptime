@@ -19,8 +19,10 @@ export function noticeInputStep(operation,component,run,id,source){
  try{return run();}catch(thrown){
   const error=thrown instanceof Error?thrown:new Error('Notice input failed.');
   if(!contexts.has(error)){
-   const category=error.code==='ENOENT'?'missing-input':['EACCES','EPERM'].includes(error.code)?'unreadable-input':error instanceof SyntaxError?'invalid-format':error.code==='ERR_ASSERTION'?(assertionCategories.get(error.message)??'invalid-input'):Number.isInteger(error.status)?'subprocess-failed':'unsupported-input';
-   contexts.set(error,{operation,component,errorCategory:category,...(id?{componentSHA256:digest(id)}:{}),...(operation.startsWith('source-')?{errorClass:error instanceof TypeError?'TypeError':error instanceof SyntaxError?'SyntaxError':error instanceof RangeError?'RangeError':error.code==='ERR_ASSERTION'?'AssertionError':'Error',errorCode:sourceErrorCodes.has(error.code)?error.code:'other',...(typeof source==='string'?{sourceSHA256:digest(source)}:{})}:{})});
+   let fields={};try{fields={code:error.code,status:error.status,message:error.message};}catch{}
+   const {code,status,message}=fields;
+   const category=code==='ENOENT'?'missing-input':['EACCES','EPERM'].includes(code)?'unreadable-input':error instanceof SyntaxError?'invalid-format':code==='ERR_ASSERTION'?(assertionCategories.get(message)??'invalid-input'):Number.isInteger(status)?'subprocess-failed':'unsupported-input';
+   contexts.set(error,{operation,component,errorCategory:category,...(id?{componentSHA256:digest(id)}:{}),...(operation.startsWith('source-')?{errorClass:error instanceof TypeError?'TypeError':error instanceof SyntaxError?'SyntaxError':error instanceof ReferenceError?'ReferenceError':error instanceof RangeError?'RangeError':code==='ERR_ASSERTION'?'AssertionError':'Error',errorCode:sourceErrorCodes.has(code)?code:'other',...(typeof source==='string'?{sourceSHA256:digest(source)}:{})}:{})});
   }
   throw error;
  }

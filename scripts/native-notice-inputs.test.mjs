@@ -156,3 +156,23 @@ test('finite native failure context preserves the innermost operation without ra
  }
  assert.equal(noticeFailureContext(Object.assign(new Error('private'),{native:{operation:'arbitrary'}})),undefined);
 }));
+
+
+test('source diagnostics keep ReferenceError finite and snapshot changing or throwing Error fields once',()=>{
+ const capture=error=>{let caught;try{noticeInputStep('source-path','metro',()=>{throw error;},undefined,'/PRIVATE_SOURCE');}catch(value){caught=value;}assert.equal(caught,error);return noticeFailureContext(caught);};
+ const reference=Object.assign(new ReferenceError('PRIVATE_MESSAGE'),{name:'PRIVATE_CLASS',code:'PRIVATE_CODE',cause:{token:'PRIVATE_TOKEN'}});
+ const projected=capture(reference);assert.equal(projected.errorClass,'ReferenceError');assert.equal(projected.errorCode,'other');assert.ok(!JSON.stringify(projected).includes('PRIVATE'));
+ const reads={code:0,status:0,message:0},changing=new Error('PRIVATE_ORIGINAL');
+ Object.defineProperties(changing,{
+  code:{get(){return ++reads.code===1?'ERR_INVALID_ARG_TYPE':'PRIVATE_CHANGED_CODE';}},
+  status:{get(){reads.status++;return undefined;}},
+  message:{get(){reads.message++;return 'PRIVATE_CHANGED_MESSAGE';}},
+ });
+ const stable=capture(changing);assert.equal(stable.errorCode,'ERR_INVALID_ARG_TYPE');assert.deepEqual(reads,{code:1,status:1,message:1});assert.ok(!JSON.stringify(stable).includes('PRIVATE'));
+ for(const throwing of ['code','status','message']){
+  const counts={code:0,status:0,message:0},original=new Error('PRIVATE_ORIGINAL');
+  for(const field of Object.keys(counts))Object.defineProperty(original,field,{get(){counts[field]++;if(field===throwing)throw new ReferenceError('PRIVATE_GETTER_FAILURE');return field==='code'?'ERR_ASSERTION':field==='status'?23:'PRIVATE_MESSAGE';}});
+  const value=capture(original);assert.equal(value.errorCode,'other');assert.equal(value.errorCategory,'unsupported-input');assert.ok(!JSON.stringify(value).includes('PRIVATE'));
+  assert.equal(counts[throwing],1);assert.ok(Object.values(counts).every(count=>count<=1));
+ }
+});
