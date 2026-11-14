@@ -175,10 +175,11 @@ jobs:
           PUPTIME_VERSION: ${{ needs.build.outputs.version }}
           PUPTIME_BUILD_COMMIT: ${{ github.sha }}
         run: |
-          if gh release view "$PUPTIME_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "$PUPTIME_RELEASE_TAG is already published"
-            exit 0
-          fi
+          # Create only; an existing ref must fail instead of silently reusing
+          # a tag from a different source. Never move or overwrite release tags.
+          gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f "ref=refs/tags/$PUPTIME_RELEASE_TAG" \
+            -f "sha=$PUPTIME_BUILD_COMMIT" > /dev/null
           puptime_notes=()
           if [[ -n "$PUPTIME_BASE_TAG" ]]; then
             puptime_notes=(--notes-start-tag "$PUPTIME_BASE_TAG")
@@ -187,6 +188,6 @@ jobs:
             "release/Puptime-${PUPTIME_VERSION}.apk#Puptime-${PUPTIME_VERSION}.apk" \
             "release/SHA256SUMS.txt#SHA256SUMS.txt" \
             --repo "$GITHUB_REPOSITORY" \
-            --target "$PUPTIME_BUILD_COMMIT" \
+            --verify-tag \
             --title "Puptime $PUPTIME_RELEASE_TAG" \
             --generate-notes "${puptime_notes[@]}"

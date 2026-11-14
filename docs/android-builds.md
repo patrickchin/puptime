@@ -10,7 +10,9 @@ Do not dispatch a candidate build until its source is frozen and the run is auth
 - `puptime-android-aab`: `app-release.aab`, built by the same Gradle invocation for qualification, not uploaded to Play or attached to the GitHub release.
 - `puptime-android-qualification`: both file digests, signature/certificate receipts, the decoded **packaged APK** manifest, the AAB's actual raw protobuf manifest, and source/run/configured-version metadata. `BUILD-INFO.json` labels configuration values; inspect the packaged manifest rather than treating those values as measured artifact fields.
 
-Signature/archive checks and the existing known-restricted-audio guard must pass before artifacts are uploaded. The publish job downloads only this run's APK and checks it against the verified build's digest before producing the unchanged `Puptime-<version>.apk` and APK-only `SHA256SUMS.txt` release assets. The release target is the checked-out source commit; it is not resolved from a branch after the build.
+Signature/archive checks and the existing known-restricted-audio guard must pass before artifacts are uploaded. The publish job downloads only this run's APK and checks it against the verified build's digest before producing the unchanged `Puptime-<version>.apk` and APK-only `SHA256SUMS.txt` release assets. It atomically creates a **new** tag at the checked-out source commit, refuses every existing tag (including annotated or same-source tags), then creates the release with `--verify-tag`. It never moves or overwrites a tag; `--target` alone would not validate an existing tag's source.
+
+If release creation fails after tag creation, preserve the tag and verified artifacts. Stop and review the source/digest before using the separate explicitly authorized existing-tag publication path; do not delete/retarget the tag or rebuild silently. Retrying this fresh-tag path will refuse the existing tag.
 
 ## Signing and final acceptance
 
