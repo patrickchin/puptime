@@ -25,10 +25,12 @@ name: Account preservation request
 - scrollUntilVisible:
     element:
       id: account.sendCode
+      enabled: true
     direction: DOWN
 - waitForAnimationToEnd
 - tapOn:
     id: account.sendCode
+    enabled: true
     retryTapIfNoChange: true
 - extendedWaitUntil:
     visible:
