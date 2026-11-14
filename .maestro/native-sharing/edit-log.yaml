@@ -1,0 +1,21 @@
+appId: com.patrickchin.puptime
+---
+- scrollUntilVisible:
+    element: {id: event.walk.edit}
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn: {id: event.walk.edit, index: 0}
+- scrollUntilVisible:
+    element: {id: editor.note.input}
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn: {id: editor.note.input}
+- eraseText
+- inputText: ${NOTE}
+- hideKeyboard
+- scrollUntilVisible:
+    element: {id: editor.close}
+    direction: UP
+    visibilityPercentage: 100
+- tapOn: {id: editor.close}
+- assertVisible: {id: screen.today}

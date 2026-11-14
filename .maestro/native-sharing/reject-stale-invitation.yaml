@@ -1,0 +1,13 @@
+appId: com.patrickchin.puptime
+# SECRET PHASE: no retained driver output or images.
+---
+- extendedWaitUntil:
+    visible: {id: shared.accept}
+    timeout: 30000
+- tapOn: {id: shared.accept}
+- extendedWaitUntil:
+    visible: Couldn’t update sharing. Check your connection and try again.
+    timeout: 30000
+- assertVisible: {id: shared.accept}
+- assertNotVisible: {id: quick.walk}
+- tapOn: {id: shared.back}

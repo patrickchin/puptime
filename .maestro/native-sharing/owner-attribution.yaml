@@ -1,0 +1,12 @@
+appId: com.patrickchin.puptime
+---
+- scrollUntilVisible:
+    element:
+      id: event.walk.note
+      text: '(?s)${NOTE}\s+Logged by ${ATTRIBUTION}'
+    direction: DOWN
+    visibilityPercentage: 100
+- assertVisible:
+    id: event.walk.note
+    text: '(?s)${NOTE}\s+Logged by ${ATTRIBUTION}'
+- takeScreenshot: native-owner-visible-attribution

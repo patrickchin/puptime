@@ -1,0 +1,31 @@
+appId: com.patrickchin.puptime
+---
+- runFlow: ../helpers/open-account.yaml
+- scrollUntilVisible:
+    element: {id: account.back}
+    direction: UP
+    visibilityPercentage: 100
+- tapOn: {id: account.back, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    visible: {id: screen.today}
+    timeout: 30000
+- scrollUntilVisible:
+    element: {id: nav.open}
+    direction: UP
+    visibilityPercentage: 100
+- tapOn: {id: nav.open, retryTapIfNoChange: true}
+- assertVisible: {id: nav.close}
+- scrollUntilVisible:
+    element: {id: nav.pets}
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn: {id: nav.pets}
+- extendedWaitUntil:
+    visible: {id: screen.pets}
+    timeout: 30000
+- scrollUntilVisible:
+    element: {id: puppy.share}
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn: {id: puppy.share}
+- assertVisible: {id: screen.sharing}
