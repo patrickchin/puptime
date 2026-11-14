@@ -16,7 +16,7 @@ const source='aacd58fd0a7102a629b92dbf8813496870aec21c',digest='2e889cd3b6eea1b0
 const [mode,configFile,hostInput,proofInput,destination]=process.argv.slice(2),compatible=mode==='--prepare-compatible-private';
 assert.ok(['--prepare-private','--prepare-compatible-private'].includes(mode),'Usage: MODE PRIVATE_CONFIG [ORIGINAL_NEWER_OUTER_ZIP INSPECTION_JSON | COMPATIBLE_HOST BUILD_MANIFEST] FRESH_PRIVATE_DIRECTORY');
 assert.ok(configFile&&hostInput&&proofInput&&destination);assert.notEqual(process.env.GITHUB_ACTIONS,'true','Production owner handoff must never run in public CI.');
-const command=(binary,args,options={})=>execFileSync(binary,args,{encoding:'utf8',timeout:120000,stdio:['ignore','pipe','pipe'],...options}).trim();
+const command=(binary,args,options={})=>execFileSync(binary,args,{encoding:'utf8',timeout:120000,stdio:[options.input===undefined?'ignore':'pipe','pipe','pipe'],...options}).trim();
 const hash=path=>createHash('sha256').update(readFileSync(path)).digest('hex');
 const save=(path,value)=>writeFileSync(path,JSON.stringify(value,null,2)+'\n',{mode:0o600});
 const simctl=(...args)=>command('xcrun',['simctl',...args]);
@@ -26,9 +26,9 @@ const config=JSON.parse(readFileSync(configFile,'utf8'));createProductionAuthFen
 assert.equal(config.origin,'https://puptime.pages.dev','Use the existing deployed app service, with no custom auth origin.');
 const output=resolve(destination);assert.ok(!existsSync(output),'Use a new private output directory.');mkdirSync(output,{recursive:true,mode:0o700});
 assert.equal(statSync(output).mode&0o077,0);assert.ok(!output.startsWith(resolve('.')+'/'),'Keep private configuration, bundle and inventory outside the repository.');
-let device,server,timer,settled=false,before,ready=false,configReads=0,overlayHost;
+let device,server,timer,settled=false,before,ready=false,configReads=0,overlayHost,phase='host-attestation';
 let finish;const completion=new Promise(resolveCompletion=>{finish=resolveCompletion;});
-const fail=()=>{if(settled)return;settled=true;save(join(output,'result.json'),{status:'failed',scope:'Private instrumented production-auth inventory; see private local evidence only.'});finish(false);};
+const fail=()=>{if(settled)return;settled=true;save(join(output,'result.json'),{status:'failed',phase,scope:'Private instrumented production-auth inventory; see private local evidence only.'});finish(false);};
 process.on('SIGINT',fail);process.on('SIGTERM',fail);
 async function main(){
  assert.equal(command('git',['status','--porcelain','--','scripts/production-auth-fence.mjs','scripts/prepare-ios-production-auth-inventory.mjs']),'','Freeze the exact test source before preparing owner handoff.');
@@ -116,25 +116,25 @@ export function denyNativeAction(){void fence.then(async value=>{try{value.denyS
  ];
  let patched=authOriginal;for(const [from,to]of replacements){assert.equal(patched.split(from).length,2,'Overlay must match exact original source once.');patched=patched.replace(from,to);}writeFileSync(authPath,patched,{mode:0o600});
  const env={...process.env,CI:'1',EXPO_NO_DOTENV:'1',EXPO_PUBLIC_CLOUD_API_URL:config.origin};for(const key of Object.keys(env))if(key.startsWith('EXPO_PUBLIC_')&&key!=='EXPO_PUBLIC_CLOUD_API_URL')delete env[key];
- command('npm',['ci'],{cwd:checkout,env,timeout:600000,maxBuffer:5*1024*1024});
+ phase='dependency-install';command('npm',['ci'],{cwd:checkout,env,timeout:600000,maxBuffer:5*1024*1024});
  const host=join(output,'instrumented/Puptime.app');overlayHost=host;mkdirSync(join(output,'instrumented'),{mode:0o700});cpSync(original,host,{recursive:true});
- command('node',['node_modules/expo/bin/cli','export:embed','--entry-file','index.ts','--platform','ios','--dev','false','--bytecode','--reset-cache','--max-workers','2','--bundle-output',join(host,'main.jsbundle'),'--assets-dest',host],{cwd:checkout,env,timeout:600000,maxBuffer:5*1024*1024});
+ phase='bundle-export';command('node',['node_modules/expo/bin/cli','export:embed','--entry-file','index.ts','--platform','ios','--dev','false','--bytecode','--reset-cache','--max-workers','2','--bundle-output',join(host,'main.jsbundle'),'--assets-dest',host],{cwd:checkout,env,timeout:600000,maxBuffer:5*1024*1024});
  command('codesign',['--force','--deep','--sign','-',host]);command('codesign',['--verify','--deep','--strict',host]);
  assert.equal(nativeSection(join(host,codeFile),'__text'),textSHA,'The overlay changes JS/signing only, never native compiled code.');
  assert.equal(nativeSection(join(host,info.CFBundleExecutable),'__entitlements'),capabilitySHA,'Keep original embedded native capabilities.');assert.deepEqual(plist(join(host,'Info.plist')),info);
  const runtime=JSON.parse(simctl('list','runtimes','-j')).runtimes.filter(value=>value.isAvailable&&value.identifier.includes('iOS-26')).at(-1);assert.ok(runtime);
- assert.ok(!settled,'Preparation was cancelled.');device=simctl('create','Puptime Private Auth Inventory '+Date.now(),'com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro',runtime.identifier);
+ phase='native-install';assert.ok(!settled,'Preparation was cancelled.');device=simctl('create','Puptime Private Auth Inventory '+Date.now(),'com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro',runtime.identifier);
  simctl('boot',device);command('xcrun',['simctl','bootstatus',device,'-b'],{timeout:300000});simctl('install',device,host);
  const flow=join(output,'prepare-guest.yaml');writeFileSync(flow,`appId: ${app}\n---\n- launchApp:\n${compatible?'    arguments:\n      RCT_jsLocation: '+JSON.stringify('127.0.0.1:'+server.address().port)+'\n':''}    permissions:\n      notifications: deny\n- runFlow: ${JSON.stringify(join(checkout,'.maestro/helpers/skip-onboarding.yaml'))}\n- assertVisible:\n    id: screen.today\n- runFlow: ${JSON.stringify(join(checkout,'.maestro/helpers/open-account.yaml'))}\n- assertVisible:\n    id: account.google\n`,{mode:0o600});
  assert.ok(command('git',['show',source+':src/components/AccountSignIn.tsx']).includes('testID="account.google"'));
  // Keep the event loop free: the owned app must read its private gate config
  // from this process while Maestro navigates the unauthenticated guest UI.
- await new Promise((resolveDriver,reject)=>{
+ phase='guest-navigation';await new Promise((resolveDriver,reject)=>{
   const fd=openSync(join(output,'guest-setup-private.log'),'wx',0o600),child=spawn(process.env.MAESTRO_BIN??'maestro',['--device',device,'test',flow,'--test-output-dir',join(output,'guest-setup')],{stdio:['ignore',fd,fd],env:{...env,MAESTRO_CLI_NO_ANALYTICS:'1',MAESTRO_DRIVER_STARTUP_TIMEOUT:'180000'}});
   const bound=setTimeout(()=>{child.kill('SIGTERM');reject(new Error('Guest setup exceeded its bound.'));},600000);
   let driverError;child.once('error',error=>{driverError=error;});child.once('close',code=>{clearTimeout(bound);closeSync(fd);code===0&&!driverError?resolveDriver():reject(new Error('Guest setup failed.'));});
  });
- assert.ok(!settled,'No authentication or rejected operation is permitted during preparation.');assert.ok(configReads>0,'Prove the owned app loaded this exact hard-fenced overlay before handoff.');before=snapshot();save(join(output,'native-before-private.json'),before);ready=true;
+ assert.ok(!settled,'No authentication or rejected operation is permitted during preparation.');assert.ok(configReads>0,'Prove the owned app loaded this exact hard-fenced overlay before handoff.');before=snapshot();save(join(output,'native-before-private.json'),before);ready=true;phase='private-owner-handoff';
  save(join(output,'ready-private.json'),{status:'ready-awaiting-private-owner-handoff',device,source,driverSource:command('git',['rev-parse','HEAD']),nativeHost:provenance,capabilities,googleClient,originalAuthSourceSHA256:createHash('sha256').update(authOriginal).digest('hex'),overlayAuthSourceSHA256:hash(authPath),fenceSourceSHA256:hash(resolve('scripts/production-auth-fence.mjs')),originalJavaScriptSHA256:provenance.javaScriptSHA256,overlayJavaScriptSHA256:hash(join(host,'main.jsbundle')),nativeTextSHA256:textSHA,nativeCapabilitySHA256:capabilitySHA,scope:'Instrumented aacd full app; no authentication started; not original/current release qualification.'});
  console.log('Prepared dedicated simulator and Account view for private owner handoff. No authentication was started.');
  timer=setTimeout(fail,30*60*1000);return await completion;
