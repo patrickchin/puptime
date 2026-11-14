@@ -25,6 +25,14 @@ test('wrong/protected native identity is rejected before its token can be forwar
  assert.throws(()=>createProductionAuthFence({...config,email:config.protectedEmails[0]}));
  const fence=createProductionAuthFence(config);fence.googleNative({type:'cancelled'});assert.equal(fence.receipt().nativeGoogleIdentityMatched,false);
  assert.throws(()=>createProductionAuthFence({...config,email:'malformed'}));assert.throws(()=>createProductionAuthFence({...config,protectedEmails:[]}));
+ for(const missing of [undefined,null,'',' '])assert.throws(()=>createProductionAuthFence(config).googleNative({type:'success',data:{user:{email:config.email},idToken:missing}}));
+ const bound=createProductionAuthFence(config);bound.googleNative(google);assert.throws(()=>bound.authorize(config.origin+'/api/auth/sign-in/social',{method:'POST',body:JSON.stringify({provider:'google',idToken:{token:'different-provider-token'}})}));assert.ok(!JSON.stringify(bound.receipt()).includes(google.data.idToken));
+});
+test('non-JSON and HTTP/transport failures retain only finite route/status evidence and end the case',()=>{
+ const request={method:'POST',path:'/api/auth/sign-in/social'};
+ for(const status of [403,502]){const fence=createProductionAuthFence(config);fence.nonJson(request,status);assert.deepEqual(fence.receipt().requests,[{...request,status}]);assert.equal(fence.receipt().failure,'non-json');}
+ for(const status of [0,400,401,403,429,500]){const fence=createProductionAuthFence(config);fence.observe(request,status,{private:'never recorded'});assert.equal(fence.receipt().failure,status===0?'transport':'http');assert.ok(!JSON.stringify(fence.receipt()).includes('never recorded'));}
+ const guest=createProductionAuthFence(config);guest.observe({method:'GET',path:'/api/account'},401,null);assert.equal(guest.receipt().failure,null);
 });
 test('SDK and account identities must agree; any existing puppy stops and protects inventory',()=>{
  for(const wrong of [{...user,email:'tracking@example.invalid'},{...user,id:'usr_different'}])assert.throws(()=>authenticated().observe({method:'GET',path:'/api/account'},200,{user:wrong,pets:[]}));
@@ -41,7 +49,7 @@ test('SDK and account identities must agree; any existing puppy stops and protec
 test('email requests are bounded and only target the private allowed inbox',()=>{
  const emailConfig={...config,provider:'email'},path=config.origin+'/api/auth/email-otp/send-verification-otp';
  const fence=createProductionAuthFence(emailConfig),body=JSON.stringify({email:config.email,type:'sign-in'});
- assert.throws(()=>fence.beforeGoogle());
+ assert.throws(()=>createProductionAuthFence(emailConfig).beforeGoogle());
  fence.authorize(path,{method:'POST',body});assert.throws(()=>fence.authorize(path,{method:'POST',body}));
  for(const wrong of ['tracking@example.invalid','other@example.invalid'])assert.throws(()=>createProductionAuthFence(emailConfig).authorize(path,{method:'POST',body:JSON.stringify({email:wrong,type:'sign-in'})}));
  assert.throws(()=>createProductionAuthFence(emailConfig).authorize(config.origin+'/api/auth/sign-in/social',{method:'POST',body:JSON.stringify({provider:'google',idToken:{token:'private-token'}})}));

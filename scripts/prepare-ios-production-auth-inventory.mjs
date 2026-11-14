@@ -57,8 +57,9 @@ async function main(){
  const info=plist(join(original,'Info.plist')),binary=join(original,info.CFBundleExecutable);
  command('codesign',['--verify','--deep','--strict',original]);assert.equal(info.CFBundleIdentifier,app);assert.equal(info.CFBundleShortVersionString,'1.12.0');assert.equal(info.CFBundleVersion,'1');
  assert.equal(hash(binary),provenance.nativeExecutableSHA256);if(provenance.javaScriptSHA256)assert.equal(hash(join(original,'main.jsbundle')),provenance.javaScriptSHA256);
- assert.equal(command('lipo',['-archs',binary]),'arm64');assert.match(command('xcrun',['vtool','-show-build',binary]),/platform\s+IOSSIMULATOR/);
- const sectionBytes=(path,section)=>{const metadata=command('otool',['-arch','arm64','-l',path]).split('Section').find(value=>new RegExp('sectname\\s+'+section+'\\s').test(value)&&/segname\s+__TEXT\s/.test(value));assert.ok(metadata);const size=parseInt(metadata.match(/\bsize\s+0x([a-f0-9]+)/i)[1],16),offset=Number(metadata.match(/\boffset\s+(\d+)/)[1]),bytes=readFileSync(path);assert.ok(size>0&&offset+size<=bytes.length);return bytes.subarray(offset,offset+size);};
+ assert.match(command('lipo',['-archs',binary]),/\barm64\b/);assert.match(command('xcrun',['vtool','-show-build',binary]),/platform\s+IOSSIMULATOR/);
+ const slices=new Map(),arm64=path=>{if(command('lipo',['-archs',path])==='arm64')return path;if(!slices.has(path)){const thin=join(output,'arm64-'+hash(path));command('lipo',[path,'-thin','arm64','-output',thin]);assert.equal(command('lipo',['-archs',thin]),'arm64');slices.set(path,thin);}return slices.get(path);};
+ const sectionBytes=(path,section)=>{const thin=arm64(path),metadata=command('otool',['-l',thin]).split('Section').find(value=>new RegExp('sectname\\s+'+section+'\\s').test(value)&&/segname\s+__TEXT\s/.test(value));assert.ok(metadata);const size=parseInt(metadata.match(/\bsize\s+0x([a-f0-9]+)/i)[1],16),offset=Number(metadata.match(/\boffset\s+(\d+)/)[1]),bytes=readFileSync(thin);assert.ok(size>0&&offset+size<=bytes.length);return bytes.subarray(offset,offset+size);};
  const nativeSection=(path,section)=>createHash('sha256').update(sectionBytes(path,section)).digest('hex');
  const capabilities=JSON.parse(command('plutil',['-convert','json','-o','-','-'],{input:sectionBytes(binary,'__entitlements').toString('utf8').replace(/\0+$/,'')}));
  if(compatible)assert.equal(capabilities['application-identifier'],'FAKETEAMID.'+app);else assert.deepEqual(capabilities,provenance.entitlements.embedded);
@@ -83,7 +84,7 @@ async function main(){
    if(req.method!=='POST'||!req.url.endsWith('/receipt')){res.writeHead(405);res.end();return;}
    let body='';for await(const part of req){body+=part;if(body.length>65536)throw new Error('Bound private receipt.');}
    const receipt=JSON.parse(body);save(join(output,'auth-inventory-private.json'),receipt);res.end('{}');
-   if(receipt.blocked){fail();return;}
+   if(receipt.blocked||receipt.failure){fail();return;}
    if(receipt.inventory&&!settled){
     assert.ok(ready,'No authentication during preparation.');settled=true;
     setTimeout(()=>{try{simctl('terminate',device,app);assert.deepEqual(snapshot(),before,'Authentication must preserve every native row exactly.');save(join(output,'result.json'),{status:'passed',scope:'Instrumented aacd full-app JS on '+(compatible?'compatible160 Debug native host':'original aacd native host')+' against production; authentication and account-summary inventory only. Every identity/count/detail remains private; no activity writes or destructive testing authorized.',inventoryStatus:receipt.inventory.status,nativeTablesPreserved:true,cloudDataMutationAllowed:false,provider:config.provider});finish(true);}catch{settled=false;fail();}},50);
@@ -101,8 +102,9 @@ const report=async value=>{await rawFetch(base+'/receipt',{method:'POST',headers
 export async function inventoryFetch(input,options){const value=await fence;let request;
  try{request=value.authorize(input,options);}catch{await report(value);throw new Error('Production inventory request blocked.');}
  let response;try{response=await rawFetch(input,{...options,redirect:'error',credentials:'omit'});}catch{value.observe(request,0,null);await report(value);throw new Error('Production authentication transport failed.');}
- try{const payload=await response.clone().json();value.observe(request,response.status,payload);}catch{await report(value);throw new Error('Production inventory response rejected.');}
- await report(value);if(value.receipt().inventory)throw new Error('Production inventory completed; awaiting private verification.');return response;}
+ let payload;try{payload=await response.clone().json();}catch{value.nonJson(request,response.status);await report(value);throw new Error('Production inventory response rejected.');}
+ try{value.observe(request,response.status,payload);}catch{await report(value);throw new Error('Production inventory identity rejected.');}
+ await report(value);if(value.receipt().failure||value.receipt().inventory)throw new Error('Production inventory stopped; awaiting private verification.');return response;}
 export function fencedGoogle(sdk){return {configure:options=>sdk.configure(options),signIn:async()=>{const value=await fence;try{value.beforeGoogle();}catch{await report(value);throw new Error('Production provider selection rejected.');}const response=await sdk.signIn();try{value.googleNative(response);}catch{await report(value);throw new Error('Production identity selection rejected.');}await report(value);return response;}};}
 export function denyNativeAction(){void fence.then(async value=>{try{value.denySocket();}catch{}await report(value);}).catch(()=>{});throw new Error('Production native action blocked.');}
 `,{mode:0o600});
