@@ -3,13 +3,14 @@
 // --prepare-enrolled ABSOLUTE_PRIVATE_DIRECTORY only prepares verified inputs.
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {execFileSync} from 'node:child_process';
+import {execFileSync,spawn} from 'node:child_process';
 import {chmodSync,closeSync,cpSync,existsSync,mkdirSync,mkdtempSync,openSync,readFileSync,readdirSync,realpathSync,renameSync,rmSync,statSync,writeFileSync} from 'node:fs';
 import {homedir,tmpdir} from 'node:os';
 import {basename,dirname,isAbsolute,join,relative,resolve,sep} from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
 import {nativeSnapshot,nativeTables} from './native-account-evidence.mjs';
 import {assertArchivedSource,nativeTextSection,nativeCodeFingerprint} from './native-runtime-inputs.mjs';
+import {deleteOwnedSimulator,installTaskCleanup,ownProcess} from './native-task-cleanup.mjs';
 
 const repository='patrickchin/puptime',app='com.patrickchin.puptime';
 const cuts=[
@@ -175,12 +176,18 @@ async function verify(){
  const runtime=runtimes.filter(value=>value.isAvailable&&value.identifier.includes('iOS-26')).at(-1);assert.ok(runtime);
  const device=simctl('create','Puptime Runtime Replacement '+Date.now(),'com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro',runtime.identifier);
  provenance.device={udid:device,runtime:runtime.identifier};provenance.photoFixtureSHA256=hash(fixture);provenance.photoSelectionFlowSHA256=hash(selectPhoto);provenance.preferenceFlowSHA256=hash(preferenceFlow);
- writeFileSync(join(output,'native-provenance.json'),JSON.stringify(provenance,null,2)+'\n');
- const flow=(name,body)=>{
+ const activeStops=new Set();
+ const runCommand=async(binary,args,timeout=120000,env=process.env)=>{
+  assert.equal(task.signal,null);const child=spawn(binary,args,{detached:true,stdio:'inherit',env}),stop=ownProcess(child);activeStops.add(stop);let timedOut=false;
+  const timer=setTimeout(()=>{timedOut=true;void stop();},timeout);
+  try{await new Promise((resolveRun,reject)=>{child.once('error',reject);child.once('close',async status=>{const stopped=await stop();status===0&&stopped&&!timedOut&&!task.signal?resolveRun():reject(new Error('Owned native command interrupted or failed.'));});});}
+  finally{clearTimeout(timer);activeStops.delete(stop);}
+ };
+ const flow=async(name,body)=>{
   const path=join(privateDir,name+'.yaml'),artifacts=join(privateDir,'maestro-'+name),receipt=join(output,name);let passed=false;
   writeFileSync(path,`appId: ${app}\nname: ${name}\n---\n${body}`);
   try{
-   execFileSync(process.env.MAESTRO_BIN??'maestro',['--device',device,'test',path,'--test-output-dir',artifacts],{timeout:600000,stdio:'inherit',env:{...process.env,MAESTRO_CLI_NO_ANALYTICS:'1',MAESTRO_DRIVER_STARTUP_TIMEOUT:'180000'}});passed=true;
+   await runCommand(process.env.MAESTRO_BIN??'maestro',['--device',device,'test',path,'--test-output-dir',artifacts],600000,{...process.env,MAESTRO_CLI_NO_ANALYTICS:'1',MAESTRO_DRIVER_STARTUP_TIMEOUT:'180000'});passed=true;
   }finally{
    // This guest-only exercise has no auth secrets. Keep raw driver logs private;
    // the three-day CI receipt needs only bounded synthetic visual evidence.
@@ -220,28 +227,30 @@ async function verify(){
  }
  function installed(cut){const path=simctl('get_app_container',device,app,'app');assert.equal(hash(join(path,'main.jsbundle')),cut.provenance.javaScriptSHA256,'Run the original embedded JS, never a substituted bundle.');assert.equal(hash(join(path,cut.provenance.executable)),cut.provenance.nativeExecutableSHA256,'Run the original native executable.');}
  let completed=false;
+ const task=installTaskCleanup(async()=>{
+  const processesStopped=(await Promise.all([...activeStops].map(stop=>stop()))).every(Boolean);
+  const simulator=deleteOwnedSimulator({device,privateDirectory:privateDir,preserve:!completed});
+  writeFileSync(join(output,'task-cleanup.json'),JSON.stringify({status:processesStopped&&simulator.deleted?'passed':'failed',processesStopped,...simulator},null,2)+'\n');
+  if(!processesStopped||!simulator.deleted)process.exitCode=1;
+ });
  try{
-  simctl('boot',device);command('xcrun',['simctl','bootstatus',device,'-b'],{timeout:300000});simctl('ui',device,'appearance','light');
-  simctl('install',device,cuts[0].host);installed(cuts[0]);simctl('addmedia',device,fixture);
-  flow('older-created-history',`- runFlow: ${JSON.stringify(resolve('.maestro/account-preservation/prepare.yaml'))}\n- runFlow:\n    file: ${JSON.stringify(resolve('.maestro/account-preservation/add-logs.yaml'))}\n    env:\n      BATCHES: '4'\n      EXPECTED_COUNT: '12'\n`);
-  flow('older-created-photo',`- runFlow: ${JSON.stringify(selectPhoto)}\n`);
-  flow('older-created-profile',`${openProfile}- tapOn:\n    id: settings.puppy.name\n    retryTapIfNoChange: true\n- tapOn:\n    id: settings.puppy.name.input\n    retryTapIfNoChange: true\n- eraseText\n- inputText: Runtime QA Maple\n- tapOn:\n    text: ^Puppy’s name$\n    childOf:\n      id: settings.puppy.name.editor\n- waitForAnimationToEnd\n- tapOn:\n    id: settings.puppy.name.save\n    enabled: true\n    retryTapIfNoChange: true\n- extendedWaitUntil:\n    notVisible:\n      id: settings.puppy.name.editor\n    timeout: 30000\n- assertNotVisible:\n    id: settings.puppy.name.error\n- assertVisible:\n    id: settings.puppy.photo.remove\n- assertNotVisible:\n    id: settings.puppy.photo.error\n- takeScreenshot: original-older-photo\n- stopApp\n`);
-  flow('older-created-preferences',preferences('seed'));
-  flow('older-cold-restart',`- launchApp:\n    permissions: {}\n${showPhoto}`);
-  flow('older-verifies-preferences',preferences('verify'));
+  writeFileSync(join(output,'native-provenance.json'),JSON.stringify(provenance,null,2)+'\n');
+  simctl('boot',device);await runCommand('xcrun',['simctl','bootstatus',device,'-b'],300000);simctl('ui',device,'appearance','light');
+  simctl('install',device,cuts[0].host);installed(cuts[0]);await runCommand('xcrun',['simctl','addmedia',device,fixture]);
+  await flow('older-created-history',`- runFlow: ${JSON.stringify(resolve('.maestro/account-preservation/prepare.yaml'))}\n- runFlow:\n    file: ${JSON.stringify(resolve('.maestro/account-preservation/add-logs.yaml'))}\n    env:\n      BATCHES: '4'\n      EXPECTED_COUNT: '12'\n`);
+  await flow('older-created-photo',`- runFlow: ${JSON.stringify(selectPhoto)}\n`);
+  await flow('older-created-profile',`${openProfile}- tapOn:\n    id: settings.puppy.name\n    retryTapIfNoChange: true\n- tapOn:\n    id: settings.puppy.name.input\n    retryTapIfNoChange: true\n- eraseText\n- inputText: Runtime QA Maple\n- tapOn:\n    text: ^Puppy’s name$\n    childOf:\n      id: settings.puppy.name.editor\n- waitForAnimationToEnd\n- tapOn:\n    id: settings.puppy.name.save\n    enabled: true\n    retryTapIfNoChange: true\n- extendedWaitUntil:\n    notVisible:\n      id: settings.puppy.name.editor\n    timeout: 30000\n- assertNotVisible:\n    id: settings.puppy.name.error\n- assertVisible:\n    id: settings.puppy.photo.remove\n- assertNotVisible:\n    id: settings.puppy.photo.error\n- takeScreenshot: original-older-photo\n- stopApp\n`);
+  await flow('older-created-preferences',preferences('seed'));
+  await flow('older-cold-restart',`- launchApp:\n    permissions: {}\n${showPhoto}`);
+  await flow('older-verifies-preferences',preferences('verify'));
   const before=snapshot();assert.ok(before.tables.events.some(row=>row.note==='Saved before and after sign-in'));assert.equal(before.tables.puppies[0].name,'Runtime QA Maple');
   simctl('install',device,cuts[1].host);installed(cuts[1]);assertPreserved(before,snapshot());
-  flow('newer-preserves-photo',`- launchApp:\n    permissions: {}\n${showPhoto}`);flow('newer-preserves-preferences',preferences('verify'));assertPreserved(before,snapshot(),{paletteChange:true});
-  flow('newer-cold-restart',`- launchApp:\n    permissions: {}\n${showPhoto}`);flow('newer-cold-preferences',preferences('verify'));const after=snapshot();assertPreserved(before,after,{paletteChange:true});
+  await flow('newer-preserves-photo',`- launchApp:\n    permissions: {}\n${showPhoto}`);await flow('newer-preserves-preferences',preferences('verify'));assertPreserved(before,snapshot(),{paletteChange:true});
+  await flow('newer-cold-restart',`- launchApp:\n    permissions: {}\n${showPhoto}`);await flow('newer-cold-preferences',preferences('verify'));const after=snapshot();assertPreserved(before,after,{paletteChange:true});
+  assert.equal(task.signal,null);
   writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',...provenance,stage:'runtime-replacement',upgradeExecuted:true,checks:['Older original app UI created12 logs, note, profile name and a genuine UIKit-selected decoded512px JPEG.','Older original Settings UI persisted dark appearance, Spanish,15-minute reminder lead and walk widget action; each was verified after old/new cold restarts.','Installing the original newer app without uninstall preserved all14 tables, file bytes, photo ID/decoded bytes and widget activity state before launch.','Newer launch and cold restart preserved every protected field; only widget background/surface colours are explicitly allowed palette changes.'],photoInput:{sha256:hash(fixture),...input},photoSaved:after.photo,protectedStateSHA256:createHash('sha256').update(JSON.stringify(before)).digest('hex'),productionAccountsUsed:false},null,2)+'\n');
   completed=true;
   console.log('PASS original iOS runtime replacement: '+output);
- }finally{
-  if(!completed&&process.env.GITHUB_ACTIONS!=='true'){
-   try{simctl('terminate',device,app);}catch{}
-   try{simctl('shutdown',device);}catch{}
-   writeFileSync(join(output,'failed-local-simulator.json'),JSON.stringify({status:'failed',device,runtime:runtime.identifier,retainedForInspection:true,originalRuntimeArchivesUnmodified:true},null,2)+'\n');
-  }else try{simctl('delete',device);}catch{/* Only the owned fresh simulator. */}
- }
+ }finally{await task.run();task.dispose();}
 }
 if(mode==='--self-check')selfCheck();else await verify();

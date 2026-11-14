@@ -19,6 +19,7 @@ import {nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeD
 import {assertArchivedSource,nativeCodeFingerprint} from './native-runtime-inputs.mjs';
 import {createSharingObserver,createSharingActors,readOwnerSharingRecords} from './native-sharing-adapters.mjs';
 import {verifyNativeSharing} from './verify-native-sharing.mjs';
+import {deleteOwnedSimulator,installTaskCleanup,ownProcess} from './native-task-cleanup.mjs';
 
 const [platform,initialDevice,host,consent,destination='build/guest-account-'+platform,onboarding]=process.argv.slice(2);
 let device=initialDevice;
@@ -46,7 +47,8 @@ const config={...JSON.parse(readFileSync('wrangler.jsonc','utf8')),name:'puptime
   vars:{ENVIRONMENT:'local',AUTH_BASE_URL:front,WEB_ORIGINS:front,AUTH_SECRET:crypto.randomUUID()+crypto.randomUUID()}};
 config.d1_databases=config.d1_databases.map(db=>({...db,migrations_dir:resolve(db.migrations_dir)}));
 writeFileSync(configPath,JSON.stringify(config),{mode:0o600});
-let worker,proxy,cookie='',code='',auth,iosFixtureHost,setupWindow;
+let worker,workerError,stopWorker,proxy,cookie='',code='',auth,iosFixtureHost,setupWindow,completed=false;
+const activeStops=new Set();
 const temporaryDevices=[];
 const requests=new Set(),restoreNative=[],requestCounts={enroll:0,push:0};
 // Backend results can be deliberately withheld. Only the native SQLite ack
@@ -74,11 +76,12 @@ function redacted(value){
 }
 function run(binary,args,env=process.env,cwd=process.cwd(),discardFailureOutput=false){
   return new Promise((resolveRun,reject)=>{
-    const child=spawn(binary,args,{env,cwd,stdio:['ignore','pipe','pipe']});let raw='';
+    if(task.signal){reject(new Error('Native task interrupted.'));return;}
+    const child=spawn(binary,args,{env,cwd,detached:true,stdio:['ignore','pipe','pipe']}),stop=ownProcess(child);activeStops.add(stop);let raw='',timedOut=false;
     child.stdout.on('data',data=>{raw+=data;});child.stderr.on('data',data=>{raw+=data;});
     // Include hosted driver startup as well as the flow's own bounded assertions.
-    const timer=setTimeout(()=>child.kill('SIGTERM'),binary==='maestro'?600000:240000);
-    child.once('error',reject);child.once('close',status=>{clearTimeout(timer);if(status===0)resolveRun(raw);else{
+    const timer=setTimeout(()=>{timedOut=true;void stop();},binary==='maestro'?600000:240000);
+    child.once('error',error=>{clearTimeout(timer);activeStops.delete(stop);reject(error);});child.once('close',async status=>{clearTimeout(timer);const stopped=await stop();activeStops.delete(stop);if(status===0&&stopped&&!timedOut&&!task.signal)resolveRun(raw);else{
       raw=redacted(raw);
       if(!discardFailureOutput)writeFileSync(join(output,'failure-redacted.log'),raw,{mode:0o600});reject(new Error(`${binary} failed (${status})${discardFailureOutput?'.':'; see redacted log.'}`));
     }});
@@ -509,6 +512,18 @@ async function verifyPuppyComparison(){
 }
 
 const childEnv={...process.env,CI:'1',WRANGLER_SEND_METRICS:'false'};
+const task=installTaskCleanup(async()=>{
+ for(const socket of changeSockets)socket.destroy();
+ proxy?.closeAllConnections();proxy?.close();
+ const processesStopped=(await Promise.all([...activeStops,...(stopWorker?[stopWorker]:[])].map(stop=>stop()))).every(Boolean);
+ try{auth?.close();}catch{}
+ if(android)try{adb('reverse','--remove','tcp:'+frontPort);}catch{}
+ let nativeRestored=true;
+ for(const [path,original] of restoreNative.reverse())try{if(original===null)rmSync(path,{force:true});else writeFileSync(path,original);}catch{nativeRestored=false;}
+ const simulators=temporaryDevices.map(device=>deleteOwnedSimulator({device,privateDirectory:privateDir,preserve:!completed}));
+ writeFileSync(join(output,'sdk-task-cleanup.json'),JSON.stringify({status:processesStopped&&nativeRestored&&simulators.every(value=>value.deleted)?'passed':'failed',processesStopped,nativeRestored,simulators},null,2)+'\n');
+ if(!processesStopped||!nativeRestored||simulators.some(value=>!value.deleted))process.exitCode=1;
+});
 try{
   // Own both ports; never attach to another task's backend or account.
   for(const port of [frontPort,backPort])await new Promise((resolveProbe,reject)=>{const server=createServer();server.once('error',reject);server.listen(port,'127.0.0.1',()=>server.close(resolveProbe));});
@@ -522,8 +537,8 @@ try{
   }
   await run('npx',['wrangler','d1','migrations','apply','AUTH_DB','--local','--config',configPath,'--persist-to',persist],childEnv);
   worker=spawn('npx',['wrangler','dev','--local','--ip','127.0.0.1','--port',String(backPort),'--config',configPath,'--persist-to',persist],{env:childEnv,stdio:['ignore','pipe','pipe'],detached:true});
-  worker.stdout.resume();worker.stderr.resume();
-  for(let attempt=0;attempt<160;attempt++){try{if((await fetch('http://127.0.0.1:'+backPort+'/health')).ok)break;}catch{}await new Promise(resolveWait=>setTimeout(resolveWait,250));}
+  stopWorker=ownProcess(worker);worker.once('error',error=>{workerError=error;});worker.stdout.resume();worker.stderr.resume();
+  for(let attempt=0;attempt<160;attempt++){if(workerError)throw workerError;try{if((await fetch('http://127.0.0.1:'+backPort+'/health')).ok)break;}catch{}await new Promise(resolveWait=>setTimeout(resolveWait,250));}
   const keyPath=join(privateDir,'localhost.key'),certPath=join(privateDir,'localhost.crt'),rootPath=join(privateDir,'root.crt'),rootKey=join(privateDir,'root.key'),csr=join(privateDir,'localhost.csr');
   if(!android)simctl('keychain',device,'reset');
   await run('openssl',['req','-x509','-newkey','rsa:2048','-nodes','-keyout',rootKey,'-out',rootPath,'-days','1','-subj','/CN=Puptime fixture CA','-addext','basicConstraints=critical,CA:TRUE']);
@@ -707,14 +722,9 @@ try{
    await flow('delete-confirm');assert.equal(auth.prepare('SELECT id FROM user WHERE id=?').all(owner).length,0);assert.deepEqual(snapshot().events,before.events);assert.equal(snapshot().owner.length,0);
    checks.push('native system confirmation cancels safely; stale auth uses real same-account OTP and a new confirmation; confirmed deletion removes the actual account, retains all 12 logs and offers manual Apple cleanup for a tokenless synthetic link');
   }
+  assert.equal(task.signal,null);
   rmSync(join(output,'failure-redacted.log'),{force:true});
   writeFileSync(join(output,'verification.json'),JSON.stringify({status:sharingKind?'awaiting-attribution-visual-review':'passed',checks,receipts,...(upgrading?{stage:'controlled-origin-enrolled-runtime-replacement',upgradeExecuted:true,originModified:true,originalInstalledBytes:false,runtimes:runtimeProvenance}:{}),scope:sharingKind?'Synthetic native sharing through the actual SDK/local HTTPS service; automated assertions and explicit attribution images require independent rendered-glyph review before qualification. No provider, owner or production data.':upgrading?'Exact historical source/native pairs with controlled-origin release JS and ad-hoc signing; actual native SDK and isolated local HTTPS Better Auth/D1/SQLite DO. No credential injection, owner data, provider OAuth, untouched-original, numeric store or final current-candidate qualification.':android?'Android Debug native host with normal embedded release JS and isolated local HTTPS Better Auth/D1/SQLite DO; actual native email SDK and Keystore. Its temporary CA is trusted only in the ignored Debug source set, restored after the run. Production onboarding is tested separately in the Release APK. No real email, production account, session injection or mocked sync.':'Release bundle and actual native email SDK with isolated local HTTPS Better Auth/D1/SQLite DO. Simulator trusts the fixture certificate. No real email, production account, session injection or mocked sync.'},null,2)+'\n');
+  completed=true;
   console.log((sharingKind?'COMPLETE sharing assertions; attribution visual review pending':('PASS '+(upgrading?'controlled-origin enrolled runtime replacement':deletionFaults?'pending native deletion cancellation, retries and lost response':photographing?'native profile photo failure, roundtrip and restore':isolating?'expired session and account isolation':offline?'offline writes, replay and pending logout':deleting?'native account deletion':comparing?'named puppy comparison':onboardingSignIn?'welcome sign-in and session recovery':android?'guest account preservation and empty-database recovery':'guest account preservation and inspected empty-device recovery')))+': '+output);
-}finally{
-  for(const socket of changeSockets)socket.destroy();
-  auth?.close();proxy?.close();for(const child of [worker])if(child?.pid)try{process.kill(-child.pid,'SIGTERM');}catch{}
-  if(android)try{adb('reverse','--remove','tcp:'+frontPort);}catch{}
-  for(const [path,original] of restoreNative.reverse())if(original===null)rmSync(path,{force:true});else writeFileSync(path,original);
-  for(const temporary of temporaryDevices)try{simctl('delete',temporary);}catch{}
-  // Retain only isolated synthetic state for failures; no auth data in public evidence.
-}
+}finally{await task.run();task.dispose();}
