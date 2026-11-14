@@ -1,4 +1,4 @@
-import {MaterialCommunityIcons} from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import {StatusBar} from 'expo-status-bar';
 import {memo,useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {Alert,BackHandler,FlatList,Keyboard,Linking,KeyboardAvoidingView,Modal,Platform,Pressable,ScrollView,StyleSheet,Switch,Text as NativeText,TextInput,View,useWindowDimensions,type TextProps} from 'react-native';

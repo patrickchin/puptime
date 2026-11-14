@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import {
   ActivityIndicator,
