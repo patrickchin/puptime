@@ -118,6 +118,7 @@ jobs:
           adb -s emulator-5588 shell svc wifi disable
           adb -s emulator-5588 shell svc data disable
           adb -s emulator-5588 shell cmd connectivity airplane-mode enable
+          node scripts/verify-android-signing-upgrade.mjs --emulator-offline
       - name: Install the established Maestro version
         env:
           MAESTRO_VERSION: '2.11.0'
