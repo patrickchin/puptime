@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import {existsSync,readFileSync,readdirSync} from 'node:fs';
 import {join} from 'node:path';
+import {gunzipSync,inflateSync,brotliDecompressSync} from 'node:zlib';
 import {STARTER_SCHEDULE,DEFAULT_WIDGET_ACTIONS} from '../src/domain.ts';
 import {DEFAULT_NOTIFICATION_PREFERENCES} from '../src/notification-config.ts';
 
@@ -112,4 +113,12 @@ export function assertEmptyIosRestoreSources({tables,sharedDirectory,documentsDi
     assert.ok(Array.isArray(backup.events),'Every retained activity backup must be readable.');
     assert.deepEqual(backup.events,[],'No local backup may supply history to a claimed empty-device restore.');
   }
+}
+
+// Decode only the observer copy. The original wire bytes/headers still reach the SDK.
+export function capturedJson(body,contentEncoding){
+ const decoders={identity:bytes=>bytes,gzip:gunzipSync,deflate:inflateSync,br:brotliDecompressSync};
+ const encodings=(contentEncoding??'identity').split(',').map(value=>value.trim().toLowerCase());
+ for(const encoding of encodings.reverse()){assert.ok(Object.hasOwn(decoders,encoding),'Unsupported captured content encoding.');body=decoders[encoding](body,{maxOutputLength:16*1024*1024});}
+ return JSON.parse(body.toString('utf8'));
 }

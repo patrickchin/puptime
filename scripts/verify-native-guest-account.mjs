@@ -15,7 +15,7 @@ import {createLocalDatabase} from '../src/local/database.ts';
 import {sqliteTestConnection} from '../src/local/sqlite-test-adapter.ts';
 import {createLocalRuntime} from '../src/local/runtime-factory.ts';
 import {pushResponseSchema,pullPageSchema,mutationSchema} from '../src/cloud/protocol.ts';
-import {nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeDrained,assertEmptyIosRestoreSources} from './native-account-evidence.mjs';
+import {nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeDrained,assertEmptyIosRestoreSources,capturedJson} from './native-account-evidence.mjs';
 
 const [platform,initialDevice,host,consent,destination='build/guest-account-'+platform,onboarding]=process.argv.slice(2);
 let device=initialDevice;
@@ -47,10 +47,16 @@ const temporaryDevices=[];
 const requests=new Set(),restoreNative=[],requestCounts={enroll:0,push:0};
 // Backend results can be deliberately withheld. Only the native SQLite ack
 // assertion below establishes that the SDK persisted a received result.
-const wireAccepted=[],wirePages=[],wirePushes=[],photoTransfers=[],receipts=[],changeSockets=new Set();
+const wireAccepted=[],wirePages=[],wirePushes=[],wireFailures=[],photoTransfers=[],receipts=[],changeSockets=new Set();
 let fault='online',photoFault='online',deleteFault='online',failedDeletes=0,acceptedDeletes=0,failedPhotoUploads=0,corruptPhotoDownloads=0,activeForwarded=0,wireParseErrors=0;
 let certificate;
 const codes=new Set(),checks=[];
+function wireFailure(phase,route,encoding,bytes){
+ wireParseErrors++;
+ const safeEncoding=['gzip','deflate','br','identity'].includes(encoding??'identity')?(encoding??'identity'):'other';
+ wireFailures.push({phase,route,encoding:safeEncoding,bytes});
+ writeFileSync(join(output,'wire-parse-failures.json'),JSON.stringify(wireFailures.slice(0,32),null,2)+'\n');
+}
 function redacted(value){
   for(const secret of [...codes,config.vars.AUTH_SECRET,cookie,...cookie.split(';').map(part=>part.trim().split('=').slice(1).join('='))].filter(Boolean))value=value.replaceAll(secret,'[REDACTED]');
   return value;
@@ -399,7 +405,7 @@ try{
     if(photoRequest&&req.method==='GET'&&photoFault==='download-corrupt'){corruptPhotoDownloads++;res.writeHead(200,{'content-type':'image/jpeg'}).end('invalid JPEG');return;}
     if(fault==='offline'){req.socket.destroy();return;}
     if(fault==='push-offline'&&pushing){req.resume();res.writeHead(503,{'content-type':'application/json'}).end('{"error":"controlled_transport_outage"}');return;}
-    const body=[];if(pushing||photoRequest&&req.method==='POST'){req.on('data',part=>body.push(part));if(pushing)req.on('end',()=>{try{const parsed=JSON.parse(Buffer.concat(body).toString());wirePushes.push({mutations:parsed.mutations.map(value=>mutationSchema.parse(value))});}catch{wireParseErrors++;}});}
+    const body=[];if(pushing||photoRequest&&req.method==='POST'){req.on('data',part=>body.push(part));if(pushing)req.on('end',()=>{try{const bytes=Buffer.concat(body),parsed=capturedJson(bytes,req.headers['content-encoding']);wirePushes.push({mutations:parsed.mutations.map(value=>mutationSchema.parse(value))});}catch{wireFailure('request','push',req.headers['content-encoding'],Buffer.concat(body).length);}});}
     const dropping=pushing&&fault==='drop-push-response-once'||deletingRequest&&deleteFault==='lost';activeForwarded++;
     let finished=false;const finish=()=>{if(!finished){finished=true;activeForwarded--;}};
     // Wrangler rewrites a matching Origin using the upstream scheme. Forwarding
@@ -407,9 +413,9 @@ try{
     const outgoing=request('http://127.0.0.1:'+backPort+req.url,{method:req.method,headers:{...req.headers,host:'127.0.0.1:'+backPort}},incoming=>{
       const chunks=[];if(pushing||pulling||photoRequest||deletingRequest)incoming.on('data',part=>chunks.push(part));
       incoming.on('end',()=>{
-        if(incoming.statusCode===200&&(pushing||pulling))try{const parsed=JSON.parse(Buffer.concat(chunks).toString());if(pushing)wireAccepted.push(...pushResponseSchema.parse(parsed).accepted);else wirePages.push(pullPageSchema.parse(parsed));}catch{wireParseErrors++;}
+        if(incoming.statusCode===200&&(pushing||pulling))try{const bytes=Buffer.concat(chunks),parsed=capturedJson(bytes,incoming.headers['content-encoding']);if(pushing)wireAccepted.push(...pushResponseSchema.parse(parsed).accepted);else wirePages.push(pullPageSchema.parse(parsed));}catch{wireFailure('response',pushing?'push':'pull',incoming.headers['content-encoding'],Buffer.concat(chunks).length);}
         if(photoRequest)photoTransfers.push({method:req.method,path:req.url,status:incoming.statusCode,...(req.method==='POST'?{requestSHA256:createHash('sha256').update(Buffer.concat(body)).digest('hex')}:{responseSHA256:createHash('sha256').update(Buffer.concat(chunks)).digest('hex')})});
-        if(deletingRequest&&incoming.statusCode===200){const reply=JSON.parse(Buffer.concat(chunks).toString());assert.equal(reply.success,true);acceptedDeletes++;}
+        if(deletingRequest&&incoming.statusCode===200){const reply=capturedJson(Buffer.concat(chunks),incoming.headers['content-encoding']);assert.equal(reply.success,true);acceptedDeletes++;}
         if(dropping&&incoming.statusCode===200){if(pushing)fault='push-offline';res.destroy();}
         else if(dropping){res.writeHead(incoming.statusCode,incoming.headers);res.end(Buffer.concat(chunks));}
         finish();

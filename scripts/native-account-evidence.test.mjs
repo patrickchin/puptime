@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {gzipSync,deflateSync,brotliCompressSync} from 'node:zlib';
 import {STARTER_SCHEDULE,DEFAULT_WIDGET_ACTIONS} from '../src/domain.ts';
 import {DEFAULT_NOTIFICATION_PREFERENCES} from '../src/notification-config.ts';
 import {DatabaseSync} from 'node:sqlite';
 import {mkdtempSync,mkdirSync,rmSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {nativeTables,nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeAcknowledged,assertNativeDrained,assertEmptyIosRestoreSources,assertFreshSetupRevisions} from './native-account-evidence.mjs';
+import {nativeTables,nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeAcknowledged,assertNativeDrained,assertEmptyIosRestoreSources,assertFreshSetupRevisions,capturedJson} from './native-account-evidence.mjs';
 
 const empty=()=>Object.fromEntries(nativeTables.map(table=>[table,[]]));
 test('snapshots include every real table and exact payload; new tables fail closed',()=>{
@@ -99,4 +100,10 @@ test('fresh setup exception is exact and never accepts activity or arbitrary pre
  const window={startedAt:100,finishedAt:120};assertFreshSetupRevisions(tables,window);
  for(const patch of [{kind:'event'},{local_id:'not-starter'},{before_data:'{}'},{after_data:'{}'},{sequence:99},{source:'sync'},{created_at:50},{pet_id:'pet_other'},{unknown:'value'}]){const bad=structuredClone(tables);Object.assign(bad.local_revisions[0],patch);assert.throws(()=>assertFreshSetupRevisions(bad,window));}
  const bad=structuredClone(tables);bad.local_revisions[12].after_data=JSON.stringify({...p,theme:'dark'});assert.throws(()=>assertFreshSetupRevisions(bad,window));
+});
+
+test('wire observer decodes real negotiated JSON compression without accepting broken bytes',()=>{
+ const value={accepted:[],rejected:[]},body=Buffer.from(JSON.stringify(value));
+ for(const [encoding,bytes] of [[undefined,body],['identity',body],['gzip',gzipSync(body)],['deflate',deflateSync(body)],['br',brotliCompressSync(body)],['gzip, br',brotliCompressSync(gzipSync(body))]])assert.deepEqual(capturedJson(bytes,encoding),value);
+ assert.throws(()=>capturedJson(gzipSync(body),undefined));assert.throws(()=>capturedJson(Buffer.from('broken'),'gzip'));assert.throws(()=>capturedJson(body,'unknown'));
 });
