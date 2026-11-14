@@ -48,6 +48,7 @@ export function createProductionAuthFence(config){
    }
   },
   nonJson(request,status){requests.push({...request,status:Number.isInteger(status)?status:0});failure='non-json';},
+  providerFailure(){nativeGoogleToken=null;googleVerified=false;failure='native-provider';},
   denySocket:reject,
   receipt(){return {provider:config.provider,nativeGoogleIdentityMatched:googleVerified,sdkUser,inventory,blocked,failure,requests:requests.map(row=>({...row}))};},
  };

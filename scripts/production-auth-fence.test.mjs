@@ -33,6 +33,7 @@ test('non-JSON and HTTP/transport failures retain only finite route/status evide
  for(const status of [403,502]){const fence=createProductionAuthFence(config);fence.nonJson(request,status);assert.deepEqual(fence.receipt().requests,[{...request,status}]);assert.equal(fence.receipt().failure,'non-json');}
  for(const status of [0,400,401,403,429,500]){const fence=createProductionAuthFence(config);fence.observe(request,status,{private:'never recorded'});assert.equal(fence.receipt().failure,status===0?'transport':'http');assert.ok(!JSON.stringify(fence.receipt()).includes('never recorded'));}
  const guest=createProductionAuthFence(config);guest.observe({method:'GET',path:'/api/account'},401,null);assert.equal(guest.receipt().failure,null);
+ const native=createProductionAuthFence(config);native.providerFailure();assert.equal(native.receipt().failure,'native-provider');assert.throws(()=>native.authorize(config.origin+'/api/account'));
 });
 test('SDK and account identities must agree; any existing puppy stops and protects inventory',()=>{
  for(const wrong of [{...user,email:'tracking@example.invalid'},{...user,id:'usr_different'}])assert.throws(()=>authenticated().observe({method:'GET',path:'/api/account'},200,{user:wrong,pets:[]}));
