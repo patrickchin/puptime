@@ -2,6 +2,8 @@
 import assert from 'node:assert/strict';
 import {existsSync,readFileSync,readdirSync} from 'node:fs';
 import {join} from 'node:path';
+import {STARTER_SCHEDULE,DEFAULT_WIDGET_ACTIONS} from '../src/domain.ts';
+import {DEFAULT_NOTIFICATION_PREFERENCES} from '../src/notification-config.ts';
 
 export const nativeTables=['metadata','puppies','events','routines','settings','pet_settings','local_revisions','local_sync_owner','local_sync_pets','local_sync_outbox','local_sync_records','local_sync_acks','local_sync_baseline','sqlite_sequence'];
 const associationTables=['local_sync_owner','local_sync_pets','local_sync_outbox','local_sync_records','local_sync_acks','local_sync_baseline'];
@@ -69,12 +71,28 @@ export function assertNativeDrained(before,after,accepted,pages){
   });
 }
 
+// The real skip-onboarding path deletes the editable starter schedule and turns
+// off two reminder defaults. These exact fresh writes are not activity history.
+export function assertFreshSetupRevisions(tables,{startedAt,finishedAt}){
+ assert.ok(Number.isFinite(startedAt)&&Number.isFinite(finishedAt)&&finishedAt>=startedAt);
+ assert.equal(tables.puppies.length,1);assert.deepEqual(tables.routines,[]);
+ const n=DEFAULT_NOTIFICATION_PREFERENCES,preferences={theme:'system',language:'system',widgetActions:[...DEFAULT_WIDGET_ACTIONS],reminderLeadMinutes:n.reminderLeadMinutes,widgetConfirmations:n.widgetConfirmations,pottyAfterPeeEnabled:n.pottyAfterPee.enabled,pottyAfterPeeDelayMinutes:n.pottyAfterPee.delayMinutes,pottyAfterMealEnabled:n.pottyAfterMeal.enabled,pottyAfterMealDelayMinutes:n.pottyAfterMeal.delayMinutes};
+ const expected=[...STARTER_SCHEDULE.map(({id,...data})=>({kind:'routine',local_id:id,before_data:data,after_data:null})),{kind:'accountPreferences',local_id:'preferences',before_data:preferences,after_data:{...preferences,pottyAfterPeeEnabled:false,pottyAfterMealEnabled:false}}];
+ assert.equal(tables.local_revisions.length,expected.length,'Only the exact fresh onboarding revisions may precede restore.');
+ let prior=startedAt;
+ assert.deepEqual(tables.local_revisions.map(row=>{
+  assert.ok(Number.isSafeInteger(row.created_at)&&row.created_at>=prior&&row.created_at<=finishedAt,'Every setup revision must be created during this fresh onboarding flow.');prior=row.created_at;
+  const {created_at,...rest}=row;return {...rest,before_data:row.before_data===null?null:JSON.parse(row.before_data),after_data:row.after_data===null?null:JSON.parse(row.after_data)};
+ }),expected.map((row,index)=>({sequence:index+1,pet_id:tables.puppies[0].id,...row,source:'local'})),'Reject unknown activity kinds, keys, bodies, IDs, sources and sequences.');
+}
+
 // Call while the synthetic app is stopped, with the actual AppGroup defaults
 // decoded from disk. Missing/unreadable inspection input must fail closed.
-export function assertEmptyIosRestoreSources({tables,sharedDirectory,documentsDirectory,defaults}){
+export function assertEmptyIosRestoreSources({tables,sharedDirectory,documentsDirectory,defaults,freshSetup}){
   assert.ok(existsSync(sharedDirectory)&&existsSync(documentsDirectory),'Resolve actual native and AppGroup containers.');
   assert.ok(defaults&&typeof defaults==='object'&&!Array.isArray(defaults),'Inspect the real shared defaults, including an absent plist as an explicitly observed empty object.');
-  for(const table of ['events','local_revisions',...associationTables])assert.deepEqual(tables[table],[],`Empty restore preflight: ${table} must be empty.`);
+  if(freshSetup)assertFreshSetupRevisions(tables,freshSetup);else assert.deepEqual(tables.local_revisions,[],'Empty restore preflight: local_revisions must be empty.');
+  for(const table of ['events',...associationTables])assert.deepEqual(tables[table],[],`Empty restore preflight: ${table} must be empty.`);
   assert.ok(!tables.metadata.some(row=>row.key==='pending_restore_operation'),'No interrupted restore intent.');
   const journal=join(sharedDirectory,'ExpoWidgets/PuptimePending');
   assert.deepEqual(existsSync(journal)?readdirSync(journal):[],[],'No immutable widget operation files, including unreadable files.');

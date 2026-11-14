@@ -42,7 +42,7 @@ const config={...JSON.parse(readFileSync('wrangler.jsonc','utf8')),name:'puptime
   vars:{ENVIRONMENT:'local',AUTH_BASE_URL:front,WEB_ORIGINS:front,AUTH_SECRET:crypto.randomUUID()+crypto.randomUUID()}};
 config.d1_databases=config.d1_databases.map(db=>({...db,migrations_dir:resolve(db.migrations_dir)}));
 writeFileSync(configPath,JSON.stringify(config),{mode:0o600});
-let worker,proxy,cookie='',code='',auth,iosFixtureHost;
+let worker,proxy,cookie='',code='',auth,iosFixtureHost,setupWindow;
 const temporaryDevices=[];
 const requests=new Set(),restoreNative=[],requestCounts={enroll:0,push:0};
 // Backend results can be deliberately withheld. Only the native SQLite ack
@@ -69,10 +69,11 @@ function run(binary,args,env=process.env,cwd=process.cwd()){
 }
 async function flow(name,env={}){
   const startup=join(homedir(),'.maestro/tests'),before=new Set(existsSync(startup)?readdirSync(startup):[]);
-  const artifacts=join(privateDir,'maestro-'+name+'-'+Date.now());
+  const startedAt=Date.now(),artifacts=join(privateDir,'maestro-'+name+'-'+Date.now());
   try{
     await run('maestro',['--device',device,'test',...Object.entries({TEST_EMAIL:email,...env}).flatMap(([key,value])=>['-e',`${key}=${value}`]),resolve('.maestro/account-preservation',name+'.yaml'),'--test-output-dir',artifacts],
       {...process.env,MAESTRO_CLI_NO_ANALYTICS:'1',TEST_EMAIL:email,MAESTRO_TEST_CODE:code,...env});
+    if(name==='prepare')setupWindow={startedAt,finishedAt:Date.now()};
     const screenshots=['native-delete-confirmation.png','native-delete-verify.png','native-deleted-account.png','recovered-account-history.png','my-account-returned-log.png','my-account-signed-in.png','my-account-guest.png','same-name-summary.png','same-name-confirmation.png','mismatched-name-summary.png','mismatched-name-confirmation.png','offline-preserved-history.png','pending-signout-cancelled.png','native-photo-saved.png'];
     for(const path of readdirSync(artifacts,{recursive:true}).filter(path=>screenshots.some(name=>String(path).endsWith(name))))
       cpSync(join(artifacts,path),join(output,String(path).split('/').at(-1)));
@@ -125,7 +126,10 @@ function emptyRestorePreflight(){
   const shared=simctl('get_app_container',device,app,group);
   const preferences=join(shared,'Library/Preferences',group+'.plist');
   const defaults=existsSync(preferences)?JSON.parse(execFileSync('plutil',['-convert','json','-o','-',preferences],{encoding:'utf8'})):{};
-  assertEmptyIosRestoreSources({tables:snapshot().tables,sharedDirectory:shared,documentsDirectory:join(data,'Documents'),defaults});
+  assert.ok(temporaryDevices.includes(device),'An empty restore must use a genuinely new task simulator.');
+  const baseline=snapshot().tables;writeFileSync(join(privateDir,'fresh-restore-native-baseline.json'),JSON.stringify({setupWindow,tables:baseline},null,2));
+  assertEmptyIosRestoreSources({tables:baseline,sharedDirectory:shared,documentsDirectory:join(data,'Documents'),defaults,freshSetup:setupWindow});
+  receipts.push({phase:'empty-device-preflight',all14TablesInspected:true,events:0,activityRevisions:0,exactFreshSetupRevisions:baseline.local_revisions.length,immutableJournalEmpty:true,widgetTimelineHistoryEmpty:true,backupHistoryEmpty:true,newTaskDevice:true});
   checks.push('iOS preflight reads all native tables, immutable shared widget files, every cached widget timeline and local backup history before cloud restore');
 }
 async function freshIosRestoreDevice(){
@@ -273,10 +277,10 @@ async function verifyPhotoLifecycle(){
  const upload=photoTransfers.filter(item=>item.method==='POST'&&item.status===200&&item.path.endsWith('/'+photo.id));assert.ok(upload.length>0);assert.ok(upload.every(item=>item.requestSHA256===photo.sha256),'The real SDK must upload the actual JPEG bytes, not File metadata or serialized JSON.');
  const cloud=await remote({allKinds:true});assert.ok(cloud.some(record=>record.kind==='puppy'&&record.data.photoId===photo.id));
  await flow('sign-out');await freshIosRestoreDevice();await flow('prepare');emptyRestorePreflight();assertNoNativePhotoFiles();
- await signIn();photoFault='download-corrupt';await flow('enable-start');
+ const freshBaseline=snapshot();await signIn();photoFault='download-corrupt';await flow('enable-start');
  await until(()=>corruptPhotoDownloads>0,'Observe the native SDK reading an intentionally corrupt JPEG response.');
  await until(()=>snapshot().events.length===0,'An invalid baseline photo must not partially apply its history.');assertNoNativePhotoFiles();
- const failed=snapshot();await flow('reopen-offline',{EXPECTED_COUNT:'0'});assertNativeTransition(failed.tables,snapshot().tables);assertNoNativePhotoFiles();
+ const failed=snapshot();for(const table of ['events','local_revisions','settings','pet_settings','puppies','routines'])assert.deepEqual(failed.tables[table],freshBaseline.tables[table],'Failed photo restore must retain the exact fresh baseline '+table);await flow('reopen-offline',{EXPECTED_COUNT:'0'});assertNativeTransition(failed.tables,snapshot().tables);assertNoNativePhotoFiles();
  assert.deepEqual(await remote({allKinds:true}),cloud,'Failed photo restore must not rewrite cloud history.');
  photoFault='online';await flow('resume-sync');await until(()=>snapshot().events.length===12,'Retry must finish the genuine empty-device restore.');
  assert.deepEqual(snapshot().events,original.events);assert.equal(snapshot().pending,0);const restored=nativePhoto();assert.equal(restored.id,photo.id);assert.deepEqual(restored.bytes,photo.bytes);

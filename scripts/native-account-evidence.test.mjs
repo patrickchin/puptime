@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {STARTER_SCHEDULE,DEFAULT_WIDGET_ACTIONS} from '../src/domain.ts';
+import {DEFAULT_NOTIFICATION_PREFERENCES} from '../src/notification-config.ts';
 import {DatabaseSync} from 'node:sqlite';
 import {mkdtempSync,mkdirSync,rmSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {nativeTables,nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeAcknowledged,assertNativeDrained,assertEmptyIosRestoreSources} from './native-account-evidence.mjs';
+import {nativeTables,nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeAcknowledged,assertNativeDrained,assertEmptyIosRestoreSources,assertFreshSetupRevisions} from './native-account-evidence.mjs';
 
 const empty=()=>Object.fromEntries(nativeTables.map(table=>[table,[]]));
 test('snapshots include every real table and exact payload; new tables fail closed',()=>{
@@ -86,4 +88,15 @@ test('a drain permits exact wire receipts, mirrors and cursor while preserving a
   }
   assert.throws(()=>assertNativeDrained(before,after,[accepted],[{...page,cursor:99}]),/Only explicitly expected/);
   assert.throws(()=>assertNativeDrained(before,after,[accepted],[]),/completed native pull/);
+});
+
+// Mirrors the production skip-onboarding write contract; never an exemption for event history.
+test('fresh setup exception is exact and never accepts activity or arbitrary preference history',()=>{
+ const tables=empty(),n=DEFAULT_NOTIFICATION_PREFERENCES;tables.puppies=[{id:'pet_fresh'}];
+ const p={theme:'system',language:'system',widgetActions:[...DEFAULT_WIDGET_ACTIONS],reminderLeadMinutes:n.reminderLeadMinutes,widgetConfirmations:n.widgetConfirmations,pottyAfterPeeEnabled:true,pottyAfterPeeDelayMinutes:120,pottyAfterMealEnabled:true,pottyAfterMealDelayMinutes:30};
+ const changes=[...STARTER_SCHEDULE.map(({id,...data})=>({kind:'routine',local_id:id,before_data:data,after_data:null})),{kind:'accountPreferences',local_id:'preferences',before_data:p,after_data:{...p,pottyAfterPeeEnabled:false,pottyAfterMealEnabled:false}}];
+ tables.local_revisions=changes.map((row,i)=>({sequence:i+1,pet_id:'pet_fresh',...row,before_data:JSON.stringify(row.before_data),after_data:row.after_data===null?null:JSON.stringify(row.after_data),created_at:100+i,source:'local'}));
+ const window={startedAt:100,finishedAt:120};assertFreshSetupRevisions(tables,window);
+ for(const patch of [{kind:'event'},{local_id:'not-starter'},{before_data:'{}'},{after_data:'{}'},{sequence:99},{source:'sync'},{created_at:50},{pet_id:'pet_other'},{unknown:'value'}]){const bad=structuredClone(tables);Object.assign(bad.local_revisions[0],patch);assert.throws(()=>assertFreshSetupRevisions(bad,window));}
+ const bad=structuredClone(tables);bad.local_revisions[12].after_data=JSON.stringify({...p,theme:'dark'});assert.throws(()=>assertFreshSetupRevisions(bad,window));
 });
