@@ -7,7 +7,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {mkdtempSync,mkdirSync,rmSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {nativeTables,nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeAcknowledged,assertNativeDrained,assertEmptyIosRestoreSources,assertFreshSetupRevisions,capturedJson,nativeAuthUiFlags,nativeCommandState} from './native-account-evidence.mjs';
+import {nativeTables,nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeAcknowledged,assertNativeDrained,assertEmptyIosRestoreSources,assertFreshSetupRevisions,capturedJson,nativeAuthUiFlags} from './native-account-evidence.mjs';
 
 const empty=()=>Object.fromEntries(nativeTables.map(table=>[table,[]]));
 test('snapshots include every real table and exact payload; new tables fail closed',()=>{
@@ -140,32 +140,4 @@ test('sign-out diagnostics expose only fixed control flags and public confirmati
  const titleOnly=nativeAuthUiFlags({children:[button,{attributes:{text:'Sign out on this device?'}}]});
  assert.deepEqual(titleOnly.signOutConfirmation,{titleVisible:true,cancelVisible:false,actionVisible:false});
  assert.deepEqual(nativeAuthUiFlags({attributes:{text:'Sign out on this device? '+secret}}).signOutConfirmation,absent);
-});
-
-
-test('private command projection identifies the actual leaf and never relabels RUNNING as FAILED',()=>{
- const row=(key,value,status)=>({command:{[key]:value},metadata:{status}});
- const failed=row('scrollUntilVisibleCommand',{selector:{idRegex:'fontLicenses.react-native-vector-icons'}},'FAILED');
- assert.deepEqual(nativeCommandState([row('runFlowCommand',{},'FAILED'),failed]),{status:'FAILED',kind:'scroll',targetId:'fontLicenses.react-native-vector-icons',sequence:2});
- const running=row('tapOnElement',{selector:{idRegex:'account.sendCode'}},'RUNNING');
- assert.deepEqual(nativeCommandState([row('runFlowCommand',{},'FAILED'),running]),{status:'RUNNING',kind:'tap',targetId:'account.sendCode',sequence:2});
- assert.equal(nativeCommandState([running,failed]).status,'FAILED');
- assert.deepEqual(nativeCommandState([row('assertConditionCommand',{condition:{visible:{idRegex:'account.code.input'}}},'FAILED')]),{status:'FAILED',kind:'assert',targetId:'account.code.input',sequence:1});
- assert.equal(nativeCommandState([row('assertConditionCommand',{condition:{notVisible:{idRegex:'screen.fontLicenses'}}},'FAILED')]).targetId,'screen.fontLicenses');
- for(const records of [null,{},[],[row('runFlowCommand',{},'FAILED')],[failed,failed],[running,running],[row('unknownCommand',{},'FAILED')],[{command:{tapOnElement:{},inputTextCommand:{}},metadata:{status:'FAILED'}}],[{...failed,metadata:{status:'COMPLETED'}}]])assert.deepEqual(nativeCommandState(records),{status:'UNKNOWN',kind:'unknown',targetId:null,sequence:0});
-});
-
-test('command projection discards secret-rich command values, errors, paths and arbitrary selectors',()=>{
- const secrets=['private-identity@example.invalid','873921','cookie=private-session','/private/auth/trace','private error stack'];
- const secret=secrets.join(' '),row={command:{inputTextCommand:{text:secret,value:secret,path:secret}},metadata:{status:'FAILED',error:secret,stackTrace:secret,evaluatedCommand:{inputTextCommand:{text:secret}}},unknown:secret};
- assert.deepEqual(nativeCommandState([row]),{status:'FAILED',kind:'input',targetId:null,sequence:1});
- for(const key of ['tapOnElement','scrollUntilVisibleCommand','assertConditionCommand']){
-  const value={selector:{idRegex:secret,textRegex:secret},condition:{visible:{idRegex:secret,textRegex:secret}},text:secret};
-  const projected=nativeCommandState([{...row,command:{[key]:value}}]);assert.equal(projected.targetId,null);
-  for(const value of secrets)assert.ok(!JSON.stringify(projected).includes(value));
-  assert.deepEqual(Object.keys(projected),['status','kind','targetId','sequence']);
- }
- assert.equal(nativeCommandState([{...row,metadata:{status:secret}}]).status,'UNKNOWN');
- const ambiguous={condition:{visible:{idRegex:'account.code.input'},notVisible:{idRegex:'account.email.input'}}};
- assert.equal(nativeCommandState([{...row,command:{assertConditionCommand:ambiguous}}]).targetId,null);
 });

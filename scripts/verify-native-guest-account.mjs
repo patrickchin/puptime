@@ -15,7 +15,8 @@ import {createLocalDatabase} from '../src/local/database.ts';
 import {sqliteTestConnection} from '../src/local/sqlite-test-adapter.ts';
 import {createLocalRuntime} from '../src/local/runtime-factory.ts';
 import {pushResponseSchema,pullPageSchema,mutationSchema} from '../src/cloud/protocol.ts';
-import {nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeDrained,assertEmptyIosRestoreSources,capturedJson,nativeAuthUiFlags,nativeCommandState} from './native-account-evidence.mjs';
+import {nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeDrained,assertEmptyIosRestoreSources,capturedJson,nativeAuthUiFlags} from './native-account-evidence.mjs';
+import {readNativeCommandState} from './native-command-evidence.mjs';
 import {assertArchivedSource,nativeCodeFingerprint} from './native-runtime-inputs.mjs';
 import {verifyNativeRichState,verifyNativeFontNotices,accountFlowEnvironment} from './verify-native-rich-state.mjs';
 import {deleteOwnedSimulator,installTaskCleanup,ownProcess} from './native-task-cleanup.mjs';
@@ -105,11 +106,7 @@ async function flow(name,env={}){
     writeFileSync(join(output,'fixture-auth-readiness.json'),JSON.stringify({phase:name,flowSequence,ui,responses:authResponses},null,2)+'\n');
     // Project the private structured command file before finally deletes it.
     // Never infer FAILED from a process timeout: a RUNNING command stays RUNNING.
-    let command=nativeCommandState(null);
-    try{
-      const files=existsSync(artifacts)?readdirSync(artifacts,{recursive:true}).map(String).filter(path=>path.split('/').at(-1)==='commands.json'):[];
-      if(files.length===1&&statSync(join(artifacts,files[0])).size<=2097152)command=nativeCommandState(JSON.parse(readFileSync(join(artifacts,files[0]),'utf8')));
-    }catch{/* Unknown is safer than retaining any raw command, error or path. */}
+    const command=readNativeCommandState(artifacts);
     writeFileSync(join(output,'fixture-command-state.json'),JSON.stringify({phase:name,flowSequence,command},null,2)+'\n');
     // These flows never enter a credential. Do not retain auth-code screenshots.
     if(!android&&['prepare','add-logs','rich-notices'].includes(name)){

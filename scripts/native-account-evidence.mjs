@@ -149,29 +149,3 @@ export function nativeAuthUiFlags(hierarchy,{email='',code=''}={}){
  const confirmation=observed.find(([title])=>title)??[false,false,false];
  return {...fields,signOutConfirmation:{titleVisible:confirmation[0],cancelVisible:confirmation[1],actionVisible:confirmation[2]}};
 }
-
-// Fixed command kinds/targets only. The structured file stays private; do not
-// inspect text, input, evaluated commands, errors, paths or stack traces here.
-const commandKinds={assertConditionCommand:'assert',tapOnElement:'tap',scrollUntilVisibleCommand:'scroll',inputTextCommand:'input',launchAppCommand:'launch',stopAppCommand:'stop',waitForAnimationToEndCommand:'animation',takeScreenshotCommand:'screenshot',eraseTextCommand:'erase',backPressCommand:'back',applyConfigurationCommand:'configuration',defineVariablesCommand:'variables'};
-const commandContainers=new Set(['runFlowCommand','repeatCommand','retryCommand']);
-const commandTargets=new Set(['screen.today','nav.open','nav.close','nav.settings','screen.settings','settings.theme.open','appearance.theme.light','appearance.theme.dark','appearance.theme.system','appearance.modal','settings.search','settings.fontLicenses.open','screen.fontLicenses','fontLicenses.body','fontLicenses.red-hat','fontLicenses.material-community-icons','fontLicenses.apache-2','fontLicenses.expo-vector-icons','fontLicenses.react-native-vector-icons','fontLicenses.close','settings.search.clear','settings.back','account.email.input','account.code.input','account.sendCode','account.verify','account.refresh','account.error','account.identity','account.signOut']);
-export function nativeCommandState(records){
- const unknown=()=>({status:'UNKNOWN',kind:'unknown',targetId:null,sequence:0});
- if(!Array.isArray(records)||records.length>10000)return unknown();
- const candidates=records.map((record,index)=>{
-  const command=record?.command,keys=command&&typeof command==='object'&&!Array.isArray(command)?Object.keys(command):[];
-  return {status:record?.metadata?.status,command,key:keys.length===1?keys[0]:null,sequence:index+1};
- }).filter(record=>['FAILED','RUNNING'].includes(record.status)&&!commandContainers.has(record.key));
- const failed=candidates.filter(record=>record.status==='FAILED');
- const selected=failed.length?failed:candidates.filter(record=>record.status==='RUNNING');
- if(selected.length!==1)return unknown();
- const {status,command,key,sequence}=selected[0];
- if(!Object.hasOwn(commandKinds,key))return unknown();
- const value=command[key];let id;
- if(key==='tapOnElement'||key==='scrollUntilVisibleCommand')id=value?.selector?.idRegex;
- if(key==='assertConditionCommand'){
-  const condition=value?.condition,selectors=[condition?.visible,condition?.notVisible].filter(value=>value!==undefined);
-  if(selectors.length===1)id=selectors[0]?.idRegex;
- }
- return {status,kind:commandKinds[key],targetId:commandTargets.has(id)?id:null,sequence};
-}
