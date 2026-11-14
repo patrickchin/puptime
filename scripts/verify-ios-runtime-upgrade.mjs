@@ -164,12 +164,13 @@ async function verify(){
   return {tables,files:Object.fromEntries(Object.entries(files(documents)).filter(([name])=>!name.startsWith('SQLite/'))),pendingWidgetFiles:files(join(shared,'ExpoWidgets/PuptimePending')),photo:{id:photo.value,jpegSHA256:hash(image),...decoded},widgetTimelines};
  }
  function installed(cut){const path=simctl('get_app_container',device,app,'app');assert.equal(hash(join(path,'main.jsbundle')),cut.provenance.javaScriptSHA256,'Run the original embedded JS, never a substituted bundle.');assert.equal(hash(join(path,cut.provenance.executable)),cut.provenance.nativeExecutableSHA256,'Run the original native executable.');}
+ let completed=false;
  try{
   simctl('boot',device);command('xcrun',['simctl','bootstatus',device,'-b'],{timeout:300000});simctl('ui',device,'appearance','light');
   simctl('install',device,cuts[0].host);installed(cuts[0]);simctl('addmedia',device,fixture);
   flow('older-created-history',`- runFlow: ${JSON.stringify(resolve('.maestro/account-preservation/prepare.yaml'))}\n- runFlow:\n    file: ${JSON.stringify(resolve('.maestro/account-preservation/add-logs.yaml'))}\n    env:\n      BATCHES: '4'\n      EXPECTED_COUNT: '12'\n`);
   flow('older-created-photo',`- runFlow: ${JSON.stringify(selectPhoto)}\n`);
-  flow('older-created-profile',`${openProfile}- tapOn:\n    id: settings.puppy.name\n    retryTapIfNoChange: true\n- tapOn:\n    id: settings.puppy.name.input\n    retryTapIfNoChange: true\n- eraseText\n- inputText: Runtime QA Maple\n- tapOn:\n    id: settings.puppy.name.save\n    retryTapIfNoChange: true\n- assertNotVisible:\n    id: settings.puppy.name.editor\n- assertVisible:\n    id: settings.puppy.photo.remove\n- assertNotVisible:\n    id: settings.puppy.photo.error\n- takeScreenshot: original-older-photo\n- stopApp\n`);
+  flow('older-created-profile',`${openProfile}- tapOn:\n    id: settings.puppy.name\n    retryTapIfNoChange: true\n- tapOn:\n    id: settings.puppy.name.input\n    retryTapIfNoChange: true\n- eraseText\n- inputText: Runtime QA Maple\n- tapOn:\n    text: ^Puppy’s name$\n    childOf:\n      id: settings.puppy.name.editor\n- waitForAnimationToEnd\n- tapOn:\n    id: settings.puppy.name.save\n    enabled: true\n    retryTapIfNoChange: true\n- extendedWaitUntil:\n    notVisible:\n      id: settings.puppy.name.editor\n    timeout: 30000\n- assertNotVisible:\n    id: settings.puppy.name.error\n- assertVisible:\n    id: settings.puppy.photo.remove\n- assertNotVisible:\n    id: settings.puppy.photo.error\n- takeScreenshot: original-older-photo\n- stopApp\n`);
   flow('older-created-preferences',preferences('seed'));
   flow('older-cold-restart',`- launchApp:\n    permissions: {}\n${showPhoto}`);
   flow('older-verifies-preferences',preferences('verify'));
@@ -178,7 +179,14 @@ async function verify(){
   flow('newer-preserves-photo',`- launchApp:\n    permissions: {}\n${showPhoto}`);flow('newer-preserves-preferences',preferences('verify'));assertPreserved(before,snapshot(),{paletteChange:true});
   flow('newer-cold-restart',`- launchApp:\n    permissions: {}\n${showPhoto}`);flow('newer-cold-preferences',preferences('verify'));const after=snapshot();assertPreserved(before,after,{paletteChange:true});
   writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',...provenance,stage:'runtime-replacement',upgradeExecuted:true,checks:['Older original app UI created12 logs, note, profile name and a genuine UIKit-selected decoded512px JPEG.','Older original Settings UI persisted dark appearance, Spanish,15-minute reminder lead and walk widget action; each was verified after old/new cold restarts.','Installing the original newer app without uninstall preserved all14 tables, file bytes, photo ID/decoded bytes and widget activity state before launch.','Newer launch and cold restart preserved every protected field; only widget background/surface colours are explicitly allowed palette changes.'],photoInput:{sha256:hash(fixture),...input},photoSaved:after.photo,protectedStateSHA256:createHash('sha256').update(JSON.stringify(before)).digest('hex'),productionAccountsUsed:false},null,2)+'\n');
+  completed=true;
   console.log('PASS original iOS runtime replacement: '+output);
- }finally{try{simctl('delete',device);}catch{/* Only the owned fresh simulator. */}}
+ }finally{
+  if(!completed&&process.env.GITHUB_ACTIONS!=='true'){
+   try{simctl('terminate',device,app);}catch{}
+   try{simctl('shutdown',device);}catch{}
+   writeFileSync(join(output,'failed-local-simulator.json'),JSON.stringify({status:'failed',device,runtime:runtime.identifier,retainedForInspection:true,originalRuntimeArchivesUnmodified:true},null,2)+'\n');
+  }else try{simctl('delete',device);}catch{/* Only the owned fresh simulator. */}
+ }
 }
 if(mode==='--self-check')selfCheck();else await verify();
