@@ -45,9 +45,19 @@ const provenance={scenario,candidateSource:source,nativeSource:run.head_sha,nati
 writeFileSync(join(output,'native-provenance.json'),JSON.stringify(provenance,null,2)+'\n');
 const runtimes=JSON.parse(command('xcrun',['simctl','list','runtimes','-j'])).runtimes;
 const runtime=runtimes.filter(item=>item.isAvailable&&item.identifier.includes('iOS-26')).at(-1);assert.ok(runtime);
+provenance.environment={runnerArchitecture:process.arch,runnerImage:process.env.ImageOS??null,runnerImageVersion:process.env.ImageVersion??null,xcodeVersion:command('xcodebuild',['-version']),developerDirectory:command('xcode-select',['-p']),runtime:{identifier:runtime.identifier,name:runtime.name,version:runtime.version,buildVersion:runtime.buildversion},deviceType:'com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro'};
+writeFileSync(join(output,'native-provenance.json'),JSON.stringify(provenance,null,2)+'\n');
 const device=command('xcrun',['simctl','create',`Puptime Account ${scenario} CI ${process.env.GITHUB_RUN_ID}`,'com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro',runtime.identifier]);
 try{
- command('xcrun',['simctl','boot',device]);command('xcrun',['simctl','bootstatus',device,'-b'],{timeout:300000});
+ const bootStarted=Date.now();
+ try{command('xcrun',['simctl','boot',device]);command('xcrun',['simctl','bootstatus',device,'-b'],{timeout:300000});}
+ catch(error){
+  // This is before app install or identity setup: retain actual OS progress, not
+  // Node's truncated rendering of the child-process error's stdout property.
+  writeFileSync(join(output,'simulator-boot-failure.log'),String(error.stdout??'').slice(-65536)+'\n'+String(error.stderr??'').slice(-8192));
+  let state='unavailable';try{const all=JSON.parse(command('xcrun',['simctl','list','devices','available','-j'],{timeout:15000}));state=Object.values(all.devices).flat().find(item=>item.udid===device)?.state??'missing';}catch{}
+  writeFileSync(join(output,'simulator-boot-failure.json'),JSON.stringify({stage:'simulator-boot',appInstalled:false,elapsedMs:Date.now()-bootStarted,category:error.code==='ETIMEDOUT'?'timeout':'command-failed',state},null,2)+'\n');throw error;
+ }
  command('xcrun',['simctl','install',device,host]);
  const mode={baseline:[],comparison:['--puppy-comparison'],offline:['--offline-lifecycle'],isolation:['--account-isolation'],photos:['--photo-lifecycle'],deletion:['--deletion-faults']}[scenario];
  const args=['scripts/verify-ios-guest-account.mjs',device,host,'--replace-synthetic',output,...mode];
