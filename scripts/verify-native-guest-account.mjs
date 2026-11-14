@@ -440,8 +440,14 @@ try{
   // Prove the fixture's HTTPS chain and actual config before the app starts.
   // This request must not count as the native app reaching /api/config.
   await new Promise((resolveReady,reject)=>{
-    const req=secureRequest(front+'/api/config',{ca:certificate},response=>{let body='';response.on('data',part=>{body+=part;});response.on('end',()=>{try{assert.equal(response.statusCode,200);const value=JSON.parse(body);assert.equal(value.protocolVersion,1);assert.equal(value.providers.email,true);resolveReady();}catch(error){reject(error);}});});
-    req.on('error',reject);req.setTimeout(15000,()=>req.destroy(new Error('Fixture HTTPS config timed out.')));req.end();
+    const settle=error=>{clearTimeout(timer);if(error)reject(error);else resolveReady();};
+    const timer=setTimeout(()=>{settle(new Error('Fixture HTTPS config timed out.'));req.destroy();},15000);
+    const req=secureRequest(front+'/api/config',{ca:certificate},response=>{let body='';
+      response.on('error',settle);response.on('aborted',()=>settle(new Error('Fixture HTTPS config response aborted.')));
+      response.on('data',part=>{body+=part;if(Buffer.byteLength(body)>16384)req.destroy(new Error('Fixture HTTPS config exceeded its bounded size.'));});
+      response.on('end',()=>{try{assert.equal(response.statusCode,200);const value=JSON.parse(body);assert.equal(value.protocolVersion,1);assert.equal(value.providers.email,true);settle();}catch(error){settle(error);}});
+    });
+    req.on('error',settle);req.end();
   });
   requests.delete('/api/config');
   writeFileSync(join(output,'fixture-readiness.json'),JSON.stringify({httpsConfigStatus:200,fixtureCertificateValidated:true,emailEnabled:true,nativeAppNotYetLaunched:true},null,2)+'\n');
