@@ -67,6 +67,8 @@ native inputs are complete, all vendors/text are reviewed, font pins match, the
 payload/ledger/package manifest/lock/app config/relevant source files equal Git
 HEAD in the canonical checkout root, and the view imports the same
 resource. A passing `seal.json` records that exact source/lock/native-input graph.
+All tracked working-tree content must equal HEAD, including build configuration
+outside the selected graph; ignored generated native/build outputs are permitted.
 Missing input metadata or a font-only placeholder cannot pass. A failed seal
 removes previous seal/final receipts. There is no generation or fallback mode.
 
@@ -142,7 +144,11 @@ walks Pods and autolinked Gradle native subtrees, fingerprints source files, and
 finds source-only `vendor`/`third_party` children as well as binary vendors.
 Native roots are restricted to installed packages, Pods and identified local
 modules; arbitrary project data is not traversed.
-Only the actual Gradle build-directory output and Git metadata are excluded.
+Only the actual Gradle build-directory output, configured CMake staging path and
+Git metadata are excluded. The metadata exporter reads AGP's CMake configuration;
+its module-local `.cxx` default applies only when CMake is enabled. Canonical
+excluded paths are recorded; there is no `.cxx`/vendor wildcard. See the pinned
+[AGP CMake staging contract](https://developer.android.com/reference/tools/gradle-api/8.12/com/android/build/api/dsl/Cmake#buildStagingDirectory()).
 Vendor text must be present within its boundary, or explicitly mapped to a pinned
 actual supplemental notice using `vendorNoticeSources`; approving a vendor name
 alone cannot borrow the root licence. Missing source/text,

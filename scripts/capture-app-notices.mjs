@@ -55,6 +55,7 @@ async function metroPaths(root,platform,privateRoot){
 
 export function assertReviewedSource(root,capture){
  assert.equal(realpathSync(root),realpathSync(git(root,'rev-parse','--show-toplevel').toString().trim()),'Use the canonical checkout root.');
+ git(root,'diff','--quiet','HEAD','--');
  const {ledger,fonts,sources,coverage}=capture;
  assertCapturedSources(root,sources,path=>committed(root,path));
  for(const path of ['package.json','package-lock.json','app.json',ledgerPath,fontPath,payloadPath])strictSource(root,path);

@@ -140,6 +140,7 @@ test('public review serialization includes only exact pinned public notice bodie
 test('actual verify CLI derives final components from map/native inputs and rejects missing assets, extras and dirty HEAD inputs',()=>fixture(({root,file})=>{
  const runGit=(...args)=>execFileSync('git',['-c','core.hooksPath=/dev/null','-c','commit.gpgsign=false',...args],{cwd:root,stdio:['ignore','pipe','pipe']});
  file('.gitignore','node_modules/\nbuild/\n');file('package.json',{name:'fixture',version:'1'});
+ const buildConfig='module.exports={presets:["controlled-preset"]};\n';file('babel.config.cjs',buildConfig);
  const app={expo:{plugins:[['expo-asset',{assets:['./assets/notices/third_party_notices.json']}]]}};file('app.json',app);
  const lock={packages:{'node_modules/qa':{version:'1'},'node_modules/assets':{version:'1'},'node_modules/extra':{version:'1'}}};file('package-lock.json',lock);
  for(const name of ['qa','assets','extra']){file(`node_modules/${name}/package.json`,{name,version:'1'});file(`node_modules/${name}/LICENSE`,mit);}
@@ -162,6 +163,12 @@ test('actual verify CLI derives final components from map/native inputs and reje
  const pack=(extra=false)=>execFileSync('python3',['-c',`import zipfile,sys\nwith zipfile.ZipFile(sys.argv[1],'w') as z:\n z.write(sys.argv[2],'assets/third_party_notices.json');z.write(sys.argv[3],'assets/index.android.bundle');z.writestr('lib/arm64-v8a/libqa.so',b'\\x7fELFcontrolled');z.writestr('assets/font.ttf','synthetic font bytes')\n if sys.argv[4]=='yes':z.writestr('assets/unknown-executable',b'\\xcf\\xfa\\xed\\xfecontrolled')`,apk,join(root,'assets/notices/third_party_notices.json'),bundle,extra?'yes':'no']);
  const verify=()=>spawnSync(process.execPath,[fileURLToPath(new URL('./capture-app-notices.mjs',import.meta.url)),'verify','android','--gradle-input',gradle,'--archive',apk,'--bundle',bundle,'--source-map',map],{cwd:root,encoding:'utf8',timeout:30000});
  pack();assert.equal(verify().status,0);
+ file('babel.config.cjs','module.exports={presets:["changed-preset"]};\n');
+ assert.deepEqual(captureResolvedInputs(root,'android',paths,gradle).sources,capture.sources,'The selected source paths/bytes remain identical.');
+ assert.throws(()=>createNoticeSeal(root,'android',capture),'Unselected dirty tracked build configuration cannot be labeled HEAD.');assert.equal(verify().status,1);
+ runGit('add','babel.config.cjs');assert.throws(()=>createNoticeSeal(root,'android',capture),'Staged build configuration drift must fail too.');assert.equal(verify().status,1);
+ file('babel.config.cjs',buildConfig);runGit('restore','--staged','--','babel.config.cjs');
+ assert.equal(verify().status,0,'Ignored generated build outputs do not make the tracked worktree dirty.');
  const receipt=JSON.parse(readFileSync(join(root,'build/notices/android/final-apk.json')));assert.equal(receipt.inventory.independentFinalComponentInventory,false);
  assert.deepEqual(receipt.inventory.resolvedBuildOnly,[{component:'maven:qa:static@1',basis:'reinspected-gradle-artifacts-and-source'}]);
  const missing={...sourceMap,sources:sourceMap.sources.filter((_,i)=>i!==2),sourcesContent:sourceMap.sourcesContent.filter((_,i)=>i!==2)};file('build/actual.map',missing);

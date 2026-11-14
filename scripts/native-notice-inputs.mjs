@@ -46,7 +46,7 @@ export function gradleNoticeInputs(root,inputFile){
   if(value.projectBuildFile){
    const pkg=npmNoticeInputs(root,[value.projectBuildFile])[0];assert.ok(pkg,'Native Gradle project must have its own installed package.');
    const prefix='node_modules/'+relative(realpathSync(join(root,'node_modules')),realpathSync(dirname(value.projectBuildFile))).split(sep).join('/');assert.ok(prefix===pkg.packagePath||prefix.startsWith(pkg.packagePath+'/'));
-   const scope=prefix===pkg.packagePath?'':prefix.slice(pkg.packagePath.length+1),scan=nativeSourceNotices(root,dirname(value.projectBuildFile),prefix,{excluded:value.projectBuildDirectory?[value.projectBuildDirectory]:[]});
+   const scope=prefix===pkg.packagePath?'':prefix.slice(pkg.packagePath.length+1),scan=nativeSourceNotices(root,dirname(value.projectBuildFile),prefix,{excluded:[value.projectBuildDirectory,value.projectCmakeStagingDirectory].filter(Boolean)});
    const scoped=key=>scope?scope+'/'+key:key;
    scan.vendors=scan.vendors.map(scoped);scan.vendorNotices=Object.fromEntries(Object.entries(scan.vendorNotices).map(([key,sources])=>[scoped(key),sources]));
    components.push(...unionNoticeInputs([pkg],[{...pkg,...scan}]));continue;

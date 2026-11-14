@@ -63,8 +63,9 @@ test('autolinked Gradle inputs include nested native notices/vendors and bind so
  file('package-lock.json',{packages:{'node_modules/qa':{version:'1'}}});file('node_modules/qa/package.json',{name:'qa',version:'1'});file('node_modules/qa/LICENSE',mit);
  const build=file('node_modules/qa/android/build.gradle','// synthetic project\n');
  file('node_modules/qa/android/src/main/cpp/NOTICE','Native subtree attribution\n');file('node_modules/qa/android/src/main/cpp/main.cpp','int original=1;');
+ file('node_modules/qa/android/.cxx-adjacent/source.cpp','int adjacent=1;');
  file('node_modules/qa/android/third_party/child/child.cpp','int child=1;');
- const input=file('gradle.json',{schema:1,configuration:'releaseRuntimeClasspath',components:[{projectBuildFile:build,projectBuildDirectory:join(root,'node_modules/qa/android/build')}]});
+ const input=file('gradle.json',{schema:1,configuration:'releaseRuntimeClasspath',components:[{projectBuildFile:build,projectBuildDirectory:join(root,'node_modules/qa/android/build'),projectCmakeStagingDirectory:join(root,'node_modules/qa/android/.cxx')}]});
  const initial=gradleNoticeInputs(root,input).components[0];assert.ok(initial.notices.some(value=>value.body==='Native subtree attribution\n'));
  assert.ok(initial.vendors.includes('android/third_party/child'));
  const missing=approval(initial);missing.components[0].reviewedVendors=[];
@@ -73,9 +74,20 @@ test('autolinked Gradle inputs include nested native notices/vendors and bind so
  file('node_modules/qa/android/third_party/child/LICENSE',mit);file('node_modules/qa/android/third_party/child/NOTICE','Child attribution\n');
  const complete=gradleNoticeInputs(root,input).components[0],approved=approval(complete);
  assert.equal(resolveNoticeCoverage([complete],approved).status,'READY');
- file('node_modules/qa/android/build/generated/Unrelated.cpp','generated output');assert.deepEqual(gradleNoticeInputs(root,input).components[0].nativeInputs,complete.nativeInputs);
+ file('node_modules/qa/android/build/generated/Unrelated.cpp','generated output');file('node_modules/qa/android/.cxx/Release/vendor/generated/no-license.cpp','generated CMake output');
+ assert.deepEqual(gradleNoticeInputs(root,input).components[0].nativeInputs,complete.nativeInputs);assert.equal(resolveNoticeCoverage(gradleNoticeInputs(root,input).components,approved).status,'READY');
+ assert.deepEqual(complete.nativeInputs['node_modules/qa/android'].excludedBuildPaths,['.cxx','build']);
+ file('node_modules/qa/android/.cxx-adjacent/source.cpp','int adjacent=2;');assert.equal(resolveNoticeCoverage(gradleNoticeInputs(root,input).components,approved).unresolved[0].reason,'native-source-digest-mismatch');file('node_modules/qa/android/.cxx-adjacent/source.cpp','int adjacent=1;');
  file('node_modules/qa/android/src/main/cpp/main.cpp','int changed=2;');
  assert.equal(resolveNoticeCoverage(gradleNoticeInputs(root,input).components,approved).unresolved[0].reason,'native-source-digest-mismatch');
+}));
+
+test('a custom AGP staging path does not exclude an unrelated directory merely named .cxx',()=>fixture(({root,file})=>{
+ file('package-lock.json',{packages:{'node_modules/qa':{version:'1'}}});file('node_modules/qa/package.json',{name:'qa',version:'1'});file('node_modules/qa/LICENSE',mit);
+ const build=file('node_modules/qa/android/build.gradle','// configured CMake staging\n');file('node_modules/qa/android/.cxx/source.cpp','int source=1;');
+ const input=file('gradle.json',{schema:1,configuration:'releaseRuntimeClasspath',components:[{projectBuildFile:build,projectCmakeStagingDirectory:join(root,'node_modules/qa/android/generated-cmake')}]});
+ const before=gradleNoticeInputs(root,input).components[0];file('node_modules/qa/android/generated-cmake/vendor/generated.cpp','generated');assert.deepEqual(gradleNoticeInputs(root,input).components[0].nativeInputs,before.nativeInputs);
+ file('node_modules/qa/android/.cxx/source.cpp','int source=2;');assert.notDeepEqual(gradleNoticeInputs(root,input).components[0].nativeInputs,before.nativeInputs);
 }));
 
 test('one stable union independently qualifies the same npm ID with different Android native inputs',()=>fixture(({root,file})=>{

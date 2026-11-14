@@ -32,7 +32,11 @@ gradle.projectsEvaluated {
                 if (id instanceof ProjectComponentIdentifier && id.projectPath != ':app') {
                     def project = gradle.rootProject.findProject(id.projectPath)
                     if (project == null) throw new GradleException('Unresolved native project input')
-                    return [projectBuildFile: project.buildFile.absolutePath, projectBuildDirectory: project.layout.buildDirectory.get().asFile.absolutePath]
+                    def cmake = project.extensions.findByName('android')?.externalNativeBuild?.cmake
+                    // AGP's configured directory, or its documented module-local
+                    // default only when this project actually enables CMake.
+                    def staging = cmake?.path != null ? project.file(cmake.buildStagingDirectory ?: new File(project.projectDir, '.cxx')).canonicalPath : null
+                    return [projectBuildFile: project.buildFile.absolutePath, projectBuildDirectory: project.layout.buildDirectory.get().asFile.canonicalPath, projectCmakeStagingDirectory: staging]
                 }
                 if (id instanceof ProjectComponentIdentifier && id.projectPath == ':app') return null
                 throw new GradleException('Unknown release component input')
