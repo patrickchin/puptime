@@ -1,43 +1,133 @@
 appId: com.patrickchin.puptime
 name: Every answer survives a failed completion and Back
 ---
+- assertVisible:
+    id: "preview.ready"
+- waitForAnimationToEnd:
+    timeout: 5000
 - tapOn:
     id: "preview.back"
+- extendedWaitUntil:
+    visible:
+      id: "preview.sharing"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 5000
 - tapOn:
     id: "preview.back"
+- extendedWaitUntil:
+    visible:
+      id: "preview.reminders.later"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 5000
 - tapOn:
     id: "preview.back"
+- extendedWaitUntil:
+    visible:
+      id: "preview.prompt"
+      text: "Here’s our starting plan."
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 5000
 - tapOn:
     id: "preview.skip"
+- extendedWaitUntil:
+    visible:
+      id: "preview.poopTimes"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 5000
 - tapOn:
     id: "preview.back"
+- extendedWaitUntil:
+    visible:
+      id: "preview.mealTimes"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 5000
 - tapOn:
     id: "preview.back"
+- extendedWaitUntil:
+    visible:
+      id: "preview.choice.meals-2"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 5000
 - tapOn:
     id: "preview.back"
+- extendedWaitUntil:
+    visible:
+      id: "preview.choice.middle"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 5000
 - tapOn:
     id: "preview.back"
+- extendedWaitUntil:
+    visible:
+      id: "preview.name"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 5000
 - assertVisible:
     id: "preview.name"
     text: "Biscuit"
 - tapOn:
     id: "preview.continue"
+- extendedWaitUntil:
+    visible:
+      id: "preview.choice.middle"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 5000
 - tapOn:
     id: "preview.choice.middle"
+- extendedWaitUntil:
+    visible:
+      id: "preview.choice.meals-2"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 5000
 - tapOn:
     id: "preview.choice.meals-2"
+- extendedWaitUntil:
+    visible:
+      id: "preview.mealTime.0"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 5000
 - assertVisible:
     id: "preview.mealTime.0"
     text: ".*8:00.*"
 - tapOn:
     id: "preview.continue"
+- extendedWaitUntil:
+    visible:
+      id: "preview.poopTime.0"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 5000
 - assertVisible:
     id: "preview.poopTime.0"
     text: ".*8:30.*9:00.*"
 - tapOn:
     id: "preview.continue"
+- extendedWaitUntil:
+    visible:
+      id: "preview.prompt"
+      text: "Here’s our starting plan."
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 5000
 - tapOn:
     id: "preview.continue"
+- extendedWaitUntil:
+    visible:
+      id: "preview.reminders.later"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 5000
 - scrollUntilVisible:
     element:
       id: "notifications.timing.pottyAfterMeal.time"
@@ -50,6 +140,14 @@ name: Every answer survives a failed completion and Back
     checked: true
 - tapOn:
     id: "preview.reminders.later"
+- extendedWaitUntil:
+    visible:
+      id: "preview.sharing"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 5000
 - runFlow: "../skip-sharing.yaml"
 - assertVisible:
     id: "preview.ready"
+- waitForAnimationToEnd:
+    timeout: 5000
