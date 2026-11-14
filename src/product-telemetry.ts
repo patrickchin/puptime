@@ -3,7 +3,8 @@ export const telemetryScreens = ['startup', 'log', 'timeline', 'insights', 'sche
 export type TelemetryScreen = typeof telemetryScreens[number];
 export const telemetryActivities = ['pee', 'poop', 'meal', 'pottyTrip', 'walk', 'nap', 'custom'];
 export const telemetryActions = ['create', 'update', 'delete', 'undo', 'nap_end', 'custom_activity_create', 'import'];
-export type ProductEvent = 'app_foreground' | 'app_screen_view' | 'app_screen_time' | 'app_navigation' | 'app_press' | 'app_log_action';
+export const telemetryErrors = ['local_read_failed', 'local_write_failed', 'import_invalid_csv', 'import_nap_conflict', 'import_read_failed', 'import_failed'] as const;
+export type ProductEvent = 'app_foreground' | 'app_screen_view' | 'app_screen_time' | 'app_navigation' | 'app_press' | 'app_log_action' | 'app_error';
 export type ProductProperties = Record<string, string | number | boolean>;
 
 // Exact static IDs and finite dynamic variants only. Never send raw test IDs:
@@ -55,10 +56,14 @@ export function telemetryControl(id?: string): string | undefined {
 }
 
 export function sanitizeProductEvent(event: string, input: Record<string, unknown>): ProductProperties | null {
-  if (!['app_foreground', 'app_screen_view', 'app_screen_time', 'app_navigation', 'app_press', 'app_log_action'].includes(event)) return null;
+  if (!['app_foreground', 'app_screen_view', 'app_screen_time', 'app_navigation', 'app_press', 'app_log_action', 'app_error'].includes(event)) return null;
   const screen = (value: unknown) => telemetryScreens.includes(value as TelemetryScreen);
   if (!screen(input.screen)) return null;
   const result: ProductProperties = { screen: input.screen as string, schema_version: 1 };
+  if (event === 'app_error') {
+    if (!telemetryErrors.includes(input.error_code as typeof telemetryErrors[number])) return null;
+    return { ...result, error_code: input.error_code as string };
+  }
   if (event === 'app_navigation') {
     if (!screen(input.from_screen) || !screen(input.to_screen)) return null;
     result.from_screen = input.from_screen as string; result.to_screen = input.to_screen as string;

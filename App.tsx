@@ -179,8 +179,13 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
 
 
   const showSaveError = useCallback(() => {
+    productTelemetry.capture('app_error', { error_code: 'local_write_failed' });
     Alert.alert(translate(language, 'app.saveErrorTitle'), translate(language, 'app.saveErrorBody'));
   }, [language]);
+  const showLoadError = useCallback(() => {
+    productTelemetry.capture('app_error', { error_code: 'local_read_failed' });
+    Alert.alert(translate(languageRef.current, 'app.loadErrorTitle'), translate(languageRef.current, 'app.loadErrorBody'));
+  }, []);
 
   const refresh = useCallback(async () => {
     const generation=++refreshGeneration.current;
@@ -259,8 +264,8 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
 
   const refreshCommittedState=useCallback(async()=>{
     try{await refresh();}
-    catch{Alert.alert(translate(languageRef.current,'app.loadErrorTitle'),translate(languageRef.current,'app.loadErrorBody'));}
-  },[refresh]);
+    catch{showLoadError();}
+  },[refresh,showLoadError]);
   const cloud=useCloud(refreshCommittedState);
   const accountState=useAccountSnapshot(cloud.controller);
   const [accessExpired,setAccessExpired]=useState(!!care&&care.expiresAt!==null&&care.expiresAt<=Date.now());
@@ -284,13 +289,13 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
       if(nativeApp){setup=care?null:await loadInitialSetup();await refresh();}
       else{
         const shown=await initialOnboardingCheck;
-        try{await refresh();}catch{Alert.alert(translate(languageRef.current,'app.loadErrorTitle'),translate(languageRef.current,'app.loadErrorBody'));}
+        try{await refresh();}catch{showLoadError();}
         setup=shown?{step:'welcome',puppyName:'My puppy'}:null;
       }
       setFirstLaunch(setup);setOnboardingVisible(setup!==null);onboardingChecked.current=true;
-    }catch{setStartupFailed(true);}
+    }catch{productTelemetry.capture('app_error',{error_code:'local_read_failed'});setStartupFailed(true);}
     finally{startupLoading.current=false;}
-  },[refresh,initialOnboardingCheck]);
+  },[refresh,initialOnboardingCheck,showLoadError]);
 
   useEffect(() => {
     let mounted = true;
@@ -299,7 +304,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
         await refresh();
       } catch {
         if (mounted) {
-          Alert.alert(translate(languageRef.current, 'app.loadErrorTitle'), translate(languageRef.current, 'app.loadErrorBody'));
+          showLoadError();
         }
       }
     };
@@ -311,7 +316,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
       mounted = false;
       subscription.remove();
     };
-  }, [openJournal, refresh]);
+  }, [openJournal, refresh, showLoadError]);
 
   useEffect(() => {
     Appearance.setColorScheme(themePreference === 'system' ? 'unspecified' : theme.isDark ? 'dark' : 'light');
@@ -508,6 +513,9 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
         skipped: result.skipped,
       }));
     } catch (error) {
+      productTelemetry.capture('app_error', { error_code: error instanceof CsvImportError ? 'import_invalid_csv'
+        : error instanceof EventsImportError ? 'import_nap_conflict'
+          : error instanceof EventsStorageError ? 'import_read_failed' : 'import_failed' });
       const body = error instanceof CsvImportError
         ? 'insights.invalidCsvBody'
         : error instanceof EventsImportError
@@ -569,7 +577,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
   };
   const refreshCommittedSchedule=async()=>{
     try{await applySavedSchedule(await loadSchedule());}
-    catch{Alert.alert(translate(language,'app.loadErrorTitle'),translate(language,'app.loadErrorBody'));}
+    catch{showLoadError();}
   };
   const changeSchedule = async (nextSchedule:ScheduleEntry[]) => {await saveSchedule(nextSchedule);await refreshCommittedSchedule();};
   const changeScheduleEntry = async (entry:ScheduleEntry,original?:ScheduleEntry) => {await saveScheduleEntry(entry,original);await refreshCommittedSchedule();};

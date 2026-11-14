@@ -78,3 +78,28 @@ test('an analytics failure never breaks the UI action', () => {
   const t = createProductTelemetry(() => { throw new Error('offline'); });
   assert.doesNotThrow(() => { t.setEnabled(true); t.setForeground(true); t.setScreen('schedule'); });
 });
+
+test('handled failures send only a known code and obey foreground consent', () => {
+  const { telemetry, events } = fixture();
+  const failure = { error_code: 'local_read_failed', message: 'PRIVATE_MESSAGE', sql: 'PRIVATE_SQL', record_id: 'PRIVATE_ID', count: 42 };
+  telemetry.capture('app_error', failure);
+  telemetry.setForeground(true);
+  telemetry.capture('app_error', failure);
+  assert.deepEqual(events, []);
+  telemetry.setEnabled(true);
+  telemetry.capture('app_error', failure);
+  assert.deepEqual(events.at(-1), { event: 'app_error', properties: { screen: 'log', schema_version: 1, error_code: 'local_read_failed' } });
+  const length = events.length;
+  telemetry.capture('app_error', { error_code: 'PRIVATE_MESSAGE' });
+  telemetry.capture('app_error', { error_code: new Error('PRIVATE_MESSAGE') });
+  assert.equal(events.length, length);
+  telemetry.setForeground(false);
+  const background = events.length;
+  telemetry.capture('app_error', failure);
+  assert.equal(events.length, background);
+  telemetry.setForeground(true);
+  telemetry.setEnabled(false);
+  const withdrawn = events.length;
+  telemetry.capture('app_error', failure);
+  assert.equal(events.length, withdrawn);
+});
