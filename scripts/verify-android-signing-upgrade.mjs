@@ -395,7 +395,7 @@ function flow(name,steps){
  }
 }
 const tap=id=>`- tapOn: {id: ${id}}\n`,scroll=id=>`- scrollUntilVisible:\n    element: {id: ${id}}\n    direction: DOWN\n    visibilityPercentage: 100\n    centerElement: true\n`;
-const settings=tap('nav.open')+'- assertVisible: {id: nav.close}\n'+tap('nav.settings')+'- assertVisible: {id: screen.settings}\n';
+const settings=tap('nav.open')+'- assertVisible: {id: nav.close}\n'+scroll('nav.settings')+tap('nav.settings')+'- assertVisible: {id: screen.settings}\n';
 function launch(){adb('shell','am','start','-W','-n',app+'/.MainActivity');}
 async function install(path,replace=false){assert.match(adb('install',...(replace?['-r']:[]),path),/Success/);const installed=adb('shell','pm','path',app).trim();assert.match(installed,/^package:\/data\/app\/[^\n]+\/base\.apk$/);assert.equal(hash(command('adb',['-s',device,'exec-out','cat',installed.slice(8)],{binaryOutput:true})),await fileHash(path),'Installed APK must be the exact input.');} 
 function snapshot(label){
