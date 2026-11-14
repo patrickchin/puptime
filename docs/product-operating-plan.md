@@ -1,6 +1,6 @@
 # Puptime product operating plan
 
-Updated November 12, 2026. The next outcome is a dependable Android beta for new puppy households. Local logging stays free without an account. Qualify saving, history, recovery and optional cloud flows before expanding features. Paid cloud remains a later phase; development access is not production billing.
+Store preparation clarified November 14, 2026; the dated release checkpoint below remains evidence from November 12 until separately refreshed. The next outcomes are a dependable Android candidate and a concrete store-preparation package. Local logging stays free without an account. Qualify saving, history, recovery and optional cloud flows before expanding features. Paid cloud remains a later phase; development access is not production billing.
 
 This plan supersedes the historical paid-app and single-pet roadmaps in [RELEASE_PLAN.md](../RELEASE_PLAN.md). Existing technical contracts and data-preservation requirements still apply.
 
@@ -16,7 +16,7 @@ Keep personal records, usage aggregates, account identifiers, diagnostics, expor
 
 1. **Confirm dependable recovery and saving.** Complete private acceptance of the qualified recovery update. Check journal access, normal logging and fresh cloud acknowledgement without treating a published APK as evidence of installation or recovery. Preserve an external backup before update/signing transitions.
 2. **Qualify the next beta candidate.** Finish the account regression matrix, supported sharing acceptance, exact-artifact upgrade checks, store signing/distribution, privacy/deletion and asset-rights gates. Changes must save exactly once, remain usable with populated history and survive restart. Fix demonstrated defects before optional cleanup.
-3. **Prepare the first external test.** Draft a direct beta destination and invitation, reuse the approved listing media and recruit the first five suitable new-puppy households after the safety gates pass. Establish whether people can install, log and return without live help.
+3. **Prepare stores in parallel.** Complete the [store/privacy/deletion/asset-rights checklist](store-readiness.md), listing drafts and signing evidence while candidate tests run. A small household product trial may be proposed as optional learning; it is not an agreed prerequisite for this preparation or release.
 
 Pause new themes, speculative voice features, activity expansion and general navigation or pet-management redesigns. Preserve supported capabilities and real saved data. Add a compatibility layer only when explicitly required.
 
@@ -33,7 +33,7 @@ Refresh this evidence before consequential install or publication advice. Public
 | Remote account tests | Heavy/native E2E work belongs on the configured remote Mac. At this checkpoint it is unreachable and the broader real-SDK suite is not verified. Prepared commands, helpers or a driver startup do not count as completed cases. Resume through the existing configured connection when available. |
 | Remaining beta work | Qualify supported sharing, account/puppy isolation and deletion on the intended service and candidate. Verify live store eligibility, app records, agreements and tester access. Repository configuration alone does not establish those gates. |
 | Store artifact | The GitHub APK channel is qualified separately from a production-signed AAB, Play App Signing, upload configuration and store acceptance. Establish the data-preserving signing transition before store distribution. |
-| Asset rights | [Bundled narration](../assets/puppy-care/audio/README.md) was generated for noncommercial use. Default commercial candidate: omit those recordings and retain written guides. Check website distribution and preview media too. Regeneration needs suitable rights and an approved budget; a later plan upgrade does not retroactively license recordings. |
+| Asset rights | [Original narration](../assets/puppy-care/audio/README.md) was generated for noncommercial use. The November 14 store-preparation change excludes its imports from the shared app/web registry; original files and written guides remain. Verify fresh exports and scan the final artifact under the [store checklist](store-readiness.md). Check preview soundtracks separately. Regeneration needs suitable rights and an approved budget; a later plan upgrade does not retroactively license recordings. |
 | Cloud charging | Development access is not production billing. Keep beta entitlement bounded and explicit; paid cloud needs separate production access controls, cost/support validation and billing work. |
 
 ## APK install decisions
@@ -68,13 +68,13 @@ A narrow urgent hotfix can be qualified for its demonstrated failure and update 
 
 ## Store and beta gates
 
-For closed beta, meet the candidate safety gates, resolve reported data-loss/sync defects and get a production-signed AAB accepted by Play's internal track. Verify the actual developer-account requirements in the console. As checked November 12, Google's [target API policy](https://support.google.com/googleplay/android-developer/answer/11926878?hl=en) requires Android 16/API 36 for new mobile apps and updates. Check [16 KB page compatibility](https://developer.android.com/guide/practices/page-sizes) on the final native libraries/artifact; requirements and deadlines must be refreshed before submission. Complete privacy policy, Data Safety, support contact, rating, countries and deletion flows. Provide direct beta entry and feedback on the website.
+For Android store testing, meet the candidate safety gates, resolve reported data-loss/sync defects and qualify a production-signed AAB on the intended track. An internal track is an optional starting point, not a general mandatory gate. Verify the actual developer-account requirements in the console. Follow the independent [store readiness gates](store-readiness.md) for privacy, deletion, audio rights, signing, AABs, agreements and declarations; none is replaced by a household trial. As checked November 12, Google's [target API policy](https://support.google.com/googleplay/android-developer/answer/11926878?hl=en) requires Android 16/API 36 for new mobile apps and updates. Check [16 KB page compatibility](https://developer.android.com/guide/practices/page-sizes) on the final native libraries/artifact; requirements and deadlines must be refreshed before submission. Complete privacy policy, Data Safety, support contact, rating, countries and deletion flows. Provide direct beta entry and feedback on the website.
 
 Keep cloud beta access bounded and explicitly free during testing. Do not require payment details or promise permanent free cloud. Monthly/yearly subscriptions remain later work, not a deadline shortcut. If public cloud is not ready, a local release is an option only after its actual feature/access configuration and safe access/export for existing users are qualified.
 
 For public release, qualify the exact submitted build and resolve data-loss, account-access and cross-puppy isolation defects. Obtain production access, policy review, accepted listing/media, asset rights and approval of the concrete launch package. Prepare a halt/rollback procedure that preserves local records.
 
-Initial external-use decision threshold: among ten suitable nonfounder households, aim for eight to install/save a first log without live help and six to log on at least three dates in their first week. These are provisional thresholds, not benchmarks or proof of demand. Use consented feedback to explain failures. Recruit about 20 eligible testers to allow for dropouts.
+Optional product-learning proposal, not an agreed release gate: if the owner chooses a household trial, assess installation/first logging and repeat use without live help. Earlier five-household recruitment and ten-household activation targets were suggestions, not mandatory prerequisites or proof of demand. Use consented feedback to explain failures. Size any legally required store test from the actual console rule, independently of this optional research.
 
 Google's [new-personal-account rule](https://support.google.com/googleplay/android-developer/answer/14151465?hl=en) applies to personal accounts created after November 13, 2023: at least 12 testers continuously opted in for 14 days before applying for production access. Verify its applicability. Elapsed time does not guarantee approval.
 
@@ -88,7 +88,7 @@ Use Asia/Shanghai dates and conditional windows, not promises controlled by a st
 | --- | --- |
 | November 12–18 | Complete recovery acceptance, restore remote test execution and finish the next candidate's remaining safety, signing and asset-rights gates. |
 | November 19 onward | Target internal/closed beta only when those gates pass. Report a concrete blocker and revised window if they do not. |
-| Following two weeks | Test with eligible households, fix observed failures and reuse the approved listing/media package after candidate checks. |
+| Following two weeks | Run an applicable store-required test; optional household feedback can run alongside it if chosen. Fix observed failures and reuse the approved listing/media package after candidate checks. |
 | Public release | After the applicable closed test, production-access decision, build/policy review and launch approval. A November 19 closed-test start would make December 3 the earliest eligibility point to apply, not a promised launch date. A later start moves the window. |
 
 ## Name and positioning
@@ -103,7 +103,7 @@ Proposed promise: **A free puppy log for the first weeks at home.** Supporting m
 
 Default spend is zero until nonfounders use the product successfully. Use one destination, a few trainer/class introductions and the existing [store-listing PR #157](https://github.com/patrickchin/puptime/pull/157) package. The owner approved its specific screenshots and roughly 15-second native preview for store/launch media. Reuse that package after candidate accuracy, asset-rights and store checks; do not commission a duplicate demo. This approval does not authorize publishing diagnostics, raw exports or other personal history.
 
-1. Prepare one short invitation with installation/feedback instructions for the first five suitable new-puppy households.
+1. If a household trial is chosen, prepare one short invitation and installation/feedback instructions. The previously suggested first five households are optional; do not hold store preparation or manufacture a release gate around that count.
 2. Prepare introductions for two or three reward-based trainers or puppy classes. Send only when explicitly authorized. Community invitations require permission under the rules and founder disclosure.
 3. Once available, make the website's primary action **Get the Android beta**, with accurate access and feedback instructions. A source-code visit is not an installation. Keep analytics consent separate from beta access.
 4. Reuse the approved preview/screenshots in the qualified listing and up to two posts a week. Stage drafts for review; avoid a daily multi-channel owner workload.

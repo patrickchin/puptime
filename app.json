@@ -104,7 +104,7 @@
         {
           "microphonePermission": "Allow Puptime to use the microphone when you dictate a log note.",
           "recordAudioAndroid": false,
-          "enableBackgroundPlayback": true,
+          "enableBackgroundPlayback": false,
           "enableBackgroundRecording": false
         }
       ],
