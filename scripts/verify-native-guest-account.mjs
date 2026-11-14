@@ -80,11 +80,12 @@ async function flow(name,env={}){
     await run('maestro',['--device',device,'test',...Object.entries({TEST_EMAIL:email,...env}).flatMap(([key,value])=>['-e',`${key}=${value}`]),resolve('.maestro/account-preservation',name+'.yaml'),'--test-output-dir',artifacts],
       {...process.env,MAESTRO_CLI_NO_ANALYTICS:'1',TEST_EMAIL:email,MAESTRO_TEST_CODE:code,...env});
     if(name==='prepare')setupWindow={startedAt,finishedAt:Date.now()};
-    const screenshots=['native-delete-confirmation.png','native-delete-verify.png','native-deleted-account.png','recovered-account-history.png','my-account-returned-log.png','my-account-signed-in.png','my-account-guest.png','same-name-summary.png','same-name-confirmation.png','mismatched-name-summary.png','mismatched-name-confirmation.png','offline-preserved-history.png','pending-signout-cancelled.png','native-photo-saved.png'];
+    const screenshots=['native-delete-confirmation.png','native-delete-verify.png','native-deleted-account.png','recovered-account-history.png','my-account-returned-log.png','my-account-signed-in.png','my-account-guest.png','my-account-config-retry.png','same-name-summary.png','same-name-confirmation.png','mismatched-name-summary.png','mismatched-name-confirmation.png','offline-preserved-history.png','pending-signout-cancelled.png','native-photo-saved.png'];
     for(const path of readdirSync(artifacts,{recursive:true}).filter(path=>screenshots.some(name=>String(path).endsWith(name))))
       cpSync(join(artifacts,path),join(output,String(path).split('/').at(-1)));
     console.log('PASS native account phase: '+name);
   }catch(error){
+    writeFileSync(join(output,'fixture-native-reach.json'),JSON.stringify({phase:name,configReached:requests.has('/api/config'),sessionReached:[...requests].some(path=>path.startsWith('/api/auth/get-session')),accountReached:requests.has('/api/account')},null,2)+'\n');
     // These flows never enter a credential. Do not retain auth-code screenshots.
     if(!android&&['prepare','add-logs'].includes(name)){
       try{simctl('io',device,'screenshot',join(output,'failure-'+name+'.png'));}catch{}
@@ -436,6 +437,14 @@ try{
     });changeSockets.add(upstream);upstream.once('close',()=>changeSockets.delete(upstream));upstream.on('error',()=>socket.destroy());socket.on('error',()=>upstream.destroy());
   });
   await new Promise(resolveProxy=>proxy.listen(frontPort,'127.0.0.1',resolveProxy));
+  // Prove the fixture's HTTPS chain and actual config before the app starts.
+  // This request must not count as the native app reaching /api/config.
+  await new Promise((resolveReady,reject)=>{
+    const req=secureRequest(front+'/api/config',{ca:certificate},response=>{let body='';response.on('data',part=>{body+=part;});response.on('end',()=>{try{assert.equal(response.statusCode,200);const value=JSON.parse(body);assert.equal(value.protocolVersion,1);assert.equal(value.providers.email,true);resolveReady();}catch(error){reject(error);}});});
+    req.on('error',reject);req.setTimeout(15000,()=>req.destroy(new Error('Fixture HTTPS config timed out.')));req.end();
+  });
+  requests.delete('/api/config');
+  writeFileSync(join(output,'fixture-readiness.json'),JSON.stringify({httpsConfigStatus:200,fixtureCertificateValidated:true,emailEnabled:true,nativeAppNotYetLaunched:true},null,2)+'\n');
   for(const file of readdirSync(join(persist,'v3/d1'),{recursive:true}).filter(file=>String(file).endsWith('.sqlite'))){
     const db=new DatabaseSync(join(persist,'v3/d1',file),{readOnly:true});
     if(db.prepare("SELECT name FROM sqlite_master WHERE name='local_email_previews'").get()){auth=db;break;}db.close();
