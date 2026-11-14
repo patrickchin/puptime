@@ -22,7 +22,7 @@ export function createProductionAuthFence(config){
   },
   authorize(input,options={}){
    if(inventory||failure)return reject();
-   let url;try{url=new URL(typeof input==='string'?input:input.url);}catch{return reject();}
+   let url;try{url=new URL(typeof input==='string'?input:input instanceof URL?input.href:input.url);}catch{return reject();}
    if(url.origin!==origin.origin||url.username||url.password||url.search||url.hash)return reject();
    const method=String(options.method??input?.method??'GET').toUpperCase(),path=url.pathname;
    if(method==='GET'&&['/api/config','/api/account','/api/auth/get-session','/api/auth/list-accounts'].includes(path))return {method,path};

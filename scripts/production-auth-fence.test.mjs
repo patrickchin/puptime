@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {createFetch} from '@better-fetch/fetch';
 import {createProductionAuthFence} from './production-auth-fence.mjs';
 
 const config={origin:'https://qa.example.invalid',provider:'google',email:'qa@example.invalid',protectedEmails:['tracking@example.invalid']};
@@ -16,6 +17,17 @@ test('only exact selected auth routes and safe reads can pass',()=>{
  for(const origin of ['https://other.example.invalid','http://qa.example.invalid','https://user@qa.example.invalid'])assert.throws(()=>createProductionAuthFence(config).authorize(origin+'/api/account'));
  for(const path of ['/api/config','/api/account','/api/auth/get-session','/api/auth/list-accounts'])assert.equal(createProductionAuthFence(config).authorize(config.origin+path).method,'GET');
  assert.throws(()=>createProductionAuthFence(config).denySocket());
+});
+test('the pinned production fetch adapter passes URL objects and serialized JSON through the same fence',async()=>{
+ const fence=createProductionAuthFence(config);fence.googleNative(google);let calls=0;
+ const sdk=createFetch({baseURL:config.origin,customFetchImpl:async(input,options)=>{
+  assert.ok(input instanceof URL);const request=fence.authorize(input,options);calls++;
+  if(request.method==='POST')assert.equal(typeof options.body,'string');
+  return Response.json({ok:true});
+ }});
+ await sdk('/api/config',{method:'GET'});await sdk('/api/auth/sign-in/social',{method:'POST',body:{provider:'google',idToken:{token:google.data.idToken}}});assert.equal(calls,2);
+ await assert.rejects(()=>sdk('/api/cloud/enroll',{method:'POST',body:{}}));assert.equal(calls,2);
+ for(const target of [config.origin+'/api/sync/pull?after=0','https://other.example.invalid/api/account'])assert.throws(()=>createProductionAuthFence(config).authorize(new URL(target)));
 });
 test('wrong/protected native identity is rejected before its token can be forwarded',()=>{
  for(const wrong of ['tracking@example.invalid','other@example.invalid',undefined]){

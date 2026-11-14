@@ -131,6 +131,7 @@ export function denyNativeAction(){void fence.then(async value=>{try{value.denyS
  // from this process while Maestro navigates the unauthenticated guest UI.
  phase='guest-navigation';await new Promise((resolveDriver,reject)=>{
   const fd=openSync(join(output,'guest-setup-private.log'),'wx',0o600),child=spawn(process.env.MAESTRO_BIN??'maestro',['--device',device,'test',flow,'--test-output-dir',join(output,'guest-setup')],{stdio:['ignore',fd,fd],env:{...env,MAESTRO_CLI_NO_ANALYTICS:'1',MAESTRO_DRIVER_STARTUP_TIMEOUT:'180000'}});
+  void completion.then(success=>{if(!success&&child.exitCode===null)child.kill('SIGTERM');});
   const bound=setTimeout(()=>{child.kill('SIGTERM');reject(new Error('Guest setup exceeded its bound.'));},600000);
   let driverError;child.once('error',error=>{driverError=error;});child.once('close',code=>{clearTimeout(bound);closeSync(fd);code===0&&!driverError?resolveDriver():reject(new Error('Guest setup failed.'));});
  });
