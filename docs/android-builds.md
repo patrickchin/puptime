@@ -14,6 +14,16 @@ Signature/archive checks and the existing known-restricted-audio guard must pass
 
 If release creation fails after tag creation, preserve the tag and verified artifacts. Stop and review the source/digest before using the separate explicitly authorized existing-tag publication path; do not delete/retarget the tag or rebuild silently. Retrying this fresh-tag path will refuse the existing tag.
 
+## Disposable signing-transition evidence
+
+The separate [disposable proof workflow](../.github/workflows/android-signing-proof.yml) consumes two already completed artifact-only runs. It pins the immutable app source separately from the reviewed driver source. Its full-tree guard permits only the two named tooling edits and the new regular-file command-evidence helper; every other path, blob and mode must match the app source. It does not build another app or adopt a production signing key.
+
+The guest-only exercise targets one fresh offline API 36 x86_64 emulator and temporary QA signing material. A static signature/lineage pass, successful installation or launch command is not a history-preserving update pass. Acceptance requires the actual guest seed and widget binding, plain-key rejection, lineage bridge, later update, exact UID/tables/files/widget comparisons and cold restart. It does not cover nonempty SDK credentials, genuine providers, Play, OEM/ARM devices or API 24–32.
+
+Read the bounded verification receipt's completed stages, actual failure and cleanup result. An unfinished stage is not a pass. Failure diagnostics retain only fixed command fields; a best-effort screenshot is permitted only for the fresh offline guest-seed failure. Missing or competing command states remain unknown. Raw driver output, databases, preferences, QA keys and APK copies are not uploadable evidence. Keep **Hold: no new APK** until the exact candidate's remaining gates pass.
+
+The current diagnostic attempt completed static signing/lineage checks and exact original-APK installation, then stopped during guest setup while tapping Settings below the drawer viewport. Emulator exit and private-material removal were confirmed. Guest setup, widget binding and the OS update/data-preservation sequence did not complete; this is a test-navigation boundary, not evidence of a failed signing transition or a passed update.
+
 ## Signing and final acceptance
 
 Signing is deliberately unchanged. The installed Expo 57 template's generated `release` build type uses `signingConfigs.debug`; this workflow supplies no production signing credentials or override. That observed template default is not proof of a historical APK's private-key provenance. A valid signature or a task named `Release` does not establish Play signing readiness. Use each resulting artifact's certificate receipt and compare the actual installed/GitHub signer, Play app-signing certificate and upload key through the qualified release process. Do not generate/rotate keys or prescribe uninstall/clear-data to resolve a mismatch.
