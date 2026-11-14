@@ -1,11 +1,12 @@
 // Frozen original iOS app -> original app runtime replacement, not a store upgrade.
 // --inspect-only downloads/attests only. --replace-synthetic owns a fresh simulator.
+// --prepare-enrolled ABSOLUTE_PRIVATE_DIRECTORY only prepares verified inputs.
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
-import {closeSync,cpSync,existsSync,mkdirSync,mkdtempSync,openSync,readFileSync,readdirSync,renameSync,rmSync,statSync,writeFileSync} from 'node:fs';
+import {chmodSync,closeSync,cpSync,existsSync,lstatSync,mkdirSync,mkdtempSync,openSync,readFileSync,readdirSync,readSync,realpathSync,renameSync,rmSync,statSync,writeFileSync} from 'node:fs';
 import {homedir,tmpdir} from 'node:os';
-import {join,resolve} from 'node:path';
+import {basename,dirname,isAbsolute,join,relative,resolve,sep} from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
 import {nativeSnapshot,nativeTables} from './native-account-evidence.mjs';
 
@@ -16,11 +17,60 @@ const cuts=[
 ];
 const nativeInputs=['package.json','package-lock.json','app.json','app.config.*','eas.json','.npmrc','.env','plugins','patches','assets','ios'];
 const [mode='--inspect-only',destination=process.env.GITHUB_ACTIONS==='true'?'build/native-runtime-replacement':join(homedir(),'Pictures/Screenshots/Codex/puptime-runtime-replacement')]=process.argv.slice(2);
-assert.ok(['--inspect-only','--replace-synthetic','--self-check'].includes(mode));
+assert.ok(['--inspect-only','--replace-synthetic','--prepare-enrolled','--self-check'].includes(mode));
+const preparing=mode==='--prepare-enrolled';
 const command=(binary,args,options={})=>execFileSync(binary,args,{encoding:'utf8',timeout:120000,stdio:['ignore','pipe','pipe'],...options}).trim();
 const hash=path=>createHash('sha256').update(readFileSync(path)).digest('hex');
 const simctl=(...args)=>command('xcrun',['simctl',...args]);
 const jsonPlist=path=>JSON.parse(command('plutil',['-convert','json','-o','-',path]));
+const inside=(root,path)=>{const name=relative(root,path);return name===''||name!=='..'&&!name.startsWith('..'+sep)&&!isAbsolute(name);};
+const regularFiles=root=>readdirSync(root,{recursive:true,withFileTypes:true}).filter(entry=>entry.isFile()).map(entry=>relative(root,join(entry.parentPath??entry.path,entry.name))).sort();
+function assertArchivedSource(root,expected){
+ assert.ok(!readdirSync(root,{recursive:true,withFileTypes:true}).some(entry=>entry.isSymbolicLink()),'Historical sources cannot contain unverified symlinks.');
+ assert.deepEqual(regularFiles(root),Object.keys(expected).sort(),'Inspect every historical source file, including unexpected additions.');
+ for(const [name,value] of Object.entries(expected)){
+  assert.ok(inside(root,resolve(root,name)),'Historical paths must stay in their owned source root.');
+  const path=join(root,name),bytes=readFileSync(path);
+  assert.equal(createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex'),value.blobSHA1,'Extract the exact Git blob, never a substituted source file.');
+  assert.equal(lstatSync(path).mode&0o111? '100755':'100644',value.mode,'Preserve historical executable modes.');
+ }
+}
+function prepareEnrolled(cuts,output,source){
+ const lockSHA256=hash('package-lock.json'),packageSHA256=hash('package.json');
+ for(const cut of cuts){
+  const directory=dirname(dirname(cut.host)),sourceRoot=join(directory,'source'),archive=join(directory,'source.tar');
+  mkdirSync(sourceRoot,{mode:0o700});
+  const fd=openSync(archive,'wx',0o600);
+  try{execFileSync('git',['archive','--format=tar',cut.source],{timeout:120000,stdio:['ignore',fd,'pipe']});}finally{closeSync(fd);}
+  command('tar',['-xf',archive,'-C',sourceRoot]);rmSync(archive);chmodSync(sourceRoot,0o700);
+  const sourceFiles=Object.fromEntries(command('git',['ls-tree','-rz',cut.source]).split('\0').filter(Boolean).map(entry=>{
+   const match=entry.match(/^(100644|100755) blob ([a-f0-9]{40})\t(.+)$/s);assert.ok(match,'Reject unsupported historical source entry modes.');
+   return [match[3],{mode:match[1],blobSHA1:match[2]}];
+  }));
+  assertArchivedSource(sourceRoot,sourceFiles);
+  assert.equal(hash(join(sourceRoot,'package-lock.json')),lockSHA256,'Share dependencies only across the exact historical and driver lock.');
+  assert.equal(hash(join(sourceRoot,'package.json')),packageSHA256,'Preserve the exact historical package contract.');
+  const nativeCode={};
+  for(const name of regularFiles(cut.host)){
+   const path=join(cut.host,name),header=Buffer.alloc(4),fd=openSync(path,'r');
+   try{readSync(fd,header,0,4,0);}finally{closeSync(fd);}
+   if(!['feedface','cefaedfe','feedfacf','cffaedfe','cafebabe','bebafeca','cafebabf','bfbafeca'].includes(header.toString('hex')))continue;
+   const architecture=command('lipo',['-archs',path]);assert.match(architecture,/\barm64\b/);
+   const thin=join(directory,'native-'+Object.keys(nativeCode).length+'.arm64');
+   if(architecture.trim()==='arm64')cpSync(path,thin);else command('lipo',[path,'-thin','arm64','-output',thin]);
+   const section=command('otool',['-l',thin]).split('Section').find(value=>/sectname\s+__text\s/.test(value)&&/segname\s+__TEXT\s/.test(value));
+   assert.ok(section,'Inspect compiled native code in every embedded Mach-O.');
+   const size=parseInt(section.match(/\bsize\s+0x([a-f0-9]+)/i)?.[1],16),offset=Number(section.match(/\boffset\s+(\d+)/)?.[1]),bytes=readFileSync(thin);
+   assert.ok(Number.isSafeInteger(size)&&size>0&&Number.isSafeInteger(offset)&&offset>=0&&offset+size<=bytes.length);
+   nativeCode[name]={fileSHA256:hash(path),arm64TextSHA256:createHash('sha256').update(bytes.subarray(offset,offset+size)).digest('hex'),architecture};rmSync(thin);
+  }
+  assert.ok(Object.hasOwn(nativeCode,cut.provenance.executable),'Attest the main executable as well as embedded native code.');
+  cut.preparation={name:cut.name,host:cut.host,sourceRoot,sourceFiles,source:cut.source,tree:cut.tree,packageSHA256,lockSHA256,appGroup:cut.group,infoPlistSHA256:hash(join(cut.host,'Info.plist')),signature:{deepStrictVerified:true,codeResourcesSHA256:hash(join(cut.host,'_CodeSignature/CodeResources'))},nativeCode,original:cut.provenance};
+ }
+ const manifest={schemaVersion:1,status:'prepared',stage:'controlled-origin-enrolled-preparation',upgradeExecuted:false,appsInstalled:false,javaScriptModified:false,driverSource:source,driverScriptSHA256:hash(new URL(import.meta.url)),packageSHA256,lockSHA256,runtimes:cuts.map(cut=>cut.preparation),scope:'Private inputs only. A later case must independently verify these files before exact-source controlled-origin exports and installation; this is not an original-byte, enrolled-runtime, numeric/store, current-candidate or provider-authentication pass.'};
+ writeFileSync(join(output,'enrolled-inputs.json'),JSON.stringify(manifest,null,2)+'\n',{mode:0o600,flag:'wx'});
+ console.log('PASS controlled-origin enrolled preparation only; no runtime replacement executed.');
+}
 function assertPreserved(before,after,{paletteChange=false}={}){
  const protectedState=value=>({...value,widgetTimelines:Object.fromEntries(Object.entries(value.widgetTimelines).map(([key,entries])=>[key,entries.map(props=>{
   if(!paletteChange)return props;
@@ -44,13 +94,32 @@ function selfCheck(){
  }
  const settings=[['puptime.theme.v1','dark'],['puptime.language.v1','es'],['puptime.widgetActions.v1','["pee","poop","meal","walk"]'],['puptime.notificationPreferences.v1','{"reminderLeadMinutes":15}']].map(([key,value])=>({key,value}));
  assertPreferences(settings);assert.throws(()=>assertPreferences(settings.filter(row=>row.key!=='puptime.language.v1')));assert.throws(()=>assertPreferences(settings.map(row=>row.key==='puptime.theme.v1'?{...row,value:'"dark"'}:row)));
- console.log('PASS runtime preservation guard: only the explicit widget palette change is allowed.');
+ const root=mkdtempSync(join(tmpdir(),'puptime-source-guard-'));
+ try{
+  const file=join(root,'index.ts'),bytes=Buffer.from('synthetic historical source\n');writeFileSync(file,bytes,{mode:0o600});
+  const expected={'index.ts':{mode:'100644',blobSHA1:createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex')}};
+  assertArchivedSource(root,expected);writeFileSync(file,'changed');assert.throws(()=>assertArchivedSource(root,expected));writeFileSync(file,bytes);
+  writeFileSync(join(root,'unexpected'),'extra');assert.throws(()=>assertArchivedSource(root,expected));rmSync(join(root,'unexpected'));
+  chmodSync(file,0o700);assert.throws(()=>assertArchivedSource(root,expected));
+  assert.ok(inside(root,join(root,'child'))&&!inside(root,root+'-sibling')&&!inside(root,dirname(root)));
+ }finally{rmSync(root,{recursive:true,force:true});}
+ console.log('PASS runtime/source preservation guards: only the explicit widget palette change is allowed; modified, extra and executable-mode-changed source files reject.');
 }
 async function verify(){
  assert.equal(process.env.GITHUB_REPOSITORY??repository,repository);
- const output=resolve(destination);mkdirSync(output,{recursive:true});
+ let output=resolve(destination);
+ if(preparing){
+  assert.ok(process.argv[3]&&isAbsolute(destination),'Preparation needs an explicit absolute private destination.');
+  output=join(realpathSync(dirname(output)),basename(output));
+  for(const root of [command('git',['rev-parse','--show-toplevel']),process.env.GITHUB_WORKSPACE].filter(Boolean))assert.ok(!inside(realpathSync(root),output),'Private inputs must stay outside checkout and uploaded build receipt roots.');
+  assert.ok(!existsSync(output),'Preparation owns a fresh destination, never supplied existing hosts or source roots.');
+  assert.ok(process.env.PUPTIME_RUNTIME_ARTIFACT_CACHE,'Preparation requires the existing verified archive cache; do not download another copy.');
+  assert.equal(command('git',['status','--porcelain','--untracked-files=all']),'','Commit the exact preparation driver before creating reusable inputs.');
+  mkdirSync(output,{mode:0o700});
+ }else mkdirSync(output,{recursive:true});
  assert.ok(!existsSync(join(output,'verification.json'))&&!existsSync(join(output,'inspection.json')),'Use a fresh receipt directory; never mix inspection with an earlier runtime result.');
- const privateDir=mkdtempSync(join(tmpdir(),'puptime-runtime-upgrade-'));
+ const privateDir=preparing?join(output,'inputs'):mkdtempSync(join(tmpdir(),'puptime-runtime-upgrade-'));
+ if(preparing)mkdirSync(privateDir,{mode:0o700});
  const cache=process.env.PUPTIME_RUNTIME_ARTIFACT_CACHE?resolve(process.env.PUPTIME_RUNTIME_ARTIFACT_CACHE):privateDir;
  mkdirSync(cache,{recursive:true});
  const api=path=>JSON.parse(command('gh',['api',`repos/${repository}/${path}`]));
@@ -60,7 +129,7 @@ async function verify(){
   const run=api(`actions/runs/${cut.run}`);assert.equal(run.status,'completed');assert.equal(run.conclusion,'success');
   assert.equal(run.head_sha,cut.source);assert.equal(run.head_repository?.full_name,repository);assert.equal(run.path,'.github/workflows/ios-simulator.yml');
   assert.equal(run.event,cut.event);assert.equal(run.head_branch,cut.branch);
-  try{command('git',['cat-file','-e',cut.source+'^{commit}']);}catch{command('git',['fetch','--no-tags','origin',cut.source]);}
+  try{command('git',['cat-file','-e',cut.source+'^{commit}']);}catch{assert.ok(!preparing,'Preparation requires the existing historical commits; do not fetch new sources.');command('git',['fetch','--no-tags','origin',cut.source]);}
   // Checkout SHAs are pinned from each original build's actual checkout log.
   // The PR merge checkout is distinct from its head, but has the same full tree.
   const checkout=api('git/commits/'+cut.checkout);assert.equal(checkout.sha,cut.checkout);assert.equal(checkout.tree.sha,cut.tree);
@@ -70,6 +139,7 @@ async function verify(){
   assert.equal(artifact.digest,'sha256:'+cut.digest);
   const archive=join(cache,cut.name+'-artifact.zip');
   if(!existsSync(archive)){
+   assert.ok(!preparing,'Preparation requires both completed cached archives.');
    const partial=archive+'.part',fd=openSync(partial,'wx',0o600);
    try{execFileSync('gh',['api',`repos/${repository}/actions/artifacts/${cut.artifact}/zip`,...rawFlags],{timeout:600000,stdio:['ignore',fd,'pipe']});}finally{closeSync(fd);}
    assert.equal(hash(partial),cut.digest,'Verify the complete download before adding it to the artifact cache.');renameSync(partial,archive);
@@ -101,6 +171,7 @@ async function verify(){
  assert.equal(command('git',['ls-files','--others','--exclude-standard','--',...nativeInputs]),'','Review untracked native inputs before reusing a frozen artifact.');
  assert.equal(cuts[0].group,cuts[1].group);assert.deepEqual(cuts[0].entitlements,cuts[1].entitlements,'Preserve the actual storage/keychain/AppGroup signing boundary.');
  assert.notEqual(cuts[0].provenance.javaScriptSHA256,cuts[1].provenance.javaScriptSHA256,'Use two genuinely different original app runtimes.');
+ if(preparing){prepareEnrolled(cuts,output,source);return;}
  const provenance={stage:'archive-inspection',upgradeExecuted:false,driverSource:source,driverScriptSHA256:hash(new URL(import.meta.url)),runtimes:cuts.map(cut=>cut.provenance),originalArchivesUnmodified:true,exercisePreferenceContract:{theme:'dark',language:'es',reminderLeadMinutes:15,widgetActionAdded:'walk',creation:'Original older Settings UI only'},scope:'Original older full app to original newer full app, same native1.12.0/build1; not numeric/store upgrade, old-JS injection, production-account or prior-aa4 legacy-format qualification.'};
  writeFileSync(join(output,'native-provenance.json'),JSON.stringify(provenance,null,2)+'\n');
  writeFileSync(join(output,'inspection.json'),JSON.stringify({status:'passed',...provenance},null,2)+'\n');
