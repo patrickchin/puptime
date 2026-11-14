@@ -76,8 +76,33 @@ jobs:
           timeout 30 sdkmanager --version | sed -n '1,4p'
           timeout 30 adb version | sed -n '1,4p'
           sdkmanager 'emulator' 'build-tools;36.0.0' 'system-images;android-36;google_apis;x86_64'
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends libpulse0
+          dpkg-query -W libpulse0
+          for puptime_properties in "$ANDROID_HOME/emulator/source.properties" "$ANDROID_HOME/build-tools/36.0.0/source.properties" "$ANDROID_HOME/system-images/android-36/google_apis/x86_64/source.properties"; do
+            test -f "$puptime_properties"
+            printf 'Android package metadata: %s\n' "$puptime_properties"
+            awk '/^Pkg\.Revision[[:space:]]*=/ {revision=1} /^(Pkg\.(Desc|Revision|BuildId)|AndroidVersion\.ApiLevel)[[:space:]]*=/ && ++n<=4 {print} END {exit !revision}' "$puptime_properties"
+          done
           test -x "$ANDROID_HOME/emulator/emulator"
           printf 'Android executable: %s\n' "$ANDROID_HOME/emulator/emulator"
+          # The launcher may supply bundled SDK library paths; ldd is diagnostic only.
+          puptime_dependency_report="$PUPTIME_SIGNING_PRIVATE/loader-dependencies.txt"
+          : > "$puptime_dependency_report"
+          puptime_loader_failed=0
+          for puptime_binary in "$ANDROID_HOME/emulator/emulator" "$ANDROID_HOME/emulator/qemu/linux-x86_64/qemu-system-x86_64"; do
+            printf 'Checking host dependencies: %s\n' "$puptime_binary"
+            test -x "$puptime_binary"
+            timeout 30 ldd "$puptime_binary" >> "$puptime_dependency_report" 2>&1 || puptime_loader_failed=1
+          done
+          puptime_missing_libraries=$(awk '$2=="=>" && $3=="not" && $4=="found" {print $1}' "$puptime_dependency_report" | sort -u)
+          if [[ -n "$puptime_missing_libraries" || "$puptime_loader_failed" != 0 ]]; then
+            printf 'Unresolved emulator ELF libraries (diagnostic; launcher may supply SDK paths):\n%s\n' "$puptime_missing_libraries"
+            if [[ "$puptime_loader_failed" != 0 ]]; then
+              printf 'ELF inspection diagnostic; launcher and boot checks remain mandatory:\n'
+              sed -n '1,40p' "$puptime_dependency_report"
+            fi
+          fi
           timeout 30 emulator -version | sed -n '1,4p'
           export ANDROID_AVD_HOME="$PUPTIME_SIGNING_PRIVATE/avd"
           mkdir -m 700 "$ANDROID_AVD_HOME"
