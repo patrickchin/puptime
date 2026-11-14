@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {readFileSync} from 'node:fs';
 import {createFetch} from '@better-fetch/fetch';
 import {createProductionAuthFence} from './production-auth-fence.mjs';
 
@@ -68,4 +69,33 @@ test('email requests are bounded and only target the private allowed inbox',()=>
  assert.throws(()=>createProductionAuthFence(emailConfig).authorize(config.origin+'/api/auth/sign-in/social',{method:'POST',body:JSON.stringify({provider:'google',idToken:{token:'private-token'}})}));
  const login=createProductionAuthFence(emailConfig),verify=login.authorize(config.origin+'/api/auth/sign-in/email-otp',{method:'POST',body:JSON.stringify({email:config.email,otp:'123456'})});
  login.observe(verify,200,{user,token:'private-session'});login.observe({method:'GET',path:'/api/account'},200,{user,pets:[]});assert.ok(!JSON.stringify(login.receipt()).includes('123456'));assert.ok(!JSON.stringify(login.receipt()).includes('private-session'));
+});
+test('the actual generated bridge requires private activation before native Google or any auth POST',async()=>{
+ const source=readFileSync(new URL('./prepare-ios-production-auth-inventory.mjs',import.meta.url),'utf8');
+ const template=source.match(/writeFileSync\(join\(checkout,'src\/cloud\/qa-production-auth.ts'\),`([\s\S]*?)`,\{mode:0o600\}\);/)?.[1];assert.ok(template);
+ let sequence=0;
+ async function bridge(provider='google',active=false){
+  const callback='http://127.0.0.1:12345/private',state={active,posts:0,native:0},key='__puptimePrivateHandoffTest'+sequence++;
+  globalThis[key]=async(input,options={})=>{
+   const url=String(input);
+   if(url===callback+'/config')return Response.json({...config,provider});
+   if(url===callback+'/handoff')return Response.json({active:state.active});
+   if(url===callback+'/receipt')return Response.json({});
+   assert.ok(url.startsWith(config.origin+'/api/'));
+   if(options.method==='POST'){state.posts++;return Response.json({user,token:'private-session-token'});}
+   return Response.json({providers:{google:true,email:true}});
+  };
+  const code=template.replace("import {fetch as rawFetch} from 'expo/fetch';",`const rawFetch=globalThis[${JSON.stringify(key)}];`)
+   .replace("import {createProductionAuthFence} from './qa-production-fence.mjs';",`import {createProductionAuthFence} from ${JSON.stringify(new URL('./production-auth-fence.mjs',import.meta.url).href)};`)
+   .replace('${JSON.stringify(callback)}',JSON.stringify(callback));
+  try{return {module:await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64')),state,sdk:{signIn:async()=>{state.native++;return google;}}};}finally{delete globalThis[key];}
+ }
+ const waiting=await bridge();await waiting.module.inventoryFetch(config.origin+'/api/config',{method:'GET'});
+ await assert.rejects(()=>waiting.module.fencedGoogle(waiting.sdk).signIn());assert.equal(waiting.state.native,0);assert.equal(waiting.state.posts,0);
+ const emailWaiting=await bridge('email');await assert.rejects(()=>emailWaiting.module.inventoryFetch(config.origin+'/api/auth/email-otp/send-verification-otp',{method:'POST',body:JSON.stringify({email:config.email,type:'sign-in'})}));assert.equal(emailWaiting.state.posts,0);
+ const expired=await bridge('google',true);await expired.module.fencedGoogle(expired.sdk).signIn();expired.state.active=false;
+ await assert.rejects(()=>expired.module.inventoryFetch(config.origin+'/api/auth/sign-in/social',{method:'POST',body:JSON.stringify({provider:'google',idToken:{token:google.data.idToken}})}));assert.equal(expired.state.native,1);assert.equal(expired.state.posts,0);
+ const enabled=await bridge('google',true);await enabled.module.fencedGoogle(enabled.sdk).signIn();
+ await enabled.module.inventoryFetch(config.origin+'/api/auth/sign-in/social',{method:'POST',body:JSON.stringify({provider:'google',idToken:{token:google.data.idToken}})});assert.equal(enabled.state.native,1);assert.equal(enabled.state.posts,1);
+ await assert.rejects(()=>enabled.module.inventoryFetch(config.origin+'/api/cloud/enroll',{method:'POST',body:'{}'}));assert.equal(enabled.state.posts,1);
 });

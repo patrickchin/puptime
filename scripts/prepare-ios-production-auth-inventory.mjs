@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import {createHash,randomBytes} from 'node:crypto';
 import {execFileSync,spawn} from 'node:child_process';
-import {closeSync,cpSync,existsSync,mkdirSync,openSync,readFileSync,statSync,writeFileSync} from 'node:fs';
+import {closeSync,cpSync,existsSync,lstatSync,mkdirSync,openSync,readFileSync,statSync,writeFileSync} from 'node:fs';
 import {createServer} from 'node:http';
 import {join,resolve} from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
@@ -79,6 +79,7 @@ async function main(){
    if(compatible&&req.method==='GET'&&req.url==='/status'){res.end('packager-status:running');return;}
    if(compatible&&req.method==='GET'&&req.url?.split('?')[0]==='/.expo/.virtual-metro-entry.bundle'&&overlayHost){res.setHeader('content-type','application/javascript');res.end(readFileSync(join(overlayHost,'main.jsbundle')));return;}
    if(compatible&&req.method==='GET'&&req.url?.startsWith('/assets/')&&overlayHost){const path=resolve(overlayHost,'.'+decodeURIComponent(req.url.split('?')[0]));if(path.startsWith(overlayHost+'/assets/')&&existsSync(path)&&statSync(path).isFile()){res.end(readFileSync(path));return;}}
+   if(req.method==='GET'&&req.url===('/'+nonce+'/handoff')){res.setHeader('content-type','application/json');res.end(JSON.stringify({active:ready&&!settled}));return;}
    if(req.url!==('/'+nonce+'/config')&&req.url!==('/'+nonce+'/receipt')){res.writeHead(404);res.end();return;}
    if(req.method==='GET'&&req.url.endsWith('/config')){configReads++;res.setHeader('content-type','application/json');res.end(JSON.stringify(config));return;}
    if(req.method!=='POST'||!req.url.endsWith('/receipt')){res.writeHead(405);res.end();return;}
@@ -99,13 +100,14 @@ import {createProductionAuthFence} from './qa-production-fence.mjs';
 const base=${JSON.stringify(callback)};
 const fence=rawFetch(base+'/config').then(response=>response.json()).then(config=>createProductionAuthFence(config));
 const report=async value=>{await rawFetch(base+'/receipt',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(value.receipt())});};
+const handoff=async value=>{try{const response=await rawFetch(base+'/handoff',{redirect:'error',credentials:'omit'});if(!response.ok||(await response.json()).active!==true)throw new Error('Not active.');}catch{value.providerFailure();throw new Error('Private owner handoff is not active.');}};
 export async function inventoryFetch(input,options){const value=await fence;let request;
- try{request=value.authorize(input,options);}catch{await report(value);throw new Error('Production inventory request blocked.');}
+ try{if(String(options?.method??input?.method??'GET').toUpperCase()!=='GET')await handoff(value);request=value.authorize(input,options);}catch{await report(value);throw new Error('Production inventory request blocked.');}
  let response;try{response=await rawFetch(input,{...options,redirect:'error',credentials:'omit'});}catch{value.observe(request,0,null);await report(value);throw new Error('Production authentication transport failed.');}
  let payload;try{payload=await response.clone().json();}catch{value.nonJson(request,response.status);await report(value);throw new Error('Production inventory response rejected.');}
  try{value.observe(request,response.status,payload);}catch{await report(value);throw new Error('Production inventory identity rejected.');}
  await report(value);if(value.receipt().failure||value.receipt().inventory)throw new Error('Production inventory stopped; awaiting private verification.');return response;}
-export function fencedGoogle(sdk){return {configure:options=>sdk.configure(options),signIn:async()=>{const value=await fence;try{value.beforeGoogle();}catch{await report(value);throw new Error('Production provider selection rejected.');}let response;try{response=await sdk.signIn();}catch{value.providerFailure();await report(value);throw new Error('Production native provider did not complete.');}try{value.googleNative(response);}catch{await report(value);throw new Error('Production identity selection rejected.');}await report(value);return response;}};}
+export function fencedGoogle(sdk){return {configure:options=>sdk.configure(options),signIn:async()=>{const value=await fence;try{await handoff(value);value.beforeGoogle();}catch{await report(value);throw new Error('Production provider selection rejected.');}let response;try{response=await sdk.signIn();}catch{value.providerFailure();await report(value);throw new Error('Production native provider did not complete.');}try{value.googleNative(response);}catch{await report(value);throw new Error('Production identity selection rejected.');}await report(value);return response;}};}
 export function denyNativeAction(){void fence.then(async value=>{try{value.denySocket();}catch{}await report(value);}).catch(()=>{});throw new Error('Production native action blocked.');}
 `,{mode:0o600});
  const replacements=[
@@ -135,10 +137,17 @@ export function denyNativeAction(){void fence.then(async value=>{try{value.denyS
   const bound=setTimeout(()=>{child.kill('SIGTERM');reject(new Error('Guest setup exceeded its bound.'));},600000);
   let driverError;child.once('error',error=>{driverError=error;});child.once('close',code=>{clearTimeout(bound);closeSync(fd);code===0&&!driverError?resolveDriver():reject(new Error('Guest setup failed.'));});
  });
- assert.ok(!settled,'No authentication or rejected operation is permitted during preparation.');assert.ok(configReads>0,'Prove the owned app loaded this exact hard-fenced overlay before handoff.');before=snapshot();save(join(output,'native-before-private.json'),before);ready=true;phase='private-owner-handoff';
- save(join(output,'ready-private.json'),{status:'ready-awaiting-private-owner-handoff',device,source,driverSource:command('git',['rev-parse','HEAD']),nativeHost:provenance,capabilities,googleClient,originalAuthSourceSHA256:createHash('sha256').update(authOriginal).digest('hex'),overlayAuthSourceSHA256:hash(authPath),fenceSourceSHA256:hash(resolve('scripts/production-auth-fence.mjs')),originalJavaScriptSHA256:provenance.javaScriptSHA256,overlayJavaScriptSHA256:hash(join(host,'main.jsbundle')),nativeTextSHA256:textSHA,nativeCapabilitySHA256:capabilitySHA,scope:'Instrumented aacd full app; no authentication started; not original/current release qualification.'});
- console.log('Prepared dedicated simulator and Account view for private owner handoff. No authentication was started.');
- timer=setTimeout(fail,30*60*1000);return await completion;
+ assert.ok(!settled,'No authentication or rejected operation is permitted during preparation.');assert.ok(configReads>0,'Prove the owned app loaded this exact hard-fenced overlay before handoff.');before=snapshot();save(join(output,'native-before-private.json'),before);phase='awaiting-devicehub-confirmation';
+ const marker=join(output,'begin-private-handoff');assert.ok(!existsSync(marker),'Confirm DeviceHub only after the private Account view is ready.');
+ save(join(output,'ready-private.json'),{status:'ready-awaiting-devicehub-confirmation',handoffMarker:marker,authClockStarted:false,device,source,driverSource:command('git',['rev-parse','HEAD']),nativeHost:provenance,capabilities,googleClient,originalAuthSourceSHA256:createHash('sha256').update(authOriginal).digest('hex'),overlayAuthSourceSHA256:hash(authPath),fenceSourceSHA256:hash(resolve('scripts/production-auth-fence.mjs')),originalJavaScriptSHA256:provenance.javaScriptSHA256,overlayJavaScriptSHA256:hash(join(host,'main.jsbundle')),nativeTextSHA256:textSHA,nativeCapabilitySHA256:capabilitySHA,scope:'Instrumented aacd full app; no authentication started; not original/current release qualification.'});
+ console.log('Prepared dedicated simulator and Account view; authentication remains blocked pending private DeviceHub confirmation.');
+ while(!settled&&!existsSync(marker))await new Promise(resolveMarker=>setTimeout(resolveMarker,500));
+ if(settled)return await completion;
+ const activation=lstatSync(marker);assert.ok(activation.isFile()&&!activation.isSymbolicLink()&&(activation.mode&0o777)===0o600,'Use a regular private0600 handoff marker.');assert.equal(readFileSync(marker,'utf8'),'begin-private-handoff\n');
+ assert.deepEqual(snapshot(),before,'Waiting for DeviceHub must preserve every native row exactly.');
+ phase='private-owner-handoff';const startedAt=Date.now();timer=setTimeout(fail,30*60*1000);ready=true;
+ save(join(output,'handoff-active-private.json'),{status:'ready-awaiting-private-owner-handoff',device,authClockStarted:true,startedAt,expiresAt:startedAt+30*60*1000});
+ console.log('Private owner handoff is active; its bounded authentication window starts now.');return await completion;
 }
 let passed=false;try{passed=await main();}catch{fail();}finally{clearTimeout(timer);server?.closeAllConnections();server?.close();if(device)try{simctl('delete',device);}catch{/* Only this fresh owned device. */}}
 if(!passed){console.error('Private production inventory did not complete; no public auth details were recorded.');process.exitCode=1;}
