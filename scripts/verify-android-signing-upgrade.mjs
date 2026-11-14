@@ -30,10 +30,10 @@ function exerciseRecorder(save){
  const event=(phase,state)=>{assert.ok(exerciseStages.includes(phase));assert.ok(['started','completed','failed'].includes(state));assert.ok(history.length<256);history.push({phase,state});};
  return {phase:()=>active.at(-1),flowFailure(flow,directory){assert.ok(exerciseFlows.includes(flow));const stage=active.at(-1);assert.ok(exerciseStages.includes(stage));const {status,kind,targetId,sequence}=readNativeCommandState(directory);nativeCommand={flow,stage,status,kind,targetId,sequence};save(snapshot());},begin(phase){event(phase,'started');active.push(phase);save(snapshot());},end(phase){assert.equal(active.at(-1),phase);event(phase,'completed');active.pop();save(snapshot());},persist(){save(snapshot());},fail(error){failure=finiteFailure(error);event(active.at(-1)??history.at(-1)?.phase??'exercise-preconditions','failed');save(snapshot());}};
 }
-// Only this fresh/offline guest flow may produce an image. Capture is best-effort
-// and must never replace the original Maestro failure or enter an auth flow.
-function guestSeedFailureImage(flow,stage,io){
- if(flow!=='old-ui-seed'||stage!=='guest-seed')return false;
+// Images are limited to two exact fresh/offline guest flow/stage pairs.
+// Capture is best-effort; the original failure still ends the attempt.
+function guestFailureImage(flow,stage,io){
+ if(!((flow==='old-ui-seed'&&stage==='guest-seed')||(flow==='bind-real-launcher-widget'&&stage==='widget-binding')))return false;
  try{if(!io.owned())return false;const bytes=io.capture();if(!Buffer.isBuffer(bytes)||bytes.length<8||bytes.length>8*1024*1024||!bytes.subarray(0,8).equals(Buffer.from('89504e470d0a1a0a','hex')))return false;io.save(bytes);return true;}catch{return false;}
 }
 function exerciseEvidenceSelfCheck(){
@@ -54,13 +54,16 @@ function exerciseEvidenceSelfCheck(){
    writeFileSync(file,JSON.stringify(records));record.flowFailure('old-ui-seed',directory);assert.equal(saved.nativeCommand.targetId,null);assert.ok(!JSON.stringify(saved).includes(secret));
   }
   assert.equal(saved.nativeCommand.status,'UNKNOWN');assert.equal(saved.nativeCommand.sequence,0);assert.throws(()=>record.flowFailure(secret,directory));assert.ok(!JSON.stringify(saved).includes(secret));
+  writeFileSync(file,JSON.stringify([{...leaf,command:{tapOnElement:{selector:{text:secret}}}}]));const widget=make();widget.begin('widget-binding');widget.flowFailure('bind-real-launcher-widget',directory);widget.fail(errors[2].error);assert.deepEqual(saved.nativeCommand,{flow:'bind-real-launcher-widget',stage:'widget-binding',status:'FAILED',kind:'tap',targetId:null,sequence:23});assert.ok(!JSON.stringify(saved).includes(secret));
  }finally{rmSync(directory,{recursive:true});}
  const png=Buffer.from('89504e470d0a1a0a','hex');let captures=0,saves=0;const io={owned:()=>true,capture:()=>{captures++;return png;},save:value=>{assert.deepEqual(value,png);saves++;}};
- assert.equal(guestSeedFailureImage('old-ui-seed','guest-seed',io),true);assert.equal(captures,1);assert.equal(saves,1);
- for(const [flow,stage] of [['later-visible','later-visible'],['old-ui-seed','qa-key-creation'],[secret,'guest-seed']])assert.equal(guestSeedFailureImage(flow,stage,io),false);assert.equal(captures,1);
- assert.equal(guestSeedFailureImage('old-ui-seed','guest-seed',{...io,owned:()=>false}),false);assert.equal(captures,1);
- for(const patch of [{owned:()=>{throw rich();}},{capture:()=>{throw rich();}},{capture:()=>Buffer.from(secret)},{capture:()=>Buffer.alloc(8*1024*1024+1)},{save:()=>{throw rich();}}])assert.equal(guestSeedFailureImage('old-ui-seed','guest-seed',{...io,...patch}),false);
- const original=errors[2].error;let caught;try{try{throw original;}catch(error){guestSeedFailureImage('old-ui-seed','guest-seed',{...io,capture:()=>{throw rich();}});throw error;}}catch(error){caught=error;}assert.equal(caught,original);assert.deepEqual(finiteFailure(caught),{class:'command-failed',status:17});
+ for(const [flow,stage] of [['old-ui-seed','guest-seed'],['bind-real-launcher-widget','widget-binding']]){
+  const beforeCaptures=captures,beforeSaves=saves;assert.equal(guestFailureImage(flow,stage,io),true);assert.equal(captures,beforeCaptures+1);assert.equal(saves,beforeSaves+1);
+  assert.equal(guestFailureImage(flow,stage,{...io,owned:()=>false}),false);assert.equal(captures,beforeCaptures+1);
+  for(const patch of [{owned:()=>{throw rich();}},{capture:()=>{throw rich();}},{capture:()=>Buffer.from(secret)},{capture:()=>Buffer.alloc(8*1024*1024+1)},{save:()=>{throw rich();}}])assert.equal(guestFailureImage(flow,stage,{...io,...patch}),false);
+ }
+ const beforeDisallowed=captures;for(const [flow,stage] of [['later-visible','later-visible'],['old-ui-seed','qa-key-creation'],['old-ui-seed','widget-binding'],['bind-real-launcher-widget','guest-seed'],['bind-real-launcher-widget','qa-key-creation'],[secret,'guest-seed']])assert.equal(guestFailureImage(flow,stage,io),false);assert.equal(captures,beforeDisallowed);
+ const original=errors[2].error;let caught;try{try{throw original;}catch(error){guestFailureImage('old-ui-seed','guest-seed',{...io,capture:()=>{throw rich();}});throw error;}}catch(error){caught=error;}assert.equal(caught,original);assert.deepEqual(finiteFailure(caught),{class:'command-failed',status:17});
  console.log('PASS finite exercise stage/error/status evidence and secret-rich negative checks; no command, keys or device operations.');
 }
 
@@ -390,7 +393,7 @@ function flow(name,steps){
  try{command('maestro',['--device',device,'test',path,'--test-output-dir',join(root,name+'-driver')],{timeout:240000});}
  catch(error){
   try{exerciseEvidence.flowFailure(name,join(root,name+'-driver'));}catch{}
-  guestSeedFailureImage(name,exerciseEvidence.phase(),{owned:()=>emulatorHost('--emulator-owned'),capture:()=>command('adb',['-s','emulator-5588','exec-out','screencap','-p'],{binaryOutput:true,timeout:5000}),save:bytes=>writeFileSync(resolve('build/android-signing-safe/guest-seed-failure.png'),bytes,{mode:0o600})});
+  guestFailureImage(name,exerciseEvidence.phase(),{owned:()=>emulatorHost('--emulator-owned'),capture:()=>command('adb',['-s','emulator-5588','exec-out','screencap','-p'],{binaryOutput:true,timeout:5000}),save:bytes=>writeFileSync(resolve('build/android-signing-safe/guest-seed-failure.png'),bytes,{mode:0o600})});
   throw error;
  }
 }
