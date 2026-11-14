@@ -27,14 +27,17 @@ function inspectCapabilities(text,a,b){
  for(const [name,value] of Object.entries(caps))assert.match(blocks[0],new RegExp('Has '+name+' capability\\s*:\\s*'+value+'(?:\\s|$)'));
 }
 function expectedLaunch(before,version){return {...before,metadata:before.metadata.map(row=>row.key==='backup_app_version'?{...row,value:version}:row)};}
-function protectedFiles(before,after,version,events,eventData=row=>row,puppyName){
- for(const [name,value] of Object.entries(before))if(!name.startsWith('files/SQLite/'))assert.equal(after[name]?.sha256,value.sha256,'Existing protected file changed: '+name);
- for(const [name,value] of Object.entries(after))if(!(name in before)&&!name.startsWith('files/SQLite/')){
-  assert.ok(name.startsWith('files/activity-backups/'),'Unexpected new protected file');
+const sqliteFile=name=>/^files\/SQLite\/puptime-v2\.db(?:-wal|-shm|-journal)?$/.test(name);
+function protectedFiles(before,after,version,events,eventData=row=>row,puppyName,expectedBackups=0){
+ for(const [name,value] of Object.entries(before))if(!sqliteFile(name))assert.equal(after[name]?.sha256,value.sha256,'Existing protected file changed: '+name);
+ let addedBackups=0;for(const [name,value] of Object.entries(after))if(!(name in before)&&!sqliteFile(name)){
+  addedBackups++;
+  assert.match(name,/^files\/activity-backups\/bkp_[a-f0-9]{32}\.json$/,'Unexpected new protected file');
   const backup=JSON.parse(value.bytes);assert.deepEqual(Object.keys(backup).sort(),['appVersion','createdAt','events','format','petId','puppyName','reason','version'].sort());assert.equal(backup.puppyName,puppyName);assert.equal(backup.reason,'before-update');assert.equal(backup.appVersion,version);
   assert.equal(backup.format,'puptime-activity');assert.equal(backup.version,1);assert.equal(backup.petId,events[0].pet_id);assert.ok(Number.isSafeInteger(backup.createdAt));
   const ordered=values=>values.slice().sort((a,b)=>a.id.localeCompare(b.id));assert.deepEqual(ordered(backup.events),ordered(events.map(row=>({id:row.id,...eventData(row)}))));
  }
+ assert.equal(addedBackups,expectedBackups,'Require exactly the source-defined before-update backup count.');
 }
 function widgetBinding(text){
  text=text.replaceAll('\r','');const section=text.split('\nWidgets:\n')[1]?.split('\nHosts:\n')[0];assert.ok(section,'Inspect the actual Widgets section.');
@@ -52,6 +55,10 @@ function selfCheck(){
  const capabilityText='Signer #1 in lineage certificate DN: A\ncertificate SHA-256 digest: a\n'+Object.entries(caps).map(([n,v])=>'Has '+n+' capability: '+v).join('\n')+'\nSigner #2 in lineage certificate DN: B\ncertificate SHA-256 digest: b\n';inspectCapabilities(capabilityText,'a','b');for(const [name,value] of Object.entries(caps))assert.throws(()=>inspectCapabilities(capabilityText.replace(name+' capability: '+value,name+' capability: '+!value),'a','b'));
  const before={metadata:[{key:'backup_app_version',value:'old'},{key:'active_pet_id',value:'pet_qa'}],events:[{id:'evt_qa'}]};assert.deepEqual(expectedLaunch(before,'new'),{...before,metadata:[{key:'backup_app_version',value:'new'},before.metadata[1]]});assert.equal(before.metadata[0].value,'old');assert.throws(()=>assert.deepEqual(expectedLaunch(before,'new'),{...before,metadata:[...expectedLaunch(before,'new').metadata,{key:'unexpected',value:'changed'}]}));
  protectedFiles({'shared_prefs/x':{sha256:'x'}},{'shared_prefs/x':{sha256:'x'}},'new',[]);assert.throws(()=>protectedFiles({'shared_prefs/x':{sha256:'x'}},{'shared_prefs/x':{sha256:'y'}},'new',[]));
+ const event={id:'evt_qa',pet_id:'pet_qa',type:'pee'},backup={format:'puptime-activity',version:1,createdAt:1,petId:'pet_qa',puppyName:'QA',reason:'before-update',appVersion:'new',events:[{id:'evt_qa',type:'pee'}]},backupFile=value=>({'files/activity-backups/bkp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.json':{bytes:Buffer.from(JSON.stringify(value))}});
+ protectedFiles({},backupFile(backup),'new',[event],row=>({type:row.type}),'QA',1);
+ for(const patch of [{reason:'daily'},{appVersion:'old'},{petId:'pet_other'},{puppyName:'Other'},{events:[{id:'evt_qa',type:'poop'}]},{extra:'forbidden'}])assert.throws(()=>protectedFiles({},backupFile({...backup,...patch}),'new',[event],row=>({type:row.type}),'QA',1));
+ assert.throws(()=>protectedFiles({},{'files/SQLite/unexpected.db':{bytes:Buffer.from('{}')}},'new',[event]));
  const dump='\nWidgets:\n  [0] id=2\n    host=HostId{user:0, app:10001, hostId:1024, pkg:launcher}\n    provider=ProviderId{user:0, app:10002, cmp:ComponentInfo{'+app+'/'+app+'.widget.PuptimeQuickLog}}\n    views=random\nHosts:\n';assert.equal(widgetBinding(dump).id,'2');assert.throws(()=>widgetBinding(dump.replace(app+'/','other/')));assert.throws(()=>widgetBinding(dump.replace('    host=','    invalid=')));
  console.log('PASS signing QA source self-checks; no network, keys, signing or device operations.');
 }
@@ -147,7 +154,7 @@ function snapshot(label){
  return {tables,files,uid,widgets};
 }
 function equal(before,after){assertNativeTransition(before.tables,after.tables);assert.equal(after.uid,before.uid);assert.deepEqual(after.widgets,before.widgets);assert.deepEqual(Object.fromEntries(Object.entries(after.files).map(([k,v])=>[k,v.sha256])),Object.fromEntries(Object.entries(before.files).map(([k,v])=>[k,v.sha256])));}
-function launched(before,after,version){assertNativeTransition(expectedLaunch(before.tables,version),after.tables);assert.equal(after.uid,before.uid);assert.deepEqual(after.widgets,before.widgets);protectedFiles(before.files,after.files,version,before.tables.events,eventDataFromSql,before.tables.puppies[0].name);}
+function launched(before,after,version){assertNativeTransition(expectedLaunch(before.tables,version),after.tables);assert.equal(after.uid,before.uid);assert.deepEqual(after.widgets,before.widgets);protectedFiles(before.files,after.files,version,before.tables.events,eventDataFromSql,before.tables.puppies[0].name,1);}
 async function waitWidgetCount(count){const deadline=Date.now()+10000;do{const value=adb('shell',`sqlite3 -readonly /data/user/0/${app}/files/SQLite/puptime-v2.db "SELECT COUNT(*) FROM events WHERE source='widget';"`).trim();if(value===String(count)){await new Promise(done=>setTimeout(done,500));return;}await new Promise(done=>setTimeout(done,200));}while(Date.now()<deadline);throw new Error('Widget did not commit exactly once within the bounded wait.');}
 function rejectUpdate(path,before,label){const result=command('adb',['-s',device,'install','-r',path],{ok:[1]});assert.match(result,/INSTALL_FAILED_UPDATE_INCOMPATIBLE/);equal(before,snapshot(label));pass(label,before);}
 await install(join(root,'original125.apk'));launch();
