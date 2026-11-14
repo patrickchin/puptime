@@ -3,8 +3,12 @@ run-name: NOT FOR RELEASE - Android signing proof
 on:
   workflow_dispatch:
     inputs:
+      expected_driver:
+        description: Exact reviewed 40-character SHA of this workflow and driver
+        type: string
+        required: true
       expected_source:
-        description: Exact reviewed 40-character source SHA shared by this driver and both artifact-only runs
+        description: Exact reviewed 40-character app source SHA shared by both artifact-only runs
         type: string
         required: true
       bridge_run_id:
@@ -26,6 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
+      PUPTIME_EXPECTED_DRIVER: ${{ inputs.expected_driver }}
       PUPTIME_EXPECTED_SOURCE: ${{ inputs.expected_source }}
       PUPTIME_BRIDGE_RUN: ${{ inputs.bridge_run_id }}
       PUPTIME_LATER_RUN: ${{ inputs.later_run_id }}
@@ -48,16 +53,29 @@ jobs:
         run: echo "PUPTIME_SIGNING_PRIVATE=$RUNNER_TEMP/puptime-signing-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
       - name: Static source checks (no keys or device)
         run: node scripts/verify-android-signing-upgrade.mjs --self-check
+      - run: npm ci
       - name: Pin completed artifact-only runs and immutable APKs
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/verify-android-signing-upgrade.mjs --preflight
-      - run: npm ci
       - name: Prepare isolated Android tools
         shell: bash
         run: |
           set -euo pipefail
           umask 077
+          test -n "$ANDROID_HOME"
+          puptime_sdkmanager=$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)
+          test -n "$puptime_sdkmanager"
+          puptime_cmdline_bin=$(dirname "$puptime_sdkmanager")
+          for puptime_tool in "$puptime_cmdline_bin/sdkmanager" "$puptime_cmdline_bin/avdmanager" "$ANDROID_HOME/platform-tools/adb" "$ANDROID_HOME/emulator/emulator"; do
+            test -x "$puptime_tool"
+            printf 'Android executable: %s\n' "$puptime_tool"
+          done
+          export PATH="$puptime_cmdline_bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+          printf '%s\n' "$puptime_cmdline_bin" "$ANDROID_HOME/platform-tools" "$ANDROID_HOME/emulator" >> "$GITHUB_PATH"
+          timeout 30 sdkmanager --version | sed -n '1,4p'
+          timeout 30 adb version | sed -n '1,4p'
+          timeout 30 emulator -version | sed -n '1,4p'
           sdkmanager 'build-tools;36.0.0' 'system-images;android-36;google_apis;x86_64'
           export ANDROID_AVD_HOME="$PUPTIME_SIGNING_PRIVATE/avd"
           mkdir -m 700 "$ANDROID_AVD_HOME"
