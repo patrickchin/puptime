@@ -19,6 +19,7 @@ const source=command('git',['rev-parse','HEAD']);
 const run=api(`actions/runs/${runId}`);
 assert.equal(run.status,'completed');assert.equal(run.conclusion,'success');
 assert.equal(run.head_repository?.full_name,repository);assert.equal(run.head_branch,'main');
+assert.equal(run.event,'push','Use a main push artifact; a pull-request head is not its compiled merge checkout.');
 assert.equal(run.path,'.github/workflows/ios-simulator.yml');
 assert.match(run.head_sha,/^[a-f0-9]{40}$/);
 command('git',['fetch','--no-tags','--depth=1','origin',run.head_sha]);
