@@ -7,3 +7,5 @@ Local logging is free and works offline without an account. Optional cloud backu
 Export an activity CSV from Insights, or import a backup to recover missing entries while keeping your current edits. CSV backups include activity times, notes, custom activity names, and estimate labels. Routines and settings are not included in the activity CSV.
 
 Voice dictation uses your device's speech-recognition service and may need an internet connection. The starter routine is an editable example. Adjust it with your veterinarian's guidance.
+
+Usage analytics are optional and off by default. You can change this choice in Settings. Puptime does not include advertising.

@@ -6,7 +6,7 @@ The old upfront app price is superseded: local features are free and optional
 cloud plans remain separately configurable. No final cloud price is approved.
 
 `Fastfile` reads the version from `app.json`; keep `store.config.json` aligned.
-Both upload paths leave automatic release off. The `metadata` lane uploads text
+Both lanes request automatic release off; inspect the saved App Store Connect release option independently before submission. A local setting does not establish the live setting. The `metadata` lane uploads text
 and screenshots without submitting a build. The `submit` lane submits the exact
 uploaded build identified by `APP_STORE_BUILD_NUMBER`; neither lane is part of
 the autonomous staging deployment.
@@ -42,3 +42,21 @@ separate from Google's account-specific closed-testing rules.
 Local checks (no Fastlane login/submission): `python3 scripts/test_store_audio.py`
 and `ruby scripts/test-store-fastlane.rb`. The Ruby check exercises the lane's
 Ruby paths from Fastlane's working directory with shell/auth/delivery stubbed.
+
+## Source-to-console handoff
+
+Follow [the listing handoff](../docs/store-listing-handoff.md) before any separately
+authorized upload. The Apple source mirrors in `store.config.json` and
+`fastlane/metadata/en-US` must match. `store/google-play/en-US/listing.json` is a
+manual-review draft only; neither lane creates or updates a Play app. Metadata
+changes do not select, upload or qualify a binary. Reconcile the selected store
+version/build with the exact candidate rather than reusing an older TestFlight
+build because it appears in the console.
+
+Supply review contact details and dedicated, durable reviewer access privately
+through the console/authorized environment. Passwordless authentication needs a
+reviewable delivery/access procedure; do not invent a password, bypass OTP or
+share a personal provider account. Account-free logging does not remove the need
+to give reviewers access to the optional account features being submitted.
+The lane does not currently populate demo-login credentials automatically.
+Verify these fields and instructions in the console before submission.
