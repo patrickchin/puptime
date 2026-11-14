@@ -16,6 +16,11 @@ on:
         description: Successful main iOS run supplying the unchanged native host
         type: string
         default: '43383649287'
+      account_case:
+        description: Isolated account case
+        type: choice
+        options: [all, baseline, comparison, offline]
+        default: all
 
 jobs:
   build:
@@ -203,7 +208,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scenario: [baseline, comparison]
+        scenario: ${{ fromJSON(inputs.account_case == 'all' && '["baseline","comparison","offline"]' || format('["{0}"]', inputs.account_case)) }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6

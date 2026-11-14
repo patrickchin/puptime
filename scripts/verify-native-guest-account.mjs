@@ -14,14 +14,15 @@ import {cloudRecordId,localRecordId} from '../src/cloud/record-identity.ts';
 import {createLocalDatabase} from '../src/local/database.ts';
 import {sqliteTestConnection} from '../src/local/sqlite-test-adapter.ts';
 import {createLocalRuntime} from '../src/local/runtime-factory.ts';
-import {nativeSnapshot,assertNativeDetached,assertEmptyIosRestoreSources} from './native-account-evidence.mjs';
+import {pushResponseSchema,pullPageSchema,mutationSchema} from '../src/cloud/protocol.ts';
+import {nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeDrained,assertEmptyIosRestoreSources} from './native-account-evidence.mjs';
 
 const [platform,initialDevice,host,consent,destination='build/guest-account-'+platform,onboarding]=process.argv.slice(2);
 let device=initialDevice;
 assert.ok(['ios','android'].includes(platform));
-assert.ok(onboarding===undefined||['--onboarding-sign-in','--account-deletion','--puppy-comparison'].includes(onboarding));
-const android=platform==='android',deleting=onboarding==='--account-deletion',onboardingSignIn=onboarding==='--onboarding-sign-in',comparing=onboarding==='--puppy-comparison';
-assert.ok(!comparing||!android,'Puppy comparison uses the dedicated iOS verification path.');
+assert.ok(onboarding===undefined||['--onboarding-sign-in','--account-deletion','--puppy-comparison','--offline-lifecycle'].includes(onboarding));
+const android=platform==='android',deleting=onboarding==='--account-deletion',onboardingSignIn=onboarding==='--onboarding-sign-in',comparing=onboarding==='--puppy-comparison',offline=onboarding==='--offline-lifecycle';
+assert.ok(!(comparing||offline)||!android,'Extended lifecycle cases use the dedicated iOS verification path.');
 assert.equal(consent,'--replace-synthetic','Use PLATFORM DEVICE HOST --replace-synthetic [OUTPUT].');
 const frontPort=Number(process.env.PUPTIME_ACCOUNT_PORT??8797),backPort=frontPort+2;assert.ok(Number.isInteger(frontPort)&&frontPort>1024&&frontPort<65533);
 const app='com.patrickchin.puptime',output=resolve(destination),front='https://127.0.0.1:'+frontPort;
@@ -44,8 +45,16 @@ writeFileSync(configPath,JSON.stringify(config),{mode:0o600});
 let worker,proxy,cookie='',code='',auth,iosFixtureHost;
 const temporaryDevices=[];
 const requests=new Set(),restoreNative=[],requestCounts={enroll:0,push:0};
+// Backend results can be deliberately withheld. Only the native SQLite ack
+// assertion below establishes that the SDK persisted a received result.
+const wireAccepted=[],wirePages=[],wirePushes=[],receipts=[];
+let fault='online',activeForwarded=0,wireParseErrors=0;
 let certificate;
 const codes=new Set(),checks=[];
+function redacted(value){
+  for(const secret of [...codes,config.vars.AUTH_SECRET,cookie,...cookie.split(';').map(part=>part.trim().split('=').slice(1).join('='))].filter(Boolean))value=value.replaceAll(secret,'[REDACTED]');
+  return value;
+}
 function run(binary,args,env=process.env,cwd=process.cwd()){
   return new Promise((resolveRun,reject)=>{
     const child=spawn(binary,args,{env,cwd,stdio:['ignore','pipe','pipe']});let raw='';
@@ -53,7 +62,7 @@ function run(binary,args,env=process.env,cwd=process.cwd()){
     // Include hosted driver startup as well as the flow's own bounded assertions.
     const timer=setTimeout(()=>child.kill('SIGTERM'),binary==='maestro'?600000:240000);
     child.once('error',reject);child.once('close',status=>{clearTimeout(timer);if(status===0)resolveRun(raw);else{
-      for(const value of codes)raw=raw.replaceAll(value,'[REDACTED]');
+      raw=redacted(raw);
       writeFileSync(join(output,'failure-redacted.log'),raw,{mode:0o600});reject(new Error(`${binary} failed (${status}); see redacted log.`));
     }});
   });
@@ -64,17 +73,25 @@ async function flow(name,env={}){
   try{
     await run('maestro',['--device',device,'test',...Object.entries({TEST_EMAIL:email,...env}).flatMap(([key,value])=>['-e',`${key}=${value}`]),resolve('.maestro/account-preservation',name+'.yaml'),'--test-output-dir',artifacts],
       {...process.env,MAESTRO_CLI_NO_ANALYTICS:'1',TEST_EMAIL:email,MAESTRO_TEST_CODE:code,...env});
-    const screenshots=['native-delete-confirmation.png','native-delete-verify.png','native-deleted-account.png','recovered-account-history.png','my-account-returned-log.png','my-account-signed-in.png','my-account-guest.png','same-name-summary.png','same-name-confirmation.png','mismatched-name-summary.png','mismatched-name-confirmation.png'];
+    const screenshots=['native-delete-confirmation.png','native-delete-verify.png','native-deleted-account.png','recovered-account-history.png','my-account-returned-log.png','my-account-signed-in.png','my-account-guest.png','same-name-summary.png','same-name-confirmation.png','mismatched-name-summary.png','mismatched-name-confirmation.png','offline-preserved-history.png','pending-signout-cancelled.png'];
     for(const path of readdirSync(artifacts,{recursive:true}).filter(path=>screenshots.some(name=>String(path).endsWith(name))))
       cpSync(join(artifacts,path),join(output,String(path).split('/').at(-1)));
     console.log('PASS native account phase: '+name);
+  }catch(error){
+    // These flows never enter a credential. Do not retain auth-code screenshots.
+    if(!android&&['prepare','add-logs'].includes(name)){
+      try{simctl('io',device,'screenshot',join(output,'failure-'+name+'.png'));}catch{}
+      const hierarchy=existsSync(artifacts)?readdirSync(artifacts,{recursive:true}).map(String).filter(path=>path.includes('hierarchy')&&/\.(json|xml)$/.test(path)).sort().at(-1):undefined;
+      if(hierarchy)writeFileSync(join(output,'failure-'+name+'-hierarchy.txt'),redacted(readFileSync(join(artifacts,hierarchy),'utf8')).slice(0,262144));
+    }
+    throw error;
   }finally{
     if(existsSync(startup))for(const directory of readdirSync(startup).filter(value=>!before.has(value))){
       const root=join(startup,directory);
       for(const file of readdirSync(root,{recursive:true}).filter(file=>String(file).endsWith('maestro.log'))){
         const path=join(root,file);let text=readFileSync(path,'utf8');
         if(!text.includes(resolve('.maestro/account-preservation',name+'.yaml')))continue;
-        for(const value of codes)text=text.replaceAll(value,'[REDACTED]');writeFileSync(path,text);
+        writeFileSync(path,redacted(text));
       }
     }
     rmSync(artifacts,{recursive:true,force:true});
@@ -126,12 +143,13 @@ async function freshIosRestoreDevice(){
   simctl('keychain',device,'add-root-cert',join(privateDir,'root.crt'));
   simctl('install',device,iosFixtureHost);
 }
-async function remote(){
+async function remote({inspectBehindFault=false,sessionCookie=cookie}={}){
   const changes=[];let after=0;
-  assert.ok(cookie,'Use the actual SDK session observed by the local proxy.');
+  assert.ok(sessionCookie,'Use the actual SDK session observed by the local proxy.');
   for(let pageNumber=0;pageNumber<100;pageNumber++){
   const page=await new Promise((resolvePage,reject)=>{
-    const req=secureRequest(front+'/api/sync/pull?after='+after,{...(certificate?{ca:certificate}:{}),headers:{cookie,origin:front}},response=>{
+    const send=inspectBehindFault?request:secureRequest,origin=inspectBehindFault?'http://127.0.0.1:'+backPort:front;
+    const req=send(origin+'/api/sync/pull?after='+after,{...(!inspectBehindFault&&certificate?{ca:certificate}:{}),headers:{cookie:sessionCookie,origin:front,host:new URL(front).host}},response=>{
       let body='';response.on('data',data=>{body+=data;});response.on('end',()=>{try{assert.equal(response.statusCode,200);resolvePage(JSON.parse(body));}catch(error){reject(error);}});
     });req.on('error',reject);req.end();
   });changes.push(...page.changes);if(!page.hasMore)break;assert.ok(page.cursor>after);after=page.cursor;assert.ok(pageNumber<99,'Bound the local fixture reader.');
@@ -150,13 +168,60 @@ async function signIn(){
   assert.match(code??'',/^\d{6}$/);codes.add(code);await flow('verify');code='';
   assert.deepEqual(snapshot(),before,'Sign-in itself must preserve every event and wait for explicit backup confirmation.');
 }
+async function until(ready,message,timeout=45000){
+ const deadline=Date.now()+timeout;
+ while(Date.now()<deadline){if(await ready())return;await new Promise(done=>setTimeout(done,200));}
+ assert.fail(message);
+}
+async function transport(mode){fault=mode;await until(()=>activeForwarded===0,'Settle prior local proxy requests before capturing a transition.');}
+function drainReceipt(before,acceptedStart,pageStart){
+ assert.equal(wireParseErrors,0,'Every captured sync response must be readable.');
+ const pending=new Set(before.tables.local_sync_outbox.map(row=>row.operation_id)),accepted=new Map();
+ for(const result of wireAccepted.slice(acceptedStart).filter(result=>pending.has(result.operationId))){
+  if(accepted.has(result.operationId))assert.deepEqual(result,accepted.get(result.operationId),'A replay must return the identical accepted record.');
+  else accepted.set(result.operationId,result);
+ }
+ const after=snapshot();assertNativeDrained(before.tables,after.tables,[...accepted.values()],wirePages.slice(pageStart));
+ receipts.push({phase:'exact-native-drain',pending:pending.size,serverAcceptedUnique:accepted.size,nativePersistedAcknowledgements:after.tables.local_sync_acks.length-before.tables.local_sync_acks.length,events:after.events.length,all14TablesChecked:true});
+ return after;
+}
+async function verifyOfflineLifecycle(){
+ await flow('prepare');await flow('add-logs',{BATCHES:'4',EXPECTED_COUNT:'12'});await signIn();await flow('enable',{EXPECTED_COUNT:'12'});
+ assert.equal(snapshot().pending,0);await assertCloud(snapshot().events);
+ await transport('offline');await flow('add-logs',{BATCHES:'1',EXPECTED_COUNT:'15'});
+ await until(()=>snapshot().pending===3,'Capture the three genuinely pending native writes.');
+ const queued=snapshot(),acceptedStart=wireAccepted.length,pageStart=wirePages.length;
+ assert.equal((await remote({inspectBehindFault:true})).length,12,'An outage cannot upload new native logs.');
+ await flow('reopen-offline',{EXPECTED_COUNT:'15'});assertNativeTransition(queued.tables,snapshot().tables);
+ await transport('online');await flow('resume-sync');const drained=drainReceipt(queued,acceptedStart,pageStart);await assertCloud(drained.events);
+ checks.push('Three enrolled offline writes survive a real native restart and drain with exact original operation/result receipts; all14 tables permit only observed mirrors, acknowledgements and pull cursor changes. Controlled transport outage, not OS airplane mode.');
+
+ await transport('drop-push-response-once');const lostStart=wireAccepted.length,lostPages=wirePages.length,pushStart=wirePushes.length;
+ await flow('add-logs',{BATCHES:'1',EXPECTED_COUNT:'18'});await until(()=>fault==='push-offline','Observe an actual server commit whose response is lost.');
+ await transport('offline');const lost=snapshot(),committedLost=new Set(wireAccepted.slice(lostStart).map(result=>result.operationId));assert.equal(lost.pending,3);assert.ok(committedLost.size>0);assert.equal((await remote({inspectBehindFault:true})).length,15+committedLost.size);
+ await transport('online');await flow('resume-sync');const replayed=drainReceipt(lost,lostStart,lostPages);await assertCloud(replayed.events);
+ const mutations=wirePushes.slice(pushStart).flatMap(item=>item.mutations),originals=new Map(lost.tables.local_sync_outbox.map(row=>[row.operation_id,JSON.parse(row.mutation_json)]));
+ for(const [operationId,mutation] of originals){const attempts=mutations.filter(item=>item.operationId===operationId);assert.ok(attempts.length>=(committedLost.has(operationId)?2:1),'Retry every real committed operation after its lost acknowledgement.');for(const attempt of attempts)assert.deepEqual(attempt,mutation);}
+ checks.push('Losing a real committed push response retries identical operation payloads, records one exact acknowledgement per operation and leaves cloud revisions at1 without duplicates.');
+
+ await transport('offline');await flow('add-logs',{BATCHES:'1',EXPECTED_COUNT:'21'});await until(()=>snapshot().pending===3,'Capture unsent changes before pending logout.');
+ const beforeCancel=snapshot(),cloudBefore=await remote({inspectBehindFault:true});
+ await flow('sign-out-pending',{ACTION:'cancel',EXPECTED_PENDING:'3'});assertNativeTransition(beforeCancel.tables,snapshot().tables);assert.deepEqual(await remote({inspectBehindFault:true}),cloudBefore);
+ await transport('push-offline');await flow('sign-out-pending',{ACTION:'confirm',EXPECTED_PENDING:'3'});assertNativeDetached(beforeCancel.tables,snapshot().tables);assert.deepEqual(snapshot().events,beforeCancel.events);
+ await transport('online');await signIn();await flow('enable',{EXPECTED_COUNT:'21'});assert.deepEqual(snapshot().events,beforeCancel.events);assert.equal(snapshot().pending,0);await assertCloud(beforeCancel.events);
+ checks.push('Cancelling logout with three unsent writes preserves every table and remote event; explicit logout detaches only expected association rows, keeps all21 logs, and same-account rejoin uploads the missing history without rewriting existing cloud records.');
+}
 // This fixture is deliberately independent of the phone's puppy identity. Only
 // the genuine native SDK's explicit confirmation may associate the two copies.
 async function fixturePost(path,body){
  assert.ok(cookie);const encoded=JSON.stringify(body);
  return new Promise((resolvePost,reject)=>{
   const req=secureRequest(front+path,{method:'POST',...(certificate?{ca:certificate}:{}),headers:{cookie,origin:front,'content-type':'application/json','content-length':Buffer.byteLength(encoded)}},response=>{
-   let value='';response.on('data',part=>{value+=part;});response.on('end',()=>{try{assert.equal(response.statusCode,200,'Independent synthetic HTTP fixture must succeed.');resolvePost(JSON.parse(value));}catch(error){reject(error);}});
+   let value='';response.on('data',part=>{value+=part;});response.on('end',()=>{try{
+    const parsed=JSON.parse(value);
+    if(response.statusCode!==200){const category=['untrusted_origin','cloud_unavailable','unauthorized','account_deleting','forbidden','not_found','invalid_request'].includes(parsed.error)?parsed.error:'unclassified';writeFileSync(join(output,'fixture-http-error.json'),JSON.stringify({path,status:response.statusCode,category}));assert.equal(response.statusCode,200,'Independent synthetic HTTP fixture failed: '+category);}
+    resolvePost(parsed);
+   }catch(error){reject(error);}});
   });req.on('error',reject);req.setTimeout(15000,()=>req.destroy(new Error('Local fixture request timed out.')));req.end(encoded);
  });
 }
@@ -221,14 +286,32 @@ try{
     if(req.method==='POST'&&req.url==='/api/cloud/enroll')requestCounts.enroll++;
     if(req.method==='POST'&&req.url==='/api/sync/push')requestCounts.push++;
     if(req.headers.cookie)cookie=req.headers.cookie;
-    const outgoing=request('http://127.0.0.1:'+backPort+req.url,{method:req.method,headers:req.headers},incoming=>{res.writeHead(incoming.statusCode,incoming.headers);incoming.pipe(res);});
-    outgoing.on('error',()=>{res.writeHead(502);res.end();});req.pipe(outgoing);
+    const pushing=req.method==='POST'&&req.url==='/api/sync/push',pulling=req.url.startsWith('/api/sync/pull');
+    if(fault==='offline'){req.socket.destroy();return;}
+    if(fault==='push-offline'&&pushing){req.resume();res.writeHead(503,{'content-type':'application/json'}).end('{"error":"controlled_transport_outage"}');return;}
+    const body=[];if(pushing){req.on('data',part=>body.push(part));req.on('end',()=>{try{const parsed=JSON.parse(Buffer.concat(body).toString());wirePushes.push({mutations:parsed.mutations.map(value=>mutationSchema.parse(value))});}catch{wireParseErrors++;}});}
+    const dropping=pushing&&fault==='drop-push-response-once';activeForwarded++;
+    let finished=false;const finish=()=>{if(!finished){finished=true;activeForwarded--;}};
+    // Wrangler rewrites a matching Origin using the upstream scheme. Forwarding
+    // the actual backend Host keeps the original HTTPS Origin intact.
+    const outgoing=request('http://127.0.0.1:'+backPort+req.url,{method:req.method,headers:{...req.headers,host:'127.0.0.1:'+backPort}},incoming=>{
+      const chunks=[];if(pushing||pulling)incoming.on('data',part=>chunks.push(part));
+      incoming.on('end',()=>{
+        if(incoming.statusCode===200&&(pushing||pulling))try{const parsed=JSON.parse(Buffer.concat(chunks).toString());if(pushing)wireAccepted.push(...pushResponseSchema.parse(parsed).accepted);else wirePages.push(pullPageSchema.parse(parsed));}catch{wireParseErrors++;}
+        if(dropping&&incoming.statusCode===200){fault='push-offline';res.destroy();}
+        else if(dropping){res.writeHead(incoming.statusCode,incoming.headers);res.end(Buffer.concat(chunks));}
+        finish();
+      });
+      incoming.on('error',finish);incoming.on('close',finish);
+      if(!dropping){res.writeHead(incoming.statusCode,incoming.headers);incoming.pipe(res);}
+    });
+    outgoing.on('error',()=>{finish();if(!res.headersSent)res.writeHead(502);res.end();});req.pipe(outgoing);
   };
   proxy=secureServer({key:readFileSync(keyPath),cert:Buffer.concat([readFileSync(certPath),certificate])},forward);
   proxy.on('tlsClientError',error=>writeFileSync(join(output,'fixture-tls-error.txt'),error.message));
   proxy.on('upgrade',(req,socket,head)=>{
     const upstream=connect(backPort,'127.0.0.1',()=>{
-      upstream.write(`${req.method} ${req.url} HTTP/1.1\r\n${Object.entries(req.headers).map(([key,value])=>`${key}: ${value}`).join('\r\n')}\r\n\r\n`);
+      upstream.write(`${req.method} ${req.url} HTTP/1.1\r\n${Object.entries({...req.headers,host:'127.0.0.1:'+backPort}).map(([key,value])=>`${key}: ${value}`).join('\r\n')}\r\n\r\n`);
       if(head.length)upstream.write(head);socket.pipe(upstream).pipe(socket);
     });upstream.on('error',()=>socket.destroy());socket.on('error',()=>upstream.destroy());
   });
@@ -288,7 +371,8 @@ try{
     checks.push('welcome email sign-in uses the real SDK, rejects a wrong code, resumes setup after verification and cold restart, and never enrolls or uploads');
   }
   if(comparing)await verifyPuppyComparison();
-  if(!onboardingSignIn&&!deleting&&!comparing){
+  if(offline)await verifyOfflineLifecycle();
+  if(!onboardingSignIn&&!deleting&&!comparing&&!offline){
   await flow('prepare');assert.equal(snapshot().events.length,0);
   assert.ok(requests.has('/api/config'),'The real app must reach this isolated backend before any sign-in attempt.');
   await flow('add-logs',{BATCHES:'4',EXPECTED_COUNT:'12'});const guest=snapshot();assert.equal(guest.events.length,12);assert.equal(guest.owner.length,0);
@@ -328,8 +412,8 @@ try{
    checks.push('native system confirmation cancels safely; stale auth uses real same-account OTP and a new confirmation; confirmed deletion removes the actual account, retains all 12 logs and offers manual Apple cleanup for a tokenless synthetic link');
   }
   rmSync(join(output,'failure-redacted.log'),{force:true});
-  writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',checks,scope:android?'Android Debug native host with normal embedded release JS and isolated local HTTPS Better Auth/D1/SQLite DO; actual native email SDK and Keystore. Its temporary CA is trusted only in the ignored Debug source set, restored after the run. Production onboarding is tested separately in the Release APK. No real email, production account, session injection or mocked sync.':'Release bundle and actual native email SDK with isolated local HTTPS Better Auth/D1/SQLite DO. Simulator trusts the fixture certificate. No real email, production account, session injection or mocked sync.'},null,2)+'\n');
-  console.log('PASS '+(deleting?'native account deletion':comparing?'named puppy comparison':onboardingSignIn?'welcome sign-in and session recovery':android?'guest account preservation and empty-database recovery':'guest account preservation and inspected empty-device recovery')+': '+output);
+  writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',checks,receipts,scope:android?'Android Debug native host with normal embedded release JS and isolated local HTTPS Better Auth/D1/SQLite DO; actual native email SDK and Keystore. Its temporary CA is trusted only in the ignored Debug source set, restored after the run. Production onboarding is tested separately in the Release APK. No real email, production account, session injection or mocked sync.':'Release bundle and actual native email SDK with isolated local HTTPS Better Auth/D1/SQLite DO. Simulator trusts the fixture certificate. No real email, production account, session injection or mocked sync.'},null,2)+'\n');
+  console.log('PASS '+(offline?'offline writes, replay and pending logout':deleting?'native account deletion':comparing?'named puppy comparison':onboardingSignIn?'welcome sign-in and session recovery':android?'guest account preservation and empty-database recovery':'guest account preservation and inspected empty-device recovery')+': '+output);
 }finally{
   auth?.close();proxy?.close();for(const child of [worker])if(child?.pid)try{process.kill(-child.pid,'SIGTERM');}catch{}
   if(android)try{adb('reverse','--remove','tcp:'+frontPort);}catch{}

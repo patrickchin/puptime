@@ -47,6 +47,28 @@ export function assertNativeAcknowledged(before,after,accepted){
     'Persist the exact accepted result and original operation payload, generation and local sequence.');
 }
 
+export function assertNativeDrained(before,after,accepted,pages){
+  assert.ok(before.local_sync_outbox.length>0,'Capture real pending writes before the outage ends.');
+  assert.equal(accepted.length,before.local_sync_outbox.length,'Acknowledge every captured operation once.');
+  assertNativeAcknowledged(before,after,accepted);
+  assert.deepEqual(after.local_sync_outbox,[]);
+  assert.ok(pages.length>0&&pages.at(-1).hasMore===false,'Observe the actual completed native pull response.');
+  const generation=before.local_sync_owner[0]?.generation;assert.ok(generation);
+  const mirrors=new Map(before.local_sync_records.map(row=>[row.record_id,row]));
+  for(const record of [...accepted.map(result=>result.record),...pages.flatMap(page=>page.changes)]){
+    const previous=mirrors.get(record.id);
+    if(previous&&JSON.parse(previous.body).sequence>=record.sequence)continue;
+    mirrors.set(record.id,{generation,record_id:record.id,body:JSON.stringify(record)});
+  }
+  // Ack rows were checked against exact captured operations/results above.
+  // Only those receipts, mirrors and the observed pull cursor may change.
+  assertNativeTransition(before,after,{
+    local_sync_outbox:[],local_sync_acks:after.local_sync_acks,
+    local_sync_records:[...mirrors.values()],
+    local_sync_owner:before.local_sync_owner.map(row=>({...row,cursor:pages.at(-1).cursor})),
+  });
+}
+
 // Call while the synthetic app is stopped, with the actual AppGroup defaults
 // decoded from disk. Missing/unreadable inspection input must fail closed.
 export function assertEmptyIosRestoreSources({tables,sharedDirectory,documentsDirectory,defaults}){

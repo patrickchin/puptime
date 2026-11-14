@@ -4,7 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {mkdtempSync,mkdirSync,rmSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {nativeTables,nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeAcknowledged,assertEmptyIosRestoreSources} from './native-account-evidence.mjs';
+import {nativeTables,nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeAcknowledged,assertNativeDrained,assertEmptyIosRestoreSources} from './native-account-evidence.mjs';
 
 const empty=()=>Object.fromEntries(nativeTables.map(table=>[table,[]]));
 test('snapshots include every real table and exact payload; new tables fail closed',()=>{
@@ -71,4 +71,19 @@ test('empty restore reads actual shared journal/cache and backups; missing or st
     writeFileSync(file,JSON.stringify({events:[]}));assertEmptyIosRestoreSources(input);
     assert.throws(()=>assertEmptyIosRestoreSources({...input,tables:{...input.tables,local_revisions:[{sequence:1}]}}),/local_revisions/);
   }finally{rmSync(root,{recursive:true,force:true});}
+});
+
+test('a drain permits exact wire receipts, mirrors and cursor while preserving all other tables',()=>{
+  const mutation={operationId:'op_sent',recordId:'evt_cloud',kind:'event',petId:'pet_cloud'};
+  const pending={sequence:9,operation_id:'op_sent',generation:'gen_current',mutation_json:JSON.stringify(mutation)};
+  const record={id:'evt_cloud',kind:'event',petId:'pet_cloud',sequence:7,revision:1,data:{note:'original'}};
+  const accepted={operationId:'op_sent',record},page={changes:[record],cursor:7,hasMore:false};
+  const before={...empty(),events:[{id:'evt_local',note:'original'}],settings:[{key:'theme',value:'dark'}],local_sync_owner:[{generation:'gen_current',cursor:6}],local_sync_outbox:[pending]};
+  const after={...before,local_sync_owner:[{generation:'gen_current',cursor:7}],local_sync_outbox:[],local_sync_records:[{generation:'gen_current',record_id:record.id,body:JSON.stringify(record)}],local_sync_acks:[{generation:'gen_current',operation_id:'op_sent',local_sequence:9,mutation_json:pending.mutation_json,result_json:JSON.stringify(accepted),outcome:'accepted'}]};
+  assertNativeDrained(before,after,[accepted],[page]);
+  for(const field of ['events','settings','local_sync_records','local_sync_owner']){
+    const corrupt={...after,[field]:[]};assert.throws(()=>assertNativeDrained(before,corrupt,[accepted],[page]),/Only explicitly expected/);
+  }
+  assert.throws(()=>assertNativeDrained(before,after,[accepted],[{...page,cursor:99}]),/Only explicitly expected/);
+  assert.throws(()=>assertNativeDrained(before,after,[accepted],[]),/completed native pull/);
 });
