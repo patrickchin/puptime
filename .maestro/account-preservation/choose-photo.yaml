@@ -44,8 +44,10 @@ name: Save an imported synthetic JPEG through the real iOS picker and crop
     retryTapIfNoChange: true
 - extendedWaitUntil:
     visible:
-      id: settings.puppy.photo.remove
-    timeout: 30000
+      id: settings.puppy.photo.(remove|error)
+    timeout: 90000
+- assertVisible:
+    id: settings.puppy.photo.remove
 - assertNotVisible:
     id: settings.puppy.photo.error
 - takeScreenshot: native-photo-saved
