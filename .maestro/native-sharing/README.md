@@ -127,6 +127,13 @@ never `ownerVisibleAttribution:true`; exit zero/AX matching is not the final
 native pass. Record the reviewed image/source and result separately. If the
 existing detail also clips attribution, report the red UI evidence.
 
+Both strict stored and rendered attribution gates are attempted before a red
+case stops. Only the explicit post-accept row/detail/access-ended images may
+survive a failed non-secret phase; implicit failure screenshots, hierarchies
+and raw driver logs are discarded. Every secret phase still discards all files
+on success and failure. Opening detail must preserve all 14 tables even when
+the attribution assertion fails.
+
 `assertNativeDrained` remains strict and unchanged for the initial reproduction.
 Before qualifying any future attribution fix that legitimately changes local
 projection, freeze a case-specific expected transition from its concrete wire

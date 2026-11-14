@@ -81,6 +81,15 @@ test('actor switching serializes devices and clipboard clears even after a read 
  const next=actors.activate(actors.carer);release();await next;assert.equal(calls.findLast(value=>value.device)?.previous,'owned-A');
 });
 
+test('a failed non-secret attribution phase retains only explicit bounded glyph images',async t=>{
+ const root=mkdtempSync(join(tmpdir(),'puptime-sharing-red-'));t.after(()=>rmSync(root,{recursive:true,force:true}));
+ const startup=join(root,'startup'),output=join(root,'output');mkdirSync(startup);let artifacts;
+ await assert.rejects(runSharingFlow({device:'synthetic',name:'owner-attribution',output,startup,execute:async(_binary,args)=>{
+  artifacts=args.at(-1);writeFileSync(join(artifacts,'native-owner-attribution-detail.png'),'synthetic visible note');writeFileSync(join(artifacts,'failure.png'),token);writeFileSync(join(artifacts,'hierarchy.json'),token);throw new Error(token);
+ }}),error=>!String(error).includes(token));
+ assert.deepEqual(readdirSync(output),['native-owner-attribution-detail.png']);assert.equal(existsSync(artifacts),false);
+});
+
 test('owner inspection paginates independently, retains latest records and requires forward progress',async()=>{
  const event={id:cloudRecordId('event','pet_owner','evt_shared'),petId:'pet_owner',kind:'event',data:{type:'walk',at:100,source:'app',note:'Synthetic'},revision:1,sequence:2,deleted:false,updatedAt:100};
  const puppy={id:'pet_owner',petId:'pet_owner',kind:'puppy',data:{name:'Synthetic'},revision:1,sequence:1,deleted:false,updatedAt:100};

@@ -16,13 +16,14 @@ appId: com.patrickchin.puptime
     element: {id: editor.note.input}
     direction: DOWN
     visibilityPercentage: 100
+# Capture actual glyphs before the strict assertion, including a red case.
+- takeScreenshot: native-owner-attribution-detail
 - assertVisible:
     id: editor.note.input
     text: '(?s)${NOTE}\s+Logged by ${ATTRIBUTION}'
 # The assertion above reads accessibility content. A reviewer MUST inspect the
 # detail image for actual visible actor glyphs; the two-line Log row can clip it.
 # No tap/type/selection in the note input: this is a read-only inspection.
-- takeScreenshot: native-owner-attribution-detail
 - scrollUntilVisible:
     element: {id: editor.close}
     direction: UP

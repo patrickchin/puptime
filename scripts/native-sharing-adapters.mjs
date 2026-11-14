@@ -100,12 +100,17 @@ export async function runSharingFlow({device,name,env={},secret=false,execute,ou
   const before=new Set(existsSync(startup)?readdirSync(startup):[]),artifacts=mkdtempSync(join(tmpdir(),'puptime-sharing-driver-'));
   try{
     await execute('maestro',['--device',device,'test',...Object.entries(env).flatMap(([key,value])=>['-e',`${key}=${value}`]),flow,'--test-output-dir',artifacts],{MAESTRO_CLI_NO_ANALYTICS:'1'});
-    if(!secret){mkdirSync(output,{recursive:true});let bytes=0;for(const file of readdirSync(artifacts,{recursive:true}).map(String))if(images.has(basename(file))){const source=join(artifacts,file),size=statSync(source).size;assert.ok(size<=4194304&&(bytes+=size)<=8388608,'Bound synthetic sharing screenshots.');cpSync(source,join(output,basename(file)));}}
   }catch{throw new Error('Native sharing phase failed: '+name);}
   finally{
-    rmSync(artifacts,{recursive:true,force:true});
-    // The caller owns the one native slot. Remove its newly created global logs too.
-    if(existsSync(startup))for(const directory of readdirSync(startup))if(!before.has(directory))rmSync(join(startup,directory),{recursive:true,force:true});
+    try{
+      // Keep explicit post-accept glyph evidence on red cases; no implicit failure
+      // image/hierarchy or secret-phase output may survive.
+      if(!secret){mkdirSync(output,{recursive:true});let bytes=0;for(const file of readdirSync(artifacts,{recursive:true}).map(String))if(images.has(basename(file))){const source=join(artifacts,file),size=statSync(source).size;assert.ok(size<=4194304&&(bytes+=size)<=8388608,'Bound synthetic sharing screenshots.');cpSync(source,join(output,basename(file)));}}
+    }finally{
+      rmSync(artifacts,{recursive:true,force:true});
+      // The caller owns the one native slot. Remove its newly created global logs too.
+      if(existsSync(startup))for(const directory of readdirSync(startup))if(!before.has(directory))rmSync(join(startup,directory),{recursive:true,force:true});
+    }
   }
 }
 

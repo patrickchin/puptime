@@ -103,17 +103,16 @@ export async function verifyNativeSharing({kind,activate,owner,carer,readOwnerRe
   for(const record of cloudBefore.records)assert.deepEqual(cloud.records.find(row=>row.id===record.id),record,'Sharing must preserve the owner’s existing cloud records.');
   const record=cloud.records.find(row=>row.kind==='event'&&localRecordId(row)===event.id);
   assert.ok(cloud.revisions.some(row=>row.recordId===record?.id&&row.deviceId===carer.accountId),'The real member must be the service revision actor.');
-  // Keep this check strict: sharedPush currently may omit readable attribution.
-  // A failing receipt/UI assertion is evidence for a separate product fix.
-  assertStoredAttribution(record,editedFor(kind),carer.attribution);
   const beforeReview=await owner.snapshot();
-  await flow(owner,'owner-attribution',{NOTE:editedFor(kind),ATTRIBUTION:carer.attribution});
-  const ownerAfter=await owner.snapshot();
-  // Opening and closing attribution detail must not edit any native table.
-  assertNativeTransition(beforeReview.tables,ownerAfter.tables);
+  // Attempt both strict gates so a red service result still has native UI evidence.
+  const attributionErrors=[];
+  try{assertStoredAttribution(record,editedFor(kind),carer.attribution);}catch(error){attributionErrors.push(error);}
+  try{await flow(owner,'owner-attribution',{NOTE:editedFor(kind),ATTRIBUTION:carer.attribution});}catch(error){attributionErrors.push(error);}
+  const ownerAfter=await owner.snapshot();assertNativeTransition(beforeReview.tables,ownerAfter.tables);
   assert.equal(ownerAfter.events.length,ownerBefore.events.length+1);
   for(const row of ownerBefore.events)assert.deepEqual(ownerAfter.events.find(value=>value.id===row.id),row);
   for(const row of ownerBefore.tables.local_revisions)assert.deepEqual(ownerAfter.tables.local_revisions.find(value=>value.sequence===row.sequence),row);
+  if(attributionErrors.length)throw new AggregateError(attributionErrors,'Native sharing attribution is not qualified.');
 
   await activate(carer);await transport('offline');await flow(carer,'add-log',{NOTE:`Unsent ${kind} entry`});
   const revokedQueue=await carer.snapshot({care:true});assert.ok(revokedQueue.pending>0);
