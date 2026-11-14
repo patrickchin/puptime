@@ -248,16 +248,19 @@ test('actual discovery setup trap keeps original failures and writes finite phas
  const invalid=spawnSync(process.execPath,[cli,'setup-failure','android','--phase','PRIVATE_UNKNOWN_PHASE'],{cwd:root,encoding:'utf8',timeout:30000});assert.equal(invalid.status,1);assert.ok(!invalid.stderr.includes('PRIVATE_UNKNOWN_PHASE'));
 }));
 
-test('the exact observed Expo external-require virtual ID resolves only to its pinned installed provider',()=>{
- const id='\0polyfill:external-require';assert.equal(digest(id),'f32cbb35a430d4c6ee0f555a934acc8f6a83aff8e2b19c414f6d756479b8f03e');
+test('the explicit Expo virtual IDs resolve only to their pinned installed provider',()=>{
+ assert.equal(digest('\0polyfill:external-require'),'f32cbb35a430d4c6ee0f555a934acc8f6a83aff8e2b19c414f6d756479b8f03e');
  const provenance=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url)));
+ for(const id of ['\0polyfill:external-require','\0polyfill:environment-variables','\0polyfill:assets-registry']){
  const result=capturedSource(process.cwd(),id,provenance);
  assert.deepEqual(result,{path:id,generated:true,provider:'node_modules/expo/node_modules/@expo/cli/build/src/start/server/metro/withMetroMultiPlatform.js',sha256:'50012292a38cb679ca3f692c5a462de57bebe0f69d5c862e937141a3fc54343f',component:'npm:@expo/cli@57.0.26'});
+ }
  assert.deepEqual(provenance.components,[],'A technical provider mapping is not reviewed app-library notice coverage.');
 });
 
 test('virtual provider mapping rejects modified bytes, wrong path/owner/version and every unknown virtual ID',()=>fixture(({root,file})=>{
- const id='\0polyfill:external-require',provider='node_modules/expo/node_modules/@expo/cli/build/src/start/server/metro/withMetroMultiPlatform.js',packagePath='node_modules/expo/node_modules/@expo/cli',content='export const fixture=1;';
+ for(const id of ['\0polyfill:external-require','\0polyfill:environment-variables','\0polyfill:assets-registry']){
+ const provider='node_modules/expo/node_modules/@expo/cli/build/src/start/server/metro/withMetroMultiPlatform.js',packagePath='node_modules/expo/node_modules/@expo/cli',content='export const fixture=1;';
  const pkg={name:'@expo/cli',version:'1.2.3'},lock={packages:{[packagePath]:{version:'1.2.3'}}};file('package-lock.json',lock);file(packagePath+'/package.json',pkg);file(packagePath+'/LICENSE',mit);file(provider,content);
  const record={provider,sha256:digest(content),component:'npm:@expo/cli@1.2.3'},provenance={generatedSources:{[id]:record}};
  assert.equal(capturedSource(root,id,provenance).component,record.component);
@@ -266,9 +269,10 @@ test('virtual provider mapping rejects modified bytes, wrong path/owner/version 
  file(packagePath+'/package.json',{...pkg,version:'9.9.9'});assert.throws(()=>capturedSource(root,id,provenance));
  file('package-lock.json',{packages:{[packagePath]:{version:'9.9.9'}}});assert.throws(()=>capturedSource(root,id,provenance),'Updating installed and locked version cannot evade the committed component pin.');
  file('package-lock.json',lock);file(packagePath+'/package.json',{...pkg,name:'private-other'});assert.throws(()=>capturedSource(root,id,provenance));file(packagePath+'/package.json',pkg);
- for(const unknown of ['\0polyfill:unknown','\0polyfill:environment-variables','\0polyfill:assets-registry']){
+ for(const unknown of ['\0polyfill:unknown','\0node:private','\0shim:private']){
   assert.throws(()=>capturedSource(root,unknown,provenance));
   assert.throws(()=>capturedSource(root,unknown,{generatedSources:{[unknown]:record}}),'An arbitrary virtual ID cannot reuse an allowed provider.');
+ }
  }
 }));
 
@@ -286,3 +290,27 @@ test('setup failure CLI retains only matching finite Gradle collector context an
  }
  file(path,known);assert.equal(cli('prebuild').status,0);assert.deepEqual(JSON.parse(readFileSync(join(root,path))),{...generic,setup:{phase:'prebuild',errorCategory:'command-failed'}});
 }));
+
+
+test('actual pinned native polyfills and this app font asset route prove the two additional exact virtual providers',async()=>{
+ const {createRequire}=await import('node:module'),require=createRequire(import.meta.url);
+ const provider='node_modules/expo/node_modules/@expo/cli/build/src/start/server/metro/withMetroMultiPlatform.js',source=readFileSync(provider,'utf8');
+ assert.equal(digest(source),'50012292a38cb679ca3f692c5a462de57bebe0f69d5c862e937141a3fc54343f');
+ const providerRequire=createRequire(join(process.cwd(),provider)),tree=require('@babel/parser').parse(source,{sourceType:'script'});
+ const definition=tree.program.body.find(value=>value.type==='FunctionDeclaration'&&value.id.name==='withWebPolyfills');assert.ok(definition);
+ const fn=Function('_metroVirtualModules','require','debug','return ('+source.slice(definition.start,definition.end)+');')(providerRequire('./metroVirtualModules.js'),providerRequire,()=>{});
+ const makeBundler=()=>({transformFile(){},_depGraph:{_fileSystem:{getSha1(){return 'source-only';}}}}),polyfillBundler=makeBundler();
+ const configured=fn({serializer:{getPolyfills:()=>[]}},{getMetroBundler:()=>polyfillBundler});
+ const polyfills=configured.serializer.getPolyfills({platform:'ios'});
+ assert.deepEqual(polyfills.slice(0,2),['\0polyfill:external-require','\0polyfill:environment-variables']);
+ assert.equal(polyfillBundler._depGraph._fileSystem.expoVirtualModules.get('\0polyfill:environment-variables').toString(),'//','This proof never generates or reads dynamic environment values.');
+ assert.ok(readFileSync('App.tsx','utf8').includes("from '@expo/vector-icons/MaterialCommunityIcons'"));
+ assert.ok(readFileSync('node_modules/@expo/vector-icons/build/MaterialCommunityIcons.js','utf8').includes('./vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf'));
+ const registry='@react-native/assets-registry/registry';assert.ok(readFileSync('node_modules/@expo/metro-config/build/ExpoMetroConfig.js','utf8').includes("assetRegistryPath: '"+registry+"'"));
+ const ast=require(join(process.cwd(),'node_modules/metro/src/Bundler/util.js')).generateAssetCodeFileAst(registry,{__packager_asset:true,name:'MaterialCommunityIcons',type:'ttf',scales:[1]});
+ const requires=[];const walk=value=>{if(!value||typeof value!=='object')return;if(value.type==='CallExpression'&&value.callee?.name==='require')requires.push(value.arguments[0].value);for(const child of Object.values(value))if(Array.isArray(child))child.forEach(walk);else if(child&&typeof child==='object')walk(child);};walk(ast);assert.deepEqual(requires,[registry]);
+ const bundler=makeBundler(),config={projectRoot:process.cwd(),resolver:{platforms:['ios','android'],sourceExts:['js','jsx','ts','tsx','json'],nodeModulesPaths:[],unstable_conditionNames:[],unstable_conditionsByPlatform:{}},serializer:{},transformer:{asyncRequireModulePath:'@expo/metro-runtime/async-require',assetRegistryPath:registry}};
+ const extended=providerRequire(providerRequire.resolve('./withMetroMultiPlatform.js')).withExtendedResolver(config,{isTsconfigPathsEnabled:false,isExporting:true,isReactServerComponentsEnabled:false,getMetroBundler:()=>bundler});
+ for(const platform of ['ios','android'])assert.deepEqual(extended.resolver.resolveRequest({originModulePath:join(process.cwd(),'node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf'),dev:false,customResolverOptions:{},resolveRequest(){throw new Error('Unintercepted asset request');}},registry,platform),{type:'sourceFile',filePath:'\0polyfill:assets-registry'});
+ assert.ok(bundler._depGraph._fileSystem.expoVirtualModules.has('\0polyfill:assets-registry'));
+});

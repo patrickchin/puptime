@@ -7,6 +7,16 @@
       "provider": "node_modules/expo/node_modules/@expo/cli/build/src/start/server/metro/withMetroMultiPlatform.js",
       "sha256": "50012292a38cb679ca3f692c5a462de57bebe0f69d5c862e937141a3fc54343f",
       "component": "npm:@expo/cli@57.0.26"
+    },
+    "\u0000polyfill:environment-variables": {
+      "provider": "node_modules/expo/node_modules/@expo/cli/build/src/start/server/metro/withMetroMultiPlatform.js",
+      "sha256": "50012292a38cb679ca3f692c5a462de57bebe0f69d5c862e937141a3fc54343f",
+      "component": "npm:@expo/cli@57.0.26"
+    },
+    "\u0000polyfill:assets-registry": {
+      "provider": "node_modules/expo/node_modules/@expo/cli/build/src/start/server/metro/withMetroMultiPlatform.js",
+      "sha256": "50012292a38cb679ca3f692c5a462de57bebe0f69d5c862e937141a3fc54343f",
+      "component": "npm:@expo/cli@57.0.26"
     }
   },
   "packagedNative": {"ios": {}, "android": {}},

@@ -165,10 +165,16 @@ entry may point at an actual pinned upstream copy under `assets/notices/sources/
 with `file`, `sha256`, `upstream`. It supplements discovered notices; it cannot
 replace a missing NOTICE with a package label or an assumed parent licence.
 Generated Metro sources permit only the known `__prelude__` and Expo CLI’s exact
-NUL-prefixed `polyfill:external-require` ID, with their exact
+NUL-prefixed `polyfill:external-require`, `polyfill:environment-variables` and
+`polyfill:assets-registry` IDs, with their exact
 installed generator path/hash. The Expo provider additionally pins its exact
 installed package path, name and version against package-lock and the committed
-component ID. This is a technical generated-source mapping, not reviewed notice
+component ID. The same pinned native polyfill function registers `external-require` and
+`environment-variables`;
+the app imports the MaterialCommunityIcons TTF, whose generated asset registry
+require is intercepted by the pinned resolver into the third. Source-only tests
+exercise those actual provider functions in memory without Metro or dynamic
+environment values. These are technical generated-source mappings, not reviewed notice
 coverage; the component ledger remains empty. Other virtual IDs are not accepted
 by a NUL/path wildcard. Final native files not identified from resolved AARs require an exact
 platform/path `packagedNative` mapping with covered `components` and a pinned

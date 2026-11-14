@@ -164,15 +164,15 @@ export function addReviewedNoticeFiles(root,components,ledger,platform){
 }
 
 const codeSource=path=>/\.(?:[cm]?js|jsx|tsx?|json)$/.test(path);
-const expoExternalRequire='\0polyfill:external-require';
-const generatedProviders=new Map([['__prelude__','node_modules/metro/src/lib/getPreludeCode.js'],[expoExternalRequire,'node_modules/expo/node_modules/@expo/cli/build/src/start/server/metro/withMetroMultiPlatform.js']]);
+const expoGeneratedSources=new Set(['\0polyfill:external-require','\0polyfill:environment-variables','\0polyfill:assets-registry']);
+const generatedProviders=new Map([['__prelude__','node_modules/metro/src/lib/getPreludeCode.js'],...[...expoGeneratedSources].map(id=>[id,'node_modules/expo/node_modules/@expo/cli/build/src/start/server/metro/withMetroMultiPlatform.js'])]);
 export function capturedSource(root,supplied,ledger={generatedSources:{}},step=(_operation,run)=>run()){
  root=step('source-root',()=>realpathSync(root));const modules=step('source-root',()=>realpathSync(join(root,'node_modules')));
  if(Object.hasOwn(ledger.generatedSources??{},supplied))return step('source-provider',()=>{
   const value=ledger.generatedSources[supplied],expected=generatedProviders.get(supplied);assert.ok(expected,'Unknown virtual provider.');assert.equal(value.provider,expected);
   const provider=realpathSync(join(root,value.provider));assert.ok(inside(modules,provider));assert.equal(digest(readFileSync(provider)),value.sha256);
   const owner=npmNoticeInputs(root,[provider])[0];
-  if(supplied===expoExternalRequire){assert.equal(owner.name,'@expo/cli');assert.equal(owner.packagePath,'node_modules/expo/node_modules/@expo/cli');assert.equal(owner.id,value.component,'Virtual provider owner/version changed.');}
+  if(expoGeneratedSources.has(supplied)){assert.equal(owner.name,'@expo/cli');assert.equal(owner.packagePath,'node_modules/expo/node_modules/@expo/cli');assert.equal(owner.id,value.component,'Virtual provider owner/version changed.');}
   return {path:supplied,generated:true,provider:value.provider,sha256:value.sha256,component:owner.id};
  });
  const path=step('source-path',()=>{

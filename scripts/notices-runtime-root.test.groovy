@@ -32,7 +32,7 @@ try {
         // Included builds need not repeat the main invocation's CLI properties.
         def parent = actual == included ? [startParameter: [projectProperties: properties]] : null
         def invocation = [parent: parent, rootProject: target, startParameter: [projectProperties: parent == null ? properties : [:]], projectsEvaluated: { body -> body.call() }]
-        if (fault.diagnostics) invocation.providers = [environmentVariable: { name -> [orNull: name == 'GITHUB_WORKSPACE' ? main.parentFile.path : name == 'GITHUB_SHA' ? 'a' * 40 : null] }]
+        if (fault.diagnostics) target.providers = [environmentVariable: { name -> [orNull: name == 'GITHUB_WORKSPACE' ? main.parentFile.path : name == 'GITHUB_SHA' ? 'a' * 40 : null] }]
         new GroovyShell(this.class.classLoader, new Binding([gradle: invocation]), config).evaluate(source)
         [registered: registered, lookups: lookups]
     }

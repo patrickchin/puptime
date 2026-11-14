@@ -7,8 +7,8 @@ import org.gradle.api.artifacts.component.ProjectComponentIdentifier
 // Diagnostic output is optional and finite. Never serialize Throwable text.
 def recordNoticeFailure = { File mainRoot, String phase, Throwable failure ->
     try {
-        def workspaceValue = gradle.providers.environmentVariable('GITHUB_WORKSPACE').orNull
-        def source = gradle.providers.environmentVariable('GITHUB_SHA').orNull
+        def workspaceValue = gradle.rootProject.providers.environmentVariable('GITHUB_WORKSPACE').orNull
+        def source = gradle.rootProject.providers.environmentVariable('GITHUB_SHA').orNull
         if (!workspaceValue || !(source ==~ /[a-f0-9]{40}/) || mainRoot == null) return
         def workspace = new File(workspaceValue).canonicalFile
         if (mainRoot != new File(workspace, 'android').canonicalFile) return
