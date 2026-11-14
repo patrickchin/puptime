@@ -10,7 +10,7 @@ const repository=process.env.GITHUB_REPOSITORY,runId=process.env.PUPTIME_NATIVE_
 assert.equal(repository,'patrickchin/puptime','Run only in the intended repository.');
 assert.match(runId??'',/^\d+$/);
 const scenario=process.env.PUPTIME_ACCOUNT_SCENARIO;
-assert.ok(['baseline','comparison','offline','isolation','photos','deletion'].includes(scenario));
+assert.ok(['baseline','comparison','offline','isolation','photos','deletion','enrolled-upgrade'].includes(scenario));
 const output=resolve('build/isolated-native-account',scenario);mkdirSync(output,{recursive:true});
 const privateDirectory=mkdtempSync(join(tmpdir(),'puptime-native-host-'));
 const command=(binary,args,options={})=>execFileSync(binary,args,{encoding:'utf8',timeout:120000,stdio:['ignore','pipe','pipe'],...options}).trim();
@@ -43,7 +43,7 @@ command('codesign',['--verify','--deep','--strict',host]);
 assert.equal(command('plutil',['-extract','CFBundleIdentifier','raw','-o','-',join(host,'Info.plist')]),'com.patrickchin.puptime');
 assert.match(command('lipo',['-archs',join(host,'Puptime')]),/\barm64\b/);
 const hash=path=>createHash('sha256').update(readFileSync(path)).digest('hex');
-const provenance={scenario,candidateSource:source,nativeSource:run.head_sha,nativeHostRunId:runId,artifactId:artifact.id,artifactDigest:artifact.digest,archiveSource:process.env.PUPTIME_NATIVE_HOST_ARCHIVE?'verified-local-cache':'download',nativeInputsUnchanged:true,nativeExecutableSHA256:hash(join(host,'Puptime')),scope:'Actual native email SDK + ephemeral local HTTPS Better Auth/D1/SQLite DO; synthetic identity and history only; no production or provider OAuth qualification.'};
+const provenance={scenario,candidateSource:source,nativeSource:run.head_sha,nativeHostRunId:runId,artifactId:artifact.id,artifactDigest:artifact.digest,archiveSource:process.env.PUPTIME_NATIVE_HOST_ARCHIVE?'verified-local-cache':'download',nativeInputsUnchanged:true,nativeExecutableSHA256:hash(join(host,'Puptime')),scope:scenario==='enrolled-upgrade'?'Driver source with privately prepared historical native/source inputs; the initial verified main host is never launched before the older historical bundle replaces it. Actual native email SDK and isolated local HTTPS service; controlled-origin runtime qualification only.':'Actual native email SDK + ephemeral local HTTPS Better Auth/D1/SQLite DO; synthetic identity and history only; no production or provider OAuth qualification.'};
 writeFileSync(join(output,'native-provenance.json'),JSON.stringify(provenance,null,2)+'\n');
 const runtimes=JSON.parse(command('xcrun',['simctl','list','runtimes','-j'])).runtimes;
 const runtime=runtimes.filter(item=>item.isAvailable&&item.identifier.includes('iOS-26')).at(-1);assert.ok(runtime);
@@ -61,7 +61,7 @@ try{
   writeFileSync(join(output,'simulator-boot-failure.json'),JSON.stringify({stage:'simulator-boot',appInstalled:false,elapsedMs:Date.now()-bootStarted,category:error.code==='ETIMEDOUT'?'timeout':'command-failed',state},null,2)+'\n');throw error;
  }
  command('xcrun',['simctl','install',device,host]);
- const mode={baseline:[],comparison:['--puppy-comparison'],offline:['--offline-lifecycle'],isolation:['--account-isolation'],photos:['--photo-lifecycle'],deletion:['--deletion-faults']}[scenario];
+ const mode={baseline:[],comparison:['--puppy-comparison'],offline:['--offline-lifecycle'],isolation:['--account-isolation'],photos:['--photo-lifecycle'],deletion:['--deletion-faults'],'enrolled-upgrade':['--enrolled-runtime-upgrade']}[scenario];
  const args=['scripts/verify-ios-guest-account.mjs',device,host,'--replace-synthetic',output,...mode];
  await new Promise((resolveCase,reject)=>{const child=spawn(process.execPath,args,{stdio:'inherit',env:{...process.env,CI:'1'}});child.once('error',reject);child.once('close',code=>code===0?resolveCase():reject(new Error(`Native ${scenario} case failed (${code}).`)));});
  assert.equal(JSON.parse(readFileSync(join(output,'verification.json'),'utf8')).status,'passed');

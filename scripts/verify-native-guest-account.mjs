@@ -5,9 +5,9 @@ import {spawn,execFileSync} from 'node:child_process';
 import {createServer,request} from 'node:http';
 import {createServer as secureServer,request as secureRequest} from 'node:https';
 import {connect} from 'node:net';
-import {cpSync,existsSync,mkdtempSync,mkdirSync,readFileSync,readdirSync,rmSync,statSync,writeFileSync} from 'node:fs';
+import {cpSync,existsSync,mkdtempSync,mkdirSync,readFileSync,readdirSync,rmSync,statSync,realpathSync,symlinkSync,writeFileSync} from 'node:fs';
 import {tmpdir,homedir} from 'node:os';
-import {join,resolve} from 'node:path';
+import {dirname,isAbsolute,join,resolve} from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
 import {eventSqlColumns,eventDataFromSql} from '../src/record-sql.ts';
 import {cloudRecordId,localRecordId} from '../src/cloud/record-identity.ts';
@@ -16,13 +16,14 @@ import {sqliteTestConnection} from '../src/local/sqlite-test-adapter.ts';
 import {createLocalRuntime} from '../src/local/runtime-factory.ts';
 import {pushResponseSchema,pullPageSchema,mutationSchema} from '../src/cloud/protocol.ts';
 import {nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeDrained,assertEmptyIosRestoreSources,capturedJson,nativeAuthUiFlags} from './native-account-evidence.mjs';
+import {assertArchivedSource,nativeCodeFingerprint} from './native-runtime-inputs.mjs';
 
 const [platform,initialDevice,host,consent,destination='build/guest-account-'+platform,onboarding]=process.argv.slice(2);
 let device=initialDevice;
 assert.ok(['ios','android'].includes(platform));
-assert.ok(onboarding===undefined||['--onboarding-sign-in','--account-deletion','--puppy-comparison','--offline-lifecycle','--account-isolation','--photo-lifecycle','--deletion-faults'].includes(onboarding));
-const android=platform==='android',deleting=onboarding==='--account-deletion',onboardingSignIn=onboarding==='--onboarding-sign-in',comparing=onboarding==='--puppy-comparison',offline=onboarding==='--offline-lifecycle',isolating=onboarding==='--account-isolation',photographing=onboarding==='--photo-lifecycle',deletionFaults=onboarding==='--deletion-faults';
-assert.ok(!(comparing||offline||isolating||photographing||deletionFaults)||!android,'Extended lifecycle cases use the dedicated iOS verification path.');
+assert.ok(onboarding===undefined||['--onboarding-sign-in','--account-deletion','--puppy-comparison','--offline-lifecycle','--account-isolation','--photo-lifecycle','--deletion-faults','--enrolled-runtime-upgrade'].includes(onboarding));
+const android=platform==='android',deleting=onboarding==='--account-deletion',onboardingSignIn=onboarding==='--onboarding-sign-in',comparing=onboarding==='--puppy-comparison',offline=onboarding==='--offline-lifecycle',isolating=onboarding==='--account-isolation',photographing=onboarding==='--photo-lifecycle',deletionFaults=onboarding==='--deletion-faults',upgrading=onboarding==='--enrolled-runtime-upgrade';
+assert.ok(!(comparing||offline||isolating||photographing||deletionFaults||upgrading)||!android,'Extended lifecycle cases use the dedicated iOS verification path.');
 assert.equal(consent,'--replace-synthetic','Use PLATFORM DEVICE HOST --replace-synthetic [OUTPUT].');
 const frontPort=Number(process.env.PUPTIME_ACCOUNT_PORT??8797),backPort=frontPort+2;assert.ok(Number.isInteger(frontPort)&&frontPort>1024&&frontPort<65533);
 const app='com.patrickchin.puptime',output=resolve(destination),front='https://127.0.0.1:'+frontPort;
@@ -49,7 +50,9 @@ const requests=new Set(),restoreNative=[],requestCounts={enroll:0,push:0};
 // assertion below establishes that the SDK persisted a received result.
 const wireAccepted=[],wirePages=[],wirePushes=[],wireFailures=[],photoTransfers=[],receipts=[],changeSockets=new Set();
 let fault='online',photoFault='online',deleteFault='online',failedDeletes=0,acceptedDeletes=0,failedPhotoUploads=0,corruptPhotoDownloads=0,activeForwarded=0,wireParseErrors=0;
-let certificate,activeFlow='startup',flowSequence=0;
+let certificate,activeFlow='startup',flowSequence=0,runtimePhase='older',newerSdkCookie='';
+const identityRequests={sendCode:0,verifyCode:0,signOut:0};
+let runtimeInputs;const runtimeBundles=new Map(),runtimeProvenance=[];
 const authResponses=[];
 const authRoutes={'/api/auth/get-session':'session','/api/auth/email-otp/send-verification-otp':'send-code','/api/auth/sign-in/email-otp':'verify-code','/api/auth/sign-out':'sign-out','/api/account':'account'};
 const codes=new Set(),checks=[];
@@ -304,6 +307,81 @@ async function verifyPhotoLifecycle(){
  receipts.push({phase:'native-photo-roundtrip',sourceJPEG:true,uiPickerAndCrop:true,width:512,height:512,bytes:photo.bytes.length,sha256:photo.sha256,failedUploads:failedPhotoUploads,rejectedCorruptDownloads:corruptPhotoDownloads,freshDeviceRestore:true,exactRestoredBytes:true});
  checks.push('Real UIKit selection/crop saves a decodable512px JPEG; actual native SDK upload failure keeps its reference/queue safe through restart, retry sends exact JPEG bytes to localR2; corrupt download leaves no partial file or applied history, then retry restores byte-identical photo plus12 original logs on a genuinely fresh device and cold restart.');
 }
+// Exact historical source/native cuts; the driver source is not installed app JS.
+const enrolledCuts=[
+ {name:'older',source:'008b4a0b7f4d8a77cc8c13d95f39001534d8fd70',tree:'7e3886c23141b4cb9843782a81566cd2aa714a84',native:'1d278f77e8e1358a1855c854462bde2c85e689f7e270fd2ea88ab0982c814971',js:'793aea3e98318fca08598782e4629e40542182bc2cbd3697f4f3533593ca5da7'},
+ {name:'newer',source:'aacd58fd0a7102a629b92dbf8813496870aec21c',tree:'abb69c7d347964ad7a6cd9bcce80a8472544ab2e',native:'49933effc73d92ff29dad23179ca45a267e48708d9b2f2ff8415d4ad253c08c5',js:'cff60a5bc0f74dc39113d58d1e5c4e8d5ccc21dfb426503fbe88cb9938ccaeb6'},
+];
+const sha256=path=>createHash('sha256').update(readFileSync(path)).digest('hex');
+const inspectCommand=(binary,args)=>execFileSync(binary,args,{encoding:'utf8',timeout:120000,stdio:['ignore','pipe','pipe']}).trim();
+function readEnrolledInputs(){
+ const path=process.env.PUPTIME_ENROLLED_RUNTIME_INPUTS;assert.ok(path&&isAbsolute(path));
+ assert.equal(realpathSync(path),path,'Use the canonical private manifest path.');
+ assert.equal(statSync(path).mode&0o777,0o600);assert.equal(statSync(dirname(path)).mode&0o777,0o700);assert.ok(statSync(path).size<2097152);
+ const value=JSON.parse(readFileSync(path,'utf8'));
+ assert.deepEqual([value.schemaVersion,value.status,value.stage,value.upgradeExecuted,value.appsInstalled,value.javaScriptModified],[1,'prepared','controlled-origin-enrolled-preparation',false,false,false]);
+ assert.match(value.driverSource,/^[a-f0-9]{40}$/);
+ for(const file of ['scripts/verify-ios-runtime-upgrade.mjs','scripts/native-runtime-inputs.mjs'])assert.equal(sha256(file),createHash('sha256').update(execFileSync('git',['show',value.driverSource+':'+file])).digest('hex'),'Revalidate the committed preparation code, not an unrelated manifest.');
+ assert.equal(value.driverScriptSHA256,sha256('scripts/verify-ios-runtime-upgrade.mjs'));
+ assert.equal(value.packageSHA256,sha256('package.json'));assert.equal(value.lockSHA256,sha256('package-lock.json'));
+ assert.equal(value.runtimes.length,2);
+ for(const [index,expected] of enrolledCuts.entries()){
+  const cut=value.runtimes[index],root=join(dirname(path),'inputs',expected.name);
+  assert.deepEqual([cut.name,cut.source,cut.tree],[expected.name,expected.source,expected.tree]);
+  assert.equal(cut.host,join(root,'host/Puptime.app'));assert.equal(cut.sourceRoot,join(root,'source'));
+  assert.equal(realpathSync(cut.host),cut.host);assert.equal(realpathSync(cut.sourceRoot),cut.sourceRoot);
+  assert.equal(inspectCommand('git',['rev-parse',cut.source+'^{tree}']),cut.tree);
+  const files=Object.fromEntries(inspectCommand('git',['ls-tree','-rz',cut.source]).split('\0').filter(Boolean).map(row=>{const match=row.match(/^(100644|100755) blob ([a-f0-9]{40})\t(.+)$/s);assert.ok(match);return [match[3],{mode:match[1],blobSHA1:match[2]}];}));
+  assert.deepEqual(cut.sourceFiles,files);assertArchivedSource(cut.sourceRoot,files);
+  assert.equal(sha256(join(cut.sourceRoot,'package.json')),value.packageSHA256);assert.equal(sha256(join(cut.sourceRoot,'package-lock.json')),value.lockSHA256);
+  inspectCommand('codesign',['--verify','--deep','--strict',cut.host]);
+  assert.equal(cut.signature.deepStrictVerified,true);assert.equal(sha256(join(cut.host,'_CodeSignature/CodeResources')),cut.signature.codeResourcesSHA256);
+  assert.equal(sha256(join(cut.host,'Info.plist')),cut.infoPlistSHA256);assert.equal(cut.appGroup,'group.com.patrickchin.puptime');
+  assert.equal(inspectCommand('plutil',['-extract','CFBundleIdentifier','raw','-o','-',join(cut.host,'Info.plist')]),app);
+  assert.equal(inspectCommand('plutil',['-extract','ExpoWidgetsAppGroupIdentifier','raw','-o','-',join(cut.host,'Info.plist')]),cut.appGroup);
+  assert.match(inspectCommand('xcrun',['vtool','-show-build',join(cut.host,'Puptime')]),/platform\s+IOSSIMULATOR/);
+  assert.equal(sha256(join(cut.host,'Puptime')),expected.native);assert.equal(sha256(join(cut.host,'main.jsbundle')),expected.js);
+  assert.equal(cut.original.nativeExecutableSHA256,expected.native);assert.equal(cut.original.javaScriptSHA256,expected.js);
+  assert.deepEqual(nativeCodeFingerprint(cut.host,mkdtempSync(join(privateDir,'native-original-'))),cut.nativeCode);
+ }
+ return value;
+}
+function embeddedEntitlements(binary){return inspectCommand('otool',['-arch','arm64','-s','__TEXT','__entitlements',binary]).split('\n').filter(line=>/^[a-f0-9]{8,16}\s/i.test(line)).map(line=>line.trim().split(/\s+/).slice(1).join('')).join('');}
+async function historicalBundle(name,bundleEnv){
+ const cut=runtimeInputs.runtimes.find(value=>value.name===name);assert.ok(cut);assertArchivedSource(cut.sourceRoot,cut.sourceFiles);
+ const directory=mkdtempSync(join(privateDir,'runtime-'+name+'-')),source=join(directory,'source'),bundle=join(directory,'Puptime.app');
+ cpSync(cut.sourceRoot,source,{recursive:true});cpSync(cut.host,bundle,{recursive:true});
+ symlinkSync(realpathSync('node_modules'),join(source,'node_modules'),'dir');
+ const originalEntitlements=embeddedEntitlements(join(bundle,'Puptime'));assert.ok(originalEntitlements);
+ await run('node',[resolve('node_modules/expo/bin/cli'),'export:embed','--entry-file','index.ts','--platform','ios','--dev','false','--bytecode','--reset-cache','--max-workers','2','--bundle-output',join(bundle,'main.jsbundle'),'--assets-dest',bundle],bundleEnv,source);
+ assert.ok(readFileSync(join(bundle,'main.jsbundle')).includes(Buffer.from(front)),'Use the same controlled origin in both exact historical sources.');
+ await run('codesign',['--force','--deep','--sign','-',bundle]);inspectCommand('codesign',['--verify','--deep','--strict',bundle]);
+ assert.equal(sha256(join(bundle,'Info.plist')),cut.infoPlistSHA256);assert.equal(embeddedEntitlements(join(bundle,'Puptime')),originalEntitlements);
+ const code=nativeCodeFingerprint(bundle,mkdtempSync(join(privateDir,'native-resigned-')));
+ const text=values=>Object.fromEntries(Object.entries(values).map(([path,{fileSHA256,...value}])=>[path,value]));
+ assert.deepEqual(text(code),text(cut.nativeCode),'Private origin export/signing must preserve every native __text section and architecture.');
+ const proof={name,source:cut.source,tree:cut.tree,originalNativeSHA256:cut.original.nativeExecutableSHA256,originalJavaScriptSHA256:cut.original.javaScriptSHA256,controlledJavaScriptSHA256:sha256(join(bundle,'main.jsbundle')),resignedExecutableSHA256:sha256(join(bundle,'Puptime')),nativeTextPreserved:true,embeddedEntitlementsPreserved:true,infoPlistPreserved:true};
+ runtimeBundles.set(name,{bundle,proof});runtimeProvenance.push(proof);writeFileSync(join(output,'controlled-runtime-provenance.json'),JSON.stringify({stage:'controlled-origin-bundle-preparation',upgradeExecuted:false,originModified:true,originalInstalledBytes:false,runtimes:runtimeProvenance},null,2)+'\n');
+ return bundle;
+}
+function assertInstalledHistorical(name){const {bundle,proof}=runtimeBundles.get(name),installed=simctl('get_app_container',device,app,'app');assert.equal(sha256(join(installed,'main.jsbundle')),proof.controlledJavaScriptSHA256);assert.equal(sha256(join(installed,'Puptime')),proof.resignedExecutableSHA256);assert.equal(sha256(join(installed,'Info.plist')),sha256(join(bundle,'Info.plist')));proof.installedVerified=true;}
+async function verifyEnrolledRuntimeUpgrade(){
+ assertInstalledHistorical('older');await flow('prepare');await flow('add-logs',{BATCHES:'4',EXPECTED_COUNT:'12'});await signIn();await flow('enable',{EXPECTED_COUNT:'12'});
+ const enrolled=snapshot(),owner=enrolled.owner[0].account_id,cloudBefore=await assertCloud(enrolled.events);assert.equal(enrolled.pending,0);
+ await transport('offline');await flow('add-logs',{BATCHES:'1',EXPECTED_COUNT:'15'});await until(()=>snapshot().pending===3,'Capture three original old-runtime pending mutations.');
+ simctl('terminate',device,app);const queued=snapshot(),acceptedStart=wireAccepted.length,pageStart=wirePages.length;
+ assert.equal((await remote({inspectBehindFault:true})).length,12);const identityBefore={...identityRequests},enrollBefore=requestCounts.enroll;
+ const bundle=await historicalBundle('newer',{...childEnv,CI:'false',EXPO_PUBLIC_CLOUD_API_URL:front});
+ simctl('install',device,bundle);assertInstalledHistorical('newer');assertNativeTransition(queued.tables,snapshot().tables);
+ runtimePhase='newer';await flow('reopen-offline',{EXPECTED_COUNT:'15'});assertNativeTransition(queued.tables,snapshot().tables);assert.deepEqual(identityRequests,identityBefore);assert.equal(requestCounts.enroll,enrollBefore);
+ await transport('online');await flow('resume-sync');const drained=drainReceipt(queued,acceptedStart,pageStart);assert.deepEqual(drained.events,queued.events);assert.equal(drained.owner[0].account_id,owner);
+ assert.ok(newerSdkCookie,'Observe the actual newer native SDK successful push cookie, not a retained inspector credential.');const identity=await inspectSession(newerSdkCookie);assert.equal(identity.status,200);assert.equal(identity.body.user.id,owner);
+ const cloudAfter=await assertCloud(drained.events);for(const record of cloudBefore)assert.deepEqual(cloudAfter.find(value=>value.id===record.id),record);
+ assert.deepEqual(identityRequests,identityBefore);assert.equal(requestCounts.enroll,enrollBefore);
+ const stable=snapshot();await flow('reopen',{EXPECTED_COUNT:'15'});assertNativeTransition(stable.tables,snapshot().tables);assert.deepEqual(await remote(),cloudAfter);assert.deepEqual(identityRequests,identityBefore);assert.equal(requestCounts.enroll,enrollBefore);
+ receipts.push({phase:'enrolled-runtime-replacement',oldLocalEvents:15,oldRemoteEvents:12,pendingPreserved:3,all14TablesChecked:true,savedSdkIdentityVerified:true,noReauthenticationOrEnrollment:true,finalCloudEvents:15,finalRestartExact14Tables:true});
+ checks.push('Exact historical old/new sources on their separately attested native hosts, rebuilt only for the same temporary HTTPS origin; real old UI/SDK enrolls12logs and leaves3offline writes. Without uninstall/reset/re-auth, installing newer preserves every table/payload/generation, actual newer SDK drains3exact acknowledgements under the original account, and15cloud records/revisions plus all14tables survive cold restart. Controlled origin/ad-hoc resign, not untouched-original, numeric store, provider or current-candidate qualification.');
+}
 function deletionState(tables){const row=tables.metadata.find(row=>row.key==='cloud_account_deletion');assert.ok(row);const state=JSON.parse(row.value);assert.equal(state.stage,'unconfirmed');return state;}
 async function verifyDeletionFaults(){
  await flow('prepare');await flow('add-logs',{BATCHES:'4',EXPECTED_COUNT:'12'});await signIn();await flow('enable',{EXPECTED_COUNT:'12'});
@@ -387,6 +465,7 @@ try{
   if(android){adb('install','-r',resolve(host));adb('shell','run-as',app,'id');}
   else try{simctl('terminate',device,app);}catch{}
   const old=sqliteDirectory();
+  if(upgrading){assert.ok(!existsSync(join(old,'puptime-v2.db')),'Start the historical case on a genuinely fresh owned simulator.');runtimeInputs=readEnrolledInputs();}
   if(existsSync(join(old,'puptime-v2.db'))){
     const prior=database();try{assert.equal(prior.prepare('SELECT COUNT(*) n FROM local_sync_owner').get().n,0,'Do not replace another account fixture.');}finally{prior.close();}
     cpSync(old,join(privateDir,'previous-synthetic-sqlite'),{recursive:true});
@@ -405,6 +484,7 @@ try{
   const forward=(req,res)=>{
     requests.add(req.url);
     const pathname=new URL(req.url,front).pathname,route=Object.hasOwn(authRoutes,pathname)?authRoutes[pathname]:undefined;
+    if(req.method==='POST'){if(route==='send-code')identityRequests.sendCode++;if(route==='verify-code')identityRequests.verifyCode++;if(route==='sign-out')identityRequests.signOut++;}
     if(route&&['GET','POST'].includes(req.method)){
       const entry={phase:activeFlow,flowSequence,route,method:req.method,status:null,state:'pending'};
       authResponses.push(entry);if(authResponses.length>64)authResponses.shift();
@@ -423,6 +503,7 @@ try{
     if(fault==='offline'){req.socket.destroy();return;}
     if(fault==='push-offline'&&pushing){req.resume();res.writeHead(503,{'content-type':'application/json'}).end('{"error":"controlled_transport_outage"}');return;}
     const body=[];if(pushing||photoRequest&&req.method==='POST'){req.on('data',part=>body.push(part));if(pushing)req.on('end',()=>{try{const bytes=Buffer.concat(body),parsed=capturedJson(bytes,req.headers['content-encoding']);wirePushes.push({mutations:parsed.mutations.map(value=>mutationSchema.parse(value))});}catch{wireFailure('request','push',req.headers['content-encoding'],Buffer.concat(body).length);}});}
+    const newerNativePush=upgrading&&runtimePhase==='newer'&&pushing;
     const dropping=pushing&&fault==='drop-push-response-once'||deletingRequest&&deleteFault==='lost';activeForwarded++;
     let finished=false;const finish=()=>{if(!finished){finished=true;activeForwarded--;}};
     // Wrangler rewrites a matching Origin using the upstream scheme. Forwarding
@@ -430,6 +511,7 @@ try{
     const outgoing=request('http://127.0.0.1:'+backPort+req.url,{method:req.method,headers:{...req.headers,host:'127.0.0.1:'+backPort}},incoming=>{
       const chunks=[];if(pushing||pulling||photoRequest||deletingRequest)incoming.on('data',part=>chunks.push(part));
       incoming.on('end',()=>{
+        if(newerNativePush&&incoming.statusCode===200&&typeof req.headers.cookie==='string')newerSdkCookie=req.headers.cookie;
         if(incoming.statusCode===200&&(pushing||pulling))try{const bytes=Buffer.concat(chunks),parsed=capturedJson(bytes,incoming.headers['content-encoding']);if(pushing)wireAccepted.push(...pushResponseSchema.parse(parsed).accepted);else wirePages.push(pullPageSchema.parse(parsed));}catch{wireFailure('response',pushing?'push':'pull',incoming.headers['content-encoding'],Buffer.concat(chunks).length);}
         if(photoRequest)photoTransfers.push({method:req.method,path:req.url,status:incoming.statusCode,...(req.method==='POST'?{requestSHA256:createHash('sha256').update(Buffer.concat(body)).digest('hex')}:{responseSHA256:createHash('sha256').update(Buffer.concat(chunks)).digest('hex')})});
         if(deletingRequest&&incoming.statusCode===200){const reply=capturedJson(Buffer.concat(chunks),incoming.headers['content-encoding']);assert.equal(reply.success,true);acceptedDeletes++;}
@@ -504,12 +586,15 @@ try{
     adb('install','-r',resolve(host));
     console.log('PASS isolated Android HTTPS native build');
   }else{
+  if(upgrading){iosFixtureHost=await historicalBundle('older',bundleEnv);simctl('install',device,iosFixtureHost);assertInstalledHistorical('older');}
+  else{
   const bundle=join(privateDir,'Puptime.app');cpSync(host,bundle,{recursive:true});iosFixtureHost=bundle;
   await run('node',['node_modules/expo/bin/cli','export:embed','--entry-file','index.ts','--platform','ios','--dev','false','--bytecode','--reset-cache','--max-workers','2','--bundle-output',join(bundle,'main.jsbundle'),'--assets-dest',bundle],
     bundleEnv);
   assert.ok(readFileSync(join(bundle,'main.jsbundle')).includes(Buffer.from(front)),'Embed the fixture HTTPS address, never a cached production API.');
   await run('codesign',['--force','--deep','--sign','-',bundle]);
   simctl('install',device,bundle);
+  }
   }
   if(onboardingSignIn){
     await flow('onboarding-request');
@@ -526,7 +611,8 @@ try{
   if(isolating)await verifyAccountIsolation();
   if(photographing)await verifyPhotoLifecycle();
   if(deletionFaults)await verifyDeletionFaults();
-  if(!onboardingSignIn&&!deleting&&!comparing&&!offline&&!isolating&&!photographing&&!deletionFaults){
+  if(upgrading)await verifyEnrolledRuntimeUpgrade();
+  if(!onboardingSignIn&&!deleting&&!comparing&&!offline&&!isolating&&!photographing&&!deletionFaults&&!upgrading){
   await flow('prepare');assert.equal(snapshot().events.length,0);
   assert.ok(requests.has('/api/config'),'The real app must reach this isolated backend before any sign-in attempt.');
   await flow('add-logs',{BATCHES:'4',EXPECTED_COUNT:'12'});const guest=snapshot();assert.equal(guest.events.length,12);assert.equal(guest.owner.length,0);
@@ -566,8 +652,8 @@ try{
    checks.push('native system confirmation cancels safely; stale auth uses real same-account OTP and a new confirmation; confirmed deletion removes the actual account, retains all 12 logs and offers manual Apple cleanup for a tokenless synthetic link');
   }
   rmSync(join(output,'failure-redacted.log'),{force:true});
-  writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',checks,receipts,scope:android?'Android Debug native host with normal embedded release JS and isolated local HTTPS Better Auth/D1/SQLite DO; actual native email SDK and Keystore. Its temporary CA is trusted only in the ignored Debug source set, restored after the run. Production onboarding is tested separately in the Release APK. No real email, production account, session injection or mocked sync.':'Release bundle and actual native email SDK with isolated local HTTPS Better Auth/D1/SQLite DO. Simulator trusts the fixture certificate. No real email, production account, session injection or mocked sync.'},null,2)+'\n');
-  console.log('PASS '+(deletionFaults?'pending native deletion cancellation, retries and lost response':photographing?'native profile photo failure, roundtrip and restore':isolating?'expired session and account isolation':offline?'offline writes, replay and pending logout':deleting?'native account deletion':comparing?'named puppy comparison':onboardingSignIn?'welcome sign-in and session recovery':android?'guest account preservation and empty-database recovery':'guest account preservation and inspected empty-device recovery')+': '+output);
+  writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',checks,receipts,...(upgrading?{stage:'controlled-origin-enrolled-runtime-replacement',upgradeExecuted:true,originModified:true,originalInstalledBytes:false,runtimes:runtimeProvenance}:{}),scope:upgrading?'Exact historical source/native pairs with controlled-origin release JS and ad-hoc signing; actual native SDK and isolated local HTTPS Better Auth/D1/SQLite DO. No credential injection, owner data, provider OAuth, untouched-original, numeric store or final current-candidate qualification.':android?'Android Debug native host with normal embedded release JS and isolated local HTTPS Better Auth/D1/SQLite DO; actual native email SDK and Keystore. Its temporary CA is trusted only in the ignored Debug source set, restored after the run. Production onboarding is tested separately in the Release APK. No real email, production account, session injection or mocked sync.':'Release bundle and actual native email SDK with isolated local HTTPS Better Auth/D1/SQLite DO. Simulator trusts the fixture certificate. No real email, production account, session injection or mocked sync.'},null,2)+'\n');
+  console.log('PASS '+(upgrading?'controlled-origin enrolled runtime replacement':deletionFaults?'pending native deletion cancellation, retries and lost response':photographing?'native profile photo failure, roundtrip and restore':isolating?'expired session and account isolation':offline?'offline writes, replay and pending logout':deleting?'native account deletion':comparing?'named puppy comparison':onboardingSignIn?'welcome sign-in and session recovery':android?'guest account preservation and empty-database recovery':'guest account preservation and inspected empty-device recovery')+': '+output);
 }finally{
   for(const socket of changeSockets)socket.destroy();
   auth?.close();proxy?.close();for(const child of [worker])if(child?.pid)try{process.kill(-child.pid,'SIGTERM');}catch{}
