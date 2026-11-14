@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
-import {closeSync,existsSync,mkdirSync,mkdtempSync,openSync,readFileSync,readdirSync,renameSync,writeFileSync} from 'node:fs';
+import {closeSync,cpSync,existsSync,mkdirSync,mkdtempSync,openSync,readFileSync,readdirSync,renameSync,rmSync,statSync,writeFileSync} from 'node:fs';
 import {homedir,tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
@@ -122,8 +122,26 @@ async function verify(){
  provenance.device={udid:device,runtime:runtime.identifier};provenance.photoFixtureSHA256=hash(fixture);provenance.photoSelectionFlowSHA256=hash(selectPhoto);provenance.preferenceFlowSHA256=hash(preferenceFlow);
  writeFileSync(join(output,'native-provenance.json'),JSON.stringify(provenance,null,2)+'\n');
  const flow=(name,body)=>{
-  const path=join(privateDir,name+'.yaml');writeFileSync(path,`appId: ${app}\nname: ${name}\n---\n${body}`);
-  execFileSync(process.env.MAESTRO_BIN??'maestro',['--device',device,'test',path,'--test-output-dir',join(output,name)],{timeout:600000,stdio:'inherit',env:{...process.env,MAESTRO_CLI_NO_ANALYTICS:'1',MAESTRO_DRIVER_STARTUP_TIMEOUT:'180000'}});
+  const path=join(privateDir,name+'.yaml'),artifacts=join(privateDir,'maestro-'+name),receipt=join(output,name);let passed=false;
+  writeFileSync(path,`appId: ${app}\nname: ${name}\n---\n${body}`);
+  try{
+   execFileSync(process.env.MAESTRO_BIN??'maestro',['--device',device,'test',path,'--test-output-dir',artifacts],{timeout:600000,stdio:'inherit',env:{...process.env,MAESTRO_CLI_NO_ANALYTICS:'1',MAESTRO_DRIVER_STARTUP_TIMEOUT:'180000'}});passed=true;
+  }finally{
+   // This guest-only exercise has no auth secrets. Keep raw driver logs private;
+   // the three-day CI receipt needs only bounded synthetic visual evidence.
+   mkdirSync(receipt,{recursive:true});const paths=existsSync(artifacts)?readdirSync(artifacts,{recursive:true}).map(String):[];
+   let bytes=0,count=0;
+   for(const file of paths.filter(file=>/(?:^|\/)(?:profile-photo|original-older-photo|native-photo-saved)\.png$/.test(file))){
+    const source=join(artifacts,file),size=statSync(source).size;if(count>=4||bytes+size>4194304)continue;
+    cpSync(source,join(receipt,'capture-'+count+'.png'));count++;bytes+=size;
+   }
+   if(!passed){
+    const failure=join(receipt,'failure.png');try{simctl('io',device,'screenshot',failure);if(statSync(failure).size>4194304)rmSync(failure);}catch{/* The original driver failure remains authoritative. */}
+    const hierarchy=paths.filter(file=>file.includes('hierarchy')&&/\.(json|xml)$/.test(file)).sort().at(-1);
+    if(hierarchy)writeFileSync(join(receipt,'failure-hierarchy.txt'),readFileSync(join(artifacts,hierarchy)).subarray(0,262144));
+   }
+   writeFileSync(join(receipt,'flow.json'),JSON.stringify({name,status:passed?'passed':'failed',rawDriverLogsUploaded:false,syntheticGuestOnly:true},null,2)+'\n');
+  }
  };
  const preferences=action=>`- runFlow:\n    file: ${JSON.stringify(preferenceFlow)}\n    env:\n      PREF_ACTION: ${action}\n`;
  const openProfile=`- runFlow: ${JSON.stringify(resolve('.maestro/helpers/open-account.yaml'))}\n- scrollUntilVisible:\n    element:\n      id: account.back\n    direction: UP\n    visibilityPercentage: 100\n- tapOn:\n    id: account.back\n    retryTapIfNoChange: true\n- extendedWaitUntil:\n    visible:\n      id: screen.today\n    timeout: 30000\n- tapOn:\n    id: header.puppy\n    retryTapIfNoChange: true\n- extendedWaitUntil:\n    visible:\n      id: screen.pets\n    timeout: 30000\n`;
