@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Artifact version (for example 1.12.0); leave blank for the next patch
+        description: Must match committed app.json; blank uses its version
         required: false
         type: string
       publish:
@@ -26,6 +26,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      EXPO_PUBLIC_APP_POSTHOG_KEY: ${{ vars.EXPO_PUBLIC_APP_POSTHOG_KEY }}
+      EXPO_PUBLIC_APP_POSTHOG_HOST: ${{ vars.EXPO_PUBLIC_APP_POSTHOG_HOST || 'https://eu.i.posthog.com' }}
     outputs:
       tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
@@ -37,52 +40,39 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Choose release version
-        id: release
-        shell: bash
-        env:
-          PUPTIME_REQUESTED_VERSION: ${{ inputs.version }}
-        run: |
-          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-            tag="$GITHUB_REF_NAME"
-            base_tag=""
-          else
-            base_tag=$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' HEAD)
-            if [[ ! "$base_tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-              echo "Unsupported release tag: $base_tag" >&2
-              exit 1
-            fi
-            if [[ -n "$PUPTIME_REQUESTED_VERSION" ]]; then
-              tag="v$PUPTIME_REQUESTED_VERSION"
-            else
-              tag="v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.$((BASH_REMATCH[3] + 1))"
-            fi
-          fi
-          if [[ ! "$tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-            echo "Unsupported release tag: $tag" >&2
-            exit 1
-          fi
-          {
-            echo "tag=$tag"
-            echo "version=${tag#v}"
-            echo "base_tag=$base_tag"
-          } >> "$GITHUB_OUTPUT"
-      - name: Set artifact version
-        env:
-          PUPTIME_VERSION: ${{ steps.release.outputs.version }}
-        run: |
-          node - <<'NODE'
-          const fs = require('node:fs');
-          const config = require('./app.json');
-          const [major, minor, patch] = process.env.PUPTIME_VERSION.split('.').map(Number);
-          config.expo.version = process.env.PUPTIME_VERSION;
-          config.expo.android.versionCode = major * 1000000 + minor * 1000 + patch;
-          fs.writeFileSync('app.json', `${JSON.stringify(config, null, 2)}\n`);
-          NODE
       - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
+      - name: Validate committed candidate version
+        id: release
+        env:
+          PUPTIME_REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          node - <<'NODE'
+          const assert = require('node:assert/strict');
+          const fs = require('node:fs');
+          const {execFileSync} = require('node:child_process');
+          const {expo} = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+          const match = /^([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(expo.version);
+          assert.ok(match, 'Commit a valid candidate version before building.');
+          const [major, minor, patch] = match.slice(1).map(Number);
+          const code = major * 1000000 + minor * 1000 + patch;
+          assert.ok(Number.isSafeInteger(code) && code > 0 && expo.android.versionCode === code,
+            'Commit the matching Android versionCode before building.');
+          const requested = (process.env.PUPTIME_REQUESTED_VERSION || '').trim();
+          assert.ok(!requested || requested === expo.version, 'Requested version must equal committed app.json.');
+          const tag = 'v' + expo.version;
+          const isTag = process.env.GITHUB_REF_TYPE === 'tag';
+          assert.ok(!isTag || process.env.GITHUB_REF_NAME === tag, 'Tag must equal committed app.json.');
+          execFileSync('git', ['diff', '--quiet', 'HEAD', '--'], {stdio: 'pipe'});
+          const base = isTag ? '' : execFileSync('git',
+            ['describe', '--tags', '--abbrev=0', '--match', 'v[0-9]*.[0-9]*.[0-9]*', 'HEAD'],
+            {encoding: 'utf8'}).trim();
+          assert.ok(!base || /^v[0-9]+\.[0-9]+\.[0-9]+$/.test(base), 'Invalid previous release tag.');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT,
+            'tag=' + tag + '\nversion=' + expo.version + '\nbase_tag=' + base + '\n');
+          NODE
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -91,16 +81,37 @@ jobs:
       - run: npx expo prebuild --platform android --no-install
         env:
           CI: "1"
+      - name: Resolve notice inputs and seal committed candidate
+        run: |
+          umask 077
+          mkdir -p build/notices/android/private
+          (cd android && ./gradlew -I ../scripts/notices-runtime.init.gradle \
+            :app:writeNoticeRuntimeInputs --no-daemon \
+            -PnoticeInputsOutput="$PWD/../build/notices/android/private/runtime-inputs.json")
+          node scripts/capture-app-notices.mjs seal android \
+            --gradle-input build/notices/android/private/runtime-inputs.json
       - run: ./gradlew assembleRelease bundleRelease --no-daemon
-        env:
-          EXPO_PUBLIC_APP_POSTHOG_KEY: ${{ vars.EXPO_PUBLIC_APP_POSTHOG_KEY }}
-          EXPO_PUBLIC_APP_POSTHOG_HOST: ${{ vars.EXPO_PUBLIC_APP_POSTHOG_HOST || 'https://eu.i.posthog.com' }}
         working-directory: android
+      - name: Verify exact packaged notices and mapped build outputs
+        run: |
+          node scripts/capture-app-notices.mjs verify android \
+            --gradle-input build/notices/android/private/runtime-inputs.json \
+            --archive android/app/build/outputs/apk/release/app-release.apk \
+            --bundle android/app/build/generated/assets/react/release/index.android.bundle \
+            --source-map android/app/build/generated/sourcemaps/react/release/index.android.bundle.map
+          node scripts/capture-app-notices.mjs verify android \
+            --gradle-input build/notices/android/private/runtime-inputs.json \
+            --archive android/app/build/outputs/bundle/release/app-release.aab \
+            --bundle android/app/build/generated/assets/react/release/index.android.bundle \
+            --source-map android/app/build/generated/sourcemaps/react/release/index.android.bundle.map
       - name: Verify artifacts and record qualification metadata
         id: verify
         shell: bash
         run: |
           mkdir qualification
+          cp build/notices/android/seal.json qualification/NOTICE-SEAL.json
+          cp build/notices/android/final-apk.json qualification/NOTICE-APK.json
+          cp build/notices/android/final-aab.json qualification/NOTICE-AAB.json
           puptime_apksigner=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)
           test -n "$puptime_apksigner"
           "$puptime_apksigner" verify --verbose --print-certs android/app/build/outputs/apk/release/app-release.apk | tee qualification/APK-SIGNING.txt
@@ -146,6 +157,26 @@ jobs:
           name: puptime-android-qualification
           path: qualification/
           if-no-files-found: error
+
+      - name: Upload unreviewed public notice inputs (INCOMPLETE)
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: unreviewed-oss-notice-inputs-android
+          path: build/notices/android/review/unreviewed-oss-notice-inputs.json
+          if-no-files-found: warn
+          retention-days: 3
+
+      - name: Upload discovery metadata (INCOMPLETE)
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: notice-discovery-metadata-android-INCOMPLETE
+          path: |
+            build/notices/android/discovery.json
+            build/notices/android/failure.json
+          if-no-files-found: warn
+          retention-days: 3
 
   publish:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true }}
