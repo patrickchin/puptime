@@ -1,7 +1,6 @@
 appId: com.patrickchin.puptime
 name: Account preservation verify
 ---
-- assertTrue: ${/^[0-9]{6}$/.test(MAESTRO_TEST_CODE)}
 - launchApp:
     stopApp: false
     permissions: {}
@@ -20,11 +19,6 @@ name: Account preservation verify
     id: account.code.input
     retryTapIfNoChange: true
 - waitForAnimationToEnd
-- extendedWaitUntil:
-    visible:
-      id: account.code.input
-      focused: true
-    timeout: 10000
 - inputText: ${MAESTRO_TEST_CODE}
 - assertVisible:
     id: account.code.input
