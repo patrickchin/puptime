@@ -14,8 +14,10 @@ import {cloudRecordId,localRecordId} from '../src/cloud/record-identity.ts';
 import {createLocalDatabase} from '../src/local/database.ts';
 import {sqliteTestConnection} from '../src/local/sqlite-test-adapter.ts';
 import {createLocalRuntime} from '../src/local/runtime-factory.ts';
+import {nativeSnapshot,assertNativeDetached,assertEmptyIosRestoreSources} from './native-account-evidence.mjs';
 
-const [platform,device,host,consent,destination='build/guest-account-'+platform,onboarding]=process.argv.slice(2);
+const [platform,initialDevice,host,consent,destination='build/guest-account-'+platform,onboarding]=process.argv.slice(2);
+let device=initialDevice;
 assert.ok(['ios','android'].includes(platform));
 assert.ok(onboarding===undefined||['--onboarding-sign-in','--account-deletion','--puppy-comparison'].includes(onboarding));
 const android=platform==='android',deleting=onboarding==='--account-deletion',onboardingSignIn=onboarding==='--onboarding-sign-in',comparing=onboarding==='--puppy-comparison';
@@ -39,7 +41,8 @@ const config={...JSON.parse(readFileSync('wrangler.jsonc','utf8')),name:'puptime
   vars:{ENVIRONMENT:'local',AUTH_BASE_URL:front,WEB_ORIGINS:front,AUTH_SECRET:crypto.randomUUID()+crypto.randomUUID()}};
 config.d1_databases=config.d1_databases.map(db=>({...db,migrations_dir:resolve(db.migrations_dir)}));
 writeFileSync(configPath,JSON.stringify(config),{mode:0o600});
-let worker,proxy,cookie='',code='',auth;
+let worker,proxy,cookie='',code='',auth,iosFixtureHost;
+const temporaryDevices=[];
 const requests=new Set(),restoreNative=[],requestCounts={enroll:0,push:0};
 let certificate;
 const codes=new Set(),checks=[];
@@ -90,10 +93,39 @@ function sqliteDirectory(){
   return join(androidSnapshot,'files/SQLite');
 }
 const database=()=>new DatabaseSync(join(sqliteDirectory(),'puptime-v2.db'),{readOnly:true});
-function snapshot(){const db=database();try{return {
+function snapshot(){const db=database();db.exec('BEGIN');try{return {
+  tables:nativeSnapshot(db),
   events:db.prepare(`SELECT id,${eventSqlColumns.join(',')} FROM events ORDER BY id`).all().map(row=>({...row})),
   owner:db.prepare('SELECT * FROM local_sync_owner').all(),pending:db.prepare('SELECT COUNT(*) n FROM local_sync_outbox').get().n,
-};}finally{db.close();}}
+};}finally{db.exec('ROLLBACK');db.close();}}
+function emptyRestorePreflight(){
+  const state=snapshot();assert.equal(state.events.length,0,'Recovery starts from an empty local database.');
+  if(android)return; // Android shared-store qualification remains a separate case.
+  simctl('terminate',device,app);
+  const data=simctl('get_app_container',device,app,'data');
+  const group=execFileSync('plutil',['-extract','ExpoWidgetsAppGroupIdentifier','raw','-o','-',join(host,'Info.plist')],{encoding:'utf8'}).trim();
+  assert.ok(group,'Read the actual native AppGroup entitlement.');
+  const shared=simctl('get_app_container',device,app,group);
+  const preferences=join(shared,'Library/Preferences',group+'.plist');
+  const defaults=existsSync(preferences)?JSON.parse(execFileSync('plutil',['-convert','json','-o','-',preferences],{encoding:'utf8'})):{};
+  assertEmptyIosRestoreSources({tables:snapshot().tables,sharedDirectory:shared,documentsDirectory:join(data,'Documents'),defaults});
+  checks.push('iOS preflight reads all native tables, immutable shared widget files, every cached widget timeline and local backup history before cloud restore');
+}
+async function freshIosRestoreDevice(){
+  assert.ok(!android&&iosFixtureHost);
+  // An app-data clear does not establish an empty AppGroup/keychain/device.
+  // A second disposable simulator makes the restoration source independent.
+  const groups=JSON.parse(simctl('list','devices','available','-j')).devices;
+  const [runtime,devices]=Object.entries(groups).find(([,items])=>items.some(item=>item.udid===device))??[];
+  const prior=devices?.find(item=>item.udid===device);assert.ok(runtime&&prior?.deviceTypeIdentifier);
+  try{simctl('terminate',device,app);}catch{}
+  simctl('shutdown',device);
+  device=simctl('create','Puptime Account Restore '+crypto.randomUUID().slice(0,8),prior.deviceTypeIdentifier,runtime);
+  temporaryDevices.push(device);simctl('boot',device);
+  await run('xcrun',['simctl','bootstatus',device,'-b']);
+  simctl('keychain',device,'add-root-cert',join(privateDir,'root.crt'));
+  simctl('install',device,iosFixtureHost);
+}
 async function remote(){
   const changes=[];let after=0;
   assert.ok(cookie,'Use the actual SDK session observed by the local proxy.');
@@ -128,11 +160,7 @@ async function fixturePost(path,body){
   });req.on('error',reject);req.setTimeout(15000,()=>req.destroy(new Error('Local fixture request timed out.')));req.end(encoded);
  });
 }
-function allLocalTables(){
- const db=database();try{return Object.fromEntries(db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map(({name})=>{
-  assert.match(name,/^[A-Za-z0-9_]+$/);return [name,db.prepare(`SELECT * FROM ${name} ORDER BY rowid`).all().map(row=>({...row}))];
- }));}finally{db.close();}
-}
+function allLocalTables(){return snapshot().tables;}
 async function verifyPuppyComparison(){
  await flow('prepare');await flow('add-logs',{BATCHES:'4',EXPECTED_COUNT:'12'});
  simctl('terminate',device,app);
@@ -242,7 +270,7 @@ try{
     adb('install','-r',resolve(host));
     console.log('PASS isolated Android HTTPS native build');
   }else{
-  const bundle=join(privateDir,'Puptime.app');cpSync(host,bundle,{recursive:true});
+  const bundle=join(privateDir,'Puptime.app');cpSync(host,bundle,{recursive:true});iosFixtureHost=bundle;
   await run('node',['node_modules/expo/bin/cli','export:embed','--entry-file','index.ts','--platform','ios','--dev','false','--bytecode','--reset-cache','--max-workers','2','--bundle-output',join(bundle,'main.jsbundle'),'--assets-dest',bundle],
     bundleEnv);
   assert.ok(readFileSync(join(bundle,'main.jsbundle')).includes(Buffer.from(front)),'Embed the fixture HTTPS address, never a cached production API.');
@@ -270,7 +298,7 @@ try{
   checks.push('12 real guest logs keep their IDs and bodies through SDK sign-in and explicit cloud enrollment');
   await flow('add-logs',{BATCHES:'1',EXPECTED_COUNT:'15'});await flow('wait-synced');
   const signed=snapshot();assert.equal(signed.events.length,15);await assertCloud(signed.events);
-  await flow('sign-out');assert.deepEqual(snapshot().events,signed.events);assert.equal(snapshot().owner.length,0);
+  await flow('sign-out');assertNativeDetached(signed.tables,snapshot().tables);
   checks.push('3 signed-in logs automatically sync; sign-out keeps all 15 local and remote logs');
   await flow('add-logs',{BATCHES:'2',EXPECTED_COUNT:'21'});const combined=snapshot();assert.equal(combined.events.length,21);
   await signIn();await flow('enable',{EXPECTED_COUNT:'21'});assert.deepEqual(snapshot().events,combined.events);assert.equal(snapshot().pending,0);
@@ -278,7 +306,8 @@ try{
   const cloudBefore=await assertCloud(combined.events);
   checks.push('6 more guest logs merge into the existing account without duplicates or revisions to the original logs');
   await flow('sign-out');cpSync(sqliteDirectory(),join(privateDir,'source-before-recovery'),{recursive:true});
-  await flow('prepare');assert.equal(snapshot().events.length,0,'Recovery starts from an empty local database.');
+  if(!android)await freshIosRestoreDevice();
+  await flow('prepare');emptyRestorePreflight();
   await signIn();await flow('enable',{EXPECTED_COUNT:'21'});
   assert.equal(snapshot().owner[0].account_id,owner);
   assert.deepEqual(snapshot().events,combined.events,'Recover every original ID, timestamp, type and optional field.');assert.equal(snapshot().pending,0);
@@ -300,10 +329,11 @@ try{
   }
   rmSync(join(output,'failure-redacted.log'),{force:true});
   writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',checks,scope:android?'Android Debug native host with normal embedded release JS and isolated local HTTPS Better Auth/D1/SQLite DO; actual native email SDK and Keystore. Its temporary CA is trusted only in the ignored Debug source set, restored after the run. Production onboarding is tested separately in the Release APK. No real email, production account, session injection or mocked sync.':'Release bundle and actual native email SDK with isolated local HTTPS Better Auth/D1/SQLite DO. Simulator trusts the fixture certificate. No real email, production account, session injection or mocked sync.'},null,2)+'\n');
-  console.log('PASS '+(deleting?'native account deletion':comparing?'named puppy comparison':onboardingSignIn?'welcome sign-in and session recovery':'guest account preservation and empty-device recovery')+': '+output);
+  console.log('PASS '+(deleting?'native account deletion':comparing?'named puppy comparison':onboardingSignIn?'welcome sign-in and session recovery':android?'guest account preservation and empty-database recovery':'guest account preservation and inspected empty-device recovery')+': '+output);
 }finally{
   auth?.close();proxy?.close();for(const child of [worker])if(child?.pid)try{process.kill(-child.pid,'SIGTERM');}catch{}
   if(android)try{adb('reverse','--remove','tcp:'+frontPort);}catch{}
   for(const [path,original] of restoreNative.reverse())if(original===null)rmSync(path,{force:true});else writeFileSync(path,original);
+  for(const temporary of temporaryDevices)try{simctl('delete',temporary);}catch{}
   // Retain only isolated synthetic state for failures; no auth data in public evidence.
 }

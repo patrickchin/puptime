@@ -6,9 +6,20 @@ on:
       - main
   pull_request:
   workflow_dispatch:
+    inputs:
+      suite:
+        description: Test suite (PRs always retain the full suite)
+        type: choice
+        options: [full, accounts]
+        default: full
+      native_host_run_id:
+        description: Successful main iOS run supplying the unchanged native host
+        type: string
+        default: '43383649287'
 
 jobs:
   build:
+    if: github.event_name != 'workflow_dispatch' || inputs.suite != 'accounts'
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v6
@@ -140,6 +151,7 @@ jobs:
             build/account-deletion-ios
           if-no-files-found: warn
           retention-days: 7
+
       - name: Capture App Store screenshots
         timeout-minutes: 20
         run: |
@@ -180,3 +192,50 @@ jobs:
             build/Puptime-iPad.png
           if-no-files-found: error
           retention-days: 7
+
+  native-accounts:
+    if: github.event_name == 'workflow_dispatch' && inputs.suite == 'accounts'
+    runs-on: macos-26
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [baseline, comparison]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: npm ci
+      - name: Check native evidence assertions
+        run: node --test scripts/native-account-evidence.test.mjs
+      - name: Install existing Maestro driver
+        env:
+          MAESTRO_VERSION: '2.11.0'
+        run: |
+          curl -fsSL 'https://get.maestro.mobile.dev' | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Run isolated real-SDK account case
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUPTIME_NATIVE_HOST_RUN_ID: ${{ inputs.native_host_run_id }}
+          PUPTIME_ACCOUNT_SCENARIO: ${{ matrix.scenario }}
+          MAESTRO_CLI_NO_ANALYTICS: '1'
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: '180000'
+        run: node scripts/run-hosted-ios-account-case.mjs
+      - name: Upload bounded synthetic account receipts
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: native-account-${{ matrix.scenario }}-${{ github.run_id }}
+          path: build/isolated-native-account/${{ matrix.scenario }}
+          if-no-files-found: warn
+          retention-days: 3
