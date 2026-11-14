@@ -113,18 +113,12 @@ jobs:
           printf 'no\n' | avdmanager create avd --name "Puptime_Signing_QA_$GITHUB_RUN_ID" --package 'system-images;android-36;google_apis;x86_64'
           "$ANDROID_HOME/emulator/emulator" -avd "Puptime_Signing_QA_$GITHUB_RUN_ID" -port 5588 -no-window -no-audio -no-snapshot -gpu swiftshader_indirect > "$PUPTIME_SIGNING_PRIVATE/emulator.log" 2>&1 &
           echo "$!" > "$PUPTIME_SIGNING_PRIVATE/emulator.pid"
-          timeout 180 adb -s emulator-5588 wait-for-device
-          for attempt in $(seq 1 90); do
-            if [[ "$(adb -s emulator-5588 shell getprop sys.boot_completed | tr -d '\r')" == 1 ]]; then break; fi
-            if [[ "$attempt" = 90 ]]; then exit 1; fi
-            sleep 2
-          done
-          test "$(adb -s emulator-5588 shell getprop sys.boot_completed | tr -d '\r')" = 1
-          adb -s emulator-5588 root
-          timeout 60 adb -s emulator-5588 wait-for-device
+          node scripts/verify-android-signing-upgrade.mjs --emulator-record
+          node scripts/verify-android-signing-upgrade.mjs --emulator-root
           adb -s emulator-5588 shell svc wifi disable
           adb -s emulator-5588 shell svc data disable
           adb -s emulator-5588 shell cmd connectivity airplane-mode enable
+          node scripts/verify-android-signing-upgrade.mjs --emulator-offline
       - name: Install the established Maestro version
         env:
           MAESTRO_VERSION: '2.11.0'
@@ -141,23 +135,19 @@ jobs:
             find "$PUPTIME_SIGNING_PRIVATE" -type d -exec chmod 700 {} +
             find "$PUPTIME_SIGNING_PRIVATE" -type f -exec chmod 600 {} +
           fi
+      - name: Remove owned emulator and private QA material
+        if: always()
+        run: |
+          if [[ -f "$PUPTIME_SIGNING_PRIVATE/NOT-FOR-RELEASE" ]]; then
+            node scripts/verify-android-signing-upgrade.mjs --emulator-cleanup
+          fi
       - name: Preserve only allowlisted non-secret comparison receipt
         if: always()
         uses: actions/upload-artifact@v6
         with:
           name: android-signing-safe-receipt
-          path: build/android-signing-safe/verification.json
+          path: |
+            build/android-signing-safe/verification.json
+            build/android-signing-safe/guest-seed-failure.png
           if-no-files-found: ignore
           retention-days: 7
-      - name: Remove owned emulator and private QA material
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -f "$PUPTIME_SIGNING_PRIVATE/NOT-FOR-RELEASE" ]]; then
-            test "$(cat "$PUPTIME_SIGNING_PRIVATE/NOT-FOR-RELEASE")" = "$PUPTIME_EXPECTED_SOURCE"
-            if adb -s emulator-5588 emu avd name 2>/dev/null | grep -Fxq "Puptime_Signing_QA_$GITHUB_RUN_ID"; then
-              adb -s emulator-5588 emu kill
-            fi
-            rm -rf -- "$PUPTIME_SIGNING_PRIVATE"
-          fi
