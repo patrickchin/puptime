@@ -35,6 +35,16 @@ function assertArchivedSource(root,expected){
   assert.equal(lstatSync(path).mode&0o111? '100755':'100644',value.mode,'Preserve historical executable modes.');
  }
 }
+function nativeTextRange(loadCommands,fileBytes,name){
+ const section=loadCommands.split('Section').find(value=>/^\s*sectname __text\s*$/m.test(value)&&/^\s*segname __TEXT\s*$/m.test(value));
+ assert.ok(section,'Inspect compiled native code in every embedded Mach-O.');
+ const size=parseInt(section.match(/^\s*size\s+0x([a-f0-9]+)\s*$/im)?.[1],16),offset=Number(section.match(/^\s*offset\s+(\d+)\s*$/m)?.[1]);
+ assert.ok(Number.isSafeInteger(size)&&Number.isSafeInteger(offset)&&offset>=0&&offset+size<=fileBytes,'Native text must stay within the actual arm64 file.');
+ // Xcode's two generated preview stubs have an empty section, not executable code.
+ const preview=/^PlugIns\/(ExpoWidgetsTarget|PuptimeQuickLogNotification)\.appex\/__preview\.dylib$/.test(name);
+ assert.ok(size>0||size===0&&preview,'Only the two known preview stubs may have empty native text.');
+ return {size,offset};
+}
 function prepareEnrolled(cuts,output,source){
  const lockSHA256=hash('package-lock.json'),packageSHA256=hash('package.json');
  for(const cut of cuts){
@@ -58,11 +68,8 @@ function prepareEnrolled(cuts,output,source){
    const architecture=command('lipo',['-archs',path]);assert.match(architecture,/\barm64\b/);
    const thin=join(directory,'native-'+Object.keys(nativeCode).length+'.arm64');
    if(architecture.trim()==='arm64')cpSync(path,thin);else command('lipo',[path,'-thin','arm64','-output',thin]);
-   const section=command('otool',['-l',thin]).split('Section').find(value=>/sectname\s+__text\s/.test(value)&&/segname\s+__TEXT\s/.test(value));
-   assert.ok(section,'Inspect compiled native code in every embedded Mach-O.');
-   const size=parseInt(section.match(/\bsize\s+0x([a-f0-9]+)/i)?.[1],16),offset=Number(section.match(/\boffset\s+(\d+)/)?.[1]),bytes=readFileSync(thin);
-   assert.ok(Number.isSafeInteger(size)&&size>0&&Number.isSafeInteger(offset)&&offset>=0&&offset+size<=bytes.length);
-   nativeCode[name]={fileSHA256:hash(path),arm64TextSHA256:createHash('sha256').update(bytes.subarray(offset,offset+size)).digest('hex'),architecture};rmSync(thin);
+   const bytes=readFileSync(thin),{size,offset}=nativeTextRange(command('otool',['-l',thin]),bytes.length,name);
+   nativeCode[name]={fileSHA256:hash(path),arm64TextSHA256:createHash('sha256').update(bytes.subarray(offset,offset+size)).digest('hex'),arm64TextBytes:size,architecture};rmSync(thin);
   }
   assert.ok(Object.hasOwn(nativeCode,cut.provenance.executable),'Attest the main executable as well as embedded native code.');
   cut.preparation={name:cut.name,host:cut.host,sourceRoot,sourceFiles,source:cut.source,tree:cut.tree,packageSHA256,lockSHA256,appGroup:cut.group,infoPlistSHA256:hash(join(cut.host,'Info.plist')),signature:{deepStrictVerified:true,codeResourcesSHA256:hash(join(cut.host,'_CodeSignature/CodeResources'))},nativeCode,original:cut.provenance};
@@ -103,7 +110,14 @@ function selfCheck(){
   chmodSync(file,0o700);assert.throws(()=>assertArchivedSource(root,expected));
   assert.ok(inside(root,join(root,'child'))&&!inside(root,root+'-sibling')&&!inside(root,dirname(root)));
  }finally{rmSync(root,{recursive:true,force:true});}
- console.log('PASS runtime/source preservation guards: only the explicit widget palette change is allowed; modified, extra and executable-mode-changed source files reject.');
+ // Actual retained older ExpoWidgetsTarget __preview.dylib: 34800 bytes.
+ const stub='Section\n  sectname __text\n   segname __TEXT\n      addr 0x0000000000000338\n      size 0x0000000000000000\n    offset 824\n     align 2^0 (1)\n    reloff 0\n    nreloc 0\n     flags 0x80000400\n reserved1 0\n reserved2 0\n';
+ const preview='PlugIns/ExpoWidgetsTarget.appex/__preview.dylib';
+ assert.deepEqual(nativeTextRange(stub,34800,preview),{size:0,offset:824});
+ assert.deepEqual(nativeTextRange(stub,34800,'PlugIns/PuptimeQuickLogNotification.appex/__preview.dylib'),{size:0,offset:824});
+ assert.deepEqual(nativeTextRange(stub.replace('size 0x0000000000000000','size 0x10'),34800,'Puptime'),{size:16,offset:824});
+ for(const [text,length,name] of [[stub,34800,'Puptime'],[stub,34800,'__preview.dylib'],[stub,823,preview],[stub.replace('size 0x0000000000000000','size 0xffff'),34800,preview],[stub.replace('offset 824','offset -1'),34800,preview],[stub.replace('offset 824','absent 824'),34800,preview],[stub.replace('segname __TEXT','segname __DATA'),34800,preview]])assert.throws(()=>nativeTextRange(text,length,name));
+ console.log('PASS runtime/source/native-text guards: palette-only change, exact source blobs/modes and bounded named-preview exception.');
 }
 async function verify(){
  assert.equal(process.env.GITHUB_REPOSITORY??repository,repository);
