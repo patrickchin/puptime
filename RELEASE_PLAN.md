@@ -1,6 +1,6 @@
 # Puptime release plan
 
-> **Current direction — November 12, 2026:** Follow the [product operating plan](docs/product-operating-plan.md) for priorities, install decisions, store gates, naming and marketing. Android v1.12.5 is the qualified GitHub recovery update; later merged UI changes await the next qualified batch. Root coordinates delegated work. Store publication and broader account acceptance retain their own gates. Everything below is historical and does not establish current implementation or readiness.
+> **Current direction — November 14, 2026:** Follow the [product operating plan](docs/product-operating-plan.md) for current evidence, install decisions, store gates, naming and marketing. Android v1.12.5 remains the qualified GitHub recovery update; later merged UI, telemetry and store/audio preparation await one qualified batch. A completed hosted iOS baseline exists; stronger lifecycle/upgrade and native sharing cases remain separate acceptance work. Root coordinates delegated execution. No new APK or store launch follows from these source merges. Everything below is historical and does not establish current implementation or readiness.
 
 ## Historical plans
 

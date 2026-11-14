@@ -159,7 +159,7 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
       <p className="footer-wordmark" aria-hidden="true">Puptime</p>
       <div className="footer-bottom">
         <p>A little record of growing up.</p>
-        <nav aria-label="Footer"><SourceLink>GitHub</SourceLink><a href="/puppy-care/">Puppy care</a><a href={privacyUrl}>Privacy</a><button type="button" onClick={openAnalyticsSettings}>Analytics settings</button><a href="#top">Back to top</a></nav>
+        <nav aria-label="Footer"><SourceLink>GitHub</SourceLink><a href="/puppy-care/">Puppy care</a><a href={privacyUrl}>Privacy</a><a href="/delete-account">Delete cloud account</a><button type="button" onClick={openAnalyticsSettings}>Analytics settings</button><a href="#top">Back to top</a></nav>
       </div>
     </footer>
   </div>;

@@ -1,9 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { audioSeek, audioTime, guideSourceText } from './guide-audio.ts';
 import { careArticles } from './puppy-care.ts';
 import { guideNarration, guideScripts } from './guide-scripts.ts';
+import { guideRecordings } from './guide-recordings.ts';
+
+test('shipping guides do not register the noncommercial narration', () => {
+  assert.deepEqual(Object.keys(guideRecordings), []);
+});
 
 test('recording source snapshots capture every written section for change detection', () => {
   for (const article of careArticles) {
@@ -25,19 +31,20 @@ test('every guide has a separate spoken adaptation with a source note', () => {
   }
 });
 
-test('recordings stay in sync with their written guides and require attribution', () => {
+test('preserved noncommercial recordings retain their scripts, source snapshots and attribution', () => {
   const recordings = JSON.parse(readFileSync(new URL('../assets/puppy-care/audio/manifest.json', import.meta.url), 'utf8'));
-  assert.deepEqual(Object.keys(recordings).sort(), careArticles.map((article) => article.id).sort(), 'every guide needs a recording');
+  const rights = JSON.parse(readFileSync(new URL('../assets/puppy-care/audio/commercial-rights.json', import.meta.url), 'utf8'));
+  assert.deepEqual(Object.values(recordings).map((item: any) => item.filename).sort(), rights.recordings.map((item: any) => item.filename).sort());
   for (const [id, recording] of Object.entries(recordings) as Array<[string, { script: string; sourceText: string; duration: number; voice: string; model: string; attribution: boolean; filename: string }]>) {
-    const article = careArticles.find((item) => item.id === id);
-    assert.ok(article, `unknown recorded guide: ${id}`);
-    assert.equal(recording.sourceText, guideSourceText(article));
-    assert.equal(recording.script, guideNarration(article));
+    // Historical recordings must not force regeneration when written guides change.
+    assert.ok(recording.script.length > 100 && recording.sourceText.length > 100);
     assert.ok(recording.duration > 0 && recording.voice && recording.model);
     assert.equal(recording.attribution, true);
     assert.match(recording.filename, /^[a-z-]+\.mp3$/);
     const audio = readFileSync(new URL(`../assets/puppy-care/audio/${recording.filename}`, import.meta.url));
-    assert.ok(audio.length > 1000);
+    const original = rights.recordings.find((item: any) => item.filename === recording.filename);
+    assert.equal(audio.length, original.bytes);
+    assert.equal(createHash('sha256').update(audio).digest('hex'), original.sha256);
     assert.ok(audio.includes(Buffer.from('elevenlabs.io')), `${id} needs attribution in its audio metadata`);
   }
 });

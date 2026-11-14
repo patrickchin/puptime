@@ -9,6 +9,9 @@ for (const path of ['+not-found.html', '_sitemap.html', 'puppy-care/[id].html'])
 // Cloudflare also protects preview deployments; keep that policy explicit in source.
 writeFileSync('dist-web/_headers', `/*\n  Referrer-Policy: strict-origin-when-cross-origin\n  X-Content-Type-Options: nosniff\nhttps://:preview.puptime.pages.dev/*\n  X-Robots-Tag: noindex\n/account\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n/account.html\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n`);
 const accountHtml=readFileSync('dist-web/account.html','utf8');
+writeFileSync('dist-web/_headers',readFileSync('dist-web/_headers','utf8')+`/delete-account\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n  Referrer-Policy: no-referrer\n/delete-account.html\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n  Referrer-Policy: no-referrer\n`);
+const deletionHtml=readFileSync('dist-web/delete-account.html','utf8');
+if(!deletionHtml.includes('Delete your Puptime account')||!deletionHtml.includes('noindex')||publicPaths.includes('/delete-account'))throw new Error('Deletion page must remain a direct, non-indexed account utility.');
 writeFileSync('dist-web/_headers',readFileSync('dist-web/_headers','utf8')+`/care\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n  Referrer-Policy: no-referrer\n/care.html\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n  Referrer-Policy: no-referrer\n`);
 const careHtml=readFileSync('dist-web/care.html','utf8');
 if(!careHtml.includes('noindex')||!careHtml.includes('Shared puppy care | Puptime')||publicPaths.includes('/care'))throw new Error('Care handoff must be excluded from the sitemap.');
