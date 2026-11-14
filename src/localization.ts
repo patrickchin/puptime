@@ -105,7 +105,7 @@ const english = {
   ...accountEnglish,
   ...sharingEnglish,
   "telemetry.title": "Usage analytics",
-  "telemetry.detail": "Share anonymous screen visits, time spent, control presses and activity types with PostHog in the EU to improve Puptime. Names, notes and custom activity labels are excluded. Optional; turn off anytime.",
+  "telemetry.detail": "Share anonymous screen visits, time spent, control presses, activity types and error categories with PostHog in the EU to improve Puptime. Names, notes and custom activity labels are excluded. Optional; turn off anytime.",
   "telemetry.unavailable": "Analytics are unavailable in this build.",
 
   "setup.welcomeTitle": "Puppy life, in one place.",
@@ -822,7 +822,7 @@ const simplifiedChinese: Dictionary = {
   ...accountChinese,
   ...sharingChinese,
   "telemetry.title": "使用情况分析",
-  "telemetry.detail": "向欧盟的 PostHog 分享匿名页面访问、停留时间、控件点击和活动类型，帮助改进 Puptime。不包含姓名、备注或自定义活动名称。此功能可选，可随时关闭。",
+  "telemetry.detail": "向欧盟的 PostHog 分享匿名页面访问、停留时间、控件点击、活动类型和错误类别，帮助改进 Puptime。不包含姓名、备注或自定义活动名称。此功能可选，可随时关闭。",
   "telemetry.unavailable": "此版本暂不支持使用情况分析。",
 
   "setup.welcomeTitle": "小狗日常，都在这里。",
@@ -1536,7 +1536,7 @@ const spanish: Dictionary = {
   ...accountSpanish,
   ...sharingSpanish,
   "telemetry.title": "Análisis de uso",
-  "telemetry.detail": "Comparte visitas anónimas, tiempo en pantalla, pulsaciones y tipos de actividad con PostHog en la UE para mejorar Puptime. Se excluyen nombres, notas y etiquetas personalizadas. Es opcional; puedes desactivarlo cuando quieras.",
+  "telemetry.detail": "Comparte visitas anónimas, tiempo en pantalla, pulsaciones, tipos de actividad y categorías de error con PostHog en la UE para mejorar Puptime. Se excluyen nombres, notas y etiquetas personalizadas. Es opcional; puedes desactivarlo cuando quieras.",
   "telemetry.unavailable": "Los análisis no están disponibles en esta versión.",
 
   "setup.welcomeTitle": "Su día a día, en un lugar.",

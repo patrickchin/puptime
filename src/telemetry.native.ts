@@ -25,6 +25,7 @@ function scrub(event: CaptureEvent): CaptureEvent | null {
   }
   return { event: event.event, uuid: event.uuid, timestamp: event.timestamp, properties: {
     ...properties, platform: Platform.OS, app_version: Application.nativeApplicationVersion ?? 'development',
+    app_build: Application.nativeBuildVersion ?? 'development',
     $process_person_profile: false, $geoip_disable: true,
   } };
 }

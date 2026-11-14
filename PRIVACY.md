@@ -1,6 +1,6 @@
 # Puptime Privacy Policy
 
-Last updated: November 12, 2026
+Last updated: November 14, 2026
 
 Puptime is a puppy routine tracker developed by Patrick Chin. Local logging works without an account. This policy explains optional cloud accounts, the native app, and the public website.
 
@@ -32,7 +32,7 @@ With cloud sync enabled, JPEG files are uploaded separately to private Cloudflar
 
 Usage analytics are off by default. In builds configured for analytics, enable **Usage analytics** in **Settings → Help & privacy** to share anonymous product events with PostHog's EU cloud. This measures screen visits and transitions, foreground time on screens, named control presses and press duration, and coarse activity-log actions (such as creating, editing, deleting, undoing, importing, ending a nap, or adding a custom activity type). Custom activities are counted as `custom`; their names are never sent.
 
-Events use a random anonymous installation identifier that is separate from your account and puppy records, plus a session identifier, platform and app version. We do not send account/provider identifiers, puppy names or identifiers, log identifiers, activity timestamps, note contents, custom activity labels, photos, email addresses, codes, search terms, typed text, touch coordinates or raw errors. Automatic text/click capture, person profiles, session recordings, feature flags, surveys and automatic push tracking are disabled. Events request no GeoIP enrichment. Requests necessarily reach PostHog; see [PostHog's privacy policy](https://posthog.com/privacy).
+Events use a random anonymous installation identifier that is separate from your account and puppy records, plus a session identifier, platform, app version and build number. Handled local read, write and activity-import failures send only one of a fixed set of error codes and the screen category. These codes describe the failed operation, not a diagnosis or its contents. We do not send account/provider identifiers, puppy names or identifiers, log identifiers, activity timestamps, note contents, custom activity labels, photos, email addresses, verification codes, search terms, typed text, touch coordinates, error messages or stacks. Automatic text/click capture, person profiles, session recordings, feature flags, surveys and automatic push tracking are disabled. Events request no GeoIP enrichment. Requests necessarily reach PostHog; see [PostHog's privacy policy](https://posthog.com/privacy).
 
 Your choice and anonymous identifier stay on this device and are not synced or included in activity exports. Turn the switch off to stop capture, discard queued events, abort pending analytics requests and remove the stored anonymous identifier. Turning it on again creates a new identifier. Events already received by PostHog are not erased by withdrawal. The event queue is bounded and kept in memory, so offline use works normally and unsent events may be lost when the app is closed. Analytics are optional and do not affect local logging or cloud access. App consent and website consent are separate. Earlier releases without this setting do not collect these app events.
 
