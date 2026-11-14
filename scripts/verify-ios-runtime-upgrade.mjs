@@ -187,7 +187,7 @@ async function verify(){
   const path=join(privateDir,name+'.yaml'),artifacts=join(privateDir,'maestro-'+name),receipt=join(output,name);let passed=false;
   writeFileSync(path,`appId: ${app}\nname: ${name}\n---\n${body}`);
   try{
-   await runCommand(process.env.MAESTRO_BIN??'maestro',['--device',device,'test',path,'--test-output-dir',artifacts],600000,{...process.env,MAESTRO_CLI_NO_ANALYTICS:'1',MAESTRO_DRIVER_STARTUP_TIMEOUT:'180000'});passed=true;
+   await runCommand(process.env.MAESTRO_BIN??'maestro',['--device',device,'test',path,'--test-output-dir',artifacts],600000,{...process.env,MAESTRO_CLI_NO_ANALYTICS:'1',MAESTRO_DRIVER_STARTUP_TIMEOUT:process.env.MAESTRO_DRIVER_STARTUP_TIMEOUT??'300000'});passed=true;
   }finally{
    // This guest-only exercise has no auth secrets. Keep raw driver logs private;
    // the three-day CI receipt needs only bounded synthetic visual evidence.
