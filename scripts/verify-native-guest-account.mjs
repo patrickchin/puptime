@@ -15,7 +15,7 @@ import {createLocalDatabase} from '../src/local/database.ts';
 import {sqliteTestConnection} from '../src/local/sqlite-test-adapter.ts';
 import {createLocalRuntime} from '../src/local/runtime-factory.ts';
 import {pushResponseSchema,pullPageSchema,mutationSchema} from '../src/cloud/protocol.ts';
-import {nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeDrained,assertEmptyIosRestoreSources,capturedJson,nativeAuthUiFlags} from './native-account-evidence.mjs';
+import {nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeDrained,assertEmptyIosRestoreSources,capturedJson,nativeAuthUiFlags,nativeHttpBoundary,nativeTransportFailure,nativeBackendState,nativeBackendHealth} from './native-account-evidence.mjs';
 import {assertArchivedSource,nativeCodeFingerprint} from './native-runtime-inputs.mjs';
 import {createSharingObserver,createSharingActors,readOwnerSharingRecords} from './native-sharing-adapters.mjs';
 import {verifyNativeSharing} from './verify-native-sharing.mjs';
@@ -105,7 +105,8 @@ async function flow(name,env={}){
     const hierarchy=existsSync(artifacts)?readdirSync(artifacts,{recursive:true}).map(String).filter(path=>path.includes('hierarchy')&&path.endsWith('.json')).sort().at(-1):undefined;
     let ui={inspected:false};
     try{if(hierarchy&&statSync(join(artifacts,hierarchy)).size<=2097152)ui={inspected:true,fields:nativeAuthUiFlags(JSON.parse(readFileSync(join(artifacts,hierarchy),'utf8')),{email,code})};}catch{/* Keep the actual driver failure; record no unprojected value. */}
-    writeFileSync(join(output,'fixture-auth-readiness.json'),JSON.stringify({phase:name,flowSequence,ui,responses:authResponses},null,2)+'\n');
+    const backendHealth=await nativeBackendHealth('http://127.0.0.1:'+backPort+'/health');
+    writeFileSync(join(output,'fixture-auth-readiness.json'),JSON.stringify({phase:name,flowSequence,ui,responses:authResponses,backend:{controlProcess:nativeBackendState(worker,workerError),health:backendHealth}},null,2)+'\n');
     // These flows never enter a credential. Do not retain auth-code screenshots.
     if(!android&&['prepare','add-logs'].includes(name)){
       try{simctl('io',device,'screenshot',join(output,'failure-'+name+'.png'));}catch{}
@@ -551,11 +552,12 @@ try{
   const forward=(req,res)=>{
     requests.add(req.url);
     const pathname=new URL(req.url,front).pathname,route=Object.hasOwn(authRoutes,pathname)?authRoutes[pathname]:undefined;
-    let sharingTicket;
+    let sharingTicket,authBoundary;
     if(sharingObserver)try{sharingTicket=sharingObserver.begin({method:req.method,url:req.url,headers:req.headers});}catch{wireFailure('request','sharing',null,0);req.resume();res.writeHead(500).end();return;}
     if(req.method==='POST'){if(route==='send-code')identityRequests.sendCode++;if(route==='verify-code')identityRequests.verifyCode++;if(route==='sign-out')identityRequests.signOut++;}
     if(route&&['GET','POST'].includes(req.method)){
       const entry={phase:activeFlow,flowSequence,route,method:req.method,status:null,state:'pending'};
+      authBoundary=nativeHttpBoundary(req,res);entry.transport=authBoundary.flags;
       authResponses.push(entry);if(authResponses.length>64)authResponses.shift();
       const record=completed=>{if(entry.state!=='pending')return;entry.status=completed?res.statusCode:null;entry.state=completed?'completed':'closed';};
       res.once('finish',()=>record(true));res.once('close',()=>record(false));
@@ -579,6 +581,7 @@ try{
     // Wrangler rewrites a matching Origin using the upstream scheme. Forwarding
     // the actual backend Host keeps the original HTTPS Origin intact.
     const outgoing=request('http://127.0.0.1:'+backPort+req.url,{method:req.method,headers:{...req.headers,host:'127.0.0.1:'+backPort}},incoming=>{
+      authBoundary?.upstreamResponse(incoming);
       const sharingReply=sharingObserver&&['/api/account','/api/auth/get-session','/api/care/accept'].includes(pathname);
       const chunks=[];if(pushing||pulling||photoRequest||deletingRequest||sharingReply)incoming.on('data',part=>chunks.push(part));
       incoming.on('end',()=>{
@@ -594,10 +597,11 @@ try{
       incoming.on('error',finish);incoming.on('close',finish);
       if(!dropping){res.writeHead(incoming.statusCode,incoming.headers);incoming.pipe(res);}
     });
+    authBoundary?.upstreamRequest(outgoing);
     outgoing.on('error',()=>{finish();if(!res.headersSent)res.writeHead(502);res.end();});req.pipe(outgoing);
   };
   proxy=secureServer({key:readFileSync(keyPath),cert:Buffer.concat([readFileSync(certPath),certificate])},forward);
-  proxy.on('tlsClientError',error=>writeFileSync(join(output,'fixture-tls-error.txt'),error.message));
+  proxy.on('tlsClientError',error=>writeFileSync(join(output,'fixture-tls-error.json'),JSON.stringify(nativeTransportFailure(error))));
   proxy.on('upgrade',(req,socket,head)=>{
     if(fault==='offline'){socket.destroy();return;}
     changeSockets.add(socket);socket.once('close',()=>changeSockets.delete(socket));
