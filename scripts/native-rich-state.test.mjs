@@ -18,12 +18,16 @@ test('read-only rich-state evidence uses actual native SQLite and production pro
   await storage.saveNotificationDelivery(true);await storage.saveQuietStatusEnabled(true);
   await storage.saveScheduleEntry({id:'rtn_rich_fixture',type:'meal',minutes:601,reminder:true,toleranceMinutes:60});
   await storage.appendEvents([{id:'evt_rich_fixture',type:'walk',at:123456,source:'app',note:'Synthetic preserved note'}]);
+  await storage.appendEvents([{id:'evt_custom_fixture',type:'custom',customLabel:'Confidence practice',at:123457,source:'app',note:'Synthetic custom note'}]);
+  await storage.saveScheduleEntry({id:'rtn_custom_fixture',type:'custom',customLabel:'Confidence practice',minutes:616,reminder:true});
   const state=await readRichNativeState(path),prefs=state.records.find(record=>record.kind==='accountPreferences').data;
   assert.equal(prefs.theme,'dark');assert.equal(prefs.language,'es');assert.equal(prefs.reminderLeadMinutes,15);assert.ok(prefs.widgetActions.includes('walk'));
   const remote=state.records.map((record,index)=>({id:cloudRecordId(record.kind,record.kind==='accountPreferences'?null:petId,record.localId),kind:record.kind,petId:record.kind==='accountPreferences'?null:petId,data:record.data,deleted:false,sequence:index+1})).reverse();
   assertRichCloud(state.records,remote);assert.ok(!JSON.stringify(remote).includes('notify_on_device'));assert.ok(!JSON.stringify(remote).includes('quiet_status_on_device'));
   assert.throws(()=>assertRichCloud(state.records,remote.filter(record=>record.kind!=='accountPreferences')));
   assert.throws(()=>assertRichCloud(state.records,remote.map(record=>record.kind==='routine'&&record.data.minutes===601?{...record,data:{...record.data,minutes:602}}:record)));
+  assert.throws(()=>assertRichCloud(state.records,remote.map(record=>record.kind==='routine'&&record.data.type==='custom'?{...record,data:{...record.data,customLabel:undefined}}:record)));
+  assert.throws(()=>assertRichCloud(state.records,remote.filter(record=>record.kind!=='customActivity')));
   assert.deepEqual((await readRichNativeState(path)).tables,state.tables,'Evidence reads must not change any native table.');
  }finally{await database.close();await rm(root,{recursive:true,force:true});}
 });
