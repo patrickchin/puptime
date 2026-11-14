@@ -114,14 +114,45 @@ test('auth failure diagnostics retain readiness categories only, never secrets o
  const email='synthetic-private@example.invalid',code='829471';
  const hierarchy={children:[{attributes:{'resource-id':'account.email.input',value:email,text:email,enabled:'true',focused:'false'}},{attributes:{'resource-id':'account.code.input',value:code,enabled:'false',focused:'true'}},{attributes:{'resource-id':'account.error',accessibilityText:'private service detail '+code}},{attributes:{'resource-id':'unknown-'+email,value:code}}]};
  const result=nativeAuthUiFlags(hierarchy,{email,code});
- assert.deepEqual(result['account.email.input'],{present:true,enabled:true,focused:false,valueCategory:'nonempty',exactExpectedMatch:true});
- assert.deepEqual(result['account.code.input'],{present:true,enabled:false,focused:true,valueCategory:'six-digits',exactExpectedMatch:true});
+ assert.deepEqual(result['account.email.input'],{present:true,ambiguous:false,enabled:true,focused:false,valueCategory:'nonempty',exactExpectedMatch:true});
+ assert.deepEqual(result['account.code.input'],{present:true,ambiguous:false,enabled:false,focused:true,valueCategory:'six-digits',exactExpectedMatch:true});
  assert.deepEqual(result['account.sendCode'],{present:false});
  for(const secret of [email,code,'private service detail','unknown-'])assert.ok(!JSON.stringify(result).includes(secret));
  for(const [value,category] of [['','empty'],['12','partial-digits'],['wrong','other'],[undefined,'unavailable']]){
   const flags=nativeAuthUiFlags({attributes:{'resource-id':'account.code.input',value}},{code})['account.code.input'];
-  assert.equal(flags.valueCategory,category);assert.equal(flags.exactExpectedMatch,false);
+  assert.equal(flags.valueCategory,category);assert.equal(flags.exactExpectedMatch,value===undefined?null:false);
  }
+});
+
+test('auth readiness keeps missing or unsupported input attributes unknown',()=>{
+ const email='private-synthetic@example.invalid';
+ for(const attributes of [
+  {},{enabled:undefined,focused:undefined,value:undefined},
+  {enabled:'unknown',focused:0,value:42,text:email,accessibilityText:email},
+ ]){
+  const result=nativeAuthUiFlags({attributes:{'resource-id':'account.email.input',...attributes}},{email})['account.email.input'];
+  assert.deepEqual(result,{present:true,ambiguous:false,enabled:null,focused:null,valueCategory:'unavailable',exactExpectedMatch:null});
+  assert.ok(!JSON.stringify(result).includes(email));
+ }
+ for(const value of [true,'true',false,'false']){
+  const result=nativeAuthUiFlags({attributes:{'resource-id':'account.sendCode',enabled:value,focused:value}})['account.sendCode'];
+  assert.equal(result.enabled,value===true||value==='true');assert.equal(result.focused,result.enabled);
+ }
+ const observed=nativeAuthUiFlags({attributes:{'resource-id':'account.email.input',value:email}})['account.email.input'];
+ assert.equal(observed.valueCategory,'nonempty');assert.equal(observed.exactExpectedMatch,null,'Missing expected value cannot establish a mismatch.');
+});
+
+test('auth readiness treats every duplicate ID as ambiguous in either order without retaining secrets',()=>{
+ const email='private-synthetic@example.invalid',secret='654321 cookie=PRIVATE_SESSION /private/value';
+ const first={attributes:{'resource-id':'account.email.input',enabled:'true',focused:'true',value:email}};
+ const second={attributes:{'resource-id':'account.email.input',enabled:'false',focused:'false',value:secret,visible:'false'}};
+ for(const children of [[first,second],[second,first],[first,first],[first,second,first]]){
+  const result=nativeAuthUiFlags({children},{email})['account.email.input'];
+  assert.deepEqual(result,{present:true,ambiguous:true,enabled:null,focused:null,valueCategory:'ambiguous',exactExpectedMatch:null});
+  for(const value of [email,secret,'PRIVATE_SESSION','/private/value'])assert.ok(!JSON.stringify(result).includes(value));
+ }
+ const buttons=[{attributes:{'resource-id':'account.sendCode',enabled:'true'}},{attributes:{'resource-id':'account.sendCode',enabled:'false'}}];
+ for(const children of [buttons,[...buttons].reverse()])assert.deepEqual(nativeAuthUiFlags({children})['account.sendCode'],{present:true,ambiguous:true,enabled:null,focused:null});
 });
 
 test('sign-out diagnostics expose only fixed control flags and public confirmation booleans',()=>{
@@ -129,7 +160,7 @@ test('sign-out diagnostics expose only fixed control flags and public confirmati
  const button={attributes:{'resource-id':'account.signOut',enabled:'false',focused:'true',text:'Sign out',value:secret},children:[{attributes:{text:'Sign out'}}]};
  const absent={titleVisible:false,cancelVisible:false,actionVisible:false};
  const initial=nativeAuthUiFlags({children:[button,{attributes:{'resource-id':'unknown-'+email,text:secret}}]},{email,code});
- assert.deepEqual(initial['account.signOut'],{present:true,enabled:false,focused:true});
+ assert.deepEqual(initial['account.signOut'],{present:true,ambiguous:false,enabled:false,focused:true});
  assert.deepEqual(initial.signOutConfirmation,absent);
  for(const [title,cancel,action] of [['Sign out on this device?','Cancel','Sign out'],['¿Cerrar sesión en este dispositivo?','Cancelar','Cerrar sesión'],['在这台设备上退出登录？','取消','退出登录']]){
   const dialog={children:[{attributes:{text:title}},{attributes:{accessibilityText:cancel}},{attributes:{text:action}},{attributes:{text:secret,value:code}}]};

@@ -126,6 +126,7 @@ export function capturedJson(body,contentEncoding){
 // Project only allowlisted readiness flags; never retain input values or labels.
 export function nativeAuthUiFlags(hierarchy,{email='',code=''}={}){
  const fields=Object.fromEntries(['account.email.input','account.code.input','account.sendCode','account.verify','account.refresh','account.error','account.identity','account.signOut'].map(id=>[id,{present:false}]));
+ const boolean=value=>value===true||value==='true'?true:value===false||value==='false'?false:null;
  const copies=[['Sign out on this device?','Cancel','Sign out'],['¿Cerrar sesión en este dispositivo?','Cancelar','Cerrar sesión'],['在这台设备上退出登录？','取消','退出登录']];
  const observed=copies.map(()=>[false,false,false]);
  function visit(node,visible=true,insideSignOut=false){
@@ -134,12 +135,13 @@ export function nativeAuthUiFlags(hierarchy,{email='',code=''}={}){
   insideSignOut=insideSignOut||id==='account.signOut';
   if(visible&&!insideSignOut)copies.forEach((copy,i)=>copy.forEach((text,j)=>{if(a.text===text||a.accessibilityText===text)observed[i][j]=true;}));
   if(Object.hasOwn(fields,id)){
-   const flags={present:true,enabled:a.enabled===true||a.enabled==='true',focused:a.focused===true||a.focused==='true'};
+   const ambiguous=fields[id].present;
+   const flags={present:true,ambiguous,enabled:ambiguous?null:boolean(a.enabled),focused:ambiguous?null:boolean(a.focused)};
    if(id==='account.email.input'||id==='account.code.input'){
-    const value=a.value??a.text;
-    flags.valueCategory=typeof value!=='string'?'unavailable':value===''?'empty':id==='account.email.input'?'nonempty':/^\d{6}$/.test(value)?'six-digits':/^\d{1,5}$/.test(value)?'partial-digits':'other';
+    const value=ambiguous?undefined:a.value??a.text;
+    flags.valueCategory=ambiguous?'ambiguous':typeof value!=='string'?'unavailable':value===''?'empty':id==='account.email.input'?'nonempty':/^\d{6}$/.test(value)?'six-digits':/^\d{1,5}$/.test(value)?'partial-digits':'other';
     const expected=id==='account.email.input'?email:code;
-    flags.exactExpectedMatch=typeof value==='string'&&expected!==''&&value===expected;
+    flags.exactExpectedMatch=typeof value==='string'&&expected!==''?value===expected:null;
    }
    fields[id]=flags;
   }
