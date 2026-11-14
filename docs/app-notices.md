@@ -61,13 +61,21 @@ node scripts/capture-app-notices.mjs verify android \
 discovery inputs are not certified. It produces neither a payload nor a seal.
 Unexpected graph/source/archive errors still fail the command. `failure.json`
 may add a `native` object containing fixed operation/component/category enums and
-an optional SHA-256 component identifier. It never includes raw errors, messages,
+an optional SHA-256 component identifier. Source-graph failures additionally use
+closed Error class/code enums and a SHA-256 of the supplied source string; no
+source path or filename is included. It never includes raw errors, messages,
 causes, paths, notice bodies or environment values. The most specific failing
 Pod operation survives outer graph/union context. No bound is raised on failure.
 
 The Gradle init script requires an explicit absolute `noticeMainProjectRoot` and
 compares canonical project directories before registering its task. Other
 included builds are skipped; a missing `:app` on the selected root still fails.
+Android discovery setup uses a best-effort ERR trap to call the existing CLI's
+`setup-failure android --phase prebuild|gradle-resolution` mode. This writes only
+`stage:setup` and fixed phase/`command-failed` fields to the same `failure.json`.
+It neither interprets raw command output nor guesses the cause. The trap always
+exits with the original nonzero setup status, including if metadata writing
+fails. The fixed metadata upload remains separate from public notice bodies.
 This uses Gradle's public [root project](https://docs.gradle.org/current/javadoc/org/gradle/api/invocation/Gradle.html#getRootProject())
 and [project directory](https://docs.gradle.org/current/javadoc/org/gradle/api/Project.html#getProjectDir()) APIs.
 The source-only root guard regression executes this actual init script through

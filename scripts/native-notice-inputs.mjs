@@ -9,17 +9,18 @@ const require=createRequire(import.meta.url),archiveReader=new URL('./notice-arc
 
 // Only finite diagnostics escape the CLI catch. Never serialize an Error,
 // message, cause, path or unvalidated dependency name into review artifacts.
-const operations=new Set(['review-inputs','source-graph','native-inputs','npm-notices','notice-union','reviewed-notices','coverage','pod-lock','pod-lock-entries','pod-acknowledgements','pod-source-scan','pod-notices']);
+const operations=new Set(['review-inputs','source-graph','native-inputs','npm-notices','notice-union','reviewed-notices','coverage','pod-lock','pod-lock-entries','pod-acknowledgements','pod-source-scan','pod-notices','source-root','source-provider','source-path','source-boundary','source-bytes','source-npm']);
 const components=new Set(['review','metro','ios','android','npm','cocoapods']);
 const contexts=new WeakMap();
+const sourceErrorCodes=new Set(['ERR_INVALID_ARG_TYPE','ERR_INVALID_ARG_VALUE','ERR_INVALID_URL','ERR_ASSERTION','ENOENT','ENOTDIR','EISDIR','ELOOP','EACCES','EPERM']);
 const assertionCategories=new Map([['Notice must be readable UTF-8.','invalid-utf8'],['Native source link escapes its component.','source-boundary'],['Native source inventory exceeds its bound.','input-bound'],['Too many native source entries.','input-bound'],['Empty or oversized notice.','input-bound'],['Notice inputs exceed the review bound.','input-bound']]);
-export function noticeInputStep(operation,component,run,id){
+export function noticeInputStep(operation,component,run,id,source){
  assert.ok(operations.has(operation)&&components.has(component));
  try{return run();}catch(thrown){
   const error=thrown instanceof Error?thrown:new Error('Notice input failed.');
   if(!contexts.has(error)){
    const category=error.code==='ENOENT'?'missing-input':['EACCES','EPERM'].includes(error.code)?'unreadable-input':error instanceof SyntaxError?'invalid-format':error.code==='ERR_ASSERTION'?(assertionCategories.get(error.message)??'invalid-input'):Number.isInteger(error.status)?'subprocess-failed':'unsupported-input';
-   contexts.set(error,{operation,component,errorCategory:category,...(id?{componentSHA256:digest(id)}:{})});
+   contexts.set(error,{operation,component,errorCategory:category,...(id?{componentSHA256:digest(id)}:{}),...(operation.startsWith('source-')?{errorClass:error instanceof TypeError?'TypeError':error instanceof SyntaxError?'SyntaxError':error instanceof RangeError?'RangeError':error.code==='ERR_ASSERTION'?'AssertionError':'Error',errorCode:sourceErrorCodes.has(error.code)?error.code:'other',...(typeof source==='string'?{sourceSHA256:digest(source)}:{})}:{})});
   }
   throw error;
  }

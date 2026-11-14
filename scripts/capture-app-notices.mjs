@@ -24,8 +24,10 @@ export function captureResolvedInputs(root,platform,paths,gradleInput){
  const [ledger,fonts]=noticeInputStep('review-inputs','review',()=>[readJSON(join(root,ledgerPath)),readJSON(join(root,fontPath))]),unresolved=[],sources=[],physical=[];
  noticeInputStep('source-graph','metro',()=>{for(const path of new Set(paths)){
   if(path==='__prelude__'&&!Object.hasOwn(ledger.generatedSources??{},path)){unresolved.push({component:'metro:__prelude__',reason:'unreviewed-generated-source'});continue;}
-  const value=capturedSource(root,path,ledger);sources.push(value);
-  physical.push(join(root,value.generated?value.provider:value.path));
+  noticeInputStep('source-graph','metro',()=>{
+   const value=capturedSource(root,path,ledger,(operation,run)=>noticeInputStep(operation,'metro',run,undefined,path));sources.push(value);
+   physical.push(join(root,value.generated?value.provider:value.path));
+  },undefined,path);
  }
  });
  const native=noticeInputStep('native-inputs',platform,()=>nativeInputs(root,platform,gradleInput));
@@ -111,10 +113,16 @@ function finalNoticeProof(root,platform,seal,capture,payload,options){
 }
 
 export async function main(args=process.argv.slice(2)){
- const [mode,platform,...tail]=args;assert.ok(['collect','seal','verify'].includes(mode)&&['ios','android'].includes(platform),'Use collect|seal|verify ios|android.');
+ const [mode,platform,...tail]=args;assert.ok(['collect','seal','verify','setup-failure'].includes(mode)&&['ios','android'].includes(platform),'Use collect|seal|verify ios|android, or setup-failure android.');
  const options={};assert.equal(tail.length%2,0);
- for(let i=0;i<tail.length;i+=2){assert.ok(['--gradle-input','--archive','--source-map','--bundle'].includes(tail[i])&&!options[tail[i]]);options[tail[i]]=resolve(tail[i+1]);}
+ for(let i=0;i<tail.length;i+=2){assert.ok(['--gradle-input','--archive','--source-map','--bundle','--phase'].includes(tail[i])&&!options[tail[i]]);options[tail[i]]=tail[i]==='--phase'?tail[i+1]:resolve(tail[i+1]);}
  const root=realpathSync(process.cwd()),out=outputDirectory(root,platform),sourceCommit=git(root,'rev-parse','HEAD').toString().trim();let stage='metro';
+ if(mode==='setup-failure'){
+  assert.equal(platform,'android');assert.deepEqual(Object.keys(options),['--phase']);assert.ok(['prebuild','gradle-resolution'].includes(options['--phase']));
+  write(join(out,'failure.json'),{schema:1,status:'INCOMPLETE',complete:false,sourceCommit,platform,stage:'setup',setup:{phase:options['--phase'],errorCategory:'command-failed'}});
+  console.error('Notices setup failed; finite metadata only, no collection or qualification.');return;
+ }
+ assert.ok(!Object.hasOwn(options,'--phase'));
  try{
   if(mode==='verify'){
    const kind=options['--archive']?.split('.').at(-1).toLowerCase();assert.ok(resourcePaths[kind]);rmSync(join(out,'final-'+kind+'.json'),{force:true});

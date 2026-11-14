@@ -164,18 +164,23 @@ export function addReviewedNoticeFiles(root,components,ledger,platform){
 }
 
 const codeSource=path=>/\.(?:[cm]?js|jsx|tsx?|json)$/.test(path);
-export function capturedSource(root,supplied,ledger={generatedSources:{}}){
- root=realpathSync(root);const modules=realpathSync(join(root,'node_modules'));
- if(Object.hasOwn(ledger.generatedSources??{},supplied)){
+export function capturedSource(root,supplied,ledger={generatedSources:{}},step=(_operation,run)=>run()){
+ root=step('source-root',()=>realpathSync(root));const modules=step('source-root',()=>realpathSync(join(root,'node_modules')));
+ if(Object.hasOwn(ledger.generatedSources??{},supplied))return step('source-provider',()=>{
   const value=ledger.generatedSources[supplied];assert.equal(supplied,'__prelude__','Only the known Metro virtual prelude has a reviewed provider.');assert.equal(value.provider,'node_modules/metro/src/lib/getPreludeCode.js');
   const provider=realpathSync(join(root,value.provider));assert.ok(inside(modules,provider));assert.equal(digest(readFileSync(provider)),value.sha256);
   return {path:supplied,generated:true,provider:value.provider,sha256:value.sha256,component:npmNoticeInputs(root,[provider])[0].id};
- }
- assert.ok(!/^[a-z]+:\/\//i.test(supplied)||supplied.startsWith('file://'),'Remote source-map paths are unsupported.');
- const path=realpathSync(supplied.startsWith('file://')?fileURLToPath(supplied):resolve(root,supplied));
- const installed=inside(modules,path);assert.ok(installed||inside(root,path),'App source resolved from another checkout.');
- const name=installed?'node_modules/'+safeRelative(relative(modules,path)):safeRelative(relative(root,path));
- return {path:name,sha256:digest(readFileSync(path)),code:codeSource(name),...(installed?{component:npmNoticeInputs(root,[path])[0].id}:{app:true})};
+ });
+ const path=step('source-path',()=>{
+  assert.ok(!/^[a-z]+:\/\//i.test(supplied)||supplied.startsWith('file://'),'Remote source-map paths are unsupported.');
+  return realpathSync(supplied.startsWith('file://')?fileURLToPath(supplied):resolve(root,supplied));
+ });
+ const installed=inside(modules,path),name=step('source-boundary',()=>{
+  assert.ok(installed||inside(root,path),'App source resolved from another checkout.');
+  return installed?'node_modules/'+safeRelative(relative(modules,path)):safeRelative(relative(root,path));
+ });
+ const sha256=step('source-bytes',()=>digest(readFileSync(path)));
+ return {path:name,sha256,code:codeSource(name),...(installed?{component:step('source-npm',()=>npmNoticeInputs(root,[path])[0].id)}:{app:true})};
 }
 export function assertCapturedSources(root,sources,readCommitted){
  assert.ok(sources.length);assert.equal(new Set(sources.map(value=>value.path)).size,sources.length);

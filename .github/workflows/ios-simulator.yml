@@ -359,8 +359,18 @@ jobs:
         env:
           CI: '1'
         run: |
+          notice_setup_failure() {
+            notice_setup_status=$?
+            # Best effort only: preserve the original setup failure even if
+            # its fixed metadata cannot be written. Never inspect raw output.
+            node scripts/capture-app-notices.mjs setup-failure android --phase "$notice_setup_phase" || :
+            exit "$notice_setup_status"
+          }
+          trap notice_setup_failure ERR
+          notice_setup_phase=prebuild
           umask 077
           npx expo prebuild --platform android --no-install
+          notice_setup_phase=gradle-resolution
           mkdir -p build/notices/android/private
           (cd android && ./gradlew -I ../scripts/notices-runtime.init.gradle \
             :app:writeNoticeRuntimeInputs --no-daemon \

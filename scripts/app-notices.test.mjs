@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import {execFileSync,spawnSync} from 'node:child_process';
-import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,realpathSync,chmodSync,symlinkSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import test from 'node:test';
+import {parse} from 'yaml';
 import {npmNoticeInputs,nativeNoticeInput,resolveNoticeCoverage,assertSourceNoticePayload,publicNoticeReport,assertFinalNoticeEvidence,capturedSource,assertCapturedSources,assertFinalSourceMap,assertPackagedNativeCoverage,digest,unreviewedOSSNoticeInputs} from './app-notices.mjs';
 import {captureResolvedInputs,createNoticeSeal} from './capture-app-notices.mjs';
 
@@ -194,4 +195,55 @@ test('actual failure CLI retains only finite Pod context and no private path, bo
  assert.deepEqual(failure,{schema:1,status:'INCOMPLETE',complete:false,sourceCommit,platform:'ios',stage:'source',native:{operation:'pod-acknowledgements',component:'cocoapods',errorCategory:'invalid-utf8'}});
  const output=JSON.stringify(failure)+result.stdout+result.stderr;
  for(const secret of [root,'PRIVATE_NOTICE_BODY','SECRET_ENV_VALUE','stack','cause','at podNoticeInputs'])assert.ok(!output.includes(secret));
+}));
+
+
+test('actual pinned Metro path serializer returns flat strings including the explicit virtual prelude',async()=>{
+ const {createRequire}=await import('node:module'),require=createRequire(import.meta.url);
+ const metro=join(require.resolve('metro/package.json'),'../src/DeltaBundler/Serializers/getAllFiles.js');
+ const getAllFiles=require(metro).default;
+ const path=new URL('../node_modules/react-native/index.js',import.meta.url).pathname;
+ const result=await getAllFiles([{path:'__prelude__'}],{dependencies:new Map([[path,{path,output:[{type:'js/module',data:{code:'',lineCount:0,map:[]}}]}]])},{platform:'ios',processModuleFilter:()=>true});
+ assert.deepEqual(result,['__prelude__',path]);assert.ok(result.every(value=>typeof value==='string'));
+});
+
+test('actual graph failure CLI emits the precise source boundary and known class/code plus hash only',()=>fixture(({root,file})=>{
+ const git=(...args)=>execFileSync('git',['-c','core.hooksPath=/dev/null','-c','commit.gpgsign=false',...args],{cwd:root,stdio:'pipe'});
+ file('.gitignore','build/\nnode_modules/\n');file('package-lock.json',{packages:{}});file('node_modules/.keep','');
+ file('scripts/app-notice-provenance.json',{schema:1,components:[]});file('scripts/font-icon-provenance.json',fonts);
+ file('src/PRIVATE_SOURCE/.keep','');
+ git('init','--quiet');git('add','.');git('-c','user.name=Notice test','-c','user.email=notice-test@example.invalid','commit','--quiet','-m','Synthetic source boundary');
+ const sourceCommit=git('rev-parse','HEAD').toString().trim();
+ file('build/notices/ios/seal.json',{sourceCommit,platform:'ios',sources:[{path:'src/PRIVATE_SOURCE'}]});
+ const cli=spawnSync(process.execPath,[fileURLToPath(new URL('./capture-app-notices.mjs',import.meta.url)),'verify','ios','--archive',join(root,'build/unused.ipa')],{cwd:root,encoding:'utf8',timeout:30000,env:{...process.env,PRIVATE_NOTICE_ENV:'SECRET_ENV'}});
+ assert.equal(cli.status,1);
+ const failure=JSON.parse(readFileSync(join(root,'build/notices/ios/failure.json')));
+ assert.deepEqual(failure.native,{operation:'source-bytes',component:'metro',errorCategory:'unsupported-input',errorClass:'Error',errorCode:'EISDIR',sourceSHA256:digest(join(realpathSync(root),'src/PRIVATE_SOURCE'))});
+ const output=JSON.stringify(failure)+cli.stdout+cli.stderr;
+ for(const secret of [root,'PRIVATE_SOURCE','SECRET_ENV','stack','cause','errno','syscall'])assert.ok(!output.includes(secret));
+}));
+
+
+test('actual discovery setup trap keeps original failures and writes finite phases, including metadata-writer failure',()=>fixture(({root,file})=>{
+ const git=(...args)=>execFileSync('git',['-c','core.hooksPath=/dev/null','-c','commit.gpgsign=false',...args],{cwd:root,stdio:'pipe'});
+ file('fixture.txt','synthetic source');git('init','--quiet');git('add','.');git('-c','user.name=Notice test','-c','user.email=notice-test@example.invalid','commit','--quiet','-m','Synthetic setup receipt');
+ const sourceCommit=git('rev-parse','HEAD').toString().trim();
+ const cli=fileURLToPath(new URL('./capture-app-notices.mjs',import.meta.url));mkdirSync(join(root,'scripts'));symlinkSync(cli,join(root,'scripts/capture-app-notices.mjs'));
+ const npx=file('stubs/npx','#!/bin/sh\nprintf "%s\\n" prebuild >> "$NOTICE_TEST_CALLS"\nexit "$NOTICE_TEST_PREBUILD_STATUS"\n');
+ const gradle=file('android/gradlew','#!/bin/sh\nprintf "%s\\n" gradle-resolution >> "$NOTICE_TEST_CALLS"\nexit "$NOTICE_TEST_GRADLE_STATUS"\n');chmodSync(npx,0o700);chmodSync(gradle,0o700);
+ const workflow=parse(readFileSync(new URL('../.github/workflows/ios-simulator.yml',import.meta.url),'utf8'));
+ const shell=workflow.jobs['notice-discovery'].steps.find(value=>value.name==='Prepare Android dependency inputs').run;
+ const calls=join(root,'calls.txt'),failurePath=join(root,'build/notices/android/failure.json');
+ for(const value of [{pre:17,gradle:0,phase:'prebuild'},{pre:0,gradle:23,phase:'gradle-resolution'},{pre:0,gradle:0},{pre:17,gradle:0,writerFailure:true}]){
+  rmSync(join(root,'build'),{recursive:true,force:true});rmSync(calls,{force:true});if(value.writerFailure)file('build','force receipt writer failure');
+  const result=spawnSync('bash',['-e','-o','pipefail','-c',shell],{cwd:root,encoding:'utf8',timeout:30000,env:{...process.env,PATH:join(root,'stubs')+':'+process.env.PATH,NOTICE_TEST_CALLS:calls,NOTICE_TEST_PREBUILD_STATUS:String(value.pre),NOTICE_TEST_GRADLE_STATUS:String(value.gradle),PRIVATE_SETUP_ENV:'SECRET_SETUP_ENV'}});
+  assert.equal(result.status,value.pre||value.gradle);
+  assert.equal(readFileSync(calls,'utf8'),value.pre?'prebuild\n':'prebuild\ngradle-resolution\n');
+  if(value.phase){
+   const failure=JSON.parse(readFileSync(failurePath));assert.deepEqual(failure,{schema:1,status:'INCOMPLETE',complete:false,sourceCommit,platform:'android',stage:'setup',setup:{phase:value.phase,errorCategory:'command-failed'}});
+   const output=JSON.stringify(failure)+result.stdout+result.stderr;for(const secret of [root,'SECRET_SETUP_ENV','stack','cause'])assert.ok(!output.includes(secret));
+  }else assert.equal(spawnSync('test',['-f',failurePath]).status,1);
+ }
+ rmSync(join(root,'build'),{recursive:true,force:true});
+ const invalid=spawnSync(process.execPath,[cli,'setup-failure','android','--phase','PRIVATE_UNKNOWN_PHASE'],{cwd:root,encoding:'utf8',timeout:30000});assert.equal(invalid.status,1);assert.ok(!invalid.stderr.includes('PRIVATE_UNKNOWN_PHASE'));
 }));

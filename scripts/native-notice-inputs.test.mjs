@@ -151,5 +151,8 @@ test('finite native failure context preserves the innermost operation without ra
    assert.ok(['missing-input','unreadable-input','invalid-input','unsupported-input'].includes(noticeFailureContext(error).errorCategory));
   }
  }
+ try{noticeInputStep('source-path','metro',()=>{throw Object.assign(new TypeError('PRIVATE_MESSAGE'),{name:'PRIVATE_CLASS',code:'PRIVATE_CODE'});},undefined,'/PRIVATE_SOURCE');}catch(error){
+  const value=noticeFailureContext(error);assert.deepEqual(value,{operation:'source-path',component:'metro',errorCategory:'unsupported-input',errorClass:'TypeError',errorCode:'other',sourceSHA256:digest('/PRIVATE_SOURCE')});assert.ok(!JSON.stringify(value).includes('PRIVATE'));
+ }
  assert.equal(noticeFailureContext(Object.assign(new Error('private'),{native:{operation:'arbitrary'}})),undefined);
 }));
