@@ -1,7 +1,8 @@
 # Native shared-care acceptance (not yet run)
 
-These new flows and `scripts/verify-native-sharing.mjs` are preparation for a
-separate test PR. They are not wired into the account runner or a workflow.
+These flows, `scripts/verify-native-sharing.mjs` and the source-tested
+`scripts/native-sharing-adapters.mjs` are preparation for a separate test PR.
+They are not wired into the account runner or a workflow.
 No native pass, sharing feature fix, production-provider result or release
 readiness follows from the small Node checks.
 
@@ -59,9 +60,44 @@ The future adapter contract is:
   auth values for redaction before a command can fail. `fixtureOrigin` is the
   exact HTTPS loopback service origin, never a production host.
 
-All adapters above remain unimplemented/unverified for this module. The shared
-care database selection and actor switching especially cannot be inferred from
-the existing personal-journal snapshot helper.
+The new adapter implements transactional native snapshots using the installed
+AsyncStorage selection, request-ticket session/account binding, service-derived
+member labels, secret-safe sharing flows, clipboard/deep-link handoff, serial
+actor binding and paginated owner inspection. Its Node checks use real SQLite
+and synthetic service/driver inputs; no native case has executed.
+
+The lifecycle runner still needs only these injected hooks (no copied service
+or SDK):
+
+- `bridge.activate({previous,device,email})` must terminate the previous app,
+  settle forwarded requests, switch the owned simulator and bind the runner's
+  device/email plus **inspector-only** cookie to that actor. It must not write
+  SecureStore or insert an SDK session. Separate native credentials persist on
+  the two simulators. Do not start any second native driver concurrently.
+- `bridge.dataDirectory(device)` resolves that simulator's real app container.
+  Snapshotting never creates or changes a DB. A care read requires both the
+  actual persisted selection and an observed successful acceptance for the
+  same SDK account/share. Missing or mismatched selection fails closed.
+- `bridge.execute(binary,args,env)` and `bridge.simctl(args,input?)` capture
+  quietly and never print raw arguments, output or thrown command objects.
+  The sharing wrapper emits only finite phase failure names. `pbcopy` must
+  pipe its supplied empty input so the invitation clipboard is actually cleared.
+- The proxy calls `observer.begin({method,url,headers})` at request start,
+  `observer.requestBody(ticket,decoded)` for creation/accept bodies, and
+  `observer.finish(ticket,status,decoded)` **only for real Worker responses**.
+  Do not call finish for proxy-generated offline errors. Initial SDK account
+  or session responses bind each synthetic email/user to its actual cookie;
+  later tickets capture that identity and the exact share/account headers,
+  independently of the mutable active-device label. Request body tokens stay
+  in memory and are immediately registered with the existing redactor.
+- `readOwnerSharingRecords` receives a `get(path)` using A's observed cookie
+  against the private local backend directly, bypassing the native observer.
+  It paginates pull/history and reads A's sharing list into
+  `observer.membership`, so the expected display actor is server-observed,
+  never guessed from an ID. Retain only the scenario's finite aggregate result.
+
+The initial A/B UI preparation and thin proxy/CLI integration remain pending.
+No source check qualifies native sharing, actor isolation or OS handoff.
 
 Secret phases include invitation creation (its QR encodes the token), Share,
 Copy, initial open/accept, revocation and stale-link acceptance. Discard every
