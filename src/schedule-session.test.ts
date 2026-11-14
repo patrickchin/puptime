@@ -16,7 +16,7 @@ function fixture(){
  };
  const jsx=(type:unknown,props:unknown)=>({type,props}),components=Object.fromEntries(['Alert','Keyboard','Linking','Modal','ScrollView','Switch','Text','TextInput','View'].map(name=>[name,name]));
  const domain={quickEventTypes:['pee','poop','meal'],customActivityKey:(v:string)=>v,formatMinutes:String,formatScheduleWindow:()=>''};
- const modules:Record<string,any>={react,'react/jsx-runtime':{jsx,jsxs:jsx},'@expo/vector-icons':{MaterialCommunityIcons:'Icon'},
+ const modules:Record<string,any>={react,'react/jsx-runtime':{jsx,jsxs:jsx},'@expo/vector-icons/MaterialCommunityIcons':{default:'Icon'},
   'react-native':{...components,Alert:{alert:(...args:any[])=>alerts.push(args)},Keyboard:{dismiss:()=>{}},StyleSheet:{create:(value:unknown)=>value}},
   '../telemetry':{useTelemetryOverlay:()=>{}},'../components/TelemetryPressable':{Pressable:'Pressable'},
   '../analytics':{scheduleStatusesForDay:()=>[],suggestScheduleFromEvents:()=>({entries:[],daysAnalyzed:0})},

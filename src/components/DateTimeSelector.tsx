@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useRef, useState } from 'react';
 import { KeyboardAvoidingView,Modal,Platform,StyleSheet, Text, TextInput, View } from 'react-native';

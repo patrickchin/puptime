@@ -21,7 +21,7 @@ function fixture() {
  const jsx=(type:unknown,props:any)=>({type,props});
  const modules:Record<string,unknown>={
   './TelemetryPressable':{Pressable:'Pressable'},
-  react,'react/jsx-runtime':{jsx,jsxs:jsx},'@expo/vector-icons':{MaterialCommunityIcons:'Icon'},
+  react,'react/jsx-runtime':{jsx,jsxs:jsx},'@expo/vector-icons/MaterialCommunityIcons':{default:'Icon'},
   'expo-speech-recognition':{ExpoSpeechRecognitionModule:sdk,useSpeechRecognitionEvent:(name:string,listener:(event?:any)=>void)=>events.set(name,listener)},
   'react-native':{AccessibilityInfo:{announceForAccessibility:(message:string)=>announcements.push(message)},Alert:{alert:()=>{}},StyleSheet:{create:(value:unknown)=>value},Pressable:'Pressable',View:'View',Text:'Text',TextInput:'TextInput'},
   '../localization-context':{useLocalization:()=>({locale:'en',t:(key:string)=>key})},

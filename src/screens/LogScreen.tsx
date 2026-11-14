@@ -1,5 +1,5 @@
 import { useTelemetryOverlay } from '../telemetry';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, FlatList, Keyboard, KeyboardAvoidingView, Modal, Platform, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Pressable } from '../components/TelemetryPressable';
