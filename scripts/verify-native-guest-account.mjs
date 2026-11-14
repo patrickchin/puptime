@@ -406,8 +406,9 @@ try{
     requests.add(req.url);
     const pathname=new URL(req.url,front).pathname,route=Object.hasOwn(authRoutes,pathname)?authRoutes[pathname]:undefined;
     if(route&&['GET','POST'].includes(req.method)){
-      const phase=activeFlow,sequence=flowSequence;let recorded=false;
-      const record=completed=>{if(recorded)return;recorded=true;authResponses.push({phase,flowSequence:sequence,route,method:req.method,status:completed?res.statusCode:null,completed});if(authResponses.length>64)authResponses.shift();};
+      const entry={phase:activeFlow,flowSequence,route,method:req.method,status:null,state:'pending'};
+      authResponses.push(entry);if(authResponses.length>64)authResponses.shift();
+      const record=completed=>{if(entry.state!=='pending')return;entry.status=completed?res.statusCode:null;entry.state=completed?'completed':'closed';};
       res.once('finish',()=>record(true));res.once('close',()=>record(false));
     }
 
