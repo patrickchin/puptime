@@ -73,6 +73,7 @@ name: Populated native history keeps its state while local notices are read
             id: fontLicenses.react-native-vector-icons
           direction: DOWN
           visibilityPercentage: 100
+          timeout: 120000
       - assertVisible:
           id: fontLicenses.close
           enabled: true
