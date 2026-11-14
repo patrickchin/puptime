@@ -12,7 +12,7 @@ name: Account preservation sign-out
 - extendedWaitUntil:
     visible:
       id: account.status
-      text: Up to date
+      text: ${ACCOUNT_STATUS || "Up to date"}
     timeout: 45000
 - scrollUntilVisible:
     element:
@@ -22,14 +22,14 @@ name: Account preservation sign-out
 - tapOn:
     id: account.signOut
     retryTapIfNoChange: true
-- assertVisible: ^Sign out on this device\?$
+- assertVisible: ${ACCOUNT_SIGN_OUT_TITLE || "^Sign out on this device\\?$"}
 - waitForAnimationToEnd
 - tapOn:
     retryTapIfNoChange: true
-    text: (?i)^Sign out$
+    text: ${ACCOUNT_SIGN_OUT_ACTION || "(?i)^Sign out$"}
     childOf:
       containsChild:
-        text: (?i)^Cancel$
+        text: ${ACCOUNT_CANCEL || "(?i)^Cancel$"}
 - extendedWaitUntil:
     notVisible:
       id: account.identity

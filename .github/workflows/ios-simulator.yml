@@ -19,7 +19,7 @@ on:
       account_case:
         description: Isolated account case
         type: choice
-        options: [all, baseline, comparison, offline, isolation, photos, deletion, upgrade]
+        options: [all, baseline, comparison, offline, isolation, photos, deletion, rich, upgrade]
         default: all
       upgrade_stage:
         description: Original-runtime archive inspection or actual data-preserving replacement
@@ -213,7 +213,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scenario: ${{ fromJSON(inputs.account_case == 'all' && '["baseline","comparison","offline","isolation","photos","deletion"]' || format('["{0}"]', inputs.account_case)) }}
+        scenario: ${{ fromJSON(inputs.account_case == 'all' && '["baseline","comparison","offline","isolation","photos","deletion","rich"]' || format('["{0}"]', inputs.account_case)) }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -226,7 +226,7 @@ jobs:
           java-version: '17'
       - run: npm ci
       - name: Check native evidence assertions
-        run: node --test scripts/native-account-evidence.test.mjs
+        run: node --test scripts/native-account-evidence.test.mjs scripts/native-rich-state.test.mjs
       - name: Install existing Maestro driver
         env:
           MAESTRO_VERSION: '2.11.0'
