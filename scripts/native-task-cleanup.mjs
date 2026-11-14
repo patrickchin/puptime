@@ -14,15 +14,18 @@ export function installTaskCleanup(cleanup){
 
 // Call immediately after spawning with detached:true; never signal a shared group.
 export function ownProcess(child,{graceMs=5000,killMs=1000}={}){
- let closed=false,stopping;
- const exited=new Promise(resolve=>child.once('close',()=>{closed=true;resolve();}));
- const wait=ms=>new Promise(resolve=>{const timer=setTimeout(resolve,ms);exited.then(()=>{clearTimeout(timer);resolve();});});
+ const group=child.pid;let stopping;
+ assert.ok(group===undefined||Number.isInteger(group)&&group>0,'Capture one successfully spawned detached process group.');
+ const exists=()=>{try{process.kill(-group,0);return true;}catch(error){return error.code!=='ESRCH';}};
+ const wait=async ms=>{const deadline=Date.now()+ms;while(exists()&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,25));};
  return ()=>stopping??=(async()=>{
-  if(closed||!child.pid)return true;
-  try{process.kill(-child.pid,'SIGTERM');}catch{}
+  if(!group||!exists())return true;
+  // A launcher can exit before an ignored-stdio descendant. Its captured
+  // detached group still belongs to this task until the last member exits.
+  try{process.kill(-group,'SIGTERM');}catch{}
   await wait(graceMs);
-  if(!closed){try{process.kill(-child.pid,'SIGKILL');}catch{}await wait(killMs);}
-  return closed;
+  if(exists()){try{process.kill(-group,'SIGKILL');}catch{}await wait(killMs);}
+  return !exists();
  })();
 }
 

@@ -57,3 +57,12 @@ test('an uncooperative owned process is force-stopped after the bounded grace pe
  const child=spawn(process.execPath,['-e',"process.on('SIGTERM',()=>{});console.log('ready');setInterval(()=>{},1000)"],{detached:true,stdio:['ignore','pipe','ignore']});
  const stop=ownProcess(child,{graceMs:30,killMs:1000});await new Promise(resolve=>child.stdout.once('data',resolve));assert.equal(await stop(),true);assert.equal(child.signalCode,'SIGKILL');
 });
+test('an exited launcher cannot leave its ignored-stdio descendant behind',async()=>{
+ const tree="const{spawn}=require('node:child_process');const child=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});child.unref();console.log(child.pid);";
+ const child=spawn(process.execPath,['-e',tree],{detached:true,stdio:['ignore','pipe','ignore']}),stop=ownProcess(child,{graceMs:1000});
+ try{
+  const descendant=await new Promise(resolve=>child.stdout.once('data',data=>resolve(Number(String(data).trim()))));
+  await new Promise(resolve=>child.once('close',resolve));assert.equal(child.exitCode,0);assert.doesNotThrow(()=>process.kill(descendant,0));
+  assert.equal(await stop(),true);assert.throws(()=>process.kill(descendant,0),{code:'ESRCH'});
+ }finally{await stop();}
+});

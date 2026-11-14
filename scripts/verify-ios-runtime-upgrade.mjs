@@ -180,7 +180,7 @@ async function verify(){
  const runCommand=async(binary,args,timeout=120000,env=process.env)=>{
   assert.equal(task.signal,null);const child=spawn(binary,args,{detached:true,stdio:'inherit',env}),stop=ownProcess(child);activeStops.add(stop);let timedOut=false;
   const timer=setTimeout(()=>{timedOut=true;void stop();},timeout);
-  try{await new Promise((resolveRun,reject)=>{child.once('error',reject);child.once('close',status=>status===0&&!timedOut&&!task.signal?resolveRun():reject(new Error('Owned native command interrupted or failed.')));});}
+  try{await new Promise((resolveRun,reject)=>{child.once('error',reject);child.once('close',async status=>{const stopped=await stop();status===0&&stopped&&!timedOut&&!task.signal?resolveRun():reject(new Error('Owned native command interrupted or failed.'));});});}
   finally{clearTimeout(timer);activeStops.delete(stop);}
  };
  const flow=async(name,body)=>{

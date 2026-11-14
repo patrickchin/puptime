@@ -75,7 +75,7 @@ function run(binary,args,env=process.env,cwd=process.cwd()){
     child.stdout.on('data',data=>{raw+=data;});child.stderr.on('data',data=>{raw+=data;});
     // Include hosted driver startup as well as the flow's own bounded assertions.
     const timer=setTimeout(()=>{timedOut=true;void stop();},binary==='maestro'?600000:240000);
-    child.once('error',error=>{clearTimeout(timer);activeStops.delete(stop);reject(error);});child.once('close',status=>{clearTimeout(timer);activeStops.delete(stop);if(status===0&&!timedOut&&!task.signal)resolveRun(raw);else{
+    child.once('error',error=>{clearTimeout(timer);activeStops.delete(stop);reject(error);});child.once('close',async status=>{clearTimeout(timer);const stopped=await stop();activeStops.delete(stop);if(status===0&&stopped&&!timedOut&&!task.signal)resolveRun(raw);else{
       raw=redacted(raw);
       writeFileSync(join(output,'failure-redacted.log'),raw,{mode:0o600});reject(new Error(`${binary} failed (${status}); see redacted log.`));
     }});

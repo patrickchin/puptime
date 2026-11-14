@@ -81,6 +81,6 @@ try{
  command('xcrun',['simctl','install',device,initialHost]);
  const mode={baseline:[],comparison:['--puppy-comparison'],offline:['--offline-lifecycle'],isolation:['--account-isolation'],photos:['--photo-lifecycle'],deletion:['--deletion-faults'],'enrolled-upgrade':['--enrolled-runtime-upgrade']}[scenario];
  const args=['scripts/verify-ios-guest-account.mjs',device,initialHost,'--replace-synthetic',output,...mode];
- await new Promise((resolveCase,reject)=>{const child=spawn(process.execPath,args,{stdio:'inherit',detached:true,env:{...process.env,CI:'1'}});stopCaseChild=ownProcess(child,{graceMs:120000});child.once('error',reject);child.once('close',code=>code===0?resolveCase():reject(new Error(`Native ${scenario} case failed (${code}).`)));});
+ await new Promise((resolveCase,reject)=>{const child=spawn(process.execPath,args,{stdio:'inherit',detached:true,env:{...process.env,CI:'1'}});stopCaseChild=ownProcess(child,{graceMs:120000});child.once('error',reject);child.once('close',async code=>{const stopped=await stopCaseChild();code===0&&stopped?resolveCase():reject(new Error(`Native ${scenario} case failed (${code}).`));});});
  assert.equal(JSON.parse(readFileSync(join(output,'verification.json'),'utf8')).status,'passed');assert.equal(task.signal,null);completed=true;
 }finally{await task.run();task.dispose();}
