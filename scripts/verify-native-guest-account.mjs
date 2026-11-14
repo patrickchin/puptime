@@ -104,7 +104,7 @@ async function flow(name,env={}){
     try{if(hierarchy&&statSync(join(artifacts,hierarchy)).size<=2097152)ui={inspected:true,fields:nativeAuthUiFlags(JSON.parse(readFileSync(join(artifacts,hierarchy),'utf8')),{email,code})};}catch{/* Keep the actual driver failure; record no unprojected value. */}
     writeFileSync(join(output,'fixture-auth-readiness.json'),JSON.stringify({phase:name,flowSequence,ui,responses:authResponses},null,2)+'\n');
     // These flows never enter a credential. Do not retain auth-code screenshots.
-    if(!android&&['prepare','add-logs'].includes(name)){
+    if(!android&&['prepare','add-logs','rich-notices'].includes(name)){
       try{simctl('io',device,'screenshot',join(output,'failure-'+name+'.png'));}catch{}
       const hierarchy=existsSync(artifacts)?readdirSync(artifacts,{recursive:true}).map(String).filter(path=>path.includes('hierarchy')&&/\.(json|xml)$/.test(path)).sort().at(-1):undefined;
       if(hierarchy)writeFileSync(join(output,'failure-'+name+'-hierarchy.txt'),redacted(readFileSync(join(artifacts,hierarchy),'utf8')).slice(0,262144));
