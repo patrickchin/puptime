@@ -122,3 +122,23 @@ export function capturedJson(body,contentEncoding){
  for(const encoding of encodings.reverse()){assert.ok(Object.hasOwn(decoders,encoding),'Unsupported captured content encoding.');body=decoders[encoding](body,{maxOutputLength:16*1024*1024});}
  return JSON.parse(body.toString('utf8'));
 }
+
+// Project only allowlisted readiness flags; never retain input values or labels.
+export function nativeAuthUiFlags(hierarchy,{email='',code=''}={}){
+ const fields=Object.fromEntries(['account.email.input','account.code.input','account.sendCode','account.verify','account.refresh','account.error','account.identity'].map(id=>[id,{present:false}]));
+ function visit(node){
+  const a=node?.attributes??{},id=a['resource-id'];
+  if(Object.hasOwn(fields,id)){
+   const flags={present:true,enabled:a.enabled===true||a.enabled==='true',focused:a.focused===true||a.focused==='true'};
+   if(id==='account.email.input'||id==='account.code.input'){
+    const value=a.value??a.text;
+    flags.valueCategory=typeof value!=='string'?'unavailable':value===''?'empty':id==='account.email.input'?'nonempty':/^\d{6}$/.test(value)?'six-digits':/^\d{1,5}$/.test(value)?'partial-digits':'other';
+    const expected=id==='account.email.input'?email:code;
+    flags.exactExpectedMatch=typeof value==='string'&&expected!==''&&value===expected;
+   }
+   fields[id]=flags;
+  }
+  for(const child of node?.children??[])visit(child);
+ }
+ visit(hierarchy);return fields;
+}

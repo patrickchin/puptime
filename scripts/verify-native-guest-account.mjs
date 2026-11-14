@@ -5,7 +5,7 @@ import {spawn,execFileSync} from 'node:child_process';
 import {createServer,request} from 'node:http';
 import {createServer as secureServer,request as secureRequest} from 'node:https';
 import {connect} from 'node:net';
-import {cpSync,existsSync,mkdtempSync,mkdirSync,readFileSync,readdirSync,rmSync,writeFileSync} from 'node:fs';
+import {cpSync,existsSync,mkdtempSync,mkdirSync,readFileSync,readdirSync,rmSync,statSync,writeFileSync} from 'node:fs';
 import {tmpdir,homedir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
@@ -15,7 +15,7 @@ import {createLocalDatabase} from '../src/local/database.ts';
 import {sqliteTestConnection} from '../src/local/sqlite-test-adapter.ts';
 import {createLocalRuntime} from '../src/local/runtime-factory.ts';
 import {pushResponseSchema,pullPageSchema,mutationSchema} from '../src/cloud/protocol.ts';
-import {nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeDrained,assertEmptyIosRestoreSources,capturedJson} from './native-account-evidence.mjs';
+import {nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeDrained,assertEmptyIosRestoreSources,capturedJson,nativeAuthUiFlags} from './native-account-evidence.mjs';
 
 const [platform,initialDevice,host,consent,destination='build/guest-account-'+platform,onboarding]=process.argv.slice(2);
 let device=initialDevice;
@@ -49,7 +49,9 @@ const requests=new Set(),restoreNative=[],requestCounts={enroll:0,push:0};
 // assertion below establishes that the SDK persisted a received result.
 const wireAccepted=[],wirePages=[],wirePushes=[],wireFailures=[],photoTransfers=[],receipts=[],changeSockets=new Set();
 let fault='online',photoFault='online',deleteFault='online',failedDeletes=0,acceptedDeletes=0,failedPhotoUploads=0,corruptPhotoDownloads=0,activeForwarded=0,wireParseErrors=0;
-let certificate;
+let certificate,activeFlow='startup',flowSequence=0;
+const authResponses=[];
+const authRoutes={'/api/auth/get-session':'session','/api/auth/email-otp/send-verification-otp':'send-code','/api/auth/sign-in/email-otp':'verify-code','/api/auth/sign-out':'sign-out','/api/account':'account'};
 const codes=new Set(),checks=[];
 function wireFailure(phase,route,encoding,bytes){
  wireParseErrors++;
@@ -74,6 +76,7 @@ function run(binary,args,env=process.env,cwd=process.cwd()){
   });
 }
 async function flow(name,env={}){
+  activeFlow=name;flowSequence++;
   const startup=join(homedir(),'.maestro/tests'),before=new Set(existsSync(startup)?readdirSync(startup):[]);
   const startedAt=Date.now(),artifacts=join(privateDir,'maestro-'+name+'-'+Date.now());
   try{
@@ -86,6 +89,11 @@ async function flow(name,env={}){
     console.log('PASS native account phase: '+name);
   }catch(error){
     writeFileSync(join(output,'fixture-native-reach.json'),JSON.stringify({phase:name,configReached:requests.has('/api/config'),sessionReached:[...requests].some(path=>path.startsWith('/api/auth/get-session')),accountReached:requests.has('/api/account')},null,2)+'\n');
+    // Raw auth hierarchy/screens stay private and are deleted in finally.
+    const hierarchy=existsSync(artifacts)?readdirSync(artifacts,{recursive:true}).map(String).filter(path=>path.includes('hierarchy')&&path.endsWith('.json')).sort().at(-1):undefined;
+    let ui={inspected:false};
+    try{if(hierarchy&&statSync(join(artifacts,hierarchy)).size<=2097152)ui={inspected:true,fields:nativeAuthUiFlags(JSON.parse(readFileSync(join(artifacts,hierarchy),'utf8')),{email,code})};}catch{/* Keep the actual driver failure; record no unprojected value. */}
+    writeFileSync(join(output,'fixture-auth-readiness.json'),JSON.stringify({phase:name,flowSequence,ui,responses:authResponses},null,2)+'\n');
     // These flows never enter a credential. Do not retain auth-code screenshots.
     if(!android&&['prepare','add-logs'].includes(name)){
       try{simctl('io',device,'screenshot',join(output,'failure-'+name+'.png'));}catch{}
@@ -396,6 +404,13 @@ try{
   certificate=readFileSync(rootPath);if(!android)simctl('keychain',device,'add-root-cert',rootPath);
   const forward=(req,res)=>{
     requests.add(req.url);
+    const pathname=new URL(req.url,front).pathname,route=Object.hasOwn(authRoutes,pathname)?authRoutes[pathname]:undefined;
+    if(route&&['GET','POST'].includes(req.method)){
+      const phase=activeFlow,sequence=flowSequence;let recorded=false;
+      const record=completed=>{if(recorded)return;recorded=true;authResponses.push({phase,flowSequence:sequence,route,method:req.method,status:completed?res.statusCode:null,completed});if(authResponses.length>64)authResponses.shift();};
+      res.once('finish',()=>record(true));res.once('close',()=>record(false));
+    }
+
     if(req.method==='POST'&&req.url==='/api/cloud/enroll')requestCounts.enroll++;
     if(req.method==='POST'&&req.url==='/api/sync/push')requestCounts.push++;
     if(req.headers.cookie)cookie=req.headers.cookie;

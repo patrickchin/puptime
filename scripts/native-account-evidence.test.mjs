@@ -7,7 +7,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {mkdtempSync,mkdirSync,rmSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {nativeTables,nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeAcknowledged,assertNativeDrained,assertEmptyIosRestoreSources,assertFreshSetupRevisions,capturedJson} from './native-account-evidence.mjs';
+import {nativeTables,nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeAcknowledged,assertNativeDrained,assertEmptyIosRestoreSources,assertFreshSetupRevisions,capturedJson,nativeAuthUiFlags} from './native-account-evidence.mjs';
 
 const empty=()=>Object.fromEntries(nativeTables.map(table=>[table,[]]));
 test('snapshots include every real table and exact payload; new tables fail closed',()=>{
@@ -106,4 +106,18 @@ test('wire observer decodes real negotiated JSON compression without accepting b
  const value={accepted:[],rejected:[]},body=Buffer.from(JSON.stringify(value));
  for(const [encoding,bytes] of [[undefined,body],['identity',body],['gzip',gzipSync(body)],['deflate',deflateSync(body)],['br',brotliCompressSync(body)],['gzip, br',brotliCompressSync(gzipSync(body))]])assert.deepEqual(capturedJson(bytes,encoding),value);
  assert.throws(()=>capturedJson(gzipSync(body),undefined));assert.throws(()=>capturedJson(Buffer.from('broken'),'gzip'));assert.throws(()=>capturedJson(body,'unknown'));
+});
+
+test('auth failure diagnostics retain readiness categories only, never secrets or labels',()=>{
+ const email='synthetic-private@example.invalid',code='829471';
+ const hierarchy={children:[{attributes:{'resource-id':'account.email.input',value:email,text:email,enabled:'true',focused:'false'}},{attributes:{'resource-id':'account.code.input',value:code,enabled:'false',focused:'true'}},{attributes:{'resource-id':'account.error',accessibilityText:'private service detail '+code}},{attributes:{'resource-id':'unknown-'+email,value:code}}]};
+ const result=nativeAuthUiFlags(hierarchy,{email,code});
+ assert.deepEqual(result['account.email.input'],{present:true,enabled:true,focused:false,valueCategory:'nonempty',exactExpectedMatch:true});
+ assert.deepEqual(result['account.code.input'],{present:true,enabled:false,focused:true,valueCategory:'six-digits',exactExpectedMatch:true});
+ assert.deepEqual(result['account.sendCode'],{present:false});
+ for(const secret of [email,code,'private service detail','unknown-'])assert.ok(!JSON.stringify(result).includes(secret));
+ for(const [value,category] of [['','empty'],['12','partial-digits'],['wrong','other'],[undefined,'unavailable']]){
+  const flags=nativeAuthUiFlags({attributes:{'resource-id':'account.code.input',value}},{code})['account.code.input'];
+  assert.equal(flags.valueCategory,category);assert.equal(flags.exactExpectedMatch,false);
+ }
 });
