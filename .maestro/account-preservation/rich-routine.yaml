@@ -68,7 +68,7 @@ name: Native routine and device-only delivery are explicitly saved
     id: schedule.editor.window.60
 - assertVisible:
     id: schedule.editor.window.60
-    checked: true
+    text: radio button, checked
 - scrollUntilVisible:
     element:
       id: schedule.editor.reminder
@@ -92,10 +92,15 @@ name: Native routine and device-only delivery are explicitly saved
     notVisible:
       id: schedule.editor
     timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: schedule.entry.meal
+    direction: UP
+    visibilityPercentage: 100
+- takeScreenshot: native-rich-routine
 - tapOn:
     id: nav.open
 - tapOn:
     id: nav.log
 - assertVisible:
     id: screen.today
-- takeScreenshot: native-rich-routine
