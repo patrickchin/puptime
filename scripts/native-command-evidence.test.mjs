@@ -35,6 +35,26 @@ test('discard secret-rich values, evaluated commands, errors, paths and arbitrar
  assert.equal(nativeCommandState([{...entry,command:{assertConditionCommand:ambiguous}}]).targetId,null);
 });
 
+test('identify only literal enable/open-account targets without exposing predicate text or runtime values',()=>{
+ const ids=['screen.account','nav.account','account.enable','account.status','account.local.count','account.combine.dialog','account.combine.confirm'];
+ const secret='private-identity@example.invalid 873921 cookie=private-session /private/auth';
+ for(const id of ids)for(const [key,value,kind] of [
+  ['tapOnElement',{selector:{idRegex:id,textRegex:secret}},'tap'],
+  ['scrollUntilVisibleCommand',{selector:{idRegex:id,textRegex:secret}},'scroll'],
+  ['assertConditionCommand',{condition:{visible:{idRegex:id,textRegex:secret}}},'assert'],
+  ['assertConditionCommand',{condition:{notVisible:{idRegex:id,textRegex:secret}}},'assert'],
+ ]){
+  const entry=row(key,value,'FAILED',11);entry.metadata.error=secret;entry.metadata.evaluatedCommand={secret};
+  const result=nativeCommandState([entry]);assert.deepEqual(result,{status:'FAILED',kind,targetId:id,sequence:11});assert.ok(!JSON.stringify(result).includes(secret));
+ }
+ for(const id of [secret,'account.enable.*','^account.enable$','account.enable/'+secret,'screen\\.(today|settings|account)','account.back']){
+  const result=nativeCommandState([row('assertConditionCommand',{condition:{visible:{idRegex:id,textRegex:secret}}},'FAILED',11)]);
+  assert.deepEqual(result,{status:'FAILED',kind:'assert',targetId:null,sequence:11});assert.ok(!JSON.stringify(result).includes(secret));
+ }
+ const failed=row('assertConditionCommand',{condition:{visible:{idRegex:'account.enable'}}},'FAILED',11),running=row('tapOnElement',{selector:{idRegex:'account.combine.confirm'}},'RUNNING',12);
+ for(const records of [[failed,running],[running,failed]])assert.deepEqual(nativeCommandState(records),unknown);
+});
+
 test('read the observed2.11 timestamp/flow/commands.json layout without returning manifest or raw data',()=>{
  const root=mkdtempSync(join(tmpdir(),'puptime-command-layout-'));
  try{
