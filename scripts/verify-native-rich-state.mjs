@@ -16,7 +16,14 @@ export async function readRichNativeState(path){
 }
 const projected=records=>records.map(record=>({kind:record.kind,localId:record.kind==='puppy'?'puppy':record.localId,data:record.data})).sort((a,b)=>JSON.stringify([a.kind,a.localId]).localeCompare(JSON.stringify([b.kind,b.localId])));
 export function assertRichCloud(local,remote){
- assert.deepEqual(projected(remote.filter(record=>!record.deleted).map(record=>({...record,localId:localRecordId(record)}))),projected(local),'Every current cloud record must match its actual production native projection.');
+ // Pull returns every revision, not just current records. Preserve that original
+ // array for later history equality; project only each ID's highest sequence.
+ const latest=new Map();
+ for(const value of remote){
+  assert.ok(Number.isSafeInteger(value.sequence)&&value.sequence>0);const record={...value,localId:localRecordId(value)},previous=latest.get(value.id);
+  if(!previous||record.sequence>previous.sequence)latest.set(record.id,record);else if(record.sequence===previous.sequence)assert.deepEqual(record,previous,'One sequence cannot describe conflicting cloud records.');
+ }
+ assert.deepEqual(projected([...latest.values()].filter(record=>!record.deleted)),projected(local),'Every current cloud record must match its actual production native projection.');
 }
 // Quiet status explicitly defaults off when its optional device row is absent.
 const devicePreferences=tables=>({notify_on_device:tables.metadata.find(row=>row.key==='notify_on_device')?.value,quiet_status_on_device:tables.metadata.find(row=>row.key==='quiet_status_on_device')?.value??'false'});
