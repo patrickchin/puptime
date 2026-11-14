@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFileSync,readdirSync} from 'node:fs';
 import test from 'node:test';
+import {assertSectionPlatforms} from '../scripts/app-notices.mjs';
 
 const root=new URL('../',import.meta.url);
 const read=(path:string)=>readFileSync(new URL(path,root));
@@ -19,7 +20,7 @@ test('font bytes, glyphs, pinned dependencies and verbatim license copies requir
  for(const [path,expected] of Object.entries(provenance.files))assert.equal(hash(read(path)),expected,`${path}: review font/license provenance`);
  assert.equal(notices.length,Object.keys(provenance.notices).length);
  assert.equal(new Set(notices.map(section=>section.id)).size,notices.length);
- for(const section of notices)assert.equal(hash(section.body),provenance.notices[section.id],`${section.id}: license text changed`);
+ for(const section of notices){assert.equal(hash(section.body),provenance.notices[section.id],`${section.id}: license text changed`);assertSectionPlatforms(section,provenance.platforms[section.id]);}
  const body=(id:string)=>notices.find(section=>section.id===id)!.body;
  assert.equal(body('red-hat'),read('assets/fonts/RedHat-OFL.txt').toString());
  assert.equal(body('expo-vector-icons'),read('node_modules/@expo/vector-icons/LICENSE').toString());

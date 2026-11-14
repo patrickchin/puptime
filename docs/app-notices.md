@@ -64,7 +64,8 @@ paths, licence source bodies, raw maps, environment values or application data.
 
 `seal` first retains that discovery report, then fails unless actual Metro and
 native inputs are complete, all vendors/text are reviewed, font pins match, the
-payload/ledger/relevant source files equal Git HEAD, and the view imports the same
+payload/ledger/package manifest/lock/app config/relevant source files equal Git
+HEAD in the canonical checkout root, and the view imports the same
 resource. A passing `seal.json` records that exact source/lock/native-input graph.
 Missing input metadata or a font-only placeholder cannot pass. A failed seal
 removes previous seal/final receipts. There is no generation or fallback mode.
@@ -72,9 +73,12 @@ removes previous seal/final receipts. There is no generation or fallback mode.
 `verify` revalidates the same source, native inputs and committed payload, then
 requires the packaged raw JSON to match byte for byte. It compares the packaged
 bundle hash with the mapped build output and requires the final composed map's
-source contents to equal captured source bytes. Code resolved from another
+source contents to equal captured source bytes. Observed component IDs come from
+those actual map entries and mapped archive-native entries, not the expected
+coverage list. Code resolved from another
 checkout, stale embedded source text, new modules and unmapped native files fail.
-Only the current worktree and its explicitly identified installed `node_modules`
+Missing asset-only packages and extra modules also fail. Only the current
+worktree and its explicitly identified installed `node_modules`
 root are accepted, with realpaths normalized. Raw source maps stay private.
 
 Native stripping may change a `.so` hash. Final Android ABI/library names are
@@ -82,6 +86,22 @@ bound to the verified source AAR's actual libraries; final hashes are recorded
 separately. Additional generated/NDK/Swift/framework inputs need explicit reviewed
 component mappings in the ledger. Nothing is silently called app-owned. All nine
 previously shipped Android LICENSE/NOTICE resources must retain their bytes.
+The archive reader inspects Mach-O magic for every regular entry, including
+extensionless main/appex executables. The exact JSON resource has its own 16 MiB
+limit and is excluded from generic 1 MiB notice-file classification.
+Universal headers are distinguished from Java class files sharing `CAFEBABE`
+using bounded architecture-table offsets/sizes. Format references are Apple's
+[fat header](https://github.com/apple-oss-distributions/cctools/blob/main/include/mach-o/fat.h)
+and [JVMS 4.1](https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-4.html#jvms-4.1).
+
+Java/static-native ownership cannot be independently recovered from DEX/static
+linked bytes here. Actual resolved Pod/Gradle inputs are re-inspected after
+packaging; IDs supported only by those inputs are separately listed under
+`resolvedBuildOnly` with their basis. Locked generated Metro providers are also
+explicit. Receipts record `independentFinalComponentInventory: false` and do not
+claim a newly regenerated Gradle resolution. Unknown/missing component IDs still
+fail; no generic omission waiver or independent native final-byte identity is
+implied by the complete *notice coverage* check.
 
 For an IPA, use `seal ios` after pod setup, set `SOURCEMAP_FILE` to a private
 absolute path for the normal Xcode build (the installed Expo/RN script composes
@@ -91,35 +111,48 @@ Keep normal version, signing, audio, provider, device and store gates separate.
 
 ## Reviewed ledger contract
 
-`scripts/app-notice-provenance.json` records exact component IDs such as
-`npm:react-native@0.86.3`, `cocoapods:Expo@57.0.24`, or Maven coordinates, actual
-notice source/hash sets, `reviewedVendors`, explicit `platforms`, a pinned
-`upstream` reference and the combined section's `sectionSHA256`. Deterministic
-section IDs are `library-` plus the first 24 SHA-256 hex characters of the exact
-component ID. Body text is the actual notice files, sorted by logical source and
-joined with two newlines. Keep separate NOTICE/multiple-vendor texts.
+`scripts/app-notice-provenance.json` has a `components` array indexed by each
+record's explicit `platform` (`ios` or `android`) and unchanged actual `component`
+ID, such as `npm:react-native@0.86.3`. Duplicate platform/component pairs fail.
+Each record pins actual notice source/hash sets, `reviewedVendors`, native source
+`nativeInputs` fingerprints, `upstream` and `sectionSHA256`. Section IDs are
+`library-` plus the first 24 SHA-256 hex characters of `platform + ':' + component`.
+Each is explicitly `iosOnly` or `androidOnly` in the ONE committed JSON. This lets
+one npm ID have extra Android-native notices without weakening iOS comparison.
+The union must contain every reviewed platform section, not only the current
+target. Bodies are actual files sorted by logical source, joined with two newlines.
+Font visibility is independently pinned in `font-icon-provenance.json` too.
 
 When an AAR/JAR omits full text, an explicitly reviewed `additionalNoticeFiles`
 entry may point at an actual pinned upstream copy under `assets/notices/sources/`
 with `file`, `sha256`, `upstream`. It supplements discovered notices; it cannot
 replace a missing NOTICE with a package label or an assumed parent licence.
-Generated Metro sources require an explicit `generatedSources` provider/hash
-mapping. Final native files not identified from resolved AARs require an exact
+Generated Metro sources permit only the known `__prelude__`, with its exact
+installed Metro generator path/hash. Final native files not identified from resolved AARs require an exact
 platform/path `packagedNative` mapping with covered `components` and a pinned
 `review` reference. These mappings are intentionally empty until discovery.
 
 Metro inputs are selected files, not every declared or installed package. Nested
 packages have their own licence boundary. CocoaPods inputs include resolved pod
 versions, generated acknowledgements, actual source notice files and vendored
-framework/library names. Gradle inputs are the actual release runtime resolution
-and artifact hashes, including autolinked native projects. Missing source/text,
+framework/library names. Raw Pod lock/plist/notice bytes must be valid UTF-8;
+invalid bytes are rejected before decoding, never repaired. Gradle inputs are the
+actual release runtime resolution and artifact hashes. A shared bounded scanner
+walks Pods and autolinked Gradle native subtrees, fingerprints source files, and
+finds source-only `vendor`/`third_party` children as well as binary vendors.
+Native roots are restricted to installed packages, Pods and identified local
+modules; arbitrary project data is not traversed.
+Only the actual Gradle build-directory output and Git metadata are excluded.
+Vendor text must be present within its boundary, or explicitly mapped to a pinned
+actual supplemental notice using `vendorNoticeSources`; approving a vendor name
+alone cannot borrow the root licence. Missing source/text,
 unreviewed vendor boundaries and changed digests stay unresolved. A POM/SPDX label
 alone is insufficient. This is scoped notice evidence, not a complete transitive
 SBOM or an independent legal certification.
 
 ## Proposed workflow wiring — not active in this preparation
 
-No build workflow is changed here. Review this exact behavior before wiring:
+No native build/upload workflow is changed here. Review this exact behavior before wiring:
 
 1. Normal simulator CI: after `pod install`, run **collect only**, with an
    explicit INCOMPLETE/non-release-qualified step name and job-summary notice.
@@ -132,6 +165,9 @@ No build workflow is changed here. Review this exact behavior before wiring:
    metadata stops before compile, preserving sanitized discovery for review.
    Commit the reviewed union/ledger first; do not plan a throwaway native build
    or overwrite assets during the build.
+   The current producer edits `app.json` for its version override; that dirty
+   config is deliberately rejected. Its frozen-source/version policy must be
+   reviewed when wiring this gate; there is no ignore-dirty switch.
 3. After the ordinary build, run strict **verify for both APK and AAB before**
    artifact uploads or the existing publisher. Only exact READY receipts and
    package hashes qualify; no `continue-on-error` or placeholder success.
@@ -142,6 +178,41 @@ No build workflow is changed here. Review this exact behavior before wiring:
 5. Keep one affected offline-view UI proof plus final resource byte proof. Actual
    new host/resource rendering, complete native input capture and final-artifact
    execution are **pending**, not supplied by these source tests.
+
+## Separate unreviewed input artifacts — upload not enabled
+
+Discovery retains `build/notices/<platform>/private/unreviewed-inputs.json` in a
+0700 directory/0600 file. It contains original component notice inputs, explicitly
+INCOMPLETE/discoveryOnly, not view sections or a seal. Never upload `private/`.
+
+A separate `review/unreviewed-oss-notice-inputs.json` includes bodies only when
+the exact component/source/SHA is explicitly pinned as public in
+`knownLicenseSources`, with explicit ecosystem and version too. Public npm,
+CocoaPods and Maven originals use the same manual pin contract; metadata alone
+never implies public origin. The artifact allowlist contains only component/version/ecosystem,
+normalized logical notice source, exact SHA and original UTF-8 body. Uncertain
+or private-origin records expose only hashes and finite unresolved reasons. No
+body is redacted or rewritten. Limits are 256 public bodies/4 MiB; over-budget
+records remain hash-only. All captured input text is capped at 16 MiB.
+
+After review, an optional upload would use exactly the following path (not a
+directory glob), separately from any build qualification artifact:
+
+```yaml
+- uses: actions/upload-artifact@v6
+  if: always()
+  with:
+    name: unreviewed-oss-notice-inputs-ios
+    path: build/notices/ios/review/unreviewed-oss-notice-inputs.json
+    if-no-files-found: warn
+    retention-days: 3
+```
+
+Its content is always `INCOMPLETE`, `complete:false`, `discoveryOnly:true`.
+The analogous Android path substitutes `android` for `ios`. No raw maps/cache,
+source archives, owner paths, credentials or customer records are included. This
+artifact supports technical review after the hosted runner disappears; it is
+not a payload generator, legal certificate or release gate success.
 
 Current npm/lock/font inputs and prior packaged Android notices are available.
 Current generated CocoaPods acknowledgements, complete resolved Gradle artifacts,

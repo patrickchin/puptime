@@ -32,7 +32,7 @@ gradle.projectsEvaluated {
                 if (id instanceof ProjectComponentIdentifier && id.projectPath != ':app') {
                     def project = gradle.rootProject.findProject(id.projectPath)
                     if (project == null) throw new GradleException('Unresolved native project input')
-                    return [projectBuildFile: project.buildFile.absolutePath]
+                    return [projectBuildFile: project.buildFile.absolutePath, projectBuildDirectory: project.layout.buildDirectory.get().asFile.absolutePath]
                 }
                 if (id instanceof ProjectComponentIdentifier && id.projectPath == ':app') return null
                 throw new GradleException('Unknown release component input')

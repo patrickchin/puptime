@@ -6,9 +6,10 @@ import {join} from 'node:path';
 import {createRequire} from 'node:module';
 import test from 'node:test';
 import {podNoticeInputs,gradleNoticeInputs,unionNoticeInputs,inspectNoticeArchive} from './native-notice-inputs.mjs';
-import {digest,resolveNoticeCoverage} from './app-notices.mjs';
+import {assertPackagedNativeCoverage,assertSourceNoticePayload,digest,npmNoticeInputs,resolveNoticeCoverage} from './app-notices.mjs';
 const require=createRequire(import.meta.url),plist=require('@expo/plist');
 const mit=readFileSync(new URL('../node_modules/react-native/LICENSE',import.meta.url),'utf8');
+const approval=(item,platform='ios')=>({schema:1,components:[{platform,component:item.id,reviewedVendors:item.vendors,nativeInputs:item.nativeInputs??{},notices:item.notices.map(({source,sha256})=>({source,sha256})),upstream:'https://example.invalid/pinned/native',sectionSHA256:digest([...item.notices].sort((a,b)=>a.source.localeCompare(b.source)).map(value=>value.body).join('\n\n'))}]});
 function fixture(run){
  const root=mkdtempSync(join(tmpdir(),'puptime-native-notice-'));
  const file=(path,body)=>{mkdirSync(join(root,path,'..'),{recursive:true});writeFileSync(join(root,path),typeof body==='string'||Buffer.isBuffer(body)?body:JSON.stringify(body));return join(root,path);};
@@ -25,7 +26,7 @@ test('resolved CocoaPods subspecs and actual generated plist text determine cove
  assert.ok(input.components.find(value=>value.name==='QA').notices.some(value=>value.body==='A distinct vendored attribution\n'));
  assert.deepEqual(input.components.find(value=>value.name==='QA').vendors,['Dependency.xcframework']);
  assert.equal(input.components.find(value=>value.name==='Missing').notices.length,0);
- assert.equal(resolveNoticeCoverage(input.components,{schema:1,components:{}}).status,'INCOMPLETE');
+ assert.equal(resolveNoticeCoverage(input.components,{schema:1,components:[]}).status,'INCOMPLETE');
 }));
 
 test('actual AAR and nested JAR LICENSE plus NOTICE text are retained, with artifact digest and native-library provenance',()=>fixture(({root,file})=>{
@@ -57,3 +58,69 @@ test('union of JS and autolinked native inputs cannot drop a NOTICE or accept co
  assert.equal(unionNoticeInputs([base],[additional])[0].notices.length,2);
  assert.throws(()=>unionNoticeInputs([base],[{...base,notices:[{...base.notices[0],sha256:'0'.repeat(64)}]}]));
 });
+
+test('autolinked Gradle inputs include nested native notices/vendors and bind source fingerprints without parent inheritance',()=>fixture(({root,file})=>{
+ file('package-lock.json',{packages:{'node_modules/qa':{version:'1'}}});file('node_modules/qa/package.json',{name:'qa',version:'1'});file('node_modules/qa/LICENSE',mit);
+ const build=file('node_modules/qa/android/build.gradle','// synthetic project\n');
+ file('node_modules/qa/android/src/main/cpp/NOTICE','Native subtree attribution\n');file('node_modules/qa/android/src/main/cpp/main.cpp','int original=1;');
+ file('node_modules/qa/android/third_party/child/child.cpp','int child=1;');
+ const input=file('gradle.json',{schema:1,configuration:'releaseRuntimeClasspath',components:[{projectBuildFile:build,projectBuildDirectory:join(root,'node_modules/qa/android/build')}]});
+ const initial=gradleNoticeInputs(root,input).components[0];assert.ok(initial.notices.some(value=>value.body==='Native subtree attribution\n'));
+ assert.ok(initial.vendors.includes('android/third_party/child'));
+ const missing=approval(initial);missing.components[0].reviewedVendors=[];
+ assert.equal(resolveNoticeCoverage([initial],missing).unresolved[0].reason,'unreviewed-vendored-source');
+ assert.equal(resolveNoticeCoverage([initial],approval(initial)).unresolved[0].reason,'missing-vendored-notice');
+ file('node_modules/qa/android/third_party/child/LICENSE',mit);file('node_modules/qa/android/third_party/child/NOTICE','Child attribution\n');
+ const complete=gradleNoticeInputs(root,input).components[0],approved=approval(complete);
+ assert.equal(resolveNoticeCoverage([complete],approved).status,'READY');
+ file('node_modules/qa/android/build/generated/Unrelated.cpp','generated output');assert.deepEqual(gradleNoticeInputs(root,input).components[0].nativeInputs,complete.nativeInputs);
+ file('node_modules/qa/android/src/main/cpp/main.cpp','int changed=2;');
+ assert.equal(resolveNoticeCoverage(gradleNoticeInputs(root,input).components,approved).unresolved[0].reason,'native-source-digest-mismatch');
+}));
+
+test('one stable union independently qualifies the same npm ID with different Android native inputs',()=>fixture(({root,file})=>{
+ file('package-lock.json',{packages:{'node_modules/qa':{version:'1'}}});file('node_modules/qa/package.json',{name:'qa',version:'1'});file('node_modules/qa/LICENSE',mit);
+ const js=file('node_modules/qa/index.js','module.exports=1;'),build=file('node_modules/qa/android/build.gradle','// native build\n');file('node_modules/qa/android/src/NOTICE','Android native notice\n');
+ const input=file('gradle.json',{schema:1,configuration:'releaseRuntimeClasspath',components:[{projectBuildFile:build}]});
+ const ios=npmNoticeInputs(root,[js])[0],android=gradleNoticeInputs(root,input).components[0];assert.equal(ios.id,android.id);assert.ok(android.notices.length>ios.notices.length);
+ const ledger={schema:1,components:[...approval(ios,'ios').components,...approval(android,'android').components]};
+ const iosCoverage=resolveNoticeCoverage([ios],ledger,'ios'),androidCoverage=resolveNoticeCoverage([android],ledger,'android');assert.equal(iosCoverage.status,'READY');assert.equal(androidCoverage.status,'READY');
+ assert.notEqual(iosCoverage.sections[0].id,androidCoverage.sections[0].id);
+ const font={id:'font',title:'Font',body:mit},fonts={notices:{font:digest(mit)},platforms:{font:['ios','android','web']}},payload=Buffer.from(JSON.stringify([font,...iosCoverage.sections,...androidCoverage.sections]));
+ assertSourceNoticePayload(payload,iosCoverage,ledger,fonts);assertSourceNoticePayload(payload,androidCoverage,ledger,fonts);
+ assert.equal(resolveNoticeCoverage([android],approval(ios,'ios'),'android').status,'INCOMPLETE');
+ assert.equal(resolveNoticeCoverage([android],approval(ios,'android'),'android').status,'INCOMPLETE');
+ assert.throws(()=>resolveNoticeCoverage([ios],{schema:1,components:[...ledger.components,ledger.components[1]]},'ios'));
+ assert.throws(()=>assertSourceNoticePayload(Buffer.from(JSON.stringify([font,...iosCoverage.sections])),iosCoverage,ledger,fonts));
+ const hidden=JSON.parse(payload);delete hidden[2].androidOnly;hidden[2].iosOnly=true;assert.throws(()=>assertSourceNoticePayload(Buffer.from(JSON.stringify(hidden)),androidCoverage,ledger,fonts));
+}));
+
+test('Pods use the same source-only vendor boundary rule and reject raw invalid UTF-8 notices/acknowledgements',()=>fixture(({root,file})=>{
+ file('ios/Podfile.lock','PODS:\n  - QA (1)\n');
+ const ack=plist.default.build({PreferenceSpecifiers:[{Title:'QA',FooterText:mit}]}),ackPath='ios/Pods/Target Support Files/Pods-Puptime/Pods-Puptime-acknowledgements.plist';file(ackPath,ack);
+ file('ios/Pods/QA/LICENSE',mit);file('ios/Pods/QA/vendor/child/file.cpp','int child=1;');
+ const initial=podNoticeInputs(root).components[0];assert.ok(initial.vendors.includes('vendor/child'));
+ const noReview=approval(initial);noReview.components[0].reviewedVendors=[];
+ assert.equal(resolveNoticeCoverage([initial],noReview).unresolved[0].reason,'unreviewed-vendored-source');
+ assert.equal(resolveNoticeCoverage([initial],approval(initial)).unresolved[0].reason,'missing-vendored-notice');
+ file('ios/Pods/QA/vendor/child/NOTICE','Actual child attribution\n');const complete=podNoticeInputs(root).components[0];assert.equal(resolveNoticeCoverage([complete],approval(complete)).status,'READY');
+ file('ios/Pods/QA/LICENSE',Buffer.from([0xff]));assert.throws(()=>podNoticeInputs(root),'Invalid source bytes must not be repaired into U+FFFD.');
+ file('ios/Pods/QA/LICENSE',mit);const bytes=Buffer.from(ack),at=bytes.indexOf('Copyright');assert.ok(at>0);file(ackPath,Buffer.concat([bytes.subarray(0,at),Buffer.from([0xff]),bytes.subarray(at+1)]));assert.throws(()=>podNoticeInputs(root));
+}));
+
+test('archive inventory includes extensionless main/appex Mach-O and unknown executables require coverage',()=>fixture(({root})=>{
+ const path=join(root,'fixture.ipa');
+ execFileSync('python3',['-c',`import zipfile,struct,sys\nfat=struct.pack('>II',0xcafebabe,2)+struct.pack('>IIIII',12,0,48,8,0)+struct.pack('>IIIII',7,0,56,8,0)+b'\\xcf\\xfa\\xed\\xfeabcd'*2\nwith zipfile.ZipFile(sys.argv[1],'w') as z:\n for name in ['Payload/Puptime.app/Puptime','Payload/Puptime.app/PlugIns/Unknown.appex/Unknown','Payload/Puptime.app/Frameworks/QA.framework/QA']:z.writestr(name,b'\\xcf\\xfa\\xed\\xfecontrolled')\n z.writestr('Payload/Puptime.app/fat-native',fat);z.writestr('Payload/Puptime.app/Qa.class',bytes.fromhex('cafebabe000000340001'));z.writestr('Payload/Puptime.app/text','plain text')`,path]);
+ const result=inspectNoticeArchive(path);assert.equal(result.nativeFiles.length,4);assert.ok(!result.nativeFiles.some(value=>value.path.endsWith('.class')));
+ const component='native:qa@1',framework=result.nativeFiles.find(value=>value.path.includes('.framework/'));
+ const ledger={packagedNative:{ios:{[framework.path]:{components:[component],review:'https://example.invalid/pinned/native'}}}};
+ assert.throws(()=>assertPackagedNativeCoverage('ios',result.nativeFiles,[],{components:[{component}]},ledger),'Main and extension binaries cannot silently disappear from the inventory.');
+}));
+
+test('the exact raw JSON resource has its own 16 MiB bound and is not counted again as a generic 1 MiB notice',()=>fixture(({root})=>{
+ const path=join(root,'fixture.apk'),payload=join(root,'payload.json');
+ execFileSync('python3',['-c',`import json,zipfile,sys\nb=json.dumps([{'id':'large','title':'Large','body':'x'*(1024*1024+20)}]).encode();open(sys.argv[2],'wb').write(b)\nwith zipfile.ZipFile(sys.argv[1],'w') as z:z.writestr('assets/third_party_notices.json',b);z.writestr('META-INF/LICENSE','Actual small licence')`,path,payload]);
+ const result=inspectNoticeArchive(path,'assets/third_party_notices.json');assert.equal(result.payload.sha256,digest(readFileSync(payload)));assert.equal(result.notices.length,1);
+ execFileSync('python3',['-c',`import json,zipfile,sys\nwith zipfile.ZipFile(sys.argv[1],'w') as z:z.writestr('assets/third_party_notices.json',json.dumps([{'body':'x'*(17*1024*1024)}]))`,path]);
+ assert.throws(()=>inspectNoticeArchive(path,'assets/third_party_notices.json'));
+}));
