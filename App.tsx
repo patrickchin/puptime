@@ -12,7 +12,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { BottomNav } from './src/components/BottomNav';
 import {SideNavigation,type AppTab} from './src/components/SideNavigation';
-import {MaterialCommunityIcons} from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { ThemePicker } from './src/components/ThemePicker';
 import { Toast } from './src/components/Toast';
 import type { ActivityCustomizations } from './src/activity-customization';

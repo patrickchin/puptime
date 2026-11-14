@@ -14,7 +14,7 @@ test('the real iOS sign-in component uses official Apple and Google controls and
   '../cloud/account-status':{accountProblemKey},
   './TelemetryPressable':{Pressable:'Pressable'},
   react:{useState:(value:unknown)=>{const i=cursor++;hooks[i]??={value};return [hooks[i].value,(next:unknown)=>{hooks[i].value=next;}];},useEffect:(effect:()=>void)=>{const i=cursor++;if(!hooks[i]){hooks[i]=true;effects.push(effect);}}},
-  'react/jsx-runtime':{jsx,jsxs:jsx},'@expo/vector-icons':{MaterialCommunityIcons:'Icon'},
+  'react/jsx-runtime':{jsx,jsxs:jsx},'@expo/vector-icons/MaterialCommunityIcons':{default:'Icon'},
   'react-native':{Platform:{OS:'ios'},StyleSheet:{create:(value:unknown)=>value},Keyboard:{dismiss:()=>{}},...Object.fromEntries(['ActivityIndicator','Pressable','Text','TextInput','View'].map(value=>[value,value]))},
   'expo-apple-authentication':{isAvailableAsync:async()=>true,AppleAuthenticationButton:nativeButton,AppleAuthenticationButtonType:{CONTINUE:1},AppleAuthenticationButtonStyle:{BLACK:2,WHITE:0}},
   '@react-native-google-signin/google-signin':{GoogleSigninButton:googleButton},

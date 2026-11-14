@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Pressable } from '../components/TelemetryPressable';
@@ -7,6 +7,7 @@ import { customActivityKey, quickEventTypes, type ActivityKey, type EventType } 
 import { ActivityIcon } from '../components/ActivityIcon';
 import { ActivityCsvSettings } from '../components/ActivityCsvSettings';
 import { SettingsRow } from '../components/SettingsRow';
+import { FontIconLicenses } from '../components/FontIconLicenses';
 import { SettingsSearch } from '../components/SettingsSearch';
 import { findSettings, type SettingSearchId } from '../settings-search';
 import type { CloudHandle } from '../cloud/use-cloud';
@@ -84,7 +85,7 @@ export function SettingsScreen({
 }) {
   const { activityColors, activityLabel, t } = useLocalization();
   const [query, setQuery] = useState('');
-  const searchable: SettingSearchId[] = ['appearance', 'language', 'notifications', 'widget', 'csv', 'guide'];
+  const searchable: SettingSearchId[] = ['appearance', 'language', 'notifications', 'widget', 'csv', 'guide', 'fontLicenses'];
   if (cloudHandle?.available && onOpenAccount) searchable.push('account');
   const matches = findSettings(query, t, searchable);
   const [savingWidget, setSavingWidget] = useState(false);
@@ -523,8 +524,8 @@ export function SettingsScreen({
       <SectionLabel label={t('settings.data')} theme={theme} />
       <ActivityCsvSettings theme={theme} eventCount={eventCount} onImport={onImport}/>
       </View>
+      {(matches.has('guide') || matches.has('fontLicenses')) && <SectionLabel label={t('settings.helpPrivacy')} theme={theme}/>}
       {matches.has('guide') && <>
-      <SectionLabel label={t('settings.helpPrivacy')} theme={theme}/>
       <View style={[styles.card,{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}>
         <SettingsRow
           testID="settings.guide.open"
@@ -536,6 +537,7 @@ export function SettingsScreen({
         />
       </View>
       </>}
+      {matches.has('fontLicenses') && <View style={[styles.card,{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}><FontIconLicenses theme={theme}/></View>}
     </ScrollView>
   );
 }

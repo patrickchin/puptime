@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useRef } from 'react';
 import { Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useLocalization } from '../localization-context';
