@@ -11,8 +11,8 @@ import {nativeSnapshot,nativeTables} from './native-account-evidence.mjs';
 
 const repository='patrickchin/puptime',app='com.patrickchin.puptime';
 const cuts=[
- {name:'older',source:'008b4a0b7f4d8a77cc8c13d95f39001534d8fd70',run:43263326680,artifact:13982701381,digest:'eb3e73181cc0b8e816e5414afe613be5667a4a019a206e9f103268b24a066a09'},
- {name:'newer',source:'aacd58fd0a7102a629b92dbf8813496870aec21c',run:43383649287,artifact:14029395865,digest:'2e889cd3b6eea1b0ce5b878665a8d259af002a68f54e1f77a3bdf7cf13003865'},
+ {name:'older',source:'008b4a0b7f4d8a77cc8c13d95f39001534d8fd70',event:'pull_request',branch:'codex/themed-puppy-confirmation',checkout:'4de8d80dd6f31f5b3fee7da09928cd24a0bdfe4e',tree:'7e3886c23141b4cb9843782a81566cd2aa714a84',run:43263326680,artifact:13982701381,digest:'eb3e73181cc0b8e816e5414afe613be5667a4a019a206e9f103268b24a066a09'},
+ {name:'newer',source:'aacd58fd0a7102a629b92dbf8813496870aec21c',event:'push',branch:'main',checkout:'aacd58fd0a7102a629b92dbf8813496870aec21c',tree:'abb69c7d347964ad7a6cd9bcce80a8472544ab2e',run:43383649287,artifact:14029395865,digest:'2e889cd3b6eea1b0ce5b878665a8d259af002a68f54e1f77a3bdf7cf13003865'},
 ];
 const nativeInputs=['package.json','package-lock.json','app.json','app.config.*','eas.json','.npmrc','.env','plugins','patches','assets','ios'];
 const [mode='--inspect-only',destination=process.env.GITHUB_ACTIONS==='true'?'build/native-runtime-replacement':join(homedir(),'Pictures/Screenshots/Codex/puptime-runtime-replacement')]=process.argv.slice(2);
@@ -24,15 +24,17 @@ const jsonPlist=path=>JSON.parse(command('plutil',['-convert','json','-o','-',pa
 function assertPreserved(before,after,{paletteChange=false}={}){
  const protectedState=value=>({...value,widgetTimelines:Object.fromEntries(Object.entries(value.widgetTimelines).map(([key,entries])=>[key,entries.map(props=>{
   if(!paletteChange)return props;
-  const {appearance,...data}=props;assert.ok(appearance?.light&&appearance?.dark,'Retain both widget appearances.');return data;
+  const {appearance}=props;assert.ok(appearance?.light&&appearance?.dark,'Retain both widget appearances.');
+  const colours=value=>{const {background,surface,...layout}=value;assert.equal(typeof background,'string');assert.equal(typeof surface,'string');return layout;};
+  return {...props,appearance:{...appearance,light:colours(appearance.light),dark:colours(appearance.dark)}};
  })]))});
  assert.deepEqual(protectedState(after),protectedState(before),'Preserve every table/row/sequence counter, saved file, photo and widget activity field.');
 }
 function selfCheck(){
- const before={tables:Object.fromEntries(nativeTables.map(table=>[table,[]])),files:{'dog-photos/img_test.jpg':'original-bytes'},widgetTimelines:{quick:[{pending:[],lastEventAt:{pee:123},appearance:{light:{background:'old'},dark:{background:'dark'}}}]}};
- const after=structuredClone(before);after.widgetTimelines.quick[0].appearance.light.background='new';
+ const before={tables:Object.fromEntries(nativeTables.map(table=>[table,[]])),files:{'dog-photos/img_test.jpg':'original-bytes'},widgetTimelines:{quick:[{pending:[],lastEventAt:{pee:123},appearance:{light:{background:'old',surface:'old',controlRadius:12},dark:{background:'dark',surface:'dark',controlRadius:12}}}]}};
+ const after=structuredClone(before);after.widgetTimelines.quick[0].appearance.light.background='new';after.widgetTimelines.quick[0].appearance.dark.surface='new';
  assertPreserved(before,after,{paletteChange:true});assert.throws(()=>assertPreserved(before,after));
- for(const mutate of [value=>value.tables.events.push({id:'changed'}),value=>value.files['dog-photos/img_test.jpg']='changed',value=>value.widgetTimelines.quick[0].pending.push({id:'unexpected'}),value=>value.widgetTimelines.quick[0].lastEventAt.pee=999]){
+ for(const mutate of [value=>value.tables.events.push({id:'changed'}),value=>value.files['dog-photos/img_test.jpg']='changed',value=>value.widgetTimelines.quick[0].pending.push({id:'unexpected'}),value=>value.widgetTimelines.quick[0].lastEventAt.pee=999,value=>value.widgetTimelines.quick[0].appearance.light.controlRadius=99,value=>value.widgetTimelines.quick[0].appearance.dark.unknown='unexpected']){
   const changed=structuredClone(after);mutate(changed);assert.throws(()=>assertPreserved(before,changed,{paletteChange:true}));
  }
  console.log('PASS runtime preservation guard: only the explicit widget palette change is allowed.');
@@ -45,18 +47,24 @@ async function verify(){
  const cache=process.env.PUPTIME_RUNTIME_ARTIFACT_CACHE?resolve(process.env.PUPTIME_RUNTIME_ARTIFACT_CACHE):privateDir;
  mkdirSync(cache,{recursive:true});
  const api=path=>JSON.parse(command('gh',['api',`repos/${repository}/${path}`]));
+ const rawFlags=command('gh',['api','--help']).includes('--allow-escape-sequences')?['--allow-escape-sequences']:[];
  const source=command('git',['rev-parse','HEAD']);
  for(const cut of cuts){
   const run=api(`actions/runs/${cut.run}`);assert.equal(run.status,'completed');assert.equal(run.conclusion,'success');
   assert.equal(run.head_sha,cut.source);assert.equal(run.head_repository?.full_name,repository);assert.equal(run.path,'.github/workflows/ios-simulator.yml');
+  assert.equal(run.event,cut.event);assert.equal(run.head_branch,cut.branch);
   try{command('git',['cat-file','-e',cut.source+'^{commit}']);}catch{command('git',['fetch','--no-tags','origin',cut.source]);}
+  // Checkout SHAs are pinned from each original build's actual checkout log.
+  // The PR merge checkout is distinct from its head, but has the same full tree.
+  const checkout=api('git/commits/'+cut.checkout);assert.equal(checkout.sha,cut.checkout);assert.equal(checkout.tree.sha,cut.tree);
+  assert.equal(command('git',['rev-parse',cut.source+'^{tree}']),cut.tree,'Attest actual compiled checkout tree, not just workflow head metadata.');
   const artifact=api(`actions/artifacts/${cut.artifact}`);
   assert.equal(artifact.name,'puptime-ios-simulator');assert.equal(artifact.expired,false);assert.equal(artifact.workflow_run.id,cut.run);
   assert.equal(artifact.digest,'sha256:'+cut.digest);
   const archive=join(cache,cut.name+'-artifact.zip');
   if(!existsSync(archive)){
    const partial=archive+'.part',fd=openSync(partial,'wx',0o600);
-   try{execFileSync('gh',['api',`repos/${repository}/actions/artifacts/${cut.artifact}/zip`],{timeout:600000,stdio:['ignore',fd,'pipe']});}finally{closeSync(fd);}
+   try{execFileSync('gh',['api',`repos/${repository}/actions/artifacts/${cut.artifact}/zip`,...rawFlags],{timeout:600000,stdio:['ignore',fd,'pipe']});}finally{closeSync(fd);}
    assert.equal(hash(partial),cut.digest,'Verify the complete download before adding it to the artifact cache.');renameSync(partial,archive);
   }
   assert.equal(hash(archive),cut.digest,'Verify exact original GitHub archive bytes, including cached files.');
@@ -80,7 +88,7 @@ async function verify(){
   assert.ok(cut.group&&embeddedEntitlements['com.apple.security.application-groups']?.includes(cut.group));
   assert.ok(embeddedEntitlements['application-identifier']?.endsWith(app));
   for(const key of Object.keys(signedEntitlements))if(key in embeddedEntitlements)assert.deepEqual(signedEntitlements[key],embeddedEntitlements[key]);
-  cut.provenance={source:cut.source,run:cut.run,artifact:cut.artifact,outerSHA256:cut.digest,innerSHA256:hash(inner),version:info.CFBundleShortVersionString,build:info.CFBundleVersion,bundleIdentifier:info.CFBundleIdentifier,executable:info.CFBundleExecutable,architecture,platform,nativeExecutableSHA256:hash(binary),javaScriptSHA256:hash(join(cut.host,'main.jsbundle')),entitlements:cut.entitlements};
+  cut.provenance={runHeadSource:cut.source,runEvent:cut.event,runBranch:cut.branch,actualCheckoutSource:cut.checkout,actualCheckoutTree:cut.tree,run:cut.run,artifact:cut.artifact,outerSHA256:cut.digest,innerSHA256:hash(inner),version:info.CFBundleShortVersionString,build:info.CFBundleVersion,bundleIdentifier:info.CFBundleIdentifier,executable:info.CFBundleExecutable,architecture,platform,nativeExecutableSHA256:hash(binary),javaScriptSHA256:hash(join(cut.host,'main.jsbundle')),entitlements:cut.entitlements};
  }
  assert.equal(command('git',['diff','--name-only',cuts[1].source,'--',...nativeInputs]),'','Driver checkout native/assets/config changed: require a newly qualified matching target; do not bypass audio/config changes.');
  assert.equal(command('git',['ls-files','--others','--exclude-standard','--',...nativeInputs]),'','Review untracked native inputs before reusing a frozen artifact.');
