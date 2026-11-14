@@ -177,7 +177,13 @@ test('backend control-process/health evidence is finite and probes only the owne
  assert.deepEqual(nativeTransportFailure({name:'TimeoutError',message:secret}),{code:'ETIMEDOUT',category:'timeout'});
  const running=nativeBackendState({pid:123,exitCode:null,signalCode:null,argv:secret,stdout:secret});assert.equal(running.state,'running');assert.ok(!JSON.stringify(running).includes('123'));for(const marker of secret.split(' '))assert.ok(!JSON.stringify(running).includes(marker));
  assert.equal(nativeBackendState({pid:123,exitCode:17,signalCode:null}).exitStatus,17);assert.equal(nativeBackendState({pid:123,exitCode:256,signalCode:'PRIVATE'}).exitStatus,null);assert.equal(nativeBackendState(null,{code:'ENOENT',message:secret}).state,'spawn-error');
- let reset=false;const server=createServer((req,res)=>{if(reset){req.socket.destroy();return;}assert.equal(req.url,'/health');res.writeHead(200,{'x-private':secret});res.end(secret);});server.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>{server.closeAllConnections();server.close();});const url='http://127.0.0.1:'+server.address().port+'/health';
- assert.deepEqual(await nativeBackendHealth(url),{state:'responded',status:200,healthy:true});reset=true;const failed=await nativeBackendHealth(url);assert.equal(failed.state,'unavailable');assert.ok(!JSON.stringify(failed).includes(secret));
+ let reset=false,redirect=false,trapHits=0;
+ const trap=createServer((_req,res)=>{trapHits++;res.end(secret);});trap.listen(0,'127.0.0.1');await once(trap,'listening');t.after(()=>{trap.closeAllConnections();trap.close();});
+ const location='http://127.0.0.1:'+trap.address().port+'/private?token=PRIVATE';
+ const server=createServer((req,res)=>{if(reset){req.socket.destroy();return;}assert.equal(req.url,'/health');res.writeHead(redirect?302:200,{'x-private':secret,...(redirect?{location}:{})});res.end(secret);});server.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>{server.closeAllConnections();server.close();});const url='http://127.0.0.1:'+server.address().port+'/health';
+ assert.deepEqual(await nativeBackendHealth(url),{state:'responded',status:200,healthy:true});
+ redirect=true;const redirected=await nativeBackendHealth(url);assert.deepEqual(redirected,{state:'responded',status:302,healthy:false});await new Promise(resolve=>setImmediate(resolve));assert.equal(trapHits,0);
+ for(const marker of [...secret.split(' '),location,'/private','token='])assert.ok(!JSON.stringify(redirected).includes(marker));
+ redirect=false;reset=true;const failed=await nativeBackendHealth(url);assert.equal(failed.state,'unavailable');assert.ok(!JSON.stringify(failed).includes(secret));
  for(const bad of ['https://example.invalid/health',url+'?token='+secret,url.replace('/health','/api/account')])assert.deepEqual(await nativeBackendHealth(bad),{state:'refused'});
 });

@@ -176,7 +176,7 @@ export function nativeBackendState(worker,error){
 export async function nativeBackendHealth(url){
  try{
   const parsed=new URL(url);if(parsed.protocol!=='http:'||parsed.hostname!=='127.0.0.1'||Number(parsed.port)<=1024||parsed.pathname!=='/health'||parsed.search||parsed.hash||parsed.username||parsed.password)return {state:'refused'};
-  const response=await fetch(parsed,{signal:AbortSignal.timeout(2000)}),result={state:'responded',status:response.status,healthy:response.ok};
+  const response=await fetch(parsed,{signal:AbortSignal.timeout(2000),redirect:'manual'}),result={state:'responded',status:response.status,healthy:response.ok};
   try{await response.body?.cancel();}catch{}return result;
  }catch(error){return {state:'unavailable',...nativeTransportFailure(error)};}
 }
