@@ -24,7 +24,7 @@ on:
       account_case:
         description: Isolated account case
         type: choice
-        options: [all, baseline, comparison, offline, isolation, photos, deletion, rich, upgrade]
+        options: [all, baseline, comparison, offline, isolation, photos, deletion, rich, font-notices, upgrade]
         default: all
       upgrade_stage:
         description: Original-runtime archive inspection or actual data-preserving replacement
@@ -219,7 +219,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scenario: ${{ fromJSON(inputs.account_case == 'all' && '["baseline","comparison","offline","isolation","photos","deletion","rich"]' || format('["{0}"]', inputs.account_case)) }}
+        scenario: ${{ fromJSON(inputs.account_case == 'all' && '["baseline","comparison","offline","isolation","photos","deletion","rich","font-notices"]' || format('["{0}"]', inputs.account_case)) }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6

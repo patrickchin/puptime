@@ -8,7 +8,7 @@ import {sqliteTestConnection} from '../src/local/sqlite-test-adapter.ts';
 import {createNativeStorage} from '../src/local/native-storage.ts';
 import {cloudRecordId} from '../src/cloud/record-identity.ts';
 import {DEFAULT_NOTIFICATION_PREFERENCES} from '../src/notification-config.ts';
-import {accountFlowEnvironment,assertRichCloud,readRichNativeState} from './verify-native-rich-state.mjs';
+import {accountFlowEnvironment,assertRichCloud,readRichNativeState,verifyNativeFontNotices} from './verify-native-rich-state.mjs';
 
 test('read-only rich-state evidence uses actual native SQLite and production projection',async()=>{
  const root=await mkdtemp(join(tmpdir(),'puptime-rich-state-')),path=join(root,'native.db'),petId='pet_rich_fixture',database=await createLocalDatabase(sqliteTestConnection(path));
@@ -51,4 +51,28 @@ test('locale expectations keep English exact and require acknowledged Spanish fi
  for(const title of ['Combine these histories','Combine these historiesX','Sync paused','Loading account…'])assert.doesNotMatch(title,new RegExp(es.ACCOUNT_READY));
  assert.match('¿Cerrar sesión en este dispositivo?',new RegExp(es.ACCOUNT_SIGN_OUT_TITLE));assert.doesNotMatch('¿Cerrar sesión en este dispositivo',new RegExp(es.ACCOUNT_SIGN_OUT_TITLE));
  assert.throws(()=>accountFlowEnvironment('unknown'));
+});
+
+
+test('standalone font-notices keeps both view snapshots strict and restores the original projection',async()=>{
+ for(const corruptView of [false,true]){
+  const root=await mkdtemp(join(tmpdir(),'puptime-notice-evidence-')),path=join(root,'native.db'),petId='pet_notices_fixture',database=await createLocalDatabase(sqliteTestConnection(path));
+  try{
+   await initializeLocalDatabase(database,()=>petId);const storage=createNativeStorage(database,petId),calls=[];
+   await storage.appendEvents(Array.from({length:12},(_,i)=>({id:'evt_notices_'+i,type:'pee',at:123456+i,source:'app',note:'Synthetic preserved notice history'})));
+   const before=await readRichNativeState(path);
+   const execute=()=>verifyNativeFontNotices({databasePath:()=>path,flow:async(name,env)=>{
+    calls.push([name,env]);
+    if(name==='rich-notices'&&env.NOTICE_ACTION==='theme')await storage.saveThemePreference(env.NOTICE_THEME);
+    if(name==='rich-notices'&&env.NOTICE_ACTION==='view'&&corruptView)await storage.appendEvents([{id:'evt_forbidden_view_write',type:'poop',at:123999,source:'app'}]);
+   }});
+   if(corruptView){await assert.rejects(execute,/Only explicitly expected rows/);assert.equal(calls.filter(([name,env])=>name==='rich-notices'&&env.NOTICE_ACTION==='view').length,1);}
+   else{
+    const result=await execute(),after=await readRichNativeState(path);
+    assert.deepEqual(calls,[['prepare',undefined],['add-logs',{BATCHES:'4',EXPECTED_COUNT:'12'}],...['light','dark'].flatMap(theme=>[['rich-notices',{NOTICE_ACTION:'theme',NOTICE_THEME:theme}],['rich-notices',{NOTICE_ACTION:'view',NOTICE_THEME:theme}]]),['rich-notices',{NOTICE_ACTION:'theme',NOTICE_THEME:'system'}]]);
+    assert.deepEqual(after.records,before.records);assert.deepEqual(after.tables.events,before.tables.events);
+    assert.deepEqual(result.receipt,{phase:'font-notices',noticeScreenshotsCaptured:true,noticeVisualReview:'required',noticeViewsAll14Stable:true});
+   }
+  }finally{await database.close();await rm(root,{recursive:true,force:true});}
+ }
 });
