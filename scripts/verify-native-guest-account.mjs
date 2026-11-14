@@ -61,7 +61,7 @@ let runtimeInputs;const runtimeBundles=new Map(),runtimeProvenance=[];
 const authResponses=[];
 const authRoutes={'/api/auth/get-session':'session','/api/auth/email-otp/send-verification-otp':'send-code','/api/auth/sign-in/email-otp':'verify-code','/api/auth/sign-out':'sign-out','/api/account':'account'};
 const codes=new Set(),checks=[];
-const sharingSecrets=new Set(),protectSharingSecret=value=>{assert.equal(typeof value,'string');sharingSecrets.add(value);};
+const sharingSecrets=new Set(),sharingArtifactCleanups=new Set(),protectSharingSecret=value=>{assert.equal(typeof value,'string');sharingSecrets.add(value);};
 const ownerSharingEmail='native-sharing-owner-'+crypto.randomUUID()+'@example.invalid',carerSharingEmail='native-sharing-carer-'+crypto.randomUUID()+'@example.invalid';
 const sharingObserver=sharingKind?createSharingObserver({ownerEmail:ownerSharingEmail,carerEmail:carerSharingEmail,protectSecret:protectSharingSecret}):null;
 function wireFailure(phase,route,encoding,bytes){
@@ -417,6 +417,7 @@ async function verifySharingLifecycle(){
   async launch(id){assert.ok(owned.has(id)&&id===device);simctl('launch',id,app);},
   async dataDirectory(id){assert.ok(owned.has(id));return simctl('get_app_container',id,app,'data');},
   async execute(binary,args,env){await run(binary,args,{...childEnv,...env},process.cwd(),true);},
+  registerCleanup(cleanup){sharingArtifactCleanups.add(cleanup);return ()=>sharingArtifactCleanups.delete(cleanup);},
   async simctl(args,input){
    assert.ok(['pbpaste','pbcopy','openurl'].includes(args[0])&&args[1]===device&&owned.has(args[1]));
    return execFileSync('xcrun',['simctl',...args],{encoding:'utf8',timeout:30000,input,stdio:[input===undefined?'ignore':'pipe','pipe','pipe']}).trim();
@@ -516,13 +517,14 @@ const task=installTaskCleanup(async()=>{
  for(const socket of changeSockets)socket.destroy();
  proxy?.closeAllConnections();proxy?.close();
  const processesStopped=(await Promise.all([...activeStops,...(stopWorker?[stopWorker]:[])].map(stop=>stop()))).every(Boolean);
+ let sharingArtifactsRemoved=true;for(const cleanup of sharingArtifactCleanups)try{cleanup();}catch{sharingArtifactsRemoved=false;}
  try{auth?.close();}catch{}
  if(android)try{adb('reverse','--remove','tcp:'+frontPort);}catch{}
  let nativeRestored=true;
  for(const [path,original] of restoreNative.reverse())try{if(original===null)rmSync(path,{force:true});else writeFileSync(path,original);}catch{nativeRestored=false;}
  const simulators=temporaryDevices.map(device=>deleteOwnedSimulator({device,privateDirectory:privateDir,preserve:!completed}));
- writeFileSync(join(output,'sdk-task-cleanup.json'),JSON.stringify({status:processesStopped&&nativeRestored&&simulators.every(value=>value.deleted)?'passed':'failed',processesStopped,nativeRestored,simulators},null,2)+'\n');
- if(!processesStopped||!nativeRestored||simulators.some(value=>!value.deleted))process.exitCode=1;
+ writeFileSync(join(output,'sdk-task-cleanup.json'),JSON.stringify({status:processesStopped&&sharingArtifactsRemoved&&nativeRestored&&simulators.every(value=>value.deleted)?'passed':'failed',processesStopped,sharingArtifactsRemoved,nativeRestored,simulators},null,2)+'\n');
+ if(!processesStopped||!sharingArtifactsRemoved||!nativeRestored||simulators.some(value=>!value.deleted))process.exitCode=1;
 });
 try{
   // Own both ports; never attach to another task's backend or account.

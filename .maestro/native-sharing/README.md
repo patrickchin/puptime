@@ -82,6 +82,8 @@ The lifecycle runner supplies these injected hooks (no copied service or SDK):
   quietly and never print raw arguments, output or thrown command objects.
   The sharing wrapper emits only finite phase failure names. `pbcopy` must
   pipe its supplied empty input so the invitation clipboard is actually cleared.
+  An idempotent artifact-cleanup callback is registered with task cleanup;
+  after its owned driver stops, cancellation removes these files before exit.
 - The proxy calls `observer.begin({method,url,headers})` at request start,
   `observer.requestBody(ticket,decoded)` for creation/accept bodies, and
   `observer.finish(ticket,status,decoded)` **only for real Worker responses**.

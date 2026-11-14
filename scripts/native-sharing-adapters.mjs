@@ -92,12 +92,21 @@ export function createSharingObserver({ownerEmail,carerEmail,protectSecret}){
 
 // `execute` must capture output quietly and reject without printing its args/output.
 // These flows never contain an OTP; initial auth remains in the existing runner.
-export async function runSharingFlow({device,name,env={},secret=false,execute,output,startup=join(homedir(),'.maestro/tests')}){
+export async function runSharingFlow({device,name,env={},secret=false,execute,output,registerCleanup,startup=join(homedir(),'.maestro/tests')}){
   name=basename(name);assert.match(name,/^[a-z-]+$/);
   assert.ok(!secretFlows.has(name)||secret,'Invite-bearing phases must suppress every driver artifact.');
   assert.ok(Object.values(env).every(value=>typeof value==='string'&&!/inv_[a-f0-9]{32}|puptime:\/\/|https?:\/\//.test(value)),'No invitation or credential in Maestro arguments.');
   const flow=resolve('.maestro/native-sharing',name+'.yaml');assert.ok(existsSync(flow));
   const before=new Set(existsSync(startup)?readdirSync(startup):[]),artifacts=mkdtempSync(join(tmpdir(),'puptime-sharing-driver-'));
+  let cleaned=false;
+  const cleanup=()=>{
+    if(cleaned)return;rmSync(artifacts,{recursive:true,force:true});
+    // The caller owns the one native slot; never retain its secret global logs.
+    if(existsSync(startup))for(const directory of readdirSync(startup))if(!before.has(directory))rmSync(join(startup,directory),{recursive:true,force:true});
+    cleaned=true;
+  };
+  // Signal cleanup invokes this after stopping the owned driver, before exit.
+  const releaseCleanup=registerCleanup?.(cleanup);
   try{
     await execute('maestro',['--device',device,'test',...Object.entries(env).flatMap(([key,value])=>['-e',`${key}=${value}`]),flow,'--test-output-dir',artifacts],{MAESTRO_CLI_NO_ANALYTICS:'1'});
   }catch{throw new Error('Native sharing phase failed: '+name);}
@@ -105,11 +114,9 @@ export async function runSharingFlow({device,name,env={},secret=false,execute,ou
     try{
       // Keep explicit post-accept glyph evidence on red cases; no implicit failure
       // image/hierarchy or secret-phase output may survive.
-      if(!secret){mkdirSync(output,{recursive:true});let bytes=0;for(const file of readdirSync(artifacts,{recursive:true}).map(String))if(images.has(basename(file))){const source=join(artifacts,file),size=statSync(source).size;assert.ok(size<=4194304&&(bytes+=size)<=8388608,'Bound synthetic sharing screenshots.');cpSync(source,join(output,basename(file)));}}
+      if(!secret&&existsSync(artifacts)){mkdirSync(output,{recursive:true});let bytes=0;for(const file of readdirSync(artifacts,{recursive:true}).map(String))if(images.has(basename(file))){const source=join(artifacts,file),size=statSync(source).size;assert.ok(size<=4194304&&(bytes+=size)<=8388608,'Bound synthetic sharing screenshots.');cpSync(source,join(output,basename(file)));}}
     }finally{
-      rmSync(artifacts,{recursive:true,force:true});
-      // The caller owns the one native slot. Remove its newly created global logs too.
-      if(existsSync(startup))for(const directory of readdirSync(startup))if(!before.has(directory))rmSync(join(startup,directory),{recursive:true,force:true});
+      cleanup();releaseCleanup?.();
     }
   }
 }
@@ -121,7 +128,7 @@ export function createSharingActors({devices,emails,observer,bridge,output,prote
     get accountId(){return observer.actor(name).accountId;},get attribution(){return observer.actor(name).attribution;},
     cookie:()=>observer.actor(name).cookie,
     async snapshot({care=false}={}){const observed=observer.actor(name);return readSharingSnapshot(await bridge.dataDirectory(devices[name]),{care,accountId:observed.accountId,shareId:observed.shareId});},
-    async flow(path,env,options){assert.equal(active,name);await bridge.launch(devices[name]);return runSharingFlow({device:devices[name],name:path,env,...options,execute:bridge.execute,output});},
+    async flow(path,env,options){assert.equal(active,name);await bridge.launch(devices[name]);return runSharingFlow({device:devices[name],name:path,env,...options,execute:bridge.execute,registerCleanup:bridge.registerCleanup,output});},
     async nativeShareCopy(){assert.equal(active,name);try{const value=await bridge.simctl(['pbpaste',devices[name]]);protectSecret(value);return value;}catch{throw new Error('Native sharing clipboard read failed.');}finally{try{await bridge.simctl(['pbcopy',devices[name]],'');}catch{throw new Error('Native sharing clipboard clearing failed.');}}},
     async openURL(value){
       assert.equal(active,name);const url=new URL(value);assert.equal(url.protocol,'puptime:');assert.equal(url.hostname,'care');

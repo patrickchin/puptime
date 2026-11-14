@@ -81,6 +81,18 @@ test('actor switching serializes devices and clipboard clears even after a read 
  const next=actors.activate(actors.carer);release();await next;assert.equal(calls.findLast(value=>value.device)?.previous,'owned-A');
 });
 
+test('registered interruption cleanup removes secret artifacts before exit and is idempotent',async t=>{
+ const root=mkdtempSync(join(tmpdir(),'puptime-sharing-interrupt-'));t.after(()=>rmSync(root,{recursive:true,force:true}));
+ const startup=join(root,'startup'),output=join(root,'output');mkdirSync(startup);let cleanup,artifacts,released=false;
+ await assert.rejects(runSharingFlow({device:'synthetic',name:'create-invitation',secret:true,output,startup,
+  registerCleanup:owned=>{cleanup=owned;return ()=>released=true;},execute:async(_binary,args)=>{
+   artifacts=args.at(-1);writeFileSync(join(artifacts,'failure.png'),token);mkdirSync(join(startup,'owned'));writeFileSync(join(startup,'owned','maestro.log'),token);
+   cleanup();assert.equal(existsSync(artifacts),false);assert.deepEqual(readdirSync(startup),[]);
+   mkdirSync(join(startup,'later-unrelated'));cleanup();assert.ok(existsSync(join(startup,'later-unrelated')));throw new Error('interrupted');
+  }}));
+ assert.equal(released,true);assert.equal(existsSync(output),false);assert.equal(existsSync(artifacts),false);
+});
+
 test('a failed non-secret attribution phase retains only explicit bounded glyph images',async t=>{
  const root=mkdtempSync(join(tmpdir(),'puptime-sharing-red-'));t.after(()=>rmSync(root,{recursive:true,force:true}));
  const startup=join(root,'startup'),output=join(root,'output');mkdirSync(startup);let artifacts;
