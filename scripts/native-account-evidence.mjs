@@ -125,9 +125,14 @@ export function capturedJson(body,contentEncoding){
 
 // Project only allowlisted readiness flags; never retain input values or labels.
 export function nativeAuthUiFlags(hierarchy,{email='',code=''}={}){
- const fields=Object.fromEntries(['account.email.input','account.code.input','account.sendCode','account.verify','account.refresh','account.error','account.identity'].map(id=>[id,{present:false}]));
- function visit(node){
+ const fields=Object.fromEntries(['account.email.input','account.code.input','account.sendCode','account.verify','account.refresh','account.error','account.identity','account.signOut'].map(id=>[id,{present:false}]));
+ const copies=[['Sign out on this device?','Cancel','Sign out'],['¿Cerrar sesión en este dispositivo?','Cancelar','Cerrar sesión'],['在这台设备上退出登录？','取消','退出登录']];
+ const observed=copies.map(()=>[false,false,false]);
+ function visit(node,visible=true,insideSignOut=false){
   const a=node?.attributes??{},id=a['resource-id'];
+  visible=visible&&a.visible!==false&&a.visible!=='false'&&a.displayed!==false&&a.displayed!=='false';
+  insideSignOut=insideSignOut||id==='account.signOut';
+  if(visible&&!insideSignOut)copies.forEach((copy,i)=>copy.forEach((text,j)=>{if(a.text===text||a.accessibilityText===text)observed[i][j]=true;}));
   if(Object.hasOwn(fields,id)){
    const flags={present:true,enabled:a.enabled===true||a.enabled==='true',focused:a.focused===true||a.focused==='true'};
    if(id==='account.email.input'||id==='account.code.input'){
@@ -138,7 +143,9 @@ export function nativeAuthUiFlags(hierarchy,{email='',code=''}={}){
    }
    fields[id]=flags;
   }
-  for(const child of node?.children??[])visit(child);
+  for(const child of node?.children??[])visit(child,visible,insideSignOut);
  }
- visit(hierarchy);return fields;
+ visit(hierarchy);
+ const confirmation=observed.find(([title])=>title)??[false,false,false];
+ return {...fields,signOutConfirmation:{titleVisible:confirmation[0],cancelVisible:confirmation[1],actionVisible:confirmation[2]}};
 }
