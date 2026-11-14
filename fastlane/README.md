@@ -11,7 +11,8 @@ and screenshots without submitting a build. The `submit` lane submits the exact
 uploaded build identified by `APP_STORE_BUILD_NUMBER`; neither lane is part of
 the autonomous staging deployment.
 
-The submit lane also requires `APP_STORE_IPA_PATH` for that exact candidate. Its
+The submit lane also requires `APP_STORE_IPA_PATH` for that exact candidate. Relative
+paths resolve from the repository root; absolute paths also work. The
 local Python-stdlib preflight checks the bundle identifier/version/build and
 rejects the known noncommercial narration bytes. This is not proof that the
 uploaded binary matches, that all other assets are licensed, or that store
@@ -37,3 +38,7 @@ It does not establish upload/app signing, a Play app record or an accepted AAB.
 No EAS login, cloud build, paid plan or store upload is needed to validate this
 metadata locally. A proposed five-household product trial is optional and is
 separate from Google's account-specific closed-testing rules.
+
+Local checks (no Fastlane login/submission): `python3 scripts/test_store_audio.py`
+and `ruby scripts/test-store-fastlane.rb`. The Ruby check exercises the lane's
+Ruby paths from Fastlane's working directory with shell/auth/delivery stubbed.
