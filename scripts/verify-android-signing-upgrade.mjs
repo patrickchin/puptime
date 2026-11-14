@@ -271,7 +271,7 @@ function emulatorHost(mode){
 
 const [mode]=process.argv.slice(2);if(['--emulator-record','--emulator-root','--emulator-offline','--emulator-cleanup'].includes(mode)){try{emulatorHost(mode);process.exit(0);}catch{console.error('FAIL host-only '+mode.slice(2)+'; raw process/error evidence remains private.');process.exit(1);}}if(mode==='--self-check'){selfCheck();process.exit(0);}
 const exerciseReceipt=resolve('build/android-signing-safe/verification.json');let exercisePrivateRoot;
-const exerciseEvidence=mode==='--exercise'?exerciseRecorder(value=>{mkdirSync(resolve(exerciseReceipt,'..'),{recursive:true,mode:0o700});const prior=existsSync(exerciseReceipt)?JSON.parse(readFileSync(exerciseReceipt)):{};writeFileSync(exerciseReceipt,JSON.stringify({...prior,...(value.failure?{status:'exercise-failed'}:{}),exercise:value},null,2),{mode:0o600});}):null;
+const exerciseEvidence=mode==='--exercise'?exerciseRecorder(value=>{mkdirSync(resolve(exerciseReceipt,'..'),{recursive:true,mode:0o700});const prior=existsSync(exerciseReceipt)?JSON.parse(readFileSync(exerciseReceipt)):{};writeFileSync(exerciseReceipt,JSON.stringify({...prior,...(value.failure?{status:'exercise-failed'}:{}),scope:'Guest-only API36 exercise stage evidence; no credential or Play acceptance. Started/completed markers do not establish later signing/data success.',exercise:value},null,2),{mode:0o600});}):null;
 try{
 exerciseEvidence?.begin('exercise-preconditions');
 assert.ok(['--preflight','--exercise'].includes(mode));assert.equal(process.env.GITHUB_ACTIONS,'true');assert.equal(process.env.RUNNER_OS,'Linux');process.umask(0o077);
