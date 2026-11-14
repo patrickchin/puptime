@@ -33,7 +33,7 @@ assert.equal(consent,'--replace-synthetic','Use PLATFORM DEVICE HOST --replace-s
 const frontPort=Number(process.env.PUPTIME_ACCOUNT_PORT??8797),backPort=frontPort+2;assert.ok(Number.isInteger(frontPort)&&frontPort>1024&&frontPort<65533);
 const app='com.patrickchin.puptime',output=resolve(destination),front='https://127.0.0.1:'+frontPort;
 let startupStage='sdk-host-validation';
-const markStartup=(stage,status='started',error)=>{startupStage=stage;if(!android)writeFileSync(join(output,'sdk-startup-stage.json'),JSON.stringify(startupEvidence(stage,status,error),null,2)+'\n');};
+const markStartup=(stage,status='started',error)=>{startupStage=stage;try{if(!android)writeFileSync(join(output,'sdk-startup-stage.json'),JSON.stringify(startupEvidence(stage,status,error),null,2)+'\n');}catch{/* Diagnostic persistence must never interrupt owned cleanup or replace the original failure. */}};
 mkdirSync(output,{recursive:true});markStartup('sdk-host-validation');
 const simctl=(...args)=>execFileSync('xcrun',['simctl',...args],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
 const adb=(...args)=>execFileSync('adb',['-s',device,...args],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();

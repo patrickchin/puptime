@@ -64,7 +64,7 @@ if(scenario==='enrolled-upgrade'){
 }
 writeFileSync(join(output,'native-provenance.json'),JSON.stringify(provenance,null,2)+'\n');
 let startupStage='runtime-selection';
-const markStartup=(stage,status='started',error)=>{startupStage=stage;writeFileSync(join(output,'startup-stage.json'),JSON.stringify(startupEvidence(stage,status,error),null,2)+'\n');};
+const markStartup=(stage,status='started',error)=>{startupStage=stage;try{writeFileSync(join(output,'startup-stage.json'),JSON.stringify(startupEvidence(stage,status,error),null,2)+'\n');}catch{/* Diagnostic persistence must never interrupt owned cleanup or replace the original failure. */}};
 try{
 markStartup('runtime-selection');
 const runtimes=JSON.parse(command('xcrun',['simctl','list','runtimes','-j'])).runtimes;

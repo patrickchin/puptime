@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
 import {startupEvidence} from './native-startup-evidence.mjs';
 
 test('startup receipts retain only fixed stage/status and actual finite failure categories',()=>{
@@ -23,4 +25,24 @@ test('error fields are captured once; throwing or changing getters cannot leak a
  let reads=0;const error={get code(){reads++;return reads===1?'ETIMEDOUT':'private-identity@example.invalid';}};
  const result=startupEvidence('sdk-process','failed',error);assert.equal(reads,1);assert.equal(result.failure.code,'ETIMEDOUT');assert.ok(!JSON.stringify(result).includes('private-identity'));
  const throwing={get status(){throw new Error('private credential');}};assert.deepEqual(startupEvidence('sdk-process','failed',throwing),{stage:'sdk-process',status:'failed',failure:{category:'other',code:'other',exitStatus:null,signal:null}});
+});
+
+
+test('actual marker callbacks survive failed writes and actual catches preserve the original error and cleanup',async()=>{
+ for(const file of ['run-hosted-ios-account-case.mjs','verify-native-guest-account.mjs'])for(const code of ['ENOSPC','EACCES']){
+  const source=readFileSync(new URL('./'+file,import.meta.url),'utf8');
+  const marker=source.match(/^const markStartup=.+;$/m)?.[0],failureCatch=source.match(/catch\(error\)\{markStartup\(startupStage,'failed',error\);throw error;\}/)?.[0];
+  assert.ok(marker&&failureCatch,'Exercise the actual committed writer and catch rather than a parallel implementation.');
+  const original=new Error('original synthetic startup failure'),writeFailure=Object.assign(new Error('private disk detail'),{code});let writes=0,cleanups=0,disposals=0,spawnCallback;
+  const context={startupEvidence,output:'synthetic-output',android:false,join:(...parts)=>parts.join('/'),writeFileSync(){writes++;throw writeFailure;},original,task:{async run(){cleanups++;},dispose(){disposals++;}},child:{once(event,callback){assert.equal(event,'spawn');spawnCallback=callback;}}};
+  runInNewContext("let startupStage='sdk-spawn';"+marker,context);
+  if(file==='run-hosted-ios-account-case.mjs'){
+   const registration=source.match(/child\.once\('spawn',\(\)=>markStartup\('sdk-process'\)\)/)?.[0];assert.ok(registration);runInNewContext(registration,context);
+   // An EventEmitter spawn callback runs outside the awaiting Promise body.
+   assert.doesNotThrow(()=>spawnCallback());assert.equal(runInNewContext('startupStage',context),'sdk-process');
+  }
+  const actualFinally=source.match(/finally\{await task\.run\(\);task\.dispose\(\);\}/)?.[0];assert.ok(actualFinally);
+  const promise=runInNewContext('(async()=>{try{try{throw original;}'+actualFinally+'}'+failureCatch+'})()',context);
+  await assert.rejects(promise,error=>error===original);assert.equal(cleanups,1);assert.equal(disposals,1);assert.equal(writes,file==='run-hosted-ios-account-case.mjs'?2:1);
+ }
 });
