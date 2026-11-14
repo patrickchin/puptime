@@ -27,10 +27,10 @@ name: Pending native logout requires an explicit cancel or confirmation
     commands:
       - tapOn:
           text: (?i)^Sign out$
-          above:
-            id: account.signOut
-          rightOf:
-            text: (?i)^Cancel$
+          childOf:
+            containsChild:
+              text: (?i)^Cancel$
+          retryTapIfNoChange: true
       - extendedWaitUntil:
           notVisible:
             id: account.identity
