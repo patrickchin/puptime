@@ -12,6 +12,7 @@ appId: com.patrickchin.puptime
       - extendedWaitUntil:
           visible:
             id: account.email.input
+            enabled: true
           timeout: 30000
       - assertNotVisible:
           id: account.error
