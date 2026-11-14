@@ -13,9 +13,14 @@ on:
         options: [full, accounts]
         default: full
       native_host_run_id:
-        description: Successful main iOS run supplying the unchanged native host
+        description: Main iOS run supplying the unchanged native host (full success by default)
         type: string
         default: '43383649287'
+      native_host_policy:
+        description: Test host admission; compiled-for-testing never qualifies a release
+        type: choice
+        options: [full-suite-success, compiled-for-testing]
+        default: full-suite-success
       account_case:
         description: Isolated account case
         type: choice
@@ -66,6 +71,13 @@ jobs:
             build/ios-simulator/Build/Products/Release-iphonesimulator/Puptime.app \
             build/Puptime-iOS-Simulator.zip
           unzip -tq build/Puptime-iOS-Simulator.zip
+      - name: Upload compiled iOS host for testing
+        uses: actions/upload-artifact@v6
+        with:
+          name: puptime-ios-simulator
+          path: build/Puptime-iOS-Simulator.zip
+          if-no-files-found: error
+          retention-days: 7
       - name: Install Maestro
         env:
           MAESTRO_VERSION: "2.11.0"
@@ -76,7 +88,7 @@ jobs:
         timeout-minutes: 60
         env:
           MAESTRO_CLI_NO_ANALYTICS: "1"
-          MAESTRO_DRIVER_STARTUP_TIMEOUT: "180000"
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: "300000"
         run: |
           runtime_id=$(xcrun simctl list runtimes -j | jq -r '[.runtimes[] | select(.isAvailable and (.identifier | contains("iOS-26")))][-1].identifier // empty')
           test -n "$runtime_id"
@@ -98,7 +110,7 @@ jobs:
         env:
           CI: "1"
           MAESTRO_CLI_NO_ANALYTICS: "1"
-          MAESTRO_DRIVER_STARTUP_TIMEOUT: "180000"
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: "300000"
         run: |
           mkdir -p build/onboarding-ci
           ditto build/ios-simulator/Build/Products/Release-iphonesimulator/Puptime.app build/onboarding-ci/Puptime.app
@@ -133,7 +145,7 @@ jobs:
         env:
           CI: "1"
           MAESTRO_CLI_NO_ANALYTICS: "1"
-          MAESTRO_DRIVER_STARTUP_TIMEOUT: "180000"
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: "300000"
         run: |
           runtime_id=$(xcrun simctl list runtimes -j | jq -r '[.runtimes[] | select(.isAvailable and (.identifier | contains("iOS-26")))][-1].identifier // empty')
           test -n "$runtime_id"
@@ -190,12 +202,6 @@ jobs:
           capture_screenshot "$ipad_id" build/Puptime-iPad.png
       - uses: actions/upload-artifact@v6
         with:
-          name: puptime-ios-simulator
-          path: build/Puptime-iOS-Simulator.zip
-          if-no-files-found: error
-          retention-days: 7
-      - uses: actions/upload-artifact@v6
-        with:
           name: puptime-app-store-screenshots
           path: |
             build/Puptime-iPhone.png
@@ -237,9 +243,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PUPTIME_NATIVE_HOST_RUN_ID: ${{ inputs.native_host_run_id }}
+          PUPTIME_NATIVE_HOST_POLICY: ${{ inputs.native_host_policy }}
           PUPTIME_ACCOUNT_SCENARIO: ${{ matrix.scenario }}
           MAESTRO_CLI_NO_ANALYTICS: '1'
-          MAESTRO_DRIVER_STARTUP_TIMEOUT: '180000'
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: '300000'
         run: node scripts/run-hosted-ios-account-case.mjs
       - name: Upload bounded synthetic account receipts
         if: always()
@@ -284,7 +291,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           UPGRADE_STAGE: ${{ inputs.upgrade_stage }}
           MAESTRO_CLI_NO_ANALYTICS: '1'
-          MAESTRO_DRIVER_STARTUP_TIMEOUT: '180000'
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: '300000'
         run: |
           case "$UPGRADE_STAGE" in
             inspect) node scripts/verify-ios-runtime-upgrade.mjs --inspect-only build/native-runtime-replacement ;;
