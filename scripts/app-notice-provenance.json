@@ -2,7 +2,13 @@
   "schema": 1,
   "scope": "INCOMPLETE preparation only. Collect actual Metro/native inputs and commit reviewed platform-union text and mappings before sealing. Empty mappings deliberately fail strict verification; discovery never writes a release payload.",
   "components": [],
-  "generatedSources": {},
+  "generatedSources": {
+    "\u0000polyfill:external-require": {
+      "provider": "node_modules/expo/node_modules/@expo/cli/build/src/start/server/metro/withMetroMultiPlatform.js",
+      "sha256": "50012292a38cb679ca3f692c5a462de57bebe0f69d5c862e937141a3fc54343f",
+      "component": "npm:@expo/cli@57.0.26"
+    }
+  },
   "packagedNative": {"ios": {}, "android": {}},
   "knownLicenseSources": [
     {"component":"npm:react-native@0.86.3","ecosystem":"npm","version":"0.86.3","public":true,"source":"node_modules/react-native/LICENSE","sha256":"da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93","upstream":"https://github.com/react/react-native/blob/v0.86.3/LICENSE"},

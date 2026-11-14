@@ -247,3 +247,27 @@ test('actual discovery setup trap keeps original failures and writes finite phas
  rmSync(join(root,'build'),{recursive:true,force:true});
  const invalid=spawnSync(process.execPath,[cli,'setup-failure','android','--phase','PRIVATE_UNKNOWN_PHASE'],{cwd:root,encoding:'utf8',timeout:30000});assert.equal(invalid.status,1);assert.ok(!invalid.stderr.includes('PRIVATE_UNKNOWN_PHASE'));
 }));
+
+test('the exact observed Expo external-require virtual ID resolves only to its pinned installed provider',()=>{
+ const id='\0polyfill:external-require';assert.equal(digest(id),'f32cbb35a430d4c6ee0f555a934acc8f6a83aff8e2b19c414f6d756479b8f03e');
+ const provenance=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url)));
+ const result=capturedSource(process.cwd(),id,provenance);
+ assert.deepEqual(result,{path:id,generated:true,provider:'node_modules/expo/node_modules/@expo/cli/build/src/start/server/metro/withMetroMultiPlatform.js',sha256:'50012292a38cb679ca3f692c5a462de57bebe0f69d5c862e937141a3fc54343f',component:'npm:@expo/cli@57.0.26'});
+ assert.deepEqual(provenance.components,[],'A technical provider mapping is not reviewed app-library notice coverage.');
+});
+
+test('virtual provider mapping rejects modified bytes, wrong path/owner/version and every unknown virtual ID',()=>fixture(({root,file})=>{
+ const id='\0polyfill:external-require',provider='node_modules/expo/node_modules/@expo/cli/build/src/start/server/metro/withMetroMultiPlatform.js',packagePath='node_modules/expo/node_modules/@expo/cli',content='export const fixture=1;';
+ const pkg={name:'@expo/cli',version:'1.2.3'},lock={packages:{[packagePath]:{version:'1.2.3'}}};file('package-lock.json',lock);file(packagePath+'/package.json',pkg);file(packagePath+'/LICENSE',mit);file(provider,content);
+ const record={provider,sha256:digest(content),component:'npm:@expo/cli@1.2.3'},provenance={generatedSources:{[id]:record}};
+ assert.equal(capturedSource(root,id,provenance).component,record.component);
+ file(provider,content+'modified');assert.throws(()=>capturedSource(root,id,provenance));file(provider,content);
+ assert.throws(()=>capturedSource(root,id,{generatedSources:{[id]:{...record,provider:'node_modules/metro/src/lib/getPreludeCode.js'}}}));
+ file(packagePath+'/package.json',{...pkg,version:'9.9.9'});assert.throws(()=>capturedSource(root,id,provenance));
+ file('package-lock.json',{packages:{[packagePath]:{version:'9.9.9'}}});assert.throws(()=>capturedSource(root,id,provenance),'Updating installed and locked version cannot evade the committed component pin.');
+ file('package-lock.json',lock);file(packagePath+'/package.json',{...pkg,name:'private-other'});assert.throws(()=>capturedSource(root,id,provenance));file(packagePath+'/package.json',pkg);
+ for(const unknown of ['\0polyfill:unknown','\0polyfill:environment-variables','\0polyfill:assets-registry']){
+  assert.throws(()=>capturedSource(root,unknown,provenance));
+  assert.throws(()=>capturedSource(root,unknown,{generatedSources:{[unknown]:record}}),'An arbitrary virtual ID cannot reuse an allowed provider.');
+ }
+}));

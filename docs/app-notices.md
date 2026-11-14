@@ -154,8 +154,13 @@ When an AAR/JAR omits full text, an explicitly reviewed `additionalNoticeFiles`
 entry may point at an actual pinned upstream copy under `assets/notices/sources/`
 with `file`, `sha256`, `upstream`. It supplements discovered notices; it cannot
 replace a missing NOTICE with a package label or an assumed parent licence.
-Generated Metro sources permit only the known `__prelude__`, with its exact
-installed Metro generator path/hash. Final native files not identified from resolved AARs require an exact
+Generated Metro sources permit only the known `__prelude__` and Expo CLI’s exact
+NUL-prefixed `polyfill:external-require` ID, with their exact
+installed generator path/hash. The Expo provider additionally pins its exact
+installed package path, name and version against package-lock and the committed
+component ID. This is a technical generated-source mapping, not reviewed notice
+coverage; the component ledger remains empty. Other virtual IDs are not accepted
+by a NUL/path wildcard. Final native files not identified from resolved AARs require an exact
 platform/path `packagedNative` mapping with covered `components` and a pinned
 `review` reference. These mappings are intentionally empty until discovery.
 
