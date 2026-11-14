@@ -26,7 +26,7 @@ test('installed native PostHog SDK obeys consent, scrubs payloads and rotates id
     process.env.EXPO_PUBLIC_APP_POSTHOG_HOST = 'https://collector.invalid';
     loader._load = function(name, ...args) {
       if (name === 'react-native') return native;
-      if (name === 'expo-application') return { nativeApplicationVersion: '1.12.0' };
+      if (name === 'expo-application') return { nativeApplicationVersion: '1.12.0', nativeBuildVersion: '1012000' };
       return originalLoad.call(this, name, ...args);
     };
     globalThis.fetch = (async (url: string, options: RequestInit) => {
@@ -47,12 +47,15 @@ test('installed native PostHog SDK obeys consent, scrubs payloads and rotates id
     const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
     const modules: Record<string, unknown> = {
       '@react-native-async-storage/async-storage': { getItem: async (key: string) => storage.get(key) ?? null, setItem: async (key: string, value: string) => { storage.set(key, value); } },
-      'react-native': native, 'expo-application': { nativeApplicationVersion: '1.12.0' },
+      'react-native': native, 'expo-application': { nativeApplicationVersion: '1.12.0', nativeBuildVersion: '1012000' },
       './entity-id': ids, './product-telemetry': policy,
     };
-    const module = { exports: {} };
-    Function('require', 'module', 'exports', compiled)((name: string) => name in modules ? modules[name] : require(name), module, module.exports);
-    adapter = module.exports;
+    const loadAdapter = () => {
+      const module = { exports: {} };
+      Function('require', 'module', 'exports', compiled)((name: string) => name in modules ? modules[name] : require(name), module, module.exports);
+      return module.exports as any;
+    };
+    adapter = loadAdapter();
     adapter.productTelemetry.setForeground(true);
     assert.equal(await adapter.initializeAppTelemetry(), false);
     adapter.productTelemetry.capture('app_press', { control: 'quick.pee' });
@@ -60,6 +63,7 @@ test('installed native PostHog SDK obeys consent, scrubs payloads and rotates id
     await adapter.setAppTelemetryEnabled(true);
     assert.equal(await adapter.initializeAppTelemetry(), true, 'remount sees the current saved choice');
     adapter.productTelemetry.capture('app_press', { control: 'quick.pee', press_duration_ms: 750, note: 'PRIVATE_NOTE', email: 'PRIVATE_EMAIL', pet_id: 'PRIVATE_PET' });
+    adapter.productTelemetry.capture('app_error', { error_code: 'local_read_failed', message: 'PRIVATE_MESSAGE', stack: 'PRIVATE_STACK' });
     await adapter.flushAppTelemetry();
     assert.ok(batches.length, 'actual SDK produces a batch after opt-in');
     const first = batches.flatMap(value => value.batch);
@@ -71,8 +75,21 @@ test('installed native PostHog SDK obeys consent, scrubs payloads and rotates id
       assert.equal(event.properties.$geoip_disable, true);
       assert.equal(event.properties.$set, undefined);
       assert.equal(event.properties.$device_model, undefined);
+      assert.equal(event.properties.app_version, '1.12.0');
+      assert.equal(event.properties.app_build, '1012000');
     }
+    assert.ok(first.some(event => event.event === 'app_error' && event.properties.error_code === 'local_read_failed'));
     const previousId = first[0].distinct_id;
+    const savedChoice = storage.get('puptime.app.analytics.v1')!;
+    await adapter.setAppTelemetryEnabled(false);
+    storage.set('puptime.app.analytics.v1', savedChoice);
+    adapter = loadAdapter();
+    adapter.productTelemetry.setScreen('settings');
+    adapter.productTelemetry.setForeground(true);
+    assert.equal(await adapter.initializeAppTelemetry(), true, 'a fresh process restores the explicit saved choice');
+    await adapter.flushAppTelemetry();
+    assert.equal(batches.at(-1).batch[0].distinct_id, previousId, 'cold start keeps the consented anonymous installation identity');
+    assert.equal(batches.at(-1).batch.filter((event: any) => event.event === 'app_screen_view').length, 1);
     adapter.productTelemetry.capture('app_press', { control: 'nav.open' });
     await adapter.setAppTelemetryEnabled(false);
     const count = batches.length;
@@ -81,6 +98,12 @@ test('installed native PostHog SDK obeys consent, scrubs payloads and rotates id
     await adapter.flushAppTelemetry(); assert.equal(batches.length, count, 'queued events cannot ship after withdrawal');
     assert.equal(await adapter.initializeAppTelemetry(), false);
     assert.ok(![...storage.values()].join('').includes(previousId), 'withdrawal removes the old anonymous identity');
+    adapter = loadAdapter();
+    adapter.productTelemetry.setForeground(true);
+    assert.equal(await adapter.initializeAppTelemetry(), false, 'a cold start preserves withdrawal');
+    adapter.productTelemetry.capture('app_error', { error_code: 'local_read_failed' });
+    await adapter.flushAppTelemetry();
+    assert.equal(batches.length, count);
     await adapter.setAppTelemetryEnabled(true); await adapter.flushAppTelemetry();
     assert.notEqual(batches.at(-1).batch[0].distinct_id, previousId);
     hold = true;
