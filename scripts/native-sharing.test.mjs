@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {addedEvent,assertVisibleAttribution,copiedInvitation} from './verify-native-sharing.mjs';
+import {addedEvent,assertStoredAttribution,assertShareDenied,copiedInvitation} from './verify-native-sharing.mjs';
 
 const origin='https://127.0.0.1:8799',id='shr_'+'1'.repeat(32),token='inv_'+'2'.repeat(32);
 const link=`${origin}/care?invite=${id}#${token}`;
@@ -26,8 +26,19 @@ test('equal counts or one new row cannot conceal an overwritten original payload
 
 test('service actor IDs are insufficient without the edited note and readable attribution',()=>{
   const note='Edited household entry',actor='Fixture household helper';
-  assertVisibleAttribution({data:{note:`${note}\n\nLogged by ${actor}`}},note,actor);
+  assertStoredAttribution({data:{note:`${note}\n\nLogged by ${actor}`}},note,actor);
   for(const saved of [note,`${note}\n\nLogged by Someone Else`,'Old text\n\nLogged by '+actor]){
-    assert.throws(()=>assertVisibleAttribution({data:{note:saved},deviceId:'usr_carer'},note,actor));
+    assert.throws(()=>assertStoredAttribution({data:{note:saved},deviceId:'usr_carer'},note,actor));
   }
+});
+
+test('revocation needs the correct actor, share, route and a forwarded service denial',()=>{
+  const scope={method:'GET',paths:['/api/account','/api/sync/pull']};
+  const denial={actor:'carer',shareId:id,forwarded:true,method:'GET',path:'/api/account',status:410};
+  assertShareDenied([denial],id,scope);
+  for(const responses of [[],[{...denial,status:200}],[{...denial,status:503}],[{...denial,forwarded:false}],
+    [{...denial,actor:'owner'}],[{...denial,shareId:null}],[{...denial,path:'/api/care/accept'}]]){
+    assert.throws(()=>assertShareDenied(responses,id,scope));
+  }
+  assertShareDenied([{...denial,method:'POST',path:'/api/care/accept'}],id,{method:'POST',paths:['/api/care/accept']});
 });

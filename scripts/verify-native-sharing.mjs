@@ -23,9 +23,15 @@ export function addedEvent(before,after){
   return added[0];
 }
 
-export function assertVisibleAttribution(record,note,actor){
+export function assertStoredAttribution(record,note,actor){
   assert.ok(typeof actor==='string'&&/^[A-Za-z ]{1,80}$/.test(actor),'Use the independently observed plain synthetic member label.');
-  assert.equal(record?.data.note,`${note}\n\nLogged by ${actor}`,'A service actor ID alone does not establish readable owner-visible attribution.');
+  assert.equal(record?.data.note,`${note}\n\nLogged by ${actor}`,'Require the exact stored actor label; verify rendered visibility separately.');
+}
+
+export function assertShareDenied(responses,shareId,{method,paths}){
+  assert.ok(responses.some(row=>row.actor==='carer'&&row.shareId===shareId&&row.forwarded===true
+    &&row.method===method&&paths.includes(row.path)&&row.status===410),
+  'Observe this caregiver’s real service denial for this share; no traffic or a proxy failure cannot prove revoked authorization.');
 }
 
 const noteFor=kind=>`Shared ${kind} entry`,editedFor=kind=>`Edited ${kind} entry`;
@@ -99,9 +105,12 @@ export async function verifyNativeSharing({kind,activate,owner,carer,readOwnerRe
   assert.ok(cloud.revisions.some(row=>row.recordId===record?.id&&row.deviceId===carer.accountId),'The real member must be the service revision actor.');
   // Keep this check strict: sharedPush currently may omit readable attribution.
   // A failing receipt/UI assertion is evidence for a separate product fix.
-  assertVisibleAttribution(record,editedFor(kind),carer.attribution);
+  assertStoredAttribution(record,editedFor(kind),carer.attribution);
+  const beforeReview=await owner.snapshot();
   await flow(owner,'owner-attribution',{NOTE:editedFor(kind),ATTRIBUTION:carer.attribution});
   const ownerAfter=await owner.snapshot();
+  // Opening and closing attribution detail must not edit any native table.
+  assertNativeTransition(beforeReview.tables,ownerAfter.tables);
   assert.equal(ownerAfter.events.length,ownerBefore.events.length+1);
   for(const row of ownerBefore.events)assert.deepEqual(ownerAfter.events.find(value=>value.id===row.id),row);
   for(const row of ownerBefore.tables.local_revisions)assert.deepEqual(ownerAfter.tables.local_revisions.find(value=>value.sequence===row.sequence),row);
@@ -109,19 +118,27 @@ export async function verifyNativeSharing({kind,activate,owner,carer,readOwnerRe
   await activate(carer);await transport('offline');await flow(carer,'add-log',{NOTE:`Unsent ${kind} entry`});
   const revokedQueue=await carer.snapshot({care:true});assert.ok(revokedQueue.pending>0);
   await activate(owner);await transport('online');await flow(owner,'revoke',{},true);
-  const atRevoke=await readOwnerRecords({historyFor:[event.id]}),acceptedAtRevoke=wire().accepted.length;
+  const atRevoke=await readOwnerRecords({historyFor:[event.id]}),revokedStart=wire();
   await activate(carer);await flow(carer,'access-ended');
+  assertShareDenied(wire().responses.slice(revokedStart.responses.length),invitation.id,{method:'GET',paths:['/api/account','/api/sync/pull']});
   const blocked=await carer.snapshot({care:true});
   assertNativeTransition(revokedQueue.tables,blocked.tables,{
     metadata:[...revokedQueue.tables.metadata.filter(row=>row.key!=='care_blocked'),{key:'care_blocked',value:'1'}],
   });
   await flow(carer,'access-ended');assertNativeTransition(blocked.tables,(await carer.snapshot({care:true})).tables);
+  const staleStart=wire().responses.length;
   await carer.openURL(invitation.url);await flow(carer,'reject-stale-invitation',{},true);
+  assertShareDenied(wire().responses.slice(staleStart),invitation.id,{method:'POST',paths:['/api/care/accept']});
   assertNativeTransition(blocked.tables,(await carer.snapshot({care:true})).tables);
-  assert.equal(wire().accepted.length,acceptedAtRevoke,'Revoked access must never accept a queued write.');
+  assert.equal(wire().accepted.length,revokedStart.accepted.length,'Revoked access must never accept a queued write.');
   assert.deepEqual(await readOwnerRecords({historyFor:[event.id]}),atRevoke,'Stale invitation/restart must not mutate the owner’s cloud.');
   assertNativeTransition(personal.tables,(await carer.snapshot()).tables);
-  await flow(carer,'return-own-journal');
+  const returnStart=wire().responses.length;await flow(carer,'return-own-journal');
+  await until(async()=>wire().responses.slice(returnStart),rows=>rows.some(row=>row.actor==='carer'&&row.shareId===null
+    &&row.forwarded===true&&row.method==='GET'&&row.path==='/api/account'&&row.status===200),
+  'B’s personal session must remain live; denial must concern the revoked share.');
   assertNativeTransition(personal.tables,(await carer.snapshot()).tables);
-  return {kind,acceptedOperations:accepted.size,offlineRestartPreserved:true,ownerVisibleAttribution:true,revokedQueuePreserved:true,staleInvitationRejected:true};
+  return {kind,status:'awaiting-attribution-visual-review',acceptedOperations:accepted.size,offlineRestartPreserved:true,
+    storedAttribution:true,requiredVisualReview:['native-owner-attribution-row.png','native-owner-attribution-detail.png'],
+    revokedServiceDenied:true,revokedQueuePreserved:true,staleInvitationRejected:true};
 }
