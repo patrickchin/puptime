@@ -6,6 +6,8 @@ import { marketingStyles } from '../src/web/marketing-styles';
 import { websiteTheme } from '../src/web/brand';
 
 type Step='email'|'code'|'confirm'|'done';
+type Operation='send'|'verify'|'delete'|'signout';
+const statusMessages={send:'Sending code…',verify:'Verifying…',delete:'Deleting cloud account…',signout:'Signing out…'};
 const messages={
  code:'That code is invalid or has expired. Request a new code and try again.',
  rate:'Too many attempts. Wait a little before trying again.',
@@ -22,29 +24,30 @@ export default function DeleteAccount(){
  const locked=useRef(false),heading=useRef<HTMLHeadingElement>(null);
  const [step,setStep]=useState<Step>('email'),[email,setEmail]=useState(''),[code,setCode]=useState('');
  const [user,setUser]=useState<DeletionIdentity|null>(null),[confirmed,setConfirmed]=useState(false);
- const [busy,setBusy]=useState(false),[error,setError]=useState(''),[appleManual,setAppleManual]=useState(false);
+ const [operation,setOperation]=useState<Operation|null>(null),[error,setError]=useState(''),[appleManual,setAppleManual]=useState(false);
+ const busy=operation!==null;
  useEffect(()=>{client.current=createWebDeletionClient(window.location.origin);},[]);
  useEffect(()=>{if(step!=='email')heading.current?.focus();},[step]);
  function reset(){setCode('');setUser(null);setConfirmed(false);setStep('email');}
- async function act(work:()=>Promise<void>){
+ async function act(operation:Operation,work:()=>Promise<void>){
   if(locked.current||!client.current)return;
-  locked.current=true;setBusy(true);setError('');
+  locked.current=true;setOperation(operation);setError('');
   try{await work();}catch(value){
    const kind=value instanceof AccountDeletionError?value.kind:'network';
    if(['auth','mismatch','reauth','unconfirmed'].includes(kind))reset();
    setError(messages[kind]);
-  }finally{locked.current=false;setBusy(false);}
+  }finally{locked.current=false;setOperation(null);}
  }
- function send(event:FormEvent){event.preventDefault();const address=email.trim().toLowerCase();void act(async()=>{
+ function send(event:FormEvent){event.preventDefault();const address=email.trim().toLowerCase();void act('send',async()=>{
   await client.current!.requestCode(address);setEmail(address);setCode('');setStep('code');
  });}
- function verify(event:FormEvent){event.preventDefault();void act(async()=>{
+ function verify(event:FormEvent){event.preventDefault();void act('verify',async()=>{
   const original=await client.current!.verify(email,code);setCode('');setUser(original);setConfirmed(false);setStep('confirm');
  });}
- function remove(event:FormEvent){event.preventDefault();if(!user||!confirmed)return;const original=user;void act(async()=>{
+ function remove(event:FormEvent){event.preventDefault();if(!user||!confirmed)return;const original=user;void act('delete',async()=>{
   const result=await client.current!.remove(original.id);setAppleManual(result.appleManual);setUser(null);setEmail('');setConfirmed(false);setStep('done');
  });}
- function cancel(){void act(async()=>{await client.current!.cancel();reset();});}
+ function cancel(){void act('signout',async()=>{await client.current!.cancel();reset();});}
  return <div className="marketing-site care-page deletion-page">
   <Head><title>Delete your account | Puptime</title><meta name="robots" content="noindex, nofollow"/><meta name="referrer" content="no-referrer"/><link rel="icon" href="/brand-icon.png" type="image/png"/></Head>
   <style>{marketingStyles+css}</style>
@@ -84,7 +87,7 @@ export default function DeleteAccount(){
     {appleManual&&<p>Apple did not confirm authorization revocation. Remove Puptime from <a href="https://account.apple.com/">your Apple Account’s Sign in with Apple settings</a>.</p>}
     <a className="text-action" href="/">Back to Puptime</a>
    </>}
-   {busy&&<p role="status">{step==='confirm'?'Deleting cloud account…':step==='email'?'Sending code…':'Verifying…'}</p>}
+   {operation&&<p role="status">{statusMessages[operation]}</p>}
    {error&&<p role="alert">{error}</p>}
    {step!=='done'&&<aside><p>Deletion does not erase provider-managed recovery copies immediately. Cloudflare recovery copies can remain for up to 30 days; a non-content retirement marker prevents old clients from restoring the deleted account.</p><p>You can also delete your cloud account in Puptime’s My account screen after recent sign-in.</p><a href="https://github.com/patrickchin/puptime/blob/main/PRIVACY.md">Read the privacy policy</a></aside>}
   </main>
