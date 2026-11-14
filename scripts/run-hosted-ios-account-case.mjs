@@ -5,6 +5,7 @@ import {execFileSync,spawn} from 'node:child_process';
 import {existsSync,mkdirSync,mkdtempSync,readFileSync,realpathSync,statSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {dirname,isAbsolute,join,resolve} from 'node:path';
+import {deleteOwnedSimulator,installTaskCleanup,ownProcess} from './native-task-cleanup.mjs';
 
 const repository=process.env.GITHUB_REPOSITORY,runId=process.env.PUPTIME_NATIVE_HOST_RUN_ID;
 assert.equal(repository,'patrickchin/puptime','Run only in the intended repository.');
@@ -60,6 +61,13 @@ const runtime=runtimes.filter(item=>item.isAvailable&&item.identifier.includes('
 provenance.environment={runnerArchitecture:process.arch,runnerImage:process.env.ImageOS??null,runnerImageVersion:process.env.ImageVersion??null,xcodeVersion:command('xcodebuild',['-version']),developerDirectory:command('xcode-select',['-p']),runtime:{identifier:runtime.identifier,name:runtime.name,version:runtime.version,buildVersion:runtime.buildversion},deviceType:'com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro'};
 writeFileSync(join(output,'native-provenance.json'),JSON.stringify(provenance,null,2)+'\n');
 const device=command('xcrun',['simctl','create',`Puptime Account ${scenario} CI ${process.env.GITHUB_RUN_ID}`,'com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro',runtime.identifier]);
+let completed=false,stopCaseChild;
+const task=installTaskCleanup(async()=>{
+ const processesStopped=stopCaseChild?await stopCaseChild():true;
+ const simulator=deleteOwnedSimulator({device,privateDirectory,preserve:!completed});
+ writeFileSync(join(output,'task-cleanup.json'),JSON.stringify({status:processesStopped&&simulator.deleted?'passed':'failed',processesStopped,...simulator},null,2)+'\n');
+ if(!processesStopped||!simulator.deleted)process.exitCode=1;
+});
 try{
  const bootStarted=Date.now();
  try{command('xcrun',['simctl','boot',device]);command('xcrun',['simctl','bootstatus',device,'-b'],{timeout:300000});}
@@ -73,6 +81,6 @@ try{
  command('xcrun',['simctl','install',device,initialHost]);
  const mode={baseline:[],comparison:['--puppy-comparison'],offline:['--offline-lifecycle'],isolation:['--account-isolation'],photos:['--photo-lifecycle'],deletion:['--deletion-faults'],'enrolled-upgrade':['--enrolled-runtime-upgrade']}[scenario];
  const args=['scripts/verify-ios-guest-account.mjs',device,initialHost,'--replace-synthetic',output,...mode];
- await new Promise((resolveCase,reject)=>{const child=spawn(process.execPath,args,{stdio:'inherit',env:{...process.env,CI:'1'}});child.once('error',reject);child.once('close',code=>code===0?resolveCase():reject(new Error(`Native ${scenario} case failed (${code}).`)));});
- assert.equal(JSON.parse(readFileSync(join(output,'verification.json'),'utf8')).status,'passed');
-}finally{try{command('xcrun',['simctl','delete',device]);}catch{/* Preserve the original case failure. */}}
+ await new Promise((resolveCase,reject)=>{const child=spawn(process.execPath,args,{stdio:'inherit',detached:true,env:{...process.env,CI:'1'}});stopCaseChild=ownProcess(child,{graceMs:120000});child.once('error',reject);child.once('close',async code=>{const stopped=await stopCaseChild();code===0&&stopped?resolveCase():reject(new Error(`Native ${scenario} case failed (${code}).`));});});
+ assert.equal(JSON.parse(readFileSync(join(output,'verification.json'),'utf8')).status,'passed');assert.equal(task.signal,null);completed=true;
+}finally{await task.run();task.dispose();}

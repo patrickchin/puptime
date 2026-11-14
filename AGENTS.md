@@ -10,3 +10,4 @@
 - When native verification needs a simulator or emulator, use one dedicated to this worktree and name it for the task or branch.
 - On macOS, use iOS Simulator as the default for native runtime and UI verification. For shared app changes, assume Android behaves the same and avoid duplicating simulator tests. Run Android verification when the change introduces or touches Android-specific behavior, code, or configuration. Report which platform was actually tested; distinguish assumed parity from verified behavior.
 - For interactions on data-heavy screens, test with populated history on the default verification platform and check that local editor or detail state does not redraw unchanged rows.
+- After a run passes, fails or is cancelled, delete only the simulators created by that task. Preserve bounded private failure evidence first. Retain a simulator only at the owner’s explicit request; never use a global simulator shutdown or deletion.
