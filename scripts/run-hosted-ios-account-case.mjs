@@ -47,7 +47,7 @@ const runtimes=JSON.parse(command('xcrun',['simctl','list','runtimes','-j'])).ru
 const runtime=runtimes.filter(item=>item.isAvailable&&item.identifier.includes('iOS-26')).at(-1);assert.ok(runtime);
 const device=command('xcrun',['simctl','create',`Puptime Account ${scenario} CI ${process.env.GITHUB_RUN_ID}`,'com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro',runtime.identifier]);
 try{
- command('xcrun',['simctl','boot',device]);command('xcrun',['simctl','bootstatus',device,'-b']);
+ command('xcrun',['simctl','boot',device]);command('xcrun',['simctl','bootstatus',device,'-b'],{timeout:300000});
  command('xcrun',['simctl','install',device,host]);
  const mode={baseline:[],comparison:['--puppy-comparison'],offline:['--offline-lifecycle'],isolation:['--account-isolation'],photos:['--photo-lifecycle'],deletion:['--deletion-faults']}[scenario];
  const args=['scripts/verify-ios-guest-account.mjs',device,host,'--replace-synthetic',output,...mode];
