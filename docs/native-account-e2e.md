@@ -14,9 +14,10 @@ The ordinary pull-request workflow retains its full build and test path. Manual 
 | `isolation` | Actual server session expiry, another native account's queue fence, no attempted enrollment/push, cancellation/restart, explicit logout and return to the original account. |
 | `photos` | Real UIKit selection/crop and decoded JPEG, upload failures, exact transmitted bytes, corrupt-download rejection and byte-exact recovery on a fresh device. |
 | `deletion` | Pending-delete cancellation, pre-commit failure and explicit retry, accepted deletion with a lost response, continued local logging and the unresolved safety barrier across restart. |
+| `rich` | Real native Settings saves dark appearance, Spanish,15-minute reminder lead and walk widget actions. A user-created meal routine has an edited native-wheel time,60-minute window and enabled reminder. Exact production-projected cloud records, IDs/bodies and log notes must survive same-account logout/rejoin and a genuinely fresh-device restore, while device-only notification/quiet-status choices remain local. Final restart checks all14 tables and unchanged cloud records. |
 | `upgrade` | The separately pinned original-archive guest runtime replacement described below. |
 
-`all` selects the six account cases, excluding `upgrade`.
+`all` selects the seven account cases, excluding `upgrade`. A prepared case is not a passing result: qualify `rich` only with an actual successful execution receipt from its recorded source and matching host.
 
 ```sh
 gh workflow run ios-simulator.yml --ref <tested-source-ref> \
@@ -83,4 +84,4 @@ A pass uses `stage: controlled-origin-enrolled-runtime-replacement`, `upgradeExe
 
 Receipts distinguish inspected archives, prepared bundles and executed scenarios. Keep exact source/tree, original/native/bundled hashes, actual platform and relevant source changes together. Session credentials, cookies, OTPs and private keys stay outside uploaded receipts. Prepared source/host manifests remain private. Bounded screenshots may show synthetic names, counts and generated `example.invalid` identities; never substitute an owner’s account. Failure UI diagnostics contain only allowlisted readiness flags and finite route/status categories. Existing hosted receipt retention is three days.
 
-Controlled proxy outages do not establish OS airplane-mode behavior. Native email SDK tests do not establish Google/Apple OAuth or production-service qualification. Historical runtime evidence does not qualify a later audio/configuration/asset cut, signing transition or store artifact. Rich preference/custom-routine cloud restoration and native caregiver sharing require their own declared cases; consult the [operating plan](product-operating-plan.md) for the remaining release gates.
+Controlled proxy outages do not establish OS airplane-mode behavior. Native email SDK tests do not establish Google/Apple OAuth or production-service qualification. Historical runtime evidence does not qualify a later audio/configuration/asset cut, signing transition or store artifact. Rich preference/custom-routine cloud restoration needs its own executed `rich` receipt; native caregiver sharing remains a separate case. Consult the [operating plan](product-operating-plan.md) for the remaining release gates.
