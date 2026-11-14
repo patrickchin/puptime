@@ -1,0 +1,101 @@
+appId: com.patrickchin.puptime
+name: Native routine and device-only delivery are explicitly saved
+---
+- launchApp:
+    stopApp: false
+    permissions:
+      notifications: allow
+- runFlow: ../helpers/open-account.yaml
+- tapOn:
+    id: account.back
+    retryTapIfNoChange: true
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.notifications
+- assertVisible:
+    id: screen.notifications
+- assertVisible:
+    id: settings.notifications.deviceDelivery
+    checked: false
+- tapOn:
+    id: settings.notifications.deviceDelivery
+- assertVisible:
+    id: settings.notifications.deviceDelivery
+    checked: true
+- scrollUntilVisible:
+    element:
+      id: notifications.quietStatus
+    direction: DOWN
+- assertVisible:
+    id: notifications.quietStatus
+    checked: false
+- tapOn:
+    id: notifications.quietStatus
+- assertVisible:
+    id: notifications.quietStatus
+    checked: true
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.schedule
+- assertVisible:
+    id: screen.schedule
+- scrollUntilVisible:
+    element:
+      id: schedule.add
+    direction: DOWN
+- tapOn:
+    id: schedule.add
+- assertVisible:
+    id: schedule.editor
+- tapOn:
+    id: schedule.editor.type.meal
+- tapOn:
+    id: schedule.editor.time
+- assertVisible:
+    id: time.nativeWheel
+# The production editor starts at a rounded15-minute time. Move its minute
+# wheel by one real native choice; the runner requires a non-rounded result.
+- tapOn:
+    id: time.nativeWheel
+    point: "50%,64%"
+- tapOn:
+    id: picker.done
+- tapOn:
+    id: schedule.editor.window
+- tapOn:
+    id: schedule.editor.window.60
+- assertVisible:
+    id: schedule.editor.window.60
+    checked: true
+- scrollUntilVisible:
+    element:
+      id: schedule.editor.reminder
+    direction: DOWN
+- assertVisible:
+    id: schedule.editor.reminder
+    checked: false
+- tapOn:
+    id: schedule.editor.reminder
+- assertVisible:
+    id: schedule.editor.reminder
+    checked: true
+- scrollUntilVisible:
+    element:
+      id: schedule.editor.save
+    direction: DOWN
+- tapOn:
+    id: schedule.editor.save
+    enabled: true
+- extendedWaitUntil:
+    notVisible:
+      id: schedule.editor
+    timeout: 30000
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.log
+- assertVisible:
+    id: screen.today
+- takeScreenshot: native-rich-routine

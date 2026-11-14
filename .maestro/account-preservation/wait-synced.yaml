@@ -12,5 +12,5 @@ name: Account preservation waits for automatic sync
 - extendedWaitUntil:
     visible:
       id: account.status
-      text: Up to date
+      text: ${ACCOUNT_STATUS || "Up to date"}
     timeout: 45000
