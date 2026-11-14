@@ -126,6 +126,7 @@ export function capturedJson(body,contentEncoding){
 // Project only allowlisted readiness flags; never retain input values or labels.
 export function nativeAuthUiFlags(hierarchy,{email='',code=''}={}){
  const fields=Object.fromEntries(['account.email.input','account.code.input','account.sendCode','account.verify','account.refresh','account.error','account.identity','account.signOut'].map(id=>[id,{present:false}]));
+ const boolean=value=>value===true||value==='true'?true:value===false||value==='false'?false:null;
  const copies=[['Sign out on this device?','Cancel','Sign out'],['¿Cerrar sesión en este dispositivo?','Cancelar','Cerrar sesión'],['在这台设备上退出登录？','取消','退出登录']];
  const observed=copies.map(()=>[false,false,false]);
  function visit(node,visible=true,insideSignOut=false){
@@ -134,12 +135,13 @@ export function nativeAuthUiFlags(hierarchy,{email='',code=''}={}){
   insideSignOut=insideSignOut||id==='account.signOut';
   if(visible&&!insideSignOut)copies.forEach((copy,i)=>copy.forEach((text,j)=>{if(a.text===text||a.accessibilityText===text)observed[i][j]=true;}));
   if(Object.hasOwn(fields,id)){
-   const flags={present:true,enabled:a.enabled===true||a.enabled==='true',focused:a.focused===true||a.focused==='true'};
+   const ambiguous=fields[id].present;
+   const flags={present:true,ambiguous,enabled:ambiguous?null:boolean(a.enabled),focused:ambiguous?null:boolean(a.focused)};
    if(id==='account.email.input'||id==='account.code.input'){
-    const value=a.value??a.text;
-    flags.valueCategory=typeof value!=='string'?'unavailable':value===''?'empty':id==='account.email.input'?'nonempty':/^\d{6}$/.test(value)?'six-digits':/^\d{1,5}$/.test(value)?'partial-digits':'other';
+    const value=ambiguous?undefined:a.value??a.text;
+    flags.valueCategory=ambiguous?'ambiguous':typeof value!=='string'?'unavailable':value===''?'empty':id==='account.email.input'?'nonempty':/^\d{6}$/.test(value)?'six-digits':/^\d{1,5}$/.test(value)?'partial-digits':'other';
     const expected=id==='account.email.input'?email:code;
-    flags.exactExpectedMatch=typeof value==='string'&&expected!==''&&value===expected;
+    flags.exactExpectedMatch=typeof value==='string'&&typeof expected==='string'&&expected!==''?value===expected:null;
    }
    fields[id]=flags;
   }
@@ -148,4 +150,35 @@ export function nativeAuthUiFlags(hierarchy,{email='',code=''}={}){
  visit(hierarchy);
  const confirmation=observed.find(([title])=>title)??[false,false,false];
  return {...fields,signOutConfirmation:{titleVisible:confirmation[0],cancelVisible:confirmation[1],actionVisible:confirmation[2]}};
+}
+
+// Observe transport lifecycle only. Never copy messages, headers, URLs or bodies.
+export function nativeTransportFailure(error){
+ const categories={ECONNRESET:'connection-reset',ECONNREFUSED:'connection-refused',ETIMEDOUT:'timeout',EPIPE:'stream',ABORT_ERR:'aborted',ERR_STREAM_PREMATURE_CLOSE:'stream',ENOENT:'missing-tool',DEPTH_ZERO_SELF_SIGNED_CERT:'tls',SELF_SIGNED_CERT_IN_CHAIN:'tls',UNABLE_TO_VERIFY_LEAF_SIGNATURE:'tls',CERT_HAS_EXPIRED:'tls',ERR_TLS_CERT_ALTNAME_INVALID:'tls'};
+ const supplied=error?.name==='TimeoutError'?'ETIMEDOUT':error?.code??error?.cause?.code,code=typeof supplied==='string'&&Object.hasOwn(categories,supplied)?supplied:error?'other':'none';
+ return {code,category:categories[code]??code};
+}
+export function nativeHttpBoundary(request,response){
+ // Successful streams close too; close flags alone never classify an error.
+ const flags={downstreamRequestEnded:false,downstreamRequestAborted:false,downstreamRequestClosed:false,downstreamResponseFinished:false,downstreamResponseClosed:false,upstreamCreated:false,upstreamRequestFinished:false,upstreamRequestClosed:false,upstreamHeadersReceived:false,upstreamStatus:null,upstreamResponseEnded:false,upstreamResponseAborted:false,upstreamResponseClosed:false,upstreamErrorAt:'none',upstreamError:nativeTransportFailure()};
+ const recordError=(where,error)=>{if(flags.upstreamErrorAt==='none'){flags.upstreamErrorAt=where;flags.upstreamError=nativeTransportFailure(error);}};
+ request.once('end',()=>flags.downstreamRequestEnded=true);request.once('aborted',()=>flags.downstreamRequestAborted=true);request.once('close',()=>flags.downstreamRequestClosed=true);
+ response.once('finish',()=>flags.downstreamResponseFinished=true);response.once('close',()=>flags.downstreamResponseClosed=true);
+ return {flags,upstreamRequest(outgoing){
+  flags.upstreamCreated=true;outgoing.once('finish',()=>flags.upstreamRequestFinished=true);outgoing.once('close',()=>flags.upstreamRequestClosed=true);outgoing.once('error',error=>recordError('request',error));
+ },upstreamResponse(incoming){
+  flags.upstreamHeadersReceived=true;const status=incoming.statusCode;flags.upstreamStatus=Number.isInteger(status)&&status>=100&&status<=599?status:null;
+  incoming.once('end',()=>flags.upstreamResponseEnded=true);incoming.once('aborted',()=>flags.upstreamResponseAborted=true);incoming.once('close',()=>flags.upstreamResponseClosed=true);incoming.once('error',error=>recordError('response',error));
+ }};
+}
+export function nativeBackendState(worker,error){
+ const status=worker?.exitCode,signal=worker?.signalCode;
+ return {basis:'wrangler-control-process',state:error?'spawn-error':!worker?'not-started':status!==null&&status!==undefined||signal?'exited':Number.isSafeInteger(worker.pid)&&worker.pid>0?'running':'starting',exitStatus:Number.isInteger(status)&&status>=0&&status<=255?status:null,signal:signal?['SIGTERM','SIGKILL','SIGINT','SIGABRT','SIGSEGV'].includes(signal)?signal:'other':'none',error:nativeTransportFailure(error)};
+}
+export async function nativeBackendHealth(url){
+ try{
+  const parsed=new URL(url);if(parsed.protocol!=='http:'||parsed.hostname!=='127.0.0.1'||Number(parsed.port)<=1024||parsed.pathname!=='/health'||parsed.search||parsed.hash||parsed.username||parsed.password)return {state:'refused'};
+  const response=await fetch(parsed,{signal:AbortSignal.timeout(2000),redirect:'manual'}),result={state:'responded',status:response.status,healthy:response.ok};
+  try{await response.body?.cancel();}catch{}return result;
+ }catch(error){return {state:'unavailable',...nativeTransportFailure(error)};}
 }

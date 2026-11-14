@@ -1,0 +1,11 @@
+appId: com.patrickchin.puptime
+# SECRET PHASE: invite is delivered by the quiet native openURL adapter, never env.
+---
+- extendedWaitUntil:
+    visible: {id: shared.accept}
+    timeout: 30000
+- tapOn: {id: shared.accept}
+- extendedWaitUntil:
+    visible: {id: screen.today}
+    timeout: 60000
+- assertNotVisible: {id: shared.accept}

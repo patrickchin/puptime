@@ -7,7 +7,9 @@ import {DatabaseSync} from 'node:sqlite';
 import {mkdtempSync,mkdirSync,rmSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {nativeTables,nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeAcknowledged,assertNativeDrained,assertEmptyIosRestoreSources,assertFreshSetupRevisions,capturedJson,nativeAuthUiFlags} from './native-account-evidence.mjs';
+import {createServer,request as httpRequest} from 'node:http';
+import {once,EventEmitter} from 'node:events';
+import {nativeTables,nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeAcknowledged,assertNativeDrained,assertEmptyIosRestoreSources,assertFreshSetupRevisions,capturedJson,nativeAuthUiFlags,nativeHttpBoundary,nativeTransportFailure,nativeBackendState,nativeBackendHealth} from './native-account-evidence.mjs';
 
 const empty=()=>Object.fromEntries(nativeTables.map(table=>[table,[]]));
 test('snapshots include every real table and exact payload; new tables fail closed',()=>{
@@ -112,14 +114,49 @@ test('auth failure diagnostics retain readiness categories only, never secrets o
  const email='synthetic-private@example.invalid',code='829471';
  const hierarchy={children:[{attributes:{'resource-id':'account.email.input',value:email,text:email,enabled:'true',focused:'false'}},{attributes:{'resource-id':'account.code.input',value:code,enabled:'false',focused:'true'}},{attributes:{'resource-id':'account.error',accessibilityText:'private service detail '+code}},{attributes:{'resource-id':'unknown-'+email,value:code}}]};
  const result=nativeAuthUiFlags(hierarchy,{email,code});
- assert.deepEqual(result['account.email.input'],{present:true,enabled:true,focused:false,valueCategory:'nonempty',exactExpectedMatch:true});
- assert.deepEqual(result['account.code.input'],{present:true,enabled:false,focused:true,valueCategory:'six-digits',exactExpectedMatch:true});
+ assert.deepEqual(result['account.email.input'],{present:true,ambiguous:false,enabled:true,focused:false,valueCategory:'nonempty',exactExpectedMatch:true});
+ assert.deepEqual(result['account.code.input'],{present:true,ambiguous:false,enabled:false,focused:true,valueCategory:'six-digits',exactExpectedMatch:true});
  assert.deepEqual(result['account.sendCode'],{present:false});
  for(const secret of [email,code,'private service detail','unknown-'])assert.ok(!JSON.stringify(result).includes(secret));
  for(const [value,category] of [['','empty'],['12','partial-digits'],['wrong','other'],[undefined,'unavailable']]){
   const flags=nativeAuthUiFlags({attributes:{'resource-id':'account.code.input',value}},{code})['account.code.input'];
-  assert.equal(flags.valueCategory,category);assert.equal(flags.exactExpectedMatch,false);
+  assert.equal(flags.valueCategory,category);assert.equal(flags.exactExpectedMatch,value===undefined?null:false);
  }
+});
+
+test('auth readiness keeps missing or unsupported input attributes unknown',()=>{
+ const email='private-synthetic@example.invalid';
+ for(const attributes of [
+  {},{enabled:undefined,focused:undefined,value:undefined},
+  {enabled:'unknown',focused:0,value:42,text:email,accessibilityText:email},
+ ]){
+  const result=nativeAuthUiFlags({attributes:{'resource-id':'account.email.input',...attributes}},{email})['account.email.input'];
+  assert.deepEqual(result,{present:true,ambiguous:false,enabled:null,focused:null,valueCategory:'unavailable',exactExpectedMatch:null});
+  assert.ok(!JSON.stringify(result).includes(email));
+ }
+ for(const value of [true,'true',false,'false']){
+  const result=nativeAuthUiFlags({attributes:{'resource-id':'account.sendCode',enabled:value,focused:value}})['account.sendCode'];
+  assert.equal(result.enabled,value===true||value==='true');assert.equal(result.focused,result.enabled);
+ }
+ const observed=nativeAuthUiFlags({attributes:{'resource-id':'account.email.input',value:email}})['account.email.input'];
+ assert.equal(observed.valueCategory,'nonempty');assert.equal(observed.exactExpectedMatch,null,'Missing expected value cannot establish a mismatch.');
+ for(const expected of [undefined,'',null,false,0,123456])for(const [id,key,value] of [['account.email.input','email',email],['account.code.input','code','654321']]){
+  const result=nativeAuthUiFlags({attributes:{'resource-id':id,value}},{[key]:expected})[id];
+  assert.equal(result.exactExpectedMatch,null,'Expected values must be nonempty strings before comparison.');
+ }
+});
+
+test('auth readiness treats every duplicate ID as ambiguous in either order without retaining secrets',()=>{
+ const email='private-synthetic@example.invalid',secret='654321 cookie=PRIVATE_SESSION /private/value';
+ const first={attributes:{'resource-id':'account.email.input',enabled:'true',focused:'true',value:email}};
+ const second={attributes:{'resource-id':'account.email.input',enabled:'false',focused:'false',value:secret,visible:'false'}};
+ for(const children of [[first,second],[second,first],[first,first],[first,second,first]]){
+  const result=nativeAuthUiFlags({children},{email})['account.email.input'];
+  assert.deepEqual(result,{present:true,ambiguous:true,enabled:null,focused:null,valueCategory:'ambiguous',exactExpectedMatch:null});
+  for(const value of [email,secret,'PRIVATE_SESSION','/private/value'])assert.ok(!JSON.stringify(result).includes(value));
+ }
+ const buttons=[{attributes:{'resource-id':'account.sendCode',enabled:'true'}},{attributes:{'resource-id':'account.sendCode',enabled:'false'}}];
+ for(const children of [buttons,[...buttons].reverse()])assert.deepEqual(nativeAuthUiFlags({children})['account.sendCode'],{present:true,ambiguous:true,enabled:null,focused:null});
 });
 
 test('sign-out diagnostics expose only fixed control flags and public confirmation booleans',()=>{
@@ -127,7 +164,7 @@ test('sign-out diagnostics expose only fixed control flags and public confirmati
  const button={attributes:{'resource-id':'account.signOut',enabled:'false',focused:'true',text:'Sign out',value:secret},children:[{attributes:{text:'Sign out'}}]};
  const absent={titleVisible:false,cancelVisible:false,actionVisible:false};
  const initial=nativeAuthUiFlags({children:[button,{attributes:{'resource-id':'unknown-'+email,text:secret}}]},{email,code});
- assert.deepEqual(initial['account.signOut'],{present:true,enabled:false,focused:true});
+ assert.deepEqual(initial['account.signOut'],{present:true,ambiguous:false,enabled:false,focused:true});
  assert.deepEqual(initial.signOutConfirmation,absent);
  for(const [title,cancel,action] of [['Sign out on this device?','Cancel','Sign out'],['¿Cerrar sesión en este dispositivo?','Cancelar','Cerrar sesión'],['在这台设备上退出登录？','取消','退出登录']]){
   const dialog={children:[{attributes:{text:title}},{attributes:{accessibilityText:cancel}},{attributes:{text:action}},{attributes:{text:secret,value:code}}]};
@@ -140,4 +177,48 @@ test('sign-out diagnostics expose only fixed control flags and public confirmati
  const titleOnly=nativeAuthUiFlags({children:[button,{attributes:{text:'Sign out on this device?'}}]});
  assert.deepEqual(titleOnly.signOutConfirmation,{titleVisible:true,cancelVisible:false,actionVisible:false});
  assert.deepEqual(nativeAuthUiFlags({attributes:{text:'Sign out on this device? '+secret}}).signOutConfirmation,absent);
+});
+
+test('real local HTTP success/reset project boundary flags without headers, bodies or error messages',{timeout:10000},async t=>{
+ const secret='PRIVATE email=fixture@example.invalid token=secret-code path=/private/key';let reset=false,flags;
+ const backend=createServer((req,res)=>{req.resume();if(reset){req.socket.destroy();return;}res.writeHead(200,{'x-private':secret});res.end(secret);});
+ const proxy=createServer((req,res)=>{
+  const boundary=nativeHttpBoundary(req,res);flags=boundary.flags;
+  const outgoing=httpRequest({host:'127.0.0.1',port:backend.address().port,path:'/private?token=secret-code',method:'POST',headers:{'x-private':secret}},incoming=>{boundary.upstreamResponse(incoming);res.writeHead(incoming.statusCode);incoming.pipe(res);});
+  boundary.upstreamRequest(outgoing);outgoing.on('error',()=>{res.writeHead(502);res.end();});req.pipe(outgoing);
+ });
+ for(const server of [backend,proxy]){server.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>{server.closeAllConnections();server.close();});}
+ const send=()=>new Promise((resolve,reject)=>{const req=httpRequest({host:'127.0.0.1',port:proxy.address().port,method:'POST',path:'/private',headers:{'x-private':secret}},res=>{res.resume();res.once('end',()=>resolve(res.statusCode));});req.on('error',reject);req.end(secret);});
+ assert.equal(await send(),200);await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(flags.downstreamRequestEnded,true);assert.equal(flags.downstreamResponseFinished,true);assert.equal(flags.upstreamCreated,true);assert.equal(flags.upstreamRequestFinished,true);assert.equal(flags.upstreamHeadersReceived,true);assert.equal(flags.upstreamStatus,200);assert.equal(flags.upstreamResponseEnded,true);assert.deepEqual(flags.upstreamError,{code:'none',category:'none'});
+ for(const marker of ['PRIVATE','fixture@example.invalid','secret-code','/private/key','x-private'])assert.ok(!JSON.stringify(flags).includes(marker));reset=true;
+ assert.equal(await send(),502);await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(flags.upstreamCreated,true);assert.equal(flags.upstreamHeadersReceived,false);assert.equal(flags.upstreamStatus,null);assert.equal(flags.upstreamErrorAt,'request');assert.deepEqual(flags.upstreamError,{code:'ECONNRESET',category:'connection-reset'});for(const marker of ['PRIVATE','fixture@example.invalid','secret-code','/private/key','x-private'])assert.ok(!JSON.stringify(flags).includes(marker));
+});
+
+test('real partial upstream response and downstream abort remain distinguishable',{timeout:10000},async t=>{
+ const backend=createServer((_req,res)=>{res.writeHead(200,{'content-length':'100'});res.write('private bytes');setImmediate(()=>res.destroy());});backend.listen(0,'127.0.0.1');await once(backend,'listening');t.after(()=>{backend.closeAllConnections();backend.close();});
+ const boundary=nativeHttpBoundary(new EventEmitter(),new EventEmitter());
+ await new Promise(resolve=>{const outgoing=httpRequest({host:'127.0.0.1',port:backend.address().port},incoming=>{boundary.upstreamResponse(incoming);incoming.resume();incoming.once('close',resolve);});boundary.upstreamRequest(outgoing);outgoing.end();});
+ assert.equal(boundary.flags.upstreamHeadersReceived,true);assert.equal(boundary.flags.upstreamStatus,200);assert.equal(boundary.flags.upstreamResponseEnded,false);assert.equal(boundary.flags.upstreamResponseAborted,true);assert.equal(boundary.flags.upstreamResponseClosed,true);assert.equal(boundary.flags.upstreamErrorAt,'response');
+ let aborted;const closed=new Promise(resolve=>{const server=createServer((req,res)=>{const watched=nativeHttpBoundary(req,res);aborted=watched.flags;req.once('aborted',resolve);req.resume();});server.listen(0,'127.0.0.1');t.after(()=>{server.closeAllConnections();server.close();});server.once('listening',()=>{const client=httpRequest({host:'127.0.0.1',port:server.address().port,method:'POST'});client.on('error',()=>{});client.write('private bytes');server.once('request',()=>setImmediate(()=>client.destroy()));});});await closed;
+ assert.equal(aborted.downstreamRequestAborted,true);assert.equal(aborted.downstreamRequestEnded,false);assert.equal(aborted.upstreamCreated,false);
+});
+
+test('backend control-process/health evidence is finite and probes only the owned loopback health route',{timeout:10000},async t=>{
+ const secret='PRIVATE token password path message stack argv pid';
+ for(const error of [Object.assign(new Error(secret),{code:secret}),{code:'ECONNRESET',message:secret,stack:secret},{cause:{code:'ECONNREFUSED',message:secret}}])assert.ok(!JSON.stringify(nativeTransportFailure(error)).includes(secret));
+ assert.deepEqual(nativeTransportFailure({code:'DEPTH_ZERO_SELF_SIGNED_CERT',message:secret}),{code:'DEPTH_ZERO_SELF_SIGNED_CERT',category:'tls'});
+ assert.deepEqual(nativeTransportFailure({name:'TimeoutError',message:secret}),{code:'ETIMEDOUT',category:'timeout'});
+ const running=nativeBackendState({pid:123,exitCode:null,signalCode:null,argv:secret,stdout:secret});assert.equal(running.state,'running');assert.ok(!JSON.stringify(running).includes('123'));for(const marker of secret.split(' '))assert.ok(!JSON.stringify(running).includes(marker));
+ assert.equal(nativeBackendState({pid:123,exitCode:17,signalCode:null}).exitStatus,17);assert.equal(nativeBackendState({pid:123,exitCode:256,signalCode:'PRIVATE'}).exitStatus,null);assert.equal(nativeBackendState(null,{code:'ENOENT',message:secret}).state,'spawn-error');
+ let reset=false,redirect=false,trapHits=0;
+ const trap=createServer((_req,res)=>{trapHits++;res.end(secret);});trap.listen(0,'127.0.0.1');await once(trap,'listening');t.after(()=>{trap.closeAllConnections();trap.close();});
+ const location='http://127.0.0.1:'+trap.address().port+'/private?token=PRIVATE';
+ const server=createServer((req,res)=>{if(reset){req.socket.destroy();return;}assert.equal(req.url,'/health');res.writeHead(redirect?302:200,{'x-private':secret,...(redirect?{location}:{})});res.end(secret);});server.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>{server.closeAllConnections();server.close();});const url='http://127.0.0.1:'+server.address().port+'/health';
+ assert.deepEqual(await nativeBackendHealth(url),{state:'responded',status:200,healthy:true});
+ redirect=true;const redirected=await nativeBackendHealth(url);assert.deepEqual(redirected,{state:'responded',status:302,healthy:false});await new Promise(resolve=>setImmediate(resolve));assert.equal(trapHits,0);
+ for(const marker of [...secret.split(' '),location,'/private','token='])assert.ok(!JSON.stringify(redirected).includes(marker));
+ redirect=false;reset=true;const failed=await nativeBackendHealth(url);assert.equal(failed.state,'unavailable');assert.ok(!JSON.stringify(failed).includes(secret));
+ for(const bad of ['https://example.invalid/health',url+'?token='+secret,url.replace('/health','/api/account')])assert.deepEqual(await nativeBackendHealth(bad),{state:'refused'});
 });

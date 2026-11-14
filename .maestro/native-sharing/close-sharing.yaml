@@ -1,0 +1,16 @@
+appId: com.patrickchin.puptime
+---
+- scrollUntilVisible:
+    element: {id: sharing.back}
+    direction: UP
+    visibilityPercentage: 100
+- tapOn: {id: sharing.back}
+- extendedWaitUntil:
+    visible: {id: screen.pets}
+    timeout: 30000
+- tapOn: {id: nav.open, retryTapIfNoChange: true}
+- assertVisible: {id: nav.close}
+- tapOn: {id: nav.log}
+- extendedWaitUntil:
+    visible: {id: screen.today}
+    timeout: 30000

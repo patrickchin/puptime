@@ -1,0 +1,24 @@
+appId: com.patrickchin.puptime
+---
+- scrollUntilVisible:
+    element: {id: quick.walk}
+    direction: UP
+    visibilityPercentage: 100
+- tapOn: {id: quick.walk}
+- tapOn: {id: toast.edit}
+- extendedWaitUntil:
+    visible: {id: editor.close}
+    timeout: 10000
+- scrollUntilVisible:
+    element: {id: editor.note.input}
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn: {id: editor.note.input}
+- inputText: ${NOTE}
+- hideKeyboard
+- scrollUntilVisible:
+    element: {id: editor.close}
+    direction: UP
+    visibilityPercentage: 100
+- tapOn: {id: editor.close}
+- assertVisible: {id: screen.today}

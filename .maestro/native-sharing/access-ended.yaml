@@ -1,0 +1,11 @@
+appId: com.patrickchin.puptime
+---
+- stopApp
+- launchApp:
+    permissions: {}
+- extendedWaitUntil:
+    visible: {id: shared.leaveEnded}
+    timeout: 60000
+- assertVisible: Access ended
+- assertNotVisible: {id: quick.walk}
+- takeScreenshot: native-revoked-care-access

@@ -1,0 +1,13 @@
+appId: com.patrickchin.puptime
+---
+- runFlow: open-sharing.yaml
+- scrollUntilVisible:
+    element: {id: 'sharing.revoke.*'}
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn: {id: 'sharing.revoke.*'}
+- assertVisible: End this access?
+- tapOn: '^End access$'
+- extendedWaitUntil:
+    notVisible: {id: 'sharing.revoke.*'}
+    timeout: 30000
