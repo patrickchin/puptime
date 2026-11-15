@@ -337,7 +337,7 @@ test('actual pinned native polyfills and this app font asset route prove the two
 });
 
 function knownOwnTextFixture(run){return fixture(({root,file})=>{
- const provenance=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))),pins=provenance.knownLicenseSources.filter(value=>value.ownText),installed=JSON.parse(readFileSync(new URL('../package-lock.json',import.meta.url))),paths=[];
+ const provenance=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))),pins=provenance.knownLicenseSources.filter(value=>value.ownText&&value.ecosystem==='npm'),installed=JSON.parse(readFileSync(new URL('../package-lock.json',import.meta.url))),paths=[];
  assert.equal(pins.length,6);file('package-lock.json',{packages:Object.fromEntries(pins.map(pin=>[pin.ownText.packagePath,installed.packages[pin.ownText.packagePath]]))});
  for(const pin of pins){for(const source of [pin.ownText.packageJSONSource,...pin.ownText.selectedSources.map(value=>value.source),pin.source])file(source,readFileSync(new URL('../'+source,import.meta.url)));paths.push(join(root,pin.ownText.selectedSources[0].source));}
  const raw=()=>npmNoticeInputs(root,paths),capture=(ledger=provenance)=>addKnownOwnNoticeFiles(root,raw(),ledger);
@@ -349,7 +349,6 @@ test('six exact npm own-text records append public attribution without component
  for(const item of items){const pin=pins.find(pin=>pin.component===item.id);assert.equal(item.notices.length,1);assert.equal(item.notices[0].sha256,pin.sha256);assert.ok(Buffer.from(item.notices[0].body).equals(readFileSync(join(root,pin.source))));assert.equal(item.nativeInputs.ownAttribution.ownerNpmID,item.id);assert.deepEqual(item.nativeInputs.ownAttribution.publisherDeclaration,pin.ownText.publisher);assert.deepEqual(item.vendors,before.find(value=>value.id===item.id).vendors);}
  const report=unreviewedOSSNoticeInputs(items,provenance);assert.equal(report.components.length,6);assert.equal(report.complete,false);assert.ok(!JSON.stringify(report).includes(root));assert.equal(resolveNoticeCoverage(items,provenance).status,'INCOMPLETE');assert.ok(resolveNoticeCoverage(items,provenance).unresolved.every(row=>row.reason==='unreviewed-component'));
  assert.equal(unreviewedOSSNoticeInputs(items,{...provenance,knownLicenseSources:[]}).components.length,0);
- for(const component of ['cocoapods:ExpoRouter@57.0.28','cocoapods:ExpoUI@57.0.25','cocoapods:Yoga@0.0.0'])assert.ok(!provenance.knownLicenseSources.some(pin=>pin.component===component));
 }));
 
 test('own-text matched selectors reject changed bytes, owners, lock pins and unknown fields without fallback',()=>knownOwnTextFixture(({root,file,provenance,pins,raw,capture})=>{

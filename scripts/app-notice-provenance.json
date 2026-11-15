@@ -1711,6 +1711,91 @@
       "podspecSHA256": "a487ac5c74d9aef1b3c6fa527e3cf929d62e031ebaf587f4948813b6717ee086",
       "sourceKind": "podspec",
       "public": true
+    },
+    {
+      "component": "cocoapods:ExpoRouter@57.0.28",
+      "ecosystem": "cocoapods",
+      "version": "57.0.28",
+      "public": true,
+      "source": "assets/notices/sources/expo-MIT.txt",
+      "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+      "upstream": "https://raw.githubusercontent.com/expo/expo/396da4641605bb19c1e6b3efff1cafaab8890a29/LICENSE",
+      "ownText": {
+        "kind": "pinned-upstream-own-attribution",
+        "ownerNpmID": "npm:expo-router@57.0.28",
+        "packagePath": "node_modules/expo-router",
+        "packageJSONSource": "node_modules/expo-router/package.json",
+        "packageJSONSHA256": "88a89b7adfba45cbc5855d270395fc72009463d9ed92ced7a73020fdce556f02",
+        "tarball": "https://registry.npmjs.org/expo-router/-/expo-router-57.0.28.tgz",
+        "integrity": "sha512-KrW7dGtZ1A9ocpt/Gq1RKczfoAkJ+2LrxweVcEq/FZcJ+eFsaKC9f60ER3uzWJ9n9mb+dbeSPewYOMzG6KMK2Q==",
+        "publisher": {
+          "gitHead": "396da4641605bb19c1e6b3efff1cafaab8890a29",
+          "metadataURL": "https://registry.npmjs.org/expo-router/57.0.28",
+          "metadataSHA256": "efe59387862cd01deb57732c17f1a1d4c7d512009679e75f421b45d16a04543b"
+        },
+        "selectedSources": [
+          {
+            "source": "node_modules/expo-router/ios/ExpoRouter.podspec",
+            "sha256": "fff64d64e4f52538977dc0571c4df05d5d217424bf01d4d7d4571671610ca955"
+          }
+        ],
+        "pod": {
+          "sourceKind": "path",
+          "podspecSource": "node_modules/expo-router/ios/ExpoRouter.podspec",
+          "podspecSHA256": "fff64d64e4f52538977dc0571c4df05d5d217424bf01d4d7d4571671610ca955"
+        }
+      }
+    },
+    {
+      "component": "cocoapods:ExpoUI@57.0.25",
+      "ecosystem": "cocoapods",
+      "version": "57.0.25",
+      "public": true,
+      "source": "assets/notices/sources/expo-MIT.txt",
+      "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+      "upstream": "https://raw.githubusercontent.com/expo/expo/396da4641605bb19c1e6b3efff1cafaab8890a29/LICENSE",
+      "ownText": {
+        "kind": "pinned-upstream-own-attribution",
+        "ownerNpmID": "npm:@expo/ui@57.0.25",
+        "packagePath": "node_modules/@expo/ui",
+        "packageJSONSource": "node_modules/@expo/ui/package.json",
+        "packageJSONSHA256": "ae8213d04de4e91cc31eae158fa665d0a54af316594d2bc65a8450efd8b18bf9",
+        "tarball": "https://registry.npmjs.org/@expo/ui/-/ui-57.0.25.tgz",
+        "integrity": "sha512-/BbxsKh/LSIFDnWAHRHfJdCcnqHY7WNcWXjld0soKnYXDUbImjvsFK7y5dqq2XZTbOMyf44BpgAWKUR/B8huCA==",
+        "publisher": {
+          "gitHead": "396da4641605bb19c1e6b3efff1cafaab8890a29",
+          "metadataURL": "https://registry.npmjs.org/%40expo%2Fui/57.0.25",
+          "metadataSHA256": "983242821b956a65cb3644a36f71a88f042aa7a509107ac066f52e7b9b2421c5"
+        },
+        "selectedSources": [
+          {
+            "source": "node_modules/@expo/ui/ios/ExpoUI.podspec",
+            "sha256": "40ccef94d3947a4b8c181459637f205c556f36ef028fa1cd6629b387f89aca6d"
+          }
+        ],
+        "pod": {
+          "sourceKind": "path",
+          "podspecSource": "node_modules/@expo/ui/ios/ExpoUI.podspec",
+          "podspecSHA256": "40ccef94d3947a4b8c181459637f205c556f36ef028fa1cd6629b387f89aca6d"
+        }
+      }
+    },
+    {
+      "component": "cocoapods:Yoga@0.0.0",
+      "ecosystem": "cocoapods",
+      "version": "0.0.0",
+      "public": true,
+      "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+      "source": "node_modules/react-native/LICENSE",
+      "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+      "upstreamIntegrity": "sha512-JR5s3bM9ezud+Mw24GlNXNfthqPIKwrQgPPJcam+L97t2sKjjEavhCzBn+fyqZZRcM5+XlhYxpTxVkK7e1n38Q==",
+      "ownerNpmID": "npm:react-native@0.86.3",
+      "packagePath": "node_modules/react-native",
+      "packageJSONSource": "node_modules/react-native/package.json",
+      "packageJSONSHA256": "416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144",
+      "sourceKind": "path",
+      "podspecSource": "node_modules/react-native/ReactCommon/yoga/Yoga.podspec",
+      "podspecSHA256": "64eb7b752d3d6eb02514d5763220453dbc3a6a0aa040f27614a4ba6371b4ba9f"
     }
   ],
   "retainedAndroidResources": {

@@ -75,8 +75,8 @@ function podOwnLicense(root,name,version,source,external){
  return {notice:{source:pin.source,sha256:pin.sha256,body},binding:{ownerNpmID:pin.ownerNpmID,packagePath,sourceKind:pin.sourceKind,packageJSON:{source:pin.packageJSONSource,sha256:pin.packageJSONSHA256},podspec:{source:pin.podspecSource,sha256:pin.podspecSHA256},license:{source:pin.source,sha256:pin.sha256},upstream:pin.upstream,upstreamIntegrity:pin.upstreamIntegrity}};
 }
 
-// Finite observations only, not licence bindings. These three pending Pod
-// forms must be observed by an otherwise justified producer, never guessed.
+// Finite observations alone grant no attribution. Explicit bindings must
+// revalidate the actual selected form and owning bytes on every capture.
 export function podActualSelectors(root,lock,versions,podLockSHA256){
  assert.match(podLockSHA256,/^[a-f0-9]{64}$/);
  return [['ExpoRouter','57.0.28','expo-router','57.0.28','ios/ExpoRouter.podspec'],['ExpoUI','57.0.25','@expo/ui','57.0.25','ios/ExpoUI.podspec'],['Yoga','0.0.0','react-native','0.86.3','ReactCommon/yoga/Yoga.podspec']].map(([name,version,npm,npmVersion,spec])=>{
@@ -100,7 +100,7 @@ export function podActualSelectors(root,lock,versions,podLockSHA256){
 export function podNoticeInputs(root){
  const lockPath=join(root,'ios/Podfile.lock'),support=join(root,'ios/Pods/Target Support Files');
  if(!existsSync(lockPath)||!existsSync(support))return {components:[],unresolved:[{component:'native:ios',reason:'missing-resolved-pod-inputs'}],nativeFiles:[]};
- const lock=noticeInputStep('pod-lock','cocoapods',()=>require('yaml').parse(noticeText(readFileSync(lockPath),16*1024*1024))),plist=require('@expo/plist').default,versions=new Map(),texts=new Map(),acknowledgements=[];
+ const [lock,podLockSHA256]=noticeInputStep('pod-lock','cocoapods',()=>{const bytes=readFileSync(lockPath);return [require('yaml').parse(noticeText(bytes,16*1024*1024)),digest(bytes)];}),plist=require('@expo/plist').default,versions=new Map(),texts=new Map(),acknowledgements=[];
  noticeInputStep('pod-lock-entries','cocoapods',()=>{for(const row of lock.PODS??[]){
   const value=typeof row==='string'?row:Object.keys(row)[0],match=value.match(/^([^\s(]+) \(([^\s)]+)/);assert.ok(match,'Unsupported resolved pod entry.');
   const name=match[1].split('/')[0],version=match[2];assert.ok(!versions.has(name)||versions.get(name)===version);versions.set(name,version);
@@ -117,6 +117,7 @@ export function podNoticeInputs(root){
   }
  }
  });
+ const actualSelectors=podActualSelectors(root,lock,versions,podLockSHA256);
  const unresolved=[],components=[];
  for(const [name,version] of versions){
   const notices=texts.get(name)??[],external=lock['EXTERNAL SOURCES']?.[name];let scan={vendors:[],vendorNotices:{},nativeInputs:{},notices:[]};
@@ -125,11 +126,12 @@ export function podNoticeInputs(root){
   else scan=noticeInputStep('pod-source-scan','cocoapods',()=>{
    const own=podOwnLicense(root,name,version,source,external),{linkedSources,...metadata}=podLinkedSources(root,name,source,external),value=nativeSourceNotices(root,source,`cocoapods:${name}`,{linkedSources});
    if(own)value.notices.push(own.notice);
-   Object.assign(value.nativeInputs[`cocoapods:${name}`],metadata,...(own?[{ownLicense:own.binding}]:[]));return value;
+   const actualSelector=actualSelectors.find(row=>row.component===`cocoapods:${name}@${version}`);
+   Object.assign(value.nativeInputs[`cocoapods:${name}`],metadata,...(own?[{ownLicense:own.binding}]:[]),...(actualSelector?[{actualSelector}]:[]));return value;
   },`cocoapods:${name}@${version}`);
   components.push(noticeInputStep('pod-notices','cocoapods',()=>nativeNoticeInput({id:`cocoapods:${name}@${version}`,name,version,ecosystem:'cocoapods',...scan,notices:[...notices,...scan.notices].sort((a,b)=>a.source.localeCompare(b.source))}),`cocoapods:${name}@${version}`));
  }
- return {components,unresolved,nativeFiles:[],actualSelectors:podActualSelectors(root,lock,versions,digest(readFileSync(lockPath))),inputHashes:{podLock:digest(readFileSync(lockPath)),podAcknowledgements:digest(JSON.stringify(acknowledgements))}};
+ return {components,unresolved,nativeFiles:[],actualSelectors,inputHashes:{podLock:podLockSHA256,podAcknowledgements:digest(JSON.stringify(acknowledgements))}};
 }
 export function gradleNoticeInputs(root,inputFile){
  if(!inputFile||!existsSync(inputFile))return {components:[],unresolved:[{component:'native:android',reason:'missing-resolved-gradle-inputs'}],nativeFiles:[]};

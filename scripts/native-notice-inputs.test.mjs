@@ -6,7 +6,8 @@ import {join,dirname} from 'node:path';
 import {createRequire} from 'node:module';
 import test from 'node:test';
 import {podNoticeInputs,gradleNoticeInputs,unionNoticeInputs,inspectNoticeArchive,noticeInputStep,noticeFailureContext,podLinkedSources,podActualSelectors} from './native-notice-inputs.mjs';
-import {assertPackagedNativeCoverage,assertSourceNoticePayload,digest,npmNoticeInputs,resolveNoticeCoverage,nativeSourceNotices,unreviewedOSSNoticeInputs} from './app-notices.mjs';
+import {addKnownOwnNoticeFiles,assertPackagedNativeCoverage,assertSourceNoticePayload,digest,npmNoticeInputs,resolveNoticeCoverage,nativeSourceNotices,unreviewedOSSNoticeInputs} from './app-notices.mjs';
+import {captureResolvedInputs,createNoticeSeal} from './capture-app-notices.mjs';
 const require=createRequire(import.meta.url),plist=require('@expo/plist');
 const mit=readFileSync(new URL('../node_modules/react-native/LICENSE',import.meta.url),'utf8');
 test('archive native hashing streams bounded bytes and preserves CRC, size and nonnative failure gates',()=>{
@@ -20,7 +21,7 @@ function fixture(run){
 }
 const initialOwnComponents=new Set(['cocoapods:ExpoAppleAuthentication@57.0.2','cocoapods:ExpoFileSystem@57.0.7','cocoapods:ExpoAdapterGoogleSignIn@16.1.5']);
 function ownLicenseFixture(run,{batch=false}={}){return fixture(({root,file})=>{
- const provenance=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))),pins=provenance.knownLicenseSources.filter(value=>value.ownerNpmID&&(batch?!initialOwnComponents.has(value.component):initialOwnComponents.has(value.component))),installed=JSON.parse(readFileSync(new URL('../package-lock.json',import.meta.url))),lock={PODS:[], 'EXTERNAL SOURCES':{}};
+ const provenance=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))),pins=provenance.knownLicenseSources.filter(value=>value.ownerNpmID&&value.component!=='cocoapods:Yoga@0.0.0'&&(batch?!initialOwnComponents.has(value.component):initialOwnComponents.has(value.component))),installed=JSON.parse(readFileSync(new URL('../package-lock.json',import.meta.url))),lock={PODS:[], 'EXTERNAL SOURCES':{}};
  assert.equal(pins.length,batch?97:3);file('package-lock.json',{packages:Object.fromEntries(pins.map(pin=>[pin.packagePath,installed.packages[pin.packagePath]]))});mkdirSync(join(root,'ios/Pods/Target Support Files'),{recursive:true});
  for(const pin of pins){const name=pin.component.slice('cocoapods:'.length,-pin.version.length-1);lock.PODS.push(name+' ('+pin.version+')');lock['EXTERNAL SOURCES'][name]={[':'+pin.sourceKind]:'../'+(pin.sourceKind==='path'?dirname(pin.podspecSource):pin.podspecSource)};for(const path of [pin.packageJSONSource,pin.podspecSource,pin.source])file(path,readFileSync(new URL('../'+path,import.meta.url)));file('ios/Pods/'+name+'/source.m','Synthetic alternate Pod root for source-form negatives');if(pin.sourceKind==='podspec')for(const arch of ['ios-arm64','ios-arm64_x86_64-simulator'])file('ios/Pods/'+name+'/'+name+'.xcframework/'+arch+'/'+name+'.framework/Info.plist','Synthetic framework source inventory');}
  file('ios/Podfile.lock',lock);return run({root,file,pins,lock,provenance,capture:()=>podNoticeInputs(root).components});
@@ -31,7 +32,6 @@ test('97 explicit RN and Expo own-package bindings resolve exact selected forms 
  for(const pin of pins){const item=items.find(value=>value.id===pin.component),bytes=readFileSync(new URL('../'+pin.source,import.meta.url));assert.ok(item);assert.equal(item.nativeInputs['cocoapods:'+item.name].ownLicense.ownerNpmID,pin.ownerNpmID);assert.ok(item.notices.some(notice=>notice.source===pin.source&&notice.sha256===pin.sha256&&Buffer.from(notice.body).equals(bytes)));assert.ok(!JSON.stringify(item).includes(root));}
  const publicInput=unreviewedOSSNoticeInputs(items,provenance);assert.equal(publicInput.components.length,97);assert.equal(publicInput.complete,false);assert.equal(resolveNoticeCoverage(items,provenance).status,'INCOMPLETE');
  const vendored=items.filter(item=>item.vendors.length);assert.equal(vendored.length,6);for(const item of vendored)assert.ok(resolveNoticeCoverage([item],approval(item)).unresolved.some(value=>value.reason==='missing-vendored-notice'));
- for(const component of ['cocoapods:ExpoRouter@57.0.28','cocoapods:ExpoUI@57.0.25','cocoapods:Yoga@0.0.0'])assert.ok(!provenance.knownLicenseSources.some(value=>value.component===component));
 },{batch:true}));
 
 test('the explicit batch rejects changed spec, root, form, package version and licence bytes; unknown siblings gain no binding',()=>ownLicenseFixture(({file,pins,lock,capture})=>{
@@ -338,7 +338,7 @@ test('the pinned RN selector uses actual autolinking metadata, with app config a
 }));
 
 
-test('three pending Pod selectors expose only actual finite forms/owner matches/hashes and grant no own-text binding',()=>fixture(({root,file})=>{
+test('three Pod selectors expose only actual finite forms/owner matches/hashes and grant no attribution alone',()=>fixture(({root,file})=>{
  const targets=[['ExpoRouter','57.0.28','expo-router','57.0.28','ios/ExpoRouter.podspec'],['ExpoUI','57.0.25','@expo/ui','57.0.25','ios/ExpoUI.podspec'],['Yoga','0.0.0','react-native','0.86.3','ReactCommon/yoga/Yoga.podspec']],versions=new Map(),external={};
  for(const [name,version,npm,ownerVersion,spec] of targets){versions.set(name,version);file('node_modules/'+npm+'/package.json',{name:npm,version:ownerVersion});file('node_modules/'+npm+'/'+spec,'Public synthetic spec');external[name]={':path':'../node_modules/'+npm+'/'+dirname(spec)};}
  const select=(values=external,current=versions)=>podActualSelectors(root,{'EXTERNAL SOURCES':values},current,'a'.repeat(64));
@@ -346,4 +346,46 @@ test('three pending Pod selectors expose only actual finite forms/owner matches/
  const yoga=external.Yoga;for(const [value,kind] of [[undefined,'missing'],[{':path':yoga[':path'],':podspec':'SECRET_LOCK'},'ambiguous'],[{':git':'https://SECRET.invalid'},'other'],[{':path':'/PRIVATE/FOREIGN/PATH'},'path'],[{':podspec':'../node_modules/react-native/ReactCommon/yoga/Yoga.podspec'},'podspec']]){const result=select({...external,Yoga:value}).find(row=>row.component==='cocoapods:Yoga@0.0.0');assert.equal(result.kind,kind);assert.equal(result.selectedRelativePathMatches,kind==='podspec');assert.ok(!JSON.stringify(result).includes('PRIVATE')&&!JSON.stringify(result).includes('SECRET')&&!JSON.stringify(result).includes(root));}
  const newer=new Map(versions);newer.set('Yoga','UNKNOWN_PRIVATE_VERSION');const wrongVersion=select(external,newer).at(-1);assert.equal(wrongVersion.resolvedVersionMatches,false);assert.equal(wrongVersion.selectedPodspecSHA256,null);assert.ok(!JSON.stringify(wrongVersion).includes('UNKNOWN'));
  file('node_modules/react-native/package.json',{name:'PRIVATE_FOREIGN_OWNER',version:'0.86.3'});const foreign=select().at(-1);assert.equal(foreign.canonicalOwnerMatches,false);assert.equal(foreign.ownerPackageJSONSHA256,null);assert.equal(foreign.selectedPodspecSHA256,null);assert.ok(!JSON.stringify(foreign).includes('PRIVATE'));
+}));
+
+function selectedOwnPodFixture(run){return fixture(({root,file})=>{
+ const provenance=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))),ids=['cocoapods:ExpoRouter@57.0.28','cocoapods:ExpoUI@57.0.25','cocoapods:Yoga@0.0.0'],pins=provenance.knownLicenseSources.filter(pin=>ids.includes(pin.component)),installed=JSON.parse(readFileSync(new URL('../package-lock.json',import.meta.url))),lock={PODS:[],'EXTERNAL SOURCES':{}};
+ assert.equal(pins.length,3);file('package-lock.json',{packages:Object.fromEntries(pins.map(pin=>{const own=pin.ownText??pin;return [own.packagePath,installed.packages[own.packagePath]];}))});mkdirSync(join(root,'ios/Pods/Target Support Files'),{recursive:true});
+ for(const pin of pins){const own=pin.ownText??pin,pod=own.pod??pin,name=pin.component.slice(10,-pin.version.length-1);lock.PODS.push(name+' ('+pin.version+')');lock['EXTERNAL SOURCES'][name]={':path':'../'+dirname(pod.podspecSource)};for(const path of [own.packageJSONSource,pod.podspecSource,pin.source])file(path,readFileSync(new URL('../'+path,import.meta.url)));file('ios/Pods/'+name+'/source.m','Synthetic alternate Pod root');}
+ file('ios/Podfile.lock',lock);
+ const native=()=>podNoticeInputs(root),capture=(ledger=provenance)=>addKnownOwnNoticeFiles(root,native().components,ledger);
+ return run({root,file,pins,lock,provenance,native,capture});
+});}
+
+test('three explicit Pod attributions bind live selectors and verbatim own text without granting coverage',()=>selectedOwnPodFixture(({root,pins,provenance,native,capture})=>{
+ const raw=native(),items=capture();assert.equal(provenance.knownLicenseSources.length,113);assert.deepEqual(provenance.components,[]);
+ for(const pin of pins){const item=items.find(value=>value.id===pin.component),selector=item.nativeInputs['cocoapods:'+item.name].actualSelector;assert.deepEqual(selector,raw.actualSelectors.find(value=>value.component===item.id));assert.equal(selector.podLockSHA256,raw.inputHashes.podLock);assert.equal(selector.kind,'path');assert.ok(item.notices.some(value=>value.source===pin.source&&value.sha256===pin.sha256&&Buffer.from(value.body).equals(readFileSync(join(root,pin.source)))));if(pin.ownText)assert.deepEqual(item.nativeInputs.ownAttribution.pod,pin.ownText.pod);else assert.equal(item.nativeInputs['cocoapods:'+item.name].ownLicense.ownerNpmID,pin.ownerNpmID);}
+ const review=unreviewedOSSNoticeInputs(items,provenance);assert.equal(review.components.length,3);assert.equal(review.complete,false);assert.ok(!JSON.stringify(review).includes(root));assert.equal(resolveNoticeCoverage(items,provenance).status,'INCOMPLETE');
+}));
+
+test('Pod own attribution rejects actual source form/root, owner, lock, spec and text drift on every capture',()=>selectedOwnPodFixture(({root,file,pins,lock,provenance,capture})=>{
+ const mutate=(path,body)=>{const original=readFileSync(join(root,path));file(path,body);assert.throws(capture);file(path,original);};
+ for(const pin of pins){const own=pin.ownText??pin,pod=own.pod??pin,name=pin.component.slice(10,-pin.version.length-1);
+  for(const path of [own.packageJSONSource,pod.podspecSource,pin.source])mutate(path,Buffer.concat([readFileSync(join(root,path)),Buffer.from('PRIVATE_CHANGED_BYTES')]));
+  const packageJSON=JSON.parse(readFileSync(join(root,own.packageJSONSource)));for(const delta of [{name:'PRIVATE_OTHER_OWNER'},{version:'999.0.0'}])mutate(own.packageJSONSource,JSON.stringify({...packageJSON,...delta}));
+  const npmLock=JSON.parse(readFileSync(join(root,'package-lock.json')));for(const field of ['version','resolved','integrity'])mutate('package-lock.json',JSON.stringify({...npmLock,packages:{...npmLock.packages,[own.packagePath]:{...npmLock.packages[own.packagePath],[field]:'PRIVATE_LOCK'}}}));
+  const alternate=own.packagePath+'/alternate';file(alternate+'/source.m','Synthetic adjacent source');
+  for(const selected of [{':podspec':'../'+pod.podspecSource},{':path':'../'+alternate},{...lock['EXTERNAL SOURCES'][name],':git':'PRIVATE_SELECTOR'}]){file('ios/Podfile.lock',{...lock,'EXTERNAL SOURCES':{...lock['EXTERNAL SOURCES'],[name]:selected}});assert.throws(capture);}file('ios/Podfile.lock',lock);
+  if(pin.ownText){for(const change of [p=>p.ownText.pod.sourceKind='podspec',p=>p.ownText.pod.podspecSHA256='a'.repeat(64),p=>p.ownText.ownerNpmID='npm:PRIVATE@1']){const changed=structuredClone(provenance);change(changed.knownLicenseSources.find(value=>value.component===pin.component));assert.throws(()=>capture(changed));}}
+ }
+}));
+
+test('unknown Pod siblings/versions gain no attribution and own text cannot clear a vendor boundary',()=>selectedOwnPodFixture(({file,pins,lock,provenance,capture})=>{
+ const pin=pins.find(value=>value.ownText),own=pin.ownText,name=pin.component.slice(10,-pin.version.length-1),source=dirname(own.pod.podspecSource),sibling='UnreviewedExpoSibling';file('ios/Podfile.lock',{...lock,PODS:[...lock.PODS,sibling+' ('+pin.version+')'],'EXTERNAL SOURCES':{...lock['EXTERNAL SOURCES'],[sibling]:{':path':'../'+source}}});const unknown=capture().find(value=>value.name===sibling);assert.deepEqual(unknown.notices,[]);assert.equal(unknown.nativeInputs.ownAttribution,undefined);assert.equal(unknown.nativeInputs['cocoapods:'+sibling].actualSelector,undefined);
+ file('ios/Podfile.lock',{...lock,PODS:lock.PODS.map(value=>value===name+' ('+pin.version+')'?name+' (999.0.0)':value)});const newer=capture().find(value=>value.name===name);assert.deepEqual(newer.notices,[]);assert.equal(newer.nativeInputs.ownAttribution,undefined);file('ios/Podfile.lock',lock);
+ file(source+'/Separate.xcframework/Info.plist','Synthetic separate vendor');const item=capture().find(value=>value.name===name);assert.equal(item.notices.length,1);assert.equal(resolveNoticeCoverage([item],approval(item)).unresolved[0].reason,'missing-vendored-notice');assert.deepEqual(provenance.components,[]);
+}));
+
+test('live Pod-lock selector provenance is fingerprinted and seal reinspection rejects drift',()=>selectedOwnPodFixture(({root,file,lock,provenance,capture})=>{
+ const git=(...args)=>execFileSync('git',['-c','core.hooksPath=/dev/null','-c','commit.gpgsign=false',...args],{cwd:root,stdio:['ignore','pipe','pipe']});
+ file('.gitignore','node_modules/\nbuild/\nios/Pods/\nios/Podfile.lock\n');file('package.json',{name:'synthetic-pod-notices',version:'1'});file('app.json',{expo:{plugins:[['expo-asset',{assets:['./assets/notices/third_party_notices.json']}]]}});file('scripts/font-icon-provenance.json',{notices:{},platforms:{},files:{}});const entry=file('index.ts','export const app=1;\n'),payload='assets/notices/third_party_notices.json';file(payload,'[]');
+ const items=capture(),approved={...provenance,components:items.map(item=>approval(item).components[0])};file('scripts/app-notice-provenance.json',approved);const recapture=()=>captureResolvedInputs(root,'ios',[entry,join(root,payload)]),coverage=recapture().coverage;assert.equal(coverage.status,'READY');file(payload,JSON.stringify(coverage.sections));git('init','--quiet');git('add','.');git('-c','user.name=Notice test','-c','user.email=notice-test@example.invalid','commit','--quiet','-m','Synthetic Pod notice source');
+ const initial=recapture(),seal=createNoticeSeal(root,'ios',initial);assert.equal(seal.complete,true);assert.equal(seal.inputHashes.podLock,initial.native.inputHashes.podLock);assert.ok(!JSON.stringify(seal).includes(root));
+ file('ios/Podfile.lock',{...lock,COCOAPODS:'Synthetic changed lock input'});const drift=recapture();assert.notEqual(drift.native.inputHashes.podLock,initial.native.inputHashes.podLock);assert.equal(drift.coverage.status,'INCOMPLETE');assert.ok(drift.coverage.unresolved.every(value=>value.reason==='native-source-digest-mismatch'));assert.throws(()=>createNoticeSeal(root,'ios',drift));
+ file('ios/Podfile.lock',lock);assert.deepEqual(createNoticeSeal(root,'ios',recapture()),seal);assert.deepEqual(provenance.components,[]);
 }));

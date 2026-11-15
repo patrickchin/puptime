@@ -10,9 +10,9 @@ The own-package source records additionally bind 97 selected RN/Expo Pods to
 lock-integrity-verified published tarballs; each reviewed podspec reads its own
 package licence. The 91 literal directory/6 exact podspec forms use the existing
 strict binding helper. These records preserve own-package attribution only.
-ExpoRouter/ExpoUI without own text, Yoga, the six missing-text NPM components,
-Metro prelude, and every vendor/generated boundary remain independently
-unresolved. The component-approval ledger and offline payload are unchanged.
+The additional six npm and three Pod own-text records below do not approve
+component coverage. Metro prelude and every vendor/generated boundary remain
+independently unresolved. The component ledger and offline payload are unchanged.
 
 ## Stable offline resource
 
@@ -238,11 +238,16 @@ discovered NOTICEs and vendor boundaries and do not approve any component,
 vendor, generated input or retained resource. Component review must bind the
 resulting text and provenance; seal and final verification recapture both.
 
-The three pending ExpoRouter, ExpoUI and Yoga Pod own-text bindings remain
-inactive. An otherwise justified iOS discovery adds `actualSelectors` containing
-only their fixed component labels, finite source kinds, match booleans and input
-hashes. Unknown versions or source forms do not select a licence. This metadata
-does not grant coverage or justify a separate discovery run.
+Three explicit Pod records additionally bind Yoga to its locked `react-native`
+package's original LICENSE, and ExpoRouter/ExpoUI to the reviewed Expo MIT text.
+Every capture reparses its actual Pod lock and requires the exact selected
+`:path`, installed owner and pinned podspec bytes. The same-capture finite
+`actualSelectors` evidence, including the Pod-lock hash, is retained in each
+component's `nativeInputs`; it cannot be supplied by a historical summary.
+Unknown siblings/versions gain no binding; changed forms, roots or owning bytes
+fail closed. Own attribution cannot approve vendors, generated inputs or retained
+resources (including ExpoFileSystem's three separate framework boundaries),
+and does not justify a separate discovery run.
 
 Generated Metro sources permit only the known `__prelude__` and Expo CLI’s exact
 NUL-prefixed `polyfill:external-require`, `polyfill:environment-variables` and
