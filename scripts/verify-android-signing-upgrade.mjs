@@ -8,6 +8,7 @@ import {Readable,Transform} from 'node:stream';
 import {pipeline} from 'node:stream/promises';
 import {DatabaseSync} from 'node:sqlite';
 import {tmpdir} from 'node:os';
+import {types as utilTypes} from 'node:util';
 import {readNativeCommandState} from './native-command-evidence.mjs';
 
 const app='com.patrickchin.puptime',oldSHA='82fa41075db35d747360183a2c3ff364e5c4fb4813519135d7a5eb076249a927';
@@ -74,12 +75,44 @@ function commandFailure(error,result,details){
  }
  commandFailures.set(error,value);return error;
 }
-function finiteFailure(error){return commandFailures.get(error)??{class:error?.code==='ERR_ASSERTION'?'assertion':'other'};}
+const positiveInstallStages=new Set(['original-install','bridge-install','later-install']);
+const regexpSource=Object.getOwnPropertyDescriptor(RegExp.prototype,'source').get;
+const regexpFlags=['hasIndices','global','ignoreCase','multiline','dotAll','unicode','unicodeSets','sticky'].map(name=>Object.getOwnPropertyDescriptor(RegExp.prototype,name)?.get);
+function nativeErrorFields(error){
+ try{
+  if(utilTypes.isProxy(error)||!utilTypes.isNativeError(error))return {};
+  const fields={};for(const key of ['code','operator','expected','actual']){const descriptor=Object.getOwnPropertyDescriptor(error,key);if(descriptor&&Object.hasOwn(descriptor,'value'))fields[key]=descriptor;}
+  return fields;
+ }catch{return {};}
+}
+function installAssertionSite(fields){
+ try{
+  if(!fields.operator||!fields.expected||!fields.actual)return 'UNKNOWN';
+  const operator=fields.operator.value,expected=fields.expected.value;
+  if(operator==='match'){
+   if(utilTypes.isProxy(expected)||!utilTypes.isRegExp(expected))return 'UNKNOWN';
+   const keys=Reflect.ownKeys(expected);if(keys.length!==1||keys[0]!=='lastIndex'||Object.getOwnPropertyDescriptor(expected,'lastIndex')?.value!==0)return 'UNKNOWN';
+   if(regexpFlags.some(get=>typeof get!=='function'||get.call(expected)!==false))return 'UNKNOWN';
+   const source=regexpSource.call(expected);
+   return source==='Success'?'success-text':source==='^package:\\/data\\/app\\/[^\\n]+\\/base\\.apk$'?'package-path':'UNKNOWN';
+  }
+  // Only the strictEqual assertion consumes actual: it is a hash, never output.
+  if(operator==='strictEqual'&&typeof expected==='string'&&/^[a-f0-9]{64}$/.test(expected)){
+   const actual=fields.actual.value;if(typeof actual==='string'&&/^[a-f0-9]{64}$/.test(actual)&&actual!==expected)return 'installed-byte-hash';
+  }
+ }catch{/* Unknown data must not mask the original assertion or cleanup. */}
+ return 'UNKNOWN';
+}
+function finiteFailure(error,phase){
+ const command=commandFailures.get(error);if(command)return command;
+ const fields=nativeErrorFields(error),assertion=fields.code?.value==='ERR_ASSERTION';
+ return {class:assertion?'assertion':'other',...(assertion&&positiveInstallStages.has(phase)?{installAssertionSite:installAssertionSite(fields)}:{})};
+}
 function exerciseRecorder(save){
  const history=[],active=[];let failure,nativeCommand,snapshotSite;
  const snapshot=()=>({phase:active.at(-1)??history.at(-1)?.phase??'exercise-preconditions',state:failure?'failed':active.length?'started':'completed',history:history.map(({phase,state})=>({phase,state})),...(failure?{failure:{...failure}}:{}),...(nativeCommand?{nativeCommand:{...nativeCommand}}:{}),...(snapshotSite?{snapshotSite}:{})});
  const event=(phase,state)=>{assert.ok(exerciseStages.includes(phase));assert.ok(['started','completed','failed'].includes(state));assert.ok(history.length<256);history.push({phase,state});};
- return {phase:()=>active.at(-1),snapshotSite(site){assert.ok(snapshotSites.includes(site));assert.ok(active.at(-1)?.startsWith('snapshot-'));snapshotSite=site;},flowFailure(flow,directory){assert.ok(exerciseFlows.includes(flow));const stage=active.at(-1);assert.ok(exerciseStages.includes(stage));const {status,kind,targetId,sequence}=readNativeCommandState(directory);nativeCommand={flow,stage,status,kind,targetId,sequence};save(snapshot());},begin(phase){event(phase,'started');active.push(phase);snapshotSite=undefined;save(snapshot());},end(phase){assert.equal(active.at(-1),phase);event(phase,'completed');active.pop();snapshotSite=undefined;save(snapshot());},persist(){save(snapshot());},fail(error){failure=finiteFailure(error);event(active.at(-1)??history.at(-1)?.phase??'exercise-preconditions','failed');save(snapshot());}};
+ return {phase:()=>active.at(-1),snapshotSite(site){assert.ok(snapshotSites.includes(site));assert.ok(active.at(-1)?.startsWith('snapshot-'));snapshotSite=site;},flowFailure(flow,directory){assert.ok(exerciseFlows.includes(flow));const stage=active.at(-1);assert.ok(exerciseStages.includes(stage));const {status,kind,targetId,sequence}=readNativeCommandState(directory);nativeCommand={flow,stage,status,kind,targetId,sequence};save(snapshot());},begin(phase){event(phase,'started');active.push(phase);snapshotSite=undefined;save(snapshot());},end(phase){assert.equal(active.at(-1),phase);event(phase,'completed');active.pop();snapshotSite=undefined;save(snapshot());},persist(){save(snapshot());},fail(error){failure=finiteFailure(error,active.at(-1)??history.at(-1)?.phase);event(active.at(-1)??history.at(-1)?.phase??'exercise-preconditions','failed');save(snapshot());}};
 }
 // Images are limited to two exact fresh/offline guest flow/stage pairs.
 // Capture is best-effort; the original failure still ends the attempt.
@@ -87,7 +120,29 @@ function guestFailureImage(flow,stage,io){
  if(!((flow==='old-ui-seed'&&stage==='guest-seed')||(flow==='bind-real-launcher-widget'&&stage==='widget-binding')))return false;
  try{if(!io.owned())return false;const bytes=io.capture();if(!Buffer.isBuffer(bytes)||bytes.length<8||bytes.length>8*1024*1024||!bytes.subarray(0,8).equals(Buffer.from('89504e470d0a1a0a','hex')))return false;io.save(bytes);return true;}catch{return false;}
 }
+function installAssertionSelfCheck(){
+ const secret='PRIVATE token=password /private/key.pem output message stack',capture=run=>{try{run();}catch(error){return error;}assert.fail('Expected native assertion');};
+ const sites=[['success-text',()=>assert.match(secret,/Success/)],['package-path',()=>assert.match(secret,/^package:\/data\/app\/[^\n]+\/base\.apk$/)],['installed-byte-hash',()=>assert.equal(hash('actual'),hash('expected'))]];
+ for(const phase of positiveInstallStages)for(const [site,run] of sites){
+  const error=capture(run),fields=nativeErrorFields(error);assert.ok(utilTypes.isNativeError(error));assert.equal(fields.code?.value,'ERR_ASSERTION');assert.equal(fields.operator?.value,site==='installed-byte-hash'?'strictEqual':'match');assert.deepEqual(finiteFailure(error,phase),{class:'assertion',installAssertionSite:site});
+  let saved,cleaned=false,caught;const record=exerciseRecorder(value=>saved=value);record.begin(phase);try{try{throw error;}catch(original){record.fail(original);throw original;}}catch(original){caught=original;}finally{cleaned=true;}assert.equal(caught,error);assert.equal(cleaned,true);assert.deepEqual(saved.failure,{class:'assertion',installAssertionSite:site});assert.ok(!JSON.stringify(saved).includes(secret));
+  for(const outside of ['original-launch','plain-B-reject','snapshot-old-created',undefined,secret])assert.deepEqual(finiteFailure(error,outside),{class:'assertion'});
+ }
+ let getters=0,traps=0;const fixture=(operator='match',expected=/Success/,actual=secret)=>Object.assign(new Error(secret),{code:'ERR_ASSERTION',operator,expected,actual});
+ const unknown=[fixture('match',/Other/),...['d','g','i','m','s','u','v','y'].map(flags=>fixture('match',new RegExp('Success',flags))),fixture('match',{}),fixture('match',new Proxy(/Success/,{get(){traps++;throw new Error(secret);},ownKeys(){traps++;throw new Error(secret);}})),fixture('other'),fixture('strictEqual','a'.repeat(64),'a'.repeat(64)),fixture('strictEqual','A'.repeat(64),'b'.repeat(64)),fixture('strictEqual',secret,secret),fixture('strictEqual',Buffer.from(secret),Buffer.from(secret)),fixture('strictEqual','a'.repeat(64),{get value(){getters++;throw new Error(secret);}})];
+ const custom=/Success/;Object.defineProperty(custom,'source',{get(){getters++;throw new Error(secret);}});unknown.push(fixture('match',custom));const shifted=/Success/;shifted.lastIndex=1;unknown.push(fixture('match',shifted));
+ for(const key of ['operator','expected','actual']){const error=fixture();Object.defineProperty(error,key,{get(){getters++;throw new Error(secret);}});unknown.push(error);const missing=fixture();delete missing[key];unknown.push(missing);}
+ const inherited=fixture();delete inherited.operator;Object.setPrototypeOf(inherited,{operator:'match'});unknown.push(inherited);
+ for(const error of unknown)assert.deepEqual(finiteFailure(error,'original-install'),{class:'assertion',installAssertionSite:'UNKNOWN'});
+ const getCode=fixture();Object.defineProperty(getCode,'code',{get(){getters++;throw new Error(secret);}});const proxy=new Proxy(fixture(),{get(){traps++;throw new Error(secret);},getOwnPropertyDescriptor(){traps++;throw new Error(secret);}}),revoked=Proxy.revocable(fixture(),{});revoked.revoke();
+ for(const error of [getCode,proxy,revoked.proxy,{code:'ERR_ASSERTION',operator:'match',expected:/Success/,actual:secret},null,undefined,secret])assert.deepEqual(finiteFailure(error,'original-install'),{class:'other'});
+ // Intrinsic accessors ignore inherited source/flags getters on a genuine RegExp.
+ const intrinsic=/Success/;Object.setPrototypeOf(intrinsic,{get source(){getters++;throw new Error(secret);},get flags(){getters++;throw new Error(secret);}});assert.deepEqual(finiteFailure(fixture('match',intrinsic),'original-install'),{class:'assertion',installAssertionSite:'success-text'});
+ const command=commandFailure(capture(sites[0][1]),{status:1},{commandKind:'package-path',installCodeDecline:'not-install-command'});assert.deepEqual(finiteFailure(command,'original-install'),{class:'command-failed',status:1,commandKind:'package-path',installCodeDecline:'not-install-command'});assert.equal(getters,0);assert.equal(traps,0);
+ console.log('PASS native assertion shapes, three closed install sites, UNKNOWN adversarial fields, no getter/proxy access and unchanged command-error precedence.');
+}
 function installCodeSelfCheck(){
+ installAssertionSelfCheck();
  const secret='PRIVATE token=password /private/key.pem',root='/private/qa',path=join(root,'bridge6.apk'),args=['-s','emulator-5588','install','-r',path];
  const result=(code,detail='',ending='\n\n')=>({status:1,stdout:'Performing Streamed Install\n',stderr:'adb: failed to install '+path+': Failure ['+code+(detail?': '+detail:'')+']'+ending});
  const stdoutVariants=['','Performing Streamed Install\n','Unrelated bounded progress\n','Performing Incremental Install\nPerforming Streamed Install\n'];
