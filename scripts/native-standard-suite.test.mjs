@@ -7,7 +7,9 @@ import {createRequire} from 'node:module';
 import {runStandardSuite,standardFixtureEnvironment,standardResults,standardSelection} from './native-standard-suite.mjs';
 
 const csv=standardSelection('standard-csv'),all=standardSelection('standard-all');
-const xml=(files,status='SUCCESS')=>'<testsuites><testsuite>'+files.map(file=>`<testcase file="${file}" name="private-value" status="${status}"><properties/><system-out>private error/body/cookie</system-out></testcase>`).join('')+'</testsuite></testsuites>';
+// cli-2.11.0 c8c361be JUnitTestSuiteReporter: file/status/counts are attributes,
+// properties wrap property attributes, and failure contains escaped text only.
+const xml=(files,status='SUCCESS')=>'<?xml version="1.0" encoding="UTF-8"?><testsuites><testsuite name="Test Suite" device="private-device" tests="'+files.length+'" failures="'+(status==='ERROR'?files.length:0)+'"><properties><property name="private-name" value="private-value"/></properties>'+files.map(file=>`<testcase id="private-id" file="${file}" name="private-value" status="${status}"><properties><property name="tags" value="private-value"/></properties>${status==='ERROR'?'<failure>private error/body/cookie</failure>':''}</testcase>`).join('')+'</testsuite></testsuites>';
 const root=()=>{const path=mkdtempSync(join(tmpdir(),'puptime-standard-test-'));mkdirSync(join(path,'output'));return path;};
 
 test('only two fixed selections run unchanged CSV or the exact thirteen standard sources',()=>{
@@ -48,8 +50,40 @@ test('JUnit projection retains only allowlisted source/status and rejects missin
  const failure=xml(csv.files,'ERROR').replace('private error/body/cookie','private@example.invalid 123456 cookie=private');
  const result=standardResults(failure,csv.files);assert.equal(result.flows[0].status,'ERROR');assert.ok(!JSON.stringify(result).includes('private'));
  for(const report of ['',xml([]),xml([...csv.files,...csv.files]),xml(['private@example.invalid']),xml(csv.files).replace('status="SUCCESS"','status="SUCCESS" status="ERROR"'),'<!DOCTYPE private>'+xml(csv.files),' '.repeat(2*1024*1024+1)])assert.equal(standardResults(report,csv.files).complete,false);
- assert.equal(standardResults(xml(csv.files).replace('<properties/>','<failure>private</failure>'),csv.files).flows[0].status,'UNKNOWN');
+ assert.equal(standardResults(xml(csv.files).replace('</testcase>','<failure>private</failure></testcase>'),csv.files).flows[0].status,'UNKNOWN');
  assert.equal(standardResults(xml(csv.files,'private error'),csv.files).flows[0].status,'UNKNOWN');
+});
+
+test('whole finalized XML envelope, exact nesting/counts and canonical producer states are mandatory',()=>{
+ const report=xml(csv.files),row=report.match(/<testcase\b[\s\S]*?<\/testcase>/)[0];
+ const bad=[
+  row,report.slice(0,-13),report+'trailing-private',report+report,
+  report.replace(row,'<!--'+row+'-->'),report.replace(row,'<![CDATA['+row+']]>'),
+  report.replace(row,'<unknown>'+row+'</unknown>'),report.replace('<testsuites>','<testsuites><testcase/>'),
+  report.replace('<testsuites>','<unknown>').replace('</testsuites>','</unknown>'),
+  report.replace('</testsuites>','<testsuite tests="0" failures="0"/></testsuites>'),
+  report.replace('tests="1"','tests="13"'),report.replace('failures="0"','failures="1"'),
+  report.replace(row,row+row),report.replace('file="'+csv.files[0]+'"','file="'+csv.files[0]+'" file="private"'),
+  report.replace('status="SUCCESS"','status="SUCCESS" status="ERROR"'),
+  report.replace('status="SUCCESS"','status="SUCCESS" private="x" private="y"'),
+  report.replace('</testcase>','<error>private cookie</error></testcase>'),
+  report.replace('</testcase>','<failure>private cookie</failure></testcase>'),
+  report.replace('</testcase>','<properties/></testcase>'),
+  report.replace('<?xml version="1.0" encoding="UTF-8"?>','<!DOCTYPE testsuites [<!ENTITY private "private-cookie">]>'),
+  report.replace('<?xml version="1.0" encoding="UTF-8"?>','<!DOCTYPE testsuites SYSTEM "file:///private/never-read">'),
+  report.replace('</testcase>','<failure>&private;</failure></testcase>'),
+  report.replace('status="SUCCESS"',''),report.replace('file="'+csv.files[0]+'"',''),
+ ];
+ for(const value of bad){const result=standardResults(value,csv.files);assert.equal(result.complete,false);assert.ok(!JSON.stringify(result).includes('private'));}
+ for(const status of ['PENDING','PREPARING','INSTALLING','RUNNING','CANCELED','STOPPED','WARNING','SKIPPED']){
+  const result=standardResults(xml(csv.files,status),csv.files);assert.equal(result.complete,false);assert.equal(result.flows[0].status,'UNKNOWN');
+ }
+ const secret='private@example.invalid 123456 cookie=private /private/raw';
+ const result=standardResults(xml(csv.files,'ERROR').replace('private error/body/cookie',secret+' &lt;testcase status=&quot;SUCCESS&quot;/&gt;'),csv.files);
+ assert.equal(result.complete,true);assert.equal(result.flows[0].status,'ERROR');assert.ok(!JSON.stringify(result).includes('private'));
+ assert.equal(standardResults(report.replace('name="private-value"','unknown="private" name="private-value"'),csv.files).complete,true);
+ assert.deepEqual(standardResults(report,['private@example.invalid']),{complete:false,flows:[]});
+ const previousPath=process.env.PATH;try{process.env.PATH='';assert.deepEqual(standardResults(report,csv.files),{complete:false,flows:[]});}finally{if(previousPath===undefined)delete process.env.PATH;else process.env.PATH=previousPath;}
 });
 
 for(const scenario of ['standard-csv','standard-all'])test('fixed '+scenario+' preserves CLI/config/bound and deletes raw producer artifacts',async()=>{
