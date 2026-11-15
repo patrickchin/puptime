@@ -232,7 +232,7 @@ jobs:
           java-version: '17'
       - run: npm ci
       - name: Check native evidence assertions
-        run: node --test scripts/native-account-evidence.test.mjs scripts/native-standard-suite.test.mjs
+        run: node --test scripts/native-account-evidence.test.mjs scripts/native-startup-evidence.test.mjs scripts/native-standard-suite.test.mjs
       - name: Install existing Maestro driver
         env:
           MAESTRO_VERSION: '2.11.0'
