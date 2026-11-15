@@ -85,6 +85,7 @@ jobs:
           curl -fsSL "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
       - name: Run Maestro end-to-end tests
+        id: standard_maestro
         timeout-minutes: 60
         env:
           MAESTRO_CLI_NO_ANALYTICS: "1"
@@ -105,6 +106,21 @@ jobs:
             --output build/maestro-report.xml \
             --test-output-dir build/maestro-results \
             .maestro
+      - name: Capture finite standard-suite verdict
+        if: always()
+        continue-on-error: true
+        env:
+          STANDARD_STEP_CONCLUSION: ${{ steps.standard_maestro.conclusion }}
+        run: node scripts/native-standard-verdict.mjs
+      - name: Upload finite standard-suite verdict
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v6
+        with:
+          name: puptime-ios-standard-verdict
+          path: build/standard-verdict.json
+          if-no-files-found: warn
+          retention-days: 7
       - name: Run conversational onboarding into the real app
         timeout-minutes: 120
         env:
