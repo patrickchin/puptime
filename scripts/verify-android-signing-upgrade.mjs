@@ -25,7 +25,9 @@ const exerciseStages=['exercise-preconditions','original-artifact-validation','b
 const exerciseFlows=['old-ui-seed','old-reminder-lead','bind-real-launcher-widget','bridge-visible','bridge-cold','later-visible','later-cold'];
 exerciseStages.push('permission-inventory-recheck','permission-lineage-creation','permission-lineage-inspection','control6-sign','control6-verify','control6-lineage-inspection','control6-v31-validation','permission-payload-equality','permission-owner-original','permission-control-install','permission-control-preservation','snapshot-permission-control-rejected','permission-owner-control');
 // Last entered assertion boundary only, not a diagnosis or captured data.
-const snapshotSites=['path-containment','sqlite-integrity','sqlite-foreign-keys','table-inventory','package-uid','widget-section','widget-count','widget-identity'];
+const snapshotSites=['path-containment','sqlite-integrity','sqlite-foreign-keys','table-inventory','package-uid','widget-section','widget-count','widget-identity','sqlite-list','sqlite-read','backup-list','backup-read','photo-list','photo-read','preferences-list','preferences-read'];
+const snapshotCategories=new Map([['files/SQLite','sqlite'],['files/activity-backups','backup'],['files/puppy-photos','photo'],['files/dog-photos','photo'],['shared_prefs','preferences']]);
+const snapshotCategory=remote=>snapshotCategories.get(remote);
 // Android16r1 PackageManager.installStatusToString: fixed names only; never retain its free-form message.
 const installFailureCodes=new Set([
  'INSTALL_FAILED_ALREADY_EXISTS','INSTALL_FAILED_INVALID_APK','INSTALL_FAILED_INVALID_URI','INSTALL_FAILED_INSUFFICIENT_STORAGE',
@@ -394,7 +396,32 @@ function snapshotSiteSelfCheck(){
   const capture=exerciseRecorder(value=>saved=value);capture.begin('snapshot-old-created');let error;try{widgetBinding(text,value=>capture.snapshotSite(value));}catch(value){error=value;capture.fail(value);}assert.equal(error?.code,'ERR_ASSERTION');assert.equal(saved.snapshotSite,site);assert.deepEqual(saved.failure,{class:'assertion'});assert.ok(!JSON.stringify(saved).includes(secret));
  }
  const entered=[];assert.equal(widgetBinding(valid,site=>entered.push(site)).id,'2');assert.deepEqual(entered,['widget-section','widget-count','widget-identity']);
- console.log('PASS eight finite in-memory snapshot sites, preserved failures/status, marker reset and production widget assertion boundaries. No native data or commands.');
+ console.log('PASS sixteen finite in-memory snapshot sites, preserved failures/status, marker reset and production widget assertion boundaries. No native data or commands.');
+}
+function snapshotIoSiteSelfCheck(){
+ const secret='PRIVATE raw path email token',expected=[['files/SQLite','sqlite'],['files/activity-backups','backup'],['files/puppy-photos','photo'],['files/dog-photos','photo'],['shared_prefs','preferences']];
+ assert.deepEqual([...snapshotCategories],expected);assert.deepEqual([...new Set(expected.flatMap(([,category])=>[category+'-list',category+'-read']))].sort(),snapshotSites.slice(8).sort());
+ for(const unknown of [secret,'','files/SQLite/extra','shared_prefs2','toString','__proto__',null,undefined,{}])assert.equal(snapshotCategory(unknown),undefined);
+ const source=readFileSync(resolve(process.argv[1]),'utf8'),matches=[...source.matchAll(/^function snapshot\(label\)\{/gm)];assert.equal(matches.length,1);const start=matches[0].index,end=source.indexOf('\nconst equal=preservationEquality',start);assert.ok(start>0&&end>start);
+ const execute=Function('assert','exerciseEvidence','adb','command','mkdirSync','join','root','app','device','isAbsolute','snapshotCategory',source.slice(start,end)+';return snapshot("old-created");');
+ for(const [remote,category] of expected)for(const operation of ['list','read','containment']){
+  let saved,writes=0,reads=0;const record=exerciseRecorder(value=>{writes++;saved=value;}),original=commandFailure(new Error(secret),{status:255}),before=()=>writes;
+  const run=(binary,args)=>{
+   assert.equal(binary,'adb');assert.deepEqual(args.slice(0,2),['-s','owned']);
+   if(args[2]==='shell'){
+    const selected=expected.find(([name])=>args[3]===`if test -d /data/user/0/${app}/${name}; then find /data/user/0/${app}/${name} -type f; fi`);assert.ok(selected);
+    assert.equal(recordedSite(),selected[1]+'-list');
+    if(selected[0]!==remote)return '';if(operation==='list')throw original;
+    return operation==='containment'?'/private/'+secret:'/data/user/0/'+app+'/'+remote+'/fixture';
+   }
+   assert.deepEqual(args,['-s','owned','exec-out','cat','/data/user/0/'+app+'/'+remote+'/fixture']);assert.equal(recordedSite(),category+'-read');reads++;throw original;
+  };
+  let site;const evidence={...record,snapshotSite(value){const count=before();record.snapshotSite(value);assert.equal(writes,count);site=value;}};const recordedSite=()=>site;
+  let caught;try{execute(assert,evidence,(...args)=>{assert.deepEqual(args,['shell','am','force-stop',app]);},run,()=>{},join,'/synthetic',app,'owned',isAbsolute,snapshotCategory);}catch(error){caught=error;record.fail(error);}
+  assert.equal(saved.snapshotSite,operation==='containment'?'path-containment':category+'-'+operation);assert.ok(!JSON.stringify(saved).includes(secret));
+  if(operation==='containment'){assert.equal(caught.code,'ERR_ASSERTION');assert.equal(reads,0);assert.deepEqual(saved.failure,{class:'assertion'});}else{assert.equal(caught,original);assert.deepEqual(saved.failure,{class:'command-failed',status:255});assert.equal(reads,Number(operation==='read'));}
+ }
+ console.log('PASS five exact directory categories, eight closed I/O sites and actual-source list/read/containment failure placement; no native commands or data.');
 }
 function preservationSelfCheck(){
  const secret='PRIVATE_EMAIL_TOKEN pet_PRIVATE evt_PRIVATE /private/record.json raw-error',event={id:'evt_PRIVATE',pet_id:'pet_PRIVATE',type:'pee',source:'widget',at:1,note:secret};
@@ -465,6 +492,7 @@ function selfCheck(){
  installCodeSelfCheck();
  exerciseEvidenceSelfCheck();
  snapshotSiteSelfCheck();
+ snapshotIoSiteSelfCheck();
  packageUidSelfCheck();
  emulatorSelfCheck();
  offlineSelfCheck();
@@ -769,9 +797,10 @@ function snapshot(label){
  adb('shell','am','force-stop',app);const dest=join(root,'snapshot-'+label);mkdirSync(dest,{mode:0o700});const files={};
  for(const remote of ['files/SQLite','files/activity-backups','files/puppy-photos','files/dog-photos','shared_prefs']){
   const path='/data/user/0/'+app+'/'+remote;
+  exerciseEvidence.snapshotSite(snapshotCategory(remote)+'-list');
   const listed=command('adb',['-s',device,'shell',`if test -d ${path}; then find ${path} -type f; fi`]);
   for(const full of listed.trim().split(/\r?\n/).filter(Boolean)){
-   const name=full.slice(('/data/user/0/'+app+'/').length);exerciseEvidence.snapshotSite('path-containment');assert.ok(full.startsWith('/data/user/0/'+app+'/')&&!name.includes('..')&&!isAbsolute(name));const bytes=command('adb',['-s',device,'exec-out','cat',full],{binaryOutput:true});files[name]={sha256:hash(bytes),bytes};const target=join(dest,name);mkdirSync(resolve(target,'..'),{recursive:true,mode:0o700});writeFileSync(target,bytes);
+   const name=full.slice(('/data/user/0/'+app+'/').length);exerciseEvidence.snapshotSite('path-containment');assert.ok(full.startsWith('/data/user/0/'+app+'/')&&!name.includes('..')&&!isAbsolute(name));exerciseEvidence.snapshotSite(snapshotCategory(remote)+'-read');const bytes=command('adb',['-s',device,'exec-out','cat',full],{binaryOutput:true});files[name]={sha256:hash(bytes),bytes};const target=join(dest,name);mkdirSync(resolve(target,'..'),{recursive:true,mode:0o700});writeFileSync(target,bytes);
   }
  }
  const db=new DatabaseSync(join(dest,'files/SQLite/puptime-v2.db'),{readOnly:true});db.exec('BEGIN');let tables;try{exerciseEvidence.snapshotSite('sqlite-integrity');assert.equal(db.prepare('PRAGMA integrity_check').get().integrity_check,'ok');exerciseEvidence.snapshotSite('sqlite-foreign-keys');assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);exerciseEvidence.snapshotSite('table-inventory');tables=nativeSnapshot(db);}finally{db.exec('ROLLBACK');db.close();}
