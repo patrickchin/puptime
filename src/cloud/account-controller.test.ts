@@ -36,6 +36,83 @@ async function localTables(runtime:Awaited<ReturnType<typeof createLocalRuntime>
  });
 }
 
+for(const endpoint of ['config','account'] as const)test(`a pending passive ${endpoint} query preserves owner/history/outbox without locking guest navigation`,async t=>{
+ const f=await fixture(t);f.state.credentials=true;await f.controller.refresh();await enrollLocal(f.runtime);await f.runtime.storage.appendEvents([event]);
+ const owner=await f.runtime.sync.status(f.runtime.petId);assert.equal(owner.accountId,'account-1');assert.ok(owner.pending>0);
+ const before=await localTables(f.runtime);let release!:()=>void,entered!:()=>void;
+ const gate=new Promise<void>(resolve=>{release=resolve;}),started=new Promise<void>(resolve=>{entered=resolve;});
+ if(endpoint==='config')f.api.config=async()=>{entered();await gate;return f.config;};
+ else f.api.account=async()=>{entered();await gate;return structuredClone(f.state.summary);};
+ const request=f.controller.refresh();await started;
+ assert.equal(f.controller.read().busy,true);assert.equal(f.controller.read().accountActionPending,false);assert.deepEqual(await localTables(f.runtime),before);
+ release();assert.equal(await request,'ok');assert.equal(f.controller.read().accountActionPending,false);
+ assert.deepEqual(await localTables(f.runtime),before);assert.equal(f.state.credentials,true);assert.equal(f.state.enrollCalls,0);assert.equal(f.state.pushCalls,0);assert.equal(f.state.signOutCalls,0);
+});
+
+test('passive recovery attempts and offline refresh never become an account-action lock',async t=>{
+ const f=await fixture(t);await f.runtime.storage.appendEvents([event]);const before=await localTables(f.runtime);
+ f.api.config=async()=>{throw new CloudApiError('network');};f.controller.setActive(true);assert.equal(await f.controller.refresh(),'error');
+ assert.equal(f.controller.read().accountActionPending,false);const recovery=f.timers.find(timer=>!timer.cancelled&&timer.delay===1000)!;assert.ok(recovery);
+ let release!:()=>void,entered!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;}),started=new Promise<void>(resolve=>{entered=resolve;});
+ f.api.config=async()=>{entered();await gate;throw new CloudApiError('network');};recovery.cancelled=true;recovery.fn();await started;
+ assert.equal(f.controller.read().busy,true);assert.equal(f.controller.read().accountActionPending,false);assert.deepEqual(await localTables(f.runtime),before);
+ release();for(let i=0;i<50&&f.controller.read().busy;i++)await tick();
+ assert.equal(f.controller.read().busy,false);assert.equal(f.controller.read().accountActionPending,false);assert.ok(f.timers.some(timer=>!timer.cancelled&&timer.delay===2000));
+ f.controller.setOnline(false);assert.equal(await f.controller.refresh(),'error');assert.equal(f.controller.read().accountActionPending,false);
+ assert.deepEqual(await localTables(f.runtime),before);assert.equal(f.state.enrollCalls,0);assert.equal(f.state.pushCalls,0);
+});
+
+for(const action of ['email','verify','social','enable','restore','sign-out','delete'] as const)test(`a pending explicit ${action} action locks guest navigation and releases its lock on failure/cancellation`,async t=>{
+ const d=deletionFixture(),f=await fixture(t,{deletion:d.deletion});
+ const signedIn=['enable','restore','sign-out','delete'].includes(action);f.state.credentials=signedIn;await f.controller.refresh();
+ if(signedIn)await enrollLocal(f.runtime);if(action==='verify')assert.equal(await f.controller.requestEmail('qa@example.invalid'),'ok');await f.runtime.storage.appendEvents([event]);const before=await localTables(f.runtime);
+ let release!:()=>void,entered!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;}),started=new Promise<void>(resolve=>{entered=resolve;});
+ const held=async()=>{entered();await gate;};
+ let request:Promise<controllerModule.AccountActionResult>;
+ if(action==='email'){f.identity.requestEmail=async()=>{await held();return {error:{status:503}};};request=f.controller.requestEmail('qa@example.invalid');}
+ else if(action==='verify'){f.identity.verifyEmail=async()=>{await held();return {error:{status:400}};};request=f.controller.verifyEmail('qa@example.invalid','123456');}
+ else if(action==='social'){f.identity.signInSocial=async()=>{await held();return {error:null,cancelled:true};};request=f.controller.signInSocial('google');}
+ else if(action==='sign-out'){f.identity.signOut=async()=>{await held();return {error:{status:500,code:'NATIVE_SIGN_OUT_FAILED'}};};request=f.controller.signOut({confirmPending:true});}
+ else if(action==='delete'){d.deletion.check=async()=>{await held();throw new Error('Synthetic check failure');};request=f.controller.prepareDeletion();}
+ else{f.api.account=async()=>{await held();throw new CloudApiError('network');};request=f.controller.enableCloud({mode:action==='restore'?'restore':'combine'});}
+ assert.equal(f.controller.read().accountActionPending,true,'Queued actions lock immediately, before their first await.');await started;
+ assert.equal(f.controller.read().busy,true);assert.equal(f.controller.read().accountActionPending,true);assert.deepEqual(await localTables(f.runtime),before);
+ release();assert.equal(await request,action==='social'?'cancelled':'error');assert.equal(f.controller.read().accountActionPending,false);
+ assert.equal(f.controller.read().problem,action==='social'?null:action==='email'?'server-error':action==='verify'?'invalid-code':action==='sign-out'?'sign-out-failed':action==='delete'?'local-storage':'network');
+ assert.deepEqual(await localTables(f.runtime),before);assert.equal(f.state.credentials,signedIn);assert.equal(f.state.enrollCalls,0);assert.equal(f.state.pushCalls,0);
+});
+
+test('queued actions remain locked across an invalidated refresh and overlapping settlements',async t=>{
+ const f=await fixture(t);await f.runtime.storage.appendEvents([event]);const before=await localTables(f.runtime);
+ let releaseConfig!:(value:typeof f.config)=>void,entered!:()=>void;const started=new Promise<void>(resolve=>{entered=resolve;});
+ f.api.config=()=>{entered();return new Promise(resolve=>{releaseConfig=resolve;});};
+ const refresh=f.controller.refresh();await started;assert.equal(f.controller.read().accountActionPending,false);
+ let releaseIdentity!:()=>void,identityEntered!:()=>void;const identityGate=new Promise<void>(resolve=>{releaseIdentity=resolve;}),identityStarted=new Promise<void>(resolve=>{identityEntered=resolve;});
+ f.identity.requestEmail=async()=>{identityEntered();await identityGate;return {error:{status:503}};};
+ const first=f.controller.requestEmail('qa@example.invalid');assert.equal(f.controller.read().accountActionPending,true);
+ const second=f.controller.requestEmail('invalid');assert.equal(await second,'cancelled','The existing identity guard still rejects overlap.');assert.equal(f.controller.read().accountActionPending,true);
+ f.api.config=async()=>f.config;releaseConfig(f.config);assert.equal(await refresh,'cancelled');await identityStarted;assert.equal(f.controller.read().accountActionPending,true);
+ const last=f.controller.retry();assert.equal(f.controller.read().accountActionPending,true);
+ let releaseAccount!:()=>void,accountEntered!:()=>void;const accountGate=new Promise<void>(resolve=>{releaseAccount=resolve;}),accountStarted=new Promise<void>(resolve=>{accountEntered=resolve;});
+ f.api.account=async()=>{accountEntered();await accountGate;throw new CloudApiError('network');};releaseIdentity();assert.equal(await first,'error');await accountStarted;
+ assert.equal(f.controller.read().accountActionPending,true,'Settling one action cannot unlock a later queued action.');
+ releaseAccount();assert.equal(await last,'error');assert.equal(f.controller.read().accountActionPending,false);assert.deepEqual(await localTables(f.runtime),before);
+ assert.equal(f.controller.read().problem,'network');assert.equal(f.state.enrollCalls,0);assert.equal(f.state.pushCalls,0);
+});
+
+test('invalid and disposed account actions settle without leaving a pending lock',async t=>{
+ const f=await fixture(t);const before=await localTables(f.runtime);
+ assert.equal(await f.controller.requestEmail('invalid'),'error');assert.equal(f.controller.read().problem,'invalid-email');assert.equal(f.controller.read().accountActionPending,false);
+ f.controller.stop();assert.equal(await f.controller.retry(),'error');assert.equal(f.controller.read().accountActionPending,false);assert.deepEqual(await localTables(f.runtime),before);
+});
+
+test('a pending-work confirmation releases the action lock without detaching or clearing credentials',async t=>{
+ const f=await fixture(t);f.state.credentials=true;await f.controller.refresh();await enrollLocal(f.runtime);await f.runtime.storage.appendEvents([event]);const before=await localTables(f.runtime);
+ const request=f.controller.signOut({confirmPending:false});assert.equal(f.controller.read().accountActionPending,true);
+ assert.equal(await request,'pending-confirmation-required');assert.equal(f.controller.read().accountActionPending,false);assert.equal(f.controller.read().problem,'pending-confirmation-required');
+ assert.deepEqual(await localTables(f.runtime),before);assert.equal(f.state.credentials,true);assert.equal(f.state.signOutCalls,0);
+});
+
 test('identity adapter uses official explicit linking and normalizes only safe account fields',async()=>{
  const calls:unknown[]=[],sdk={emailOtp:{sendVerificationOtp:async()=>({error:null})},signIn:{emailOtp:async()=>({error:null}),social:async(input:unknown)=>{calls.push(input);return {error:null};}},signOut:async()=>({error:null}),getCookie:async()=> 'managed-cookie',linkSocial:async(input:unknown)=>{calls.push(input);return {error:null};},listAccounts:async()=>({data:[{userId:'owner',providerId:'google',accountId:'private-subject',accessToken:'private-token'}] as unknown,error:null})};
  const identity=controllerModule.createIdentityAdapter(sdk);
