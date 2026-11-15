@@ -1,7 +1,7 @@
 # App notice capture and final-artifact gate
 
 This is incomplete build preparation. The source JSON currently contains the
-reviewed font/icon notices only. Twenty-four exact iOS inputs have attribution
+reviewed font/icon notices only. Forty-nine exact iOS inputs have attribution
 reviews; remaining component review and the incomplete payload prevent sealing.
 Source tests, an internal simulator build, and finding licence filenames
 do not establish complete app-library notice coverage or store readiness.
@@ -44,7 +44,19 @@ public files reproduce the three captured native fingerprints. React, Hermes,
 JSI, React Native dependencies and system frameworks are excluded from these
 mappings; no generic inheritance is allowed.
 
-Against the qualified82 inventory, 179 components plus one generated source
+Twenty-five further exact npm records cover only their captured Expo JavaScript
+notice sets. Root-agent review matched all 267 selected non-generated JS files,
+package manifests and complete original notices to official cached tar/SRI
+inputs and installed bytes. Twenty-four reuse the original Expo MIT text; Speech
+Recognition preserves the distinct original 2024 jamsch MIT notice. Same-name
+native Pods, vendors and generated inputs remain separate. The 24 new public text pins
+name exact component/version/source/hash and official registry tar/SRI. The
+existing identical Expo SDK-57 public tuple is reused unchanged; its component
+record names the approved official tar, with the fresh SRI proof retained in
+source-review evidence.
+No generic MIT allowlist or name-based native inheritance is permitted.
+
+Against the qualified82 inventory, 154 components plus one generated source
 remain unreviewed. Of 109 recorded vendor boundaries, only the twelve specific
 own-product boundaries above are reviewed; the other 97 remain held. No new
 discovery, Android, packaged-native, retained-resource, payload or sealing
