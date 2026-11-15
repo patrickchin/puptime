@@ -14,9 +14,32 @@ name: Skip optional answers to reminder setup
     retryTapIfNoChange: true
 - assertVisible:
     id: preview.profile
-- waitForAnimationToEnd
-- tapOn:
-    id: preview.skip
+# Hosted prepare failed at the age-heading assertion; its cause is unproved.
+# Retry only this source/destination boundary, never the age-answer action.
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: preview.profile
+          commands:
+            - waitForAnimationToEnd
+            - runFlow:
+                when:
+                  notVisible:
+                    id: preview.prompt
+                    text: How old is your pup?
+                commands:
+                  - assertVisible:
+                      id: preview.profile
+                  - tapOn:
+                      id: preview.skip
+                      text: ^I’ll add their name later$
+                      enabled: true
+      - assertVisible:
+          id: preview.prompt
+          text: How old is your pup?
 - assertVisible:
     id: preview.prompt
     text: How old is your pup?
