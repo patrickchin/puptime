@@ -206,8 +206,13 @@ podspec's installed npm package. The link target, owning package, podspec and
 selected target bytes are fingerprinted. Undeclared links, targets outside that
 package and nested links escaping the selected framework remain rejected; a
 declared link does not supply the vendor's licence. Gradle inputs are the
-actual release runtime resolution and artifact hashes. A shared bounded scanner
-walks Pods and autolinked Gradle native subtrees, fingerprints source files, and
+actual release runtime resolution and artifact hashes. External module archives
+use a strict module-only Gradle artifact view;
+the unfiltered resolution graph still supplies every selected local project's
+build/source/CMake inputs. No local AAR is required or silently approved before
+it is built. Unknown graph identifiers, missing projects and module-resolution
+errors still fail; no leniency, attribute override or variant reselection is used.
+A shared bounded scanner walks Pods and autolinked Gradle native subtrees, fingerprints source files, and
 finds source-only `vendor`/`third_party` children as well as binary vendors.
 Native roots are restricted to installed packages, Pods and identified local
 modules; arbitrary project data is not traversed.

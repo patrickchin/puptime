@@ -80,7 +80,7 @@ gradle.projectsEvaluated {
             requested = app.findProperty('noticeInputsOutput')
             if (!requested) throw new GradleException('Explicit private notice output required')
             configuration = app.configurations.getByName('releaseRuntimeClasspath')
-            artifacts = configuration.resolvedConfiguration.resolvedArtifacts
+            artifacts = configuration.incoming.artifactView { componentFilter { it instanceof ModuleComponentIdentifier } }.artifacts.artifacts
             }
             observed('artifact-collection') {
             def metadataOnly = []

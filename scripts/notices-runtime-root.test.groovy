@@ -29,14 +29,23 @@ try {
     config.addCompilationCustomizers(new ImportCustomizer().addImports('org.gradle.api.GradleException'))
     def execute = { File actual, Object requested, boolean hasApp, Map fault=[:] ->
         def registered = []; int lookups = 0
-        def configuration = [resolvedConfiguration: [resolvedArtifacts: []], incoming: [resolutionResult: [allComponents: [iterator: { -> throw fault.failure }, size: { -> 1 }] as Collection]]]
+        def configuration = [incoming: [resolutionResult: [allComponents: fault.containsKey('graph') ? fault.graph : [iterator: { -> throw fault.failure }, size: { -> 1 }] as Collection], artifactView: { definition ->
+            def view = new Expando(), filter; int filters = 0
+            view.componentFilter = { predicate -> filter = predicate; filters++ }
+            definition.rehydrate(view, definition.owner, definition.thisObject).call()
+            assert filters == 1 && view.properties.keySet() == ['componentFilter'] as Set
+            if (fault.moduleFailure) throw fault.moduleFailure
+            def selected = (fault.artifacts ?: []).findAll { filter.call(it.id.componentIdentifier) }
+            if (fault.observeView) fault.observeView(selected)
+            return [artifacts: [artifacts: selected]]
+        }]]
         def app = [findProperty: { name -> new File(main.parentFile, 'build/private-input.json').path }, configurations: [getByName: { name -> if (fault.phase == 'runtime-resolution') throw fault.failure; configuration }], tasks: [register: { name, body ->
             if (fault.phase == 'task-registration') throw fault.failure
             registered.add(name)
             if (fault.runTask) { def task = new Expando(); task.doLast = { action -> action.call() }; body.rehydrate(task, body.owner, body.thisObject).call() }
         }]]
         def target
-        target = [projectDir: actual, findProject: { path -> lookups++; if (path != ':app') return path == ':public-library' ? [path: path, rootProject: fault.foreignProject ? new Object() : target] : null; if (fault.phase == 'root-binding') throw fault.failure; hasApp ? app : null }]
+        target = [projectDir: actual, findProject: { path -> lookups++; if (path != ':app') return fault.projects?.containsKey(path) ? fault.projects[path] : path == ':public-library' ? [path: path, rootProject: fault.foreignProject ? new Object() : target] : null; if (fault.phase == 'root-binding') throw fault.failure; hasApp ? app : null }]
         app.rootProject = target; app.path = ':app'
         def properties = requested == null ? [:] : [noticeMainProjectRoot: requested]
         // Included builds need not repeat the main invocation's CLI properties.
@@ -112,6 +121,31 @@ try {
     clear(); build.text = 'PRIVATE_WRITER_BLOCKER'; Throwable selectedCaught
     try { execute(main, main.path, true, [phase: 'runtime-resolution', failure: selectedOriginal, diagnostics: true, runTask: true]) } catch (Throwable failure) { selectedCaught = failure }
     assert selectedCaught.is(selectedOriginal) && !report.exists(); build.delete(); selectionChecks++
+    clear()
+    def moduleId = [getGroup: { 'qa' }, getModule: { 'library' }, getVersion: { '1' }] as ModuleComponentIdentifier
+    def bomId = [getGroup: { 'qa' }, getModule: { 'platform' }, getVersion: { '1' }] as ModuleComponentIdentifier
+    def projectId = project(':', ':qa-library'), appId = project(':', ':app')
+    File moduleFile = new File(fixture, 'synthetic-module.jar'); moduleFile.text = 'SYNTHETIC_MODULE_BYTES'
+    def moduleArtifact = [id: [componentIdentifier: moduleId], file: moduleFile], unbuiltProjectArtifact = [id: [componentIdentifier: projectId], file: new File(fixture, 'absent-unbuilt-project.aar')]
+    File projectDir = new File(main.parentFile, 'node_modules/qa-library/android'); projectDir.mkdirs()
+    File projectBuild = new File(projectDir, 'build.gradle'); projectBuild.text = '// Synthetic public native source'
+    File projectOutput = new File(projectDir, 'build'), staging = new File(projectDir, 'configured-native-staging')
+    def buildProvider = new Expando(); buildProvider.get = { [asFile: projectOutput] }
+    def localProject = [buildFile: projectBuild, layout: [buildDirectory: buildProvider], extensions: [findByName: { ignored -> [externalNativeBuild: [cmake: [path: new File(projectDir, 'CMakeLists.txt'), buildStagingDirectory: staging]]] }], file: { value -> value }]
+    int viewChecks = 0
+    def mixed = [runTask: true, graph: [moduleId, bomId, projectId, appId].collect { [id: it] }, artifacts: [moduleArtifact, unbuiltProjectArtifact], projects: [':qa-library': localProject], observeView: { selected -> assert selected == [moduleArtifact]; viewChecks++ }]
+    execute(main, main.path, true, mixed)
+    def runtime = new JsonSlurper().parse(new File(main.parentFile, 'build/private-input.json'))
+    assert runtime.schema == 1 && runtime.configuration == 'releaseRuntimeClasspath' && viewChecks == 1
+    assert runtime.components == [[group: 'qa', name: 'library', version: '1', artifacts: [[file: moduleFile.absolutePath, sha256: MessageDigest.getInstance('SHA-256').digest(moduleFile.bytes).encodeHex().toString()]]], [projectBuildFile: projectBuild.absolutePath, projectBuildDirectory: projectOutput.canonicalPath, projectCmakeStagingDirectory: staging.canonicalPath]]
+    assert runtime.metadataOnly == [[group: 'qa', name: 'platform', version: '1']] && !unbuiltProjectArtifact.file.exists()
+    int strictGraphChecks = 0
+    for (bad in [[graph: [[id: [getDisplayName: { 'PRIVATE_UNKNOWN' }] as ComponentIdentifier]], message: 'Unknown release component input'], [graph: [[id: project(':', ':missing')]], message: 'Unresolved native project input']]) {
+        try { execute(main, main.path, true, mixed + [graph: bad.graph]); assert false } catch (GradleException failure) { assert failure.message == bad.message; strictGraphChecks++ }
+    }
+    def unresolvedModule = new IllegalStateException('PRIVATE_MODULE_FAILURE'); Throwable moduleCaught
+    try { execute(main, main.path, true, mixed + [moduleFailure: unresolvedModule]); assert false } catch (Throwable failure) { moduleCaught = failure }
+    assert moduleCaught.is(unresolvedModule); strictGraphChecks++
     for (blocked in ['file', 'symlink']) {
         clear(); if (blocked == 'file') build.text = 'PRIVATE_BLOCKER'; else Files.createSymbolicLink(build.toPath(), new File(fixture, 'outside').tap { mkdirs() }.toPath())
         def original = new IllegalArgumentException('PRIVATE_ORIGINAL'); Throwable caught
@@ -119,5 +153,5 @@ try {
         assert caught.is(original) && !report.exists()
         build.delete()
     }
-    println "Actual init source: 7 root guards +4 finite Throwable phases +5 bounded cause chains +${selectionChecks} selection cases +2 failed/outside writers PASS; no Gradle build."
+    println "Actual init source: 7 root guards +4 finite Throwable phases +5 bounded cause chains +${selectionChecks} selection cases +2 failed/outside writers +1 mixed graph +${strictGraphChecks} strict graph/module failures PASS; no Gradle build."
 } finally { fixture.deleteDir() }
