@@ -15,9 +15,15 @@ const app='com.patrickchin.puptime',oldSHA='82fa41075db35d747360183a2c3ff364e5c4
 const oldCert='fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c';
 const keySHA='221e0a3106aa4c3ccc154e0a418b55020b3f9ea6e84f92e8749cd9e2f39f5e58';
 const caps={'installed data':true,'shared UID':false,permission:false,rollback:false,auth:false};
+const permissionEvidencePath='scripts/android-permission-experiment.py';
+const permissionSource='fcf9d544d9324d447514a957daf87a0e59603fde';
+const permissionRuns=['43623634026','43623654003'];
+const permissionQualificationDigests=['0948d51163a14ebb03a00bd665dfc9f0c602af8c361e044a1da1e3e3527a7b31','269f093e480aedb14124070861e5a909a17324b243dedc64c8e66289af33727c'];
+function permissionSelection(value){assert.ok(value===undefined||value==='false'||value==='true');return value==='true';}
 const hash=value=>createHash('sha256').update(value).digest('hex');
 const exerciseStages=['exercise-preconditions','original-artifact-validation','bridge-input-validation','later-input-validation','public-template-validation','qa-key-creation','qa-certificate-readback','lineage-creation','lineage-inspection','plain6-sign','plain6-verify','bridge6-sign','bridge6-verify','plain7-sign','plain7-verify','bridge-lineage-inspection','plain6-lineage-absence','plain7-lineage-absence','bridge-v31-validation','native-evidence-imports','original-install','original-launch','guest-seed','reminder-preference-seed','widget-binding','widget-first-save','snapshot-old-created','original-state-validation','plain-B-reject','snapshot-plain-B-rejected','plain-B-preservation','bridge-install','snapshot-bridge-before-launch','bridge-before-launch-preservation','bridge-launch','bridge-visible','snapshot-bridge-launched','bridge-state-validation','bridge-widget-save','snapshot-bridge-widget','bridge-widget-validation','higher-A-reject','snapshot-higher-A-rollback-rejected','higher-A-preservation','later-install','snapshot-later-before-launch','later-before-launch-preservation','later-launch','later-visible','snapshot-later-launched','later-state-validation','later-cold-restart','snapshot-later-cold','later-cold-preservation','exercise-finalize'];
 const exerciseFlows=['old-ui-seed','old-reminder-lead','bind-real-launcher-widget','bridge-visible','bridge-cold','later-visible','later-cold'];
+exerciseStages.push('permission-inventory-recheck','permission-lineage-creation','permission-lineage-inspection','control6-sign','control6-verify','control6-lineage-inspection','control6-v31-validation','permission-payload-equality','permission-owner-original','permission-control-install','permission-control-preservation','snapshot-permission-control-rejected','permission-owner-control');
 // Last entered assertion boundary only, not a diagnosis or captured data.
 const snapshotSites=['path-containment','sqlite-integrity','sqlite-foreign-keys','table-inventory','package-uid','widget-section','widget-count','widget-identity'];
 // Android16r1 PackageManager.installStatusToString: fixed names only; never retain its free-form message.
@@ -80,7 +86,7 @@ function installFailureProjection(result,path){
  return {installCode:match[1]};
 }
 function installCommandFailure(binary,args,result,phase,root){
- const file=phase==='original-install'?'original125.apk':phase==='bridge-install'?'bridge6.apk':phase==='later-install'?'plain7.apk':undefined;if(!file)return;
+ const file=phase==='original-install'?'original125.apk':phase==='bridge-install'?'bridge6.apk':phase==='later-install'?'plain7.apk':phase==='permission-control-install'?'control6.apk':undefined;if(!file)return;
  const exact=expected=>binary==='adb'&&Array.isArray(args)&&args.length===expected.length&&args.every((value,i)=>value===expected[i]);
  const path=join(root,file),install=['-s','emulator-5588','install',...(phase==='original-install'?[]:['-r']),path];
  let commandKind='unrecognized';
@@ -90,6 +96,12 @@ function installCommandFailure(binary,args,result,phase,root){
  return {commandKind,...(commandKind==='adb-install'?installFailureProjection(result,path):{installCodeDecline:'not-install-command'})};
 }
 const commandFailures=new WeakMap();
+function permissionControl(error){
+ const value=commandFailures.get(error);assert.equal(value?.class,'command-failed');assert.equal(value.status,1);assert.equal(value.commandKind,'adb-install');
+ if(value.installCode==='INSTALL_FAILED_DUPLICATE_PERMISSION')return {...value,evidence:'unambiguous-observed-code'};
+ assert.equal(value.installCode,undefined);assert.equal(value.installCodeDecline,'ambiguous-content');const observed=finiteInstallAmbiguity(value.installCodeAmbiguity);assert.ok(observed);assert.equal(observed.successToken,false);assert.equal(observed.unknownCodeObserved,false);assert.deepEqual(observed.publicCodes,['INSTALL_FAILED_DUPLICATE_PERMISSION']);
+ return {...value,evidence:'consistent-observed-set-only'};
+}
 function commandFailure(error,result,details){
  const value={class:result.error?.code==='ETIMEDOUT'?'timeout':result.error?.code==='ENOENT'?'missing-tool':'command-failed'};
  if(Number.isInteger(result.status)&&result.status>=0&&result.status<=255)value.status=result.status;
@@ -260,13 +272,13 @@ function exerciseEvidenceSelfCheck(){
 const toolingPaths=['.github/workflows/android-signing-proof.yml','scripts/verify-android-signing-upgrade.mjs'];
 const nativeCommandPath='scripts/native-command-evidence.mjs';
 function validateDriver(expected,actual){assert.match(expected??'',/^[a-f0-9]{40}$/);assert.equal(actual,expected,'Pin the reviewed driver SHA separately from artifact source.');}
-function equivalentChanges(raw){
+function equivalentChanges(raw,permissionExperiment=false){
  if(!raw)return [];
  assert.ok(raw.endsWith('\0'));const fields=raw.slice(0,-1).split('\0');assert.equal(fields.length%2,0);
  const changes=[];
  for(let i=0;i<fields.length;i+=2){
   const modified=fields[i].match(/^:100644 100644 ([a-f0-9]{40}) ([a-f0-9]{40}) M$/),added=fields[i].match(/^:000000 100644 (0{40}) ([a-f0-9]{40}) A$/),path=fields[i+1];
-  assert.ok(modified&&toolingPaths.includes(path)||added&&path===nativeCommandPath&&added[2]!=='0'.repeat(40),'Only two same-mode tooling edits and the exact new regular-file command helper are allowed.');
+  assert.ok(modified&&toolingPaths.includes(path)||added&&(path===nativeCommandPath||permissionExperiment&&path===permissionEvidencePath)&&added[2]!=='0'.repeat(40),'Only two same-mode tooling edits and explicitly selected regular-file evidence helpers are allowed.');
   const match=modified??added;assert.ok(!changes.some(value=>value.path===path));changes.push({path,mode:'100644',sourceBlob:match[1],driverBlob:match[2],...(added?{changeType:'A'}:{})});
  }
  return changes;
@@ -291,10 +303,17 @@ function validateRun(run,jobs,repo,source,id){
  assert.deepEqual(jobs.map(job=>[job.name,job.conclusion]).sort(),[['build','success'],['publish','skipped']]);
 }
 function chooseArtifact(items,name,runId){const matches=items.filter(item=>item.name===name);assert.equal(matches.length,1);const item=matches[0];assert.equal(item.expired,false);assert.match(item.digest,/^sha256:[a-f0-9]{64}$/);assert.equal(item.workflow_run.id,Number(runId));return item;}
-function inspectCapabilities(text,a,b){
+function inspectCapabilities(text,a,b,expected=caps){
  const blocks=text.split(/(?=Signer #\d+ in lineage certificate DN:)/).filter(value=>value.trim());assert.equal(blocks.length,2);
  for(const [i,cert] of [a,b].entries())assert.ok(blocks[i].includes('certificate SHA-256 digest: '+cert));
- for(const [name,value] of Object.entries(caps))assert.match(blocks[0],new RegExp('Has '+name+' capability\\s*:\\s*'+value+'(?:\\s|$)'));
+ for(const [name,value] of Object.entries(expected))assert.match(blocks[0],new RegExp('Has '+name+' capability\\s*:\\s*'+value+'(?:\\s|$)'));
+}
+function permissionCapabilityPair(control,experiment,a,b){
+ inspectCapabilities(control,a,b);inspectCapabilities(experiment,a,b,{...caps,permission:true});
+ const oldBlock=text=>text.split(/(?=Signer #\d+ in lineage certificate DN:)/).filter(value=>value.trim())[0];
+ for(const text of [control,experiment])for(const name of Object.keys(caps))assert.equal([...oldBlock(text).matchAll(new RegExp('Has '+name+' capability\\s*:\\s*(true|false)(?=\\s|$)','g'))].length,1);
+ const normalize=text=>text.replace(/(Has permission capability\s*:\s*)true(?=\s|$)/,'$1false');
+ assert.equal(normalize(experiment),control,'Only old-A PERMISSION may differ, including all other signer fields.');
 }
 function expectedLaunch(before,version){return {...before,metadata:before.metadata.map(row=>row.key==='backup_app_version'?{...row,value:version}:row)};}
 const sqliteFile=name=>/^files\/SQLite\/puptime-v2\.db(?:-wal|-shm|-journal)?$/.test(name);
@@ -347,6 +366,19 @@ function snapshotSiteSelfCheck(){
  console.log('PASS eight finite in-memory snapshot sites, preserved failures/status, marker reset and production widget assertion boundaries. No native data or commands.');
 }
 function selfCheck(){
+ for(const value of [undefined,'false'])assert.equal(permissionSelection(value),false);assert.equal(permissionSelection('true'),true);for(const value of ['',true,false,'TRUE','1','other'])assert.throws(()=>permissionSelection(value));
+ const permissionAddition=`:000000 100644 ${'0'.repeat(40)} ${'c'.repeat(40)} A\0${permissionEvidencePath}\0`;assert.throws(()=>equivalentChanges(permissionAddition));assert.equal(equivalentChanges(permissionAddition,true).length,1);
+ for(const raw of [permissionAddition.replace('100644','100755'),permissionAddition.replace(' A\0',' M\0'),permissionAddition.replace(permissionEvidencePath,'scripts/other.py'),permissionAddition+permissionAddition])assert.throws(()=>equivalentChanges(raw,true));
+ const pairText=permission=>'Signer #1 in lineage certificate DN: A\ncertificate SHA-256 digest: a\n'+Object.entries({...caps,permission}).map(([name,value])=>'Has '+name+' capability: '+value).join('\n')+'\nSigner #2 in lineage certificate DN: B\ncertificate SHA-256 digest: b\nHas permission capability: true\n';
+ permissionCapabilityPair(pairText(false),pairText(true),'a','b');for(const changed of [pairText(false),pairText(true).replace('shared UID capability: false','shared UID capability: true'),pairText(true).replace('DN: B','DN: OTHER'),pairText(true)+'extra',pairText(true).replace('Has permission capability: true','Has permission capability: true\nHas permission capability: true')])assert.throws(()=>permissionCapabilityPair(pairText(false),changed,'a','b'));
+ for(const [name,value] of Object.entries(caps))if(name!=='permission')assert.throws(()=>permissionCapabilityPair(pairText(false),pairText(true).replace('Has '+name+' capability: '+value,'Has '+name+' capability: '+!value),'a','b'));
+ const controlled=value=>commandFailure(new Error('PRIVATE'),{status:1},value),code={commandKind:'adb-install',installCode:'INSTALL_FAILED_DUPLICATE_PERMISSION'},ambiguous={commandKind:'adb-install',installCodeDecline:'ambiguous-content',installCodeAmbiguity:{firstPredicate:'code-token-count',successToken:false,codeTokens:'multiple',failureMarkers:'multiple',publicCodes:['INSTALL_FAILED_DUPLICATE_PERMISSION'],unknownCodeObserved:false}};
+ assert.equal(permissionControl(controlled(code)).evidence,'unambiguous-observed-code');assert.equal(permissionControl(controlled(ambiguous)).evidence,'consistent-observed-set-only');assert.equal(permissionControl(controlled(ambiguous)).installCode,undefined);
+ for(const value of [{...code,installCode:'INSTALL_FAILED_UPDATE_INCOMPATIBLE'},{...code,commandKind:'package-path'},{...ambiguous,installCodeAmbiguity:{...ambiguous.installCodeAmbiguity,successToken:true,firstPredicate:'success-token'}},{...ambiguous,installCodeAmbiguity:{...ambiguous.installCodeAmbiguity,unknownCodeObserved:true}},{...ambiguous,installCodeAmbiguity:{...ambiguous.installCodeAmbiguity,publicCodes:['INSTALL_FAILED_ABORTED','INSTALL_FAILED_DUPLICATE_PERMISSION']}},{}])assert.throws(()=>permissionControl(controlled(value)));
+ for(const error of [undefined,new Error('PRIVATE'),commandFailure(new Error('PRIVATE'),{status:0},code),commandFailure(new Error('PRIVATE'),{status:1,error:{code:'ETIMEDOUT'}},code)])assert.throws(()=>permissionControl(error));
+ const controlRoot='/private/SYNTHETIC',controlPath=join(controlRoot,'control6.apk'),controlArgs=['-s','emulator-5588','install','-r',controlPath],controlResult={status:1,stdout:'',stderr:'adb: failed to install '+controlPath+': Failure [INSTALL_FAILED_DUPLICATE_PERMISSION]\n'};
+ assert.deepEqual(installCommandFailure('adb',controlArgs,controlResult,'permission-control-install',controlRoot),code);
+ for(const args of [controlArgs.slice(0,-1).concat('/private/OTHER.apk'),controlArgs.concat('--extra'),controlArgs.filter(value=>value!=='-r')])assert.throws(()=>permissionControl(controlled(installCommandFailure('adb',args,controlResult,'permission-control-install',controlRoot))));
  installCodeSelfCheck();
  exerciseEvidenceSelfCheck();
  snapshotSiteSelfCheck();
@@ -528,7 +560,8 @@ function emulatorHost(mode){
  }catch(error){if(existsSync(folder))writeFileSync(join(folder,'emulator-host-failure.txt'),String(error.stack),{mode:0o600});throw error;}
 }
 
-const [mode]=process.argv.slice(2);if(['--emulator-record','--emulator-root','--emulator-offline','--emulator-cleanup'].includes(mode)){try{emulatorHost(mode);process.exit(0);}catch{console.error('FAIL host-only '+mode.slice(2)+'; raw process/error evidence remains private.');process.exit(1);}}if(mode==='--self-check'){selfCheck();process.exit(0);}
+const [mode]=process.argv.slice(2);if(['--emulator-record','--emulator-root','--emulator-offline','--emulator-cleanup'].includes(mode)){try{emulatorHost(mode);process.exit(0);}catch{console.error('FAIL host-only '+mode.slice(2)+'; raw process/error evidence remains private.');process.exit(1);}}
+const permissionExperimentSelected=['--self-check','--preflight','--exercise'].includes(mode)?permissionSelection(process.env.PUPTIME_PERMISSION_EXPERIMENT):false;if(mode==='--self-check'){selfCheck();if(permissionExperimentSelected)execFileSync('python3',[permissionEvidencePath,'--self-check'],{timeout:15000,maxBuffer:65536,stdio:['ignore','pipe','pipe']});process.exit(0);}
 const exerciseReceipt=resolve('build/android-signing-safe/verification.json');let exercisePrivateRoot;
 const exerciseEvidence=mode==='--exercise'?exerciseRecorder(value=>{mkdirSync(resolve(exerciseReceipt,'..'),{recursive:true,mode:0o700});const prior=existsSync(exerciseReceipt)?JSON.parse(readFileSync(exerciseReceipt)):{};writeFileSync(exerciseReceipt,JSON.stringify({...prior,...(value.failure?{status:'exercise-failed'}:{}),scope:'Guest-only API36 exercise stage evidence; no credential or Play acceptance. Started/completed markers do not establish later signing/data success.',exercise:value},null,2),{mode:0o600});}):null;
 try{
@@ -537,8 +570,8 @@ assert.ok(['--preflight','--exercise'].includes(mode));assert.equal(process.env.
 const root=resolve(process.env.PUPTIME_SIGNING_PRIVATE??'');assert.ok(process.env.RUNNER_TEMP&&root.startsWith(resolve(process.env.RUNNER_TEMP)+'/puptime-signing-'));
 const source=process.env.PUPTIME_EXPECTED_SOURCE,driverSource=process.env.PUPTIME_EXPECTED_DRIVER;assert.match(source??'',/^[a-f0-9]{40}$/);validateDriver(driverSource,process.env.GITHUB_SHA);assertWidgetSource();
 const repo=process.env.GITHUB_REPOSITORY;assert.equal(repo,'patrickchin/puptime');
-function command(binary,args,{ok=[0],binaryOutput=false,timeout=120000}={}){
- const result=spawnSync(binary,args,{encoding:binaryOutput?undefined:'utf8',timeout,maxBuffer:256*1024*1024,stdio:['ignore','pipe','pipe']});
+function command(binary,args,{ok=[0],binaryOutput=false,timeout=120000,maxBuffer=256*1024*1024}={}){
+ const result=spawnSync(binary,args,{encoding:binaryOutput?undefined:'utf8',timeout,maxBuffer,stdio:['ignore','pipe','pipe']});
  if(!ok.includes(result.status)){
   if(existsSync(root))writeFileSync(join(root,'last-command-failure.txt'),String(result.stdout??'').slice(0,32768)+'\n'+String(result.stderr??'').slice(0,32768),{mode:0o600});
   const details=installCommandFailure(binary,args,result,exerciseEvidence?.phase(),root);
@@ -549,7 +582,7 @@ function command(binary,args,{ok=[0],binaryOutput=false,timeout=120000}={}){
 assert.equal(command('git',['rev-parse','HEAD']).trim(),driverSource);
 assert.equal(command('git',['status','--porcelain','--untracked-files=no']).trim(),'','Require an unchanged tracked checkout.');
 if(spawnSync('git',['cat-file','-e',source+'^{commit}'],{stdio:'ignore',timeout:30000}).status!==0)command('git',['fetch','--no-tags','--depth=1','origin',source]);
-const sourceEquivalence={source,driverSource,sourceTree:command('git',['rev-parse',source+'^{tree}']).trim(),driverTree:command('git',['rev-parse',driverSource+'^{tree}']).trim(),changes:equivalentChanges(command('git',['diff-tree','--no-commit-id','--raw','--no-abbrev','--no-renames','-r','-z',source,driverSource])),allOtherBlobsAndModesEqual:true};
+const sourceEquivalence={source,driverSource,sourceTree:command('git',['rev-parse',source+'^{tree}']).trim(),driverTree:command('git',['rev-parse',driverSource+'^{tree}']).trim(),changes:equivalentChanges(command('git',['diff-tree','--no-commit-id','--raw','--no-abbrev','--no-renames','-r','-z',source,driverSource]),permissionExperimentSelected),allOtherBlobsAndModesEqual:true};
 const output=resolve('build/android-signing-safe');
 const api=path=>JSON.parse(command('gh',['api',`repos/${repo}/${path}`]));
 async function download(url,path,digest,token=false){
@@ -561,10 +594,13 @@ async function download(url,path,digest,token=false){
 }
 function zipEntry(zip,name,path){const fd=openSync(path,'wx',0o600);try{execFileSync('unzip',['-p',zip,name],{timeout:120000,stdio:['ignore',fd,'pipe']});}finally{closeSync(fd);}return path;}
 const marker=join(root,'NOT-FOR-RELEASE');
+const permissionEvidence=mode=>JSON.parse(command('python3',[permissionEvidencePath,mode,root],{maxBuffer:65536}));
+function assertPermissionInputs(){assert.equal(source,permissionSource);assert.deepEqual([process.env.PUPTIME_BRIDGE_RUN,process.env.PUPTIME_LATER_RUN],permissionRuns);assert.equal(hash(command('git',['show',source+':.github/workflows/android-apk.yml'],{binaryOutput:true})),'94966e86d0a01b1099c33271a7c00d81a30d9e3f8c6385a305a09d33baa4c7fe');}
 if(mode==='--preflight'){
  assert.ok(!existsSync(root),'Fresh private directory required.');mkdirSync(root,{mode:0o700});writeFileSync(marker,source);
  const ids=[process.env.PUPTIME_BRIDGE_RUN,process.env.PUPTIME_LATER_RUN];assert.ok(ids.every(id=>/^[1-9]\d+$/.test(id??'')));assert.notEqual(...ids);
  const inputs={source,driverSource,sourceEquivalence,baselineSHA:oldSHA,artifacts:[]};
+ if(permissionExperimentSelected)assertPermissionInputs();
  for(const [index,id] of ids.entries()){
   const run=api('actions/runs/'+id),jobs=api('actions/runs/'+id+'/jobs?per_page=100');assert.equal(jobs.total_count,jobs.jobs.length);validateRun(run,jobs.jobs,repo,source,id);
   const list=api('actions/runs/'+id+'/artifacts?per_page=100');assert.equal(list.total_count,list.artifacts.length);
@@ -572,17 +608,27 @@ if(mode==='--preflight'){
   for(const name of ['puptime-android-apk','puptime-android-qualification']){
    const artifact=chooseArtifact(list.artifacts,name,id),zip=join(folder,name+'.zip');await download(`https://api.github.com/repos/${repo}/actions/artifacts/${artifact.id}/zip`,zip,artifact.digest.slice(7),true);
    if(name==='puptime-android-apk')zipEntry(zip,'app-release.apk',join(folder,'input.apk'));
-   else for(const file of ['BUILD-INFO.json','SHA256SUMS.txt'])zipEntry(zip,file,join(folder,file));
+   else {if(permissionExperimentSelected)assert.equal(artifact.digest,'sha256:'+permissionQualificationDigests[index]);for(const file of ['BUILD-INFO.json','SHA256SUMS.txt',...(permissionExperimentSelected?['APK-MANIFEST.xml']:[])])zipEntry(zip,file,join(folder,file));}
   }
   const info=JSON.parse(readFileSync(join(folder,'BUILD-INFO.json')));assert.deepEqual(Object.keys(info).sort(),['configuredPackage','configuredVersion','configuredVersionCode','runId','sourceCommit'].sort());assert.equal(info.sourceCommit,source);assert.equal(String(info.runId),id);assert.equal(info.configuredPackage,app);assert.equal(info.configuredVersion,'1.12.'+(index+6));assert.equal(info.configuredVersionCode,1012006+index);
   const digest=readFileSync(join(folder,'SHA256SUMS.txt'),'utf8').match(/^([a-f0-9]{64})\s+app-release\.apk$/m)?.[1];assert.ok(digest);assert.equal(await fileHash(join(folder,'input.apk')),digest);
   inputs.artifacts.push({run:Number(id),...info,sha256:digest});
  }
  await download(`https://github.com/${repo}/releases/download/v1.12.5/Puptime-1.12.5.apk`,join(root,'original125.apk'),oldSHA);
- writeFileSync(join(root,'inputs.json'),JSON.stringify(inputs,null,2));mkdirSync(output,{recursive:true,mode:0o700});writeFileSync(join(output,'verification.json'),JSON.stringify({status:'preflight-passed',source,driverSource,sourceEquivalence,artifacts:inputs.artifacts,phases:[],scope:'Pinned equivalent driver/app inputs only; no keys or Android runtime.'},null,2));console.log('PASS pinned driver/input tree equivalence, artifact-only runs, ZIP/APK digests and exact source/version metadata. No signing or Android runtime.');process.exit(0);
+ if(permissionExperimentSelected){
+  const home=realpathSync(process.env.ANDROID_HOME),folder=join(home,'cmdline-tools'),analyzers=[...new Set(readdirSync(folder).map(name=>join(folder,name,'bin/apkanalyzer')).filter(existsSync).map(path=>realpathSync(path)))];assert.equal(analyzers.length,1,'Require one installed SDK apkanalyzer; do not guess a tool version.');const analyzer=realpathSync(analyzers[0]);assert.ok(analyzer.startsWith(folder+'/')&&lstatSync(analyzer).isFile());
+  writeFileSync(join(root,'original125-manifest.xml'),command(analyzer,['manifest','print',join(root,'original125.apk')],{binaryOutput:true,maxBuffer:65536}),{flag:'wx',mode:0o600});
+  inputs.permissionInventory=permissionEvidence('--inventory');inputs.originalManifestToolSHA256=await fileHash(analyzer);
+ }
+ inputs.permissionExperimentSelected=permissionExperimentSelected;
+ writeFileSync(join(root,'inputs.json'),JSON.stringify(inputs,null,2));mkdirSync(output,{recursive:true,mode:0o700});writeFileSync(join(output,'verification.json'),JSON.stringify({status:'preflight-passed',source,driverSource,sourceEquivalence,artifacts:inputs.artifacts,phases:[],...(permissionExperimentSelected?{permissionExperiment:{inventory:inputs.permissionInventory,originalManifestToolSHA256:inputs.originalManifestToolSHA256}}:{}),scope:'Pinned equivalent driver/app inputs only; no keys or Android runtime.'},null,2));console.log('PASS pinned driver/input tree equivalence, artifact-only runs, ZIP/APK digests and exact source/version metadata. No signing or Android runtime.');process.exit(0);
 }
 assert.equal(readFileSync(marker,'utf8'),source);assert.equal(lstatSync(root).mode&0o777,0o700);exercisePrivateRoot=root;
 const inputs=JSON.parse(readFileSync(join(root,'inputs.json')));assert.equal(inputs.source,source);assert.equal(inputs.driverSource,driverSource);assert.deepEqual(inputs.sourceEquivalence,sourceEquivalence);assert.equal(await fileHash(join(root,'original125.apk')),oldSHA);
+assert.equal(inputs.permissionExperimentSelected,permissionExperimentSelected);
+const permissionExperiment=permissionExperimentSelected?{inventory:inputs.permissionInventory,originalManifestToolSHA256:inputs.originalManifestToolSHA256}:undefined;
+if(permissionExperimentSelected){exerciseEvidence.begin('permission-inventory-recheck');assertPermissionInputs();assert.deepEqual(permissionEvidence('--inventory'),inputs.permissionInventory);exerciseEvidence.end('permission-inventory-recheck');}
+function persistPermission(){const prior=JSON.parse(readFileSync(join(output,'verification.json')));writeFileSync(join(output,'verification.json'),JSON.stringify({...prior,permissionExperiment},null,2),{mode:0o600});exerciseEvidence.persist();}
 for(const [i,name] of ['bridge','later'].entries())assert.equal(await fileHash(join(root,name,'input.apk')),inputs.artifacts[i].sha256);
 const device='emulator-5588',adb=(...args)=>command('adb',['-s',device,...args]);assert.equal(adb('emu','avd','name').trim().split(/\r?\n/)[0],'Puptime_Signing_QA_'+process.env.GITHUB_RUN_ID);assert.equal(adb('shell','getprop','ro.build.version.sdk').trim(),'36');
 assert.equal(adb('shell','settings','get','global','airplane_mode_on').trim(),'1');assert.equal(adb('shell','id','-u').trim(),'0');assert.equal(command('adb',['-s',device,'shell','pm','path',app],{ok:[1]}),'','The task emulator must not contain any pre-existing Puptime installation.');
@@ -601,17 +647,27 @@ const key=(name,alias)=>['--ks',join(root,name==='A'?'public-A.keystore':'QA-onl
 const A=key('A','androiddebugkey'),B=key('B','qa-only'),lineage=join(root,'QA-only.lineage');
 exerciseEvidence.begin('lineage-creation');command(signer,['rotate','--out',lineage,'--old-signer',...A,...Object.entries(caps).flatMap(([name,value])=>['--set-'+({'installed data':'installed-data','shared UID':'shared-uid'}[name]??name),String(value)]),'--new-signer',...B]);exerciseEvidence.end('lineage-creation');
 exerciseEvidence.begin('lineage-inspection');inspectCapabilities(command(signer,['lineage','--in',lineage,'--print-certs','-v']),oldCert,b);exerciseEvidence.end('lineage-inspection');
-for(const [name,input,keys] of [['plain6','bridge',B],['bridge6','bridge',[...A,'--next-signer',...B,'--lineage',lineage,'--rotation-min-sdk-version','33']],['plain7','later',B]]){
+let signingLineage=lineage;
+if(permissionExperimentSelected){
+ signingLineage=join(root,'QA-only-permission.lineage');exerciseEvidence.begin('permission-lineage-creation');command(signer,['rotate','--out',signingLineage,'--old-signer',...A,...Object.entries({...caps,permission:true}).flatMap(([name,value])=>['--set-'+({'installed data':'installed-data','shared UID':'shared-uid'}[name]??name),String(value)]),'--new-signer',...B]);exerciseEvidence.end('permission-lineage-creation');
+ exerciseEvidence.begin('permission-lineage-inspection');permissionCapabilityPair(command(signer,['lineage','--in',lineage,'--print-certs','-v']),command(signer,['lineage','--in',signingLineage,'--print-certs','-v']),oldCert,b);exerciseEvidence.end('permission-lineage-inspection');
+}
+for(const [name,input,keys] of [['plain6','bridge',B],['bridge6','bridge',[...A,'--next-signer',...B,'--lineage',signingLineage,'--rotation-min-sdk-version','33']],['plain7','later',B],...(permissionExperimentSelected?[['control6','bridge',[...A,'--next-signer',...B,'--lineage',lineage,'--rotation-min-sdk-version','33']]]:[])]){
  const target=join(root,name+'.apk');exerciseEvidence.begin(name+'-sign');command(signer,['sign',...keys,'--out',target,join(root,input,'input.apk')]);exerciseEvidence.end(name+'-sign');exerciseEvidence.begin(name+'-verify');artifact(target,name==='plain7'?1012007:1012006,b);
  assert.deepEqual(command('unzip',['-p',target,'AndroidManifest.xml'],{binaryOutput:true}),command('unzip',['-p',join(root,input,'input.apk'),'AndroidManifest.xml'],{binaryOutput:true}));exerciseEvidence.end(name+'-verify');
 }
-exerciseEvidence.begin('bridge-lineage-inspection');inspectCapabilities(command(signer,['lineage','--in',join(root,'bridge6.apk'),'--print-certs','-v']),oldCert,b);exerciseEvidence.end('bridge-lineage-inspection');
+exerciseEvidence.begin('bridge-lineage-inspection');inspectCapabilities(command(signer,['lineage','--in',join(root,'bridge6.apk'),'--print-certs','-v']),oldCert,b,permissionExperimentSelected?{...caps,permission:true}:caps);exerciseEvidence.end('bridge-lineage-inspection');
+if(permissionExperimentSelected){exerciseEvidence.begin('control6-lineage-inspection');permissionCapabilityPair(command(signer,['lineage','--in',join(root,'control6.apk'),'--print-certs','-v']),command(signer,['lineage','--in',join(root,'bridge6.apk'),'--print-certs','-v']),oldCert,b);exerciseEvidence.end('control6-lineage-inspection');}
 for(const name of ['plain6','plain7']){exerciseEvidence.begin(name+'-lineage-absence');assert.match(command(signer,['lineage','--in',join(root,name+'.apk'),'--print-certs'],{ok:[1]}),/does not contain a valid lineage/);exerciseEvidence.end(name+'-lineage-absence');}
 exerciseEvidence.begin('bridge-v31-validation');const bridgeVerification=command(signer,['verify','--verbose','--print-certs','--min-sdk-version','33','--max-sdk-version','36',join(root,'bridge6.apk')]);assert.ok(bridgeVerification.includes('Verified using v3.1 scheme (APK Signature Scheme v3.1): true'));exerciseEvidence.end('bridge-v31-validation');
+if(permissionExperimentSelected){
+ exerciseEvidence.begin('control6-v31-validation');const controlVerification=command(signer,['verify','--verbose','--print-certs','--min-sdk-version','33','--max-sdk-version','36',join(root,'control6.apk')]);assert.ok(controlVerification.includes('Verified using v3.1 scheme (APK Signature Scheme v3.1): true'));exerciseEvidence.end('control6-v31-validation');
+ exerciseEvidence.begin('permission-payload-equality');permissionExperiment.payload=permissionEvidence('--payload');permissionExperiment.capabilities={control:{...caps},experiment:{...caps,permission:true}};persistPermission();exerciseEvidence.end('permission-payload-equality');
+}
 
 exerciseEvidence.begin('native-evidence-imports');const {nativeSnapshot,assertNativeTransition}=await import('./native-account-evidence.mjs');
 const {eventDataFromSql}=await import('../src/record-sql.ts');exerciseEvidence.end('native-evidence-imports');
-const phases=[];function pass(phase,state){phases.push({phase,protectedStateSHA256:hash(JSON.stringify(state))});writeFileSync(join(output,'verification.json'),JSON.stringify({status:'in-progress',source,driverSource,sourceEquivalence,artifacts:inputs.artifacts,phases,scope:'Guest-only API36 x86; no credential or Play acceptance.'},null,2));exerciseEvidence.persist();console.log('PASS signing QA phase: '+phase);}
+const phases=[];function pass(phase,state){phases.push({phase,protectedStateSHA256:hash(JSON.stringify(state))});writeFileSync(join(output,'verification.json'),JSON.stringify({status:'in-progress',source,driverSource,sourceEquivalence,artifacts:inputs.artifacts,phases,...(permissionExperimentSelected?{permissionExperiment}:{}),scope:'Guest-only API36 x86; no credential or Play acceptance.'},null,2));exerciseEvidence.persist();console.log('PASS signing QA phase: '+phase);}
 function flow(name,steps){
  const path=join(root,name+'.yaml');writeFileSync(path,`appId: ${app}\n---\n${steps}\n`);
  try{command('maestro',['--device',device,'test',path,'--test-output-dir',join(root,name+'-driver')],{timeout:240000});}
@@ -644,19 +700,33 @@ function equal(before,after){assertNativeTransition(before.tables,after.tables);
 function launched(before,after,version){assertNativeTransition(expectedLaunch(before.tables,version),after.tables);assert.equal(after.uid,before.uid);assert.deepEqual(after.widgets,before.widgets);protectedFiles(before.files,after.files,version,before.tables.events,eventDataFromSql,before.tables.puppies[0].name,1);}
 async function waitWidgetCount(count){const deadline=Date.now()+10000;do{const value=adb('shell',`sqlite3 -readonly /data/user/0/${app}/files/SQLite/puptime-v2.db "SELECT COUNT(*) FROM events WHERE source='widget';"`).trim();if(value===String(count)){await new Promise(done=>setTimeout(done,500));return;}await new Promise(done=>setTimeout(done,200));}while(Date.now()<deadline);throw new Error('Widget did not commit exactly once within the bounded wait.');}
 function rejectUpdate(path,before,label){const prefix=label==='plain-B-rejected'?'plain-B':'higher-A';exerciseEvidence.begin(prefix+'-reject');const result=command('adb',['-s',device,'install','-r',path],{ok:[1]});assert.match(result,/INSTALL_FAILED_UPDATE_INCOMPATIBLE/);exerciseEvidence.end(prefix+'-reject');exerciseEvidence.begin(prefix+'-preservation');equal(before,snapshot(label));pass(label,before);exerciseEvidence.end(prefix+'-preservation');}
-exerciseEvidence.begin('original-install');await install(join(root,'original125.apk'));exerciseEvidence.end('original-install');exerciseEvidence.begin('original-launch');launch();exerciseEvidence.end('original-launch');
+function permissionOwner(label){
+ const stage='permission-owner-'+label;exerciseEvidence.begin(stage);
+ writeFileSync(join(root,stage+'.txt'),command('adb',['-s',device,'shell','cmd','package','list','permissions','-f'],{binaryOutput:true,maxBuffer:2*1024*1024}),{flag:'wx',mode:0o600});
+ const value=permissionEvidence('--owner-'+label);assert.equal(value.ownerObserved,true);assert.equal(value.expectedAppOwnsPermission,true);assert.equal(value.signatureOnly,true);exerciseEvidence.end(stage);return value;
+}
+exerciseEvidence.begin('original-install');await install(join(root,'original125.apk'));exerciseEvidence.end('original-install');
+if(permissionExperimentSelected){permissionExperiment.originalOwner=permissionOwner('original');persistPermission();}
+exerciseEvidence.begin('original-launch');launch();exerciseEvidence.end('original-launch');
 exerciseEvidence.begin('guest-seed');flow('old-ui-seed',`- runFlow: ${JSON.stringify(resolve('.maestro/helpers/skip-onboarding.yaml'))}\n- assertVisible: {id: screen.today}\n- repeat:\n    times: 4\n    commands:\n      - tapOn: {id: quick.pee}\n      - tapOn: {id: quick.poop}\n      - tapOn: {id: quick.meal}\n- tapOn: {id: event.meal.edit, index: 0}\n${scroll('editor.note.input')+tap('editor.note.input')}- inputText: Signing QA note\n- pressKey: Back\n- scrollUntilVisible:\n    element: {id: editor.close}\n    direction: UP\n${tap('editor.close')+settings}${tap('settings.widget.open')+scroll('settings.widget.action.walk')+tap('settings.widget.action.walk')+tap('settings.widget.close')+tap('settings.theme.open')+tap('appearance.theme.dark')+tap('settings.language.open')+tap('appearance.language.es')}- stopApp\n`);exerciseEvidence.end('guest-seed');
 exerciseEvidence.begin('reminder-preference-seed');launch();
 flow('old-reminder-lead','- extendedWaitUntil:\n    visible: {id: screen.today}\n    timeout: 90000\n'+settings+scroll('settings.notifications.open')+tap('settings.notifications.open')+scroll('settings.notifications.lead.15')+tap('settings.notifications.lead.15')+'- pressKey: Home\n');exerciseEvidence.end('reminder-preference-seed');
 exerciseEvidence.begin('widget-binding');flow('bind-real-launcher-widget',`- longPressOn:\n    id: '.*:id/workspace'\n- tapOn: '^Widgets$'\n- scrollUntilVisible:\n    element: {text: '^Puptime$'}\n    direction: DOWN\n- tapOn: '^Puptime$'\n- scrollUntilVisible:\n    element: {text: '^Puptime Quick Log$'}\n    direction: DOWN\n    visibilityPercentage: 100\n    centerElement: true\n- tapOn: '^Puptime Quick Log$'\n- tapOn: '^Add$'\n- extendedWaitUntil:\n    visible: '^Log pee, last logged .+$'\n    timeout: 30000\n- tapOn: '^Log pee, last logged .+$'\n`);exerciseEvidence.end('widget-binding');
 exerciseEvidence.begin('widget-first-save');await waitWidgetCount(1);exerciseEvidence.end('widget-first-save');const before=snapshot('old-created');exerciseEvidence.begin('original-state-validation');assert.equal(before.tables.events.length,13);assert.ok(before.tables.events.some(row=>row.note==='Signing QA note'));assert.equal(before.tables.events.filter(row=>row.source==='widget').length,1);assert.deepEqual(before.tables.local_sync_owner,[]);assert.deepEqual(before.tables.local_sync_outbox,[]);
 assert.equal(before.tables.metadata.find(row=>row.key==='backup_app_version')?.value,'1.12.5/1012005');const prefs=Object.fromEntries(before.tables.settings.map(row=>[row.key,row.value]));assert.equal(prefs['puptime.theme.v1'],'dark');assert.equal(prefs['puptime.language.v1'],'es');assert.ok(JSON.parse(prefs['puptime.widgetActions.v1']).includes('walk'));assert.equal(JSON.parse(prefs['puptime.notificationPreferences.v1']).reminderLeadMinutes,15);pass('original125-created-state',before);exerciseEvidence.end('original-state-validation');
-rejectUpdate(join(root,'plain6.apk'),before,'plain-B-rejected');exerciseEvidence.begin('bridge-install');await install(join(root,'bridge6.apk'),true);exerciseEvidence.end('bridge-install');exerciseEvidence.begin('bridge-before-launch-preservation');equal(before,snapshot('bridge-before-launch'));exerciseEvidence.end('bridge-before-launch-preservation');exerciseEvidence.begin('bridge-launch');launch();exerciseEvidence.end('bridge-launch');exerciseEvidence.begin('bridge-visible');flow('bridge-visible','- extendedWaitUntil:\n    visible: {id: screen.today}\n    timeout: 90000\n');exerciseEvidence.end('bridge-visible');const bridge=snapshot('bridge-launched');exerciseEvidence.begin('bridge-state-validation');launched(before,bridge,'1.12.6/1012006');exerciseEvidence.end('bridge-state-validation');
+rejectUpdate(join(root,'plain6.apk'),before,'plain-B-rejected');
+if(permissionExperimentSelected){
+ exerciseEvidence.begin('permission-control-install');let original;try{command('adb',['-s',device,'install','-r',join(root,'control6.apk')]);}catch(error){original=error;}try{permissionExperiment.control=permissionControl(original);}catch(error){throw original??error;}persistPermission();exerciseEvidence.end('permission-control-install');
+ exerciseEvidence.begin('permission-control-preservation');equal(before,snapshot('permission-control-rejected'));
+ const installed=adb('shell','pm','path',app).trim();assert.match(installed,/^package:\/data\/app\/[^\n]+\/base\.apk$/);assert.equal(hash(command('adb',['-s',device,'exec-out','cat',installed.slice(8)],{binaryOutput:true})),oldSHA);
+ assert.deepEqual(permissionOwner('control'),permissionExperiment.originalOwner);Object.assign(permissionExperiment.control,{protectedStateUnchanged:true,installedOriginalUnchanged:true,ownerUnchanged:true});pass('permission-false-control-rejected',before);exerciseEvidence.end('permission-control-preservation');
+}
+exerciseEvidence.begin('bridge-install');await install(join(root,'bridge6.apk'),true);exerciseEvidence.end('bridge-install');exerciseEvidence.begin('bridge-before-launch-preservation');equal(before,snapshot('bridge-before-launch'));exerciseEvidence.end('bridge-before-launch-preservation');exerciseEvidence.begin('bridge-launch');launch();exerciseEvidence.end('bridge-launch');exerciseEvidence.begin('bridge-visible');flow('bridge-visible','- extendedWaitUntil:\n    visible: {id: screen.today}\n    timeout: 90000\n');exerciseEvidence.end('bridge-visible');const bridge=snapshot('bridge-launched');exerciseEvidence.begin('bridge-state-validation');launched(before,bridge,'1.12.6/1012006');exerciseEvidence.end('bridge-state-validation');
 exerciseEvidence.begin('bridge-widget-save');launch();flow('bridge-cold','- extendedWaitUntil:\n    visible: {id: screen.today}\n    timeout: 90000\n- pressKey: Home\n- assertVisible: ^Log pee, last logged .+$\n- tapOn: ^Log pee, last logged .+$\n');await waitWidgetCount(2);exerciseEvidence.end('bridge-widget-save');const widget=snapshot('bridge-widget');
 exerciseEvidence.begin('bridge-widget-validation');const added=widget.tables.events.filter(row=>!bridge.tables.events.some(old=>old.id===row.id));assert.equal(added.length,1);assert.equal(added[0].type,'pee');assert.equal(added[0].source,'widget');const revisions=widget.tables.local_revisions.slice(bridge.tables.local_revisions.length);assert.equal(revisions.length,1);assert.equal(revisions[0].local_id,added[0].id);assert.equal(revisions[0].kind,'event');assert.equal(revisions[0].sequence,Math.max(0,...bridge.tables.local_revisions.map(row=>row.sequence))+1);assert.equal(revisions[0].pet_id,added[0].pet_id);assert.equal(revisions[0].source,'local');assert.ok(Number.isSafeInteger(revisions[0].created_at)&&revisions[0].created_at>=added[0].at);assert.equal(revisions[0].before_data,null);assert.deepEqual(JSON.parse(revisions[0].after_data),eventDataFromSql(added[0]));
 assertNativeTransition(bridge.tables,widget.tables,{events:[...bridge.tables.events,added[0]],local_revisions:[...bridge.tables.local_revisions,revisions[0]],sqlite_sequence:bridge.tables.sqlite_sequence.map(row=>row.name==='local_revisions'?{...row,seq:row.seq+1}:row)});assert.equal(widget.uid,bridge.uid);assert.deepEqual(widget.widgets,bridge.widgets);protectedFiles(bridge.files,widget.files,'1.12.6/1012006',bridge.tables.events,eventDataFromSql,bridge.tables.puppies[0].name);pass('bridge-and-existing-widget-save',widget);exerciseEvidence.end('bridge-widget-validation');
 rejectUpdate(join(root,'later/input.apk'),widget,'higher-A-rollback-rejected');exerciseEvidence.begin('later-install');await install(join(root,'plain7.apk'),true);exerciseEvidence.end('later-install');exerciseEvidence.begin('later-before-launch-preservation');equal(widget,snapshot('later-before-launch'));exerciseEvidence.end('later-before-launch-preservation');exerciseEvidence.begin('later-launch');launch();exerciseEvidence.end('later-launch');exerciseEvidence.begin('later-visible');flow('later-visible','- extendedWaitUntil:\n    visible: {id: screen.today}\n    timeout: 90000\n');exerciseEvidence.end('later-visible');const later=snapshot('later-launched');exerciseEvidence.begin('later-state-validation');launched(widget,later,'1.12.7/1012007');exerciseEvidence.end('later-state-validation');exerciseEvidence.begin('later-cold-restart');launch();flow('later-cold','- extendedWaitUntil:\n    visible: {id: screen.today}\n    timeout: 90000\n');exerciseEvidence.end('later-cold-restart');exerciseEvidence.begin('later-cold-preservation');equal(later,snapshot('later-cold'));pass('later-B-update-and-cold-restart',later);exerciseEvidence.end('later-cold-preservation');
-exerciseEvidence.begin('exercise-finalize');writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',source,driverSource,sourceEquivalence,artifacts:inputs.artifacts,phases,capabilities:caps,oldCertificate:oldCert,qaCertificate:b,scope:'Untouched125 guest→numeric QA bridge→numeric B update, API36 x86 only. No nonempty SecureStore/auth, genuine provider, ARM/OEM, Play or production-key acceptance.'},null,2));
+exerciseEvidence.begin('exercise-finalize');writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',source,driverSource,sourceEquivalence,artifacts:inputs.artifacts,phases,capabilities:permissionExperimentSelected?{...caps,permission:true}:caps,...(permissionExperimentSelected?{permissionExperiment}:{}),oldCertificate:oldCert,qaCertificate:b,scope:'Untouched125 guest→numeric QA bridge→numeric B update, API36 x86 only. No nonempty SecureStore/auth, genuine provider, ARM/OEM, Play or production-key acceptance.'},null,2));
 for(const path of readdirSync(root,{recursive:true}))if(lstatSync(join(root,path)).isFile())chmodSync(join(root,path),0o600);
 
 exerciseEvidence.end('exercise-finalize');

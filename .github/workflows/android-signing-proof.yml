@@ -19,6 +19,10 @@ on:
         description: Successful Android APK artifact-only run at version 1.12.7
         type: string
         required: true
+      permission_experiment:
+        description: Disposable matched false-control then permission-true QA experiment (not production policy)
+        type: boolean
+        default: false
 permissions:
   contents: read
   actions: read
@@ -34,6 +38,7 @@ jobs:
       PUPTIME_EXPECTED_SOURCE: ${{ inputs.expected_source }}
       PUPTIME_BRIDGE_RUN: ${{ inputs.bridge_run_id }}
       PUPTIME_LATER_RUN: ${{ inputs.later_run_id }}
+      PUPTIME_PERMISSION_EXPERIMENT: ${{ inputs.permission_experiment }}
       MAESTRO_CLI_NO_ANALYTICS: '1'
       MAESTRO_DRIVER_STARTUP_TIMEOUT: '180000'
     steps:
