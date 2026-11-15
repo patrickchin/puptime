@@ -214,6 +214,24 @@ test('source diagnostics keep ReferenceError finite and snapshot changing or thr
  }
 });
 
+test('archive diagnostics preserve the original error and expose only fixed enums and verified hashes',()=>{
+ const hash=digest('SYNTHETIC_ARCHIVE'),id='maven:PRIVATE_GROUP:PRIVATE_MODULE@PRIVATE_VERSION',original=new Error('PRIVATE_MESSAGE'),reads={stdout:0,stderr:0,stack:0,status:0};
+ for(const key of ['stdout','stderr','stack'])Object.defineProperty(original,key,{get(){reads[key]++;throw new Error('PRIVATE_CHILD_OUTPUT');}});
+ Object.defineProperty(original,'status',{get(){return ++reads.status===1?7:'PRIVATE_CHANGED_STATUS';}});
+ let caught;try{noticeInputStep('native-inputs','android',()=>noticeInputStep('gradle-archive-scan','maven',()=>{throw original;},id,undefined,hash));}catch(error){caught=error;}
+ assert.equal(caught,original);assert.deepEqual(reads,{stdout:0,stderr:0,stack:0,status:1});assert.deepEqual(noticeFailureContext(caught),{operation:'gradle-archive-scan',component:'maven',errorCategory:'subprocess-failed',componentSHA256:digest(id),archiveSHA256:hash});assert.ok(!JSON.stringify(noticeFailureContext(caught)).includes('PRIVATE'));
+ for(const hashValue of [undefined,'PRIVATE_HASH',hash.toUpperCase(),{toString(){throw new Error('PRIVATE_COERCION');}}]){let invoked=false;assert.throws(()=>noticeInputStep('gradle-archive-scan','maven',()=>{invoked=true;},id,undefined,hashValue));assert.equal(invoked,false);}
+ for(const [operation,component,source] of [['pod-source-scan','cocoapods',undefined],['pod-source-scan','maven',undefined],['gradle-archive-scan','android',undefined],['gradle-archive-scan','maven','PRIVATE_PATH']])assert.throws(()=>noticeInputStep(operation,component,()=>{},id,source,hash));
+});
+
+test('actual Gradle archive inspection reports its verified component/archive hashes and keeps success and drift strict',()=>fixture(({root,file})=>{
+ const path=file('PRIVATE_ARCHIVE.aar','PRIVATE_NOT_A_ZIP'),hash=digest(readFileSync(path)),input={schema:1,configuration:'releaseRuntimeClasspath',components:[{group:'qa',name:'archive',version:'1',artifacts:[{file:path,sha256:hash}]}]},metadata=file('private-runtime.json',input);
+ let failure;try{noticeInputStep('native-inputs','android',()=>gradleNoticeInputs(root,metadata));}catch(error){failure=error;}
+ assert.equal(failure.status,1,'The original Python nonzero exit is preserved.');assert.deepEqual(noticeFailureContext(failure),{operation:'gradle-archive-scan',component:'maven',errorCategory:'subprocess-failed',componentSHA256:digest('maven:qa:archive@1'),archiveSHA256:hash});for(const secret of [root,'PRIVATE','Traceback','stderr','message'])assert.ok(!JSON.stringify(noticeFailureContext(failure)).includes(secret));
+ input.components[0].artifacts[0].sha256=digest('DIFFERENT_BYTES');file('private-runtime.json',input);let drift;try{noticeInputStep('native-inputs','android',()=>gradleNoticeInputs(root,metadata));}catch(error){drift=error;}assert.ok(drift.message.startsWith('Resolved artifact changed.'));assert.equal(noticeFailureContext(drift).operation,'native-inputs');assert.equal(noticeFailureContext(drift).archiveSHA256,undefined,'Unverified bytes cannot gain archive context.');
+ execFileSync('python3',['-c',"import zipfile,sys\nwith zipfile.ZipFile(sys.argv[1],'w') as z:z.writestr('META-INF/LICENSE','Actual synthetic notice\\n')",path]);const bytes=readFileSync(path);input.components[0].artifacts[0].sha256=digest(bytes);file('private-runtime.json',input);const result=gradleNoticeInputs(root,metadata);assert.equal(result.components[0].id,'maven:qa:archive@1');assert.deepEqual(result.components[0].notices,[{source:'maven:qa:archive:1/PRIVATE_ARCHIVE.aar!META-INF/LICENSE',sha256:digest('Actual synthetic notice\n'),body:'Actual synthetic notice\n'}]);assert.deepEqual(result.nativeFiles,[]);
+}));
+
 
 test('Pods follow only exact selected frameworks into the locked podspec package and still require vendor notices',()=>fixture(({root,file})=>{
  const pkg='node_modules/qa-sdk',pod='ios/Pods/QA',list='ios/Pods/Target Support Files/QA/QA-xcframeworks-input-files.xcfilelist';

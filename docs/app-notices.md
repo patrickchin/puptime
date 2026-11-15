@@ -67,6 +67,12 @@ source path or filename is included. It never includes raw errors, messages,
 causes, paths, notice bodies or environment values. The most specific failing
 Pod operation survives outer graph/union context. No bound is raised on failure.
 
+Gradle archive inspection failures use the fixed `gradle-archive-scan`/`maven`
+context with the existing canonical component ID's SHA and the archive SHA
+already verified against its bytes. This wraps only the original Python call;
+its invocation, bounds, strict exit and exception remain unchanged. Child output
+and paths are not copied into this context.
+
 The Gradle init script requires an explicit absolute `noticeMainProjectRoot` and
 compares canonical project directories before registering its task. Other
 included builds are skipped; a missing `:app` on the selected root still fails.

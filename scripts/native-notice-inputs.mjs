@@ -9,20 +9,21 @@ const require=createRequire(import.meta.url),archiveReader=new URL('./notice-arc
 
 // Only finite diagnostics escape the CLI catch. Never serialize an Error,
 // message, cause, path or unvalidated dependency name into review artifacts.
-const operations=new Set(['review-inputs','source-graph','native-inputs','npm-notices','notice-union','reviewed-notices','coverage','pod-lock','pod-lock-entries','pod-acknowledgements','pod-source-scan','pod-notices','source-root','source-provider','source-path','source-boundary','source-bytes','source-npm']);
-const components=new Set(['review','metro','ios','android','npm','cocoapods']);
+const operations=new Set(['review-inputs','source-graph','native-inputs','npm-notices','notice-union','reviewed-notices','coverage','pod-lock','pod-lock-entries','pod-acknowledgements','pod-source-scan','pod-notices','source-root','source-provider','source-path','source-boundary','source-bytes','source-npm','gradle-archive-scan']);
+const components=new Set(['review','metro','ios','android','npm','cocoapods','maven']);
 const contexts=new WeakMap();
 const sourceErrorCodes=new Set(['ERR_INVALID_ARG_TYPE','ERR_INVALID_ARG_VALUE','ERR_INVALID_URL','ERR_ASSERTION','ENOENT','ENOTDIR','EISDIR','ELOOP','EACCES','EPERM']);
 const assertionCategories=new Map([['Notice must be readable UTF-8.','invalid-utf8'],['Native source link escapes its component.','source-boundary'],['Native source inventory exceeds its bound.','input-bound'],['Too many native source entries.','input-bound'],['Empty or oversized notice.','input-bound'],['Notice inputs exceed the review bound.','input-bound']]);
-export function noticeInputStep(operation,component,run,id,source){
+export function noticeInputStep(operation,component,run,id,source,archiveSHA256){
  assert.ok(operations.has(operation)&&components.has(component));
+ const archive=operation==='gradle-archive-scan';assert.ok(archive?component==='maven'&&typeof id==='string'&&id.startsWith('maven:')&&source===undefined&&typeof archiveSHA256==='string'&&/^[a-f0-9]{64}$/.test(archiveSHA256):component!=='maven'&&archiveSHA256===undefined);
  try{return run();}catch(thrown){
   const error=thrown instanceof Error?thrown:new Error('Notice input failed.');
   if(!contexts.has(error)){
    let fields={};try{fields={code:error.code,status:error.status,message:error.message};}catch{}
    const {code,status,message}=fields;
    const category=code==='ENOENT'?'missing-input':['EACCES','EPERM'].includes(code)?'unreadable-input':error instanceof SyntaxError?'invalid-format':code==='ERR_ASSERTION'?(assertionCategories.get(message)??'invalid-input'):Number.isInteger(status)?'subprocess-failed':'unsupported-input';
-   contexts.set(error,{operation,component,errorCategory:category,...(id?{componentSHA256:digest(id)}:{}),...(operation.startsWith('source-')?{errorClass:error instanceof TypeError?'TypeError':error instanceof SyntaxError?'SyntaxError':error instanceof ReferenceError?'ReferenceError':error instanceof RangeError?'RangeError':code==='ERR_ASSERTION'?'AssertionError':'Error',errorCode:sourceErrorCodes.has(code)?code:'other',...(typeof source==='string'?{sourceSHA256:digest(source)}:{})}:{})});
+   contexts.set(error,{operation,component,errorCategory:category,...(id?{componentSHA256:digest(id)}:{}),...(archive?{archiveSHA256}:{}),...(operation.startsWith('source-')?{errorClass:error instanceof TypeError?'TypeError':error instanceof SyntaxError?'SyntaxError':error instanceof ReferenceError?'ReferenceError':error instanceof RangeError?'RangeError':code==='ERR_ASSERTION'?'AssertionError':'Error',errorCode:sourceErrorCodes.has(code)?code:'other',...(typeof source==='string'?{sourceSHA256:digest(source)}:{})}:{})});
   }
   throw error;
  }
@@ -124,7 +125,7 @@ export function gradleNoticeInputs(root,inputFile){
   assert.ok(value.group&&value.name&&value.version&&value.artifacts.length);const notices=[],vendors=[];
   for(const artifact of value.artifacts){
    const bytes=readFileSync(artifact.file);assert.equal(digest(bytes),artifact.sha256,'Resolved artifact changed.');
-   const inspected=inspectNoticeArchive(artifact.file),prefix='maven:'+value.group+':'+value.name+':'+value.version+'/'+basename(artifact.file)+'!';
+   const inspected=noticeInputStep('gradle-archive-scan','maven',()=>inspectNoticeArchive(artifact.file),`maven:${value.group}:${value.name}@${value.version}`,undefined,artifact.sha256),prefix='maven:'+value.group+':'+value.name+':'+value.version+'/'+basename(artifact.file)+'!';
    notices.push(...inspected.notices.map(item=>({...item,source:prefix+item.source})));
    nativeFiles.push(...inspected.nativeFiles.map(item=>({...item,component:`maven:${value.group}:${value.name}@${value.version}`})));
    for(const item of inspected.notices)if(/(^|\/)(vendor|third[-_]?party)(\/|$)/i.test(item.source))vendors.push(item.source);
