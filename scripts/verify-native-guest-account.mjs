@@ -16,6 +16,7 @@ import {sqliteTestConnection} from '../src/local/sqlite-test-adapter.ts';
 import {createLocalRuntime} from '../src/local/runtime-factory.ts';
 import {pushResponseSchema,pullPageSchema,mutationSchema} from '../src/cloud/protocol.ts';
 import {nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeDrained,assertEmptyIosRestoreSources,capturedJson,nativeAuthUiFlags} from './native-account-evidence.mjs';
+import {startupEvidence} from './native-startup-evidence.mjs';
 import {assertArchivedSource,nativeCodeFingerprint} from './native-runtime-inputs.mjs';
 import {deleteOwnedSimulator,installTaskCleanup,ownProcess} from './native-task-cleanup.mjs';
 import {standardFixtureEnvironment,runStandardSuite} from './native-standard-suite.mjs';
@@ -31,6 +32,9 @@ assert.ok(!standard||!android,'The fixed standard selections are iOS only.');
 assert.equal(consent,'--replace-synthetic','Use PLATFORM DEVICE HOST --replace-synthetic [OUTPUT].');
 const frontPort=Number(process.env.PUPTIME_ACCOUNT_PORT??8797),backPort=frontPort+2;assert.ok(Number.isInteger(frontPort)&&frontPort>1024&&frontPort<65533);
 const app='com.patrickchin.puptime',output=resolve(destination),front='https://127.0.0.1:'+frontPort;
+let startupStage='sdk-host-validation';
+const markStartup=(stage,status='started',error)=>{startupStage=stage;try{if(!android)writeFileSync(join(output,'sdk-startup-stage.json'),JSON.stringify(startupEvidence(stage,status,error),null,2)+'\n');}catch{/* Diagnostic persistence must never interrupt owned cleanup or replace the original failure. */}};
+mkdirSync(output,{recursive:true});markStartup('sdk-host-validation');
 const simctl=(...args)=>execFileSync('xcrun',['simctl',...args],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
 const adb=(...args)=>execFileSync('adb',['-s',device,...args],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
 if(android){assert.match(adb('emu','avd','name'),/^Puptime_(Onboarding_2f17|SignIn_461a)/);assert.ok(existsSync(host),'Supply a debuggable native APK.');}
@@ -41,7 +45,7 @@ else{
   assert.ok(execFileSync('otool',['-arch','arm64','-s','__TEXT','__entitlements',join(host,'Puptime')],{encoding:'utf8'}).includes('Contents of (__TEXT,__entitlements)'),
     'Build the simulator host with CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- so SecureStore has its simulator entitlements.');
 }
-mkdirSync(output,{recursive:true});
+markStartup('fixture-config');
 const privateDir=mkdtempSync(join(tmpdir(),'puptime-2f17-account-')),persist=join(privateDir,'state'),configPath=join(privateDir,'wrangler.json');
 const config={...JSON.parse(readFileSync('wrangler.jsonc','utf8')),name:'puptime-2f17-account',main:resolve('server/index.ts'),env:undefined,
   vars:{ENVIRONMENT:'local',AUTH_BASE_URL:front,WEB_ORIGINS:front,AUTH_SECRET:crypto.randomUUID()+crypto.randomUUID()}};
@@ -79,9 +83,9 @@ function run(binary,args,env=process.env,cwd=process.cwd(),timeoutMs=binary==='m
     else{child.stdout.on('data',data=>{raw+=data;});child.stderr.on('data',data=>{raw+=data;});}
     // Include hosted driver startup as well as the flow's own bounded assertions.
     const timer=setTimeout(()=>{timedOut=true;void stop();},timeoutMs);
-    child.once('error',error=>{clearTimeout(timer);activeStops.delete(stop);reject(error);});child.once('close',async status=>{clearTimeout(timer);const stopped=await stop();activeStops.delete(stop);if(status===0&&stopped&&!timedOut&&!task.signal)resolveRun(raw);else{
+    child.once('error',error=>{clearTimeout(timer);activeStops.delete(stop);reject(error);});child.once('close',async (status,signal)=>{clearTimeout(timer);const stopped=await stop();activeStops.delete(stop);if(status===0&&stopped&&!timedOut&&!task.signal)resolveRun(raw);else{
       raw=redacted(raw);
-      if(!standard)writeFileSync(join(output,'failure-redacted.log'),raw,{mode:0o600});reject(new Error(standard?`${binary} failed (${status}); see finite receipts.`:`${binary} failed (${status}); see redacted log.`));
+      if(!standard)writeFileSync(join(output,'failure-redacted.log'),raw,{mode:0o600});reject(Object.assign(new Error(standard?`${binary} failed (${status}); see finite receipts.`:`${binary} failed (${status}); see redacted log.`),{status,signal,...(timedOut?{code:'ETIMEDOUT'}:{})}));
     }});
   });
 }
@@ -90,8 +94,10 @@ async function flow(name,env={}){
   const startup=join(homedir(),'.maestro/tests'),before=new Set(existsSync(startup)?readdirSync(startup):[]);
   const startedAt=Date.now(),artifacts=join(privateDir,'maestro-'+name+'-'+Date.now());
   try{
+    markStartup('maestro-process');
     await run('maestro',['--device',device,'test',...Object.entries({TEST_EMAIL:email,...env}).flatMap(([key,value])=>['-e',`${key}=${value}`]),resolve('.maestro/account-preservation',name+'.yaml'),'--test-output-dir',artifacts],
       {...process.env,MAESTRO_CLI_NO_ANALYTICS:'1',TEST_EMAIL:email,MAESTRO_TEST_CODE:code,...env});
+    markStartup('case-assertions');
     if(name==='prepare')setupWindow={startedAt,finishedAt:Date.now()};
     const screenshots=['native-delete-confirmation.png','native-delete-verify.png','native-deleted-account.png','recovered-account-history.png','my-account-returned-log.png','my-account-signed-in.png','my-account-guest.png','my-account-config-retry.png','same-name-summary.png','same-name-confirmation.png','mismatched-name-summary.png','mismatched-name-confirmation.png','offline-preserved-history.png','pending-signout-cancelled.png','native-photo-saved.png'];
     for(const path of readdirSync(artifacts,{recursive:true}).filter(path=>screenshots.some(name=>String(path).endsWith(name))))
@@ -484,11 +490,13 @@ const task=installTaskCleanup(async()=>{
  if(!processesStopped||!nativeRestored||simulators.some(value=>!value.deleted))process.exitCode=1;
 });
 try{
+  markStartup('owned-port-preflight');
   if(standard)markStandardStage('fixture-preparation');
   // Own both ports; never attach to another task's backend or account.
   for(const port of [frontPort,backPort])await new Promise((resolveProbe,reject)=>{const server=createServer();server.once('error',reject);server.listen(port,'127.0.0.1',()=>server.close(resolveProbe));});
   if(android){adb('install','-r',resolve(host));adb('shell','run-as',app,'id');}
   else try{simctl('terminate',device,app);}catch{}
+  markStartup('existing-store-check');
   const old=sqliteDirectory();
   if(standard)assert.ok(!existsSync(join(old,'puptime-v2.db')),'Standard cases require a genuinely fresh task simulator.');
   if(upgrading){assert.ok(!existsSync(join(old,'puptime-v2.db')),'Start the historical case on a genuinely fresh owned simulator.');runtimeInputs=readEnrolledInputs();}
@@ -496,16 +504,24 @@ try{
     const prior=database();try{assert.equal(prior.prepare('SELECT COUNT(*) n FROM local_sync_owner').get().n,0,'Do not replace another account fixture.');}finally{prior.close();}
     cpSync(old,join(privateDir,'previous-synthetic-sqlite'),{recursive:true});
   }
+  markStartup('local-auth-migrations');
   await run('npx',['wrangler','d1','migrations','apply','AUTH_DB','--local','--config',configPath,'--persist-to',persist],childEnv);
+  markStartup('local-worker-start');
   worker=spawn('npx',['wrangler','dev','--local','--ip','127.0.0.1','--port',String(backPort),'--config',configPath,'--persist-to',persist],{env:childEnv,stdio:['ignore','pipe','pipe'],detached:true});
   stopWorker=ownProcess(worker);worker.once('error',error=>{workerError=error;});worker.stdout.resume();worker.stderr.resume();
+  markStartup('local-worker-health');
   for(let attempt=0;attempt<160;attempt++){if(workerError)throw workerError;try{if((await fetch('http://127.0.0.1:'+backPort+'/health')).ok)break;}catch{}await new Promise(resolveWait=>setTimeout(resolveWait,250));}
   const keyPath=join(privateDir,'localhost.key'),certPath=join(privateDir,'localhost.crt'),rootPath=join(privateDir,'root.crt'),rootKey=join(privateDir,'root.key'),csr=join(privateDir,'localhost.csr');
+  markStartup('fixture-keychain');
   if(!android)simctl('keychain',device,'reset');
+  markStartup('fixture-root-certificate');
   await run('openssl',['req','-x509','-newkey','rsa:2048','-nodes','-keyout',rootKey,'-out',rootPath,'-days','1','-subj','/CN=Puptime fixture CA','-addext','basicConstraints=critical,CA:TRUE']);
+  markStartup('fixture-server-certificate');
   await run('openssl',['req','-new','-newkey','rsa:2048','-nodes','-keyout',keyPath,'-out',csr,'-subj','/CN=localhost']);
   const extensions=join(privateDir,'server.cnf');writeFileSync(extensions,'basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectAltName=IP:127.0.0.1,DNS:localhost\n');
+  markStartup('fixture-certificate-sign');
   await run('openssl',['x509','-req','-in',csr,'-CA',rootPath,'-CAkey',rootKey,'-CAcreateserial','-out',certPath,'-days','1','-extfile',extensions]);
+  markStartup('fixture-certificate-trust');
   certificate=readFileSync(rootPath);if(!android)simctl('keychain',device,'add-root-cert',rootPath);
   const forward=(req,res)=>{
     requests.add(req.url);
@@ -560,7 +576,9 @@ try{
       if(head.length)upstream.write(head);socket.pipe(upstream).pipe(socket);
     });changeSockets.add(upstream);upstream.once('close',()=>changeSockets.delete(upstream));upstream.on('error',()=>socket.destroy());socket.on('error',()=>upstream.destroy());
   });
+  markStartup('fixture-proxy-bind');
   await new Promise(resolveProxy=>proxy.listen(frontPort,'127.0.0.1',resolveProxy));
+  markStartup('fixture-https-preflight');
   // Prove the fixture's HTTPS chain and actual config before the app starts.
   // This request must not count as the native app reaching /api/config.
   await new Promise((resolveReady,reject)=>{
@@ -575,6 +593,7 @@ try{
   });
   requests.delete('/api/config');
   writeFileSync(join(output,'fixture-readiness.json'),JSON.stringify({httpsConfigStatus:200,fixtureCertificateValidated:true,emailEnabled:true,nativeAppNotYetLaunched:true},null,2)+'\n');
+  markStartup('fixture-auth-database');
   for(const file of readdirSync(join(persist,'v3/d1'),{recursive:true}).filter(file=>String(file).endsWith('.sqlite'))){
     const db=new DatabaseSync(join(persist,'v3/d1',file),{readOnly:true});
     if(db.prepare("SELECT name FROM sqlite_master WHERE name='local_email_previews'").get()){auth=db;break;}db.close();
@@ -615,13 +634,16 @@ try{
   }else{
   if(upgrading){iosFixtureHost=await historicalBundle('older',bundleEnv);simctl('install',device,iosFixtureHost);assertInstalledHistorical('older');}
   else{
+  markStartup('candidate-bundle-copy');
   const bundle=join(privateDir,'Puptime.app');cpSync(host,bundle,{recursive:true});iosFixtureHost=bundle;
   const fingerprint=()=>nativeCodeFingerprint(bundle,mkdtempSync(join(privateDir,'standard-native-')));
   const nativeText=code=>Object.fromEntries(Object.entries(code).map(([path,{arm64TextSHA256,arm64TextBytes,architecture}])=>[path,{arm64TextSHA256,arm64TextBytes,architecture}]));
   const standardBefore=standard?{info:createHash('sha256').update(readFileSync(join(bundle,'Info.plist'))).digest('hex'),code:nativeText(fingerprint())}:null;
+  markStartup('candidate-bundle-export');
   await run('node',['node_modules/expo/bin/cli','export:embed','--entry-file','index.ts','--platform','ios','--dev','false','--bytecode','--reset-cache','--max-workers','2','--bundle-output',join(bundle,'main.jsbundle'),'--assets-dest',bundle],
     bundleEnv);
   assert.ok(readFileSync(join(bundle,'main.jsbundle')).includes(Buffer.from(front)),'Embed the fixture HTTPS address, never a cached production API.');
+  markStartup('candidate-bundle-sign');
   await run('codesign',['--force','--deep','--sign','-',bundle]);
   if(standard){
    assert.equal(createHash('sha256').update(readFileSync(join(bundle,'Info.plist'))).digest('hex'),standardBefore.info);
@@ -629,6 +651,7 @@ try{
    await run('codesign',['--verify','--deep','--strict',bundle]);
    markStandardStage('production-app-install');
   }
+  markStartup('candidate-bundle-install');
   simctl('install',device,bundle);
   if(standard){
    const installed=simctl('get_app_container',device,app,'app'),hash=path=>createHash('sha256').update(readFileSync(path)).digest('hex');
@@ -641,14 +664,17 @@ try{
   }
   if(standard){
    markStandardStage('standard-maestro');
+   markStartup('maestro-process');
    const scenario=onboarding.slice(2),result=await runStandardSuite({scenario,device,privateDirectory:privateDir,output,execute:run,environment:{...childEnv,MAESTRO_DRIVER_STARTUP_TIMEOUT:process.env.MAESTRO_DRIVER_STARTUP_TIMEOUT??'300000'}});
+   markStartup('case-assertions');
    assert.ok(requests.has('/api/config'),'The production App must reach the isolated fixture.');
    assert.deepEqual(identityRequests,{sendCode:0,verifyCode:0,signOut:0});assert.deepEqual(requestCounts,{enroll:0,push:0});assert.equal(cookie,'');
    assert.equal(snapshot().owner.length,0);assert.equal(auth.prepare('SELECT COUNT(*) n FROM user').get().n,0);
    assert.equal(task.signal,null);
    writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',stage:'standard-production-app',scenario,flows:result.flows,configReached:true,noIdentityOrCloudMutation:true,appPostHogConfigured:false,scope:'Full production App guest UI, native storage/navigation and SDK with local HTTPS Better Auth/D1/DO/R2. No email sign-in, provider, production, account lifecycle or release qualification.'},null,2)+'\n');
-   completed=true;markStandardStage('standard-complete','passed');console.log('PASS fixed production App standard case: '+scenario);
+   completed=true;markStartup('case-result','passed');markStandardStage('standard-complete','passed');console.log('PASS fixed production App standard case: '+scenario);
   }else{
+  markStartup('case-assertions');
   if(onboardingSignIn){
     await flow('onboarding-request');
     code=auth.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(email)?.code;
@@ -707,10 +733,10 @@ try{
   assert.equal(task.signal,null);
   rmSync(join(output,'failure-redacted.log'),{force:true});
   writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',checks,receipts,...(upgrading?{stage:'controlled-origin-enrolled-runtime-replacement',upgradeExecuted:true,originModified:true,originalInstalledBytes:false,runtimes:runtimeProvenance}:{}),scope:upgrading?'Exact historical source/native pairs with controlled-origin release JS and ad-hoc signing; actual native SDK and isolated local HTTPS Better Auth/D1/SQLite DO. No credential injection, owner data, provider OAuth, untouched-original, numeric store or final current-candidate qualification.':android?'Android Debug native host with normal embedded release JS and isolated local HTTPS Better Auth/D1/SQLite DO; actual native email SDK and Keystore. Its temporary CA is trusted only in the ignored Debug source set, restored after the run. Production onboarding is tested separately in the Release APK. No real email, production account, session injection or mocked sync.':'Release bundle and actual native email SDK with isolated local HTTPS Better Auth/D1/SQLite DO. Simulator trusts the fixture certificate. No real email, production account, session injection or mocked sync.'},null,2)+'\n');
-  completed=true;
+  completed=true;markStartup('case-result','passed');
   console.log('PASS '+(upgrading?'controlled-origin enrolled runtime replacement':deletionFaults?'pending native deletion cancellation, retries and lost response':photographing?'native profile photo failure, roundtrip and restore':isolating?'expired session and account isolation':offline?'offline writes, replay and pending logout':deleting?'native account deletion':comparing?'named puppy comparison':onboardingSignIn?'welcome sign-in and session recovery':android?'guest account preservation and empty-database recovery':'guest account preservation and inspected empty-device recovery')+': '+output);
   }
-}catch(error){
+}catch(error){markStartup(startupStage,'failed',error);
  if(standard){
   markStandardStage(standardStage,'failed');
   try{writeFileSync(join(output,'standard-isolation.json'),JSON.stringify({configReached:requests.has('/api/config'),identityRequests,cloudMutationRequests:requestCounts,authenticatedSessionObserved:Boolean(cookie)},null,2)+'\n');}catch{}
