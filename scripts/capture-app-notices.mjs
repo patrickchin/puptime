@@ -119,8 +119,12 @@ function retainedCollectorFailure(path,sourceCommit,phase){
   assert.deepEqual(Object.keys(value).sort(),['schema','status','complete','sourceCommit','platform','stage','setup'].sort());
   assert.equal(value.schema,1);assert.equal(value.status,'INCOMPLETE');assert.equal(value.complete,false);assert.equal(value.sourceCommit,sourceCommit);assert.equal(value.platform,'android');assert.equal(value.stage,'setup');
   assert.deepEqual(Object.keys(setup).sort(),['phase','errorCategory','collector'].sort());assert.equal(setup.phase,phase);assert.equal(setup.errorCategory,'command-failed');
-  assert.deepEqual(Object.keys(collector).sort(),['phase','errorClass'].sort());assert.ok(['root-binding','task-registration','runtime-resolution','artifact-collection'].includes(collector.phase));assert.ok(['ResolveException','GradleException','IOException','IllegalArgumentException','IllegalStateException','SecurityException','Error','Throwable'].includes(collector.errorClass));
-  return {phase:collector.phase,errorClass:collector.errorClass};
+  const classes=['ResolveException','GradleException','IOException','IllegalArgumentException','IllegalStateException','SecurityException','Error','Throwable'];
+  assert.deepEqual(Object.keys(collector).sort(),['phase','errorClass','causeChain','causeChainEnd'].sort());assert.ok(['root-binding','task-registration','runtime-resolution','artifact-collection'].includes(collector.phase));assert.ok(classes.includes(collector.errorClass));
+  assert.ok(Array.isArray(collector.causeChain)&&collector.causeChain.length>=1&&collector.causeChain.length<=8);assert.ok(['end','limit','cycle','unreadable'].includes(collector.causeChainEnd));assert.ok(collector.causeChainEnd!=='limit'||collector.causeChain.length===8);
+  const causeChain=collector.causeChain.map(value=>{assert.deepEqual(Object.keys(value).sort(),['errorClass','classSHA256'].sort());assert.ok(classes.includes(value.errorClass)&&typeof value.classSHA256==='string'&&/^[a-f0-9]{64}$/.test(value.classSHA256));return {errorClass:value.errorClass,classSHA256:value.classSHA256};});
+  assert.equal(collector.errorClass,causeChain[0].errorClass);
+  return {phase:collector.phase,errorClass:collector.errorClass,causeChain,causeChainEnd:collector.causeChainEnd};
  }catch{return;}
 }
 

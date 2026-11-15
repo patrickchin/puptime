@@ -78,8 +78,15 @@ exits with the original nonzero setup status, including if metadata writing
 fails. The fixed metadata upload remains separate from public notice bodies.
 If reached, the existing Gradle collector adds only a fixed root-binding,
 task-registration, runtime-resolution or artifact-collection phase and a closed
-public/base Throwable class. It reads no exception message or stack and always
-rethrows the same Throwable; a failed/outside-workspace metadata write is ignored.
+public/base Throwable class. A standard `getCause()` chain includes at most eight
+entries, starting with the thrown object; each contains only that closed class
+enum and the SHA-256 of its fully qualified class name. Identity cycles, the
+eight-entry limit and throwing cause getters have fixed termination labels.
+Gradle 9.3.1's [multi-cause implementation](https://github.com/gradle/gradle/blob/v9.3.1/platforms/core-runtime/stdlib-java-extensions/src/main/java/org/gradle/internal/exceptions/DefaultMultiCauseException.java#L111)
+exposes only the first cause through `getCause()`, so this does not enumerate all
+resolution failures or prove a root cause. It reads no raw class name into the
+report, exception message or stack and always rethrows the same Throwable; a
+failed/outside-workspace metadata write is ignored.
 The shell writer retains this context only after exact schema, source and enum
 validation, then reconstructs the finite report. Failures before these callbacks
 or during other Gradle/plugin configuration still have only the generic setup

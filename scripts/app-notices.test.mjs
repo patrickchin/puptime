@@ -281,13 +281,18 @@ test('setup failure CLI retains only matching finite Gradle collector context an
  file('fixture.txt','synthetic');git('init','--quiet');git('add','.');git('-c','user.name=Notice test','-c','user.email=notice-test@example.invalid','commit','--quiet','-m','Synthetic collector metadata');
  const sourceCommit=git('rev-parse','HEAD').toString().trim(),path='build/notices/android/failure.json';
  const generic={schema:1,status:'INCOMPLETE',complete:false,sourceCommit,platform:'android',stage:'setup',setup:{phase:'gradle-resolution',errorCategory:'command-failed'}};
- const known={...generic,setup:{...generic.setup,collector:{phase:'runtime-resolution',errorClass:'ResolveException'}}};
+ const chain=[{errorClass:'ResolveException',classSHA256:digest('org.gradle.api.artifacts.ResolveException')},{errorClass:'Throwable',classSHA256:digest('PRIVATE_UNKNOWN_CLASS')}],collector={phase:'runtime-resolution',errorClass:'ResolveException',causeChain:chain,causeChainEnd:'end'};
+ const known={...generic,setup:{...generic.setup,collector}};
  const cli=phase=>spawnSync(process.execPath,[fileURLToPath(new URL('./capture-app-notices.mjs',import.meta.url)),'setup-failure','android','--phase',phase],{cwd:root,encoding:'utf8',timeout:30000});
  file(path,known);assert.equal(cli('gradle-resolution').status,0);assert.deepEqual(JSON.parse(readFileSync(join(root,path))),known);
  for(const changed of [{...known,sourceCommit:'b'.repeat(40)},{...known,privateMessage:'PRIVATE_BODY'},{...known,setup:{...known.setup,collector:{phase:'PRIVATE_PHASE',errorClass:'ResolveException'}}},{...known,setup:{...known.setup,collector:{phase:'runtime-resolution',errorClass:'PRIVATE_CLASS'}}},'PRIVATE_BODY'.repeat(500)]){
   file(path,changed);const result=cli('gradle-resolution');assert.equal(result.status,0);
   const value=JSON.parse(readFileSync(join(root,path)));assert.deepEqual(value,generic);assert.ok(!(JSON.stringify(value)+result.stdout+result.stderr).includes('PRIVATE'));
  }
+ for(const bad of [{causeChain:[]},{causeChain:Array(9).fill(chain[0])},{causeChain:[{...chain[0],message:'PRIVATE_MESSAGE'}]},{causeChain:[{...chain[0],classSHA256:'PRIVATE_CLASS'}]},{causeChain:[{...chain[0],classSHA256:[chain[0].classSHA256]}]},{causeChain:[{...chain[0],errorClass:'PRIVATE_CLASS'}]},{causeChain:[chain[1]]},{causeChainEnd:'PRIVATE_END'},{causeChainEnd:'limit'}]){
+  file(path,{...known,setup:{...known.setup,collector:{...collector,...bad}}});const result=cli('gradle-resolution');assert.equal(result.status,0);assert.deepEqual(JSON.parse(readFileSync(join(root,path))),generic);assert.ok(!(readFileSync(join(root,path),'utf8')+result.stdout+result.stderr).includes('PRIVATE'));
+ }
+ for(const end of ['end','cycle','unreadable','limit']){const causes=end==='limit'?Array(8).fill(chain[0]):chain;const value={...known,setup:{...known.setup,collector:{...collector,causeChain:causes,causeChainEnd:end}}};file(path,value);assert.equal(cli('gradle-resolution').status,0);assert.deepEqual(JSON.parse(readFileSync(join(root,path))),value);}
  file(path,known);assert.equal(cli('prebuild').status,0);assert.deepEqual(JSON.parse(readFileSync(join(root,path))),{...generic,setup:{phase:'prebuild',errorCategory:'command-failed'}});
 }));
 
