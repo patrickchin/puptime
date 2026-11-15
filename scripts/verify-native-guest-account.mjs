@@ -18,6 +18,7 @@ import {pushResponseSchema,pullPageSchema,mutationSchema} from '../src/cloud/pro
 import {nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeDrained,assertEmptyIosRestoreSources,capturedJson,nativeAuthUiFlags} from './native-account-evidence.mjs';
 import {startupEvidence} from './native-startup-evidence.mjs';
 import {readNativeCommandState} from './native-command-evidence.mjs';
+import {recordNativeFontNoticeOutcome} from './native-font-notice-evidence.mjs';
 import {assertArchivedSource,nativeCodeFingerprint} from './native-runtime-inputs.mjs';
 import {verifyNativeRichState,verifyNativeFontNotices,accountFlowEnvironment} from './verify-native-rich-state.mjs';
 import {deleteOwnedSimulator,installTaskCleanup,ownProcess} from './native-task-cleanup.mjs';
@@ -114,11 +115,12 @@ async function flow(name,env={}){
     // Never infer FAILED from a process timeout: a RUNNING command stays RUNNING.
     const command=readNativeCommandState(artifacts);
     writeFileSync(join(output,'fixture-command-state.json'),JSON.stringify({phase:name,flowSequence,command},null,2)+'\n');
+    recordNativeFontNoticeOutcome({fontNotices,name,env,flowSequence,command,artifacts,output});
     // These flows never enter a credential. Do not retain auth-code screenshots.
     if(!android&&['prepare','add-logs','rich-notices'].includes(name)){
       try{simctl('io',device,'screenshot',join(output,'failure-'+name+'.png'));}catch{}
       const hierarchy=existsSync(artifacts)?readdirSync(artifacts,{recursive:true}).map(String).filter(path=>path.includes('hierarchy')&&/\.(json|xml)$/.test(path)).sort().at(-1):undefined;
-      if(hierarchy)writeFileSync(join(output,'failure-'+name+'-hierarchy.txt'),redacted(readFileSync(join(artifacts,hierarchy),'utf8')).slice(0,262144));
+      if(hierarchy&&!(fontNotices&&name==='rich-notices'))writeFileSync(join(output,'failure-'+name+'-hierarchy.txt'),redacted(readFileSync(join(artifacts,hierarchy),'utf8')).slice(0,262144));
     }
     throw error;
   }finally{
