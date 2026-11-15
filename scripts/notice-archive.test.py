@@ -8,6 +8,7 @@ import tempfile
 from types import SimpleNamespace
 import unittest
 import zipfile
+import zlib
 
 spec = importlib.util.spec_from_file_location("notice_archive", Path(__file__).with_name("notice-archive.py"))
 reader = importlib.util.module_from_spec(spec)
@@ -33,7 +34,7 @@ class NativeArchiveTests(unittest.TestCase):
                     archive.writestr("classes.jar", nested.getvalue())
                 result = reader.inspect_archive(path)
                 self.assertEqual(result["notices"], [{"source": "LICENSE", "body": "Actual synthetic notice\n", "sha256": hashlib.sha256(b"Actual synthetic notice\n").hexdigest()}])
-                self.assertEqual(result["emptyNotices"], [{"source": source, "bytes": 0, "sha256": hashlib.sha256(b"").hexdigest(), "crc32": "00000000"} for source in ("third_party_licenses.txt", "classes.jar!META-INF/NOTICE")])
+                self.assertEqual(result["nonTextNotices"], [{"kind": "empty-bytes", "source": source, "bytes": 0, "sha256": hashlib.sha256(b"").hexdigest(), "crc32": "00000000"} for source in ("third_party_licenses.txt", "classes.jar!META-INF/NOTICE")])
 
     def test_empty_notice_bad_crc_and_nonempty_member_forged_as_zero_fail(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -54,14 +55,53 @@ class NativeArchiveTests(unittest.TestCase):
                         with self.assertRaises(zipfile.BadZipFile):
                             reader.inspect_archive(path)
 
+    def test_only_matched_json_empty_containers_are_non_text_descriptors(self):
+        cases = {"LICENSE.json": b"{}\n", "sub/NOTICE.JSON": b" [\n] ",
+                 "LICENSE.txt": b"{}", "NOTICE.json": b'{"notice":"Actual text"}',
+                 "COPYING.json": b'["Actual text"]', "copyright.json": b"not JSON",
+                 "NOTICE.null.json": b"null", "NOTICE.string.json": b'""',
+                 "NOTICE.deep.json": b"[" * 1100 + b"0" + b"]" * 1100}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "descriptors.zip"
+            with zipfile.ZipFile(path, "w") as archive:
+                for name, body in cases.items():
+                    archive.writestr(name, body)
+            result = reader.inspect_archive(path)
+            self.assertEqual(result["nonTextNotices"], [{"kind": "empty-json-descriptor", "source": name, "bytes": len(cases[name]), "sha256": hashlib.sha256(cases[name]).hexdigest(), "crc32": f"{zlib.crc32(cases[name]):08x}"} for name in ("LICENSE.json", "sub/NOTICE.JSON")])
+            self.assertEqual([(x["source"], x["body"]) for x in result["notices"]], [(name, body.decode()) for name, body in list(cases.items())[2:]])
+            for kind, size, data in [("unknown", 0, b""), ("empty-json-descriptor", 0, b""), ("empty-bytes", 1, b"a")]:
+                with self.assertRaises(ValueError):
+                    reader.non_text_notice(None, SimpleNamespace(file_size=size), "NOTICE", kind, data)
+
+    def test_json_descriptor_crc_and_forged_trailing_payload_are_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "descriptor.zip"
+            for compression in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
+                for forged in (False, True):
+                    with self.subTest(compression=compression, forged=forged):
+                        with zipfile.ZipFile(path, "w", compression=compression) as archive:
+                            archive.writestr("NOTICE.json", b"{}\nhidden" if forged else b"{}\n")
+                        data = bytearray(path.read_bytes())
+                        central = data.index(b"PK\x01\x02")
+                        crc = zlib.crc32(b"{}\n") if forged else 1
+                        struct.pack_into("<I", data, central + 16, crc)
+                        struct.pack_into("<I", data, 14, crc)
+                        if forged:
+                            struct.pack_into("<I", data, central + 24, 3)
+                            struct.pack_into("<I", data, 22, 3)
+                        path.write_bytes(data)
+                        with self.assertRaises(zipfile.BadZipFile):
+                            reader.inspect_archive(path)
+
     def test_nonempty_invalid_notices_and_aggregate_limit_still_fail(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "invalid.zip"
-            for body in (b" \n", b"notice\0body", b"\xff"):
-                with zipfile.ZipFile(path, "w") as archive:
-                    archive.writestr("NOTICE", body)
-                with self.assertRaises(ValueError):
-                    reader.inspect_archive(path)
+            for name in ("NOTICE", "NOTICE.json"):
+                for body in (b" \n", b"notice\0body", b"\xff"):
+                    with zipfile.ZipFile(path, "w") as archive:
+                        archive.writestr(name, body)
+                    with self.assertRaises(ValueError):
+                        reader.inspect_archive(path)
             with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
                 archive.writestr("NOTICE.empty", b"")
                 for index in range(17):

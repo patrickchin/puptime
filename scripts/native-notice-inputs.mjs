@@ -122,16 +122,16 @@ export function gradleNoticeInputs(root,inputFile){
    scan.vendors=scan.vendors.map(scoped);scan.vendorNotices=Object.fromEntries(Object.entries(scan.vendorNotices).map(([key,sources])=>[scoped(key),sources]));
    components.push(...unionNoticeInputs([pkg],[{...pkg,...scan}]));continue;
   }
-  assert.ok(value.group&&value.name&&value.version&&value.artifacts.length);const notices=[],vendors=[],emptyNotices=[];
+  assert.ok(value.group&&value.name&&value.version&&value.artifacts.length);const notices=[],vendors=[],noticeArchives=[];
   for(const artifact of value.artifacts){
    const bytes=readFileSync(artifact.file);assert.equal(digest(bytes),artifact.sha256,'Resolved artifact changed.');
    const inspected=noticeInputStep('gradle-archive-scan','maven',()=>inspectNoticeArchive(artifact.file),`maven:${value.group}:${value.name}@${value.version}`,undefined,artifact.sha256),prefix='maven:'+value.group+':'+value.name+':'+value.version+'/'+basename(artifact.file)+'!';
    notices.push(...inspected.notices.map(item=>({...item,source:prefix+item.source})));
-   emptyNotices.push(...inspected.emptyNotices.map(item=>({...item,source:prefix+item.source,archiveSHA256:artifact.sha256})));
+   if(inspected.nonTextNotices.length)noticeArchives.push({archiveSHA256:artifact.sha256,nonTextNotices:inspected.nonTextNotices.map(item=>({...item,source:prefix+item.source}))});
    nativeFiles.push(...inspected.nativeFiles.map(item=>({...item,component:`maven:${value.group}:${value.name}@${value.version}`})));
-   for(const item of [...inspected.notices,...inspected.emptyNotices])if(/(^|\/)(vendor|third[-_]?party)(\/|$)/i.test(item.source))vendors.push(item.source);
+   for(const item of [...inspected.notices,...inspected.nonTextNotices])if(/(^|\/)(vendor|third[-_]?party)(\/|$)/i.test(item.source))vendors.push(item.source);
   }
-  components.push(nativeNoticeInput({id:`maven:${value.group}:${value.name}@${value.version}`,name:value.group+':'+value.name,version:value.version,ecosystem:'maven',notices,vendors,nativeInputs:emptyNotices.length?{emptyNotices:emptyNotices.sort((a,b)=>a.source.localeCompare(b.source))}:{}}));
+  components.push(nativeNoticeInput({id:`maven:${value.group}:${value.name}@${value.version}`,name:value.group+':'+value.name,version:value.version,ecosystem:'maven',notices,vendors,nativeInputs:noticeArchives.length?{noticeArchives:noticeArchives.sort((a,b)=>a.archiveSHA256.localeCompare(b.archiveSHA256)||a.nonTextNotices[0].source.localeCompare(b.nonTextNotices[0].source))}:{}}));
  }
  return {components,nativeFiles,unresolved:[],inputHashes:{gradle:digest(readFileSync(inputFile))}};
 }

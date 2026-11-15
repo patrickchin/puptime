@@ -109,7 +109,7 @@ function finalNoticeProof(root,platform,seal,capture,payload,options){
  const resolvedBuildOnly=[...resolved.values()].filter(value=>!observedComponents.includes(value.component)).sort((a,b)=>a.component.localeCompare(b.component));
  const resources=Object.fromEntries(archive.notices.map(value=>[kind==='aab'?value.source.replace(/^base\/root\//,''):value.source,value.sha256]));
  assertFinalNoticeEvidence({manifest:seal,payload,observedComponents,resolvedBuildOnly,resources,retainedResources:platform==='android'?capture.ledger.retainedAndroidResources:{}});
- return {schema:1,scope:'final-artifact-verification',status:'READY',sourceCommit:seal.sourceCommit,platform,payloadSHA256:digest(payload),archiveSHA256:digest(readFileSync(options['--archive'])),bundleSHA256:archive.bundle.sha256,sourceMapSHA256:digest(readFileSync(options['--source-map'])),mapEvidence,native,emptyNotices:archive.emptyNotices,inventory:{observedComponents,resolvedBuildOnly,independentFinalComponentInventory:false,postPackageResolvedInputReinspection:true,postBuildResolutionRegenerated:false},complete:true};
+ return {schema:1,scope:'final-artifact-verification',status:'READY',sourceCommit:seal.sourceCommit,platform,payloadSHA256:digest(payload),archiveSHA256:digest(readFileSync(options['--archive'])),bundleSHA256:archive.bundle.sha256,sourceMapSHA256:digest(readFileSync(options['--source-map'])),mapEvidence,native,nonTextNotices:archive.nonTextNotices,inventory:{observedComponents,resolvedBuildOnly,independentFinalComponentInventory:false,postPackageResolvedInputReinspection:true,postBuildResolutionRegenerated:false},complete:true};
 }
 
 function retainedCollectorFailure(path,sourceCommit,phase){

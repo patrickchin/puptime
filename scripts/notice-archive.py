@@ -151,8 +151,24 @@ def is_macho(archive, entry):
         raise ValueError("Malformed or unsupported universal native input")
 
 
+def non_text_notice(archive, entry, source, kind, expected):
+    if (kind not in ("empty-bytes", "empty-json-descriptor")
+            or (kind == "empty-bytes") != (entry.file_size == 0)
+            or len(expected) != entry.file_size or not 0 <= entry.file_size <= MAX_TEXT):
+        raise ValueError("Invalid non-text notice input")
+    # ZipExtFile truncates at the declared size. Probe one extra byte on a
+    # copy so a forged length cannot hide text after an empty descriptor.
+    probe = copy.copy(entry)
+    probe.file_size += 1
+    with archive.open(probe) as stream:
+        raw = stream.read(entry.file_size)
+        if raw != expected or stream.read(1) or (zlib.crc32(raw) & 0xffffffff) != entry.CRC:
+            raise zipfile.BadZipFile("Invalid non-text notice input")
+    return {"kind": kind, "source": source, "bytes": entry.file_size, "sha256": hashlib.sha256(raw).hexdigest(), "crc32": f"{entry.CRC:08x}"}
+
+
 def inspect_archive(path, payload_path=None, bundle_path=None):
-    result = {"notices": [], "emptyNotices": [], "nativeFiles": [], "payload": None, "bundle": None}
+    result = {"notices": [], "nonTextNotices": [], "nativeFiles": [], "payload": None, "bundle": None}
     total = 0
 
     def inspect(source, prefix="", depth=0):
@@ -188,21 +204,19 @@ def inspect_archive(path, payload_path=None, bundle_path=None):
                     if total > MAX_TOTAL_TEXT:
                         raise ValueError("Too much notice text")
                     if entry.file_size == 0:
-                        # ZipExtFile truncates at the declared size. A one-byte
-                        # probe must also prove that the actual member is empty.
-                        probe = copy.copy(entry)
-                        probe.file_size = 1
-                        with archive.open(probe) as stream:
-                            raw = stream.read(1)
-                            if raw or stream.read(1) or (zlib.crc32(raw) & 0xffffffff) != entry.CRC:
-                                raise zipfile.BadZipFile("Invalid empty notice input")
-                        result["emptyNotices"].append({"source": logical, "bytes": 0, "sha256": hashlib.sha256(raw).hexdigest(), "crc32": f"{entry.CRC:08x}"})
+                        result["nonTextNotices"].append(non_text_notice(archive, entry, logical, "empty-bytes", b""))
                     else:
                         raw = archive.read(entry)
                         body = raw.decode("utf-8")
                         if not body.strip() or "\0" in body:
                             raise ValueError("Unreadable notice")
-                        result["notices"].append({"source": logical, "body": body, "sha256": hashlib.sha256(raw).hexdigest()})
+                        # This is exactly the JSON empty-container grammar;
+                        # other candidates are not parsed or reclassified.
+                        descriptor = name.lower().endswith(".json") and re.fullmatch(r"[ \t\r\n]*(?:\{[ \t\r\n]*\}|\[[ \t\r\n]*\])[ \t\r\n]*", body)
+                        if descriptor:
+                            result["nonTextNotices"].append(non_text_notice(archive, entry, logical, "empty-json-descriptor", raw))
+                        else:
+                            result["notices"].append({"source": logical, "body": body, "sha256": hashlib.sha256(raw).hexdigest()})
                 if name.endswith(".so") or is_macho(archive, entry):
                     result["nativeFiles"].append({"path": logical, "sha256": native_digest(archive, entry)})
                 if depth == 0 and name.endswith(".jar"):

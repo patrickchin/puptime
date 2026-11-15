@@ -151,7 +151,7 @@ test('actual verify CLI derives final components from map/native inputs and reje
  const aar=file('build/source.aar',''),staticJar=file('build/static.jar','');
  execFileSync('python3',['-c',`import zipfile,sys\nwith zipfile.ZipFile(sys.argv[1],'w') as z:z.writestr('LICENSE',sys.argv[3]);z.writestr('jni/arm64-v8a/libqa.so',b'\\x7fELFcontrolled')\nwith zipfile.ZipFile(sys.argv[2],'w') as z:z.writestr('LICENSE',sys.argv[3])`,aar,staticJar,mit]);
  const gradle=file('build/runtime-inputs.json',{schema:1,configuration:'releaseRuntimeClasspath',components:[{group:'qa',name:'native',version:'1',artifacts:[{file:aar,sha256:digest(readFileSync(aar))}]},{group:'qa',name:'static',version:'1',artifacts:[{file:staticJar,sha256:digest(readFileSync(staticJar))}]}]});
- const empty={schema:1,components:[],knownLicenseSources:[],retainedAndroidResources:{'META-INF/NOTICE':digest('Required synthetic native notice\n')}};file('scripts/app-notice-provenance.json',empty);
+ const empty={schema:1,components:[],knownLicenseSources:[],retainedAndroidResources:{'META-INF/NOTICE.json':digest('{"notice":"Required synthetic native notice"}\n')}};file('scripts/app-notice-provenance.json',empty);
  const paths=[appPath,modulePath,assetPath,join(root,'assets/notices/third_party_notices.json')];
  const initial=captureResolvedInputs(root,'android',paths,gradle),approved={...empty,components:initial.noticeInputs.map(item=>review(item,'android'))};file('scripts/app-notice-provenance.json',approved);
  const coverage=resolveNoticeCoverage(initial.noticeInputs,approved,'android');file('assets/notices/third_party_notices.json',sourcePayload(coverage));
@@ -161,7 +161,7 @@ test('actual verify CLI derives final components from map/native inputs and reje
  assert.throws(()=>createNoticeSeal(join(root,'node_modules'), 'android',capture));
  const sourceMap={version:3,sources:['index.ts','node_modules/qa/index.js','node_modules/assets/font.ttf','assets/notices/third_party_notices.json'],sourcesContent:[appCode,moduleCode,'',readFileSync(join(root,'assets/notices/third_party_notices.json'),'utf8')]};
  const map=file('build/actual.map',sourceMap),bundle=file('build/index.android.bundle','controlled compiler output'),apk=join(root,'build/final.apk');
- const pack=(extra=false,emptyRetained=false)=>execFileSync('python3',['-c',`import zipfile,sys\nwith zipfile.ZipFile(sys.argv[1],'w') as z:\n z.write(sys.argv[2],'assets/third_party_notices.json');z.write(sys.argv[3],'assets/index.android.bundle');z.writestr('lib/arm64-v8a/libqa.so',b'\\x7fELFcontrolled');z.writestr('assets/font.ttf','synthetic font bytes');z.writestr('third_party_licenses.txt',b'');z.writestr('META-INF/NOTICE',b'' if sys.argv[5]=='yes' else sys.argv[6])\n if sys.argv[4]=='yes':z.writestr('assets/unknown-executable',b'\\xcf\\xfa\\xed\\xfecontrolled')`,apk,join(root,'assets/notices/third_party_notices.json'),bundle,extra?'yes':'no',emptyRetained?'yes':'no','Required synthetic native notice\n']);
+ const pack=(extra=false,emptyRetained=false)=>execFileSync('python3',['-c',`import zipfile,sys\nwith zipfile.ZipFile(sys.argv[1],'w') as z:\n z.write(sys.argv[2],'assets/third_party_notices.json');z.write(sys.argv[3],'assets/index.android.bundle');z.writestr('lib/arm64-v8a/libqa.so',b'\\x7fELFcontrolled');z.writestr('assets/font.ttf','synthetic font bytes');z.writestr('third_party_licenses.txt',b'');z.writestr('third_party_licenses.json',sys.argv[7]);z.writestr('META-INF/NOTICE.json',b'' if sys.argv[5]=='yes' else sys.argv[7] if sys.argv[5]=='json' else sys.argv[6])\n if sys.argv[4]=='yes':z.writestr('assets/unknown-executable',b'\\xcf\\xfa\\xed\\xfecontrolled')`,apk,join(root,'assets/notices/third_party_notices.json'),bundle,extra?'yes':'no',emptyRetained===true?'yes':emptyRetained==='json'?'json':'no','{"notice":"Required synthetic native notice"}\n','{}\n']);
  const verify=()=>spawnSync(process.execPath,[fileURLToPath(new URL('./capture-app-notices.mjs',import.meta.url)),'verify','android','--gradle-input',gradle,'--archive',apk,'--bundle',bundle,'--source-map',map],{cwd:root,encoding:'utf8',timeout:30000});
  pack();assert.equal(verify().status,0);
  file('babel.config.cjs','module.exports={presets:["changed-preset"]};\n');
@@ -171,8 +171,9 @@ test('actual verify CLI derives final components from map/native inputs and reje
  file('babel.config.cjs',buildConfig);runGit('restore','--staged','--','babel.config.cjs');
  assert.equal(verify().status,0,'Ignored generated build outputs do not make the tracked worktree dirty.');
  const receipt=JSON.parse(readFileSync(join(root,'build/notices/android/final-apk.json')));assert.equal(receipt.inventory.independentFinalComponentInventory,false);
- assert.deepEqual(receipt.emptyNotices,[{source:'third_party_licenses.txt',bytes:0,sha256:digest(''),crc32:'00000000'}]);
+ assert.deepEqual(receipt.nonTextNotices,[{kind:'empty-bytes',source:'third_party_licenses.txt',bytes:0,sha256:digest(''),crc32:'00000000'},{kind:'empty-json-descriptor',source:'third_party_licenses.json',bytes:3,sha256:digest('{}\n'),crc32:'dda1b006'}]);
  pack(false,true);assert.equal(verify().status,1,'An empty retained file cannot satisfy a required nonempty native notice resource.');
+ pack(false,'json');assert.equal(verify().status,1,'An empty JSON descriptor cannot satisfy a required nonempty native notice resource.');
  pack();assert.equal(verify().status,0);
  assert.deepEqual(receipt.inventory.resolvedBuildOnly,[{component:'maven:qa:static@1',basis:'reinspected-gradle-artifacts-and-source'}]);
  const missing={...sourceMap,sources:sourceMap.sources.filter((_,i)=>i!==2),sourcesContent:sourceMap.sourcesContent.filter((_,i)=>i!==2)};file('build/actual.map',missing);
