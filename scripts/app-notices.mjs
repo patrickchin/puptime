@@ -144,6 +144,33 @@ export function npmNoticeInputs(root,modulePaths){
  }).sort((a,b)=>a.id.localeCompare(b.id));
 }
 
+// Explicit own-text approval is separate from component/vendor coverage. Publisher
+// metadata is a manually reviewed declaration, not an unfetched runtime check.
+export function addKnownOwnNoticeFiles(root,components,ledger){
+ const exact=(value,keys)=>assert.deepEqual(Object.keys(value??{}).sort(),[...keys].sort(),'Unsupported own-text selector.');
+ const pins=(ledger.knownLicenseSources??[]).filter(pin=>pin.ownText),seen=new Set();
+ for(const pin of pins){assert.ok(!seen.has(pin.component));seen.add(pin.component);assert.equal(pin.ecosystem,'npm');assert.equal(pin.public,true);}
+ const project=realpathSync(root),modules=pins.length?realpathSync(join(root,'node_modules')):null,lock=pins.length?JSON.parse(readFileSync(join(root,'package-lock.json'))).packages:{};
+ return components.map(item=>{
+  const pin=pins.find(value=>value.component===item.id);if(!pin)return item;
+  const own=pin.ownText;exact(own,['kind','ownerNpmID','packagePath','packageJSONSource','packageJSONSHA256','tarball','integrity','publisher','selectedSources']);
+  assert.equal(own.kind,'pinned-upstream-own-attribution');assert.equal(item.ecosystem,'npm');assert.equal(item.version,pin.version);assert.equal(item.id,own.ownerNpmID);
+  assert.equal(item.packagePath,own.packagePath);assert.equal(own.packagePath,'node_modules/'+item.name);assert.equal(own.ownerNpmID,`npm:${item.name}@${item.version}`);
+  const owner=realpathSync(join(project,safeRelative(own.packagePath)));assert.equal(owner,join(modules,item.name));assert.ok(inside(modules,owner));
+  const checked=(source,expected)=>{safeRelative(source);const logical=join(project,source),path=realpathSync(logical);assert.ok(inside(owner,path)&&path!==owner);assert.ok(lstatSync(logical).isFile()&&!lstatSync(logical).isSymbolicLink());assert.equal(path,join(owner,relative(join(project,own.packagePath),logical)));const bytes=readFileSync(path);assert.match(expected??'',/^[a-f0-9]{64}$/);assert.equal(digest(bytes),expected,'Own-text source bytes changed.');return bytes;};
+  assert.equal(own.packageJSONSource,own.packagePath+'/package.json');const pkg=JSON.parse(noticeText(checked(own.packageJSONSource,own.packageJSONSHA256)));
+  assert.equal(pkg.name,item.name);assert.equal(pkg.version,item.version);assert.equal(pkg.license,'MIT');assert.equal(lock[own.packagePath]?.version,item.version);assert.equal(lock[own.packagePath]?.resolved,own.tarball);assert.equal(lock[own.packagePath]?.integrity,own.integrity);assert.match(own.integrity,/^sha512-[A-Za-z0-9+/]{86}==$/);assert.equal(own.tarball,`https://registry.npmjs.org/${item.name}/-/${item.name.split('/').at(-1)}-${item.version}.tgz`);
+  exact(own.publisher,['gitHead','metadataURL','metadataSHA256']);assert.match(own.publisher.gitHead,/^[a-f0-9]{40}$/);assert.match(own.publisher.metadataSHA256,/^[a-f0-9]{64}$/);
+  assert.equal(own.publisher.metadataURL,`https://registry.npmjs.org/${encodeURIComponent(item.name)}/${item.version}`);
+  const repository=new URL((typeof pkg.repository==='string'?pkg.repository:pkg.repository?.url??'').replace(/^git\+/,'').replace(/\.git$/,''));assert.equal(repository.protocol,'https:');assert.equal(repository.hostname,'github.com');assert.ok(!repository.username&&!repository.password&&!repository.search&&!repository.hash&&/^\/[^/]+\/[^/]+$/.test(repository.pathname));
+  assert.equal(pin.upstream,`https://raw.githubusercontent.com${repository.pathname}/${own.publisher.gitHead}/LICENSE`);
+  assert.ok(Array.isArray(own.selectedSources)&&own.selectedSources.length>0&&own.selectedSources.length<=8);const selected=new Set();for(const value of own.selectedSources){exact(value,['source','sha256']);assert.ok(!selected.has(value.source));selected.add(value.source);checked(value.source,value.sha256);}
+  safeRelative(pin.source);assert.ok(pin.source.startsWith('assets/notices/sources/'));const path=join(project,pin.source);assert.equal(realpathSync(path),path);assert.ok(lstatSync(path).isFile()&&!lstatSync(path).isSymbolicLink());
+  const notice=candidate(project,path,pin.source);assert.equal(notice.sha256,pin.sha256,'Own-text licence bytes changed.');assert.ok(!item.notices.some(value=>value.source===notice.source));assert.ok(!Object.hasOwn(item.nativeInputs??{},'ownAttribution'));
+  return {...item,notices:[...item.notices,notice].sort((a,b)=>a.source.localeCompare(b.source)),nativeInputs:{...item.nativeInputs,ownAttribution:{kind:own.kind,ownerNpmID:own.ownerNpmID,packagePath:own.packagePath,packageJSON:{source:own.packageJSONSource,sha256:own.packageJSONSHA256},tarball:own.tarball,integrity:own.integrity,publisherDeclaration:{...own.publisher},selectedSources:own.selectedSources.map(value=>({...value})),text:{source:pin.source,sha256:pin.sha256,upstream:pin.upstream}}}};
+ });
+}
+
 // Native adapters must supply actual resolved coordinates and actual text,
 // never a POM SPDX label or an assumed parent package's permission notice.
 export function nativeNoticeInput({id,name,version,ecosystem,notices,vendors=[],vendorNotices={},nativeInputs={}}){

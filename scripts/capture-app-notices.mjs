@@ -5,7 +5,7 @@ import {chmodSync,existsSync,lstatSync,mkdirSync,readFileSync,realpathSync,rmSyn
 import {createRequire} from 'node:module';
 import {dirname,join,relative,resolve,sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {addReviewedNoticeFiles,assertCapturedSources,assertFinalNoticeEvidence,assertFinalSourceMap,assertPackagedNativeCoverage,assertSourceNoticePayload,capturedSource,digest,npmNoticeInputs,noticeText,publicNoticeReport,resolveNoticeCoverage,unreviewedOSSNoticeInputs} from './app-notices.mjs';
+import {addKnownOwnNoticeFiles,addReviewedNoticeFiles,assertCapturedSources,assertFinalNoticeEvidence,assertFinalSourceMap,assertPackagedNativeCoverage,assertSourceNoticePayload,capturedSource,digest,npmNoticeInputs,noticeText,publicNoticeReport,resolveNoticeCoverage,unreviewedOSSNoticeInputs} from './app-notices.mjs';
 import {gradleNoticeInputs,inspectNoticeArchive,podNoticeInputs,unionNoticeInputs,noticeInputStep,noticeFailureContext} from './native-notice-inputs.mjs';
 import {installTaskCleanup} from './native-task-cleanup.mjs';
 
@@ -34,7 +34,7 @@ export function captureResolvedInputs(root,platform,paths,gradleInput){
  const npm=noticeInputStep('npm-notices','npm',()=>npmNoticeInputs(root,physical));
  const union=noticeInputStep('notice-union','review',()=>unionNoticeInputs(npm,native.components));
  const components=noticeInputStep('reviewed-notices','review',()=>{
-  const result=addReviewedNoticeFiles(root,union,ledger,platform);
+  const result=addReviewedNoticeFiles(root,addKnownOwnNoticeFiles(root,union,ledger),ledger,platform);
   assert.ok(result.length<=2048&&result.reduce((bytes,item)=>bytes+item.notices.reduce((sum,value)=>sum+Buffer.byteLength(value.body),0),0)<=16*1024*1024,'Notice inputs exceed the review bound.');return result;
  });
  const coverage=noticeInputStep('coverage','review',()=>resolveNoticeCoverage(components,ledger,platform));coverage.unresolved.push(...unresolved,...native.unresolved);
@@ -68,6 +68,7 @@ export function assertReviewedSource(root,capture){
  for(const path of ['package.json','package-lock.json','app.json',ledgerPath,fontPath,payloadPath])strictSource(root,path);
  for(const [path,expected] of Object.entries(fonts.files))assert.equal(digest(readFileSync(join(root,path))),expected,'Installed font input drifted.');
  for(const component of ledger.components)for(const item of component.additionalNoticeFiles??[])strictSource(root,item.file);
+ for(const item of capture.noticeInputs)if(item.nativeInputs?.ownAttribution)strictSource(root,item.nativeInputs.ownAttribution.text.source);
  const payload=readFileSync(join(root,payloadPath));assertSourceNoticePayload(payload,coverage,ledger,fonts);
  assert.ok(sources.some(value=>value.path===payloadPath&&value.sha256===digest(payload)),'The offline view must import the same committed resource.');
  const app=readJSON(join(root,'app.json')).expo;
@@ -156,7 +157,7 @@ export async function main(args=process.argv.slice(2)){
   const privateRoot=join(out,'private');mkdirSync(privateRoot,{recursive:true,mode:0o700});chmodSync(privateRoot,0o700);
   const paths=await metroPaths(root,platform,privateRoot);stage='native';const capture=captureResolvedInputs(root,platform,paths,options['--gradle-input']);
   const report=publicNoticeReport({platform,sourceCommit,entry,lockSHA256:digest(readFileSync(join(root,'package-lock.json'))),coverage:capture.coverage});
-  write(join(out,'discovery.json'),{...report,sources:capture.sources,inputHashes:inputHashes(root,capture)});
+  write(join(out,'discovery.json'),{...report,sources:capture.sources,inputHashes:inputHashes(root,capture),...(platform==='ios'?{actualSelectors:capture.native.actualSelectors??[]}:{})});
   write(join(privateRoot,'unreviewed-inputs.json'),{schema:1,status:'INCOMPLETE',complete:false,discoveryOnly:true,components:capture.noticeInputs});
   const review=join(out,'review');mkdirSync(review,{recursive:true,mode:0o700});write(join(review,'unreviewed-oss-notice-inputs.json'),unreviewedOSSNoticeInputs(capture.noticeInputs,capture.ledger));
   if(mode==='collect'){console.log(`Notices discovery: INCOMPLETE (${capture.coverage.unresolved.length} unresolved inputs); no release payload generated.`);return;}

@@ -225,6 +225,25 @@ When an AAR/JAR omits full text, an explicitly reviewed `additionalNoticeFiles`
 entry may point at an actual pinned upstream copy under `assets/notices/sources/`
 with `file`, `sha256`, `upstream`. It supplements discovered notices; it cannot
 replace a missing NOTICE with a package label or an assumed parent licence.
+
+Six exact npm records in `knownLicenseSources` also supplement missing own MIT
+text: `@expo/ui`, the four React Native subpackages listed there, and
+`qrcode-generator`. Their closed `ownText` selectors rehash the installed package
+manifest, selected package files and committed text, and match the actual lock
+version, tarball and integrity. Publisher `gitHead` and metadata SHA are manually
+reviewed declarations included in the component fingerprint; capture does not
+fetch or independently verify that remote metadata. The three pinned Expo,
+React Native and qrcode text files are attribution inputs only. They preserve
+discovered NOTICEs and vendor boundaries and do not approve any component,
+vendor, generated input or retained resource. Component review must bind the
+resulting text and provenance; seal and final verification recapture both.
+
+The three pending ExpoRouter, ExpoUI and Yoga Pod own-text bindings remain
+inactive. An otherwise justified iOS discovery adds `actualSelectors` containing
+only their fixed component labels, finite source kinds, match booleans and input
+hashes. Unknown versions or source forms do not select a licence. This metadata
+does not grant coverage or justify a separate discovery run.
+
 Generated Metro sources permit only the known `__prelude__` and Expo CLI’s exact
 NUL-prefixed `polyfill:external-require`, `polyfill:environment-variables` and
 `polyfill:assets-registry` IDs, with their exact

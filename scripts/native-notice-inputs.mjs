@@ -75,6 +75,28 @@ function podOwnLicense(root,name,version,source,external){
  return {notice:{source:pin.source,sha256:pin.sha256,body},binding:{ownerNpmID:pin.ownerNpmID,packagePath,sourceKind:pin.sourceKind,packageJSON:{source:pin.packageJSONSource,sha256:pin.packageJSONSHA256},podspec:{source:pin.podspecSource,sha256:pin.podspecSHA256},license:{source:pin.source,sha256:pin.sha256},upstream:pin.upstream,upstreamIntegrity:pin.upstreamIntegrity}};
 }
 
+// Finite observations only, not licence bindings. These three pending Pod
+// forms must be observed by an otherwise justified producer, never guessed.
+export function podActualSelectors(root,lock,versions,podLockSHA256){
+ assert.match(podLockSHA256,/^[a-f0-9]{64}$/);
+ return [['ExpoRouter','57.0.28','expo-router','57.0.28','ios/ExpoRouter.podspec'],['ExpoUI','57.0.25','@expo/ui','57.0.25','ios/ExpoUI.podspec'],['Yoga','0.0.0','react-native','0.86.3','ReactCommon/yoga/Yoga.podspec']].map(([name,version,npm,npmVersion,spec])=>{
+  const value=lock['EXTERNAL SOURCES']?.[name],keys=value&&typeof value==='object'&&!Array.isArray(value)?Object.keys(value):[];
+  const kind=value===undefined?'missing':keys.length>1?'ambiguous':keys.length===1&&[':path',':podspec'].includes(keys[0])&&typeof value[keys[0]]==='string'?keys[0].slice(1):'other';
+  const result={component:`cocoapods:${name}@${version}`,resolvedVersionMatches:versions.get(name)===version,kind,canonicalOwnerMatches:false,selectedRelativePathMatches:false,podLockSHA256,ownerPackageJSONSHA256:null,selectedPodspecSHA256:null};
+  try{
+   const modules=realpathSync(join(root,'node_modules')),owner=realpathSync(join(root,'node_modules',npm));assert.equal(owner,join(modules,npm));
+   const manifest=join(owner,'package.json');assert.equal(realpathSync(manifest),manifest);assert.ok(lstatSync(manifest).isFile()&&!lstatSync(manifest).isSymbolicLink());const bytes=readFileSync(manifest),pkg=JSON.parse(noticeText(bytes));
+   assert.equal(pkg.name,npm);assert.equal(pkg.version,npmVersion);result.canonicalOwnerMatches=true;result.ownerPackageJSONSHA256=digest(bytes);
+   if(result.resolvedVersionMatches&&['path','podspec'].includes(kind)){
+    const expected=join(owner,spec);assert.equal(realpathSync(expected),expected);assert.ok(lstatSync(expected).isFile()&&!lstatSync(expected).isSymbolicLink());
+    result.selectedRelativePathMatches=realpathSync(resolve(root,'ios',value[':'+kind]))===(kind==='path'?dirname(expected):expected);
+    if(result.selectedRelativePathMatches)result.selectedPodspecSHA256=digest(readFileSync(expected));
+   }
+  }catch{/* Never emit unknown source paths, lock values, package data or errors. */}
+  return result;
+ });
+}
+
 export function podNoticeInputs(root){
  const lockPath=join(root,'ios/Podfile.lock'),support=join(root,'ios/Pods/Target Support Files');
  if(!existsSync(lockPath)||!existsSync(support))return {components:[],unresolved:[{component:'native:ios',reason:'missing-resolved-pod-inputs'}],nativeFiles:[]};
@@ -107,7 +129,7 @@ export function podNoticeInputs(root){
   },`cocoapods:${name}@${version}`);
   components.push(noticeInputStep('pod-notices','cocoapods',()=>nativeNoticeInput({id:`cocoapods:${name}@${version}`,name,version,ecosystem:'cocoapods',...scan,notices:[...notices,...scan.notices].sort((a,b)=>a.source.localeCompare(b.source))}),`cocoapods:${name}@${version}`));
  }
- return {components,unresolved,nativeFiles:[],inputHashes:{podLock:digest(readFileSync(lockPath)),podAcknowledgements:digest(JSON.stringify(acknowledgements))}};
+ return {components,unresolved,nativeFiles:[],actualSelectors:podActualSelectors(root,lock,versions,digest(readFileSync(lockPath))),inputHashes:{podLock:digest(readFileSync(lockPath)),podAcknowledgements:digest(JSON.stringify(acknowledgements))}};
 }
 export function gradleNoticeInputs(root,inputFile){
  if(!inputFile||!existsSync(inputFile))return {components:[],unresolved:[{component:'native:android',reason:'missing-resolved-gradle-inputs'}],nativeFiles:[]};

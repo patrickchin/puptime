@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os';
 import {join,dirname} from 'node:path';
 import {createRequire} from 'node:module';
 import test from 'node:test';
-import {podNoticeInputs,gradleNoticeInputs,unionNoticeInputs,inspectNoticeArchive,noticeInputStep,noticeFailureContext,podLinkedSources} from './native-notice-inputs.mjs';
+import {podNoticeInputs,gradleNoticeInputs,unionNoticeInputs,inspectNoticeArchive,noticeInputStep,noticeFailureContext,podLinkedSources,podActualSelectors} from './native-notice-inputs.mjs';
 import {assertPackagedNativeCoverage,assertSourceNoticePayload,digest,npmNoticeInputs,resolveNoticeCoverage,nativeSourceNotices,unreviewedOSSNoticeInputs} from './app-notices.mjs';
 const require=createRequire(import.meta.url),plist=require('@expo/plist');
 const mit=readFileSync(new URL('../node_modules/react-native/LICENSE',import.meta.url),'utf8');
@@ -335,4 +335,15 @@ test('the pinned RN selector uses actual autolinking metadata, with app config a
  try{console.log=()=>{};console.warn=()=>{};config=utils.readReactNativeConfig(root,join(root,'ios'));selected=utils.findCodegenEnabledLibraries({name:'notice-fixture'},root,join(root,'ios'),config,{}).filter(value=>!utils.findDisabledLibrariesByPlatform(config,'ios').includes(value.name));}finally{console.log=log;console.warn=warn;}
  assert.deepEqual(selected.map(value=>{const pkg=JSON.parse(readFileSync(join(value.libraryPath,'package.json')));return 'npm:'+pkg.name+'@'+pkg.version;}).sort(),pins.libraries.filter(value=>value.codegen).map(value=>value.component).sort());
  assert.deepEqual(pins.coreSourceTrees.map(value=>value.source),['node_modules/react-native/src','node_modules/react-native/React/FBReactNativeSpec']);assert.ok(JSON.parse(readFileSync('node_modules/react-native/package.json')).codegenConfig.libraries.some(value=>value.name==='FBReactNativeSpec'));
+}));
+
+
+test('three pending Pod selectors expose only actual finite forms/owner matches/hashes and grant no own-text binding',()=>fixture(({root,file})=>{
+ const targets=[['ExpoRouter','57.0.28','expo-router','57.0.28','ios/ExpoRouter.podspec'],['ExpoUI','57.0.25','@expo/ui','57.0.25','ios/ExpoUI.podspec'],['Yoga','0.0.0','react-native','0.86.3','ReactCommon/yoga/Yoga.podspec']],versions=new Map(),external={};
+ for(const [name,version,npm,ownerVersion,spec] of targets){versions.set(name,version);file('node_modules/'+npm+'/package.json',{name:npm,version:ownerVersion});file('node_modules/'+npm+'/'+spec,'Public synthetic spec');external[name]={':path':'../node_modules/'+npm+'/'+dirname(spec)};}
+ const select=(values=external,current=versions)=>podActualSelectors(root,{'EXTERNAL SOURCES':values},current,'a'.repeat(64));
+ const good=select();assert.equal(good.length,3);for(const row of good){assert.equal(row.kind,'path');assert.equal(row.resolvedVersionMatches,true);assert.equal(row.canonicalOwnerMatches,true);assert.equal(row.selectedRelativePathMatches,true);assert.match(row.ownerPackageJSONSHA256,/^[a-f0-9]{64}$/);assert.match(row.selectedPodspecSHA256,/^[a-f0-9]{64}$/);assert.deepEqual(Object.keys(row),['component','resolvedVersionMatches','kind','canonicalOwnerMatches','selectedRelativePathMatches','podLockSHA256','ownerPackageJSONSHA256','selectedPodspecSHA256']);}
+ const yoga=external.Yoga;for(const [value,kind] of [[undefined,'missing'],[{':path':yoga[':path'],':podspec':'SECRET_LOCK'},'ambiguous'],[{':git':'https://SECRET.invalid'},'other'],[{':path':'/PRIVATE/FOREIGN/PATH'},'path'],[{':podspec':'../node_modules/react-native/ReactCommon/yoga/Yoga.podspec'},'podspec']]){const result=select({...external,Yoga:value}).find(row=>row.component==='cocoapods:Yoga@0.0.0');assert.equal(result.kind,kind);assert.equal(result.selectedRelativePathMatches,kind==='podspec');assert.ok(!JSON.stringify(result).includes('PRIVATE')&&!JSON.stringify(result).includes('SECRET')&&!JSON.stringify(result).includes(root));}
+ const newer=new Map(versions);newer.set('Yoga','UNKNOWN_PRIVATE_VERSION');const wrongVersion=select(external,newer).at(-1);assert.equal(wrongVersion.resolvedVersionMatches,false);assert.equal(wrongVersion.selectedPodspecSHA256,null);assert.ok(!JSON.stringify(wrongVersion).includes('UNKNOWN'));
+ file('node_modules/react-native/package.json',{name:'PRIVATE_FOREIGN_OWNER',version:'0.86.3'});const foreign=select().at(-1);assert.equal(foreign.canonicalOwnerMatches,false);assert.equal(foreign.ownerPackageJSONSHA256,null);assert.equal(foreign.selectedPodspecSHA256,null);assert.ok(!JSON.stringify(foreign).includes('PRIVATE'));
 }));

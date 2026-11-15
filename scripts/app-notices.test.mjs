@@ -6,7 +6,7 @@ import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import test from 'node:test';
 import {parse} from 'yaml';
-import {npmNoticeInputs,nativeNoticeInput,resolveNoticeCoverage,assertSourceNoticePayload,publicNoticeReport,assertFinalNoticeEvidence,capturedSource,assertCapturedSources,assertFinalSourceMap,assertPackagedNativeCoverage,digest,unreviewedOSSNoticeInputs} from './app-notices.mjs';
+import {addKnownOwnNoticeFiles,npmNoticeInputs,nativeNoticeInput,resolveNoticeCoverage,assertSourceNoticePayload,publicNoticeReport,assertFinalNoticeEvidence,capturedSource,assertCapturedSources,assertFinalSourceMap,assertPackagedNativeCoverage,digest,unreviewedOSSNoticeInputs} from './app-notices.mjs';
 import {captureResolvedInputs,createNoticeSeal} from './capture-app-notices.mjs';
 
 const mit=readFileSync(new URL('../node_modules/react-native/LICENSE',import.meta.url),'utf8');
@@ -151,11 +151,16 @@ test('actual verify CLI derives final components from map/native inputs and reje
  const aar=file('build/source.aar',''),staticJar=file('build/static.jar','');
  execFileSync('python3',['-c',`import zipfile,sys\nwith zipfile.ZipFile(sys.argv[1],'w') as z:z.writestr('LICENSE',sys.argv[3]);z.writestr('jni/arm64-v8a/libqa.so',b'\\x7fELFcontrolled')\nwith zipfile.ZipFile(sys.argv[2],'w') as z:z.writestr('LICENSE',sys.argv[3])`,aar,staticJar,mit]);
  const gradle=file('build/runtime-inputs.json',{schema:1,configuration:'releaseRuntimeClasspath',components:[{group:'qa',name:'native',version:'1',artifacts:[{file:aar,sha256:digest(readFileSync(aar))}]},{group:'qa',name:'static',version:'1',artifacts:[{file:staticJar,sha256:digest(readFileSync(staticJar))}]}]});
- const empty={schema:1,components:[],knownLicenseSources:[],retainedAndroidResources:{'META-INF/NOTICE.json':digest('{"notice":"Required synthetic native notice"}\n')}};file('scripts/app-notice-provenance.json',empty);
+ const ownSource='assets/notices/sources/qa-MIT.txt';file(ownSource,mit);const ownPackage={name:'qa',version:'1',license:'MIT',repository:'https://github.com/qa/library.git'};file('node_modules/qa/package.json',ownPackage);
+ const tarball='https://registry.npmjs.org/qa/-/qa-1.tgz',integrity='sha512-'+Buffer.alloc(64).toString('base64');lock.packages['node_modules/qa']={version:'1',resolved:tarball,integrity};file('package-lock.json',lock);
+ const ownPin={component:'npm:qa@1',ecosystem:'npm',version:'1',public:true,source:ownSource,sha256:digest(mit),upstream:'https://raw.githubusercontent.com/qa/library/'+ 'a'.repeat(40)+'/LICENSE',ownText:{kind:'pinned-upstream-own-attribution',ownerNpmID:'npm:qa@1',packagePath:'node_modules/qa',packageJSONSource:'node_modules/qa/package.json',packageJSONSHA256:digest(readFileSync(join(root,'node_modules/qa/package.json'))),tarball,integrity,publisher:{gitHead:'a'.repeat(40),metadataURL:'https://registry.npmjs.org/qa/1',metadataSHA256:'b'.repeat(64)},selectedSources:[{source:'node_modules/qa/index.js',sha256:digest(moduleCode)}]}};
+ const empty={schema:1,components:[],knownLicenseSources:[ownPin],retainedAndroidResources:{'META-INF/NOTICE.json':digest('{"notice":"Required synthetic native notice"}\n')}};file('scripts/app-notice-provenance.json',empty);
  const paths=[appPath,modulePath,assetPath,join(root,'assets/notices/third_party_notices.json')];
  const initial=captureResolvedInputs(root,'android',paths,gradle),approved={...empty,components:initial.noticeInputs.map(item=>review(item,'android'))};file('scripts/app-notice-provenance.json',approved);
  const coverage=resolveNoticeCoverage(initial.noticeInputs,approved,'android');file('assets/notices/third_party_notices.json',sourcePayload(coverage));
- runGit('init','--quiet');runGit('add','.');runGit('-c','user.name=Notice test','-c','user.email=notice-test@example.invalid','commit','--quiet','-m','Synthetic notice fixture');
+ runGit('init','--quiet');runGit('add','.');runGit('reset','--',ownSource);runGit('-c','user.name=Notice test','-c','user.email=notice-test@example.invalid','commit','--quiet','-m','Synthetic notice fixture');
+ assert.throws(()=>createNoticeSeal(root,'android',captureResolvedInputs(root,'android',paths,gradle)),'Even exact approved own text must be committed, not just untracked readable bytes.');
+ runGit('add',ownSource);runGit('-c','user.name=Notice test','-c','user.email=notice-test@example.invalid','commit','--quiet','-m','Commit synthetic own text');
  const capture=captureResolvedInputs(root,'android',paths,gradle),seal=createNoticeSeal(root,'android',capture);file('build/notices/android/seal.json',seal);
  for(const name of ['app.json','package-lock.json']){const before=readFileSync(join(root,name));file(name,Buffer.concat([before,Buffer.from(' ')]));assert.throws(()=>createNoticeSeal(root,'android',capture));file(name,before);}
  assert.throws(()=>createNoticeSeal(join(root,'node_modules'), 'android',capture));
@@ -164,6 +169,8 @@ test('actual verify CLI derives final components from map/native inputs and reje
  const pack=(extra=false,emptyRetained=false)=>execFileSync('python3',['-c',`import zipfile,sys\nwith zipfile.ZipFile(sys.argv[1],'w') as z:\n z.write(sys.argv[2],'assets/third_party_notices.json');z.write(sys.argv[3],'assets/index.android.bundle');z.writestr('lib/arm64-v8a/libqa.so',b'\\x7fELFcontrolled');z.writestr('assets/font.ttf','synthetic font bytes');z.writestr('third_party_licenses.txt',b'');z.writestr('third_party_licenses.json',sys.argv[7]);z.writestr('META-INF/NOTICE.json',b'' if sys.argv[5]=='yes' else sys.argv[7] if sys.argv[5]=='json' else sys.argv[6])\n if sys.argv[4]=='yes':z.writestr('assets/unknown-executable',b'\\xcf\\xfa\\xed\\xfecontrolled')`,apk,join(root,'assets/notices/third_party_notices.json'),bundle,extra?'yes':'no',emptyRetained===true?'yes':emptyRetained==='json'?'json':'no','{"notice":"Required synthetic native notice"}\n','{}\n']);
  const verify=()=>spawnSync(process.execPath,[fileURLToPath(new URL('./capture-app-notices.mjs',import.meta.url)),'verify','android','--gradle-input',gradle,'--archive',apk,'--bundle',bundle,'--source-map',map],{cwd:root,encoding:'utf8',timeout:30000});
  pack();assert.equal(verify().status,0);
+ const changedDeclaration=structuredClone(approved);changedDeclaration.knownLicenseSources[0].ownText.publisher.metadataSHA256='c'.repeat(64);file('scripts/app-notice-provenance.json',changedDeclaration);assert.equal(verify().status,1,'Final reinspection rejects changed own-text publisher provenance.');file('scripts/app-notice-provenance.json',approved);
+ const ownBytes=readFileSync(join(root,ownSource));file(ownSource,Buffer.concat([ownBytes,Buffer.from('changed')]));assert.equal(verify().status,1,'Final reinspection rejects changed own-text bytes.');file(ownSource,ownBytes);assert.equal(verify().status,0);
  file('babel.config.cjs','module.exports={presets:["changed-preset"]};\n');
  assert.deepEqual(captureResolvedInputs(root,'android',paths,gradle).sources,capture.sources,'The selected source paths/bytes remain identical.');
  assert.throws(()=>createNoticeSeal(root,'android',capture),'Unselected dirty tracked build configuration cannot be labeled HEAD.');assert.equal(verify().status,1);
@@ -328,3 +335,40 @@ test('actual pinned native polyfills and this app font asset route prove the two
  for(const platform of ['ios','android'])assert.deepEqual(extended.resolver.resolveRequest({originModulePath:join(process.cwd(),'node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf'),dev:false,customResolverOptions:{},resolveRequest(){throw new Error('Unintercepted asset request');}},registry,platform),{type:'sourceFile',filePath:'\0polyfill:assets-registry'});
  assert.ok(bundler._depGraph._fileSystem.expoVirtualModules.has('\0polyfill:assets-registry'));
 });
+
+function knownOwnTextFixture(run){return fixture(({root,file})=>{
+ const provenance=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))),pins=provenance.knownLicenseSources.filter(value=>value.ownText),installed=JSON.parse(readFileSync(new URL('../package-lock.json',import.meta.url))),paths=[];
+ assert.equal(pins.length,6);file('package-lock.json',{packages:Object.fromEntries(pins.map(pin=>[pin.ownText.packagePath,installed.packages[pin.ownText.packagePath]]))});
+ for(const pin of pins){for(const source of [pin.ownText.packageJSONSource,...pin.ownText.selectedSources.map(value=>value.source),pin.source])file(source,readFileSync(new URL('../'+source,import.meta.url)));paths.push(join(root,pin.ownText.selectedSources[0].source));}
+ const raw=()=>npmNoticeInputs(root,paths),capture=(ledger=provenance)=>addKnownOwnNoticeFiles(root,raw(),ledger);
+ return run({root,file,provenance,pins,paths,raw,capture});
+});}
+
+test('six exact npm own-text records append public attribution without component, parent or vendor approval',()=>knownOwnTextFixture(({root,provenance,pins,raw,capture})=>{
+ const before=raw(),items=capture();assert.equal(items.length,6);assert.equal(provenance.components.length,0);assert.ok(before.every(item=>item.notices.length===0));
+ for(const item of items){const pin=pins.find(pin=>pin.component===item.id);assert.equal(item.notices.length,1);assert.equal(item.notices[0].sha256,pin.sha256);assert.ok(Buffer.from(item.notices[0].body).equals(readFileSync(join(root,pin.source))));assert.equal(item.nativeInputs.ownAttribution.ownerNpmID,item.id);assert.deepEqual(item.nativeInputs.ownAttribution.publisherDeclaration,pin.ownText.publisher);assert.deepEqual(item.vendors,before.find(value=>value.id===item.id).vendors);}
+ const report=unreviewedOSSNoticeInputs(items,provenance);assert.equal(report.components.length,6);assert.equal(report.complete,false);assert.ok(!JSON.stringify(report).includes(root));assert.equal(resolveNoticeCoverage(items,provenance).status,'INCOMPLETE');assert.ok(resolveNoticeCoverage(items,provenance).unresolved.every(row=>row.reason==='unreviewed-component'));
+ assert.equal(unreviewedOSSNoticeInputs(items,{...provenance,knownLicenseSources:[]}).components.length,0);
+ for(const component of ['cocoapods:ExpoRouter@57.0.28','cocoapods:ExpoUI@57.0.25','cocoapods:Yoga@0.0.0'])assert.ok(!provenance.knownLicenseSources.some(pin=>pin.component===component));
+}));
+
+test('own-text matched selectors reject changed bytes, owners, lock pins and unknown fields without fallback',()=>knownOwnTextFixture(({root,file,provenance,pins,raw,capture})=>{
+ const pin=pins[0],mutate=(source,body)=>{const path=join(root,source),before=readFileSync(path);writeFileSync(path,body);assert.throws(capture);writeFileSync(path,before);};
+ for(const source of [pin.source,pin.ownText.packageJSONSource,pin.ownText.selectedSources[0].source])mutate(source,Buffer.concat([readFileSync(join(root,source)),Buffer.from('changed')]));
+ mutate(pin.source,'');const lock=JSON.parse(readFileSync(join(root,'package-lock.json')));for(const field of ['version','resolved','integrity']){const changed=structuredClone(lock);changed.packages[pin.ownText.packagePath][field]='changed';mutate('package-lock.json',JSON.stringify(changed));}
+ for(const update of [p=>p.ownText.kind='unknown',p=>p.ownText.ownerNpmID='npm:other@1',p=>p.ownText.packagePath='node_modules/other',p=>p.ownText.publisher.gitHead='a'.repeat(40),p=>p.ownText.publisher.metadataURL='https://private.invalid/',p=>p.ownText.extra='PRIVATE',p=>p.ownText.selectedSources[0].source='node_modules/other/private.js',p=>p.source='../PRIVATE']){const changed=structuredClone(provenance);update(changed.knownLicenseSources.find(value=>value.component===pin.component));assert.throws(()=>capture(changed));}
+ const old=join(root,pin.source),body=readFileSync(old);rmSync(old);symlinkSync(file('outside-private.txt',body),old);assert.throws(capture);rmSync(old);file(pin.source,body);
+ const foreign=file('node_modules/unknown/index.js','source');file('node_modules/unknown/package.json',{name:'unknown',version:'1',license:'MIT'});file('node_modules/unknown/LICENSE',mit);const changed=JSON.parse(readFileSync(join(root,'package-lock.json')));changed.packages['node_modules/unknown']={version:'1'};file('package-lock.json',changed);const unknown=npmNoticeInputs(root,[foreign]);assert.deepEqual(addKnownOwnNoticeFiles(root,unknown,provenance),unknown);
+ const current=raw()[0],version={...current,id:`npm:${current.name}@999`,version:'999'};assert.equal(addKnownOwnNoticeFiles(root,[version],provenance)[0].nativeInputs,undefined);
+}));
+
+test('reviewed publisher declarations and text-source provenance are fingerprinted, not runtime metadata verification',()=>knownOwnTextFixture(({provenance,pins,capture})=>{
+ const items=capture(),item=items.find(item=>item.id===pins[0].component),approved={schema:1,components:[review(item)]};assert.equal(resolveNoticeCoverage([item],approved).status,'READY');
+ for(const change of [pin=>pin.ownText.publisher.metadataSHA256='f'.repeat(64),pin=>{pin.ownText.publisher.gitHead='e'.repeat(40);pin.upstream=pin.upstream.replace(/[a-f0-9]{40}/,'e'.repeat(40));}]){const declaration=structuredClone(provenance);change(declaration.knownLicenseSources.find(pin=>pin.component===item.id));const changed=capture(declaration).find(value=>value.id===item.id);assert.equal(resolveNoticeCoverage([changed],approved).unresolved[0].reason,'native-source-digest-mismatch');}
+ const removed={...item,nativeInputs:{}};assert.equal(resolveNoticeCoverage([removed],approved).unresolved[0].reason,'native-source-digest-mismatch');const textDropped={...item,notices:[]};assert.equal(resolveNoticeCoverage([textDropped],approved).unresolved[0].reason,'missing-notice-text');
+}));
+
+test('injected own text preserves discovered NOTICEs and cannot satisfy vendored-source attribution',()=>knownOwnTextFixture(({root,file,provenance,pins})=>{
+ const pin=pins[0],source=file(pin.ownText.packagePath+'/vendor/separate/index.js','vendored source');file(pin.ownText.packagePath+'/NOTICE','Separate preserved NOTICE');
+ const original=npmNoticeInputs(root,[source])[0],item=addKnownOwnNoticeFiles(root,[original],provenance)[0];assert.ok(item.notices.some(value=>value.source===original.notices[0].source&&value.sha256===original.notices[0].sha256));assert.deepEqual(item.vendorNotices,original.vendorNotices);assert.equal(resolveNoticeCoverage([item],{schema:1,components:[review(item)]}).unresolved[0].reason,'missing-vendored-notice');
+}));
