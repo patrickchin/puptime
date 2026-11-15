@@ -38,19 +38,44 @@ const installFailureCodes=new Set([
 ]);
 const installCommandKinds=['adb-install','package-path','installed-apk-readback','unrecognized'];
 const installCodeDeclines=['not-install-command','process-state','output-type-or-size','stderr-frame','ambiguous-content','unlisted-code'];
+const ambiguityPredicates=['success-token','code-token-count','failure-marker-count'],countBuckets=['zero','one','multiple'];
+function diagnosticFields(value,names){
+ try{
+  if(!value||typeof value!=='object'||utilTypes.isProxy(value))return;
+  const fields={};for(const name of names){const descriptor=Object.getOwnPropertyDescriptor(value,name);if(descriptor&&!Object.hasOwn(descriptor,'value'))return;fields[name]=descriptor?.value;}return fields;
+ }catch{return;}
+}
+function installAmbiguity(content){
+ const successToken=/Success|INSTALL_SUCCEEDED/i.test(content),tokens=content.match(/\bINSTALL_(?:PARSE_)?FAILED_[A-Z_]+\b/gi)??[],markers=content.match(/\bFailure\s*\[/gi)??[];
+ if(!successToken&&tokens.length===1&&markers.length===1)return;
+ const bucket=count=>count===0?'zero':count===1?'one':'multiple';
+ return {firstPredicate:successToken?'success-token':tokens.length!==1?'code-token-count':'failure-marker-count',successToken,codeTokens:bucket(tokens.length),failureMarkers:bucket(markers.length),publicCodes:[...installFailureCodes].filter(code=>tokens.includes(code)).sort(),unknownCodeObserved:tokens.some(code=>!installFailureCodes.has(code))};
+}
+function finiteInstallAmbiguity(value){
+ const fields=diagnosticFields(value,['firstPredicate','successToken','codeTokens','failureMarkers','publicCodes','unknownCodeObserved']);if(!fields)return;
+ if(!ambiguityPredicates.includes(fields.firstPredicate)||typeof fields.successToken!=='boolean'||typeof fields.unknownCodeObserved!=='boolean'||!countBuckets.includes(fields.codeTokens)||!countBuckets.includes(fields.failureMarkers))return;
+ const expected=fields.successToken?'success-token':fields.codeTokens!=='one'?'code-token-count':fields.failureMarkers!=='one'?'failure-marker-count':undefined;if(fields.firstPredicate!==expected)return;
+ const codes=fields.publicCodes;if(utilTypes.isProxy(codes)||!Array.isArray(codes))return;
+ const length=diagnosticFields(codes,['length'])?.length;if(!Number.isSafeInteger(length)||length<0||length>installFailureCodes.size)return;
+ const publicCodes=[];for(let i=0;i<length;i++){const code=diagnosticFields(codes,[String(i)])?.[i];if(!installFailureCodes.has(code)||(i>0&&publicCodes[i-1]>=code))return;publicCodes.push(code);}
+ if(fields.codeTokens==='zero'&&(length||fields.unknownCodeObserved)||fields.codeTokens==='one'&&length+Number(fields.unknownCodeObserved)!==1||fields.codeTokens==='multiple'&&!length&&!fields.unknownCodeObserved)return;
+ return {firstPredicate:fields.firstPredicate,successToken:fields.successToken,codeTokens:fields.codeTokens,failureMarkers:fields.failureMarkers,publicCodes,unknownCodeObserved:fields.unknownCodeObserved};
+}
 // The first declined predicate describes this projection, never the cause or actual install mode.
 function installFailureProjection(result,path){
  const decline=installCodeDecline=>({installCodeDecline});
- if(!result||result.error||result.status!==1)return decline('process-state');
- if(typeof result.stdout!=='string'||typeof result.stderr!=='string'||Buffer.byteLength(result.stdout)>32768||Buffer.byteLength(result.stderr)>32768)return decline('output-type-or-size');
+ const fields=diagnosticFields(result,['error','status','stdout','stderr']);
+ if(!fields||fields.error||fields.status!==1)return decline('process-state');
+ const {stdout,stderr}=fields;
+ if(typeof stdout!=='string'||typeof stderr!=='string'||Buffer.byteLength(stdout)>32768||Buffer.byteLength(stderr)>32768)return decline('output-type-or-size');
  if(typeof path!=='string'||!path||/[\x00-\x1f\x7f\u2028\u2029]/.test(path))return decline('stderr-frame');
- const prefix='adb: failed to install '+path+': ';if(!result.stderr.startsWith(prefix))return decline('stderr-frame');
- const frame=result.stderr.slice(prefix.length),match=/^Failure \[(INSTALL_(?:PARSE_)?FAILED_[A-Z_]+)(?:: [^\x00-\x1f\x7f\u2028\u2029[\]]*)?\]\n{1,2}$/.exec(frame);
+ const prefix='adb: failed to install '+path+': ';if(!stderr.startsWith(prefix))return decline('stderr-frame');
+ const frame=stderr.slice(prefix.length),match=/^Failure \[(INSTALL_(?:PARSE_)?FAILED_[A-Z_]+)(?:: [^\x00-\x1f\x7f\u2028\u2029[\]]*)?\]\n{1,2}$/.exec(frame);
  if(!match||match[0]!==frame)return decline('stderr-frame');
  // stdout is not a pure mode/announcement protocol. Trust only the complete
  // owned-file stderr frame; report an observed ADB code, never its cause/mode.
- const content=result.stdout+'\n'+result.stderr;
- if(/Success|INSTALL_SUCCEEDED/i.test(content)||(content.match(/\bINSTALL_(?:PARSE_)?FAILED_[A-Z_]+\b/gi)??[]).length!==1||(content.match(/\bFailure\s*\[/gi)??[]).length!==1)return decline('ambiguous-content');
+ const ambiguity=installAmbiguity(stdout+'\n'+stderr);
+ if(ambiguity)return {...decline('ambiguous-content'),installCodeAmbiguity:ambiguity};
  if(!installFailureCodes.has(match[1]))return decline('unlisted-code');
  return {installCode:match[1]};
 }
@@ -70,8 +95,9 @@ function commandFailure(error,result,details){
  if(Number.isInteger(result.status)&&result.status>=0&&result.status<=255)value.status=result.status;
  if(installCommandKinds.includes(details?.commandKind)){
   value.commandKind=details.commandKind;
-  if(details.commandKind==='adb-install'&&installFailureCodes.has(details.installCode))value.installCode=details.installCode;
+  if(details.commandKind==='adb-install'&&details.installCodeDecline!=='ambiguous-content'&&installFailureCodes.has(details.installCode))value.installCode=details.installCode;
   else if(installCodeDeclines.includes(details.installCodeDecline))value.installCodeDecline=details.installCodeDecline;
+  if(value.commandKind==='adb-install'&&value.installCodeDecline==='ambiguous-content'){const ambiguity=finiteInstallAmbiguity(diagnosticFields(details,['installCodeAmbiguity'])?.installCodeAmbiguity);if(ambiguity)value.installCodeAmbiguity=ambiguity;}
  }
  commandFailures.set(error,value);return error;
 }
@@ -141,8 +167,41 @@ function installAssertionSelfCheck(){
  const command=commandFailure(capture(sites[0][1]),{status:1},{commandKind:'package-path',installCodeDecline:'not-install-command'});assert.deepEqual(finiteFailure(command,'original-install'),{class:'command-failed',status:1,commandKind:'package-path',installCodeDecline:'not-install-command'});assert.equal(getters,0);assert.equal(traps,0);
  console.log('PASS native assertion shapes, three closed install sites, UNKNOWN adversarial fields, no getter/proxy access and unchanged command-error precedence.');
 }
+function installAmbiguitySelfCheck(){
+ const secret='PRIVATE token=password /private/key.pem',unknown='INSTALL_FAILED_PRIVATE_TOKEN',path='/private/qa/bridge6.apk',first='INSTALL_FAILED_INVALID_APK',second='INSTALL_FAILED_UPDATE_INCOMPATIBLE';
+ const result=(stdout='',detail='',candidate=first)=>({status:1,stdout,stderr:'adb: failed to install '+path+': Failure ['+candidate+(detail?': '+detail:'')+']\n'});
+ const evidence=(firstPredicate,successToken,codeTokens,failureMarkers,publicCodes,unknownCodeObserved=false)=>({firstPredicate,successToken,codeTokens,failureMarkers,publicCodes,unknownCodeObserved});
+ const rows=[
+  [result('Success\n'+secret),evidence('success-token',true,'one','one',[first])],
+  [result('',first),evidence('code-token-count',false,'multiple','one',[first])],
+  [result(second),evidence('code-token-count',false,'multiple','one',[first,second])],
+  [result(unknown+' '+secret),evidence('code-token-count',false,'multiple','one',[first],true)],
+  [result('INSTALL_SUCCEEDED\n'+unknown+'\nFailure [transport]'),evidence('success-token',true,'multiple','multiple',[first],true)],
+  [result('Failure [transport] '+secret),evidence('failure-marker-count',false,'one','multiple',[first])],
+  [result(first.toLowerCase()),evidence('code-token-count',false,'multiple','one',[first],true)],
+  [result('Success','',unknown),evidence('success-token',true,'one','one',[],true)],
+ ];
+ for(const [input,expected] of rows){
+  const projected=installFailureProjection(input,path);assert.deepEqual(projected,{installCodeDecline:'ambiguous-content',installCodeAmbiguity:expected});assert.equal(projected.installCode,undefined);assert.deepEqual(finiteInstallAmbiguity(projected.installCodeAmbiguity),expected);
+  const original=new Error(secret),error=commandFailure(original,input,{commandKind:'adb-install',...projected,installCode:first});assert.equal(error,original);const finite=finiteFailure(error,'bridge-install');assert.deepEqual(finite,{class:'command-failed',status:1,commandKind:'adb-install',installCodeDecline:'ambiguous-content',installCodeAmbiguity:expected});for(const privateValue of [secret,unknown])assert.ok(!JSON.stringify(finite).includes(privateValue));
+ }
+ for(const code of installFailureCodes){const input=result('Success','',code),projected=installFailureProjection(input,path);assert.deepEqual(projected.installCodeAmbiguity.publicCodes,[code]);assert.equal(projected.installCodeAmbiguity.unknownCodeObserved,false);assert.equal(projected.installCode,undefined);}
+ assert.deepEqual(installFailureProjection(result(secret),path),{installCode:first});
+ assert.deepEqual(installAmbiguity(''),evidence('code-token-count',false,'zero','zero',[]));assert.equal(installAmbiguity('Failure ['+first+']'),undefined);
+ let getters=0,traps=0;const proxy=new Proxy(result(),{get(){traps++;throw new Error(secret);},getOwnPropertyDescriptor(){traps++;throw new Error(secret);}}),revoked=Proxy.revocable(result(),{});revoked.revoke();
+ for(const input of [proxy,revoked.proxy,Object.create(result()),{...result(),error:new Proxy({}, {get(){traps++;throw new Error(secret);}})}])assert.deepEqual(installFailureProjection(input,path),{installCodeDecline:'process-state'});
+ for(const field of ['error','status','stdout','stderr']){const input=result();Object.defineProperty(input,field,{get(){getters++;throw new Error(secret);}});assert.deepEqual(installFailureProjection(input,path),{installCodeDecline:'process-state'});}
+ const good=result('Success');for(const [input,reason] of [[{...good,status:0},'process-state'],[{...good,error:{code:'ETIMEDOUT'}},'process-state'],[{...good,stdout:Buffer.from(secret)},'output-type-or-size'],[{...good,stderr:'x'.repeat(32769)},'output-type-or-size'],[{...good,stdout:'x'.repeat(32769)},'output-type-or-size'],[{...good,stderr:good.stderr.replace(path,path+'-other')},'stderr-frame'],[{...good,stderr:good.stderr+'extra'},'stderr-frame']])assert.deepEqual(installFailureProjection(input,path),{installCodeDecline:reason});
+ const valid=rows[0][1],bad=[null,secret,{...valid,firstPredicate:secret},{...valid,successToken:secret},{...valid,codeTokens:2},{...valid,failureMarkers:secret},{...valid,publicCodes:[unknown]},{...valid,publicCodes:[first,first]},{...valid,publicCodes:[second,first]},{...valid,publicCodes:Array(50).fill(first)},{...valid,unknownCodeObserved:secret},{...valid,firstPredicate:'code-token-count'},{...valid,publicCodes:[first,second]},{...valid,publicCodes:[],unknownCodeObserved:false}];
+ for(const field of Object.keys(valid)){const input={...valid};Object.defineProperty(input,field,{get(){getters++;throw new Error(secret);}});bad.push(input);}
+ const array=[first];Object.defineProperty(array,0,{get(){getters++;throw new Error(secret);}});bad.push({...valid,publicCodes:array},{...valid,publicCodes:new Proxy([first],{get(){traps++;throw new Error(secret);}})},new Proxy(valid,{getOwnPropertyDescriptor(){traps++;throw new Error(secret);}}));
+ for(const input of bad)assert.equal(finiteInstallAmbiguity(input),undefined);
+ const details={commandKind:'adb-install',installCodeDecline:'ambiguous-content'};Object.defineProperty(details,'installCodeAmbiguity',{get(){getters++;throw new Error(secret);}});assert.deepEqual(finiteFailure(commandFailure(new Error(secret),good,details)),{class:'command-failed',status:1,commandKind:'adb-install',installCodeDecline:'ambiguous-content'});assert.equal(getters,0);assert.equal(traps,0);
+ console.log('PASS finite first-predicate/count buckets and literal public-code sets; ambiguous codes stay unaccepted, unknown tokens/private data/getters/proxies are excluded.');
+}
 function installCodeSelfCheck(){
  installAssertionSelfCheck();
+ installAmbiguitySelfCheck();
  const secret='PRIVATE token=password /private/key.pem',root='/private/qa',path=join(root,'bridge6.apk'),args=['-s','emulator-5588','install','-r',path];
  const result=(code,detail='',ending='\n\n')=>({status:1,stdout:'Performing Streamed Install\n',stderr:'adb: failed to install '+path+': Failure ['+code+(detail?': '+detail:'')+']'+ending});
  const stdoutVariants=['','Performing Streamed Install\n','Unrelated bounded progress\n','Performing Incremental Install\nPerforming Streamed Install\n'];
@@ -157,7 +216,7 @@ function installCodeSelfCheck(){
   ['unlisted-code',result('INSTALL_FAILED_UNKNOWN')],['unlisted-code',result('INSTALL_FAILED_UPDATE_INCOMPATIBLE_EXTRA')],['ambiguous-content',result('INSTALL_FAILED_UPDATE_INCOMPATIBLE',secret+' INSTALL_PARSE_FAILED_BAD_MANIFEST')],['ambiguous-content',result('INSTALL_FAILED_UPDATE_INCOMPATIBLE','Success')],['ambiguous-content',result('INSTALL_FAILED_UPDATE_INCOMPATIBLE','INSTALL_SUCCEEDED')],
   ...[result('INSTALL_FAILED_UPDATE_INCOMPATIBLE','nested [message]'),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE',secret+'\n'),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE',secret+'\u2028'),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE','',''),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE','','\n\n\n'),{...good,stderr:good.stderr+'Failure [INSTALL_FAILED_INVALID_APK]\n'},{...good,stderr:'prefix\n'+good.stderr},{...good,stderr:good.stderr.replace(']','')},{...good,stderr:good.stderr.replace('Failure [','Failure [prefix ')}].map(value=>['stderr-frame',value]),
  ];
- for(const [reason,value] of cases)assert.deepEqual(installFailureProjection(value,path),{installCodeDecline:reason});
+ for(const [reason,value] of cases){const projected=installFailureProjection(value,path);assert.equal(projected.installCodeDecline,reason);if(reason!=='ambiguous-content')assert.deepEqual(projected,{installCodeDecline:reason});else{assert.deepEqual(finiteInstallAmbiguity(projected.installCodeAmbiguity),projected.installCodeAmbiguity);assert.equal(projected.installCode,undefined);}}
  for(const value of [undefined,null,'',path+'wrong',path+'\n'])assert.deepEqual(installFailureProjection(good,value),{installCodeDecline:'stderr-frame'});
  assert.deepEqual(installFailureProjection({...good,stdout:''},path),{installCode:'INSTALL_FAILED_UPDATE_INCOMPATIBLE'});
  for(const [argv,kind] of [[['-s','emulator-5588','shell','pm','path',app],'package-path'],[['-s','emulator-5588','exec-out','cat','/data/app/synthetic/base.apk'],'installed-apk-readback'],[['-s','wrong','install','-r',path],'unrecognized']])assert.deepEqual(installCommandFailure('adb',argv,good,'bridge-install',root),{commandKind:kind,installCodeDecline:'not-install-command'});
