@@ -1,7 +1,7 @@
 # App notice capture and final-artifact gate
 
 This is incomplete build preparation. The source JSON currently contains the
-reviewed font/icon notices only. Forty-nine exact iOS inputs have attribution
+reviewed font/icon notices only. Seventy-four exact iOS inputs have attribution
 reviews; remaining component review and the incomplete payload prevent sealing.
 Source tests, an internal simulator build, and finding licence filenames
 do not establish complete app-library notice coverage or store readiness.
@@ -56,7 +56,16 @@ record names the approved official tar, with the fresh SRI proof retained in
 source-review evidence.
 No generic MIT allowlist or name-based native inheritance is permitted.
 
-Against the qualified82 inventory, 154 components plus one generated source
+Twenty-five exact React Native 0.86.3 source-Pod records cover their selected
+`ReactCommon/react` trees. Whole official npm tar/SRI, package, podspec and
+original Meta MIT bytes were verified. Every own podspec reads its licence from
+the same pinned package JSON. All 357 captured file entries (338 unique files)
+match published and installed source; public tree projections and the unchanged
+native-source scanner reproduce all 25 qualified82 fingerprints. Existing public
+text pins are reused; no new text, native vendor or generated input is approved.
+Dependencies and expanded transitive compile/link inputs remain separate.
+
+Against the qualified82 inventory, 129 components plus one generated source
 remain unreviewed. Of 109 recorded vendor boundaries, only the twelve specific
 own-product boundaries above are reviewed; the other 97 remain held. No new
 discovery, Android, packaged-native, retained-resource, payload or sealing

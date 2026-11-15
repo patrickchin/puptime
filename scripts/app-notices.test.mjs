@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
 import {execFileSync,spawnSync} from 'node:child_process';
-import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,realpathSync,chmodSync,symlinkSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,realpathSync,chmodSync,symlinkSync,cpSync,readdirSync} from 'node:fs';
 import {tmpdir} from 'node:os';
-import {join} from 'node:path';
+import {join,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import test from 'node:test';
 import {parse} from 'yaml';
 import {addKnownOwnNoticeFiles,npmNoticeInputs,nativeNoticeInput,resolveNoticeCoverage,assertSourceNoticePayload,publicNoticeReport,assertFinalNoticeEvidence,capturedSource,assertCapturedSources,assertFinalSourceMap,assertPackagedNativeCoverage,digest,unreviewedOSSNoticeInputs} from './app-notices.mjs';
 import {captureResolvedInputs,createNoticeSeal} from './capture-app-notices.mjs';
+import {podNoticeInputs} from './native-notice-inputs.mjs';
 
 const mit=readFileSync(new URL('../node_modules/react-native/LICENSE',import.meta.url),'utf8');
 function fixture(run){
@@ -459,9 +460,9 @@ test('three Expo product reviews bind exact native/notice maps and reject extra 
 
 const reviewedExpoJsComponents=["npm:expo-apple-authentication@57.0.2","npm:expo-application@57.0.3","npm:expo-asset@57.0.18","npm:expo-audio@57.0.5","npm:expo-blur@57.0.3","npm:expo-constants@57.0.22","npm:expo-crypto@57.0.4","npm:expo-document-picker@57.0.3","npm:expo-file-system@57.0.7","npm:expo-font@57.0.4","npm:expo-haptics@57.0.3","npm:expo-image-manipulator@57.0.21","npm:expo-image-picker@57.0.20","npm:expo-linking@57.0.13","npm:expo-modules-core@57.0.18","npm:expo-network@57.0.2","npm:expo-notifications@57.0.20","npm:expo-secure-store@57.0.4","npm:expo-sharing@57.0.21","npm:expo-speech-recognition@57.0.0","npm:expo-sqlite@57.0.4","npm:expo-status-bar@57.0.1","npm:expo-web-browser@57.0.3","npm:expo-widgets@57.0.26","npm:expo@57.0.24"];
 
-const expoJsSourceLedger=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url)));
+const expoJsSourceLedger=(()=>{const value=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url)));return {...value,components:value.components.slice(0,49)};})();
 const expoJsSourcePins=reviewedExpoJsComponents.map(component=>component==='npm:expo@57.0.24'?expoJsSourceLedger.knownLicenseSources.find(pin=>pin.component===component):expoJsSourceLedger.knownLicenseSources.slice(128).find(pin=>pin.component===component));
-test('actual49-record ledger preserves24 reviews and128 pins, adds24 exact pins and reuses Expo tuple',()=>{
+test('the explicit49 review fixture preserves24 reviews and128 pins, adds24 exact pins and reuses Expo tuple',()=>{
  assert.deepEqual(expoJsSourceLedger.components.map(value=>value.component),[...reviewedIosMITComponents,...reviewedRuntimeComponents,'cocoapods:ExpoFileSystem@57.0.7',...expoOwnProducts.map(([name,version])=>`cocoapods:${name}@${version}`),...reviewedExpoJsComponents]);assert.ok(expoJsSourceLedger.components.every(value=>value.platform==='ios'));assert.equal(expoJsSourceLedger.knownLicenseSources.length,152);assert.deepEqual(expoJsSourceLedger.knownLicenseSources.slice(128).map(pin=>pin.component),reviewedExpoJsComponents.filter(value=>value!=='npm:expo@57.0.24'));
  assert.deepEqual(expoJsSourcePins.at(-1),{component:'npm:expo@57.0.24',ecosystem:'npm',version:'57.0.24',public:true,source:'node_modules/expo/LICENSE',sha256:'fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4',upstream:'https://github.com/expo/expo/blob/sdk-57/LICENSE'});
 });
@@ -469,6 +470,40 @@ test('25 Expo JS reviews preserve all original notice bytes and explicit public 
  const items=capture(),coverage=resolveNoticeCoverage(items,approved),publicInput=unreviewedOSSNoticeInputs(items,approved),lock=JSON.parse(readFileSync(new URL('../package-lock.json',import.meta.url)));assert.equal(items.length,25);assert.equal(coverage.status,'READY');assert.equal(coverage.sections.length,25);assert.equal(publicInput.components.length,25);
  for(const pin of pins){const item=items.find(value=>value.id===pin.component),packagePath=pin.source.slice(0,pin.source.lastIndexOf('/')),record=approved.components.find(value=>value.component===item.id);assert.equal(record.upstream,lock.packages[packagePath].resolved);if(pin.component!=='npm:expo@57.0.24'){assert.equal(pin.upstream,lock.packages[packagePath].resolved);assert.equal(pin.upstreamIntegrity,lock.packages[packagePath].integrity);}assert.deepEqual(item.vendors,[]);assert.deepEqual(item.nativeInputs??{},{});assert.equal(item.notices.length,1);assert.equal(item.notices[0].sha256,pin.sha256);assert.ok(Buffer.from(item.notices[0].body).equals(readFileSync(join(root,pin.source))));assert.equal(record.sectionSHA256,pin.sha256);}
 },expoJsSourceLedger,expoJsSourcePins));
+
+const reviewedRNSourcePods=['React-debug','React-defaultsnativemodule','React-domnativemodule','React-featureflags','React-featureflagsnativemodule','React-graphics','React-idlecallbacksnativemodule','React-ImageManager','React-intersectionobservernativemodule','React-microtasksnativemodule','React-mutationobservernativemodule','React-NativeModulesApple','React-networking','React-performancecdpmetrics','React-performancetimeline','React-rendererconsistency','React-renderercss','React-rendererdebug','React-RuntimeApple','React-RuntimeCore','React-runtimescheduler','React-timing','React-utils','React-viewtransitionnativemodule','React-webperformancenativemodule'];
+const rnSourceLedger=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url)));
+const rnSourceRecords=rnSourceLedger.components.slice(49);
+function rnSourceFixture(run){return fixture(({root,file})=>{
+ const pkg='node_modules/react-native';
+ for(const source of new Set([pkg+'/package.json',pkg+'/LICENSE',...rnSourceRecords.map(record=>dirname(record.nativeInputs['cocoapods:'+record.component.split(':')[1].split('@')[0]].ownLicense.podspec.source))])){
+  const target=join(root,source);mkdirSync(dirname(target),{recursive:true});cpSync(new URL('../'+source,import.meta.url),target,{recursive:true});
+ }
+ const installed=JSON.parse(readFileSync(new URL('../package-lock.json',import.meta.url)));
+ file('package-lock.json',{packages:{[pkg]:installed.packages[pkg]}});
+ mkdirSync(join(root,'ios/Pods/Target Support Files'),{recursive:true});
+ const lock={PODS:reviewedRNSourcePods.map(name=>`${name} (0.86.3)`),'EXTERNAL SOURCES':Object.fromEntries(rnSourceRecords.map(record=>{const name=record.component.split(':')[1].split('@')[0];return [name,{':path':'../'+dirname(record.nativeInputs['cocoapods:'+name].ownLicense.podspec.source)}];}))};
+ file('ios/Podfile.lock',lock);return run({root,file,lock,capture:()=>podNoticeInputs(root),approved:rnSourceLedger});
+});}
+
+test('actual74-record ledger adds only25 exact RN source Pods without new public pins',()=>{
+ assert.equal(rnSourceLedger.components.length,74);assert.deepEqual(rnSourceLedger.components.slice(0,49),expoJsSourceLedger.components);assert.equal(rnSourceLedger.knownLicenseSources.length,152);
+ assert.deepEqual(rnSourceRecords.map(value=>value.component),reviewedRNSourcePods.map(name=>`cocoapods:${name}@0.86.3`));assert.ok(rnSourceLedger.components.every(value=>value.platform==='ios'));
+ let files=0;for(const record of rnSourceRecords){const name=record.component.split(':')[1].split('@')[0],key='cocoapods:'+name,input=record.nativeInputs[key];assert.deepEqual(Object.keys(record.nativeInputs),[key]);assert.deepEqual(record.reviewedVendors,[]);assert.deepEqual(Object.keys(input),['sha256','files','excludedBuildPaths','ownLicense']);assert.deepEqual(input.excludedBuildPaths,[]);assert.equal(input.ownLicense.ownerNpmID,'npm:react-native@0.86.3');assert.equal(input.ownLicense.sourceKind,'path');assert.ok(input.ownLicense.podspec.source.startsWith('node_modules/react-native/ReactCommon/react/'));assert.deepEqual(record.notices,[{source:'node_modules/react-native/LICENSE',sha256:digest(mit)}]);assert.equal(record.sectionSHA256,digest(mit));files+=input.files;}
+ assert.equal(files,357);
+});
+test('25 actual source-Pod captures match approved native fingerprints and original MIT bytes',()=>rnSourceFixture(({capture,approved})=>{
+ const input=capture();assert.deepEqual(input.unresolved,[]);assert.equal(input.components.length,25);const coverage=resolveNoticeCoverage(input.components,approved);assert.equal(coverage.status,'READY');assert.equal(coverage.sections.length,25);assert.equal(unreviewedOSSNoticeInputs(input.components,approved).components.length,25);
+ for(const item of input.components){const record=approved.components.find(value=>value.component===item.id);assert.deepEqual(item.nativeInputs,record.nativeInputs);assert.deepEqual(item.vendors,[]);assert.deepEqual(item.vendorNotices,{});assert.equal(item.notices.length,1);assert.equal(item.notices[0].body,mit);assert.deepEqual(item.notices.map(({source,sha256})=>({source,sha256})),record.notices);}
+ assert.throws(()=>assertSourceNoticePayload(Buffer.from(JSON.stringify([font])+'\n'),coverage,fonts));
+}));
+test('RN source reviews reject actual source, own-text and selector drift without sibling or Android approval',()=>rnSourceFixture(({root,file,lock,capture,approved})=>{
+ const items=capture().components,first=items.find(value=>value.name==='React-debug');assert.equal(resolveNoticeCoverage(items,expoJsSourceLedger).unresolved.length,25);assert.equal(resolveNoticeCoverage(items,approved,'android').unresolved.length,25);
+ assert.equal(resolveNoticeCoverage([{...first,id:'cocoapods:React-UnreviewedSibling@0.86.3'}],approved).unresolved[0].reason,'unreviewed-component');assert.equal(resolveNoticeCoverage([{...first,id:'cocoapods:React-debug@999',version:'999'}],approved).unresolved[0].reason,'unreviewed-component');assert.equal(resolveNoticeCoverage([{...first,vendors:['vendor/unreviewed']}],approved).unresolved[0].reason,'unreviewed-vendored-source');
+ const selected=dirname(first.nativeInputs['cocoapods:React-debug'].ownLicense.podspec.source),source=join(selected,readdirSync(join(root,selected)).find(name=>/\.(cpp|h)$/.test(name))),before=readFileSync(join(root,source));file(source,Buffer.concat([before,Buffer.from('\n// Unreviewed source drift\n')]));assert.equal(resolveNoticeCoverage(capture().components,approved).unresolved.find(value=>value.component===first.id).reason,'native-source-digest-mismatch');file(source,before);
+ const text=readFileSync(join(root,'node_modules/react-native/LICENSE'));file('node_modules/react-native/LICENSE',Buffer.concat([text,Buffer.from('UNREVIEWED_TEXT')]));assert.throws(capture,/Bound licence input bytes changed/);file('node_modules/react-native/LICENSE',text);
+ lock['EXTERNAL SOURCES']['React-debug'][':path']='../node_modules/react-native/ReactCommon/react/featureflags';file('ios/Podfile.lock',lock);assert.throws(capture,/Require the exact selected Pod source|Expected values/);
+}));
 test('Expo JavaScript review cannot infer Pod/native/vendor, unknown, changed text/NOTICE or Android approval',()=>runtimeNoticeFixture(({root,file,approved,pins,capture})=>{
  const items=capture();for(const item of items){const changed=structuredClone(item);changed.nativeInputs={unreviewedNative:true};assert.equal(resolveNoticeCoverage([changed],approved).unresolved[0].reason,'native-source-digest-mismatch');assert.equal(resolveNoticeCoverage([{...item,id:item.id+'-unknown'}],approved).unresolved[0].reason,'unreviewed-component');assert.equal(resolveNoticeCoverage([{...item,id:item.id.slice(0,item.id.lastIndexOf('@')+1)+'999',version:'999'}],approved).unresolved[0].reason,'unreviewed-component');}
  assert.equal(resolveNoticeCoverage(items,approved,'android').unresolved.length,25);const font=items.find(value=>value.id==='npm:expo-font@57.0.4'),speech=items.find(value=>value.id==='npm:expo-speech-recognition@57.0.0');assert.equal(resolveNoticeCoverage([{...font,id:'cocoapods:ExpoFont@57.0.4',name:'ExpoFont',ecosystem:'cocoapods'}],approved).unresolved[0].reason,'native-source-digest-mismatch');assert.equal(resolveNoticeCoverage([{...speech,id:'cocoapods:ExpoSpeechRecognition@57.0.0',name:'ExpoSpeechRecognition',ecosystem:'cocoapods'}],approved).unresolved[0].reason,'unreviewed-component');
