@@ -9,6 +9,9 @@ import {podNoticeInputs,gradleNoticeInputs,unionNoticeInputs,inspectNoticeArchiv
 import {assertPackagedNativeCoverage,assertSourceNoticePayload,digest,npmNoticeInputs,resolveNoticeCoverage,nativeSourceNotices,unreviewedOSSNoticeInputs} from './app-notices.mjs';
 const require=createRequire(import.meta.url),plist=require('@expo/plist');
 const mit=readFileSync(new URL('../node_modules/react-native/LICENSE',import.meta.url),'utf8');
+test('archive native hashing streams bounded bytes and preserves CRC, size and nonnative failure gates',()=>{
+ execFileSync('python3',[new URL('./notice-archive.test.py',import.meta.url).pathname],{stdio:['ignore','pipe','pipe'],timeout:30000});
+});
 const approval=(item,platform='ios')=>({schema:1,components:[{platform,component:item.id,reviewedVendors:item.vendors,nativeInputs:item.nativeInputs??{},notices:item.notices.map(({source,sha256})=>({source,sha256})),upstream:'https://example.invalid/pinned/native',sectionSHA256:digest([...item.notices].sort((a,b)=>a.source.localeCompare(b.source)).map(value=>value.body).join('\n\n'))}]});
 function fixture(run){
  const root=mkdtempSync(join(tmpdir(),'puptime-native-notice-'));

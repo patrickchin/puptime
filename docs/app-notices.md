@@ -70,8 +70,17 @@ Pod operation survives outer graph/union context. No bound is raised on failure.
 Gradle archive inspection failures use the fixed `gradle-archive-scan`/`maven`
 context with the existing canonical component ID's SHA and the archive SHA
 already verified against its bytes. This wraps only the original Python call;
-its invocation, bounds, strict exit and exception remain unchanged. Child output
+its invocation, strict exit and exception remain unchanged. Child output
 and paths are not copied into this context.
+
+Native archive entries have a separate 192 MiB cap and SHA-256 is streamed in
+1 MiB chunks through ZIP EOF/CRC validation, requiring the declared byte count.
+Text (1 MiB each/16 MiB total), payload (16 MiB), bundle and nested JAR (128 MiB)
+bounds remain unchanged. The exact public React Android 0.86.3 release AAR
+(`59b66e453d8775a54df66a321c0d5002b98716d68c4bd9edb8e64d7110ff8d28`)
+has 32 native entries; its largest is 140,693,272 bytes, above the previous
+128 MiB shared bound. This establishes the scoped size failure, not complete
+notice coverage or a qualified app artifact.
 
 The Gradle init script requires an explicit absolute `noticeMainProjectRoot` and
 compares canonical project directories before registering its task. Other

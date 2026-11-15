@@ -12,6 +12,24 @@ from pathlib import Path, PurePosixPath
 MAX_TEXT = 1024 * 1024
 MAX_TOTAL_TEXT = 16 * MAX_TEXT
 MAX_NESTED = 128 * MAX_TEXT
+MAX_NATIVE = 192 * MAX_TEXT
+NATIVE_CHUNK = MAX_TEXT
+
+
+def native_digest(archive, entry):
+    if entry.file_size > MAX_NATIVE:
+        raise ValueError("Oversized native input")
+    digest = hashlib.sha256()
+    observed = 0
+    with archive.open(entry) as stream:
+        while chunk := stream.read(NATIVE_CHUNK):
+            observed += len(chunk)
+            if observed > entry.file_size or observed > MAX_NATIVE:
+                raise ValueError("Native input size mismatch")
+            digest.update(chunk)
+    if observed != entry.file_size:
+        raise ValueError("Native input size mismatch")
+    return digest.hexdigest()
 
 
 def is_macho(archive, entry):
@@ -80,9 +98,7 @@ def inspect_archive(path, payload_path=None, bundle_path=None):
                         raise ValueError("Unreadable notice")
                     result["notices"].append({"source": logical, "body": body, "sha256": hashlib.sha256(raw).hexdigest()})
                 if name.endswith(".so") or is_macho(archive, entry):
-                    if entry.file_size > MAX_NESTED:
-                        raise ValueError("Oversized native input")
-                    result["nativeFiles"].append({"path": logical, "sha256": hashlib.sha256(archive.read(entry)).hexdigest()})
+                    result["nativeFiles"].append({"path": logical, "sha256": native_digest(archive, entry)})
                 if depth == 0 and name.endswith(".jar"):
                     if entry.file_size > MAX_NESTED:
                         raise ValueError("Oversized nested SDK archive")
