@@ -5,6 +5,15 @@ reviewed font/icon notices only. An empty component ledger deliberately prevents
 sealing. Source tests, an internal simulator build, and finding licence filenames
 do not establish complete app-library notice coverage or store readiness.
 
+The own-package source records additionally bind 97 selected RN/Expo Pods to
+28 exact public NPM owners. Package, podspec and original MIT text hashes match
+lock-integrity-verified published tarballs; each reviewed podspec reads its own
+package licence. The 91 literal directory/6 exact podspec forms use the existing
+strict binding helper. These records preserve own-package attribution only.
+ExpoRouter/ExpoUI without own text, Yoga, the six missing-text NPM components,
+Metro prelude, and every vendor/generated boundary remain independently
+unresolved. The component-approval ledger and offline payload are unchanged.
+
 ## Stable offline resource
 
 `assets/notices/third_party_notices.json` is a **committed platform union** of

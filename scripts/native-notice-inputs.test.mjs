@@ -18,12 +18,33 @@ function fixture(run){
  const file=(path,body)=>{mkdirSync(join(root,path,'..'),{recursive:true});writeFileSync(join(root,path),typeof body==='string'||Buffer.isBuffer(body)?body:JSON.stringify(body));return join(root,path);};
  try{return run({root,file});}finally{rmSync(root,{recursive:true,force:true});}
 }
-function ownLicenseFixture(run){return fixture(({root,file})=>{
- const provenance=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))),pins=provenance.knownLicenseSources.filter(value=>value.ownerNpmID),installed=JSON.parse(readFileSync(new URL('../package-lock.json',import.meta.url))),lock={PODS:[], 'EXTERNAL SOURCES':{}};
- assert.equal(pins.length,3);file('package-lock.json',{packages:Object.fromEntries(pins.map(pin=>[pin.packagePath,installed.packages[pin.packagePath]]))});mkdirSync(join(root,'ios/Pods/Target Support Files'),{recursive:true});
+const initialOwnComponents=new Set(['cocoapods:ExpoAppleAuthentication@57.0.2','cocoapods:ExpoFileSystem@57.0.7','cocoapods:ExpoAdapterGoogleSignIn@16.1.5']);
+function ownLicenseFixture(run,{batch=false}={}){return fixture(({root,file})=>{
+ const provenance=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))),pins=provenance.knownLicenseSources.filter(value=>value.ownerNpmID&&(batch?!initialOwnComponents.has(value.component):initialOwnComponents.has(value.component))),installed=JSON.parse(readFileSync(new URL('../package-lock.json',import.meta.url))),lock={PODS:[], 'EXTERNAL SOURCES':{}};
+ assert.equal(pins.length,batch?97:3);file('package-lock.json',{packages:Object.fromEntries(pins.map(pin=>[pin.packagePath,installed.packages[pin.packagePath]]))});mkdirSync(join(root,'ios/Pods/Target Support Files'),{recursive:true});
  for(const pin of pins){const name=pin.component.slice('cocoapods:'.length,-pin.version.length-1);lock.PODS.push(name+' ('+pin.version+')');lock['EXTERNAL SOURCES'][name]={[':'+pin.sourceKind]:'../'+(pin.sourceKind==='path'?dirname(pin.podspecSource):pin.podspecSource)};for(const path of [pin.packageJSONSource,pin.podspecSource,pin.source])file(path,readFileSync(new URL('../'+path,import.meta.url)));file('ios/Pods/'+name+'/source.m','Synthetic alternate Pod root for source-form negatives');if(pin.sourceKind==='podspec')for(const arch of ['ios-arm64','ios-arm64_x86_64-simulator'])file('ios/Pods/'+name+'/'+name+'.xcframework/'+arch+'/'+name+'.framework/Info.plist','Synthetic framework source inventory');}
  file('ios/Podfile.lock',lock);return run({root,file,pins,lock,provenance,capture:()=>podNoticeInputs(root).components});
 });}
+
+test('97 explicit RN and Expo own-package bindings resolve exact selected forms without component or vendor approval',()=>ownLicenseFixture(({root,pins,provenance,capture})=>{
+ const items=capture();assert.equal(items.length,97);assert.equal(new Set(pins.map(value=>value.ownerNpmID)).size,28);assert.equal(pins.filter(value=>value.sourceKind==='path').length,91);assert.equal(provenance.components.length,0);
+ for(const pin of pins){const item=items.find(value=>value.id===pin.component),bytes=readFileSync(new URL('../'+pin.source,import.meta.url));assert.ok(item);assert.equal(item.nativeInputs['cocoapods:'+item.name].ownLicense.ownerNpmID,pin.ownerNpmID);assert.ok(item.notices.some(notice=>notice.source===pin.source&&notice.sha256===pin.sha256&&Buffer.from(notice.body).equals(bytes)));assert.ok(!JSON.stringify(item).includes(root));}
+ const publicInput=unreviewedOSSNoticeInputs(items,provenance);assert.equal(publicInput.components.length,97);assert.equal(publicInput.complete,false);assert.equal(resolveNoticeCoverage(items,provenance).status,'INCOMPLETE');
+ const vendored=items.filter(item=>item.vendors.length);assert.equal(vendored.length,6);for(const item of vendored)assert.ok(resolveNoticeCoverage([item],approval(item)).unresolved.some(value=>value.reason==='missing-vendored-notice'));
+ for(const component of ['cocoapods:ExpoRouter@57.0.28','cocoapods:ExpoUI@57.0.25','cocoapods:Yoga@0.0.0'])assert.ok(!provenance.knownLicenseSources.some(value=>value.component===component));
+},{batch:true}));
+
+test('the explicit batch rejects changed spec, root, form, package version and licence bytes; unknown siblings gain no binding',()=>ownLicenseFixture(({file,pins,lock,capture})=>{
+ const selected=[pins.find(value=>value.ownerNpmID==='npm:react-native@0.86.3'&&value.sourceKind==='path'),pins.find(value=>value.ownerNpmID!=='npm:react-native@0.86.3'&&value.sourceKind==='path'),pins.find(value=>value.sourceKind==='podspec')];
+ const mutate=(path,bytes)=>{const before=readFileSync(path);writeFileSync(path,bytes);assert.throws(capture);writeFileSync(path,before);};
+ for(const pin of selected){const name=pin.component.slice('cocoapods:'.length,-pin.version.length-1);
+  for(const source of [pin.podspecSource,pin.source]){const path=file(source,readFileSync(new URL('../'+source,import.meta.url)));mutate(path,Buffer.concat([readFileSync(path),Buffer.from('\nChanged synthetic bytes')]));}
+  const pkgPath=file(pin.packageJSONSource,readFileSync(new URL('../'+pin.packageJSONSource,import.meta.url))),pkg=JSON.parse(readFileSync(pkgPath));mutate(pkgPath,JSON.stringify({...pkg,version:'999.0.0'}));
+  const alternate=pin.packagePath+'/alternate-pod-root';file(alternate+'/source.m','Synthetic adjacent source');for(const external of [{':path':'../'+alternate},{[pin.sourceKind==='path'?':podspec':':path']:'../'+(pin.sourceKind==='path'?pin.podspecSource:dirname(pin.podspecSource))}]){file('ios/Podfile.lock',{...lock,'EXTERNAL SOURCES':{...lock['EXTERNAL SOURCES'],[name]:external}});assert.throws(capture);}file('ios/Podfile.lock',lock);
+ }
+ const pin=selected[0],sibling='UnreviewedRNSibling';file('ios/Podfile.lock',{...lock,PODS:[...lock.PODS,sibling+' ('+pin.version+')'],'EXTERNAL SOURCES':{...lock['EXTERNAL SOURCES'],[sibling]:{':path':'../'+dirname(pin.podspecSource)}}});let item=capture().find(value=>value.name===sibling);assert.equal(item.nativeInputs['cocoapods:'+sibling].ownLicense,undefined);
+ const name=pin.component.slice('cocoapods:'.length,-pin.version.length-1);file('ios/Podfile.lock',{...lock,PODS:lock.PODS.map(value=>value===name+' ('+pin.version+')'?name+' (999.0.0)':value)});item=capture().find(value=>value.name===name);assert.equal(item.nativeInputs['cocoapods:'+name].ownLicense,undefined);
+},{batch:true}));
 
 test('three explicitly bound Pods retain exact own-package text without approving their vendor coverage',()=>ownLicenseFixture(({root,pins,provenance,capture})=>{
  const items=capture();assert.equal(items.length,3);assert.equal(provenance.components.length,0);assert.equal(resolveNoticeCoverage(items,provenance).status,'INCOMPLETE');
