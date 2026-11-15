@@ -39,6 +39,15 @@ test('geometry is a clipped nonnegative intersection only, never an occlusion or
  children(value)[1].attributes.text=body('expo-vector-icons').trim();children(value)[1].attributes.accessibilityText=secret;assert.equal(nativeFontNoticeOutcome(value).staticBodySection,'UNKNOWN');
 });
 
+test('pinned TreeNode shape may expose known controls as AX siblings rather than React ancestors',()=>{
+ const original=tree(),modal={...original,children:[]},scroll={...original.children[0],children:[]};
+ // IOSDriver recursively maps the AX tree; TestOutputWriter omits empty fields.
+ const flat={children:[modal,scroll,...children(original)].map(({attributes})=>({attributes}))};
+ const result=nativeFontNoticeOutcome(flat);assert.equal(result.status,'KNOWN');assert.equal(result.ancestry,'UNKNOWN');assert.equal(result.staticBodySection,'expo-vector-icons');
+ assert.deepEqual(result.controls,nativeFontNoticeOutcome(original).controls);
+ flat.children.push({...modal});assert.deepEqual(nativeFontNoticeOutcome(flat),unknown);
+});
+
 test('missing, duplicate, malformed and unsupported structures fail closed without secret-bearing output',()=>{
  const cases=[null,[],{},node('fontLicenses.body','[0,0][402,874]'),tree(),tree(),tree(),tree(),tree(),tree(),tree(),tree()];
  cases[4].children.push(cases[4].children[0]);

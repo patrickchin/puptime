@@ -39,23 +39,22 @@ const nonempty=value=>value&&value.x>=0&&value.y>=0&&value.width>0&&value.height
 
 export function nativeFontNoticeOutcome(root){
  try{
-  const found=new Map(ids.map(id=>[id,[]])),pending=[[root,0,false,false]],bodyMatches=[];let nodes=0;
+  const found=new Map(ids.map(id=>[id,[]])),pending=[[root,0]],bodyMatches=[];let nodes=0;
   while(pending.length){
-   const [node,depth,inModal,inBody]=pending.pop();
+   const [node,depth]=pending.pop();
    if(++nodes>4096||depth>64||!object(node))return unknown();
    const attrs=node.attributes??{},children=node.children??[];
    if(!object(attrs)||!Array.isArray(children)||children.length>4096||Object.values(attrs).some(value=>typeof value!=='string'))return unknown();
-   const id=attrs['resource-id'],modal=inModal||id==='screen.fontLicenses',body=inBody||id==='fontLicenses.body';
+   const id=attrs['resource-id'];
    if(found.has(id)){
-    if((id==='fontLicenses.body'&&!inModal)||(id.startsWith('fontLicenses.')&&id!=='fontLicenses.body'&&!inBody))return unknown();
     const values=found.get(id);values.push(rect(attrs.bounds));if(values.length>1)return unknown();
    }
-   if(inBody){
+   {
     const matched=new Set(['text','accessibilityText','value'].map(key=>bodies.get(attrs[key])).filter(Boolean));
     if(matched.size>1)return unknown();
     if(matched.size===1)bodyMatches.push({section:[...matched][0],rect:rect(attrs.bounds)});
    }
-   pending.push(...children.map(child=>[child,depth+1,modal,body]));
+   pending.push(...children.map(child=>[child,depth+1]));
   }
   const modal=found.get('screen.fontLicenses')[0],body=found.get('fontLicenses.body')[0];
   if(!nonempty(modal)||!nonempty(body))return unknown();
@@ -67,7 +66,8 @@ export function nativeFontNoticeOutcome(root){
   if(bodyMatches.some(value=>!value.rect))return unknown();
   const matching=bodyMatches.filter(value=>nonempty(intersection(value.rect,viewport)));
   if(matching.length>1)return unknown();
-  return {status:'KNOWN',controls,staticBodySection:matching[0]?.section??'UNKNOWN'};
+  // XCTest AX parents are not a contract for the React component ancestry.
+  return {status:'KNOWN',ancestry:'UNKNOWN',controls,staticBodySection:matching[0]?.section??'UNKNOWN'};
  }catch{return unknown();}
 }
 
