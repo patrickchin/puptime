@@ -261,7 +261,7 @@ test('actual discovery setup trap keeps original failures and writes finite phas
 
 test('the explicit Expo virtual IDs resolve only to their pinned installed provider',()=>{
  assert.equal(digest('\0polyfill:external-require'),'f32cbb35a430d4c6ee0f555a934acc8f6a83aff8e2b19c414f6d756479b8f03e');
- const provenance=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url)));
+ const provenance={...JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))),components:[]};
  for(const id of ['\0polyfill:external-require','\0polyfill:environment-variables','\0polyfill:assets-registry']){
  const result=capturedSource(process.cwd(),id,provenance);
  assert.deepEqual(result,{path:id,generated:true,provider:'node_modules/expo/node_modules/@expo/cli/build/src/start/server/metro/withMetroMultiPlatform.js',sha256:'50012292a38cb679ca3f692c5a462de57bebe0f69d5c862e937141a3fc54343f',component:'npm:@expo/cli@57.0.26'});
@@ -337,7 +337,7 @@ test('actual pinned native polyfills and this app font asset route prove the two
 });
 
 function knownOwnTextFixture(run){return fixture(({root,file})=>{
- const provenance=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))),pins=provenance.knownLicenseSources.filter(value=>value.ownText&&value.ecosystem==='npm'),installed=JSON.parse(readFileSync(new URL('../package-lock.json',import.meta.url))),paths=[];
+ const provenance={...JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))),components:[]},pins=provenance.knownLicenseSources.filter(value=>value.ownText&&value.ecosystem==='npm'),installed=JSON.parse(readFileSync(new URL('../package-lock.json',import.meta.url))),paths=[];
  assert.equal(pins.length,6);file('package-lock.json',{packages:Object.fromEntries(pins.map(pin=>[pin.ownText.packagePath,installed.packages[pin.ownText.packagePath]]))});
  for(const pin of pins){for(const source of [pin.ownText.packageJSONSource,...pin.ownText.selectedSources.map(value=>value.source),pin.source])file(source,readFileSync(new URL('../'+source,import.meta.url)));paths.push(join(root,pin.ownText.selectedSources[0].source));}
  const raw=()=>npmNoticeInputs(root,paths),capture=(ledger=provenance)=>addKnownOwnNoticeFiles(root,raw(),ledger);
@@ -370,4 +370,31 @@ test('reviewed publisher declarations and text-source provenance are fingerprint
 test('injected own text preserves discovered NOTICEs and cannot satisfy vendored-source attribution',()=>knownOwnTextFixture(({root,file,provenance,pins})=>{
  const pin=pins[0],source=file(pin.ownText.packagePath+'/vendor/separate/index.js','vendored source');file(pin.ownText.packagePath+'/NOTICE','Separate preserved NOTICE');
  const original=npmNoticeInputs(root,[source])[0],item=addKnownOwnNoticeFiles(root,[original],provenance)[0];assert.ok(item.notices.some(value=>value.source===original.notices[0].source&&value.sha256===original.notices[0].sha256));assert.deepEqual(item.vendorNotices,original.vendorNotices);assert.equal(resolveNoticeCoverage([item],{schema:1,components:[review(item)]}).unresolved[0].reason,'missing-vendored-notice');
+}));
+
+const reviewedIosMITComponents=['npm:@react-native/assets-registry@0.86.3','npm:@react-native/js-polyfills@0.86.3','npm:@react-native/normalize-colors@0.86.3','npm:@react-native/virtualized-lists@0.86.3','npm:qrcode-generator@2.0.4'];
+test('five exact iOS MIT reviews qualify only their actual captured owning provenance and original bodies',()=>knownOwnTextFixture(({root,capture})=>{
+ const approved=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))),items=capture(),coverage=resolveNoticeCoverage(items,approved);
+ assert.deepEqual(approved.components.map(value=>value.component),reviewedIosMITComponents);assert.ok(approved.components.every(value=>value.platform==='ios'));
+ assert.equal(coverage.status,'INCOMPLETE');assert.deepEqual(coverage.unresolved,[{component:'npm:@expo/ui@57.0.25',reason:'unreviewed-component'}]);assert.equal(coverage.sections.length,5);
+ for(const record of approved.components){const item=items.find(value=>value.id===record.component),section=coverage.sections.find(value=>value.id==='library-'+digest('ios:'+item.id).slice(0,24));assert.deepEqual(item.nativeInputs,record.nativeInputs);assert.ok(Buffer.from(section.body).equals(readFileSync(join(root,item.notices[0].source))));assert.equal(digest(section.body),record.sectionSHA256);assert.equal(section.iosOnly,true);assert.equal(section.androidOnly,undefined);}
+}));
+
+test('the five reviews reject owning-source/notice/native drift, vendors and inferred sibling or Android approval',()=>knownOwnTextFixture(({capture})=>{
+ const approved=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))),items=capture().filter(value=>reviewedIosMITComponents.includes(value.id));
+ const reject=(item,change,reason)=>{const changed=structuredClone(item);change(changed);assert.equal(resolveNoticeCoverage([changed],approved).unresolved[0].reason,reason);};
+ for(const item of items){
+  reject(item,value=>value.nativeInputs.ownAttribution.packageJSON.sha256='f'.repeat(64),'native-source-digest-mismatch');
+  reject(item,value=>value.notices[0].sha256='f'.repeat(64),'notice-set-or-digest-mismatch');
+  reject(item,value=>value.nativeInputs.unreviewedNativeInput={sha256:'f'.repeat(64)},'native-source-digest-mismatch');
+  reject(item,value=>value.vendors.push('Unreviewed.xcframework'),'unreviewed-vendored-source');
+  reject(item,value=>{value.id+='-unknown-sibling';},'unreviewed-component');
+  reject(item,value=>{value.id=value.id.slice(0,value.id.lastIndexOf('@')+1)+'999';value.version='999';},'unreviewed-component');
+ }
+ assert.equal(resolveNoticeCoverage(items,approved,'android').unresolved.length,5);assert.ok(resolveNoticeCoverage(items,approved,'android').unresolved.every(value=>value.reason==='unreviewed-component'));
+}));
+
+test('five component reviews cannot seal the unchanged font-only payload',()=>knownOwnTextFixture(({capture})=>{
+ const approved=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))),items=capture().filter(value=>reviewedIosMITComponents.includes(value.id)),coverage=resolveNoticeCoverage(items,approved),payload=readFileSync(new URL('../assets/notices/third_party_notices.json',import.meta.url)),fontProvenance=JSON.parse(readFileSync(new URL('./font-icon-provenance.json',import.meta.url)));
+ assert.equal(coverage.status,'READY');assert.throws(()=>assertSourceNoticePayload(payload,coverage,approved,fontProvenance),/Actual included library differs from the committed union/);
 }));

@@ -1,8 +1,9 @@
 # App notice capture and final-artifact gate
 
 This is incomplete build preparation. The source JSON currently contains the
-reviewed font/icon notices only. An empty component ledger deliberately prevents
-sealing. Source tests, an internal simulator build, and finding licence filenames
+reviewed font/icon notices only. Five exact iOS npm inputs have attribution
+reviews; remaining component review and the incomplete payload prevent sealing.
+Source tests, an internal simulator build, and finding licence filenames
 do not establish complete app-library notice coverage or store readiness.
 
 The own-package source records additionally bind 97 selected RN/Expo Pods to
@@ -12,7 +13,18 @@ package licence. The 91 literal directory/6 exact podspec forms use the existing
 strict binding helper. These records preserve own-package attribution only.
 The additional six npm and three Pod own-text records below do not approve
 component coverage. Metro prelude and every vendor/generated boundary remain
-independently unresolved. The component ledger and offline payload are unchanged.
+independently unresolved. The offline payload is unchanged.
+
+The first component batch is iOS-only: `@react-native/assets-registry`,
+`js-polyfills`, `normalize-colors` and `virtualized-lists` at 0.86.3, plus
+`qrcode-generator` at 2.0.4. Their exact captured `ownAttribution` fingerprints
+and original MIT notices match discovery 43682437095 at source82cede4. All 20 selected
+JS files matched installed bytes and exact SHA512-pinned cached official tar
+members. None has a selected generated source, vendor boundary or extra native
+input. Against that inventory, 198 components plus one generated source remain
+unreviewed, with all 109 recorded vendor boundaries still requiring their
+applicable review. These five records grant no Android, vendor, generated,
+native-binary or retained-resource approval; no new discovery or sealing is implied.
 
 ## Stable offline resource
 
@@ -260,7 +272,7 @@ the app imports the MaterialCommunityIcons TTF, whose generated asset registry
 require is intercepted by the pinned resolver into the third. Source-only tests
 exercise those actual provider functions in memory without Metro or dynamic
 environment values. These are technical generated-source mappings, not reviewed notice
-coverage; the component ledger remains empty. Other virtual IDs are not accepted
+coverage; the five npm reviews do not approve their providers. Other virtual IDs are not accepted
 by a NUL/path wildcard. Final native files not identified from resolved AARs require an exact
 platform/path `packagedNative` mapping with covered `components` and a pinned
 `review` reference. Packaged-native mappings remain empty until reviewed discovery.
@@ -299,7 +311,7 @@ and absolute roots stay private; only logical package/version identities and
 hashes enter reports. Unknown roots, changed pins and escaping links reject.
 All output bytes are fingerprinted, and each input owner remains a separate
 vendor boundary needing explicit notice review; admitting a generated source
-does not inherit a producer's licence or complete the empty approval ledger.
+does not inherit a producer's licence or complete component review.
 Only the actual Gradle build-directory output, configured CMake staging path and
 Git metadata are excluded. The metadata exporter reads AGP's CMake configuration;
 its module-local `.cxx` default applies only when CMake is enabled. Canonical
