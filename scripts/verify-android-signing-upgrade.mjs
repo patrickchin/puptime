@@ -35,21 +35,42 @@ const installFailureCodes=new Set([
  'INSTALL_FAILED_WRONG_INSTALLED_VERSION','INSTALL_FAILED_PROCESS_NOT_DEFINED','INSTALL_FAILED_SESSION_INVALID','INSTALL_FAILED_SHARED_LIBRARY_BAD_CERTIFICATE_DIGEST',
  'INSTALL_FAILED_MULTI_ARCH_NOT_MATCH_ALL_NATIVE_ABIS',
 ]);
-function installFailureCode(result,path){
- if(!result||result.error||result.status!==1||typeof path!=='string'||!path||/[\x00-\x1f\x7f\u2028\u2029]/.test(path))return;
- if(typeof result.stdout!=='string'||typeof result.stderr!=='string'||Buffer.byteLength(result.stdout)>32768||Buffer.byteLength(result.stderr)>32768)return;
- if(!['','Performing Streamed Install\n'].includes(result.stdout))return;
- const prefix='adb: failed to install '+path+': ';if(!result.stderr.startsWith(prefix))return;
+const installCommandKinds=['adb-install','package-path','installed-apk-readback','unrecognized'];
+const installCodeDeclines=['not-install-command','process-state','output-type-or-size','incremental-announcement','stdout-shape','stderr-frame','ambiguous-content','unlisted-code'];
+// The first declined predicate describes this projection, never the cause or actual install mode.
+function installFailureProjection(result,path){
+ const decline=installCodeDecline=>({installCodeDecline});
+ if(!result||result.error||result.status!==1)return decline('process-state');
+ if(typeof result.stdout!=='string'||typeof result.stderr!=='string'||Buffer.byteLength(result.stdout)>32768||Buffer.byteLength(result.stderr)>32768)return decline('output-type-or-size');
+ if(result.stdout.startsWith('Performing Incremental Install\n'))return decline('incremental-announcement');
+ if(!['','Performing Streamed Install\n'].includes(result.stdout))return decline('stdout-shape');
+ if(typeof path!=='string'||!path||/[\x00-\x1f\x7f\u2028\u2029]/.test(path))return decline('stderr-frame');
+ const prefix='adb: failed to install '+path+': ';if(!result.stderr.startsWith(prefix))return decline('stderr-frame');
  const frame=result.stderr.slice(prefix.length),match=/^Failure \[(INSTALL_(?:PARSE_)?FAILED_[A-Z_]+)(?:: [^\x00-\x1f\x7f\u2028\u2029[\]]*)?\]\n{1,2}$/.exec(frame);
- if(!match||match[0]!==frame||!installFailureCodes.has(match[1])||/Success/i.test(frame))return;
- if((frame.match(/\bINSTALL_(?:PARSE_)?FAILED_[A-Z_]+\b/g)??[]).length!==1)return;
- return match[1];
+ if(!match||match[0]!==frame)return decline('stderr-frame');
+ if(/Success/i.test(frame)||(frame.match(/\bINSTALL_(?:PARSE_)?FAILED_[A-Z_]+\b/g)??[]).length!==1)return decline('ambiguous-content');
+ if(!installFailureCodes.has(match[1]))return decline('unlisted-code');
+ return {installCode:match[1]};
+}
+function installCommandFailure(binary,args,result,phase,root){
+ const file=phase==='original-install'?'original125.apk':phase==='bridge-install'?'bridge6.apk':phase==='later-install'?'plain7.apk':undefined;if(!file)return;
+ const exact=expected=>binary==='adb'&&Array.isArray(args)&&args.length===expected.length&&args.every((value,i)=>value===expected[i]);
+ const path=join(root,file),install=['-s','emulator-5588','install',...(phase==='original-install'?[]:['-r']),path];
+ let commandKind='unrecognized';
+ if(exact(install))commandKind='adb-install';
+ else if(exact(['-s','emulator-5588','shell','pm','path',app]))commandKind='package-path';
+ else if(typeof args?.[4]==='string'&&/^\/data\/app\/[^\n]+\/base\.apk$/.exec(args[4])?.[0]===args[4]&&exact(['-s','emulator-5588','exec-out','cat',args[4]]))commandKind='installed-apk-readback';
+ return {commandKind,...(commandKind==='adb-install'?installFailureProjection(result,path):{installCodeDecline:'not-install-command'})};
 }
 const commandFailures=new WeakMap();
-function commandFailure(error,result,installCode){
+function commandFailure(error,result,details){
  const value={class:result.error?.code==='ETIMEDOUT'?'timeout':result.error?.code==='ENOENT'?'missing-tool':'command-failed'};
  if(Number.isInteger(result.status)&&result.status>=0&&result.status<=255)value.status=result.status;
- if(installFailureCodes.has(installCode))value.installCode=installCode;
+ if(installCommandKinds.includes(details?.commandKind)){
+  value.commandKind=details.commandKind;
+  if(details.commandKind==='adb-install'&&installFailureCodes.has(details.installCode))value.installCode=details.installCode;
+  else if(installCodeDeclines.includes(details.installCodeDecline))value.installCodeDecline=details.installCodeDecline;
+ }
  commandFailures.set(error,value);return error;
 }
 function finiteFailure(error){return commandFailures.get(error)??{class:error?.code==='ERR_ASSERTION'?'assertion':'other'};}
@@ -66,19 +87,28 @@ function guestFailureImage(flow,stage,io){
  try{if(!io.owned())return false;const bytes=io.capture();if(!Buffer.isBuffer(bytes)||bytes.length<8||bytes.length>8*1024*1024||!bytes.subarray(0,8).equals(Buffer.from('89504e470d0a1a0a','hex')))return false;io.save(bytes);return true;}catch{return false;}
 }
 function installCodeSelfCheck(){
- const secret='PRIVATE token=password /private/key.pem',path='/private/qa/bridge6.apk';
+ const secret='PRIVATE token=password /private/key.pem',root='/private/qa',path=join(root,'bridge6.apk'),args=['-s','emulator-5588','install','-r',path];
  const result=(code,detail='',ending='\n\n')=>({status:1,stdout:'Performing Streamed Install\n',stderr:'adb: failed to install '+path+': Failure ['+code+(detail?': '+detail:'')+']'+ending});
  for(const code of installFailureCodes)for(const detail of ['',secret])for(const ending of ['\n','\n\n']){
-  const value=result(code,detail,ending);assert.equal(installFailureCode(value,path),code);
-  const error=commandFailure(Object.assign(new Error(secret),{stdout:secret,stderr:secret,stack:secret}),value,installFailureCode(value,path));assert.deepEqual(finiteFailure(error),{class:'command-failed',status:1,installCode:code});assert.ok(!JSON.stringify(finiteFailure(error)).includes(secret));
+  const value=result(code,detail,ending);assert.deepEqual(installFailureProjection(value,path),{installCode:code});
+  const original=Object.assign(new Error(secret),{stdout:secret,stderr:secret,stack:secret}),error=commandFailure(original,value,installCommandFailure('adb',args,value,'bridge-install',root));assert.equal(error,original);assert.deepEqual(finiteFailure(error),{class:'command-failed',status:1,commandKind:'adb-install',installCode:code});assert.ok(!JSON.stringify(finiteFailure(error)).includes(secret));
  }
- const good=result('INSTALL_FAILED_UPDATE_INCOMPATIBLE',secret),bad=[null,{},...[-1,0,2,256,null,'1'].map(status=>({...good,status})),...['ETIMEDOUT','ENOENT'].map(code=>({...good,error:{code,message:secret}})),{...good,stdout:Buffer.from(secret)},{...good,stderr:Buffer.from(secret)},{...good,stdout:'x'.repeat(32769)},{...good,stderr:'x'.repeat(32769)},{...good,stdout:'Success\n'},{...good,stdout:'Performing Push Install\n'},result('INSTALL_FAILED_UNKNOWN'),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE_EXTRA'),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE',secret+' INSTALL_PARSE_FAILED_BAD_MANIFEST'),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE','Success'),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE','nested [message]'),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE',secret+'\n'),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE',secret+'\u2028'),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE','',''),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE','','\n\n\n'),{...good,stderr:good.stderr+'Failure [INSTALL_FAILED_INVALID_APK]\n'},{...good,stderr:'prefix\n'+good.stderr},{...good,stderr:good.stderr.replace(']','')},{...good,stderr:good.stderr.replace('Failure [','Failure [prefix ')}];
- for(const value of bad)assert.equal(installFailureCode(value,path),undefined);
- for(const value of [undefined,null,'',path+'wrong',path+'\n'])assert.equal(installFailureCode(good,value),undefined);
- assert.equal(installFailureCode({...good,stdout:''},path),'INSTALL_FAILED_UPDATE_INCOMPATIBLE');
- assert.deepEqual(finiteFailure(commandFailure(new Error(secret),good,secret)),{class:'command-failed',status:1});
- const record=exerciseRecorder(value=>{assert.ok(!JSON.stringify(value).includes(secret));});record.begin('bridge-install');const error=commandFailure(new Error(secret),good,installFailureCode(good,path));record.fail(error);assert.equal(finiteFailure(error).installCode,'INSTALL_FAILED_UPDATE_INCOMPATIBLE');
- console.log('PASS bounded fixed install-code projection and secret-rich/ambiguous negatives; no install or device operations.');
+ const good=result('INSTALL_FAILED_UPDATE_INCOMPATIBLE',secret),cases=[
+  ['process-state',null],['process-state',{}],...[-1,0,2,256,null,'1'].map(status=>['process-state',{...good,status}]),...['ETIMEDOUT','ENOENT'].map(code=>['process-state',{...good,error:{code,message:secret}}]),
+  ...[{...good,stdout:Buffer.from(secret)},{...good,stderr:Buffer.from(secret)},{...good,stdout:'x'.repeat(32769)},{...good,stderr:'x'.repeat(32769)}].map(value=>['output-type-or-size',value]),
+  ['incremental-announcement',{...good,stdout:'Performing Incremental Install\n'+secret}],['incremental-announcement',{...good,stdout:'Performing Incremental Install\nFailure [INSTALL_FAILED_INVALID_APK]\nPerforming Streamed Install\n'}],
+  ['stdout-shape',{...good,stdout:'Success\n'}],['stdout-shape',{...good,stdout:'Performing Push Install\n'}],
+  ['unlisted-code',result('INSTALL_FAILED_UNKNOWN')],['unlisted-code',result('INSTALL_FAILED_UPDATE_INCOMPATIBLE_EXTRA')],['ambiguous-content',result('INSTALL_FAILED_UPDATE_INCOMPATIBLE',secret+' INSTALL_PARSE_FAILED_BAD_MANIFEST')],['ambiguous-content',result('INSTALL_FAILED_UPDATE_INCOMPATIBLE','Success')],
+  ...[result('INSTALL_FAILED_UPDATE_INCOMPATIBLE','nested [message]'),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE',secret+'\n'),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE',secret+'\u2028'),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE','',''),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE','','\n\n\n'),{...good,stderr:good.stderr+'Failure [INSTALL_FAILED_INVALID_APK]\n'},{...good,stderr:'prefix\n'+good.stderr},{...good,stderr:good.stderr.replace(']','')},{...good,stderr:good.stderr.replace('Failure [','Failure [prefix ')}].map(value=>['stderr-frame',value]),
+ ];
+ for(const [reason,value] of cases)assert.deepEqual(installFailureProjection(value,path),{installCodeDecline:reason});
+ for(const value of [undefined,null,'',path+'wrong',path+'\n'])assert.deepEqual(installFailureProjection(good,value),{installCodeDecline:'stderr-frame'});
+ assert.deepEqual(installFailureProjection({...good,stdout:''},path),{installCode:'INSTALL_FAILED_UPDATE_INCOMPATIBLE'});
+ for(const [argv,kind] of [[['-s','emulator-5588','shell','pm','path',app],'package-path'],[['-s','emulator-5588','exec-out','cat','/data/app/synthetic/base.apk'],'installed-apk-readback'],[['-s','wrong','install','-r',path],'unrecognized']])assert.deepEqual(installCommandFailure('adb',argv,good,'bridge-install',root),{commandKind:kind,installCodeDecline:'not-install-command'});
+ for(const phase of ['plain-B-reject','snapshot-old-created','constructor',secret,undefined])assert.equal(installCommandFailure('adb',args,good,phase,root),undefined);
+ assert.deepEqual(finiteFailure(commandFailure(new Error(secret),good,{commandKind:secret,installCode:secret,installCodeDecline:secret})),{class:'command-failed',status:1});
+ const record=exerciseRecorder(value=>{assert.ok(!JSON.stringify(value).includes(secret));});record.begin('bridge-install');const error=commandFailure(new Error(secret),good,installCommandFailure('adb',args,good,'bridge-install',root));record.fail(error);assert.equal(finiteFailure(error).installCode,'INSTALL_FAILED_UPDATE_INCOMPATIBLE');
+ console.log('PASS finite owned install command kinds/first-decline predicates and secret-rich negatives; observed cues do not prove mode or cause.');
 }
 
 function exerciseEvidenceSelfCheck(){
@@ -396,10 +426,8 @@ function command(binary,args,{ok=[0],binaryOutput=false,timeout=120000}={}){
  const result=spawnSync(binary,args,{encoding:binaryOutput?undefined:'utf8',timeout,maxBuffer:256*1024*1024,stdio:['ignore','pipe','pipe']});
  if(!ok.includes(result.status)){
   if(existsSync(root))writeFileSync(join(root,'last-command-failure.txt'),String(result.stdout??'').slice(0,32768)+'\n'+String(result.stderr??'').slice(0,32768),{mode:0o600});
-  const phase=exerciseEvidence?.phase(),file=phase==='original-install'?'original125.apk':phase==='bridge-install'?'bridge6.apk':phase==='later-install'?'plain7.apk':undefined;
-  const expected=file?['-s','emulator-5588','install',...(phase==='original-install'?[]:['-r']),join(root,file)]:[];
-  const installCode=file&&binary==='adb'&&Array.isArray(args)&&args.length===expected.length&&args.every((value,i)=>value===expected[i])?installFailureCode(result,expected.at(-1)):undefined;
-  throw commandFailure(new Error(binary+' failed (exit '+result.status+'); private command/driver evidence was not uploaded.'),result,installCode);
+  const details=installCommandFailure(binary,args,result,exerciseEvidence?.phase(),root);
+  throw commandFailure(new Error(binary+' failed (exit '+result.status+'); private command/driver evidence was not uploaded.'),result,details);
  }
  return binaryOutput?result.stdout:String(result.stdout??'')+(result.status?String(result.stderr??''):'');
 }
