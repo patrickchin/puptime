@@ -19,10 +19,37 @@ const exerciseStages=['exercise-preconditions','original-artifact-validation','b
 const exerciseFlows=['old-ui-seed','old-reminder-lead','bind-real-launcher-widget','bridge-visible','bridge-cold','later-visible','later-cold'];
 // Last entered assertion boundary only, not a diagnosis or captured data.
 const snapshotSites=['path-containment','sqlite-integrity','sqlite-foreign-keys','table-inventory','package-uid','widget-section','widget-count','widget-identity'];
+// Android16r1 PackageManager.installStatusToString: fixed names only; never retain its free-form message.
+const installFailureCodes=new Set([
+ 'INSTALL_FAILED_ALREADY_EXISTS','INSTALL_FAILED_INVALID_APK','INSTALL_FAILED_INVALID_URI','INSTALL_FAILED_INSUFFICIENT_STORAGE',
+ 'INSTALL_FAILED_DUPLICATE_PACKAGE','INSTALL_FAILED_NO_SHARED_USER','INSTALL_FAILED_UPDATE_INCOMPATIBLE','INSTALL_FAILED_SHARED_USER_INCOMPATIBLE',
+ 'INSTALL_FAILED_MISSING_SHARED_LIBRARY','INSTALL_FAILED_REPLACE_COULDNT_DELETE','INSTALL_FAILED_DEXOPT','INSTALL_FAILED_OLDER_SDK',
+ 'INSTALL_FAILED_CONFLICTING_PROVIDER','INSTALL_FAILED_NEWER_SDK','INSTALL_FAILED_TEST_ONLY','INSTALL_FAILED_CPU_ABI_INCOMPATIBLE',
+ 'INSTALL_FAILED_MISSING_FEATURE','INSTALL_FAILED_CONTAINER_ERROR','INSTALL_FAILED_INVALID_INSTALL_LOCATION','INSTALL_FAILED_MEDIA_UNAVAILABLE',
+ 'INSTALL_FAILED_VERIFICATION_TIMEOUT','INSTALL_FAILED_VERIFICATION_FAILURE','INSTALL_FAILED_PACKAGE_CHANGED','INSTALL_FAILED_UID_CHANGED',
+ 'INSTALL_FAILED_VERSION_DOWNGRADE','INSTALL_PARSE_FAILED_NOT_APK','INSTALL_PARSE_FAILED_BAD_MANIFEST','INSTALL_PARSE_FAILED_UNEXPECTED_EXCEPTION',
+ 'INSTALL_PARSE_FAILED_NO_CERTIFICATES','INSTALL_PARSE_FAILED_INCONSISTENT_CERTIFICATES','INSTALL_PARSE_FAILED_CERTIFICATE_ENCODING','INSTALL_PARSE_FAILED_BAD_PACKAGE_NAME',
+ 'INSTALL_PARSE_FAILED_BAD_SHARED_USER_ID','INSTALL_PARSE_FAILED_MANIFEST_MALFORMED','INSTALL_PARSE_FAILED_MANIFEST_EMPTY','INSTALL_FAILED_INTERNAL_ERROR',
+ 'INSTALL_FAILED_USER_RESTRICTED','INSTALL_FAILED_DUPLICATE_PERMISSION','INSTALL_FAILED_NO_MATCHING_ABIS','INSTALL_FAILED_ABORTED',
+ 'INSTALL_FAILED_BAD_DEX_METADATA','INSTALL_FAILED_MISSING_SPLIT','INSTALL_FAILED_DEPRECATED_SDK_VERSION','INSTALL_FAILED_BAD_SIGNATURE',
+ 'INSTALL_FAILED_WRONG_INSTALLED_VERSION','INSTALL_FAILED_PROCESS_NOT_DEFINED','INSTALL_FAILED_SESSION_INVALID','INSTALL_FAILED_SHARED_LIBRARY_BAD_CERTIFICATE_DIGEST',
+ 'INSTALL_FAILED_MULTI_ARCH_NOT_MATCH_ALL_NATIVE_ABIS',
+]);
+function installFailureCode(result,path){
+ if(!result||result.error||result.status!==1||typeof path!=='string'||!path||/[\x00-\x1f\x7f\u2028\u2029]/.test(path))return;
+ if(typeof result.stdout!=='string'||typeof result.stderr!=='string'||Buffer.byteLength(result.stdout)>32768||Buffer.byteLength(result.stderr)>32768)return;
+ if(!['','Performing Streamed Install\n'].includes(result.stdout))return;
+ const prefix='adb: failed to install '+path+': ';if(!result.stderr.startsWith(prefix))return;
+ const frame=result.stderr.slice(prefix.length),match=/^Failure \[(INSTALL_(?:PARSE_)?FAILED_[A-Z_]+)(?:: [^\x00-\x1f\x7f\u2028\u2029[\]]*)?\]\n{1,2}$/.exec(frame);
+ if(!match||match[0]!==frame||!installFailureCodes.has(match[1])||/Success/i.test(frame))return;
+ if((frame.match(/\bINSTALL_(?:PARSE_)?FAILED_[A-Z_]+\b/g)??[]).length!==1)return;
+ return match[1];
+}
 const commandFailures=new WeakMap();
-function commandFailure(error,result){
+function commandFailure(error,result,installCode){
  const value={class:result.error?.code==='ETIMEDOUT'?'timeout':result.error?.code==='ENOENT'?'missing-tool':'command-failed'};
  if(Number.isInteger(result.status)&&result.status>=0&&result.status<=255)value.status=result.status;
+ if(installFailureCodes.has(installCode))value.installCode=installCode;
  commandFailures.set(error,value);return error;
 }
 function finiteFailure(error){return commandFailures.get(error)??{class:error?.code==='ERR_ASSERTION'?'assertion':'other'};}
@@ -38,6 +65,22 @@ function guestFailureImage(flow,stage,io){
  if(!((flow==='old-ui-seed'&&stage==='guest-seed')||(flow==='bind-real-launcher-widget'&&stage==='widget-binding')))return false;
  try{if(!io.owned())return false;const bytes=io.capture();if(!Buffer.isBuffer(bytes)||bytes.length<8||bytes.length>8*1024*1024||!bytes.subarray(0,8).equals(Buffer.from('89504e470d0a1a0a','hex')))return false;io.save(bytes);return true;}catch{return false;}
 }
+function installCodeSelfCheck(){
+ const secret='PRIVATE token=password /private/key.pem',path='/private/qa/bridge6.apk';
+ const result=(code,detail='',ending='\n\n')=>({status:1,stdout:'Performing Streamed Install\n',stderr:'adb: failed to install '+path+': Failure ['+code+(detail?': '+detail:'')+']'+ending});
+ for(const code of installFailureCodes)for(const detail of ['',secret])for(const ending of ['\n','\n\n']){
+  const value=result(code,detail,ending);assert.equal(installFailureCode(value,path),code);
+  const error=commandFailure(Object.assign(new Error(secret),{stdout:secret,stderr:secret,stack:secret}),value,installFailureCode(value,path));assert.deepEqual(finiteFailure(error),{class:'command-failed',status:1,installCode:code});assert.ok(!JSON.stringify(finiteFailure(error)).includes(secret));
+ }
+ const good=result('INSTALL_FAILED_UPDATE_INCOMPATIBLE',secret),bad=[null,{},...[-1,0,2,256,null,'1'].map(status=>({...good,status})),...['ETIMEDOUT','ENOENT'].map(code=>({...good,error:{code,message:secret}})),{...good,stdout:Buffer.from(secret)},{...good,stderr:Buffer.from(secret)},{...good,stdout:'x'.repeat(32769)},{...good,stderr:'x'.repeat(32769)},{...good,stdout:'Success\n'},{...good,stdout:'Performing Push Install\n'},result('INSTALL_FAILED_UNKNOWN'),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE_EXTRA'),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE',secret+' INSTALL_PARSE_FAILED_BAD_MANIFEST'),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE','Success'),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE','nested [message]'),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE',secret+'\n'),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE',secret+'\u2028'),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE','',''),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE','','\n\n\n'),{...good,stderr:good.stderr+'Failure [INSTALL_FAILED_INVALID_APK]\n'},{...good,stderr:'prefix\n'+good.stderr},{...good,stderr:good.stderr.replace(']','')},{...good,stderr:good.stderr.replace('Failure [','Failure [prefix ')}];
+ for(const value of bad)assert.equal(installFailureCode(value,path),undefined);
+ for(const value of [undefined,null,'',path+'wrong',path+'\n'])assert.equal(installFailureCode(good,value),undefined);
+ assert.equal(installFailureCode({...good,stdout:''},path),'INSTALL_FAILED_UPDATE_INCOMPATIBLE');
+ assert.deepEqual(finiteFailure(commandFailure(new Error(secret),good,secret)),{class:'command-failed',status:1});
+ const record=exerciseRecorder(value=>{assert.ok(!JSON.stringify(value).includes(secret));});record.begin('bridge-install');const error=commandFailure(new Error(secret),good,installFailureCode(good,path));record.fail(error);assert.equal(finiteFailure(error).installCode,'INSTALL_FAILED_UPDATE_INCOMPATIBLE');
+ console.log('PASS bounded fixed install-code projection and secret-rich/ambiguous negatives; no install or device operations.');
+}
+
 function exerciseEvidenceSelfCheck(){
  const secret='PRIVATE token=password key=/private/secret.pem stdout stderr stack';let saved;const make=()=>exerciseRecorder(value=>saved=JSON.parse(JSON.stringify(value)));
  const rich=()=>Object.assign(new Error(secret),{stack:secret,argv:[secret],stdout:Buffer.from(secret),stderr:secret,key:secret,password:secret,path:secret,token:secret,status:secret});
@@ -159,6 +202,7 @@ function snapshotSiteSelfCheck(){
  console.log('PASS eight finite in-memory snapshot sites, preserved failures/status, marker reset and production widget assertion boundaries. No native data or commands.');
 }
 function selfCheck(){
+ installCodeSelfCheck();
  exerciseEvidenceSelfCheck();
  snapshotSiteSelfCheck();
  packageUidSelfCheck();
@@ -352,7 +396,10 @@ function command(binary,args,{ok=[0],binaryOutput=false,timeout=120000}={}){
  const result=spawnSync(binary,args,{encoding:binaryOutput?undefined:'utf8',timeout,maxBuffer:256*1024*1024,stdio:['ignore','pipe','pipe']});
  if(!ok.includes(result.status)){
   if(existsSync(root))writeFileSync(join(root,'last-command-failure.txt'),String(result.stdout??'').slice(0,32768)+'\n'+String(result.stderr??'').slice(0,32768),{mode:0o600});
-  throw commandFailure(new Error(binary+' failed (exit '+result.status+'); private command/driver evidence was not uploaded.'),result);
+  const phase=exerciseEvidence?.phase(),file=phase==='original-install'?'original125.apk':phase==='bridge-install'?'bridge6.apk':phase==='later-install'?'plain7.apk':undefined;
+  const expected=file?['-s','emulator-5588','install',...(phase==='original-install'?[]:['-r']),join(root,file)]:[];
+  const installCode=file&&binary==='adb'&&Array.isArray(args)&&args.length===expected.length&&args.every((value,i)=>value===expected[i])?installFailureCode(result,expected.at(-1)):undefined;
+  throw commandFailure(new Error(binary+' failed (exit '+result.status+'); private command/driver evidence was not uploaded.'),result,installCode);
  }
  return binaryOutput?result.stdout:String(result.stdout??'')+(result.status?String(result.stderr??''):'');
 }
