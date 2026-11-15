@@ -14,7 +14,7 @@ jobs:
           node-version-file: .node-version
           cache: npm
       - run: npm ci
-      - run: node --test scripts/native-task-cleanup.test.mjs scripts/native-rich-state.test.mjs scripts/native-command-evidence.test.mjs scripts/native-startup-evidence.test.mjs scripts/native-account-evidence.test.mjs scripts/native-standard-suite.test.mjs
+      - run: node --test scripts/native-task-cleanup.test.mjs scripts/native-rich-state.test.mjs scripts/native-command-evidence.test.mjs scripts/native-startup-evidence.test.mjs scripts/native-account-evidence.test.mjs scripts/native-standard-suite.test.mjs scripts/native-font-notice-evidence.test.mjs
       - run: node --test scripts/native-host-policy.test.mjs
       - run: npm run typecheck
       - run: npm run typecheck:ios
