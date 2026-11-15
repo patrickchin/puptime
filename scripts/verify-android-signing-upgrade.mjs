@@ -8,7 +8,7 @@ import {Readable,Transform} from 'node:stream';
 import {pipeline} from 'node:stream/promises';
 import {DatabaseSync} from 'node:sqlite';
 import {tmpdir} from 'node:os';
-import {types as utilTypes} from 'node:util';
+import {types as utilTypes,isDeepStrictEqual} from 'node:util';
 import {readNativeCommandState} from './native-command-evidence.mjs';
 
 const app='com.patrickchin.puptime',oldSHA='82fa41075db35d747360183a2c3ff364e5c4fb4813519135d7a5eb076249a927';
@@ -96,6 +96,27 @@ function installCommandFailure(binary,args,result,phase,root){
  return {commandKind,...(commandKind==='adb-install'?installFailureProjection(result,path):{installCodeDecline:'not-install-command'})};
 }
 const commandFailures=new WeakMap();
+const preservationFailures=new WeakMap();
+const preservationSites=['native-tables','uid','widget-binding','file-hashes'];
+const preservationTables=['metadata','puppies','events','routines','settings','pet_settings','local_revisions','local_sync_owner','local_sync_pets','local_sync_outbox','local_sync_records','local_sync_acks','local_sync_baseline','sqlite_sequence'];
+function preservationProjection(before,after,firstSite,eventData,transition){
+ assert.ok(preservationSites.includes(firstSite));
+ const tableEqual=Object.fromEntries(preservationTables.map(table=>[table,isDeepStrictEqual(before.tables[table],after.tables[table])]));
+ const hashes=files=>Object.fromEntries(Object.entries(files).map(([name,value])=>[name,value.sha256]));
+ const categories=['sqlite','preferences','backup','photo','other'],changes=Object.fromEntries(categories.map(category=>[category,{added:0,removed:0,changed:0}]));
+ const category=name=>sqliteFile(name)?'sqlite':name.startsWith('shared_prefs/')?'preferences':name.startsWith('files/activity-backups/')?'backup':/^files\/(?:puppy|dog)-photos\//.test(name)?'photo':'other';
+ for(const name of new Set([...Object.keys(before.files),...Object.keys(after.files)])){
+  const old=Object.hasOwn(before.files,name),current=Object.hasOwn(after.files,name),kind=!old?'added':!current?'removed':before.files[name].sha256!==after.files[name].sha256?'changed':undefined;
+  if(kind)changes[category(name)][kind]++;
+ }
+ const bucket=count=>count===0?'zero':count===1?'one':'multiple';
+ const matches=run=>{try{run();return true;}catch(error){return nativeErrorFields(error).code?.value==='ERR_ASSERTION'?false:null;}};
+ return {firstSite,nativeTablesEqual:isDeepStrictEqual(before.tables,after.tables),uidEqual:before.uid===after.uid,widgetBindingEqual:isDeepStrictEqual(before.widgets,after.widgets),fileHashesEqual:isDeepStrictEqual(hashes(before.files),hashes(after.files)),tableEqual,fileChanges:Object.fromEntries(categories.map(name=>[name,Object.fromEntries(Object.entries(changes[name]).map(([kind,count])=>[kind,bucket(count)]))])),bridge126TablesMatch:matches(()=>transition(expectedLaunch(before.tables,'1.12.6/1012006'),after.tables)),bridge126ProtectedFilesMatch:matches(()=>protectedFiles(before.files,after.files,'1.12.6/1012006',before.tables.events,eventData,before.tables.puppies[0].name,1))};
+}
+// Closed test seam: production and source self-checks exercise the same equal().
+function preservationEquality(assertNativeTransition,eventDataFromSql){
+ return function equal(before,after){let site='native-tables';try{assertNativeTransition(before.tables,after.tables);site='uid';assert.equal(after.uid,before.uid);site='widget-binding';assert.deepEqual(after.widgets,before.widgets);site='file-hashes';assert.deepEqual(Object.fromEntries(Object.entries(after.files).map(([k,v])=>[k,v.sha256])),Object.fromEntries(Object.entries(before.files).map(([k,v])=>[k,v.sha256])));}catch(error){try{preservationFailures.delete(error);preservationFailures.set(error,preservationProjection(before,after,site,eventDataFromSql,assertNativeTransition));}catch{/* Diagnostic faults never replace the original failure. */}throw error;}};
+}
 function permissionControl(error){
  const value=commandFailures.get(error);assert.equal(value?.class,'command-failed');assert.equal(value.status,1);assert.equal(value.commandKind,'adb-install');
  if(value.installCode==='INSTALL_FAILED_DUPLICATE_PERMISSION')return {...value,evidence:'unambiguous-observed-code'};
@@ -147,10 +168,10 @@ function finiteFailure(error,phase){
  return {class:assertion?'assertion':'other',...(assertion&&positiveInstallStages.has(phase)?{installAssertionSite:installAssertionSite(fields)}:{})};
 }
 function exerciseRecorder(save){
- const history=[],active=[];let failure,nativeCommand,snapshotSite;
- const snapshot=()=>({phase:active.at(-1)??history.at(-1)?.phase??'exercise-preconditions',state:failure?'failed':active.length?'started':'completed',history:history.map(({phase,state})=>({phase,state})),...(failure?{failure:{...failure}}:{}),...(nativeCommand?{nativeCommand:{...nativeCommand}}:{}),...(snapshotSite?{snapshotSite}:{})});
+ const history=[],active=[];let failure,nativeCommand,snapshotSite,preservationComparison;
+ const snapshot=()=>({phase:active.at(-1)??history.at(-1)?.phase??'exercise-preconditions',state:failure?'failed':active.length?'started':'completed',history:history.map(({phase,state})=>({phase,state})),...(failure?{failure:{...failure}}:{}),...(nativeCommand?{nativeCommand:{...nativeCommand}}:{}),...(snapshotSite?{snapshotSite}:{}),...(preservationComparison?{preservationComparison}:{})});
  const event=(phase,state)=>{assert.ok(exerciseStages.includes(phase));assert.ok(['started','completed','failed'].includes(state));assert.ok(history.length<256);history.push({phase,state});};
- return {phase:()=>active.at(-1),snapshotSite(site){assert.ok(snapshotSites.includes(site));assert.ok(active.at(-1)?.startsWith('snapshot-'));snapshotSite=site;},flowFailure(flow,directory){assert.ok(exerciseFlows.includes(flow));const stage=active.at(-1);assert.ok(exerciseStages.includes(stage));const {status,kind,targetId,sequence}=readNativeCommandState(directory);nativeCommand={flow,stage,status,kind,targetId,sequence};save(snapshot());},begin(phase){event(phase,'started');active.push(phase);snapshotSite=undefined;save(snapshot());},end(phase){assert.equal(active.at(-1),phase);event(phase,'completed');active.pop();snapshotSite=undefined;save(snapshot());},persist(){save(snapshot());},fail(error){failure=finiteFailure(error,active.at(-1)??history.at(-1)?.phase);event(active.at(-1)??history.at(-1)?.phase??'exercise-preconditions','failed');save(snapshot());}};
+ return {phase:()=>active.at(-1),snapshotSite(site){assert.ok(snapshotSites.includes(site));assert.ok(active.at(-1)?.startsWith('snapshot-'));snapshotSite=site;},flowFailure(flow,directory){assert.ok(exerciseFlows.includes(flow));const stage=active.at(-1);assert.ok(exerciseStages.includes(stage));const {status,kind,targetId,sequence}=readNativeCommandState(directory);nativeCommand={flow,stage,status,kind,targetId,sequence};save(snapshot());},begin(phase){event(phase,'started');active.push(phase);snapshotSite=undefined;save(snapshot());},end(phase){assert.equal(active.at(-1),phase);event(phase,'completed');active.pop();snapshotSite=undefined;save(snapshot());},persist(){save(snapshot());},fail(error){failure=finiteFailure(error,active.at(-1)??history.at(-1)?.phase);preservationComparison=preservationFailures.get(error);event(active.at(-1)??history.at(-1)?.phase??'exercise-preconditions','failed');save(snapshot());}};
 }
 // Images are limited to two exact fresh/offline guest flow/stage pairs.
 // Capture is best-effort; the original failure still ends the attempt.
@@ -365,7 +386,35 @@ function snapshotSiteSelfCheck(){
  const entered=[];assert.equal(widgetBinding(valid,site=>entered.push(site)).id,'2');assert.deepEqual(entered,['widget-section','widget-count','widget-identity']);
  console.log('PASS eight finite in-memory snapshot sites, preserved failures/status, marker reset and production widget assertion boundaries. No native data or commands.');
 }
+function preservationSelfCheck(){
+ const secret='PRIVATE_EMAIL_TOKEN pet_PRIVATE evt_PRIVATE /private/record.json raw-error',event={id:'evt_PRIVATE',pet_id:'pet_PRIVATE',type:'pee',source:'widget',at:1,note:secret};
+ const eventData=({id,pet_id,...body})=>body,transition=(before,after)=>assert.deepEqual(after,before),equal=preservationEquality(transition,eventData);
+ const tables=Object.fromEntries(preservationTables.map(name=>[name,[]]));Object.assign(tables,{metadata:[{key:'backup_app_version',value:'1.12.5/1012005'},{key:'active_pet_id',value:'pet_PRIVATE'}],puppies:[{id:'pet_PRIVATE',name:secret}],events:[event]});
+ const before={tables,uid:'10123',widgets:{id:'77',host:secret,provider:secret},files:{'files/SQLite/puptime-v2.db':{sha256:hash('db'),bytes:Buffer.from(secret)},'shared_prefs/PRIVATE.xml':{sha256:hash('prefs'),bytes:Buffer.from(secret)},'files/puppy-photos/pet_PRIVATE.jpg':{sha256:hash('photo'),bytes:Buffer.from(secret)}}};
+ assert.equal(preservationTables.length,14);assert.equal(new Set(preservationTables).size,14);assert.equal(equal(before,structuredClone(before)),undefined);
+ const projection=(after,site)=>{const oldBefore=JSON.stringify(before),oldAfter=JSON.stringify(after);let error;try{equal(before,after);}catch(value){error=value;}assert.equal(JSON.stringify(before),oldBefore);assert.equal(JSON.stringify(after),oldAfter);assert.ok(error);const value=preservationFailures.get(error);assert.ok(value);assert.equal(value.firstSite,site);assert.deepEqual(Object.keys(value.tableEqual),preservationTables);assert.equal(Object.keys(value.tableEqual).length,14);assert.deepEqual(Object.keys(value.fileChanges),['sqlite','preferences','backup','photo','other']);assert.ok(!JSON.stringify(value).includes('PRIVATE'));assert.ok(!JSON.stringify(value).includes('10123'));return {error,value};};
+ for(const site of preservationSites){
+  const after=structuredClone(before);if(site==='native-tables')after.tables.events[0].note=secret+' changed';if(site==='uid')after.uid='10124';if(site==='widget-binding')after.widgets.id='78';if(site==='file-hashes')after.files['shared_prefs/PRIVATE.xml'].sha256=hash('changed');
+  const {error,value}=projection(after,site);assert.deepEqual([value.nativeTablesEqual,value.uidEqual,value.widgetBindingEqual,value.fileHashesEqual],preservationSites.map(name=>name!==site));
+  assert.equal(value.tableEqual.events,site!=='native-tables');assert.equal(Object.values(value.tableEqual).filter(flag=>!flag).length,site==='native-tables'?1:0);assert.deepEqual(finiteFailure(error,'bridge-before-launch-preservation'),{class:'assertion'});
+  let saved;const record=exerciseRecorder(value=>saved=value);record.begin('bridge-before-launch-preservation');record.fail(error);assert.deepEqual(saved.preservationComparison,value);assert.deepEqual(saved.failure,{class:'assertion'});assert.equal(saved.state,'failed');assert.ok(!JSON.stringify(saved).includes('PRIVATE'));
+ }
+ const mixed=structuredClone(before);mixed.tables.events[0].note=secret+' changed';mixed.uid='10124';mixed.widgets.id='78';mixed.files['shared_prefs/PRIVATE.xml'].sha256=hash('changed');const all=projection(mixed,'native-tables').value;assert.deepEqual([all.nativeTablesEqual,all.uidEqual,all.widgetBindingEqual,all.fileHashesEqual],[false,false,false,false]);
+ const files=structuredClone(before);files.files['files/SQLite/puptime-v2.db'].sha256=hash('checkpoint');files.files['shared_prefs/PRIVATE.xml'].sha256=hash('changed');delete files.files['files/puppy-photos/pet_PRIVATE.jpg'];files.files['files/activity-backups/bkp_'+ 'b'.repeat(32)+'.json']={sha256:hash('backup'),bytes:Buffer.from(secret)};files.files['files/other-PRIVATE-A']={sha256:hash('other-a')};files.files['files/other-PRIVATE-B']={sha256:hash('other-b')};
+ const change=projection(files,'file-hashes').value.fileChanges;assert.deepEqual(change.sqlite,{added:'zero',removed:'zero',changed:'one'});assert.equal(change.preferences.changed,'one');assert.equal(change.photo.removed,'one');assert.equal(change.backup.added,'one');assert.equal(change.other.added,'multiple');
+ const version=structuredClone(before);version.tables=expectedLaunch(version.tables,'1.12.6/1012006');version.files['files/SQLite/puptime-v2.db'].sha256=hash('checkpoint');
+ const backup={format:'puptime-activity',version:1,createdAt:1,petId:'pet_PRIVATE',puppyName:secret,reason:'before-update',appVersion:'1.12.6/1012006',events:[{id:event.id,...eventData(event)}]},backupBytes=Buffer.from(JSON.stringify(backup)),backupPath='files/activity-backups/bkp_'+ 'a'.repeat(32)+'.json';version.files[backupPath]={sha256:hash(backupBytes),bytes:backupBytes};
+ const expected=projection(version,'native-tables');assert.equal(expected.value.bridge126TablesMatch,true);assert.equal(expected.value.bridge126ProtectedFilesMatch,true);assert.equal(expected.value.nativeTablesEqual,false);assert.equal(expected.value.tableEqual.metadata,false);assert.equal(Object.values(expected.value.tableEqual).filter(flag=>!flag).length,1);assert.deepEqual(finiteFailure(expected.error,'bridge-before-launch-preservation'),{class:'assertion'});
+ version.files[backupPath].bytes=Buffer.from(secret);assert.equal(projection(version,'native-tables').value.bridge126ProtectedFilesMatch,null,'Unexpected diagnostic exceptions are unknown, never a failed original oracle.');
+ const original=commandFailure(new Error(secret),{status:19}),throwing=preservationEquality(()=>{throw original;},eventData);let caught;
+ try{throwing(before,structuredClone(before));}catch(error){caught=error;}assert.equal(caught,original);assert.ok(preservationFailures.has(original));
+ const broken=structuredClone(before);Object.defineProperty(broken,'files',{get(){throw Object.assign(new Error(secret),{code:'EACCES'});}});
+ try{throwing(before,broken);}catch(error){caught=error;}assert.equal(caught,original);assert.equal(preservationFailures.has(original),false,'A failed diagnostic clears stale evidence for the same error identity.');let saved;const record=exerciseRecorder(value=>saved=value);record.begin('bridge-before-launch-preservation');record.fail(caught);assert.deepEqual(saved.failure,{class:'command-failed',status:19});assert.ok(!('preservationComparison' in saved));assert.ok(!JSON.stringify(saved).includes('PRIVATE'));
+ for(const primitive of [null,secret]){const compare=preservationEquality(()=>{throw primitive;},eventData);let caught;try{compare(before,structuredClone(before));}catch(error){caught=error;}assert.equal(caught,primitive);assert.equal(preservationFailures.get(caught),undefined);assert.deepEqual(finiteFailure(caught,'bridge-before-launch-preservation'),{class:'other'});}
+ console.log('PASS actual equality wrapper table/UID/widget/file failures, closed14-table/file-bucket evidence, version-only still rejected, unknown diagnostic faults and original error/status/privacy preservation.');
+}
 function selfCheck(){
+ preservationSelfCheck();
  for(const value of [undefined,'false'])assert.equal(permissionSelection(value),false);assert.equal(permissionSelection('true'),true);for(const value of ['',true,false,'TRUE','1','other'])assert.throws(()=>permissionSelection(value));
  const permissionAddition=`:000000 100644 ${'0'.repeat(40)} ${'c'.repeat(40)} A\0${permissionEvidencePath}\0`;assert.throws(()=>equivalentChanges(permissionAddition));assert.equal(equivalentChanges(permissionAddition,true).length,1);
  for(const raw of [permissionAddition.replace('100644','100755'),permissionAddition.replace(' A\0',' M\0'),permissionAddition.replace(permissionEvidencePath,'scripts/other.py'),permissionAddition+permissionAddition])assert.throws(()=>equivalentChanges(raw,true));
@@ -696,7 +745,7 @@ function snapshot(label){
  const widgets=widgetBinding(adb('shell','dumpsys','appwidget'),site=>exerciseEvidence.snapshotSite(site));
  exerciseEvidence.end('snapshot-'+label);return {tables,files,uid,widgets};
 }
-function equal(before,after){assertNativeTransition(before.tables,after.tables);assert.equal(after.uid,before.uid);assert.deepEqual(after.widgets,before.widgets);assert.deepEqual(Object.fromEntries(Object.entries(after.files).map(([k,v])=>[k,v.sha256])),Object.fromEntries(Object.entries(before.files).map(([k,v])=>[k,v.sha256])));}
+const equal=preservationEquality(assertNativeTransition,eventDataFromSql);
 function launched(before,after,version){assertNativeTransition(expectedLaunch(before.tables,version),after.tables);assert.equal(after.uid,before.uid);assert.deepEqual(after.widgets,before.widgets);protectedFiles(before.files,after.files,version,before.tables.events,eventDataFromSql,before.tables.puppies[0].name,1);}
 async function waitWidgetCount(count){const deadline=Date.now()+10000;do{const value=adb('shell',`sqlite3 -readonly /data/user/0/${app}/files/SQLite/puptime-v2.db "SELECT COUNT(*) FROM events WHERE source='widget';"`).trim();if(value===String(count)){await new Promise(done=>setTimeout(done,500));return;}await new Promise(done=>setTimeout(done,200));}while(Date.now()<deadline);throw new Error('Widget did not commit exactly once within the bounded wait.');}
 function rejectUpdate(path,before,label){const prefix=label==='plain-B-rejected'?'plain-B':'higher-A';exerciseEvidence.begin(prefix+'-reject');const result=command('adb',['-s',device,'install','-r',path],{ok:[1]});assert.match(result,/INSTALL_FAILED_UPDATE_INCOMPATIBLE/);exerciseEvidence.end(prefix+'-reject');exerciseEvidence.begin(prefix+'-preservation');equal(before,snapshot(label));pass(label,before);exerciseEvidence.end(prefix+'-preservation');}
