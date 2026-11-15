@@ -24,6 +24,8 @@ GitHub timestamp precision). Duplicate or stale artifacts fail closed; no
 artifact overwrite or deletion is introduced. The consumer rechecks run attempt,
 source and artifact metadata after download, before creating a simulator.
 
+The [current compiled-host producer at `ee31437`](https://github.com/patrickchin/puptime/actions/runs/43635534948) compiled and uploaded its host, then passed 12 of 13 standard flows. The CSV-import flow failed; conversational, SDK/account and deletion steps were not reached. This is usable compiled-host evidence under the explicit policy, not a full-suite or release pass. The older successful baseline remains historical evidence at its recorded source.
+
 Use the additional policy only deliberately:
 
 ```sh

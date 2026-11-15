@@ -7,7 +7,7 @@ import {nativeCommandState,readNativeCommandState} from './native-command-eviden
 
 const unknown={status:'UNKNOWN',kind:'unknown',targetId:null,sequence:0};
 const row=(key,value,status,sequenceNumber=0)=>({command:{[key]:value},metadata:{status,sequenceNumber}});
-const failed=row('scrollUntilVisibleCommand',{selector:{idRegex:'fontLicenses.react-native-vector-icons'}},'FAILED',26);
+const failed=row('scrollUntilVisible',{selector:{idRegex:'fontLicenses.react-native-vector-icons'}},'FAILED',26);
 const running=row('tapOnElement',{selector:{idRegex:'account.sendCode'}},'RUNNING',27);
 
 test('project actual leaf status/sequence, never infer failure or order competing unfinished leaves',()=>{
@@ -24,7 +24,7 @@ test('discard secret-rich values, evaluated commands, errors, paths and arbitrar
  const secrets=['private-identity@example.invalid','873921','cookie=private-session','/private/auth/trace','private error stack'];
  const secret=secrets.join(' '),entry={command:{inputTextCommand:{text:secret,value:secret,path:secret}},metadata:{status:'FAILED',sequenceNumber:4,error:secret,stackTrace:secret,evaluatedCommand:{inputTextCommand:{text:secret}}},unknown:secret};
  assert.deepEqual(nativeCommandState([entry]),{status:'FAILED',kind:'input',targetId:null,sequence:4});
- for(const key of ['tapOnElement','scrollUntilVisibleCommand','assertConditionCommand']){
+ for(const key of ['tapOnElement','scrollUntilVisible','assertConditionCommand']){
   const value={selector:{idRegex:secret,textRegex:secret},condition:{visible:{idRegex:secret,textRegex:secret}},text:secret};
   const projected=nativeCommandState([{...entry,command:{[key]:value}}]);assert.equal(projected.targetId,null);
   for(const value of secrets)assert.ok(!JSON.stringify(projected).includes(value));
@@ -33,6 +33,26 @@ test('discard secret-rich values, evaluated commands, errors, paths and arbitrar
  assert.deepEqual(nativeCommandState([{...entry,metadata:{status:secret,sequenceNumber:1}}]),unknown);
  const ambiguous={condition:{visible:{idRegex:'account.code.input'},notVisible:{idRegex:'account.email.input'}}};
  assert.equal(nativeCommandState([{...entry,command:{assertConditionCommand:ambiguous}}]).targetId,null);
+});
+
+test('identify only literal enable/open-account targets without exposing predicate text or runtime values',()=>{
+ const ids=['screen.account','nav.account','account.enable','account.status','account.local.count','account.combine.dialog','account.combine.confirm'];
+ const secret='private-identity@example.invalid 873921 cookie=private-session /private/auth';
+ for(const id of ids)for(const [key,value,kind] of [
+  ['tapOnElement',{selector:{idRegex:id,textRegex:secret}},'tap'],
+  ['scrollUntilVisible',{selector:{idRegex:id,textRegex:secret}},'scroll'],
+  ['assertConditionCommand',{condition:{visible:{idRegex:id,textRegex:secret}}},'assert'],
+  ['assertConditionCommand',{condition:{notVisible:{idRegex:id,textRegex:secret}}},'assert'],
+ ]){
+  const entry=row(key,value,'FAILED',11);entry.metadata.error=secret;entry.metadata.evaluatedCommand={secret};
+  const result=nativeCommandState([entry]);assert.deepEqual(result,{status:'FAILED',kind,targetId:id,sequence:11});assert.ok(!JSON.stringify(result).includes(secret));
+ }
+ for(const id of [secret,'account.enable.*','^account.enable$','account.enable/'+secret,'screen\\.(today|settings|account)','account.back']){
+  const result=nativeCommandState([row('assertConditionCommand',{condition:{visible:{idRegex:id,textRegex:secret}}},'FAILED',11)]);
+  assert.deepEqual(result,{status:'FAILED',kind:'assert',targetId:null,sequence:11});assert.ok(!JSON.stringify(result).includes(secret));
+ }
+ const failed=row('assertConditionCommand',{condition:{visible:{idRegex:'account.enable'}}},'FAILED',11),running=row('tapOnElement',{selector:{idRegex:'account.combine.confirm'}},'RUNNING',12);
+ for(const records of [[failed,running],[running,failed]])assert.deepEqual(nativeCommandState(records),unknown);
 });
 
 test('read the observed2.11 timestamp/flow/commands.json layout without returning manifest or raw data',()=>{
@@ -59,4 +79,18 @@ test('missing, malformed, oversized, invalid UTF8, symlink and ambiguous files f
   writeFileSync(join(root,'commands-(Synthetic flow).json'),JSON.stringify([failed]));assert.deepEqual(readNativeCommandState(root),unknown);
   for(let i=0;i<1025;i++)writeFileSync(join(root,'entry-'+i),'');assert.deepEqual(readNativeCommandState(root),unknown);
  }finally{rmSync(root,{recursive:true,force:true});}
+});
+
+
+// cli-2.11.0 commit c8c361be1cc89b2e742f185466a302a22778be6b:
+// maestro-orchestra-models/src/main/java/maestro/orchestra/MaestroCommand.kt
+// declares/constructs scrollUntilVisible (lines66/119); Commands.kt owns selector.
+test('pinned2.11 serialized scroll uses only scrollUntilVisible, never the invented Command suffix',()=>{
+ const value={selector:{idRegex:'fontLicenses.react-native-vector-icons',textRegex:'private identity@example.invalid 654321'},direction:'DOWN',scrollDuration:'601',timeout:'20000',visibilityPercentage:100,centerElement:false};
+ const metadata={status:'FAILED',sequenceNumber:41,error:'private body/header/cookie',evaluatedCommand:{private:'secret'}};
+ const result=nativeCommandState([{command:{scrollUntilVisible:value},metadata}]);
+ assert.deepEqual(result,{status:'FAILED',kind:'scroll',targetId:'fontLicenses.react-native-vector-icons',sequence:41});
+ for(const secret of ['identity@example.invalid','654321','private body/header/cookie','secret'])assert.ok(!JSON.stringify(result).includes(secret));
+ assert.deepEqual(nativeCommandState([{command:{scrollUntilVisibleCommand:value},metadata}]),unknown,'No legacy alias for a key absent from the pinned model.');
+ assert.deepEqual(nativeCommandState([{command:{scrollUntilVisible:value,scrollUntilVisibleCommand:value},metadata}]),unknown,'A mixed command union remains ambiguous.');
 });
