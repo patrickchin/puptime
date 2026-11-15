@@ -3,6 +3,7 @@ import hashlib
 import importlib.util
 import io
 from pathlib import Path
+import struct
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -13,7 +14,100 @@ reader = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(reader)
 
 
+def jvm_fixture(extra=b"", slots=0, major=52):
+    pool = b"\x01\x00\x02QA\x07\x00\x01\x01\x00\x10java/lang/Object\x07\x00\x03"
+    return b"\xca\xfe\xba\xbe" + struct.pack(">HHH", 0, major, 5 + slots) + pool + extra + struct.pack(">7H", 0x21, 2, 4, 0, 0, 0, 0)
+
+
 class NativeArchiveTests(unittest.TestCase):
+    def test_positive_jvm_structure_does_not_depend_on_extension(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "classes.jar"
+            with zipfile.ZipFile(path, "w") as archive:
+                for name in ("QA.class", "DebugProbesKt.bin", "extensionless"):
+                    archive.writestr(name, jvm_fixture())
+                archive.writestr("modified-utf8", jvm_fixture(b"\x01\x00\x05\xc0\x80\xed\xa0\x80", 1))
+            self.assertEqual(reader.inspect_archive(path)["nativeFiles"], [])
+
+    def test_malformed_jvm_pool_version_references_lengths_and_eof_fail(self):
+        valid = jvm_fixture()
+        invalid = [valid[:8] + b"\x00\x00" + valid[10:], valid[:-1], valid + b"\0",
+                   valid[:10] + b"\x02" + valid[11:], valid[:16] + b"\x00\xff" + valid[18:],
+                   valid[:-12] + b"\x00\x01" + valid[-10:],
+                   valid[:-2] + b"\x00\x01\x00\x01\x00\x00\x00\x03ab",
+                   jvm_fixture(b"\x05" + bytes(8), 1),
+                   jvm_fixture(b"\x05" + bytes(8) + b"\x07\x00\x06", 3),
+                   jvm_fixture(b"\x13\x00\x01", 1), jvm_fixture(major=70),
+                   jvm_fixture(b"\x01\x00\x01\x00", 1), jvm_fixture(b"\x01\x00\x01\xff", 1),
+                   b"\xca\xfe\xba\xbe\x00\x00\x00\x34" + bytes(1100)]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "invalid.jar"
+            for data in invalid:
+                with self.subTest(sha256=hashlib.sha256(data).hexdigest()):
+                    with zipfile.ZipFile(path, "w") as archive:
+                        archive.writestr("ambiguous.bin", data)
+                    with self.assertRaises(ValueError):
+                        reader.inspect_archive(path)
+
+    def test_valid_fat_32_64_swapped_and_jvm_looking_header_are_native_first(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "fat.zip"
+            with zipfile.ZipFile(path, "w") as archive:
+                for endian in (">", "<"):
+                    for wide in (False, True):
+                        width = 32 if wide else 20
+                        table = struct.pack(endian + ("IIQQII" if wide else "IIIII"), 12, 0, 8 + width, 4, 0, *([0] if wide else []))
+                        archive.writestr(f"{endian}-{wide}.class", struct.pack(endian + "II", 0xcafebabf if wide else 0xcafebabe, 1) + table + bytes(4))
+                table = struct.pack(">IIIII", 12, 0, 1048, 4, 0) * 52
+                archive.writestr("major52.bin", struct.pack(">II", 0xcafebabe, 52) + table + bytes(4))
+            self.assertEqual(len(reader.inspect_archive(path)["nativeFiles"]), 5)
+
+    def test_jvm_crc_and_original_read_errors_propagate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "crc.jar"
+            with zipfile.ZipFile(path, "w") as archive:
+                archive.writestr("QA.bin", jvm_fixture())
+            with zipfile.ZipFile(path) as archive:
+                entry = archive.infolist()[0]
+                offset = entry.header_offset + 30 + len(entry.filename.encode()) + len(entry.extra)
+            corrupt = bytearray(path.read_bytes())
+            corrupt[offset + 13] ^= 1
+            path.write_bytes(corrupt)
+            with self.assertRaises(zipfile.BadZipFile):
+                reader.inspect_archive(path)
+        original = OSError("synthetic JVM read failure")
+
+        class FailedStream(io.BytesIO):
+            def read(self, size=-1):
+                if self.tell() >= 8:
+                    raise original
+                return super().read(size)
+
+        with self.assertRaises(OSError) as caught:
+            reader.jvm_class_structure(SimpleNamespace(open=lambda _: FailedStream(jvm_fixture())), SimpleNamespace(file_size=len(jvm_fixture())))
+        self.assertIs(caught.exception, original)
+
+    def test_jvm_attribute_skip_and_declared_file_bound_are_finite(self):
+        data = jvm_fixture()[:-2] + struct.pack(">HHI", 1, 1, 2 * 1024**2) + bytes(2 * 1024**2)
+        requests = []
+
+        class BoundedStream(io.BytesIO):
+            def read(self, size=-1):
+                requests.append(size)
+                if not 0 <= size <= 1024**2:
+                    raise AssertionError("Unbounded JVM read")
+                return super().read(size)
+
+        archive = SimpleNamespace(open=lambda _: BoundedStream(data))
+        reader.jvm_class_structure(archive, SimpleNamespace(file_size=len(data)))
+        self.assertIn(1024**2, requests)
+        with self.assertRaises(ValueError):
+            reader.jvm_class_structure(archive, SimpleNamespace(file_size=len(data) + 1))
+        requests.clear()
+        with self.assertRaises(ValueError):
+            reader.jvm_class_structure(archive, SimpleNamespace(file_size=128 * 1024**2 + 1))
+        self.assertEqual(requests, [])
+
     def test_native_stream_never_uses_unbounded_reads(self):
         class BoundedStream(io.BytesIO):
             def read(self, size=-1):

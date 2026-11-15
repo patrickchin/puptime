@@ -32,6 +32,98 @@ def native_digest(archive, entry):
     return digest.hexdigest()
 
 
+def jvm_class_structure(archive, entry):
+    # JVMS 4.1/4.4/4.7 framing, not bytecode verification or execution.
+    def require(condition):
+        if not condition:
+            raise ValueError("Malformed or unsupported universal native input")
+
+    require(10 <= entry.file_size <= MAX_NESTED)
+    remaining = entry.file_size
+    with archive.open(entry) as stream:
+        def take(size):
+            nonlocal remaining
+            require(0 <= size <= min(remaining, MAX_TEXT))
+            value = stream.read(size)
+            require(len(value) == size)
+            remaining -= size
+            return value
+
+        def integer(size=2):
+            return int.from_bytes(take(size), "big")
+
+        def skip(size):
+            require(size <= remaining)
+            while size:
+                chunk = min(size, MAX_TEXT)
+                take(chunk)
+                size -= chunk
+
+        require(take(4) == b"\xca\xfe\xba\xbe")
+        minor, major = integer(), integer()
+        require(45 <= major <= 69 and (major < 56 or minor in (0, 65535)))
+        count = integer()
+        require(count > 0)
+        pool, references, index = [None] * count, [], 1
+        while index < count:
+            tag = integer(1)
+            pool[index] = tag
+            require(tag in (1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15, 16, 17, 18, 19, 20))
+            require(tag not in (15, 16, 18) or major >= 51)
+            require(tag not in (19, 20) or major >= 53)
+            require(tag != 17 or major >= 55)
+            if tag == 1:
+                value = take(integer())
+                require(b"\0" not in value and all(byte < 0xf0 for byte in value))
+                # Modified UTF-8 permits encoded NUL and surrogate code units.
+                value.replace(b"\xc0\x80", b"\0").decode("utf-8", errors="surrogatepass")
+            elif tag in (3, 4, 5, 6):
+                skip(8 if tag in (5, 6) else 4)
+                if tag in (5, 6):
+                    index += 1
+                    require(index < count)
+            elif tag in (7, 8, 16, 19, 20):
+                references.append((integer(), (1,)))
+            elif tag in (9, 10, 11, 12):
+                references.extend([(integer(), (1,) if tag == 12 else (7,)), (integer(), (1,) if tag == 12 else (12,))])
+            elif tag in (17, 18):
+                integer()  # Bootstrap-method table index, not a pool reference.
+                references.append((integer(), (12,)))
+            else:
+                kind = integer(1)
+                require(1 <= kind <= 9)
+                allowed = (9,) if kind <= 4 else (11,) if kind == 9 else (10, 11) if kind in (6, 7) and major >= 52 else (10,)
+                references.append((integer(), allowed))
+            index += 1
+
+        def reference(index, tags):
+            require(0 < index < count and pool[index] in tags)
+
+        for index, tags in references:
+            reference(index, tags)
+
+        def attributes():
+            for _ in range(integer()):
+                reference(integer(), (1,))
+                skip(integer(4))
+
+        integer()  # access_flags
+        reference(integer(), (7,))
+        superclass = integer()
+        if superclass:
+            reference(superclass, (7,))
+        for _ in range(integer()):
+            reference(integer(), (7,))
+        for _ in range(2):  # fields, then methods
+            for _ in range(integer()):
+                integer()
+                reference(integer(), (1,))
+                reference(integer(), (1,))
+                attributes()
+        attributes()
+        require(remaining == 0 and stream.read(1) == b"")
+
+
 def is_macho(archive, entry):
     # CAFEBABE is shared with JVM class files. Check the bounded universal
     # architecture table, not magic alone (Apple mach-o/fat.h; JVMS 4.1).
@@ -51,7 +143,8 @@ def is_macho(archive, entry):
             ranges = [struct.unpack_from(endian + ("QQ" if wide else "II"), table, i * width + 8) for i in range(count)]
             if all(offset >= 8 + count * width and size >= 4 and offset + size <= entry.file_size for offset, size in ranges):
                 return True
-        if magic == b"\xca\xfe\xba\xbe" and entry.filename.endswith(".class") and len(header) == 8 and struct.unpack(">H", header[6:8])[0] >= 45:
+        if magic == b"\xca\xfe\xba\xbe":
+            jvm_class_structure(archive, entry)
             return False
         raise ValueError("Malformed or unsupported universal native input")
 

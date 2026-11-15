@@ -82,6 +82,15 @@ has 32 native entries; its largest is 140,693,272 bytes, above the previous
 128 MiB shared bound. This establishes the scoped size failure, not complete
 notice coverage or a qualified app artifact.
 
+`CAFEBABE` also identifies JVM class bytes. After valid universal-native tables
+are checked first, the reader recognizes JVM structure independently of the
+filename: known version/pool tags and references, member and attribute framing,
+and exact EOF/CRC within the existing 128 MiB nested-input bound. It does not
+execute or semantically verify bytecode. Malformed or unknown ambiguous inputs
+still fail. The pinned [Kotlin producer](https://github.com/Kotlin/kotlinx.coroutines/blob/1.10.2/kotlinx-coroutines-core/jvm/src/debug/internal/AgentPremain.kt#L40)
+uses `DebugProbesKt.bin` as class bytes; this is a format distinction, not an
+archive-member exclusion or a notice-coverage approval.
+
 The Gradle init script requires an explicit absolute `noticeMainProjectRoot` and
 compares canonical project directories before registering its task. Other
 included builds are skipped; a missing `:app` on the selected root still fails.
