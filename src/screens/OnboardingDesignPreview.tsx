@@ -19,6 +19,7 @@ import {OnboardingPlanTimeline} from '../components/OnboardingPlanTimeline';
 import {AccountSignIn} from '../components/AccountSignIn';
 import {useAccountSnapshot} from '../cloud/use-account-snapshot';
 import type {CloudHandle} from '../cloud/handle';
+import type {OnboardingDiagnosticInput} from '../cloud/sync-diagnostics';
 import {ExactReminderAccessError} from '../reminders';
 import {translate} from '../localization';
 export type OnboardingDraft={puppyName:string;schedule:ScheduleEntry[];notifications:NotificationPreferences;showGuide:boolean;sharingKind?:'household'|'temporary'|null};
@@ -76,6 +77,13 @@ function PreviewFlow({cloud,onFinish,onAllowNotifications,onDisableNotifications
   const [direction,setDirection]=useState(1);
   const transition=useRef(new Animated.Value(1)).current;
   const page=useRef<ReactNode>(null),transitioning=useRef(false);
+  const diagnostic=useRef({record:cloud.recordOnboardingDiagnostic,step});
+  diagnostic.current.record=cloud.recordOnboardingDiagnostic;
+  function record(point:OnboardingDiagnosticInput['point'],details:Pick<OnboardingDiagnosticInput,'accountActionPending'|'decision'|'animation'>={},observedStep:Step=step){
+    try{diagnostic.current.record?.({event:'onboarding',point,step:observedStep==='welcome'||observedStep==='account'||observedStep==='profile'?observedStep:'other',...details});}catch{/* Support logging cannot affect onboarding. */}
+  }
+  useEffect(()=>{record('mount');return()=>record('unmount',{},diagnostic.current.step);},[]);
+  useEffect(()=>{diagnostic.current.step=step;if(step==='welcome'||step==='account'||step==='profile')record('screen',{accountActionPending:guestLocked});},[step,guestLocked]);
   useEffect(()=>{
     let current=true;
     void AccessibilityInfo.isReduceMotionEnabled().then(value=>{if(current)setReduceMotion(value);});
@@ -105,15 +113,18 @@ function PreviewFlow({cloud,onFinish,onAllowNotifications,onDisableNotifications
     return()=>subscription.remove();
   },[step,signingIn]);
   function go(next:Step,backward=false){
-    if(transitioning.current||next===step)return;
+    if(transitioning.current||next===step){if(next==='profile')record('profile-decision',{decision:transitioning.current?'transitioning':'same-step'});return;}
+    if(next==='profile')record('profile-decision',{decision:'accepted'});
     Keyboard.dismiss();setPickingTime(false);
     if(reduceMotion){setStep(next);return;}
     transitioning.current=true;setOutgoing(page.current);setDirection(backward?-1:1);
     transition.setValue(0);setStep(next);
-    requestAnimationFrame(()=>Animated.timing(transition,{toValue:1,duration:300,easing:Easing.out(Easing.cubic),useNativeDriver:true}).start(()=>{setOutgoing(null);transitioning.current=false;}));
+    requestAnimationFrame(()=>Animated.timing(transition,{toValue:1,duration:300,easing:Easing.out(Easing.cubic),useNativeDriver:true}).start(result=>{if(next==='profile')record('animation-settled',{animation:result?.finished===true?'finished':result?.finished===false?'interrupted':'unknown'},diagnostic.current.step);setOutgoing(null);transitioning.current=false;}));
   }
   function startWithoutAccount(){
-    if(cloud.controller?.read().accountActionPending)return;
+    const accountActionPending=cloud.controller?.read().accountActionPending??false;
+    record('guest-handler',{accountActionPending});
+    if(accountActionPending){record('profile-decision',{decision:'account-action-pending'});return;}
     go('profile');
   }
   function preparePoop(times:number[]){
@@ -187,7 +198,7 @@ function PreviewFlow({cloud,onFinish,onAllowNotifications,onDisableNotifications
     <View style={styles.welcomeArt}><Image accessible={false} source={mascot} resizeMode="contain" style={styles.mascot}/></View>
     <View style={styles.welcomeActions}>
       <Text style={styles.welcomeQuestion}>How would you like to begin?</Text>
-      <Pressable testID="preview.guest" accessibilityRole="button" disabled={guestLocked} accessibilityState={{disabled:guestLocked}} onPress={startWithoutAccount} style={[styles.secondary,{backgroundColor:theme.primary}]}><Text style={[styles.secondaryText,{color:theme.onPrimary}]}>Let’s start without an account</Text></Pressable>
+      <Pressable testID="preview.guest" accessibilityRole="button" disabled={guestLocked} accessibilityState={{disabled:guestLocked}} onPressIn={()=>record('guest-press-in')} onPress={startWithoutAccount} style={[styles.secondary,{backgroundColor:theme.primary}]}><Text style={[styles.secondaryText,{color:theme.onPrimary}]}>Let’s start without an account</Text></Pressable>
       <AccountSignIn cloud={cloud} theme={welcomeAccountTheme} showIntro={false} onEmailPress={()=>go('account')}/>
       <Pressable testID="preview.invited" accessibilityRole="button" onPress={()=>{if(onOpenShared)onOpenShared();else void Linking.openURL(`${cloud.sharingOrigin??'https://puptime.pages.dev'}/care`).catch(()=>setReminderError('Couldn’t open shared puppies. Open your invitation link in your browser.'));}} style={styles.secondary}><Text style={styles.secondaryText}>Already invited? Open shared puppies</Text></Pressable>
       {reminderError?<Text accessibilityRole="alert" style={styles.error}>{reminderError}</Text>:null}
@@ -196,7 +207,7 @@ function PreviewFlow({cloud,onFinish,onAllowNotifications,onDisableNotifications
   else if(step==='account')body=<ScrollView testID="preview.account" keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={styles.conversation}>
     {prompt('Sign in')}
     <View style={styles.emailCard}><AccountSignIn cloud={cloud} theme={appTheme} showIntro={false} emailOnly/></View>
-    <Pressable testID="preview.guest" accessibilityRole="button" disabled={guestLocked} accessibilityState={{disabled:guestLocked}} onPress={startWithoutAccount} style={styles.secondary}><Text style={styles.secondaryText}>Let’s start without an account</Text></Pressable>
+    <Pressable testID="preview.guest" accessibilityRole="button" disabled={guestLocked} accessibilityState={{disabled:guestLocked}} onPressIn={()=>record('guest-press-in')} onPress={startWithoutAccount} style={styles.secondary}><Text style={styles.secondaryText}>Let’s start without an account</Text></Pressable>
   </ScrollView>;
   else if(step==='profile')body=<>
     <ScrollView ref={scroll} testID="preview.profile" keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={styles.profileContent}>
