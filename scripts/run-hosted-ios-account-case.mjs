@@ -8,13 +8,15 @@ import {dirname,isAbsolute,join,resolve} from 'node:path';
 import {deleteOwnedSimulator,installTaskCleanup,ownProcess} from './native-task-cleanup.mjs';
 import {nativeCodeFingerprint} from './native-runtime-inputs.mjs';
 import {assertNativeHostRun,assertNativeHostPolicy,assertSameHostAttempt} from './native-host-policy.mjs';
+import {standardSelection} from './native-standard-suite.mjs';
 
 const repository=process.env.GITHUB_REPOSITORY,runId=process.env.PUPTIME_NATIVE_HOST_RUN_ID;
 assert.equal(repository,'patrickchin/puptime','Run only in the intended repository.');
 assert.match(runId??'',/^\d+$/);
 const scenario=process.env.PUPTIME_ACCOUNT_SCENARIO;
-assert.ok(['baseline','comparison','offline','isolation','photos','deletion','enrolled-upgrade'].includes(scenario));
-const output=resolve('build/isolated-native-account',scenario);mkdirSync(output,{recursive:true});
+assert.ok(['baseline','comparison','offline','isolation','photos','deletion','enrolled-upgrade','standard-csv','standard-all'].includes(scenario));
+const standard=scenario==='standard-csv'||scenario==='standard-all';
+const output=resolve('build/isolated-native-account',scenario);if(standard)assert.ok(!existsSync(output),'Use a fresh standard-case output.');mkdirSync(output,{recursive:true});
 const privateDirectory=mkdtempSync(join(tmpdir(),'puptime-native-host-'));
 const command=(binary,args,options={})=>execFileSync(binary,args,{encoding:'utf8',timeout:120000,stdio:['ignore','pipe','pipe'],...options}).trim();
 const api=path=>JSON.parse(command('gh',['api',`repos/${repository}/${path}`]));
@@ -51,6 +53,7 @@ const currentRun=api(`actions/runs/${runId}`);assertSameHostAttempt(run,currentR
 const currentArtifact=api(`actions/artifacts/${artifact.id}`);assert.equal(currentArtifact.digest,artifact.digest);
 const {proof}=assertNativeHostPolicy({policy,run:currentRun,artifacts:{total_count:1,artifacts:[currentArtifact]},jobs,repository});
 const provenance={...proof,scenario,candidateSource:source,nativeSource:run.head_sha,nativeHostRunId:runId,artifactId:artifact.id,artifactDigest:artifact.digest,archiveSource:process.env.PUPTIME_NATIVE_HOST_ARCHIVE?'verified-local-cache':'download',nativeInputsUnchanged:true,nativeExecutableSHA256:hash(join(host,'Puptime')),nativeCode,scope:scenario==='enrolled-upgrade'?'Driver source with privately prepared historical native/source inputs; the selected-main artifact is a reference attestation, and the prepared older native host is installed first. Actual native email SDK and isolated local HTTPS service; controlled-origin runtime qualification only.':'Actual native email SDK + ephemeral local HTTPS Better Auth/D1/SQLite DO; synthetic identity and history only; no production, provider OAuth or release qualification.'};
+if(standard)provenance.scope='Full production App with unchanged standard guest flows, native storage/navigation and SDK using an ephemeral local HTTPS service. App PostHog is unconfigured. No email sign-in, provider, production or release qualification.';
 let initialHost=host;
 if(scenario==='enrolled-upgrade'){
  const path=process.env.PUPTIME_ENROLLED_RUNTIME_INPUTS;assert.ok(path&&isAbsolute(path));assert.equal(realpathSync(path),path);assert.equal(statSync(path).mode&0o777,0o600);assert.equal(statSync(dirname(path)).mode&0o777,0o700);assert.ok(statSync(path).size<2097152);
@@ -80,12 +83,12 @@ try{
  catch(error){
   // This is before app install or identity setup: retain actual OS progress, not
   // Node's truncated rendering of the child-process error's stdout property.
-  writeFileSync(join(output,'simulator-boot-failure.log'),String(error.stdout??'').slice(-65536)+'\n'+String(error.stderr??'').slice(-8192));
+  if(!standard)writeFileSync(join(output,'simulator-boot-failure.log'),String(error.stdout??'').slice(-65536)+'\n'+String(error.stderr??'').slice(-8192));
   let state='unavailable';try{const all=JSON.parse(command('xcrun',['simctl','list','devices','available','-j'],{timeout:15000}));state=Object.values(all.devices).flat().find(item=>item.udid===device)?.state??'missing';}catch{}
   writeFileSync(join(output,'simulator-boot-failure.json'),JSON.stringify({stage:'simulator-boot',appInstalled:false,elapsedMs:Date.now()-bootStarted,category:error.code==='ETIMEDOUT'?'timeout':'command-failed',state},null,2)+'\n');throw error;
  }
  command('xcrun',['simctl','install',device,initialHost]);
- const mode={baseline:[],comparison:['--puppy-comparison'],offline:['--offline-lifecycle'],isolation:['--account-isolation'],photos:['--photo-lifecycle'],deletion:['--deletion-faults'],'enrolled-upgrade':['--enrolled-runtime-upgrade']}[scenario];
+ const mode=standard?[standardSelection(scenario).mode]:{baseline:[],comparison:['--puppy-comparison'],offline:['--offline-lifecycle'],isolation:['--account-isolation'],photos:['--photo-lifecycle'],deletion:['--deletion-faults'],'enrolled-upgrade':['--enrolled-runtime-upgrade']}[scenario];
  const args=['scripts/verify-ios-guest-account.mjs',device,initialHost,'--replace-synthetic',output,...mode];
  await new Promise((resolveCase,reject)=>{const child=spawn(process.execPath,args,{stdio:'inherit',detached:true,env:{...process.env,CI:'1'}});stopCaseChild=ownProcess(child,{graceMs:120000});child.once('error',reject);child.once('close',async code=>{const stopped=await stopCaseChild();code===0&&stopped?resolveCase():reject(new Error(`Native ${scenario} case failed (${code}).`));});});
  assert.equal(JSON.parse(readFileSync(join(output,'verification.json'),'utf8')).status,'passed');assert.equal(task.signal,null);completed=true;

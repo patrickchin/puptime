@@ -24,7 +24,7 @@ on:
       account_case:
         description: Isolated account case
         type: choice
-        options: [all, baseline, comparison, offline, isolation, photos, deletion, upgrade]
+        options: [all, baseline, comparison, offline, isolation, photos, deletion, upgrade, standard-csv, standard-all]
         default: all
       upgrade_stage:
         description: Original-runtime archive inspection or actual data-preserving replacement
@@ -232,7 +232,7 @@ jobs:
           java-version: '17'
       - run: npm ci
       - name: Check native evidence assertions
-        run: node --test scripts/native-account-evidence.test.mjs
+        run: node --test scripts/native-account-evidence.test.mjs scripts/native-standard-suite.test.mjs
       - name: Install existing Maestro driver
         env:
           MAESTRO_VERSION: '2.11.0'
@@ -240,6 +240,7 @@ jobs:
           curl -fsSL 'https://get.maestro.mobile.dev' | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
       - name: Run isolated real-SDK account case
+        timeout-minutes: ${{ startsWith(matrix.scenario, 'standard-') && 60 || 90 }}
         env:
           GH_TOKEN: ${{ github.token }}
           PUPTIME_NATIVE_HOST_RUN_ID: ${{ inputs.native_host_run_id }}
