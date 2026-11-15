@@ -1,7 +1,7 @@
 # App notice capture and final-artifact gate
 
 This is incomplete build preparation. The source JSON currently contains the
-reviewed font/icon notices only. Five exact iOS npm inputs have attribution
+reviewed font/icon notices only. Twenty-one exact iOS inputs have attribution
 reviews; remaining component review and the incomplete payload prevent sealing.
 Source tests, an internal simulator build, and finding licence filenames
 do not establish complete app-library notice coverage or store readiness.
@@ -21,10 +21,25 @@ The first component batch is iOS-only: `@react-native/assets-registry`,
 and original MIT notices match discovery 43682437095 at source82cede4. All 20 selected
 JS files matched installed bytes and exact SHA512-pinned cached official tar
 members. None has a selected generated source, vendor boundary or extra native
-input. Against that inventory, 198 components plus one generated source remain
-unreviewed, with all 109 recorded vendor boundaries still requiring their
-applicable review. These five records grant no Android, vendor, generated,
-native-binary or retained-resource approval; no new discovery or sealing is implied.
+input. These five records grant no Android, vendor, generated, native-binary or
+retained-resource approval.
+
+The next fifteen explicit npm records cover the listed React/runtime/polyfill
+support packages, with original package LICENSE files and exact registry
+tarball/SRI public-source pins. All 63 selected files matched the qualified
+capture, installed bytes and official cached tar members. Root-agent source
+review read the twelve new distinct MIT texts; React/scheduler reuse the exact
+previously reviewed Meta text. A package's MIT label alone grants no approval.
+Hoist's BSD text remains deferred; no generic MIT or sibling allowlist is used.
+
+One additional iOS record covers only `ExpoFileSystem@57.0.7` and its three exact
+own-product xcframework/slice boundaries, mapped to that package's original
+LICENSE. The selected 63-file source/product fingerprint and published inputs
+are pinned. External React/Hermes/framework dependencies gain no attribution.
+Against the qualified82 inventory, 182 components plus one generated source
+remain unreviewed. Of 109 recorded vendor boundaries, only these three specific
+FileSystem boundaries are reviewed; the other 106 remain held. No new discovery,
+Android, packaged-native, retained-resource, payload or sealing approval is implied.
 
 ## Stable offline resource
 
@@ -272,7 +287,7 @@ the app imports the MaterialCommunityIcons TTF, whose generated asset registry
 require is intercepted by the pinned resolver into the third. Source-only tests
 exercise those actual provider functions in memory without Metro or dynamic
 environment values. These are technical generated-source mappings, not reviewed notice
-coverage; the five npm reviews do not approve their providers. Other virtual IDs are not accepted
+coverage; component reviews do not approve their providers. Other virtual IDs are not accepted
 by a NUL/path wildcard. Final native files not identified from resolved AARs require an exact
 platform/path `packagedNative` mapping with covered `components` and a pinned
 `review` reference. Packaged-native mappings remain empty until reviewed discovery.

@@ -215,6 +215,274 @@
       ],
       "upstream": "https://raw.githubusercontent.com/kazuhikoarase/qrcode-generator/83b7e8fe3fddd3b0368dbafd6ce56995bd25e3c8/LICENSE",
       "sectionSHA256": "3a850fa5f08101db6f40676c2786e10bd2cd5fff7b12ffdf1e0c434d4e49d90c"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:@babel/runtime@7.29.7",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/@babel/runtime/LICENSE",
+          "sha256": "117da2af0d4ce0fe1c8e19b5cff9dcd806adf973d328d27b11d4448c4ff24f76"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/@babel/runtime/-/runtime-7.29.7.tgz",
+      "sectionSHA256": "117da2af0d4ce0fe1c8e19b5cff9dcd806adf973d328d27b11d4448c4ff24f76"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:abort-controller@3.0.0",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/abort-controller/LICENSE",
+          "sha256": "dbbf03317f0101fed5643cd87ca80fb769e358fa4f428445bf2315deeb23a154"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/abort-controller/-/abort-controller-3.0.0.tgz",
+      "sectionSHA256": "dbbf03317f0101fed5643cd87ca80fb769e358fa4f428445bf2315deeb23a154"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:base64-js@1.5.1",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/base64-js/LICENSE",
+          "sha256": "5b37224c080cdcc97c871ada971c224e9926370fe74f11b539aa1cf9f3b1aca1"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/base64-js/-/base64-js-1.5.1.tgz",
+      "sectionSHA256": "5b37224c080cdcc97c871ada971c224e9926370fe74f11b539aa1cf9f3b1aca1"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:event-target-shim@5.0.1",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/event-target-shim/LICENSE",
+          "sha256": "97d87142793695cd73243de7258694abe85b3b6060fca7f247b0a2afa8219678"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/event-target-shim/-/event-target-shim-5.0.1.tgz",
+      "sectionSHA256": "97d87142793695cd73243de7258694abe85b3b6060fca7f247b0a2afa8219678"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:flow-enums-runtime@0.0.6",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/flow-enums-runtime/LICENSE",
+          "sha256": "52412d7bc7ce4157ea628bbaacb8829e0a9cb3c58f57f99176126bc8cf2bfc85"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/flow-enums-runtime/-/flow-enums-runtime-0.0.6.tgz",
+      "sectionSHA256": "52412d7bc7ce4157ea628bbaacb8829e0a9cb3c58f57f99176126bc8cf2bfc85"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:invariant@2.2.4",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/invariant/LICENSE",
+          "sha256": "f657f99d3fb9647db92628e96007aabb46e5f04f33e49999075aab8e250ca7ce"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/invariant/-/invariant-2.2.4.tgz",
+      "sectionSHA256": "f657f99d3fb9647db92628e96007aabb46e5f04f33e49999075aab8e250ca7ce"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:memoize-one@5.2.1",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/memoize-one/LICENSE",
+          "sha256": "b1c501095de70182748cb8e8d97ac5577701a4ef3b755ba30d59fd87b24bdb0f"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/memoize-one/-/memoize-one-5.2.1.tgz",
+      "sectionSHA256": "b1c501095de70182748cb8e8d97ac5577701a4ef3b755ba30d59fd87b24bdb0f"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:nullthrows@1.1.1",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/nullthrows/LICENSE",
+          "sha256": "dd5f97aa25431e25fea6654f12f4ce167dc19b3148ab515cc271aa8efe6eb0be"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/nullthrows/-/nullthrows-1.1.1.tgz",
+      "sectionSHA256": "dd5f97aa25431e25fea6654f12f4ce167dc19b3148ab515cc271aa8efe6eb0be"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:promise@8.3.0",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/promise/LICENSE",
+          "sha256": "5e733eb92ed0c571da3f27c5da203e0a9f975b4f96e7692c9fa3660ca54820ec"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/promise/-/promise-8.3.0.tgz",
+      "sectionSHA256": "5e733eb92ed0c571da3f27c5da203e0a9f975b4f96e7692c9fa3660ca54820ec"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:react-is@16.13.1",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/hoist-non-react-statics/node_modules/react-is/LICENSE",
+          "sha256": "52412d7bc7ce4157ea628bbaacb8829e0a9cb3c58f57f99176126bc8cf2bfc85"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-is/-/react-is-16.13.1.tgz",
+      "sectionSHA256": "52412d7bc7ce4157ea628bbaacb8829e0a9cb3c58f57f99176126bc8cf2bfc85"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:react@19.2.3",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/react/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react/-/react-19.2.3.tgz",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:regenerator-runtime@0.13.11",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/regenerator-runtime/LICENSE",
+          "sha256": "51887a3d47051ac2fce1210562e5b9fe0830a8a8fabeb272c2d586eeb18a05fd"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/regenerator-runtime/-/regenerator-runtime-0.13.11.tgz",
+      "sectionSHA256": "51887a3d47051ac2fce1210562e5b9fe0830a8a8fabeb272c2d586eeb18a05fd"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:scheduler@0.27.0",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/scheduler/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/scheduler/-/scheduler-0.27.0.tgz",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:stacktrace-parser@0.1.11",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/stacktrace-parser/LICENSE",
+          "sha256": "e1898814043cb5500483d9c8517edda824b352f696d35e5043fcfb537c221531"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/stacktrace-parser/-/stacktrace-parser-0.1.11.tgz",
+      "sectionSHA256": "e1898814043cb5500483d9c8517edda824b352f696d35e5043fcfb537c221531"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:whatwg-fetch@3.6.20",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/whatwg-fetch/LICENSE",
+          "sha256": "c887d1c97797646dbb216925ab44a93c6b3e7f03bbe6ef6e0f92b8b8ade63014"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/whatwg-fetch/-/whatwg-fetch-3.6.20.tgz",
+      "sectionSHA256": "c887d1c97797646dbb216925ab44a93c6b3e7f03bbe6ef6e0f92b8b8ade63014"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:ExpoFileSystem@57.0.7",
+      "reviewedVendors": [
+        "ExpoFileSystem.xcframework",
+        "ExpoFileSystem.xcframework/ios-arm64/ExpoFileSystem.framework",
+        "ExpoFileSystem.xcframework/ios-arm64_x86_64-simulator/ExpoFileSystem.framework"
+      ],
+      "vendorNoticeSources": {
+        "ExpoFileSystem.xcframework": [
+          "node_modules/expo-file-system/LICENSE"
+        ],
+        "ExpoFileSystem.xcframework/ios-arm64/ExpoFileSystem.framework": [
+          "node_modules/expo-file-system/LICENSE"
+        ],
+        "ExpoFileSystem.xcframework/ios-arm64_x86_64-simulator/ExpoFileSystem.framework": [
+          "node_modules/expo-file-system/LICENSE"
+        ]
+      },
+      "nativeInputs": {
+        "cocoapods:ExpoFileSystem": {
+          "sha256": "2170187d5f6c7e19a06acf677791826a325457b75e4f15541f452b605edc646e",
+          "files": 63,
+          "excludedBuildPaths": [],
+          "frameworkInputList": {
+            "source": "ios/Pods/Target Support Files/ExpoFileSystem/ExpoFileSystem-xcframeworks-input-files.xcfilelist",
+            "sha256": "cbfe1f9e30b8eb3d6f709186ace6be7ec8c1427b1bd18825f4411bbf4b7ca1f7"
+          },
+          "ownLicense": {
+            "ownerNpmID": "npm:expo-file-system@57.0.7",
+            "packagePath": "node_modules/expo-file-system",
+            "sourceKind": "podspec",
+            "packageJSON": {
+              "source": "node_modules/expo-file-system/package.json",
+              "sha256": "db1d8ced7ce04e7daf4e55c3fd543bfbe42e32aa5e192bbb8ae4bda98de50069"
+            },
+            "podspec": {
+              "source": "node_modules/expo-file-system/ios/ExpoFileSystem.podspec",
+              "sha256": "c651c016d967b778b8ccd4dea4490454a10ef6c27488d0f05ee9896ca45172f7"
+            },
+            "license": {
+              "source": "node_modules/expo-file-system/LICENSE",
+              "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4"
+            },
+            "upstream": "https://registry.npmjs.org/expo-file-system/-/expo-file-system-57.0.7.tgz",
+            "upstreamIntegrity": "sha512-1vkZRadOsIputFDBcclqBa1pO3iXOO6iIsdqJipQWw4V5TSnWgmRTuOF7ro8IzrVue+PHbum++KCG3Tawem4cg=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/expo-file-system/LICENSE",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/expo-file-system/-/expo-file-system-57.0.7.tgz",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4"
     }
   ],
   "generatedSources": {
@@ -2011,6 +2279,156 @@
       "sourceKind": "path",
       "podspecSource": "node_modules/react-native/ReactCommon/yoga/Yoga.podspec",
       "podspecSHA256": "64eb7b752d3d6eb02514d5763220453dbc3a6a0aa040f27614a4ba6371b4ba9f"
+    },
+    {
+      "component": "npm:@babel/runtime@7.29.7",
+      "ecosystem": "npm",
+      "version": "7.29.7",
+      "public": true,
+      "source": "node_modules/@babel/runtime/LICENSE",
+      "sha256": "117da2af0d4ce0fe1c8e19b5cff9dcd806adf973d328d27b11d4448c4ff24f76",
+      "upstream": "https://registry.npmjs.org/@babel/runtime/-/runtime-7.29.7.tgz",
+      "upstreamIntegrity": "sha512-Nq8OhGWiZIZGV6hLHoyAKLLcJihP/xFeBMGJoUrxTX2psI8dCifzLhZISFb+VWS3wFMRDmCGw5R+dOySCqPLhw=="
+    },
+    {
+      "component": "npm:abort-controller@3.0.0",
+      "ecosystem": "npm",
+      "version": "3.0.0",
+      "public": true,
+      "source": "node_modules/abort-controller/LICENSE",
+      "sha256": "dbbf03317f0101fed5643cd87ca80fb769e358fa4f428445bf2315deeb23a154",
+      "upstream": "https://registry.npmjs.org/abort-controller/-/abort-controller-3.0.0.tgz",
+      "upstreamIntegrity": "sha512-h8lQ8tacZYnR3vNQTgibj+tODHI5/+l06Au2Pcriv/Gmet0eaj4TwWH41sO9wnHDiQsEj19q0drzdWdeAHtweg=="
+    },
+    {
+      "component": "npm:base64-js@1.5.1",
+      "ecosystem": "npm",
+      "version": "1.5.1",
+      "public": true,
+      "source": "node_modules/base64-js/LICENSE",
+      "sha256": "5b37224c080cdcc97c871ada971c224e9926370fe74f11b539aa1cf9f3b1aca1",
+      "upstream": "https://registry.npmjs.org/base64-js/-/base64-js-1.5.1.tgz",
+      "upstreamIntegrity": "sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA=="
+    },
+    {
+      "component": "npm:event-target-shim@5.0.1",
+      "ecosystem": "npm",
+      "version": "5.0.1",
+      "public": true,
+      "source": "node_modules/event-target-shim/LICENSE",
+      "sha256": "97d87142793695cd73243de7258694abe85b3b6060fca7f247b0a2afa8219678",
+      "upstream": "https://registry.npmjs.org/event-target-shim/-/event-target-shim-5.0.1.tgz",
+      "upstreamIntegrity": "sha512-i/2XbnSz/uxRCU6+NdVJgKWDTM427+MqYbkQzD321DuCQJUqOuJKIA0IM2+W2xtYHdKOmZ4dR6fExsd4SXL+WQ=="
+    },
+    {
+      "component": "npm:flow-enums-runtime@0.0.6",
+      "ecosystem": "npm",
+      "version": "0.0.6",
+      "public": true,
+      "source": "node_modules/flow-enums-runtime/LICENSE",
+      "sha256": "52412d7bc7ce4157ea628bbaacb8829e0a9cb3c58f57f99176126bc8cf2bfc85",
+      "upstream": "https://registry.npmjs.org/flow-enums-runtime/-/flow-enums-runtime-0.0.6.tgz",
+      "upstreamIntegrity": "sha512-3PYnM29RFXwvAN6Pc/scUfkI7RwhQ/xqyLUyPNlXUp9S40zI8nup9tUSrTLSVnWGBN38FNiGWbwZOB6uR4OGdw=="
+    },
+    {
+      "component": "npm:invariant@2.2.4",
+      "ecosystem": "npm",
+      "version": "2.2.4",
+      "public": true,
+      "source": "node_modules/invariant/LICENSE",
+      "sha256": "f657f99d3fb9647db92628e96007aabb46e5f04f33e49999075aab8e250ca7ce",
+      "upstream": "https://registry.npmjs.org/invariant/-/invariant-2.2.4.tgz",
+      "upstreamIntegrity": "sha512-phJfQVBuaJM5raOpJjSfkiD6BpbCE4Ns//LaXl6wGYtUBY83nWS6Rf9tXm2e8VaK60JEjYldbPif/A2B1C2gNA=="
+    },
+    {
+      "component": "npm:memoize-one@5.2.1",
+      "ecosystem": "npm",
+      "version": "5.2.1",
+      "public": true,
+      "source": "node_modules/memoize-one/LICENSE",
+      "sha256": "b1c501095de70182748cb8e8d97ac5577701a4ef3b755ba30d59fd87b24bdb0f",
+      "upstream": "https://registry.npmjs.org/memoize-one/-/memoize-one-5.2.1.tgz",
+      "upstreamIntegrity": "sha512-zYiwtZUcYyXKo/np96AGZAckk+FWWsUdJ3cHGGmld7+AhvcWmQyGCYUh1hc4Q/pkOhb65dQR/pqCyK0cOaHz4Q=="
+    },
+    {
+      "component": "npm:nullthrows@1.1.1",
+      "ecosystem": "npm",
+      "version": "1.1.1",
+      "public": true,
+      "source": "node_modules/nullthrows/LICENSE",
+      "sha256": "dd5f97aa25431e25fea6654f12f4ce167dc19b3148ab515cc271aa8efe6eb0be",
+      "upstream": "https://registry.npmjs.org/nullthrows/-/nullthrows-1.1.1.tgz",
+      "upstreamIntegrity": "sha512-2vPPEi+Z7WqML2jZYddDIfy5Dqb0r2fze2zTxNNknZaFpVHU3mFB3R+DWeJWGVx0ecvttSGlJTI+WG+8Z4cDWw=="
+    },
+    {
+      "component": "npm:promise@8.3.0",
+      "ecosystem": "npm",
+      "version": "8.3.0",
+      "public": true,
+      "source": "node_modules/promise/LICENSE",
+      "sha256": "5e733eb92ed0c571da3f27c5da203e0a9f975b4f96e7692c9fa3660ca54820ec",
+      "upstream": "https://registry.npmjs.org/promise/-/promise-8.3.0.tgz",
+      "upstreamIntegrity": "sha512-rZPNPKTOYVNEEKFaq1HqTgOwZD+4/YHS5ukLzQCypkj+OkYx7iv0mA91lJlpPPZ8vMau3IIGj5Qlwrx+8iiSmg=="
+    },
+    {
+      "component": "npm:react-is@16.13.1",
+      "ecosystem": "npm",
+      "version": "16.13.1",
+      "public": true,
+      "source": "node_modules/hoist-non-react-statics/node_modules/react-is/LICENSE",
+      "sha256": "52412d7bc7ce4157ea628bbaacb8829e0a9cb3c58f57f99176126bc8cf2bfc85",
+      "upstream": "https://registry.npmjs.org/react-is/-/react-is-16.13.1.tgz",
+      "upstreamIntegrity": "sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ=="
+    },
+    {
+      "component": "npm:react@19.2.3",
+      "ecosystem": "npm",
+      "version": "19.2.3",
+      "public": true,
+      "source": "node_modules/react/LICENSE",
+      "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+      "upstream": "https://registry.npmjs.org/react/-/react-19.2.3.tgz",
+      "upstreamIntegrity": "sha512-Ku/hhYbVjOQnXDZFv2+RibmLFGwFdeeKHFcOTlrt7xplBnya5OGn/hIRDsqDiSUcfORsDC7MPxwork8jBwsIWA=="
+    },
+    {
+      "component": "npm:regenerator-runtime@0.13.11",
+      "ecosystem": "npm",
+      "version": "0.13.11",
+      "public": true,
+      "source": "node_modules/regenerator-runtime/LICENSE",
+      "sha256": "51887a3d47051ac2fce1210562e5b9fe0830a8a8fabeb272c2d586eeb18a05fd",
+      "upstream": "https://registry.npmjs.org/regenerator-runtime/-/regenerator-runtime-0.13.11.tgz",
+      "upstreamIntegrity": "sha512-kY1AZVr2Ra+t+piVaJ4gxaFaReZVH40AKNo7UCX6W+dEwBo/2oZJzqfuN1qLq1oL45o56cPaTXELwrTh8Fpggg=="
+    },
+    {
+      "component": "npm:scheduler@0.27.0",
+      "ecosystem": "npm",
+      "version": "0.27.0",
+      "public": true,
+      "source": "node_modules/scheduler/LICENSE",
+      "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+      "upstream": "https://registry.npmjs.org/scheduler/-/scheduler-0.27.0.tgz",
+      "upstreamIntegrity": "sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q=="
+    },
+    {
+      "component": "npm:stacktrace-parser@0.1.11",
+      "ecosystem": "npm",
+      "version": "0.1.11",
+      "public": true,
+      "source": "node_modules/stacktrace-parser/LICENSE",
+      "sha256": "e1898814043cb5500483d9c8517edda824b352f696d35e5043fcfb537c221531",
+      "upstream": "https://registry.npmjs.org/stacktrace-parser/-/stacktrace-parser-0.1.11.tgz",
+      "upstreamIntegrity": "sha512-WjlahMgHmCJpqzU8bIBy4qtsZdU9lRlcZE3Lvyej6t4tuOuv1vk57OW3MBrj6hXBFx/nNoC9MPMTcr5YA7NQbg=="
+    },
+    {
+      "component": "npm:whatwg-fetch@3.6.20",
+      "ecosystem": "npm",
+      "version": "3.6.20",
+      "public": true,
+      "source": "node_modules/whatwg-fetch/LICENSE",
+      "sha256": "c887d1c97797646dbb216925ab44a93c6b3e7f03bbe6ef6e0f92b8b8ade63014",
+      "upstream": "https://registry.npmjs.org/whatwg-fetch/-/whatwg-fetch-3.6.20.tgz",
+      "upstreamIntegrity": "sha512-EqhiFU6daOA8kpjOWTL0olhVOF3i7OrFzSYiGsEMB8GcXS+RrzauAERX65xMeNWVqxA6HXH2m69Z9LaKKdisfg=="
     }
   ],
   "retainedAndroidResources": {

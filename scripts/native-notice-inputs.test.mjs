@@ -349,7 +349,8 @@ test('three Pod selectors expose only actual finite forms/owner matches/hashes a
 }));
 
 function selectedOwnPodFixture(run){return fixture(({root,file})=>{
- const provenance={...JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))),components:[]},ids=['cocoapods:ExpoRouter@57.0.28','cocoapods:ExpoUI@57.0.25','cocoapods:Yoga@0.0.0'],pins=provenance.knownLicenseSources.filter(pin=>ids.includes(pin.component)),installed=JSON.parse(readFileSync(new URL('../package-lock.json',import.meta.url))),lock={PODS:[],'EXTERNAL SOURCES':{}};
+ const provenance={...JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))),components:[]};provenance.knownLicenseSources=provenance.knownLicenseSources.slice(0,113);
+ const ids=['cocoapods:ExpoRouter@57.0.28','cocoapods:ExpoUI@57.0.25','cocoapods:Yoga@0.0.0'],pins=provenance.knownLicenseSources.filter(pin=>ids.includes(pin.component)),installed=JSON.parse(readFileSync(new URL('../package-lock.json',import.meta.url))),lock={PODS:[],'EXTERNAL SOURCES':{}};
  assert.equal(pins.length,3);file('package-lock.json',{packages:Object.fromEntries(pins.map(pin=>{const own=pin.ownText??pin;return [own.packagePath,installed.packages[own.packagePath]];}))});mkdirSync(join(root,'ios/Pods/Target Support Files'),{recursive:true});
  for(const pin of pins){const own=pin.ownText??pin,pod=own.pod??pin,name=pin.component.slice(10,-pin.version.length-1);lock.PODS.push(name+' ('+pin.version+')');lock['EXTERNAL SOURCES'][name]={':path':'../'+dirname(pod.podspecSource)};for(const path of [own.packageJSONSource,pod.podspecSource,pin.source])file(path,readFileSync(new URL('../'+path,import.meta.url)));file('ios/Pods/'+name+'/source.m','Synthetic alternate Pod root');}
  file('ios/Podfile.lock',lock);

@@ -373,15 +373,16 @@ test('injected own text preserves discovered NOTICEs and cannot satisfy vendored
 }));
 
 const reviewedIosMITComponents=['npm:@react-native/assets-registry@0.86.3','npm:@react-native/js-polyfills@0.86.3','npm:@react-native/normalize-colors@0.86.3','npm:@react-native/virtualized-lists@0.86.3','npm:qrcode-generator@2.0.4'];
+const fiveReviewedLedger=()=>{const value=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url)));return {...value,components:value.components.filter(record=>reviewedIosMITComponents.includes(record.component))};};
 test('five exact iOS MIT reviews qualify only their actual captured owning provenance and original bodies',()=>knownOwnTextFixture(({root,capture})=>{
- const approved=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))),items=capture(),coverage=resolveNoticeCoverage(items,approved);
+ const approved=fiveReviewedLedger(),items=capture(),coverage=resolveNoticeCoverage(items,approved);
  assert.deepEqual(approved.components.map(value=>value.component),reviewedIosMITComponents);assert.ok(approved.components.every(value=>value.platform==='ios'));
  assert.equal(coverage.status,'INCOMPLETE');assert.deepEqual(coverage.unresolved,[{component:'npm:@expo/ui@57.0.25',reason:'unreviewed-component'}]);assert.equal(coverage.sections.length,5);
  for(const record of approved.components){const item=items.find(value=>value.id===record.component),section=coverage.sections.find(value=>value.id==='library-'+digest('ios:'+item.id).slice(0,24));assert.deepEqual(item.nativeInputs,record.nativeInputs);assert.ok(Buffer.from(section.body).equals(readFileSync(join(root,item.notices[0].source))));assert.equal(digest(section.body),record.sectionSHA256);assert.equal(section.iosOnly,true);assert.equal(section.androidOnly,undefined);}
 }));
 
 test('the five reviews reject owning-source/notice/native drift, vendors and inferred sibling or Android approval',()=>knownOwnTextFixture(({capture})=>{
- const approved=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))),items=capture().filter(value=>reviewedIosMITComponents.includes(value.id));
+ const approved=fiveReviewedLedger(),items=capture().filter(value=>reviewedIosMITComponents.includes(value.id));
  const reject=(item,change,reason)=>{const changed=structuredClone(item);change(changed);assert.equal(resolveNoticeCoverage([changed],approved).unresolved[0].reason,reason);};
  for(const item of items){
   reject(item,value=>value.nativeInputs.ownAttribution.packageJSON.sha256='f'.repeat(64),'native-source-digest-mismatch');
@@ -395,6 +396,43 @@ test('the five reviews reject owning-source/notice/native drift, vendors and inf
 }));
 
 test('five component reviews cannot seal the unchanged font-only payload',()=>knownOwnTextFixture(({capture})=>{
- const approved=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))),items=capture().filter(value=>reviewedIosMITComponents.includes(value.id)),coverage=resolveNoticeCoverage(items,approved),payload=readFileSync(new URL('../assets/notices/third_party_notices.json',import.meta.url)),fontProvenance=JSON.parse(readFileSync(new URL('./font-icon-provenance.json',import.meta.url)));
+ const approved=fiveReviewedLedger(),items=capture().filter(value=>reviewedIosMITComponents.includes(value.id)),coverage=resolveNoticeCoverage(items,approved),payload=readFileSync(new URL('../assets/notices/third_party_notices.json',import.meta.url)),fontProvenance=JSON.parse(readFileSync(new URL('./font-icon-provenance.json',import.meta.url)));
  assert.equal(coverage.status,'READY');assert.throws(()=>assertSourceNoticePayload(payload,coverage,approved,fontProvenance),/Actual included library differs from the committed union/);
 }));
+
+const reviewedRuntimeComponents=['npm:@babel/runtime@7.29.7','npm:abort-controller@3.0.0','npm:base64-js@1.5.1','npm:event-target-shim@5.0.1','npm:flow-enums-runtime@0.0.6','npm:invariant@2.2.4','npm:memoize-one@5.2.1','npm:nullthrows@1.1.1','npm:promise@8.3.0','npm:react-is@16.13.1','npm:react@19.2.3','npm:regenerator-runtime@0.13.11','npm:scheduler@0.27.0','npm:stacktrace-parser@0.1.11','npm:whatwg-fetch@3.6.20'];
+function runtimeNoticeFixture(run){return fixture(({root,file})=>{
+ const approved=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))),pins=approved.knownLicenseSources.filter(pin=>reviewedRuntimeComponents.includes(pin.component)),installed=JSON.parse(readFileSync(new URL('../package-lock.json',import.meta.url))),packages={},paths=[];
+ for(const pin of pins){const packagePath=pin.source.slice(0,pin.source.lastIndexOf('/'));packages[packagePath]=installed.packages[packagePath];for(const source of [packagePath+'/package.json',pin.source])file(source,readFileSync(new URL('../'+source,import.meta.url)));paths.push(file(packagePath+'/selected.js','export const syntheticSelectedSource=1;\n'));}
+ file('package-lock.json',{packages});return run({root,file,approved,pins,paths,capture:()=>npmNoticeInputs(root,paths)});
+});}
+
+test('actual ledger contains only the exact21 iOS reviews and15 exact public runtime text pins',()=>runtimeNoticeFixture(({root,approved,pins,capture})=>{
+ assert.deepEqual(approved.components.map(value=>value.component),[...reviewedIosMITComponents,...reviewedRuntimeComponents,'cocoapods:ExpoFileSystem@57.0.7']);assert.ok(approved.components.every(value=>value.platform==='ios'));assert.equal(approved.knownLicenseSources.length,128);assert.deepEqual(pins.map(value=>value.component),reviewedRuntimeComponents);
+ const items=capture(),coverage=resolveNoticeCoverage(items,approved),publicInput=unreviewedOSSNoticeInputs(items,approved),lock=JSON.parse(readFileSync(new URL('../package-lock.json',import.meta.url)));
+ assert.equal(items.length,15);assert.equal(coverage.status,'READY');assert.equal(coverage.sections.length,15);assert.equal(publicInput.components.length,15);
+ for(const pin of pins){const item=items.find(value=>value.id===pin.component),packagePath=pin.source.slice(0,pin.source.lastIndexOf('/'));assert.equal(pin.upstream,lock.packages[packagePath].resolved);assert.equal(pin.upstreamIntegrity,lock.packages[packagePath].integrity);assert.equal(item.notices.length,1);assert.equal(item.notices[0].sha256,pin.sha256);assert.ok(Buffer.from(item.notices[0].body).equals(readFileSync(join(root,pin.source))));assert.equal(approved.components.find(value=>value.component===item.id).sectionSHA256,pin.sha256);assert.deepEqual(item.vendors,[]);assert.deepEqual(item.nativeInputs??{},{});}
+}));
+
+test('runtime reviews keep changed text, additional NOTICE, native inputs, vendors, unknowns and Android unapproved',()=>runtimeNoticeFixture(({root,file,approved,pins,paths,capture})=>{
+ const items=capture();for(const item of items){
+  const changed=structuredClone(item);changed.nativeInputs={unreviewedNative:'synthetic'};assert.equal(resolveNoticeCoverage([changed],approved).unresolved[0].reason,'native-source-digest-mismatch');
+  const sibling={...item,id:item.id+'-unreviewed'};assert.equal(resolveNoticeCoverage([sibling],approved).unresolved[0].reason,'unreviewed-component');
+  const version={...item,id:item.id.slice(0,item.id.lastIndexOf('@')+1)+'999',version:'999'};assert.equal(resolveNoticeCoverage([version],approved).unresolved[0].reason,'unreviewed-component');
+ }
+ assert.equal(resolveNoticeCoverage(items,approved,'android').unresolved.length,15);
+ const pin=pins[0],original=readFileSync(join(root,pin.source));file(pin.source,Buffer.concat([original,Buffer.from('PRIVATE_SYNTHETIC_CHANGED_TEXT')]));let changed=capture();assert.equal(resolveNoticeCoverage(changed,approved).unresolved[0].reason,'notice-set-or-digest-mismatch');assert.ok(!JSON.stringify(unreviewedOSSNoticeInputs(changed,approved)).includes('PRIVATE_SYNTHETIC_CHANGED_TEXT'));file(pin.source,original);
+ const packagePath=pin.source.slice(0,pin.source.lastIndexOf('/')),notice=file(packagePath+'/NOTICE','A separate original notice');assert.equal(resolveNoticeCoverage(capture(),approved).unresolved[0].reason,'notice-set-or-digest-mismatch');rmSync(notice);
+ const vendor=file(packagePath+'/vendor/separate/selected.js','Synthetic independently attributed vendor');assert.equal(resolveNoticeCoverage(npmNoticeInputs(root,[vendor]),approved).unresolved[0].reason,'unreviewed-vendored-source');
+ const unknown=file('node_modules/unreviewed-sibling/index.js','source');file('node_modules/unreviewed-sibling/package.json',{name:'unreviewed-sibling',version:'1'});file('node_modules/unreviewed-sibling/LICENSE',original);const lock=JSON.parse(readFileSync(join(root,'package-lock.json')));lock.packages['node_modules/unreviewed-sibling']={version:'1'};file('package-lock.json',lock);const unreviewed=npmNoticeInputs(root,[unknown]);assert.equal(resolveNoticeCoverage(unreviewed,approved).unresolved[0].reason,'unreviewed-component');assert.equal(unreviewedOSSNoticeInputs(unreviewed,approved).components.length,0);
+}));
+
+test('ExpoFileSystem review binds only its exact63-file product and three own framework notice mappings',()=>{
+ const approved=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))),record=approved.components.find(value=>value.component==='cocoapods:ExpoFileSystem@57.0.7'),source='node_modules/expo-file-system/LICENSE',sha256='fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4',body=readFileSync(new URL('../'+source,import.meta.url),'utf8'),vendors=['ExpoFileSystem.xcframework','ExpoFileSystem.xcframework/ios-arm64/ExpoFileSystem.framework','ExpoFileSystem.xcframework/ios-arm64_x86_64-simulator/ExpoFileSystem.framework'];
+ assert.deepEqual(record.reviewedVendors,vendors);assert.deepEqual(record.vendorNoticeSources,Object.fromEntries(vendors.map(value=>[value,[source]])));assert.equal(record.nativeInputs['cocoapods:ExpoFileSystem'].sha256,'2170187d5f6c7e19a06acf677791826a325457b75e4f15541f452b605edc646e');assert.equal(record.nativeInputs['cocoapods:ExpoFileSystem'].files,63);assert.equal(digest(body),sha256);
+ const item=nativeNoticeInput({id:record.component,name:'ExpoFileSystem',version:'57.0.7',ecosystem:'cocoapods',vendors,notices:[{source,sha256,body}],nativeInputs:record.nativeInputs});assert.equal(resolveNoticeCoverage([item],approved).status,'READY');
+ const changed=structuredClone(item);changed.nativeInputs['cocoapods:ExpoFileSystem'].sha256='f'.repeat(64);assert.equal(resolveNoticeCoverage([changed],approved).unresolved[0].reason,'native-source-digest-mismatch');
+ for(const vendor of ['Unreviewed.xcframework','React.xcframework'])assert.equal(resolveNoticeCoverage([{...item,vendors:[...vendors,vendor]}],approved).unresolved[0].reason,'unreviewed-vendored-source');
+ const mapping=structuredClone(approved);delete mapping.components.find(value=>value.component===record.component).vendorNoticeSources[vendors[0]];assert.equal(resolveNoticeCoverage([item],mapping).unresolved[0].reason,'missing-vendored-notice');
+ assert.equal(resolveNoticeCoverage([{...item,notices:[{source,sha256:'f'.repeat(64),body}]}],approved).unresolved[0].reason,'notice-set-or-digest-mismatch');assert.throws(()=>nativeNoticeInput({...item,notices:[{source,sha256,body:body+'changed'}]}));assert.equal(resolveNoticeCoverage([item],approved,'android').unresolved[0].reason,'unreviewed-component');
+});
