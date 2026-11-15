@@ -121,6 +121,19 @@ function protectedFiles(before,after,version,events,eventData=row=>row,puppyName
  }
  assert.equal(addedBackups,expectedBackups,'Require exactly the source-defined before-update backup count.');
 }
+// Exact user-0 package row; retain the full UID string, without dumpsys aliases.
+function packageUid(text){
+ const match=typeof text==='string'&&/^package:com\.patrickchin\.puptime uid:([1-9][0-9]{0,9})\n?$/.exec(text);
+ assert.ok(match&&match[0]===text&&Number(match[1])<=2147483647,'Require one exact package row with a positive full Java-int UID.');
+ return match[1];
+}
+function packageUidSelfCheck(){
+ const row=uid=>'package:com.patrickchin.puptime uid:'+uid;
+ for(const uid of ['1','10001','2147483647'])for(const suffix of ['','\n']){const actual=packageUid(row(uid)+suffix);assert.equal(actual,uid);assert.equal(typeof actual,'string');}
+ const invalid=[null,undefined,{},new String(row('10001')),'',row('0'),...['-1','+10001','010001','00','2147483648','9999999999','10000000000','1e4','0x2711','10.0','10001,10002','١٠٠٠١','１０００１','NaN','Infinity',' 10001','10001 '].map(row),row('10001')+'\n\n',row('10001')+'\r\n',row('10001')+'\nextra','\n'+row('10001'),' '+row('10001'),row('10001')+' extra',row('10001')+'\n'+row('10001'),row('10001')+'\n'+row('10002')+'\n',row('10001').replace('puptime','puptime.extra'),row('10001').replace('package:','package:prefix.'),row('10001').replace(' uid:','\tuid:'),row('10001').replace('uid:','userId:'),'userId=10001','appId=10001'];
+ for(const value of invalid)assert.throws(()=>packageUid(value),{code:'ERR_ASSERTION'});
+ console.log('PASS strict exact-package full UID rows, Java-int bounds and adversarial output rejection; no legacy aliases or commands.');
+}
 function widgetBinding(text,mark=()=>{}){
  text=text.replaceAll('\r','');const section=text.split('\nWidgets:\n')[1]?.split('\nHosts:\n')[0];mark('widget-section');assert.ok(section,'Inspect the actual Widgets section.');
  const blocks=section.split(/(?=^\s*\[\d+\] id=)/m).filter(part=>part.includes(app+'/'));
@@ -148,6 +161,7 @@ function snapshotSiteSelfCheck(){
 function selfCheck(){
  exerciseEvidenceSelfCheck();
  snapshotSiteSelfCheck();
+ packageUidSelfCheck();
  emulatorSelfCheck();
  offlineSelfCheck();
  assertWidgetSource();
@@ -432,7 +446,7 @@ function snapshot(label){
   }
  }
  const db=new DatabaseSync(join(dest,'files/SQLite/puptime-v2.db'),{readOnly:true});db.exec('BEGIN');let tables;try{exerciseEvidence.snapshotSite('sqlite-integrity');assert.equal(db.prepare('PRAGMA integrity_check').get().integrity_check,'ok');exerciseEvidence.snapshotSite('sqlite-foreign-keys');assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);exerciseEvidence.snapshotSite('table-inventory');tables=nativeSnapshot(db);}finally{db.exec('ROLLBACK');db.close();}
- const uid=adb('shell','dumpsys','package',app).match(/\buserId=(\d+)/)?.[1];exerciseEvidence.snapshotSite('package-uid');assert.ok(uid);
+ const packageInfo=adb('shell','cmd','package','list','packages','-U','--user','0',app);exerciseEvidence.snapshotSite('package-uid');const uid=packageUid(packageInfo);
  const widgets=widgetBinding(adb('shell','dumpsys','appwidget'),site=>exerciseEvidence.snapshotSite(site));
  exerciseEvidence.end('snapshot-'+label);return {tables,files,uid,widgets};
 }
