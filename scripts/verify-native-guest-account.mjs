@@ -22,14 +22,17 @@ import {recordNativeFontNoticeOutcome} from './native-font-notice-evidence.mjs';
 import {assertArchivedSource,nativeCodeFingerprint} from './native-runtime-inputs.mjs';
 import {verifyNativeRichState,verifyNativeFontNotices,accountFlowEnvironment} from './verify-native-rich-state.mjs';
 import {deleteOwnedSimulator,installTaskCleanup,ownProcess} from './native-task-cleanup.mjs';
+import {standardFixtureEnvironment,runStandardSuite} from './native-standard-suite.mjs';
 
 const [platform,initialDevice,host,consent,destination='build/guest-account-'+platform,onboarding]=process.argv.slice(2);
 let device=initialDevice;
 assert.ok(['ios','android'].includes(platform));
-assert.ok(onboarding===undefined||['--onboarding-sign-in','--account-deletion','--puppy-comparison','--offline-lifecycle','--account-isolation','--photo-lifecycle','--deletion-faults','--enrolled-runtime-upgrade','--rich-state','--font-notices'].includes(onboarding));
+assert.ok(onboarding===undefined||['--onboarding-sign-in','--account-deletion','--puppy-comparison','--offline-lifecycle','--account-isolation','--photo-lifecycle','--deletion-faults','--enrolled-runtime-upgrade','--rich-state','--font-notices','--standard-csv','--standard-all'].includes(onboarding));
+const standard=onboarding==='--standard-csv'||onboarding==='--standard-all';
 const android=platform==='android',deleting=onboarding==='--account-deletion',onboardingSignIn=onboarding==='--onboarding-sign-in',comparing=onboarding==='--puppy-comparison',offline=onboarding==='--offline-lifecycle',isolating=onboarding==='--account-isolation',photographing=onboarding==='--photo-lifecycle',deletionFaults=onboarding==='--deletion-faults',upgrading=onboarding==='--enrolled-runtime-upgrade';
 const richState=onboarding==='--rich-state',fontNotices=onboarding==='--font-notices';let flowLanguage='en';
 assert.ok(!(comparing||offline||isolating||photographing||deletionFaults||upgrading||richState||fontNotices)||!android,'Extended lifecycle cases use the dedicated iOS verification path.');
+assert.ok(!standard||!android,'The fixed standard selections are iOS only.');
 assert.equal(consent,'--replace-synthetic','Use PLATFORM DEVICE HOST --replace-synthetic [OUTPUT].');
 const frontPort=Number(process.env.PUPTIME_ACCOUNT_PORT??8797),backPort=frontPort+2;assert.ok(Number.isInteger(frontPort)&&frontPort>1024&&frontPort<65533);
 const app='com.patrickchin.puptime',output=resolve(destination),front='https://127.0.0.1:'+frontPort;
@@ -76,16 +79,17 @@ function redacted(value){
   for(const secret of [...codes,config.vars.AUTH_SECRET,cookie,...cookie.split(';').map(part=>part.trim().split('=').slice(1).join('='))].filter(Boolean))value=value.replaceAll(secret,'[REDACTED]');
   return value;
 }
-function run(binary,args,env=process.env,cwd=process.cwd()){
+function run(binary,args,env=process.env,cwd=process.cwd(),timeoutMs=binary==='maestro'?600000:240000){
   return new Promise((resolveRun,reject)=>{
     if(task.signal){reject(new Error('Native task interrupted.'));return;}
     const child=spawn(binary,args,{env,cwd,detached:true,stdio:['ignore','pipe','pipe']}),stop=ownProcess(child);activeStops.add(stop);let raw='',timedOut=false;
-    child.stdout.on('data',data=>{raw+=data;});child.stderr.on('data',data=>{raw+=data;});
+    if(standard){child.stdout.resume();child.stderr.resume();}
+    else{child.stdout.on('data',data=>{raw+=data;});child.stderr.on('data',data=>{raw+=data;});}
     // Include hosted driver startup as well as the flow's own bounded assertions.
-    const timer=setTimeout(()=>{timedOut=true;void stop();},binary==='maestro'?600000:240000);
+    const timer=setTimeout(()=>{timedOut=true;void stop();},timeoutMs);
     child.once('error',error=>{clearTimeout(timer);activeStops.delete(stop);reject(error);});child.once('close',async (status,signal)=>{clearTimeout(timer);const stopped=await stop();activeStops.delete(stop);if(status===0&&stopped&&!timedOut&&!task.signal)resolveRun(raw);else{
       raw=redacted(raw);
-      writeFileSync(join(output,'failure-redacted.log'),raw,{mode:0o600});reject(Object.assign(new Error(`${binary} failed (${status}); see redacted log.`),{status,signal,...(timedOut?{code:'ETIMEDOUT'}:{})}));
+      if(!standard)writeFileSync(join(output,'failure-redacted.log'),raw,{mode:0o600});reject(Object.assign(new Error(standard?`${binary} failed (${status}); see finite receipts.`:`${binary} failed (${status}); see redacted log.`),{status,signal,...(timedOut?{code:'ETIMEDOUT'}:{})}));
     }});
   });
 }
@@ -120,7 +124,7 @@ async function flow(name,env={}){
     if(!android&&['prepare','add-logs','rich-notices'].includes(name)){
       try{simctl('io',device,'screenshot',join(output,'failure-'+name+'.png'));}catch{}
       const hierarchy=existsSync(artifacts)?readdirSync(artifacts,{recursive:true}).map(String).filter(path=>path.includes('hierarchy')&&/\.(json|xml)$/.test(path)).sort().at(-1):undefined;
-      if(hierarchy&&!(fontNotices&&name==='rich-notices'))writeFileSync(join(output,'failure-'+name+'-hierarchy.txt'),redacted(readFileSync(join(artifacts,hierarchy),'utf8')).slice(0,262144));
+      if(hierarchy&&!fontNotices)writeFileSync(join(output,'failure-'+name+'-hierarchy.txt'),redacted(readFileSync(join(artifacts,hierarchy),'utf8')).slice(0,262144));
     }
     throw error;
   }finally{
@@ -477,7 +481,12 @@ async function verifyPuppyComparison(){
  checks.push('Only explicit native confirmation combines the two distinct identities; all127 original events retain their IDs/bodies, cloud event revisions remain1, pending work drains, and cold restart causes no duplicate or cloud rewrite.');
 }
 
-const childEnv={...process.env,CI:'1',WRANGLER_SEND_METRICS:'false'};
+const childEnv=standard?standardFixtureEnvironment({...process.env,CI:'1',WRANGLER_SEND_METRICS:'false'},front):{...process.env,CI:'1',WRANGLER_SEND_METRICS:'false'};
+let standardStage='fixture-preparation';
+function markStandardStage(stage,status='running'){
+ standardStage=stage;
+ if(standard)try{writeFileSync(join(output,'standard-startup.json'),JSON.stringify({stage,status})+'\n');}catch{}
+}
 const task=installTaskCleanup(async()=>{
  for(const socket of changeSockets)socket.destroy();
  proxy?.closeAllConnections();proxy?.close();
@@ -492,12 +501,14 @@ const task=installTaskCleanup(async()=>{
 });
 try{
   markStartup('owned-port-preflight');
+  if(standard)markStandardStage('fixture-preparation');
   // Own both ports; never attach to another task's backend or account.
   for(const port of [frontPort,backPort])await new Promise((resolveProbe,reject)=>{const server=createServer();server.once('error',reject);server.listen(port,'127.0.0.1',()=>server.close(resolveProbe));});
   if(android){adb('install','-r',resolve(host));adb('shell','run-as',app,'id');}
   else try{simctl('terminate',device,app);}catch{}
   markStartup('existing-store-check');
   const old=sqliteDirectory();
+  if(standard)assert.ok(!existsSync(join(old,'puptime-v2.db')),'Standard cases require a genuinely fresh task simulator.');
   if(upgrading){assert.ok(!existsSync(join(old,'puptime-v2.db')),'Start the historical case on a genuinely fresh owned simulator.');runtimeInputs=readEnrolledInputs();}
   if(existsSync(join(old,'puptime-v2.db'))){
     const prior=database();try{assert.equal(prior.prepare('SELECT COUNT(*) n FROM local_sync_owner').get().n,0,'Do not replace another account fixture.');}finally{prior.close();}
@@ -566,7 +577,7 @@ try{
     outgoing.on('error',()=>{finish();if(!res.headersSent)res.writeHead(502);res.end();});req.pipe(outgoing);
   };
   proxy=secureServer({key:readFileSync(keyPath),cert:Buffer.concat([readFileSync(certPath),certificate])},forward);
-  proxy.on('tlsClientError',error=>writeFileSync(join(output,'fixture-tls-error.txt'),error.message));
+  proxy.on('tlsClientError',error=>{if(standard){try{writeFileSync(join(output,'fixture-tls-error.json'),JSON.stringify({category:'tls-client-error'})+'\n');}catch{}}else writeFileSync(join(output,'fixture-tls-error.txt'),error.message);});
   proxy.on('upgrade',(req,socket,head)=>{
     if(fault==='offline'){socket.destroy();return;}
     changeSockets.add(socket);socket.once('close',()=>changeSockets.delete(socket));
@@ -586,7 +597,7 @@ try{
     const req=secureRequest(front+'/api/config',{ca:certificate},response=>{let body='';
       response.on('error',settle);response.on('aborted',()=>settle(new Error('Fixture HTTPS config response aborted.')));
       response.on('data',part=>{body+=part;if(Buffer.byteLength(body)>16384)req.destroy(new Error('Fixture HTTPS config exceeded its bounded size.'));});
-      response.on('end',()=>{try{assert.equal(response.statusCode,200);const value=JSON.parse(body);assert.equal(value.protocolVersion,1);assert.equal(value.providers.email,true);settle();}catch(error){settle(error);}});
+      response.on('end',()=>{try{assert.equal(response.statusCode,200);const value=JSON.parse(body);assert.equal(value.protocolVersion,1);assert.equal(value.providers.email,true);if(standard)assert.deepEqual(value.providers,{apple:false,google:false,email:true});settle();}catch(error){settle(error);}});
     });
     req.on('error',settle);req.end();
   });
@@ -601,6 +612,7 @@ try{
   // Expo ignores --reset-cache in CI. Fixture bundles must re-inline the local
   // backend URL rather than reuse transforms from the production build.
   const bundleEnv={...childEnv,CI:'false',EXPO_PUBLIC_CLOUD_API_URL:front};
+  if(standard)markStandardStage('production-app-bundle');
   if(android){
     adb('reverse','tcp:'+frontPort,'tcp:'+frontPort);
     assert.ok(process.env.ANDROID_HOME||process.env.ANDROID_SDK_ROOT,'Set ANDROID_HOME for the isolated native fixture build.');
@@ -634,16 +646,42 @@ try{
   else{
   markStartup('candidate-bundle-copy');
   const bundle=join(privateDir,'Puptime.app');cpSync(host,bundle,{recursive:true});iosFixtureHost=bundle;
+  const fingerprint=()=>nativeCodeFingerprint(bundle,mkdtempSync(join(privateDir,'standard-native-')));
+  const nativeText=code=>Object.fromEntries(Object.entries(code).map(([path,{arm64TextSHA256,arm64TextBytes,architecture}])=>[path,{arm64TextSHA256,arm64TextBytes,architecture}]));
+  const standardBefore=standard?{info:createHash('sha256').update(readFileSync(join(bundle,'Info.plist'))).digest('hex'),code:nativeText(fingerprint())}:null;
   markStartup('candidate-bundle-export');
   await run('node',['node_modules/expo/bin/cli','export:embed','--entry-file','index.ts','--platform','ios','--dev','false','--bytecode','--reset-cache','--max-workers','2','--bundle-output',join(bundle,'main.jsbundle'),'--assets-dest',bundle],
     bundleEnv);
   assert.ok(readFileSync(join(bundle,'main.jsbundle')).includes(Buffer.from(front)),'Embed the fixture HTTPS address, never a cached production API.');
   markStartup('candidate-bundle-sign');
   await run('codesign',['--force','--deep','--sign','-',bundle]);
+  if(standard){
+   assert.equal(createHash('sha256').update(readFileSync(join(bundle,'Info.plist'))).digest('hex'),standardBefore.info);
+   assert.deepEqual(nativeText(fingerprint()),standardBefore.code,'Keep every embedded native code section unchanged.');
+   await run('codesign',['--verify','--deep','--strict',bundle]);
+   markStandardStage('production-app-install');
+  }
   markStartup('candidate-bundle-install');
   simctl('install',device,bundle);
+  if(standard){
+   const installed=simctl('get_app_container',device,app,'app'),hash=path=>createHash('sha256').update(readFileSync(path)).digest('hex');
+   assert.equal(hash(join(installed,'main.jsbundle')),hash(join(bundle,'main.jsbundle')));
+   assert.equal(bundleEnv.EXPO_NO_DOTENV,'1');assert.equal(bundleEnv.EXPO_PUBLIC_CLOUD_API_URL,front);
+   assert.equal(bundleEnv.EXPO_PUBLIC_APP_POSTHOG_KEY,'');assert.equal(bundleEnv.EXPO_PUBLIC_POSTHOG_KEY,'');
+   writeFileSync(join(output,'standard-installed-provenance.json'),JSON.stringify({entry:'index.ts',entrySHA256:hash('index.ts'),javaScriptSHA256:hash(join(bundle,'main.jsbundle')),installedJavaScriptVerified:true,nativeCodeUnchanged:true,infoPlistUnchanged:true,dotenvDisabled:true,cloudOrigin:'isolated-loopback-https',appPostHogConfigured:false,webPostHogConfigured:false,scope:'Production App JavaScript rebundled for an isolated local HTTPS service; ad-hoc signed compiled test host, not a release.'},null,2)+'\n');
   }
   }
+  }
+  if(standard){
+   markStandardStage('standard-maestro');
+   const scenario=onboarding.slice(2),result=await runStandardSuite({scenario,device,privateDirectory:privateDir,output,execute:run,environment:{...childEnv,MAESTRO_DRIVER_STARTUP_TIMEOUT:process.env.MAESTRO_DRIVER_STARTUP_TIMEOUT??'300000'}});
+   assert.ok(requests.has('/api/config'),'The production App must reach the isolated fixture.');
+   assert.deepEqual(identityRequests,{sendCode:0,verifyCode:0,signOut:0});assert.deepEqual(requestCounts,{enroll:0,push:0});assert.equal(cookie,'');
+   assert.equal(snapshot().owner.length,0);assert.equal(auth.prepare('SELECT COUNT(*) n FROM user').get().n,0);
+   assert.equal(task.signal,null);
+   writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',stage:'standard-production-app',scenario,flows:result.flows,configReached:true,noIdentityOrCloudMutation:true,appPostHogConfigured:false,scope:'Full production App guest UI, native storage/navigation and SDK with local HTTPS Better Auth/D1/DO/R2. No email sign-in, provider, production, account lifecycle or release qualification.'},null,2)+'\n');
+   completed=true;markStandardStage('standard-complete','passed');console.log('PASS fixed production App standard case: '+scenario);
+  }else{
   markStartup('case-assertions');
   if(onboardingSignIn){
     await flow('onboarding-request');
@@ -707,4 +745,11 @@ try{
   writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',checks,receipts,...(upgrading?{stage:'controlled-origin-enrolled-runtime-replacement',upgradeExecuted:true,originModified:true,originalInstalledBytes:false,runtimes:runtimeProvenance}:{}),scope:fontNotices?'Pre-authentication iOS font/icon notice UI and populated guest history on an attested test host; no credential entry, account enrollment, cloud roundtrip, provider or release qualification.':upgrading?'Exact historical source/native pairs with controlled-origin release JS and ad-hoc signing; actual native SDK and isolated local HTTPS Better Auth/D1/SQLite DO. No credential injection, owner data, provider OAuth, untouched-original, numeric store or final current-candidate qualification.':android?'Android Debug native host with normal embedded release JS and isolated local HTTPS Better Auth/D1/SQLite DO; actual native email SDK and Keystore. Its temporary CA is trusted only in the ignored Debug source set, restored after the run. Production onboarding is tested separately in the Release APK. No real email, production account, session injection or mocked sync.':'Release bundle and actual native email SDK with isolated local HTTPS Better Auth/D1/SQLite DO. Simulator trusts the fixture certificate. No real email, production account, session injection or mocked sync.'},null,2)+'\n');
   completed=true;markStartup('case-result','passed');
   console.log('PASS '+(fontNotices?'populated pre-auth native font/icon notices':richState?'native rich preference and routine cloud restoration':upgrading?'controlled-origin enrolled runtime replacement':deletionFaults?'pending native deletion cancellation, retries and lost response':photographing?'native profile photo failure, roundtrip and restore':isolating?'expired session and account isolation':offline?'offline writes, replay and pending logout':deleting?'native account deletion':comparing?'named puppy comparison':onboardingSignIn?'welcome sign-in and session recovery':android?'guest account preservation and empty-database recovery':'guest account preservation and inspected empty-device recovery')+': '+output);
-}catch(error){markStartup(startupStage,'failed',error);throw error;}finally{await task.run();task.dispose();}
+  }
+}catch(error){markStartup(startupStage,'failed',error);
+ if(standard){
+  markStandardStage(standardStage,'failed');
+  try{writeFileSync(join(output,'standard-isolation.json'),JSON.stringify({configReached:requests.has('/api/config'),identityRequests,cloudMutationRequests:requestCounts,authenticatedSessionObserved:Boolean(cookie)},null,2)+'\n');}catch{}
+ }
+ throw error;
+}finally{await task.run();task.dispose();}

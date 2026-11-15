@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
+import ts from 'typescript';
 import {startupEvidence} from './native-startup-evidence.mjs';
 
 test('startup receipts retain only fixed stage/status and actual finite failure categories',()=>{
@@ -29,12 +30,20 @@ test('error fields are captured once; throwing or changing getters cannot leak a
 
 
 test('actual marker callbacks survive failed writes and actual catches preserve the original error and cleanup',async()=>{
- for(const file of ['run-hosted-ios-account-case.mjs','verify-native-guest-account.mjs'])for(const code of ['ENOSPC','EACCES']){
+ const actualCatch=source=>{
+  const parsed=ts.createSourceFile('actual-runner.mjs',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.JS),matches=[];
+  assert.equal(parsed.parseDiagnostics.length,0);
+  const visit=node=>{if(ts.isCatchClause(node)&&node.block.statements[0]?.getText(parsed)==="markStartup(startupStage,'failed',error);")matches.push(node.getText(parsed));ts.forEachChild(node,visit);};visit(parsed);
+  assert.equal(matches.length,1,'Require one actual startup catch, with no missing/ambiguous fallback.');return matches[0];
+ };
+ assert.throws(()=>actualCatch('try {} catch(error) { throw error; }'));
+ assert.throws(()=>actualCatch("try {} catch(error) { markStartup(startupStage,'failed',error); throw error; }\ntry {} catch(error) { markStartup(startupStage,'failed',error); throw error; }"));
+ for(const file of ['run-hosted-ios-account-case.mjs','verify-native-guest-account.mjs'])for(const standard of file==='verify-native-guest-account.mjs'?[false,true]:[false])for(const code of ['ENOSPC','EACCES']){
   const source=readFileSync(new URL('./'+file,import.meta.url),'utf8');
-  const marker=source.match(/^const markStartup=.+;$/m)?.[0],failureCatch=source.match(/catch\(error\)\{markStartup\(startupStage,'failed',error\);throw error;\}/)?.[0];
+  const marker=source.match(/^const markStartup=.+;$/m)?.[0],failureCatch=actualCatch(source);
   assert.ok(marker&&failureCatch,'Exercise the actual committed writer and catch rather than a parallel implementation.');
   const original=new Error('original synthetic startup failure'),writeFailure=Object.assign(new Error('private disk detail'),{code});let writes=0,cleanups=0,disposals=0,spawnCallback;
-  const context={startupEvidence,output:'synthetic-output',android:false,join:(...parts)=>parts.join('/'),writeFileSync(){writes++;throw writeFailure;},original,task:{async run(){cleanups++;},dispose(){disposals++;}},child:{once(event,callback){assert.equal(event,'spawn');spawnCallback=callback;}}};
+  const context={startupEvidence,output:'synthetic-output',android:false,standard,standardStage:'synthetic',markStandardStage(){},requests:new Set(),identityRequests:{sendCode:0,verifyCode:0,signOut:0},requestCounts:{enroll:0,push:0},cookie:'',join:(...parts)=>parts.join('/'),writeFileSync(){writes++;throw writeFailure;},original,task:{async run(){cleanups++;},dispose(){disposals++;}},child:{once(event,callback){assert.equal(event,'spawn');spawnCallback=callback;}}};
   runInNewContext("let startupStage='sdk-spawn';"+marker,context);
   if(file==='run-hosted-ios-account-case.mjs'){
    const registration=source.match(/child\.once\('spawn',\(\)=>markStartup\('sdk-process'\)\)/)?.[0];assert.ok(registration);runInNewContext(registration,context);
@@ -43,6 +52,6 @@ test('actual marker callbacks survive failed writes and actual catches preserve 
   }
   const actualFinally=source.match(/finally\{await task\.run\(\);task\.dispose\(\);\}/)?.[0];assert.ok(actualFinally);
   const promise=runInNewContext('(async()=>{try{try{throw original;}'+actualFinally+'}'+failureCatch+'})()',context);
-  await assert.rejects(promise,error=>error===original);assert.equal(cleanups,1);assert.equal(disposals,1);assert.equal(writes,file==='run-hosted-ios-account-case.mjs'?2:1);
+  await assert.rejects(promise,error=>error===original);assert.equal(cleanups,1);assert.equal(disposals,1);assert.equal(writes,file==='run-hosted-ios-account-case.mjs'||standard?2:1);
  }
 });

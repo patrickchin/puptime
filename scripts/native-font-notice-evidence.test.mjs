@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {existsSync,mkdirSync,mkdtempSync,readFileSync,rmSync,symlinkSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
+import {runInNewContext} from 'node:vm';
 import {join} from 'node:path';
 import notices from '../src/font-icon-notices.json' with {type:'json'};
 import {nativeFontNoticeOutcome,readNativeFontNoticeOutcome,recordNativeFontNoticeOutcome} from './native-font-notice-evidence.mjs';
@@ -76,6 +77,9 @@ test('reader consumes only the existing exact failed sequence plus one, with str
 });
 
 test('only font-only view failures write finite outcome receipts; failed persistence remains nonthrowing',()=>{
+ const source=readFileSync(new URL('./verify-native-guest-account.mjs',import.meta.url),'utf8');
+ const rawCopyGuard=source.match(/if\(([^;\n]+)\)writeFileSync\(join\(output,'failure-'\+name\+'-hierarchy.txt'\)/)?.[1];assert.ok(rawCopyGuard);
+ for(const name of ['prepare','add-logs','rich-notices'])for(const fontNotices of [false,true])assert.equal(runInNewContext('Boolean('+rawCopyGuard+')',{hierarchy:secret,fontNotices,name}),!fontNotices);
  const root=privateRoot();try{
   writeHierarchy(root,tree('react-native-vector-icons'));const output=join(root,'output');mkdirSync(output);
   const args={fontNotices:true,name:'rich-notices',env:{NOTICE_ACTION:'view',NOTICE_THEME:'dark'},flowSequence:6,command,artifacts:root,output};

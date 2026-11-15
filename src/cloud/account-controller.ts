@@ -52,7 +52,7 @@ export function createIdentityAdapter(auth:SdkIdentityClient,{appleIdToken,googl
   };
 }
 export type AccountDeletionState={accountId:string;email:string;stage:'confirm'|'verify'|'unconfirmed'|'confirmed';codeSent:boolean;unresolved:boolean;appleManual?:boolean};
-export type AccountSnapshot={deletion?:AccountDeletionState|null;deleted?:'done'|'apple-manual'|null;config:CloudConfig|null;account:CloudAccountSummary|null;linkedProviders:SocialProvider[]|null;linkingProvider:SocialProvider|null;local:{name:string;eventCount:number;lastActivityAt:number|null}|null;sync:SyncStatus|null;run:RunResult|null;problem:AccountProblem|null;codeSentTo:string|null;busy:boolean;exporting:boolean;running:boolean;active:boolean;online:boolean;lastSyncedAt:number|null};
+export type AccountSnapshot={deletion?:AccountDeletionState|null;deleted?:'done'|'apple-manual'|null;config:CloudConfig|null;account:CloudAccountSummary|null;linkedProviders:SocialProvider[]|null;linkingProvider:SocialProvider|null;local:{name:string;eventCount:number;lastActivityAt:number|null}|null;sync:SyncStatus|null;run:RunResult|null;problem:AccountProblem|null;codeSentTo:string|null;busy:boolean;accountActionPending:boolean;exporting:boolean;running:boolean;active:boolean;online:boolean;lastSyncedAt:number|null};
 const defaultDefer=(fn:()=>void,delay:number)=>{const timer=setTimeout(fn,delay);return()=>clearTimeout(timer);};
 // Call only after pausing the owning controller, or when no client exists.
 export async function continueFirstLaunchLocally(runtime:Runtime,confirmPending=false,confirmedThrough?:number):Promise<AccountActionResult> {
@@ -64,11 +64,12 @@ export async function continueFirstLaunchLocally(runtime:Runtime,confirmPending=
   return 'ok';
 }
 export function createAccountController({runtime,api,identity,subscribeLocalWrites,defer=defaultDefer,changed,exportCloud,photos,deletion,diagnose}:{runtime:Runtime;photos?:PhotoSync;deletion?:AccountDeletionApi;diagnose?:RecordCloudDiagnostic;exportCloud?:CloudExportAction;api:CloudApi;identity:IdentityAdapter;subscribeLocalWrites:(fn:()=>void)=>()=>void;defer?:(fn:()=>void,delay:number)=>()=>void;changed:()=>void}) {
-  let snapshot:AccountSnapshot={config:null,account:null,linkedProviders:null,linkingProvider:null,local:null,sync:null,run:null,problem:null,codeSentTo:null,busy:false,exporting:false,running:false,active:false,online:true,lastSyncedAt:null};
+  let snapshot:AccountSnapshot={config:null,account:null,linkedProviders:null,linkingProvider:null,local:null,sync:null,run:null,problem:null,codeSentTo:null,busy:false,accountActionPending:false,exporting:false,running:false,active:false,online:true,lastSyncedAt:null};
   const listeners=new Set<()=>void>();
   let disposed=false,suspended=false,signOutUnfinished=false,rerun=false,associationConfirmationNeeded=false;
   let actions:Promise<unknown>=Promise.resolve(),refreshing:Promise<AccountActionResult>|null=null,running:Promise<void>|null=null,aborter:AbortController|null=null,cancelScheduled:(()=>void)|null=null;
   let identityPending:Promise<AccountActionResult>|null=null,exportPending:Promise<AccountActionResult>|null=null;
+  let pendingAccountActions=0;
   let exportAborter:AbortController|null=null;
   let refreshGeneration=0,refreshFailures=0,cancelRefreshScheduled:(()=>void)|null=null;
   const runner=createSyncRunner({sync:runtime.sync,api,photos,petId:runtime.petId,deviceId:runtime.deviceId,sessionAccountId:()=>snapshot.account?.user.id??null,changed});
@@ -121,7 +122,8 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
   }
   async function pauseTransport() {suspended=true;rerun=false;cancelTimer();aborter?.abort();if(running)await running;}
   function perform(action:()=>Promise<AccountActionResult>,refreshFence?:number):Promise<AccountActionResult> {
-    if(refreshFence===undefined)cancelRefreshRecovery();
+    const accountAction=refreshFence===undefined;
+    if(accountAction){cancelRefreshRecovery();pendingAccountActions++;emit({accountActionPending:true});}
     const result=actions.then(async()=>{
       if(disposed)return 'error' as const;
       if(refreshFence!==undefined&&refreshFence!==refreshGeneration)return 'cancelled' as const;
@@ -129,7 +131,7 @@ export function createAccountController({runtime,api,identity,subscribeLocalWrit
       try{return await action();}
       catch(error){return fail(error instanceof CloudApiError?error.category:'local-storage');}
       finally{try{await localState();}catch{fail('local-storage');}emit({busy:false});kick();}
-    });
+    }).finally(()=>{if(accountAction){pendingAccountActions--;emit({accountActionPending:pendingAccountActions>0});}});
     actions=result.catch(()=>undefined);return result;
   }
   function authenticate(action:()=>Promise<AccountActionResult>):Promise<AccountActionResult> {

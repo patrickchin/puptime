@@ -49,6 +49,7 @@ function PreviewFlow({cloud,onFinish,onAllowNotifications,onDisableNotifications
   const [step,setStep]=useState<Step>('welcome');
   const [sharingKind,setSharingKind]=useState<'household'|'temporary'|null>(null);
   const accountState=useAccountSnapshot(cloud.controller),signingIn=accountState?.busy??false;
+  const guestLocked=accountState?.accountActionPending??false;
   const [name,setName]=useState('');
   const [age,setAge]=useState<PuppyAge|null>(null);
   const [mealTimes,setMealTimes]=useState(()=>starterMealTimes(3));
@@ -110,6 +111,10 @@ function PreviewFlow({cloud,onFinish,onAllowNotifications,onDisableNotifications
     transitioning.current=true;setOutgoing(page.current);setDirection(backward?-1:1);
     transition.setValue(0);setStep(next);
     requestAnimationFrame(()=>Animated.timing(transition,{toValue:1,duration:300,easing:Easing.out(Easing.cubic),useNativeDriver:true}).start(()=>{setOutgoing(null);transitioning.current=false;}));
+  }
+  function startWithoutAccount(){
+    if(cloud.controller?.read().accountActionPending)return;
+    go('profile');
   }
   function preparePoop(times:number[]){
     if(times.length!==poopMealTimes.current.length||times.some((time,index)=>time!==poopMealTimes.current[index])){
@@ -182,7 +187,7 @@ function PreviewFlow({cloud,onFinish,onAllowNotifications,onDisableNotifications
     <View style={styles.welcomeArt}><Image accessible={false} source={mascot} resizeMode="contain" style={styles.mascot}/></View>
     <View style={styles.welcomeActions}>
       <Text style={styles.welcomeQuestion}>How would you like to begin?</Text>
-      <Pressable testID="preview.guest" accessibilityRole="button" disabled={signingIn} accessibilityState={{disabled:signingIn}} onPress={()=>go('profile')} style={[styles.secondary,{backgroundColor:theme.primary}]}><Text style={[styles.secondaryText,{color:theme.onPrimary}]}>Let’s start without an account</Text></Pressable>
+      <Pressable testID="preview.guest" accessibilityRole="button" disabled={guestLocked} accessibilityState={{disabled:guestLocked}} onPress={startWithoutAccount} style={[styles.secondary,{backgroundColor:theme.primary}]}><Text style={[styles.secondaryText,{color:theme.onPrimary}]}>Let’s start without an account</Text></Pressable>
       <AccountSignIn cloud={cloud} theme={welcomeAccountTheme} showIntro={false} onEmailPress={()=>go('account')}/>
       <Pressable testID="preview.invited" accessibilityRole="button" onPress={()=>{if(onOpenShared)onOpenShared();else void Linking.openURL(`${cloud.sharingOrigin??'https://puptime.pages.dev'}/care`).catch(()=>setReminderError('Couldn’t open shared puppies. Open your invitation link in your browser.'));}} style={styles.secondary}><Text style={styles.secondaryText}>Already invited? Open shared puppies</Text></Pressable>
       {reminderError?<Text accessibilityRole="alert" style={styles.error}>{reminderError}</Text>:null}
@@ -191,7 +196,7 @@ function PreviewFlow({cloud,onFinish,onAllowNotifications,onDisableNotifications
   else if(step==='account')body=<ScrollView testID="preview.account" keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={styles.conversation}>
     {prompt('Sign in')}
     <View style={styles.emailCard}><AccountSignIn cloud={cloud} theme={appTheme} showIntro={false} emailOnly/></View>
-    <Pressable testID="preview.guest" accessibilityRole="button" disabled={signingIn} accessibilityState={{disabled:signingIn}} onPress={()=>go('profile')} style={styles.secondary}><Text style={styles.secondaryText}>Let’s start without an account</Text></Pressable>
+    <Pressable testID="preview.guest" accessibilityRole="button" disabled={guestLocked} accessibilityState={{disabled:guestLocked}} onPress={startWithoutAccount} style={styles.secondary}><Text style={styles.secondaryText}>Let’s start without an account</Text></Pressable>
   </ScrollView>;
   else if(step==='profile')body=<>
     <ScrollView ref={scroll} testID="preview.profile" keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={styles.profileContent}>

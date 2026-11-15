@@ -17,18 +17,68 @@ const caps={'installed data':true,'shared UID':false,permission:false,rollback:f
 const hash=value=>createHash('sha256').update(value).digest('hex');
 const exerciseStages=['exercise-preconditions','original-artifact-validation','bridge-input-validation','later-input-validation','public-template-validation','qa-key-creation','qa-certificate-readback','lineage-creation','lineage-inspection','plain6-sign','plain6-verify','bridge6-sign','bridge6-verify','plain7-sign','plain7-verify','bridge-lineage-inspection','plain6-lineage-absence','plain7-lineage-absence','bridge-v31-validation','native-evidence-imports','original-install','original-launch','guest-seed','reminder-preference-seed','widget-binding','widget-first-save','snapshot-old-created','original-state-validation','plain-B-reject','snapshot-plain-B-rejected','plain-B-preservation','bridge-install','snapshot-bridge-before-launch','bridge-before-launch-preservation','bridge-launch','bridge-visible','snapshot-bridge-launched','bridge-state-validation','bridge-widget-save','snapshot-bridge-widget','bridge-widget-validation','higher-A-reject','snapshot-higher-A-rollback-rejected','higher-A-preservation','later-install','snapshot-later-before-launch','later-before-launch-preservation','later-launch','later-visible','snapshot-later-launched','later-state-validation','later-cold-restart','snapshot-later-cold','later-cold-preservation','exercise-finalize'];
 const exerciseFlows=['old-ui-seed','old-reminder-lead','bind-real-launcher-widget','bridge-visible','bridge-cold','later-visible','later-cold'];
+// Last entered assertion boundary only, not a diagnosis or captured data.
+const snapshotSites=['path-containment','sqlite-integrity','sqlite-foreign-keys','table-inventory','package-uid','widget-section','widget-count','widget-identity'];
+// Android16r1 PackageManager.installStatusToString: fixed names only; never retain its free-form message.
+const installFailureCodes=new Set([
+ 'INSTALL_FAILED_ALREADY_EXISTS','INSTALL_FAILED_INVALID_APK','INSTALL_FAILED_INVALID_URI','INSTALL_FAILED_INSUFFICIENT_STORAGE',
+ 'INSTALL_FAILED_DUPLICATE_PACKAGE','INSTALL_FAILED_NO_SHARED_USER','INSTALL_FAILED_UPDATE_INCOMPATIBLE','INSTALL_FAILED_SHARED_USER_INCOMPATIBLE',
+ 'INSTALL_FAILED_MISSING_SHARED_LIBRARY','INSTALL_FAILED_REPLACE_COULDNT_DELETE','INSTALL_FAILED_DEXOPT','INSTALL_FAILED_OLDER_SDK',
+ 'INSTALL_FAILED_CONFLICTING_PROVIDER','INSTALL_FAILED_NEWER_SDK','INSTALL_FAILED_TEST_ONLY','INSTALL_FAILED_CPU_ABI_INCOMPATIBLE',
+ 'INSTALL_FAILED_MISSING_FEATURE','INSTALL_FAILED_CONTAINER_ERROR','INSTALL_FAILED_INVALID_INSTALL_LOCATION','INSTALL_FAILED_MEDIA_UNAVAILABLE',
+ 'INSTALL_FAILED_VERIFICATION_TIMEOUT','INSTALL_FAILED_VERIFICATION_FAILURE','INSTALL_FAILED_PACKAGE_CHANGED','INSTALL_FAILED_UID_CHANGED',
+ 'INSTALL_FAILED_VERSION_DOWNGRADE','INSTALL_PARSE_FAILED_NOT_APK','INSTALL_PARSE_FAILED_BAD_MANIFEST','INSTALL_PARSE_FAILED_UNEXPECTED_EXCEPTION',
+ 'INSTALL_PARSE_FAILED_NO_CERTIFICATES','INSTALL_PARSE_FAILED_INCONSISTENT_CERTIFICATES','INSTALL_PARSE_FAILED_CERTIFICATE_ENCODING','INSTALL_PARSE_FAILED_BAD_PACKAGE_NAME',
+ 'INSTALL_PARSE_FAILED_BAD_SHARED_USER_ID','INSTALL_PARSE_FAILED_MANIFEST_MALFORMED','INSTALL_PARSE_FAILED_MANIFEST_EMPTY','INSTALL_FAILED_INTERNAL_ERROR',
+ 'INSTALL_FAILED_USER_RESTRICTED','INSTALL_FAILED_DUPLICATE_PERMISSION','INSTALL_FAILED_NO_MATCHING_ABIS','INSTALL_FAILED_ABORTED',
+ 'INSTALL_FAILED_BAD_DEX_METADATA','INSTALL_FAILED_MISSING_SPLIT','INSTALL_FAILED_DEPRECATED_SDK_VERSION','INSTALL_FAILED_BAD_SIGNATURE',
+ 'INSTALL_FAILED_WRONG_INSTALLED_VERSION','INSTALL_FAILED_PROCESS_NOT_DEFINED','INSTALL_FAILED_SESSION_INVALID','INSTALL_FAILED_SHARED_LIBRARY_BAD_CERTIFICATE_DIGEST',
+ 'INSTALL_FAILED_MULTI_ARCH_NOT_MATCH_ALL_NATIVE_ABIS',
+]);
+const installCommandKinds=['adb-install','package-path','installed-apk-readback','unrecognized'];
+const installCodeDeclines=['not-install-command','process-state','output-type-or-size','incremental-announcement','stdout-shape','stderr-frame','ambiguous-content','unlisted-code'];
+// The first declined predicate describes this projection, never the cause or actual install mode.
+function installFailureProjection(result,path){
+ const decline=installCodeDecline=>({installCodeDecline});
+ if(!result||result.error||result.status!==1)return decline('process-state');
+ if(typeof result.stdout!=='string'||typeof result.stderr!=='string'||Buffer.byteLength(result.stdout)>32768||Buffer.byteLength(result.stderr)>32768)return decline('output-type-or-size');
+ if(result.stdout.startsWith('Performing Incremental Install\n'))return decline('incremental-announcement');
+ if(!['','Performing Streamed Install\n'].includes(result.stdout))return decline('stdout-shape');
+ if(typeof path!=='string'||!path||/[\x00-\x1f\x7f\u2028\u2029]/.test(path))return decline('stderr-frame');
+ const prefix='adb: failed to install '+path+': ';if(!result.stderr.startsWith(prefix))return decline('stderr-frame');
+ const frame=result.stderr.slice(prefix.length),match=/^Failure \[(INSTALL_(?:PARSE_)?FAILED_[A-Z_]+)(?:: [^\x00-\x1f\x7f\u2028\u2029[\]]*)?\]\n{1,2}$/.exec(frame);
+ if(!match||match[0]!==frame)return decline('stderr-frame');
+ if(/Success/i.test(frame)||(frame.match(/\bINSTALL_(?:PARSE_)?FAILED_[A-Z_]+\b/g)??[]).length!==1)return decline('ambiguous-content');
+ if(!installFailureCodes.has(match[1]))return decline('unlisted-code');
+ return {installCode:match[1]};
+}
+function installCommandFailure(binary,args,result,phase,root){
+ const file=phase==='original-install'?'original125.apk':phase==='bridge-install'?'bridge6.apk':phase==='later-install'?'plain7.apk':undefined;if(!file)return;
+ const exact=expected=>binary==='adb'&&Array.isArray(args)&&args.length===expected.length&&args.every((value,i)=>value===expected[i]);
+ const path=join(root,file),install=['-s','emulator-5588','install',...(phase==='original-install'?[]:['-r']),path];
+ let commandKind='unrecognized';
+ if(exact(install))commandKind='adb-install';
+ else if(exact(['-s','emulator-5588','shell','pm','path',app]))commandKind='package-path';
+ else if(typeof args?.[4]==='string'&&/^\/data\/app\/[^\n]+\/base\.apk$/.exec(args[4])?.[0]===args[4]&&exact(['-s','emulator-5588','exec-out','cat',args[4]]))commandKind='installed-apk-readback';
+ return {commandKind,...(commandKind==='adb-install'?installFailureProjection(result,path):{installCodeDecline:'not-install-command'})};
+}
 const commandFailures=new WeakMap();
-function commandFailure(error,result){
+function commandFailure(error,result,details){
  const value={class:result.error?.code==='ETIMEDOUT'?'timeout':result.error?.code==='ENOENT'?'missing-tool':'command-failed'};
  if(Number.isInteger(result.status)&&result.status>=0&&result.status<=255)value.status=result.status;
+ if(installCommandKinds.includes(details?.commandKind)){
+  value.commandKind=details.commandKind;
+  if(details.commandKind==='adb-install'&&installFailureCodes.has(details.installCode))value.installCode=details.installCode;
+  else if(installCodeDeclines.includes(details.installCodeDecline))value.installCodeDecline=details.installCodeDecline;
+ }
  commandFailures.set(error,value);return error;
 }
 function finiteFailure(error){return commandFailures.get(error)??{class:error?.code==='ERR_ASSERTION'?'assertion':'other'};}
 function exerciseRecorder(save){
- const history=[],active=[];let failure,nativeCommand;
- const snapshot=()=>({phase:active.at(-1)??history.at(-1)?.phase??'exercise-preconditions',state:failure?'failed':active.length?'started':'completed',history:history.map(({phase,state})=>({phase,state})),...(failure?{failure:{...failure}}:{}),...(nativeCommand?{nativeCommand:{...nativeCommand}}:{})});
+ const history=[],active=[];let failure,nativeCommand,snapshotSite;
+ const snapshot=()=>({phase:active.at(-1)??history.at(-1)?.phase??'exercise-preconditions',state:failure?'failed':active.length?'started':'completed',history:history.map(({phase,state})=>({phase,state})),...(failure?{failure:{...failure}}:{}),...(nativeCommand?{nativeCommand:{...nativeCommand}}:{}),...(snapshotSite?{snapshotSite}:{})});
  const event=(phase,state)=>{assert.ok(exerciseStages.includes(phase));assert.ok(['started','completed','failed'].includes(state));assert.ok(history.length<256);history.push({phase,state});};
- return {phase:()=>active.at(-1),flowFailure(flow,directory){assert.ok(exerciseFlows.includes(flow));const stage=active.at(-1);assert.ok(exerciseStages.includes(stage));const {status,kind,targetId,sequence}=readNativeCommandState(directory);nativeCommand={flow,stage,status,kind,targetId,sequence};save(snapshot());},begin(phase){event(phase,'started');active.push(phase);save(snapshot());},end(phase){assert.equal(active.at(-1),phase);event(phase,'completed');active.pop();save(snapshot());},persist(){save(snapshot());},fail(error){failure=finiteFailure(error);event(active.at(-1)??history.at(-1)?.phase??'exercise-preconditions','failed');save(snapshot());}};
+ return {phase:()=>active.at(-1),snapshotSite(site){assert.ok(snapshotSites.includes(site));assert.ok(active.at(-1)?.startsWith('snapshot-'));snapshotSite=site;},flowFailure(flow,directory){assert.ok(exerciseFlows.includes(flow));const stage=active.at(-1);assert.ok(exerciseStages.includes(stage));const {status,kind,targetId,sequence}=readNativeCommandState(directory);nativeCommand={flow,stage,status,kind,targetId,sequence};save(snapshot());},begin(phase){event(phase,'started');active.push(phase);snapshotSite=undefined;save(snapshot());},end(phase){assert.equal(active.at(-1),phase);event(phase,'completed');active.pop();snapshotSite=undefined;save(snapshot());},persist(){save(snapshot());},fail(error){failure=finiteFailure(error);event(active.at(-1)??history.at(-1)?.phase??'exercise-preconditions','failed');save(snapshot());}};
 }
 // Images are limited to two exact fresh/offline guest flow/stage pairs.
 // Capture is best-effort; the original failure still ends the attempt.
@@ -36,6 +86,31 @@ function guestFailureImage(flow,stage,io){
  if(!((flow==='old-ui-seed'&&stage==='guest-seed')||(flow==='bind-real-launcher-widget'&&stage==='widget-binding')))return false;
  try{if(!io.owned())return false;const bytes=io.capture();if(!Buffer.isBuffer(bytes)||bytes.length<8||bytes.length>8*1024*1024||!bytes.subarray(0,8).equals(Buffer.from('89504e470d0a1a0a','hex')))return false;io.save(bytes);return true;}catch{return false;}
 }
+function installCodeSelfCheck(){
+ const secret='PRIVATE token=password /private/key.pem',root='/private/qa',path=join(root,'bridge6.apk'),args=['-s','emulator-5588','install','-r',path];
+ const result=(code,detail='',ending='\n\n')=>({status:1,stdout:'Performing Streamed Install\n',stderr:'adb: failed to install '+path+': Failure ['+code+(detail?': '+detail:'')+']'+ending});
+ for(const code of installFailureCodes)for(const detail of ['',secret])for(const ending of ['\n','\n\n']){
+  const value=result(code,detail,ending);assert.deepEqual(installFailureProjection(value,path),{installCode:code});
+  const original=Object.assign(new Error(secret),{stdout:secret,stderr:secret,stack:secret}),error=commandFailure(original,value,installCommandFailure('adb',args,value,'bridge-install',root));assert.equal(error,original);assert.deepEqual(finiteFailure(error),{class:'command-failed',status:1,commandKind:'adb-install',installCode:code});assert.ok(!JSON.stringify(finiteFailure(error)).includes(secret));
+ }
+ const good=result('INSTALL_FAILED_UPDATE_INCOMPATIBLE',secret),cases=[
+  ['process-state',null],['process-state',{}],...[-1,0,2,256,null,'1'].map(status=>['process-state',{...good,status}]),...['ETIMEDOUT','ENOENT'].map(code=>['process-state',{...good,error:{code,message:secret}}]),
+  ...[{...good,stdout:Buffer.from(secret)},{...good,stderr:Buffer.from(secret)},{...good,stdout:'x'.repeat(32769)},{...good,stderr:'x'.repeat(32769)}].map(value=>['output-type-or-size',value]),
+  ['incremental-announcement',{...good,stdout:'Performing Incremental Install\n'+secret}],['incremental-announcement',{...good,stdout:'Performing Incremental Install\nFailure [INSTALL_FAILED_INVALID_APK]\nPerforming Streamed Install\n'}],
+  ['stdout-shape',{...good,stdout:'Success\n'}],['stdout-shape',{...good,stdout:'Performing Push Install\n'}],
+  ['unlisted-code',result('INSTALL_FAILED_UNKNOWN')],['unlisted-code',result('INSTALL_FAILED_UPDATE_INCOMPATIBLE_EXTRA')],['ambiguous-content',result('INSTALL_FAILED_UPDATE_INCOMPATIBLE',secret+' INSTALL_PARSE_FAILED_BAD_MANIFEST')],['ambiguous-content',result('INSTALL_FAILED_UPDATE_INCOMPATIBLE','Success')],
+  ...[result('INSTALL_FAILED_UPDATE_INCOMPATIBLE','nested [message]'),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE',secret+'\n'),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE',secret+'\u2028'),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE','',''),result('INSTALL_FAILED_UPDATE_INCOMPATIBLE','','\n\n\n'),{...good,stderr:good.stderr+'Failure [INSTALL_FAILED_INVALID_APK]\n'},{...good,stderr:'prefix\n'+good.stderr},{...good,stderr:good.stderr.replace(']','')},{...good,stderr:good.stderr.replace('Failure [','Failure [prefix ')}].map(value=>['stderr-frame',value]),
+ ];
+ for(const [reason,value] of cases)assert.deepEqual(installFailureProjection(value,path),{installCodeDecline:reason});
+ for(const value of [undefined,null,'',path+'wrong',path+'\n'])assert.deepEqual(installFailureProjection(good,value),{installCodeDecline:'stderr-frame'});
+ assert.deepEqual(installFailureProjection({...good,stdout:''},path),{installCode:'INSTALL_FAILED_UPDATE_INCOMPATIBLE'});
+ for(const [argv,kind] of [[['-s','emulator-5588','shell','pm','path',app],'package-path'],[['-s','emulator-5588','exec-out','cat','/data/app/synthetic/base.apk'],'installed-apk-readback'],[['-s','wrong','install','-r',path],'unrecognized']])assert.deepEqual(installCommandFailure('adb',argv,good,'bridge-install',root),{commandKind:kind,installCodeDecline:'not-install-command'});
+ for(const phase of ['plain-B-reject','snapshot-old-created','constructor',secret,undefined])assert.equal(installCommandFailure('adb',args,good,phase,root),undefined);
+ assert.deepEqual(finiteFailure(commandFailure(new Error(secret),good,{commandKind:secret,installCode:secret,installCodeDecline:secret})),{class:'command-failed',status:1});
+ const record=exerciseRecorder(value=>{assert.ok(!JSON.stringify(value).includes(secret));});record.begin('bridge-install');const error=commandFailure(new Error(secret),good,installCommandFailure('adb',args,good,'bridge-install',root));record.fail(error);assert.equal(finiteFailure(error).installCode,'INSTALL_FAILED_UPDATE_INCOMPATIBLE');
+ console.log('PASS finite owned install command kinds/first-decline predicates and secret-rich negatives; observed cues do not prove mode or cause.');
+}
+
 function exerciseEvidenceSelfCheck(){
  const secret='PRIVATE token=password key=/private/secret.pem stdout stderr stack';let saved;const make=()=>exerciseRecorder(value=>saved=JSON.parse(JSON.stringify(value)));
  const rich=()=>Object.assign(new Error(secret),{stack:secret,argv:[secret],stdout:Buffer.from(secret),stderr:secret,key:secret,password:secret,path:secret,token:secret,status:secret});
@@ -119,15 +194,48 @@ function protectedFiles(before,after,version,events,eventData=row=>row,puppyName
  }
  assert.equal(addedBackups,expectedBackups,'Require exactly the source-defined before-update backup count.');
 }
-function widgetBinding(text){
- text=text.replaceAll('\r','');const section=text.split('\nWidgets:\n')[1]?.split('\nHosts:\n')[0];assert.ok(section,'Inspect the actual Widgets section.');
+// Exact user-0 package row; retain the full UID string, without dumpsys aliases.
+function packageUid(text){
+ const match=typeof text==='string'&&/^package:com\.patrickchin\.puptime uid:([1-9][0-9]{0,9})\n?$/.exec(text);
+ assert.ok(match&&match[0]===text&&Number(match[1])<=2147483647,'Require one exact package row with a positive full Java-int UID.');
+ return match[1];
+}
+function packageUidSelfCheck(){
+ const row=uid=>'package:com.patrickchin.puptime uid:'+uid;
+ for(const uid of ['1','10001','2147483647'])for(const suffix of ['','\n']){const actual=packageUid(row(uid)+suffix);assert.equal(actual,uid);assert.equal(typeof actual,'string');}
+ const invalid=[null,undefined,{},new String(row('10001')),'',row('0'),...['-1','+10001','010001','00','2147483648','9999999999','10000000000','1e4','0x2711','10.0','10001,10002','١٠٠٠١','１０００１','NaN','Infinity',' 10001','10001 '].map(row),row('10001')+'\n\n',row('10001')+'\r\n',row('10001')+'\nextra','\n'+row('10001'),' '+row('10001'),row('10001')+' extra',row('10001')+'\n'+row('10001'),row('10001')+'\n'+row('10002')+'\n',row('10001').replace('puptime','puptime.extra'),row('10001').replace('package:','package:prefix.'),row('10001').replace(' uid:','\tuid:'),row('10001').replace('uid:','userId:'),'userId=10001','appId=10001'];
+ for(const value of invalid)assert.throws(()=>packageUid(value),{code:'ERR_ASSERTION'});
+ console.log('PASS strict exact-package full UID rows, Java-int bounds and adversarial output rejection; no legacy aliases or commands.');
+}
+function widgetBinding(text,mark=()=>{}){
+ text=text.replaceAll('\r','');const section=text.split('\nWidgets:\n')[1]?.split('\nHosts:\n')[0];mark('widget-section');assert.ok(section,'Inspect the actual Widgets section.');
  const blocks=section.split(/(?=^\s*\[\d+\] id=)/m).filter(part=>part.includes(app+'/'));
- assert.equal(blocks.length,1,'Require one real bound Puptime widget.');const block=blocks[0];
+ mark('widget-count');assert.equal(blocks.length,1,'Require one real bound Puptime widget.');const block=blocks[0];
  const id=block.match(/^\s*\[\d+\] id=(\d+)/m)?.[1],host=block.match(/^\s*host=(HostId\{[^\n]+\})/m)?.[1],provider=block.match(/^\s*provider=(ProviderId\{[^\n]+\})/m)?.[1];
- assert.ok(id&&host&&provider);return {id,host,provider};
+ mark('widget-identity');assert.ok(id&&host&&provider);return {id,host,provider};
+}
+function snapshotSiteSelfCheck(){
+ const secret='PRIVATE raw path UID widget database error token',rich=()=>Object.assign(new Error(secret),{code:'ERR_ASSERTION',actual:secret,expected:secret,stdout:secret,stderr:secret,stack:secret});
+ for(const site of snapshotSites){
+  let saved,writes=0;const record=exerciseRecorder(value=>{writes++;saved=JSON.parse(JSON.stringify(value));});record.begin('snapshot-old-created');const before=writes;
+  record.snapshotSite(site);assert.equal(writes,before,'Markers are in-memory only.');const error=rich();let caught;try{throw error;}catch(value){caught=value;record.fail(value);}assert.equal(caught,error);assert.equal(saved.snapshotSite,site);assert.deepEqual(saved.failure,{class:'assertion'});assert.deepEqual(saved.history,[{phase:'snapshot-old-created',state:'started'},{phase:'snapshot-old-created',state:'failed'}]);assert.ok(!JSON.stringify(saved).includes(secret));
+ }
+ let saved,writes=0;const record=exerciseRecorder(value=>{writes++;saved=JSON.parse(JSON.stringify(value));});record.begin('snapshot-old-created');record.snapshotSite('package-uid');const before=writes;
+ for(const invalid of [secret,'',null,{},['package-uid']])assert.throws(()=>record.snapshotSite(invalid));assert.equal(writes,before);record.fail(commandFailure(rich(),{status:17}));assert.equal(saved.snapshotSite,'package-uid');assert.deepEqual(saved.failure,{class:'command-failed',status:17});assert.ok(!JSON.stringify(saved).includes(secret));
+ const clean=exerciseRecorder(value=>saved=value);clean.begin('snapshot-old-created');clean.snapshotSite('widget-identity');clean.end('snapshot-old-created');assert.ok(!('snapshotSite' in saved));clean.begin('snapshot-bridge-before-launch');assert.ok(!('snapshotSite' in saved));clean.snapshotSite('package-uid');clean.begin('snapshot-bridge-launched');assert.ok(!('snapshotSite' in saved));
+ const outside=exerciseRecorder(value=>saved=value);outside.begin('guest-seed');assert.throws(()=>outside.snapshotSite('package-uid'));outside.fail(rich());assert.ok(!('snapshotSite' in saved));
+ const valid='\nWidgets:\n  [0] id=2\n    host=HostId{'+secret+'}\n    provider=ProviderId{'+app+'/'+app+'.widget.PuptimeQuickLog '+secret+'}\nHosts:\n';
+ for(const [text,site] of [[secret,'widget-section'],['\nWidgets:\n  unrelated\nHosts:\n','widget-count'],[valid.replace('    host=','    missing='),'widget-identity']]){
+  const capture=exerciseRecorder(value=>saved=value);capture.begin('snapshot-old-created');let error;try{widgetBinding(text,value=>capture.snapshotSite(value));}catch(value){error=value;capture.fail(value);}assert.equal(error?.code,'ERR_ASSERTION');assert.equal(saved.snapshotSite,site);assert.deepEqual(saved.failure,{class:'assertion'});assert.ok(!JSON.stringify(saved).includes(secret));
+ }
+ const entered=[];assert.equal(widgetBinding(valid,site=>entered.push(site)).id,'2');assert.deepEqual(entered,['widget-section','widget-count','widget-identity']);
+ console.log('PASS eight finite in-memory snapshot sites, preserved failures/status, marker reset and production widget assertion boundaries. No native data or commands.');
 }
 function selfCheck(){
+ installCodeSelfCheck();
  exerciseEvidenceSelfCheck();
+ snapshotSiteSelfCheck();
+ packageUidSelfCheck();
  emulatorSelfCheck();
  offlineSelfCheck();
  assertWidgetSource();
@@ -318,7 +426,8 @@ function command(binary,args,{ok=[0],binaryOutput=false,timeout=120000}={}){
  const result=spawnSync(binary,args,{encoding:binaryOutput?undefined:'utf8',timeout,maxBuffer:256*1024*1024,stdio:['ignore','pipe','pipe']});
  if(!ok.includes(result.status)){
   if(existsSync(root))writeFileSync(join(root,'last-command-failure.txt'),String(result.stdout??'').slice(0,32768)+'\n'+String(result.stderr??'').slice(0,32768),{mode:0o600});
-  throw commandFailure(new Error(binary+' failed (exit '+result.status+'); private command/driver evidence was not uploaded.'),result);
+  const details=installCommandFailure(binary,args,result,exerciseEvidence?.phase(),root);
+  throw commandFailure(new Error(binary+' failed (exit '+result.status+'); private command/driver evidence was not uploaded.'),result,details);
  }
  return binaryOutput?result.stdout:String(result.stdout??'')+(result.status?String(result.stderr??''):'');
 }
@@ -408,12 +517,12 @@ function snapshot(label){
   const path='/data/user/0/'+app+'/'+remote;
   const listed=command('adb',['-s',device,'shell',`if test -d ${path}; then find ${path} -type f; fi`]);
   for(const full of listed.trim().split(/\r?\n/).filter(Boolean)){
-   const name=full.slice(('/data/user/0/'+app+'/').length);assert.ok(full.startsWith('/data/user/0/'+app+'/')&&!name.includes('..')&&!isAbsolute(name));const bytes=command('adb',['-s',device,'exec-out','cat',full],{binaryOutput:true});files[name]={sha256:hash(bytes),bytes};const target=join(dest,name);mkdirSync(resolve(target,'..'),{recursive:true,mode:0o700});writeFileSync(target,bytes);
+   const name=full.slice(('/data/user/0/'+app+'/').length);exerciseEvidence.snapshotSite('path-containment');assert.ok(full.startsWith('/data/user/0/'+app+'/')&&!name.includes('..')&&!isAbsolute(name));const bytes=command('adb',['-s',device,'exec-out','cat',full],{binaryOutput:true});files[name]={sha256:hash(bytes),bytes};const target=join(dest,name);mkdirSync(resolve(target,'..'),{recursive:true,mode:0o700});writeFileSync(target,bytes);
   }
  }
- const db=new DatabaseSync(join(dest,'files/SQLite/puptime-v2.db'),{readOnly:true});db.exec('BEGIN');let tables;try{assert.equal(db.prepare('PRAGMA integrity_check').get().integrity_check,'ok');assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);tables=nativeSnapshot(db);}finally{db.exec('ROLLBACK');db.close();}
- const uid=adb('shell','dumpsys','package',app).match(/\buserId=(\d+)/)?.[1];assert.ok(uid);
- const widgets=widgetBinding(adb('shell','dumpsys','appwidget'));
+ const db=new DatabaseSync(join(dest,'files/SQLite/puptime-v2.db'),{readOnly:true});db.exec('BEGIN');let tables;try{exerciseEvidence.snapshotSite('sqlite-integrity');assert.equal(db.prepare('PRAGMA integrity_check').get().integrity_check,'ok');exerciseEvidence.snapshotSite('sqlite-foreign-keys');assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);exerciseEvidence.snapshotSite('table-inventory');tables=nativeSnapshot(db);}finally{db.exec('ROLLBACK');db.close();}
+ const packageInfo=adb('shell','cmd','package','list','packages','-U','--user','0',app);exerciseEvidence.snapshotSite('package-uid');const uid=packageUid(packageInfo);
+ const widgets=widgetBinding(adb('shell','dumpsys','appwidget'),site=>exerciseEvidence.snapshotSite(site));
  exerciseEvidence.end('snapshot-'+label);return {tables,files,uid,widgets};
 }
 function equal(before,after){assertNativeTransition(before.tables,after.tables);assert.equal(after.uid,before.uid);assert.deepEqual(after.widgets,before.widgets);assert.deepEqual(Object.fromEntries(Object.entries(after.files).map(([k,v])=>[k,v.sha256])),Object.fromEntries(Object.entries(before.files).map(([k,v])=>[k,v.sha256])));}
