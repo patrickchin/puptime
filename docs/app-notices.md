@@ -1,7 +1,7 @@
 # App notice capture and final-artifact gate
 
 This is incomplete build preparation. The source JSON currently contains the
-reviewed font/icon notices only. Twenty-one exact iOS inputs have attribution
+reviewed font/icon notices only. Twenty-four exact iOS inputs have attribution
 reviews; remaining component review and the incomplete payload prevent sealing.
 Source tests, an internal simulator build, and finding licence filenames
 do not establish complete app-library notice coverage or store readiness.
@@ -36,10 +36,19 @@ One additional iOS record covers only `ExpoFileSystem@57.0.7` and its three exac
 own-product xcframework/slice boundaries, mapped to that package's original
 LICENSE. The selected 63-file source/product fingerprint and published inputs
 are pinned. External React/Hermes/framework dependencies gain no attribution.
-Against the qualified82 inventory, 182 components plus one generated source
-remain unreviewed. Of 109 recorded vendor boundaries, only these three specific
-FileSystem boundaries are reviewed; the other 106 remain held. No new discovery,
-Android, packaged-native, retained-resource, payload or sealing approval is implied.
+Three additional iOS records cover only `ExpoFont@57.0.4`,
+`ExpoModulesCore@57.0.18` and `ExpoModulesWorklets@57.0.18`, with nine exact
+own-product wrapper/slice mappings to the same owning package's original Expo
+MIT text. Exact published npm inputs, six product archives and all 277 selected
+public files reproduce the three captured native fingerprints. React, Hermes,
+JSI, React Native dependencies and system frameworks are excluded from these
+mappings; no generic inheritance is allowed.
+
+Against the qualified82 inventory, 179 components plus one generated source
+remain unreviewed. Of 109 recorded vendor boundaries, only the twelve specific
+own-product boundaries above are reviewed; the other 97 remain held. No new
+discovery, Android, packaged-native, retained-resource, payload or sealing
+approval is implied.
 
 ## Stable offline resource
 

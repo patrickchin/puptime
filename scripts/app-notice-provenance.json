@@ -483,6 +483,180 @@
       ],
       "upstream": "https://registry.npmjs.org/expo-file-system/-/expo-file-system-57.0.7.tgz",
       "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:ExpoFont@57.0.4",
+      "reviewedVendors": [
+        "ExpoFont.xcframework",
+        "ExpoFont.xcframework/ios-arm64/ExpoFont.framework",
+        "ExpoFont.xcframework/ios-arm64_x86_64-simulator/ExpoFont.framework"
+      ],
+      "vendorNoticeSources": {
+        "ExpoFont.xcframework": [
+          "node_modules/expo-font/LICENSE"
+        ],
+        "ExpoFont.xcframework/ios-arm64/ExpoFont.framework": [
+          "node_modules/expo-font/LICENSE"
+        ],
+        "ExpoFont.xcframework/ios-arm64_x86_64-simulator/ExpoFont.framework": [
+          "node_modules/expo-font/LICENSE"
+        ]
+      },
+      "nativeInputs": {
+        "cocoapods:ExpoFont": {
+          "sha256": "1b4c071b9f19595a2fd3f6f9a12b17b3205b97a5a3673805c722a4aaacb35db6",
+          "files": 35,
+          "excludedBuildPaths": [],
+          "frameworkInputList": {
+            "source": "ios/Pods/Target Support Files/ExpoFont/ExpoFont-xcframeworks-input-files.xcfilelist",
+            "sha256": "7a8db9b822e4abb811f863608e5559d3f95c095d53580fb303efce59261a2cc3"
+          },
+          "ownLicense": {
+            "ownerNpmID": "npm:expo-font@57.0.4",
+            "packagePath": "node_modules/expo-font",
+            "sourceKind": "podspec",
+            "packageJSON": {
+              "source": "node_modules/expo-font/package.json",
+              "sha256": "ad2dd07d792d6a6f3fd0f374e459356c2fbcc749645175743ab32bb4be56c5f7"
+            },
+            "podspec": {
+              "source": "node_modules/expo-font/ios/ExpoFont.podspec",
+              "sha256": "e9b906e51f162670d3364873ba9b0d4d4b281287b2482012f53bd9648172dfa0"
+            },
+            "license": {
+              "source": "node_modules/expo-font/LICENSE",
+              "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4"
+            },
+            "upstream": "https://registry.npmjs.org/expo-font/-/expo-font-57.0.4.tgz",
+            "upstreamIntegrity": "sha512-7WOMC2oA6xCfOm8bbofqWn2bIqyWFm7YLEnpc/gA1MJH0Ll0TfT/3+CqRkoW2eNRWMS8sxrz5WukUmSvmNquHA=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/expo-font/LICENSE",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/expo-font/-/expo-font-57.0.4.tgz",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:ExpoModulesCore@57.0.18",
+      "reviewedVendors": [
+        "ExpoModulesCore.xcframework",
+        "ExpoModulesCore.xcframework/ios-arm64/ExpoModulesCore.framework",
+        "ExpoModulesCore.xcframework/ios-arm64_x86_64-simulator/ExpoModulesCore.framework"
+      ],
+      "vendorNoticeSources": {
+        "ExpoModulesCore.xcframework": [
+          "node_modules/expo-modules-core/LICENSE"
+        ],
+        "ExpoModulesCore.xcframework/ios-arm64/ExpoModulesCore.framework": [
+          "node_modules/expo-modules-core/LICENSE"
+        ],
+        "ExpoModulesCore.xcframework/ios-arm64_x86_64-simulator/ExpoModulesCore.framework": [
+          "node_modules/expo-modules-core/LICENSE"
+        ]
+      },
+      "nativeInputs": {
+        "cocoapods:ExpoModulesCore": {
+          "sha256": "a822393fbf5a3da4d319e10c55e313a6e5a0c8a93eea610183e923fd6a1f3c10",
+          "files": 193,
+          "excludedBuildPaths": [],
+          "frameworkInputList": {
+            "source": "ios/Pods/Target Support Files/ExpoModulesCore/ExpoModulesCore-xcframeworks-input-files.xcfilelist",
+            "sha256": "3e54c8996ab0b54bf4d08f17f5da6613baeedff526fdf3f2a00d84cb8c96a30c"
+          },
+          "ownLicense": {
+            "ownerNpmID": "npm:expo-modules-core@57.0.18",
+            "packagePath": "node_modules/expo-modules-core",
+            "sourceKind": "podspec",
+            "packageJSON": {
+              "source": "node_modules/expo-modules-core/package.json",
+              "sha256": "e2041e04ed5a09e29d9d69eb28b4f216c88c65a8b222760076e7eadb50e8c73b"
+            },
+            "podspec": {
+              "source": "node_modules/expo-modules-core/ExpoModulesCore.podspec",
+              "sha256": "b8259e2770ded8730eec301be7ac22f1a8624c85dcd4bfeaeaf01a0bcd0c4887"
+            },
+            "license": {
+              "source": "node_modules/expo-modules-core/LICENSE",
+              "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4"
+            },
+            "upstream": "https://registry.npmjs.org/expo-modules-core/-/expo-modules-core-57.0.18.tgz",
+            "upstreamIntegrity": "sha512-ovB7C+GVQTlKAOIsOIHJVVXN9Mn0ljf2SYBS+afrRaGqq+HZEn1D3o+HReIVeH1NjCn/xDBb7I4HjldHs6luZA=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/expo-modules-core/LICENSE",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/expo-modules-core/-/expo-modules-core-57.0.18.tgz",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:ExpoModulesWorklets@57.0.18",
+      "reviewedVendors": [
+        "ExpoModulesWorklets.xcframework",
+        "ExpoModulesWorklets.xcframework/ios-arm64/ExpoModulesWorklets.framework",
+        "ExpoModulesWorklets.xcframework/ios-arm64_x86_64-simulator/ExpoModulesWorklets.framework"
+      ],
+      "vendorNoticeSources": {
+        "ExpoModulesWorklets.xcframework": [
+          "node_modules/expo-modules-core/LICENSE"
+        ],
+        "ExpoModulesWorklets.xcframework/ios-arm64/ExpoModulesWorklets.framework": [
+          "node_modules/expo-modules-core/LICENSE"
+        ],
+        "ExpoModulesWorklets.xcframework/ios-arm64_x86_64-simulator/ExpoModulesWorklets.framework": [
+          "node_modules/expo-modules-core/LICENSE"
+        ]
+      },
+      "nativeInputs": {
+        "cocoapods:ExpoModulesWorklets": {
+          "sha256": "c1dfd76bbc396c9bffa4b05cbaee14bb4063ae9898caaf14f1f91faf5cc7c33c",
+          "files": 49,
+          "excludedBuildPaths": [],
+          "frameworkInputList": {
+            "source": "ios/Pods/Target Support Files/ExpoModulesWorklets/ExpoModulesWorklets-xcframeworks-input-files.xcfilelist",
+            "sha256": "817db22f09dcd31057032c388f06b742d8b026e151986ee582579c653416e6af"
+          },
+          "ownLicense": {
+            "ownerNpmID": "npm:expo-modules-core@57.0.18",
+            "packagePath": "node_modules/expo-modules-core",
+            "sourceKind": "podspec",
+            "packageJSON": {
+              "source": "node_modules/expo-modules-core/package.json",
+              "sha256": "e2041e04ed5a09e29d9d69eb28b4f216c88c65a8b222760076e7eadb50e8c73b"
+            },
+            "podspec": {
+              "source": "node_modules/expo-modules-core/ExpoModulesWorklets.podspec",
+              "sha256": "9e25c99d9193663d944fba43798c3b3c93823d67ebb5f6af7251a007067cc95a"
+            },
+            "license": {
+              "source": "node_modules/expo-modules-core/LICENSE",
+              "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4"
+            },
+            "upstream": "https://registry.npmjs.org/expo-modules-core/-/expo-modules-core-57.0.18.tgz",
+            "upstreamIntegrity": "sha512-ovB7C+GVQTlKAOIsOIHJVVXN9Mn0ljf2SYBS+afrRaGqq+HZEn1D3o+HReIVeH1NjCn/xDBb7I4HjldHs6luZA=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/expo-modules-core/LICENSE",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/expo-modules-core/-/expo-modules-core-57.0.18.tgz",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4"
     }
   ],
   "generatedSources": {
