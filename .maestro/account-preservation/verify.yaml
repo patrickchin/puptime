@@ -23,7 +23,7 @@ name: Account preservation verify
 - assertVisible:
     id: account.code.input
     text: ^[0-9]{6}$
-- tapOn: Sign-in code
+- tapOn: ${ACCOUNT_CODE_LABEL || "Sign-in code"}
 - scrollUntilVisible:
     element:
       id: account.verify
@@ -46,8 +46,8 @@ name: Account preservation verify
     element:
       id: account.back
     direction: UP
-- assertVisible: My account
-- assertVisible: Signed in as
+- assertVisible: ${ACCOUNT_TITLE || "My account"}
+- assertVisible: ${ACCOUNT_SIGNED_IN || "Signed in as"}
 - assertVisible:
     id: account.email
     text: ${TEST_EMAIL}

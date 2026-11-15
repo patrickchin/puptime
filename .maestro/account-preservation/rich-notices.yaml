@@ -1,0 +1,99 @@
+appId: com.patrickchin.puptime
+name: Populated native history keeps its state while local notices are read
+---
+- assertTrue: ${NOTICE_ACTION === 'theme' || NOTICE_ACTION === 'view'}
+- assertTrue: ${NOTICE_THEME === 'light' || NOTICE_THEME === 'dark' || NOTICE_THEME === 'system'}
+- launchApp:
+    permissions: {}
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 90000
+- runFlow:
+    when:
+      true: ${NOTICE_ACTION === 'view'}
+    commands:
+      - waitForAnimationToEnd
+      - takeScreenshot: native-notice-glyphs-${NOTICE_THEME}
+- tapOn:
+    id: nav.open
+    retryTapIfNoChange: true
+- assertVisible:
+    id: nav.close
+- tapOn:
+    id: nav.settings
+    retryTapIfNoChange: true
+- assertVisible:
+    id: screen.settings
+- runFlow:
+    when:
+      true: ${NOTICE_ACTION === 'theme'}
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: settings.theme.open
+          direction: UP
+          visibilityPercentage: 100
+      - tapOn:
+          id: settings.theme.open
+          retryTapIfNoChange: true
+      - assertVisible:
+          id: appearance.theme.${NOTICE_THEME}
+      - tapOn:
+          id: appearance.theme.${NOTICE_THEME}
+      - assertNotVisible:
+          id: appearance.modal
+- runFlow:
+    when:
+      true: ${NOTICE_ACTION === 'view'}
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: settings.search
+          direction: UP
+          visibilityPercentage: 100
+      - tapOn:
+          id: settings.search
+      - inputText: licenses
+      # Leave the search keyboard active: opening the real row must produce
+      # a readable native sheet, rather than a test-side hideKeyboard workaround.
+      - assertVisible:
+          id: settings.fontLicenses.open
+          enabled: true
+      - tapOn:
+          id: settings.fontLicenses.open
+      - assertVisible:
+          id: screen.fontLicenses
+      - assertVisible:
+          id: fontLicenses.body
+      - assertVisible:
+          id: fontLicenses.red-hat
+      - scrollUntilVisible:
+          element:
+            id: fontLicenses.react-native-vector-icons
+          direction: DOWN
+          visibilityPercentage: 100
+          timeout: 120000
+      - assertVisible:
+          id: fontLicenses.close
+          enabled: true
+      - waitForAnimationToEnd
+      - takeScreenshot: native-notices-${NOTICE_THEME}
+      - tapOn:
+          id: fontLicenses.close
+      - assertNotVisible:
+          id: screen.fontLicenses
+      - assertVisible:
+          id: settings.search.clear
+      - tapOn:
+          id: settings.search.clear
+- scrollUntilVisible:
+    element:
+      id: settings.back
+    direction: UP
+    visibilityPercentage: 100
+- tapOn:
+    id: settings.back
+    retryTapIfNoChange: true
+- assertVisible:
+    id: screen.today

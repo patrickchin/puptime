@@ -18,9 +18,9 @@ name: Account preservation reopen
 - extendedWaitUntil:
     visible:
       id: account.status
-      text: Up to date
+      text: ${ACCOUNT_STATUS || "Up to date"}
     timeout: 45000
 - assertVisible:
     id: account.local.count
-    text: ${EXPECTED_COUNT} activity logs
+    text: ${ACCOUNT_LOG_COUNT || (EXPECTED_COUNT + " activity logs")}
 - takeScreenshot: recovered-account-history

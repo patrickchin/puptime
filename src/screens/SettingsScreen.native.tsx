@@ -1,6 +1,6 @@
 import { AnalyticsSettings } from '../components/AnalyticsSettings.native';
 import { useTelemetryOverlay } from '../telemetry';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useState } from 'react';
 import { Alert, Keyboard, Linking, Modal, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
 import { Pressable } from '../components/TelemetryPressable';
@@ -11,6 +11,7 @@ import {PuppyIdentity} from '../components/PuppyIdentity';
 import { ActivityIcon } from '../components/ActivityIcon';
 import { ActivityCsvSettings } from '../components/ActivityCsvSettings';
 import { SettingsRow } from '../components/SettingsRow';
+import { FontIconLicenses } from '../components/FontIconLicenses';
 import { SettingsSearch } from '../components/SettingsSearch';
 import { findSettings, type SettingSearchId } from '../settings-search';
 import { ActivityBackupSettings } from '../components/ActivityBackupSettings.native';
@@ -83,7 +84,7 @@ export function SettingsScreen({
   const [widgetVisible,setWidgetVisible]=useState(false);
   useTelemetryOverlay('widget_settings', widgetVisible);
   const [query, setQuery] = useState('');
-  const searchable: SettingSearchId[] = ['appearance', 'language', 'notifications', 'widget', 'backups', 'csv', 'analytics', 'guide', 'privacy'];
+  const searchable: SettingSearchId[] = ['appearance', 'language', 'notifications', 'widget', 'backups', 'csv', 'analytics', 'guide', 'privacy', 'fontLicenses'];
   if (onOpenHistory) searchable.push('history');
   const matches = findSettings(query, t, searchable);
   const [savingWidget, setSavingWidget] = useState(false);
@@ -239,13 +240,14 @@ export function SettingsScreen({
       <View style={!matches.has('backups') && styles.hidden}><ActivityBackupSettings theme={theme} onRestored={onBackupsRestored}/></View>
       <View style={!matches.has('csv') && styles.hidden}><ActivityCsvSettings theme={theme} eventCount={eventCount} onImport={onImport}/></View>
       {matches.has('history') && onOpenHistory?<View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}><SettingsRow testID="settings.history.open" icon="history" label={t('history.recentTitle')} detail={t('history.recentDetail')} onPress={onOpenHistory} theme={theme} wrap/></View>:null}
-      {(matches.has('analytics') || matches.has('guide') || matches.has('privacy')) && <SectionLabel label={t('settings.helpPrivacy')} theme={theme}/>}
+      {(matches.has('analytics') || matches.has('guide') || matches.has('privacy') || matches.has('fontLicenses')) && <SectionLabel label={t('settings.helpPrivacy')} theme={theme}/>}
       <View style={!matches.has('analytics') && styles.hidden}><AnalyticsSettings theme={theme}/></View>
       {matches.has('guide') || matches.has('privacy') ? <View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}>
         {matches.has('guide') && <SettingsRow testID="settings.guide.open" icon="compass-outline" label={t('settings.guide')} detail={t('settings.guideDetail')} onPress={onOpenGuide} theme={theme} wrap/>}
         {matches.has('guide') && matches.has('privacy') && <View style={[styles.divider,{backgroundColor:theme.border}]}/>}
         {matches.has('privacy') && <SettingsRow testID="settings.privacy.open" icon="shield-outline" label={t('account.privacy')} detail={t('settings.privacyDetail')} onPress={()=>{void Linking.openURL('https://github.com/patrickchin/puptime/blob/main/PRIVACY.md').catch(()=>Alert.alert(t('learn.linkError'),t('learn.linkErrorBody')));}} theme={theme} wrap/>}
       </View> : null}
+      {matches.has('fontLicenses') && <View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}><FontIconLicenses theme={theme}/></View>}
     </ScrollView>
     <Modal visible={widgetVisible} presentationStyle="pageSheet" animationType="slide" onRequestClose={()=>setWidgetVisible(false)}>
       <SafeAreaView style={{flex:1,backgroundColor:theme.background}}>

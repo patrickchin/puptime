@@ -1,4 +1,4 @@
-import {MaterialCommunityIcons} from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import {useFonts} from 'expo-font';
 import {StatusBar} from 'expo-status-bar';
 import {useEffect,useRef,useState,type ReactNode} from 'react';

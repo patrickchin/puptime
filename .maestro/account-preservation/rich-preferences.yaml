@@ -1,0 +1,7 @@
+appId: com.patrickchin.puptime
+name: Native rich preferences use production Settings
+---
+- runFlow:
+    file: ../runtime-upgrade/preferences.yaml
+    env:
+      PREF_ACTION: ${PREF_ACTION}

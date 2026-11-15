@@ -1,0 +1,100 @@
+appId: com.patrickchin.puptime
+name: Existing native editors retain a labeled custom activity and routine
+---
+- assertVisible:
+    id: screen.today
+- scrollUntilVisible:
+    element:
+      id: event.meal.edit
+    direction: DOWN
+- tapOn:
+    id: event.meal.edit
+    index: 0
+- assertVisible:
+    id: editor
+- tapOn:
+    id: editor.type.custom
+- scrollUntilVisible:
+    element:
+      id: editor.custom.input
+    direction: DOWN
+- tapOn:
+    id: editor.custom.input
+- inputText: Confidence practice
+- assertVisible:
+    id: editor.custom.input
+    text: Confidence practice
+- scrollUntilVisible:
+    element:
+      id: editor.close
+    direction: UP
+- tapOn:
+    id: editor.close
+- extendedWaitUntil:
+    notVisible:
+      id: editor
+    timeout: 30000
+- assertVisible:
+    id: event.custom.note
+    text: Saved before and after sign-in
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.schedule
+- scrollUntilVisible:
+    element:
+      id: schedule.add
+    direction: DOWN
+- tapOn:
+    id: schedule.add
+- scrollUntilVisible:
+    element:
+      id: schedule.editor.type.custom
+    direction: DOWN
+- tapOn:
+    id: schedule.editor.type.custom
+- scrollUntilVisible:
+    element:
+      id: schedule.editor.time
+    direction: DOWN
+- tapOn:
+    id: schedule.editor.time
+- tapOn:
+    id: time.nativeWheel
+    point: "50%,64%"
+- tapOn:
+    id: picker.done
+- scrollUntilVisible:
+    element:
+      id: schedule.editor.reminder
+    direction: DOWN
+- assertVisible:
+    id: schedule.editor.reminder
+    checked: false
+- tapOn:
+    id: schedule.editor.reminder
+- assertVisible:
+    id: schedule.editor.reminder
+    checked: true
+- scrollUntilVisible:
+    element:
+      id: schedule.editor.save
+    direction: DOWN
+- tapOn:
+    id: schedule.editor.save
+    enabled: true
+- extendedWaitUntil:
+    notVisible:
+      id: schedule.editor
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: schedule.entry.custom
+    direction: UP
+- takeScreenshot: native-rich-custom-routine
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.log
+- assertVisible:
+    id: screen.today

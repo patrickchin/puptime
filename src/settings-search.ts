@@ -11,6 +11,7 @@ const settingsSearchKeys = {
   analytics: ['telemetry.title', 'settings.helpPrivacy'],
   guide: ['settings.guide', 'settings.guideDetail', 'settings.helpPrivacy'],
   privacy: ['account.privacy', 'settings.privacyDetail', 'settings.helpPrivacy'],
+  fontLicenses: ['settings.fontLicenses', 'settings.fontLicensesDetail', 'settings.helpPrivacy'],
   account: ['account.title', 'account.signIn'],
 } as const satisfies Record<string, readonly MessageKey[]>;
 

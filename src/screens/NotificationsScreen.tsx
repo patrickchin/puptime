@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import * as Notifications from 'expo-notifications';
