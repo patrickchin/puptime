@@ -12,7 +12,7 @@ function guestScreen(){
  const hooks:any[]=[],snapshot={busy:false,accountActionPending:false,account:null,online:true,problem:null as string|null};let cursor=0,reads=0,finished=0;
  const jsx=(type:unknown,props:any)=>({type,props});
  const modules:Record<string,unknown>={
-  '@expo/vector-icons':{MaterialCommunityIcons:'Icon'},'expo-font':{useFonts:()=>[true,null]},'expo-status-bar':{StatusBar:'StatusBar'},
+  '@expo/vector-icons/MaterialCommunityIcons':{default:'Icon'},'expo-font':{useFonts:()=>[true,null]},'expo-status-bar':{StatusBar:'StatusBar'},
   react:{useEffect:()=>{},useState:(initial:any)=>{const index=cursor++;hooks[index]??={value:typeof initial==='function'?initial():initial};return [hooks[index].value,(next:any)=>{hooks[index].value=typeof next==='function'?next(hooks[index].value):next;}];},useRef:(initial:any)=>{const index=cursor++;return hooks[index]??=( {current:initial} );}},
   'react/jsx-runtime':{jsx,jsxs:jsx,Fragment:'Fragment'},
   'react-native':{Platform:{OS:'ios'},StyleSheet:{create:(value:unknown)=>value},Keyboard:{isVisible:()=>false,dismiss:()=>{}},Animated:{Value:class{interpolate(){return 0;}}},useWindowDimensions:()=>({width:402,height:874,fontScale:1}),...Object.fromEntries(['AccessibilityInfo','ActivityIndicator','BackHandler','Easing','Image','KeyboardAvoidingView','Linking','Pressable','ScrollView','Text','TextInput','View'].map(name=>[name,name]))},
