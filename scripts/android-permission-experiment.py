@@ -182,26 +182,31 @@ def zip_payload(path, root):
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     try:
         before = os.fstat(fd); rows, total, manifest = [], 0, None
-        with os.fdopen(fd, 'rb', closefd=False) as stream, zipfile.ZipFile(stream) as archive:
+        require(stat.S_ISREG(before.st_mode) and stat.S_IMODE(before.st_mode) == 0o600 and before.st_uid == os.geteuid() and before.st_size == pin['bytes'])
+        with os.fdopen(fd, 'rb', closefd=False) as stream:
             # Bind the very descriptor parsed by ZipFile to the already checked hash.
-            stream.seek(0); digest = hashlib.sha256()
-            while chunk := stream.read(65536): digest.update(chunk)
-            require(digest.hexdigest() == pin['sha256'] and before.st_size == pin['bytes'])
-            entries = archive.infolist(); require(0 < len(entries) <= MAX_ENTRIES)
-            names = set()
-            for item in entries:
-                name = item.filename
-                require(name == item.orig_filename and 0 < len(name.encode('utf-8')) <= 1024 and not name.startswith('/') and '\\' not in name and '\0' not in name and '..' not in name.split('/'))
-                require(name not in names and not item.flag_bits & 1 and not stat.S_ISLNK(item.external_attr >> 16))
-                require(0 <= item.file_size <= MAX_ENTRY_BYTES)
-                names.add(name); total += item.file_size; require(total <= MAX_PAYLOAD_BYTES)
-                digest, size = hashlib.sha256(), 0
-                with archive.open(item) as source:
-                    while chunk := source.read(65536):
-                        size += len(chunk); require(size <= item.file_size); digest.update(chunk)
-                require(size == item.file_size)
-                value = digest.hexdigest(); rows.append([name, size, value])
-                if name == 'AndroidManifest.xml': manifest = value
+            stream.seek(0); digest, size = hashlib.sha256(), 0
+            while chunk := stream.read(min(65536, pin['bytes'] + 1 - size)):
+                size += len(chunk); require(size <= pin['bytes']); digest.update(chunk)
+            require(size == pin['bytes'] and digest.hexdigest() == pin['sha256'] and before.st_size == pin['bytes'])
+            qualified = os.fstat(fd)
+            require(all(getattr(before, key) == getattr(qualified, key) for key in ['st_dev', 'st_ino', 'st_mode', 'st_size', 'st_mtime_ns', 'st_ctime_ns']))
+            with zipfile.ZipFile(stream) as archive:
+                entries = archive.infolist(); require(0 < len(entries) <= MAX_ENTRIES)
+                names = set()
+                for item in entries:
+                    name = item.filename
+                    require(name == item.orig_filename and 0 < len(name.encode('utf-8')) <= 1024 and not name.startswith('/') and '\\' not in name and '\0' not in name and '..' not in name.split('/'))
+                    require(name not in names and not item.flag_bits & 1 and not stat.S_ISLNK(item.external_attr >> 16))
+                    require(0 <= item.file_size <= MAX_ENTRY_BYTES)
+                    names.add(name); total += item.file_size; require(total <= MAX_PAYLOAD_BYTES)
+                    digest, size = hashlib.sha256(), 0
+                    with archive.open(item) as source:
+                        while chunk := source.read(65536):
+                            size += len(chunk); require(size <= item.file_size); digest.update(chunk)
+                    require(size == item.file_size)
+                    value = digest.hexdigest(); rows.append([name, size, value])
+                    if name == 'AndroidManifest.xml': manifest = value
         require(manifest is not None)
         after = os.fstat(fd)
         require(all(getattr(before, key) == getattr(after, key) for key in ['st_dev', 'st_ino', 'st_mode', 'st_size', 'st_mtime_ns', 'st_ctime_ns']))

@@ -138,6 +138,34 @@ class PermissionTests(unittest.TestCase):
             write(); data = path.read_bytes().replace(b'SYNTHETIC_CODE', b'SYNTHETIC_FAIL'); private(path, data)
             with self.assertRaises(zipfile.BadZipFile): p.zip_payload(path, root)
 
+    def test_second_descriptor_growth_stops_at_pinned_size_plus_one(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve(); root.chmod(0o700); path = root / 'fixture.apk'
+            with zipfile.ZipFile(path, 'w') as archive: archive.writestr('AndroidManifest.xml', b'SYNTHETIC_MANIFEST')
+            path.chmod(0o600); initial = path.stat().st_size; fdopen = os.fdopen; original_zip = zipfile.ZipFile
+            requested, consumed = [], []
+            class Reader:
+                def __init__(self, stream): self.stream, self.hashing, self.grown = stream, False, False
+                def __enter__(self): return self
+                def __exit__(self, *args): return self.stream.__exit__(*args)
+                def __getattr__(self, name): return getattr(self.stream, name)
+                def seek(self, offset, whence=0):
+                    if offset == 0 and whence == 0: self.hashing = True
+                    return self.stream.seek(offset, whence)
+                def read(self, count=-1):
+                    if self.hashing and not self.grown:
+                        self.grown = True
+                        with path.open('ab') as output: output.write(b'GROWTH' * 1000)
+                    data = self.stream.read(count)
+                    if self.hashing: requested.append(count); consumed.append(len(data))
+                    return data
+            with patch.object(p.os, 'fdopen', side_effect=lambda *args, **kwargs: Reader(fdopen(*args, **kwargs))), patch.object(p.zipfile, 'ZipFile', wraps=original_zip) as parsed:
+                with self.assertRaises(ValueError): p.zip_payload(path, root)
+                parsed.assert_not_called()
+            self.assertTrue(requested)
+            self.assertTrue(all(0 < count <= min(65536, initial + 1) for count in requested))
+            self.assertLessEqual(sum(consumed), initial + 1)
+
     def test_cli_no_arbitrary_path_mode_or_error_disclosure(self):
         for args in [[], ['--unknown', '/PRIVATE_TOKEN'], ['--inventory', '/PRIVATE_TOKEN']]:
             result = subprocess.run(['python3', str(HERE / 'android-permission-experiment.py'), *args], text=True, capture_output=True, timeout=10, env={**os.environ, 'GITHUB_RUN_ID': '1', 'GITHUB_RUN_ATTEMPT': '1', 'RUNNER_TEMP': '/private/tmp'})
@@ -165,6 +193,28 @@ console.log(JSON.stringify({status:'passed',actualControlBlockCases:cases,defaul
         result = subprocess.run(['node', '-e', source, str(HERE / 'verify-android-signing-upgrade.mjs')], text=True, capture_output=True, timeout=20)
         self.assertEqual(result.returncode, 0, 'Actual control block model failed (private details suppressed).')
         self.assertEqual(json.loads(result.stdout), {'status': 'passed', 'actualControlBlockCases': 6, 'defaultNewControlIO': 0})
+
+    def test_actual_dispatch_invalid_flag_never_prevents_owned_host_cleanup(self):
+        source = r'''
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),path=require('node:path'),crypto=require('node:crypto');
+const source=fs.readFileSync(process.argv[1],'utf8'),mode=process.argv[2],calls=[];let flagReads=0,selfChecks=0;
+const context={assert,utilTypes:require('node:util').types,createHash:crypto.createHash,join:path.join};vm.createContext(context);
+vm.runInContext(source.slice(source.indexOf('const app='),source.indexOf('const [mode]=')),context);
+const select=context.permissionSelection;context.permissionSelection=value=>{flagReads++;return select(value);};context.emulatorHost=value=>calls.push(value);context.selfCheck=()=>selfChecks++;
+const report=exit=>console.log(JSON.stringify({mode,calls,flagReads,selfChecks,exit}));
+context.console={error(){}};context.process={argv:['node','driver',mode],env:{PUPTIME_PERMISSION_EXPERIMENT:'INVALID'},exit(code){report(code);process.exit(code);}};
+try{vm.runInContext(source.slice(source.indexOf('const [mode]='),source.indexOf('const exerciseReceipt=')),context);report(null);}catch{report('rejected');}
+'''
+        for mode in ['--emulator-record', '--emulator-root', '--emulator-offline', '--emulator-cleanup', '--self-check', '--preflight', '--exercise', '--unknown']:
+            result = subprocess.run(['node', '-e', source, str(HERE / 'verify-android-signing-upgrade.mjs'), mode], text=True, capture_output=True, timeout=10)
+            self.assertEqual(result.returncode, 0, 'Actual dispatch model failed (private details suppressed).')
+            value = json.loads(result.stdout)
+            if mode.startswith('--emulator-'):
+                self.assertEqual(value, {'mode': mode, 'calls': [mode], 'flagReads': 0, 'selfChecks': 0, 'exit': 0})
+            elif mode == '--unknown':
+                self.assertEqual(value, {'mode': mode, 'calls': [], 'flagReads': 0, 'selfChecks': 0, 'exit': None})
+            else:
+                self.assertEqual(value, {'mode': mode, 'calls': [], 'flagReads': 1, 'selfChecks': 0, 'exit': 'rejected'})
 
     def test_source_inventory_precedes_keys_device_and_workflow_selection_is_explicit(self):
         source = (HERE / 'verify-android-signing-upgrade.mjs').read_text()
