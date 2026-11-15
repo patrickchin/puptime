@@ -100,6 +100,16 @@ still fail. The pinned [Kotlin producer](https://github.com/Kotlin/kotlinx.corou
 uses `DebugProbesKt.bin` as class bytes; this is a format distinction, not an
 archive-member exclusion or a notice-coverage approval.
 
+Zero-byte notice members are reported separately as `emptyNotices` with their
+logical source, zero length, empty SHA-256 and verified ZIP CRC. They never enter
+the notice text list or resource-coverage map. Maven component `nativeInputs`
+binds those records and the verified source archive hash; a changed or dropped
+record invalidates its review. A component without actual text remains
+`missing-notice-text`, even with a ledger entry. Other text and vendored sources
+still require the normal explicit review. Final evidence retains empty records
+separately, and an empty file cannot satisfy a required nonempty notice resource.
+Nonempty invalid text and all existing archive/size limits remain strict.
+
 The Gradle init script requires an explicit absolute `noticeMainProjectRoot` and
 compares canonical project directories before registering its task. Other
 included builds are skipped; a missing `:app` on the selected root still fails.

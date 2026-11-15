@@ -101,6 +101,17 @@ test('actual AAR and nested JAR LICENSE plus NOTICE text are retained, with arti
  input.components[0].artifacts[0].sha256='0'.repeat(64);file('private-gradle-input.json',input);assert.throws(()=>gradleNoticeInputs(root,path));
 }));
 
+test('real empty archive notices remain fingerprinted metadata, missing text and vendor review are never satisfied by them',()=>fixture(({root,file})=>{
+ const aar=join(root,'empty.aar'),input={schema:1,configuration:'releaseRuntimeClasspath',components:[{group:'qa',name:'empty',version:'1',artifacts:[]}]},path=join(root,'runtime.json');
+ const capture=(text=false,vendor=false)=>{execFileSync('python3',['-c',`import zipfile,sys\nwith zipfile.ZipFile(sys.argv[1],'w') as z:\n z.writestr('third_party/vendor/LICENSE' if sys.argv[3]=='yes' else 'third_party_licenses.txt',b'')\n if sys.argv[2]=='yes':z.writestr('LICENSE','Actual synthetic notice\\n')`,aar,text?'yes':'no',vendor?'yes':'no']);input.components[0].artifacts=[{file:aar,sha256:digest(readFileSync(aar))}];file('runtime.json',input);return gradleNoticeInputs(root,path).components[0];};
+ const empty=capture(),record={source:'maven:qa:empty:1/empty.aar!third_party_licenses.txt',bytes:0,sha256:digest(''),crc32:'00000000',archiveSHA256:input.components[0].artifacts[0].sha256};assert.deepEqual(empty.notices,[]);assert.deepEqual(empty.nativeInputs,{emptyNotices:[record]});assert.ok(!JSON.stringify(empty).includes(root));
+ assert.equal(resolveNoticeCoverage([empty],approval(empty,'android'),'android').unresolved[0].reason,'missing-notice-text');assert.equal(unreviewedOSSNoticeInputs([empty],{}).components.length,0);
+ const actual=capture(true),reviewed=approval(actual,'android');assert.equal(actual.notices.length,1);assert.equal(resolveNoticeCoverage([actual],{schema:1,components:[]},'android').unresolved[0].reason,'unreviewed-component');assert.equal(resolveNoticeCoverage([actual],reviewed,'android').status,'READY');
+ for(const field of ['source','bytes','sha256','crc32','archiveSHA256']){const changed=structuredClone(actual);changed.nativeInputs.emptyNotices[0][field]=field==='bytes'?1:'changed';assert.equal(resolveNoticeCoverage([changed],reviewed,'android').unresolved[0].reason,'native-source-digest-mismatch');}
+ for(const inputs of [{},{emptyNotices:[]}]){const changed={...actual,nativeInputs:inputs};assert.equal(resolveNoticeCoverage([changed],reviewed,'android').unresolved[0].reason,'native-source-digest-mismatch');}
+ const vendored=capture(true,true);assert.deepEqual(vendored.vendors,['third_party/vendor/LICENSE']);assert.equal(resolveNoticeCoverage([vendored],approval(vendored,'android'),'android').unresolved[0].reason,'missing-vendored-notice');
+}));
+
 test('archive reader rejects duplicate/traversal input, and reads the exact final JSON resource without extraction',()=>fixture(({root})=>{
  const path=join(root,'fixture.apk'),payload=JSON.stringify([{id:'qa',title:'QA',body:mit}])+'\n';
  execFileSync('python3',['-c',`import zipfile,sys\nwith zipfile.ZipFile(sys.argv[1],'w') as z:z.writestr('assets/third_party_notices.json',sys.argv[2])`,path,payload]);

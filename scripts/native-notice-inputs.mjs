@@ -122,15 +122,16 @@ export function gradleNoticeInputs(root,inputFile){
    scan.vendors=scan.vendors.map(scoped);scan.vendorNotices=Object.fromEntries(Object.entries(scan.vendorNotices).map(([key,sources])=>[scoped(key),sources]));
    components.push(...unionNoticeInputs([pkg],[{...pkg,...scan}]));continue;
   }
-  assert.ok(value.group&&value.name&&value.version&&value.artifacts.length);const notices=[],vendors=[];
+  assert.ok(value.group&&value.name&&value.version&&value.artifacts.length);const notices=[],vendors=[],emptyNotices=[];
   for(const artifact of value.artifacts){
    const bytes=readFileSync(artifact.file);assert.equal(digest(bytes),artifact.sha256,'Resolved artifact changed.');
    const inspected=noticeInputStep('gradle-archive-scan','maven',()=>inspectNoticeArchive(artifact.file),`maven:${value.group}:${value.name}@${value.version}`,undefined,artifact.sha256),prefix='maven:'+value.group+':'+value.name+':'+value.version+'/'+basename(artifact.file)+'!';
    notices.push(...inspected.notices.map(item=>({...item,source:prefix+item.source})));
+   emptyNotices.push(...inspected.emptyNotices.map(item=>({...item,source:prefix+item.source,archiveSHA256:artifact.sha256})));
    nativeFiles.push(...inspected.nativeFiles.map(item=>({...item,component:`maven:${value.group}:${value.name}@${value.version}`})));
-   for(const item of inspected.notices)if(/(^|\/)(vendor|third[-_]?party)(\/|$)/i.test(item.source))vendors.push(item.source);
+   for(const item of [...inspected.notices,...inspected.emptyNotices])if(/(^|\/)(vendor|third[-_]?party)(\/|$)/i.test(item.source))vendors.push(item.source);
   }
-  components.push(nativeNoticeInput({id:`maven:${value.group}:${value.name}@${value.version}`,name:value.group+':'+value.name,version:value.version,ecosystem:'maven',notices,vendors}));
+  components.push(nativeNoticeInput({id:`maven:${value.group}:${value.name}@${value.version}`,name:value.group+':'+value.name,version:value.version,ecosystem:'maven',notices,vendors,nativeInputs:emptyNotices.length?{emptyNotices:emptyNotices.sort((a,b)=>a.source.localeCompare(b.source))}:{}}));
  }
  return {components,nativeFiles,unresolved:[],inputHashes:{gradle:digest(readFileSync(inputFile))}};
 }

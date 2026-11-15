@@ -20,6 +20,55 @@ def jvm_fixture(extra=b"", slots=0, major=52):
 
 
 class NativeArchiveTests(unittest.TestCase):
+    def test_empty_notices_are_crc_verified_metadata_and_never_text(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "empty.aar"
+            for compression in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
+                nested = io.BytesIO()
+                with zipfile.ZipFile(nested, "w", compression=compression) as archive:
+                    archive.writestr("META-INF/NOTICE", b"")
+                with zipfile.ZipFile(path, "w", compression=compression) as archive:
+                    archive.writestr("third_party_licenses.txt", b"")
+                    archive.writestr("LICENSE", b"Actual synthetic notice\n")
+                    archive.writestr("classes.jar", nested.getvalue())
+                result = reader.inspect_archive(path)
+                self.assertEqual(result["notices"], [{"source": "LICENSE", "body": "Actual synthetic notice\n", "sha256": hashlib.sha256(b"Actual synthetic notice\n").hexdigest()}])
+                self.assertEqual(result["emptyNotices"], [{"source": source, "bytes": 0, "sha256": hashlib.sha256(b"").hexdigest(), "crc32": "00000000"} for source in ("third_party_licenses.txt", "classes.jar!META-INF/NOTICE")])
+
+    def test_empty_notice_bad_crc_and_nonempty_member_forged_as_zero_fail(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "corrupt.zip"
+            for compression in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
+                for forged in (False, True):
+                    with self.subTest(compression=compression, forged=forged):
+                        with zipfile.ZipFile(path, "w", compression=compression) as archive:
+                            archive.writestr("NOTICE", b"nonempty" if forged else b"")
+                        data = bytearray(path.read_bytes())
+                        central = data.index(b"PK\x01\x02")
+                        struct.pack_into("<I", data, central + 16, 0 if forged else 1)
+                        struct.pack_into("<I", data, 14, 0 if forged else 1)
+                        if forged:
+                            struct.pack_into("<I", data, central + 24, 0)
+                            struct.pack_into("<I", data, 22, 0)
+                        path.write_bytes(data)
+                        with self.assertRaises(zipfile.BadZipFile):
+                            reader.inspect_archive(path)
+
+    def test_nonempty_invalid_notices_and_aggregate_limit_still_fail(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "invalid.zip"
+            for body in (b" \n", b"notice\0body", b"\xff"):
+                with zipfile.ZipFile(path, "w") as archive:
+                    archive.writestr("NOTICE", body)
+                with self.assertRaises(ValueError):
+                    reader.inspect_archive(path)
+            with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                archive.writestr("NOTICE.empty", b"")
+                for index in range(17):
+                    archive.writestr(f"NOTICE.{index}", b"a" * 1024**2)
+            with self.assertRaisesRegex(ValueError, "Too much notice text"):
+                reader.inspect_archive(path)
+
     def test_positive_jvm_structure_does_not_depend_on_extension(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "classes.jar"

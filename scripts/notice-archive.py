@@ -1,5 +1,6 @@
 """Read-only, bounded SDK/archive notice input. Never extracts files."""
 import base64
+import copy
 import hashlib
 import io
 import json
@@ -7,6 +8,7 @@ import re
 import struct
 import sys
 import zipfile
+import zlib
 from pathlib import Path, PurePosixPath
 
 MAX_TEXT = 1024 * 1024
@@ -150,7 +152,7 @@ def is_macho(archive, entry):
 
 
 def inspect_archive(path, payload_path=None, bundle_path=None):
-    result = {"notices": [], "nativeFiles": [], "payload": None, "bundle": None}
+    result = {"notices": [], "emptyNotices": [], "nativeFiles": [], "payload": None, "bundle": None}
     total = 0
 
     def inspect(source, prefix="", depth=0):
@@ -180,16 +182,27 @@ def inspect_archive(path, payload_path=None, bundle_path=None):
                         raise ValueError("Empty or oversized application bundle")
                     result["bundle"] = {"sha256": hashlib.sha256(archive.read(entry)).hexdigest(), "bytes": entry.file_size}
                 if not (payload_path and not prefix and name == payload_path) and any(re.fullmatch(r"(licen[sc]es?|notices?|copying|copyright|third[._-]?party[._-]?(licen[sc]es?|notices?))([._-].*)?", part, re.I) for part in PurePosixPath(name).parts):
-                    if not 0 < entry.file_size <= MAX_TEXT:
+                    if entry.file_size > MAX_TEXT:
                         raise ValueError("Empty or oversized notice")
                     total += entry.file_size
                     if total > MAX_TOTAL_TEXT:
                         raise ValueError("Too much notice text")
-                    raw = archive.read(entry)
-                    body = raw.decode("utf-8")
-                    if not body.strip() or "\0" in body:
-                        raise ValueError("Unreadable notice")
-                    result["notices"].append({"source": logical, "body": body, "sha256": hashlib.sha256(raw).hexdigest()})
+                    if entry.file_size == 0:
+                        # ZipExtFile truncates at the declared size. A one-byte
+                        # probe must also prove that the actual member is empty.
+                        probe = copy.copy(entry)
+                        probe.file_size = 1
+                        with archive.open(probe) as stream:
+                            raw = stream.read(1)
+                            if raw or stream.read(1) or (zlib.crc32(raw) & 0xffffffff) != entry.CRC:
+                                raise zipfile.BadZipFile("Invalid empty notice input")
+                        result["emptyNotices"].append({"source": logical, "bytes": 0, "sha256": hashlib.sha256(raw).hexdigest(), "crc32": f"{entry.CRC:08x}"})
+                    else:
+                        raw = archive.read(entry)
+                        body = raw.decode("utf-8")
+                        if not body.strip() or "\0" in body:
+                            raise ValueError("Unreadable notice")
+                        result["notices"].append({"source": logical, "body": body, "sha256": hashlib.sha256(raw).hexdigest()})
                 if name.endswith(".so") or is_macho(archive, entry):
                     result["nativeFiles"].append({"path": logical, "sha256": native_digest(archive, entry)})
                 if depth == 0 and name.endswith(".jar"):
