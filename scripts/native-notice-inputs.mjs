@@ -53,6 +53,27 @@ export function podLinkedSources(root,name,source,external){
  return {linkedSources,frameworkInputList,externalPodspec:capturedSource(root,spec)};
 }
 
+// Only these reviewed Pod/package pairs may use their own package's exact text.
+// This never searches parents or supplies a vendored framework's attribution.
+function podOwnLicense(root,name,version,source,external){
+ const pins=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))).knownLicenseSources??[];
+ const pin=pins.find(value=>value.component===`cocoapods:${name}@${version}`&&value.ownerNpmID);
+ if(!pin)return;
+ assert.equal(pin.ecosystem,'cocoapods');assert.equal(pin.version,version);assert.ok(['path','podspec'].includes(pin.sourceKind));
+ assert.deepEqual(Object.keys(external??{}),[':'+pin.sourceKind],'Require the exact selected Pod source form.');
+ const project=realpathSync(root),modules=realpathSync(join(root,'node_modules')),packagePath=safeRelative(pin.packagePath),owner=realpathSync(join(root,packagePath));
+ assert.equal('node_modules/'+safeRelative(relative(modules,owner)),packagePath,'Require the exact installed package root.');
+ assert.equal(pin.packageJSONSource,packagePath+'/package.json');
+ const checked=(logical,expected)=>{safeRelative(logical);const path=realpathSync(join(root,logical));assert.ok(path.startsWith(owner+sep),'Bound licence inputs must stay in their owning package.');const bytes=readFileSync(path);assert.equal(digest(bytes),expected,'Bound licence input bytes changed.');return {path,bytes};};
+ const packageJSON=checked(pin.packageJSONSource,pin.packageJSONSHA256),pkg=JSON.parse(noticeText(packageJSON.bytes)),lock=JSON.parse(readFileSync(join(root,'package-lock.json'))).packages?.[packagePath];
+ assert.equal(`npm:${pkg.name}@${pkg.version}`,pin.ownerNpmID);assert.equal(lock?.version,pkg.version);assert.equal(lock.resolved,pin.upstream);assert.equal(lock.integrity,pin.upstreamIntegrity);
+ const spec=checked(pin.podspecSource,pin.podspecSHA256),selected=realpathSync(source),selector=realpathSync(resolve(root,'ios',external[':'+pin.sourceKind]));
+ if(pin.sourceKind==='path'){assert.equal(selected,dirname(spec.path));assert.equal(selector,selected);}
+ else{const sandbox=join(project,'ios/Pods',name);assert.equal(selector,spec.path);assert.equal(selected,sandbox);assert.equal(realpathSync(sandbox),sandbox);}
+ const license=checked(pin.source,pin.sha256),body=noticeText(license.bytes);
+ return {notice:{source:pin.source,sha256:pin.sha256,body},binding:{ownerNpmID:pin.ownerNpmID,packagePath,sourceKind:pin.sourceKind,packageJSON:{source:pin.packageJSONSource,sha256:pin.packageJSONSHA256},podspec:{source:pin.podspecSource,sha256:pin.podspecSHA256},license:{source:pin.source,sha256:pin.sha256},upstream:pin.upstream,upstreamIntegrity:pin.upstreamIntegrity}};
+}
+
 export function podNoticeInputs(root){
  const lockPath=join(root,'ios/Podfile.lock'),support=join(root,'ios/Pods/Target Support Files');
  if(!existsSync(lockPath)||!existsSync(support))return {components:[],unresolved:[{component:'native:ios',reason:'missing-resolved-pod-inputs'}],nativeFiles:[]};
@@ -79,8 +100,9 @@ export function podNoticeInputs(root){
   const source=external?.[':path']?resolve(root,'ios',external[':path']):join(root,'ios/Pods',name);
   if(!existsSync(source))unresolved.push({component:`cocoapods:${name}@${version}`,reason:'missing-resolved-pod-source'});
   else scan=noticeInputStep('pod-source-scan','cocoapods',()=>{
-   const {linkedSources,...metadata}=podLinkedSources(root,name,source,external),value=nativeSourceNotices(root,source,`cocoapods:${name}`,{linkedSources});
-   Object.assign(value.nativeInputs[`cocoapods:${name}`],metadata);return value;
+   const own=podOwnLicense(root,name,version,source,external),{linkedSources,...metadata}=podLinkedSources(root,name,source,external),value=nativeSourceNotices(root,source,`cocoapods:${name}`,{linkedSources});
+   if(own)value.notices.push(own.notice);
+   Object.assign(value.nativeInputs[`cocoapods:${name}`],metadata,...(own?[{ownLicense:own.binding}]:[]));return value;
   },`cocoapods:${name}@${version}`);
   components.push(noticeInputStep('pod-notices','cocoapods',()=>nativeNoticeInput({id:`cocoapods:${name}@${version}`,name,version,ecosystem:'cocoapods',...scan,notices:[...notices,...scan.notices].sort((a,b)=>a.source.localeCompare(b.source))}),`cocoapods:${name}@${version}`));
  }
