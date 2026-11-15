@@ -16,9 +16,9 @@ export function useCloud(onRemoteChange:()=>unknown):CloudHandle {
   const care=useCareSession();
   const callback=useRef(onRemoteChange);callback.current=onRemoteChange;
   const [attempt,setAttempt]=useState(0),retry=useCallback(()=>setAttempt(value=>value+1),[]);
-  const [handle,setHandle]=useState<CloudHandle>({available:true,controller:null,problem:null,getLocalName,retry,shareDiagnostics:shareCloudDiagnostics});
+  const [handle,setHandle]=useState<CloudHandle>({available:true,controller:null,problem:null,getLocalName,retry,shareDiagnostics:shareCloudDiagnostics,recordOnboardingDiagnostic:recordCloudDiagnostic});
   useEffect(()=>{
-    setHandle({available:true,controller:null,problem:null,getLocalName,retry,shareDiagnostics:shareCloudDiagnostics});
+    setHandle({available:true,controller:null,problem:null,getLocalName,retry,shareDiagnostics:shareCloudDiagnostics,recordOnboardingDiagnostic:recordCloudDiagnostic});
     let disposed=false,controller:AccountController|null=null,stopChanges:(()=>void)|null=null;
     let active=AppState.currentState==='active',online=true,networkEvent=false;
     const connectivity=(state:Network.NetworkState)=>state.isConnected!==false&&state.isInternetReachable!==false;
@@ -26,8 +26,8 @@ export function useCloud(onRemoteChange:()=>unknown):CloudHandle {
     const networkSubscription=Network.addNetworkStateListener(state=>{networkEvent=true;online=connectivity(state);controller?.setOnline(online);});
     void (async()=>{
       let client:ReturnType<typeof createNativeCloudClient>;
-      try{client=createNativeCloudClient(care.selection??undefined);}catch{if(!disposed)setHandle({available:true,controller:null,problem:'configuration',getLocalName,retry,shareDiagnostics:shareCloudDiagnostics});return;}
-      if(!client){if(!disposed)setHandle({available:true,controller:null,problem:'configuration',getLocalName,retry,shareDiagnostics:shareCloudDiagnostics});return;}
+      try{client=createNativeCloudClient(care.selection??undefined);}catch{if(!disposed)setHandle({available:true,controller:null,problem:'configuration',getLocalName,retry,shareDiagnostics:shareCloudDiagnostics,recordOnboardingDiagnostic:recordCloudDiagnostic});return;}
+      if(!client){if(!disposed)setHandle({available:true,controller:null,problem:'configuration',getLocalName,retry,shareDiagnostics:shareCloudDiagnostics,recordOnboardingDiagnostic:recordCloudDiagnostic});return;}
       try {
         const [runtime,network]=await Promise.all([getLocalRuntime(),Network.getNetworkStateAsync().catch(()=>null)]);
         if(disposed)return;if(network&&!networkEvent)online=connectivity(network);
@@ -35,10 +35,10 @@ export function useCloud(onRemoteChange:()=>unknown):CloudHandle {
         if(care.selection){const timer=setInterval(()=>{if(active&&online)controller?.invalidate();},15000);stopChanges=()=>clearInterval(timer);}
         else stopChanges=watchAccountChanges({controller,open:client.openChanges});
         controller.setOnline(online);controller.setActive(active);
-        setHandle({available:true,controller,problem:null,getLocalName,retry,shareDiagnostics:shareCloudDiagnostics,sharing:client.sharing,sharingOrigin:client.origin});
+        setHandle({available:true,controller,problem:null,getLocalName,retry,shareDiagnostics:shareCloudDiagnostics,recordOnboardingDiagnostic:recordCloudDiagnostic,sharing:client.sharing,sharingOrigin:client.origin});
         if(care.selection){controller.subscribe(()=>{const snapshot=controller?.read();if(snapshot?.problem==='account-deleted'||snapshot?.problem==='forbidden'||snapshot?.problem==='account-mismatch'||snapshot?.problem==='conflict'||snapshot?.problem==='auth-required'){void runtime.database.write(sql=>sql.runAsync("INSERT OR REPLACE INTO metadata(key,value) VALUES('care_blocked','1')")).then(()=>{if(care.isCurrent())return callback.current();}).catch(()=>{});}});}
         await controller.refresh();
-      }catch{if(!disposed)setHandle({available:true,controller:null,problem:'local-storage',getLocalName,retry,shareDiagnostics:shareCloudDiagnostics});}
+      }catch{if(!disposed)setHandle({available:true,controller:null,problem:'local-storage',getLocalName,retry,shareDiagnostics:shareCloudDiagnostics,recordOnboardingDiagnostic:recordCloudDiagnostic});}
     })();
     return()=>{disposed=true;stopChanges?.();controller?.stop();appSubscription.remove();networkSubscription.remove();};
   },[attempt,retry]);

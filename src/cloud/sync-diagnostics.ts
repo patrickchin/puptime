@@ -13,9 +13,20 @@ const diagnostic = z.object({
   blocked: z.number().int().min(0).max(1_000_000).optional(),
   batchCount: z.number().int().min(0).max(50).optional(),
 });
-const entry = diagnostic.extend({ at: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER) });
+const onboardingDiagnostic = z.object({
+  event: z.literal('onboarding'),
+  point: z.enum(['mount', 'unmount', 'screen', 'guest-press-in', 'guest-handler', 'profile-decision', 'animation-settled']),
+  step: z.enum(['welcome', 'account', 'profile', 'other']),
+  accountActionPending: z.boolean().optional(),
+  decision: z.enum(['account-action-pending', 'transitioning', 'same-step', 'accepted']).optional(),
+  animation: z.enum(['finished', 'interrupted', 'unknown']).optional(),
+});
+const timestamp = { at: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER) };
+const entry = z.union([diagnostic.extend(timestamp), onboardingDiagnostic.extend(timestamp)]);
 export type CloudDiagnosticInput = z.input<typeof diagnostic>;
 export type RecordCloudDiagnostic = (input: CloudDiagnosticInput) => void;
+export type OnboardingDiagnosticInput = z.input<typeof onboardingDiagnostic>;
+export type RecordOnboardingDiagnostic = (input: OnboardingDiagnosticInput) => void;
 type DiagnosticEntry = z.infer<typeof entry>;
 type DiagnosticStorage = { getItem(key: string): Promise<string | null>; setItem(key: string, value: string): Promise<unknown> };
 const storageKey = 'puptime.sync.diagnostics.v1';
@@ -41,7 +52,7 @@ export function createSyncDiagnostics(storage: DiagnosticStorage, now = Date.now
       }
     }).finally(() => { saving = null; if (dirty) persist(); });
   }
-  const record: RecordCloudDiagnostic = input => {
+  const record = (input: CloudDiagnosticInput | OnboardingDiagnosticInput) => {
     try {
       const parsed = entry.safeParse({ ...input, at: now() });
       if (!parsed.success) return;

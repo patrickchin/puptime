@@ -22,10 +22,10 @@ test('diagnostics retain only bounded allowlisted data and sanitize persisted hi
   const reloaded = createSyncDiagnostics(storage);
   const events = await reloaded.read();
   assert.equal(events.length, 100);
-  assert.equal(events[0].pending, 5);
-  assert.equal(events.at(-1)?.pending, 104);
-  events[0].pending = 999;
-  assert.equal((await reloaded.read())[0].pending, 5);
+  assert.equal(events[0].event==='sync'&&events[0].pending, 5);
+  const last=events.at(-1);assert.equal(last?.event==='sync'&&last.pending, 104);
+  if(events[0].event==='sync')events[0].pending = 999;
+  const first=(await reloaded.read())[0];assert.equal(first.event==='sync'&&first.pending, 5);
 });
 
 test('logging during asynchronous load keeps both histories and recovers after storage failures', async () => {
@@ -46,4 +46,18 @@ test('logging during asynchronous load keeps both histories and recovers after s
   assert.equal(JSON.parse(stored).length, 3);
   const corrupt = createSyncDiagnostics({ getItem: async () => 'invalid JSON', setItem: storage.setItem });
   await assert.doesNotReject(corrupt.read());
+});
+
+
+test('device-only onboarding records use the same bounded ring and strip private fields again after restart',async()=>{
+ let saved=JSON.stringify([{at:1,event:'onboarding',point:'guest-handler',step:'welcome',accountActionPending:false,email:'PRIVATE_EMAIL',input:'PRIVATE_NAME',sessionId:'PRIVATE_ID'}]);
+ const storage={getItem:async()=>saved,setItem:async(_key:string,value:string)=>{assert.equal(_key,'puptime.sync.diagnostics.v1');saved=value;}};
+ const ring=createSyncDiagnostics(storage,()=>2);
+ assert.deepEqual(await ring.read(),[{at:1,event:'onboarding',point:'guest-handler',step:'welcome',accountActionPending:false}]);
+ ring.record({event:'onboarding',point:'profile-decision',step:'welcome',decision:'accepted',...( {url:'PRIVATE_URL',error:new Error('PRIVATE_MESSAGE'),stack:'PRIVATE_STACK'} as {})});
+ for(const field of ['point','step','decision','animation','accountActionPending'])ring.record({event:'onboarding',point:'screen',step:'welcome',[field]:'PRIVATE_VALUE'} as never);
+ await ring.flush();assert.equal((await ring.read()).length,2);assert.ok(!saved.includes('PRIVATE'));
+ for(let i=0;i<105;i++)ring.record(i%2?{event:'sync',result:'success',pending:i}:{event:'onboarding',point:'screen',step:'profile',accountActionPending:false});
+ await ring.flush();const reopened=createSyncDiagnostics(storage,()=>3);const entries=await reopened.read();assert.equal(entries.length,100);assert.ok(entries.some(row=>row.event==='sync'));assert.ok(entries.some(row=>row.event==='onboarding'));
+ assert.ok(!saved.includes('PRIVATE'));assert.deepEqual(await reopened.read(),entries);
 });
