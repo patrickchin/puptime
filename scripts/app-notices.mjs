@@ -4,6 +4,7 @@ import {createHash} from 'node:crypto';
 import {closeSync,existsSync,openSync,readFileSync,readSync,readdirSync,realpathSync,statSync,lstatSync} from 'node:fs';
 import {dirname,isAbsolute,join,relative,resolve,sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {createRequire} from 'node:module';
 import {isDeepStrictEqual} from 'node:util';
 
 export const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -12,6 +13,7 @@ const inside=(root,path)=>path===root||path.startsWith(root+sep);
 const noticeName=/^(licen[cs]es?|notices?|copying|copyright|third[._-]?party[._-]?(?:licen[cs]es?|notices?))([._-].*)?$/i;
 const vendorName=/^(vendor|vendored|third[-_]?party)$/i;
 const maximumTextBytes=1024*1024;
+const require=createRequire(import.meta.url);
 export function safeRelative(value){
  assert.equal(typeof value,'string');assert.ok(value&&!isAbsolute(value)&&!/^\w:[\\/]/.test(value)&&!value.split(/[\\/]/).includes('..'));
  return value.replaceAll('\\','/');
@@ -40,7 +42,8 @@ function nearbyNotices(boundary,start,prefix){
 // through the actual project build-directory metadata, never a vendor wildcard.
 export function nativeSourceNotices(root,supplied,prefix,{excluded=[],linkedSources=[]}={}){
  const boundary=realpathSync(supplied),project=realpathSync(root),modules=existsSync(join(root,'node_modules'))?realpathSync(join(root,'node_modules')):null;
- assert.ok((modules&&inside(modules,boundary))||boundary.startsWith(join(project,'ios/Pods')+sep)||boundary.startsWith(join(project,'modules')+sep),'Native source must be an identified package/Pod/local module, not arbitrary project data.');
+ const generated=generatedPodInputs(root,supplied,prefix);
+ assert.ok(generated||(modules&&inside(modules,boundary))||boundary.startsWith(join(project,'ios/Pods')+sep)||boundary.startsWith(join(project,'modules')+sep),'Native source must be an identified package/Pod/local module, not arbitrary project data.');
  const canonicalFuture=path=>{path=resolve(path);let ancestor=path;while(!existsSync(ancestor))ancestor=dirname(ancestor);return resolve(realpathSync(ancestor),relative(ancestor,path));};
  const links=new Map();
  for(const value of linkedSources){
@@ -51,7 +54,7 @@ export function nativeSourceNotices(root,supplied,prefix,{excluded=[],linkedSour
   assert.ok(inside(packageRoot,target)&&realpathSync(link)===target&&statSync(target).isDirectory(),'Native source link escapes its component.');
   links.set(name,{source:name,target:targetName,packagePath:owner.packagePath,component:owner.id,targetRoot:target});
  }
- const omitted=new Set(excluded.map(canonicalFuture)),files=[],notices=[],vendors=new Set(),visited=new Set();let count=0,total=0;
+ const omitted=new Set(excluded.map(canonicalFuture)),files=[],notices=[...(generated?.notices??[])],vendors=new Set(generated?.vendors??[]),visited=new Set();let count=0,total=0;
  function walk(folder,logical='',scope=boundary){
   const canonical=realpathSync(folder);assert.ok(inside(scope,canonical),'Native source link escapes its component.');
   if(visited.has(canonical))return;visited.add(canonical);
@@ -71,7 +74,45 @@ export function nativeSourceNotices(root,supplied,prefix,{excluded=[],linkedSour
  }
  walk(boundary);
  const vendorNotices=Object.fromEntries([...vendors].sort().map(value=>[value,notices.filter(item=>item.source.startsWith(prefix+'/'+value+'/')).map(item=>item.source)]));
- return {notices,vendors:[...vendors].sort(),vendorNotices,nativeInputs:{[prefix]:{sha256:digest(JSON.stringify(files)),files:files.length,excludedBuildPaths:[...omitted].filter(path=>inside(boundary,path)).map(path=>safeRelative(relative(boundary,path))).sort(),...(links.size?{linkedSources:[...links.values()].map(({targetRoot,...value})=>value).sort((a,b)=>a.source.localeCompare(b.source))}:{})}}};
+ return {notices,vendors:[...vendors].sort(),vendorNotices,nativeInputs:{[prefix]:{sha256:digest(JSON.stringify(files)),files:files.length,excludedBuildPaths:[...omitted].filter(path=>inside(boundary,path)).map(path=>safeRelative(relative(boundary,path))).sort(),...(generated?{generated:generated.inputs}:{}),...(links.size?{linkedSources:[...links.values()].map(({targetRoot,...value})=>value).sort((a,b)=>a.source.localeCompare(b.source))}:{})}}};
+}
+
+// These two selected RN-generated Pods are not a general build-directory root.
+// Admission proves their locked producers/selected source closure, not licences.
+export function generatedPodInputs(root,supplied,prefix){
+ const name=prefix.replace(/^cocoapods:/,'');if(!['ReactAppDependencyProvider','ReactCodegen'].includes(name)||prefix!=='cocoapods:'+name)return;
+ root=realpathSync(root);const project=root,source='ios/build/generated/ios/'+name,expected=join(project,source),pins=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))).generatedPods;
+ assert.equal(pins.version,'0.86.3');assert.equal(realpathSync(supplied),expected);assert.equal(realpathSync(expected),expected);
+ const lock=require('yaml').parse(noticeText(readFileSync(join(root,'ios/Podfile.lock')),16*maximumTextBytes));
+ assert.ok(lock.PODS.some(value=>(typeof value==='string'?value:Object.keys(value)[0]).split(' (')[0]===name&&new RegExp('^'+name+' \\(0\\.86\\.3\\)').test(typeof value==='string'?value:Object.keys(value)[0])));assert.deepEqual(lock['EXTERNAL SOURCES'][name],{':path':'build/generated/ios/'+name});
+ const notices=[],owners=[];
+ assert.deepEqual(pins.producerPackages.map(value=>value.component).sort(),['npm:@react-native/codegen@0.86.3','npm:react-native@0.86.3']);
+ const pinnedPackage=value=>{const path=safeRelative(value.packagePath),pkg=JSON.parse(readFileSync(join(root,path,'package.json'))),item=npmNoticeInputs(root,[join(root,path,'package.json')])[0];assert.equal(item?.id,value.component);assert.equal(item.packagePath,path);assert.equal(digest(readFileSync(join(root,path,'package.json'))),value.packageJSONSHA256);notices.push(...item.notices);owners.push(value.component);return pkg;};
+ for(const value of pins.producerPackages)pinnedPackage(value);
+ const files=['node_modules/react-native/scripts/generate-codegen-artifacts.js','node_modules/react-native/scripts/cocoapods/codegen_utils.rb','node_modules/react-native/scripts/react_native_pods.rb','node_modules/react-native/scripts/cocoapods/codegen.rb'];
+ assert.deepEqual(pins.producerFiles.map(value=>value.source),files);
+ for(const value of pins.producerFiles){const actual=capturedSource(root,value.source);assert.equal(actual.component,'npm:react-native@0.86.3');assert.equal(actual.sha256,value.sha256);}
+ assert.deepEqual(pins.producerTrees.map(value=>value.source),['node_modules/react-native/scripts/codegen','node_modules/@react-native/codegen/lib']);
+ assert.deepEqual(pins.coreSourceTrees.map(value=>value.source),['node_modules/react-native/src','node_modules/react-native/React/FBReactNativeSpec']);
+ for(const value of [...pins.producerTrees,...pins.coreSourceTrees]){const tree=nativeSourceNotices(root,join(root,value.source),'generator-input');assert.equal(tree.nativeInputs['generator-input'].sha256,value.sha256);assert.equal(tree.nativeInputs['generator-input'].files,value.files);assert.equal(tree.vendors.length,0,'Generated input vendor boundary needs separate provenance.');}
+ const metaPath='ios/build/generated/autolinking/autolinking.json',bytes=readFileSync(join(root,metaPath)),meta=JSON.parse(noticeText(bytes,16*maximumTextBytes));
+ assert.equal(realpathSync(meta.root),project);assert.equal(realpathSync(meta.reactNativePath),realpathSync(join(root,'node_modules/react-native')));assert.equal(JSON.parse(readFileSync(join(root,'package.json'))).codegenConfig,undefined);
+ assert.equal(pins.libraries.length,9);assert.deepEqual(Object.keys(meta.dependencies).sort(),pins.libraries.map(value=>JSON.parse(readFileSync(join(root,value.packagePath,'package.json'))).name).sort());
+ const libraries=[];
+ for(const value of pins.libraries){const pkg=pinnedPackage(value),config=meta.dependencies[pkg.name];assert.equal(realpathSync(config.root),realpathSync(join(root,value.packagePath)));assert.notEqual(config.platforms?.ios,null);assert.equal(!!pkg.codegenConfig,value.codegen);
+  const record={component:value.component,packagePath:value.packagePath,packageJSONSHA256:value.packageJSONSHA256,codegen:value.codegen};
+  if(value.codegen){assert.ok(!pkg.codegenConfig.libraries);const path=resolve(root,value.packagePath,safeRelative(pkg.codegenConfig.jsSrcsDir));assert.ok(inside(realpathSync(join(root,value.packagePath)),realpathSync(path)));assert.equal(safeRelative(relative(project,path)),value.source);const scan=nativeSourceNotices(root,path,'codegen-input'),tree=scan.nativeInputs['codegen-input'];assert.equal(tree.sha256,value.sourceFingerprint.sha256);assert.equal(tree.files,value.sourceFingerprint.files);assert.equal(scan.vendors.length,0,'Generated input vendor boundary needs separate provenance.');record.source=value.source;record.sourceFingerprint={sha256:tree.sha256,files:tree.files};
+   assert.deepEqual(readdirSync(join(root,value.packagePath)).filter(value=>value.endsWith('.podspec')).sort(),value.podspecs.map(value=>value.source.slice(value.source.lastIndexOf('/')+1)));record.podspecs=value.podspecs.map(value=>{const actual=capturedSource(root,value.source);assert.equal(actual.component,record.component);assert.equal(actual.sha256,value.sha256);return {source:actual.path,sha256:actual.sha256};});
+   const ios=pkg.codegenConfig.ios;if(pkg.codegenConfig.type!=='modules')assert.ok((ios?.componentProvider&&!ios.components)||(ios?.components&&Object.keys(ios.components).length&&Object.values(ios.components).every(value=>typeof value.className==='string'&&value.className)),'Unproven codegen native component crawl.');
+  }libraries.push(record);
+ }
+ if(name==='ReactAppDependencyProvider'){
+  const outputs={'RCTAppDependencyProvider.h':'RCTAppDependencyProviderH.template','RCTAppDependencyProvider.mm':'RCTAppDependencyProviderMM.template','ReactAppDependencyProvider.podspec':'ReactAppDependencyProvider.podspec.template'};assert.deepEqual(readdirSync(expected).sort(),Object.keys(outputs).sort());
+  for(const [output,template] of Object.entries(outputs)){let bytes=readFileSync(join(root,'node_modules/react-native/scripts/codegen/templates',template));if(output.endsWith('.podspec'))bytes=Buffer.from(bytes.toString('utf8').replace('{react-native-version}','0.86.3').replace('{react-native-licence}','MIT'));assert.ok(lstatSync(join(expected,output)).isFile());assert.ok(bytes.equals(readFileSync(join(expected,output))));}
+ }else{
+  for(const output of ['ReactCodegen.podspec',...['RCTThirdPartyComponentsProvider','RCTModuleProviders','RCTModulesConformingToProtocolsProvider','RCTUnstableModulesRequiringMainQueueSetupProvider'].flatMap(value=>[value+'.h',value+'.mm'])])assert.ok(lstatSync(join(expected,output)).isFile());
+ }
+ return {notices:[...new Map(notices.map(value=>[value.source,value])).values()],vendors:[...new Set(owners)].sort().map(value=>'generated-input:'+value),inputs:{source,producerPackages:pins.producerPackages.map(({component,packagePath,packageJSONSHA256})=>({component,packagePath,packageJSONSHA256})),producerFiles:pins.producerFiles.map(({source,sha256})=>({source,sha256})),producerTrees:pins.producerTrees.map(({source,sha256,files})=>({source,sha256,files})),coreSourceTrees:pins.coreSourceTrees.map(({source,sha256,files})=>({source,sha256,files})),autolinking:{source:metaPath,sha256:digest(bytes)},appCodegenConfigAbsent:true,libraries}};
 }
 
 // Use the actual Metro-selected files, not all installed/declared dependencies.

@@ -19,6 +19,35 @@
       "component": "npm:@expo/cli@57.0.26"
     }
   },
+  "generatedPods": {
+    "version": "0.86.3",
+    "producerPackages": [
+      {"component":"npm:react-native@0.86.3","packagePath":"node_modules/react-native","packageJSONSHA256":"416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144"},
+      {"component":"npm:@react-native/codegen@0.86.3","packagePath":"node_modules/@react-native/codegen","packageJSONSHA256":"3a6b22f59979fe504ec41caf22461865406e83e3eccf4788097377e5e02846c9"}
+    ],
+    "producerFiles": [
+      {"source":"node_modules/react-native/scripts/generate-codegen-artifacts.js","sha256":"5d6386b6b00960a72711d9616b3f72b3f08cb4e1ae591b4a74ac2bb8e51fc91d"},
+      {"source":"node_modules/react-native/scripts/cocoapods/codegen_utils.rb","sha256":"438fcff096c2d69bd0e1254412e22cbe04609b9d20ad709001e41f8c5333e0b7"},
+      {"source":"node_modules/react-native/scripts/react_native_pods.rb","sha256":"3415dc14a93f59ec61fb83976d99c2fb6e0265ff80f6fc1ee4c07a5b127fd4c8"},
+      {"source":"node_modules/react-native/scripts/cocoapods/codegen.rb","sha256":"ef5295dde034fbf335e90628769bd6f36093aa29f050eaafca43423acf23e1f0"}
+    ],
+    "producerTrees": [
+      {"source":"node_modules/react-native/scripts/codegen","files":28,"sha256":"95be210dc48143a1684f0e89d4a385e31602a42317b6e2ca7301b12312a9ce4c"},
+      {"source":"node_modules/@react-native/codegen/lib","files":171,"sha256":"1f78538018229e10fd0d09d42d9bdfe62a9511827c884ef5a11d7281fcc3c9c9"}
+    ],
+    "coreSourceTrees": [{"source":"node_modules/react-native/src","sha256":"85e1e0f7113b29ede48aee9e84a9eaff0c9cafaf65691b75d11f0e61c735a768","files":188},{"source":"node_modules/react-native/React/FBReactNativeSpec","sha256":"d7012919fba286bea5bc5b00506e97b9666f44d9566eab2b9597038a84359fee","files":14}],
+    "libraries": [
+      {"component":"npm:@react-native-async-storage/async-storage@2.2.0","packagePath":"node_modules/@react-native-async-storage/async-storage","packageJSONSHA256":"6346a7c16602136ed46fc0aadd02c388ab160540dc32c1c5ad877d7152750d30","codegen":true,"source":"node_modules/@react-native-async-storage/async-storage/src","sourceFingerprint":{"sha256":"109f0e2274334ea1b1a438f64afb353ab01fcf79faee48eac7685f65e7f4ee2f","files":9},"podspecs":[{"source":"node_modules/@react-native-async-storage/async-storage/RNCAsyncStorage.podspec","sha256":"c2f33c853d9a40318299e76c040e0f7d349edc0d6983857ad7dad1506cf56281"}]},
+      {"component":"npm:@react-native-google-signin/google-signin@16.1.5","packagePath":"node_modules/@react-native-google-signin/google-signin","packageJSONSHA256":"8007e4f26f1b1a34a1621f713d8d4bb4a7170f2d976299e14721b74068989727","codegen":true,"source":"node_modules/@react-native-google-signin/google-signin/src/spec","sourceFingerprint":{"sha256":"7eaa1b008ed562bbfe6623786b20f239937edb84314aa7e11d512c4866708343","files":2},"podspecs":[{"source":"node_modules/@react-native-google-signin/google-signin/RNGoogleSignin.podspec","sha256":"50e4c8ec91bb448f4cb5d7dd291b0baea940607a5d3cb6230a96958cb9bb6493"}]},
+      {"component":"npm:@react-native-masked-view/masked-view@0.3.2","packagePath":"node_modules/@react-native-masked-view/masked-view","packageJSONSHA256":"0ba91122588091da58e02f3b58ed093ba7710e0166f7e829a4db403cac8539cd","codegen":false},
+      {"component":"npm:expo@57.0.24","packagePath":"node_modules/expo","packageJSONSHA256":"d01199b51f5f9beca73e371e1893a360a0017fe8cbdc722a5f3ca86aee5d1273","codegen":false},
+      {"component":"npm:react-native-gesture-handler@2.32.0","packagePath":"node_modules/react-native-gesture-handler","packageJSONSHA256":"837b814bfafd97dcd2f3a50a55e7cffb2dbf06a55e6b449bc52959c0e75c6e58","codegen":true,"source":"node_modules/react-native-gesture-handler/src/specs","sourceFingerprint":{"sha256":"36b9361a5cfcf0d7397fae96e43fe2c74ec9b3714e7bbad892b79e87ba28719d","files":3},"podspecs":[{"source":"node_modules/react-native-gesture-handler/RNGestureHandler.podspec","sha256":"de7206bf70e4ed764b0e1a8ca666ab0c9c7b6927351f6fabadab922d65c4b7e5"}]},
+      {"component":"npm:react-native-reanimated@4.5.1","packagePath":"node_modules/react-native-reanimated","packageJSONSHA256":"bc85351a040fce75f2e42ba96dea2e3cc3e29f65c7a89ce4eaae893b11c1bece","codegen":true,"source":"node_modules/react-native-reanimated/src/specs","sourceFingerprint":{"sha256":"ec32459dfb1694ad0d63fbda1e0e42cecce64a11d4e8c689a89199fea1d41fc1","files":5},"podspecs":[{"source":"node_modules/react-native-reanimated/RNReanimated.podspec","sha256":"93d2d5148b78e7bd0f99588cb940081f32bafce53545debac97a1a5f7103f09d"}]},
+      {"component":"npm:react-native-safe-area-context@5.7.0","packagePath":"node_modules/react-native-safe-area-context","packageJSONSHA256":"752ca40cc831855a26fb9eda18ff6bad54986835d9aa42bba1129d53857f6131","codegen":true,"source":"node_modules/react-native-safe-area-context/src/specs","sourceFingerprint":{"sha256":"d659b81eb1e2a578a6926edd4ebe32756e844e548d90b3837acb2250c6377f03","files":3},"podspecs":[{"source":"node_modules/react-native-safe-area-context/react-native-safe-area-context.podspec","sha256":"0fb3d1f4f44273c9b2ac59f05e5e18220e60cee7152fc0da5bb71be0b29afffa"}]},
+      {"component":"npm:react-native-screens@4.26.2","packagePath":"node_modules/react-native-screens","packageJSONSHA256":"31107f4c0ad2e0902b5da521bd5b04060ebb462d474a7becdb5b2739f90bde0c","codegen":true,"source":"node_modules/react-native-screens/src/fabric","sourceFingerprint":{"sha256":"83e60150fed6fe12d75b4ccb7ec2c8f4dfd51adab875356c84f1e32539630b97","files":33},"podspecs":[{"source":"node_modules/react-native-screens/RNScreens.podspec","sha256":"3cfd1157e743f67e5b9a634faca6566a5a930cd4b44062d8eefebf74f2509b03"}]},
+      {"component":"npm:react-native-worklets@0.10.1","packagePath":"node_modules/react-native-worklets","packageJSONSHA256":"485883959fd6a9d6981fbf2dc9607aaf6c9d8ce380c5359f0dd82f27fda95628","codegen":true,"source":"node_modules/react-native-worklets/src/specs","sourceFingerprint":{"sha256":"8c89a56371729773980629b107fab4af16fc55603e33f908177700ed71384e3a","files":2},"podspecs":[{"source":"node_modules/react-native-worklets/RNWorklets.podspec","sha256":"a4c9da94d93668b3f260a578933a685e8154a3f219e47523919c7972aa887c75"}]}
+    ]
+  },
   "packagedNative": {"ios": {}, "android": {}},
   "knownLicenseSources": [
     {"component":"npm:react-native@0.86.3","ecosystem":"npm","version":"0.86.3","public":true,"source":"node_modules/react-native/LICENSE","sha256":"da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93","upstream":"https://github.com/react/react-native/blob/v0.86.3/LICENSE"},

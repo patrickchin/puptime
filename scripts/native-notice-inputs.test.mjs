@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,symlinkSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,symlinkSync,cpSync,readdirSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createRequire} from 'node:module';
@@ -202,4 +202,45 @@ test('Pods follow only exact selected frameworks into the locked podspec package
  file('ios/Podfile.lock',{...lock,'EXTERNAL SOURCES':{QA:{':podspec':'../node_modules/other/ios/Other.podspec'}}});assert.throws(()=>podNoticeInputs(root));file('ios/Podfile.lock',lock);
  file(pkg+'/package.json',{name:'qa-sdk',version:'2'});assert.throws(()=>podNoticeInputs(root),'An installed owner differing from package-lock cannot qualify the link.');file(pkg+'/package.json',{name:'qa-sdk',version:'1'});
  file(pkg+'/outside/NOTICE','Not inside the selected vendor root');symlinkSync(join(root,pkg,'outside'),join(root,target,'outside'));assert.throws(()=>podNoticeInputs(root),'Nested links cannot escape even into another part of the owner package.');
+}));
+
+test('only the two locked generated Pods admit their actual autolink/config/spec closure, without inheriting licences',()=>fixture(({root,file})=>{
+ const pins=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))).generatedPods,packages=[...pins.producerPackages,...pins.libraries],unique=[...new Map(packages.map(value=>[value.packagePath,value])).values()];
+ file('package.json',{name:'notice-fixture',version:'1'});file('package-lock.json',{packages:Object.fromEntries(unique.map(value=>[value.packagePath,{version:value.component.slice(value.component.lastIndexOf('@')+1)}]))});
+ for(const value of unique){file(value.packagePath+'/package.json',readFileSync(value.packagePath+'/package.json'));for(const notice of npmNoticeInputs(process.cwd(),[join(process.cwd(),value.packagePath,'package.json')])[0].notices)file(notice.source,notice.body);}
+ for(const value of pins.producerFiles)file(value.source,readFileSync(value.source));
+ for(const value of [...pins.producerTrees,...pins.coreSourceTrees,...pins.libraries.filter(value=>value.codegen)]){const target=value.source;mkdirSync(join(root,target),{recursive:true});cpSync(target,join(root,target),{recursive:true});for(const spec of value.podspecs??[])file(spec.source,readFileSync(spec.source));}
+ const names=['ReactAppDependencyProvider','ReactCodegen'],lock={PODS:names.map(name=>name+' (0.86.3)'),'EXTERNAL SOURCES':Object.fromEntries(names.map(name=>[name,{':path':'build/generated/ios/'+name}]))};file('ios/Podfile.lock',lock);mkdirSync(join(root,'ios/Pods/Target Support Files'),{recursive:true});
+ const metadata={root,reactNativePath:join(root,'node_modules/react-native'),dependencies:Object.fromEntries(pins.libraries.map(value=>[JSON.parse(readFileSync(value.packagePath+'/package.json')).name,{root:join(root,value.packagePath),platforms:{ios:{}}}])),project:{privateBody:'PRIVATE_EMAIL_AND_PATH'}};const metaPath='ios/build/generated/autolinking/autolinking.json';file(metaPath,metadata);
+ const provider='ios/build/generated/ios/ReactAppDependencyProvider',codegen='ios/build/generated/ios/ReactCodegen';
+ for(const [name,template] of Object.entries({'RCTAppDependencyProvider.h':'RCTAppDependencyProviderH.template','RCTAppDependencyProvider.mm':'RCTAppDependencyProviderMM.template','ReactAppDependencyProvider.podspec':'ReactAppDependencyProvider.podspec.template'})){let bytes=readFileSync('node_modules/react-native/scripts/codegen/templates/'+template);if(name.endsWith('.podspec'))bytes=Buffer.from(bytes.toString().replace('{react-native-version}','0.86.3').replace('{react-native-licence}','MIT'));file(provider+'/'+name,bytes);}
+ for(const name of ['ReactCodegen.podspec',...['RCTThirdPartyComponentsProvider','RCTModuleProviders','RCTModulesConformingToProtocolsProvider','RCTUnstableModulesRequiringMainQueueSetupProvider'].flatMap(value=>[value+'.h',value+'.mm'])])file(codegen+'/'+name,'Synthetic generated output; no native execution or licence approval.\n');
+ const capture=()=>podNoticeInputs(root).components,initial=capture();assert.equal(initial.length,2);
+ for(const item of initial){const value=item.nativeInputs['cocoapods:'+item.name].generated;assert.equal(value.libraries.length,9);assert.equal(value.libraries.filter(value=>value.codegen).length,7);assert.equal(resolveNoticeCoverage([item],approval(item)).unresolved[0].reason,'missing-vendored-notice');assert.ok(!JSON.stringify(item).includes(root)&&!JSON.stringify(item).includes('PRIVATE'));
+  if(item.name==='ReactCodegen'){file(codegen+'/RCTModuleProviders.h','Changed synthetic generated output');assert.notEqual(capture().find(v=>v.name===item.name).nativeInputs['cocoapods:ReactCodegen'].sha256,item.nativeInputs['cocoapods:ReactCodegen'].sha256);file(codegen+'/RCTModuleProviders.h','Synthetic generated output; no native execution or licence approval.\n');}
+ }
+ const rejects=()=>assert.throws(capture),mutate=(path,bytes)=>{const before=readFileSync(join(root,path));file(path,bytes);rejects();file(path,before);};
+ mutate(pins.producerFiles[0].source,'Changed generator bytes');mutate('node_modules/react-native/scripts/codegen/generate-artifacts-executor/index.js','Changed dispatcher');
+ const core=pins.coreSourceTrees[0].source,coreEntry=readdirSync(join(root,core),{recursive:true,withFileTypes:true}).find(value=>value.isFile());mutate(join(coreEntry.parentPath??coreEntry.path,coreEntry.name).slice(root.length+1),'Changed React Native core spec source');
+ mutate(pins.libraries.find(value=>value.codegen).podspecs[0].source,'Changed platform-selection podspec');
+ const source=pins.libraries.find(value=>value.codegen).source,entry=readdirSync(join(root,source),{recursive:true,withFileTypes:true}).find(value=>value.isFile());mutate(join(entry.parentPath??entry.path,entry.name).slice(root.length+1),'Changed selected spec input');
+ mutate(provider+'/RCTAppDependencyProvider.h','Modified provider');file(provider+'/unknown-output.h','unknown');rejects();rmSync(join(root,provider+'/unknown-output.h'));
+ const metaClone=()=>JSON.parse(JSON.stringify(metadata));
+ for(const change of [v=>delete v.dependencies.expo,v=>v.dependencies.unknown={root},v=>v.dependencies.expo.platforms.ios=null,v=>v.dependencies.expo.root=root,v=>v.root=join(root,'elsewhere')]){const v=metaClone();change(v);file(metaPath,v);rejects();}file(metaPath,metadata);
+ file('package.json',{name:'notice-fixture',codegenConfig:{jsSrcsDir:'src'}});rejects();file('package.json',{name:'notice-fixture',version:'1'});
+ const version=JSON.parse(JSON.stringify(lock));version.PODS[0]='ReactAppDependencyProvider (0.86.4)';file('ios/Podfile.lock',version);rejects();file('ios/Podfile.lock',lock);
+ mutate('node_modules/react-native/package.json',JSON.stringify({...JSON.parse(readFileSync('node_modules/react-native/package.json')),version:'0.86.4'}));
+ file('outside/private','PRIVATE_SOURCE');symlinkSync(join(root,'outside'),join(root,codegen,'escaping'));rejects();rmSync(join(root,codegen,'escaping'));
+ assert.throws(()=>nativeSourceNotices(root,join(root,codegen),'cocoapods:UnknownGenerated'));
+ assert.throws(()=>nativeSourceNotices(root,join(root,provider),'cocoapods:ReactCodegen'));
+ const absent=join(root,metaPath);rmSync(absent);rejects();file(metaPath,metadata);assert.equal(capture().length,2);
+}));
+
+test('the pinned RN selector uses actual autolinking metadata, with app config absent and core evidence kept separate',()=>fixture(({root,file})=>{
+ const pins=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))).generatedPods,utils=require('react-native/scripts/codegen/generate-artifacts-executor/utils.js');
+ const meta={root,reactNativePath:join(process.cwd(),'node_modules/react-native'),dependencies:Object.fromEntries(pins.libraries.map(value=>[JSON.parse(readFileSync(value.packagePath+'/package.json')).name,{root:join(process.cwd(),value.packagePath),platforms:{ios:{}}}]))};file('ios/build/generated/autolinking/autolinking.json',meta);
+ const log=console.log,warn=console.warn;let selected,config;
+ try{console.log=()=>{};console.warn=()=>{};config=utils.readReactNativeConfig(root,join(root,'ios'));selected=utils.findCodegenEnabledLibraries({name:'notice-fixture'},root,join(root,'ios'),config,{}).filter(value=>!utils.findDisabledLibrariesByPlatform(config,'ios').includes(value.name));}finally{console.log=log;console.warn=warn;}
+ assert.deepEqual(selected.map(value=>{const pkg=JSON.parse(readFileSync(join(value.libraryPath,'package.json')));return 'npm:'+pkg.name+'@'+pkg.version;}).sort(),pins.libraries.filter(value=>value.codegen).map(value=>value.component).sort());
+ assert.deepEqual(pins.coreSourceTrees.map(value=>value.source),['node_modules/react-native/src','node_modules/react-native/React/FBReactNativeSpec']);assert.ok(JSON.parse(readFileSync('node_modules/react-native/package.json')).codegenConfig.libraries.some(value=>value.name==='FBReactNativeSpec'));
 }));

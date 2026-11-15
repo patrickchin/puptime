@@ -120,11 +120,12 @@ function retainedCollectorFailure(path,sourceCommit,phase){
   assert.equal(value.schema,1);assert.equal(value.status,'INCOMPLETE');assert.equal(value.complete,false);assert.equal(value.sourceCommit,sourceCommit);assert.equal(value.platform,'android');assert.equal(value.stage,'setup');
   assert.deepEqual(Object.keys(setup).sort(),['phase','errorCategory','collector'].sort());assert.equal(setup.phase,phase);assert.equal(setup.errorCategory,'command-failed');
   const classes=['ResolveException','GradleException','IOException','IllegalArgumentException','IllegalStateException','SecurityException','Error','Throwable'];
-  assert.deepEqual(Object.keys(collector).sort(),['phase','errorClass','causeChain','causeChainEnd'].sort());assert.ok(['root-binding','task-registration','runtime-resolution','artifact-collection'].includes(collector.phase));assert.ok(classes.includes(collector.errorClass));
+  assert.deepEqual(Object.keys(collector).sort(),['phase','errorClass','causeChain','causeChainEnd',...(Object.hasOwn(collector,'selection')?['selection']:[])].sort());assert.ok(['root-binding','task-registration','runtime-resolution','artifact-collection'].includes(collector.phase));assert.ok(classes.includes(collector.errorClass));
   assert.ok(Array.isArray(collector.causeChain)&&collector.causeChain.length>=1&&collector.causeChain.length<=8);assert.ok(['end','limit','cycle','unreadable'].includes(collector.causeChainEnd));assert.ok(collector.causeChainEnd!=='limit'||collector.causeChain.length===8);
   const causeChain=collector.causeChain.map(value=>{assert.deepEqual(Object.keys(value).sort(),['errorClass','classSHA256'].sort());assert.ok(classes.includes(value.errorClass)&&typeof value.classSHA256==='string'&&/^[a-f0-9]{64}$/.test(value.classSHA256));return {errorClass:value.errorClass,classSHA256:value.classSHA256};});
   assert.equal(collector.errorClass,causeChain[0].errorClass);
-  return {phase:collector.phase,errorClass:collector.errorClass,causeChain,causeChainEnd:collector.causeChainEnd};
+  let selection;if(Object.hasOwn(collector,'selection')){const value=collector.selection;assert.deepEqual(Object.keys(value).sort(),['failureClassSHA256','componentKind','componentSHA256'].sort());assert.equal(causeChain.filter(value=>value.classSHA256==='2a5335183636baba800ed56814f24536518c33cbd68932ba9a3fd10004d2b5fd').length,1);assert.ok(['module','main-project'].includes(value.componentKind));for(const hash of [value.failureClassSHA256,value.componentSHA256])assert.ok(typeof hash==='string'&&/^[a-f0-9]{64}$/.test(hash));selection={failureClassSHA256:value.failureClassSHA256,componentKind:value.componentKind,componentSHA256:value.componentSHA256};}
+  return {phase:collector.phase,errorClass:collector.errorClass,causeChain,causeChainEnd:collector.causeChainEnd,...(selection?{selection}:{})};
  }catch{return;}
 }
 

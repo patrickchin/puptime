@@ -87,6 +87,14 @@ exposes only the first cause through `getCause()`, so this does not enumerate al
 resolution failures or prove a root cause. It reads no raw class name into the
 report, exception message or stack and always rethrows the same Throwable; a
 failed/outside-workspace metadata write is ignored.
+Only the observed exact Gradle 9.3.1 `ArtifactSelectionException` can add optional
+selection metadata: failure-class SHA, a fixed module/main-project kind and a
+component SHA. Module identity is `maven:group:module@version`; main-project
+identity is `gradle-project:` plus its build path, `:` and project path, after
+checking the actual main root/project binding. Getters are contained; unknown,
+unreadable or competing leaves omit this context. No display name, attribute,
+variant, message or raw coordinate is emitted. This identifies a failure family
+and component fingerprint, not a successful resolution or a demonstrated cause.
 The shell writer retains this context only after exact schema, source and enum
 validation, then reconstructs the finite report. Failures before these callbacks
 or during other Gradle/plugin configuration still have only the generic setup
@@ -97,7 +105,7 @@ This uses Gradle's public [root project](https://docs.gradle.org/current/javadoc
 and [project directory](https://docs.gradle.org/current/javadoc/org/gradle/api/Project.html#getProjectDir()) APIs.
 The source-only root guard regression executes this actual init script through
 `groovy.ui.GroovyMain scripts/notices-runtime-root.test.groovy scripts/notices-runtime.init.gradle`
-with the installed Gradle distribution's `lib/*` on the Java classpath. It stubs
+with the installed Gradle distribution's `lib/*` and `lib/plugins/*` on the Java classpath. It stubs
 Gradle callbacks/task registration only; it starts no build or resolver.
 
 Reports expose
@@ -203,6 +211,20 @@ walks Pods and autolinked Gradle native subtrees, fingerprints source files, and
 finds source-only `vendor`/`third_party` children as well as binary vendors.
 Native roots are restricted to installed packages, Pods and identified local
 modules; arbitrary project data is not traversed.
+The two literal RN 0.86.3 roots `ReactAppDependencyProvider` and `ReactCodegen`
+under `ios/build/generated/ios/` also require their exact Podfile.lock declaration,
+locked producer package/config/template hashes and selected input fingerprints.
+The Provider must contain exactly its three expected template-derived files.
+ReactCodegen requires actual autolinking JSON with the pinned nine dependency
+configs, seven configured spec-source trees and platform podspecs, no app-level
+codegen config or native component crawler, plus separate RN core/spec evidence.
+A test invokes the pinned selector to prove this selection path; no missing
+metadata is replaced with guessed dependency discovery. Raw autolinking bodies
+and absolute roots stay private; only logical package/version identities and
+hashes enter reports. Unknown roots, changed pins and escaping links reject.
+All output bytes are fingerprinted, and each input owner remains a separate
+vendor boundary needing explicit notice review; admitting a generated source
+does not inherit a producer's licence or complete the empty approval ledger.
 Only the actual Gradle build-directory output, configured CMake staging path and
 Git metadata are excluded. The metadata exporter reads AGP's CMake configuration;
 its module-local `.cxx` default applies only when CMake is enabled. Canonical
