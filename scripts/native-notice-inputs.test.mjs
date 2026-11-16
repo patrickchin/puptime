@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,symlinkSync,cpSync,readdirSync,renameSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join,dirname} from 'node:path';
-import {createRequire} from 'node:module';
+import {createRequire,syncBuiltinESMExports} from 'node:module';
 import test from 'node:test';
 import {podNoticeInputs,gradleNoticeInputs,unionNoticeInputs,inspectNoticeArchive,noticeInputStep,noticeFailureContext,podLinkedSources,podActualSelectors,sqlitePodSourceEvidence} from './native-notice-inputs.mjs';
 import {addKnownOwnNoticeFiles,assertPackagedNativeCoverage,assertSourceNoticePayload,digest,npmNoticeInputs,resolveNoticeCoverage,nativeSourceNotices,unreviewedOSSNoticeInputs,publicNoticeReport} from './app-notices.mjs';
@@ -39,6 +40,13 @@ test('SQLite .5 source observation survives actual Pod capture without attributi
 test('SQLite .5 source observation records changed copies and configured branches without inferring selected or licensed code',()=>sqliteSourceFixture(({root,file,prefix,direct})=>{
  const original=direct();file(prefix+'/ios/sqlite3.c','Changed synthetic copy\n');let changed=direct();assert.equal(changed.copiedPairMatches,false);assert.notDeepEqual(changed.files,original.files);
  file('ios/Podfile.properties.json',{'expo.sqlite.useSQLCipher':'true','expo.sqlite.useLibSQL':'true','expo.sqlite.withSQLiteVecExtension':'true','expo.sqlite.customBuildFlags':'PRIVATE_FLAGS','PRIVATE':'PRIVATE_VALUE'});changed=direct();assert.deepEqual(changed.options,{useSQLCipher:true,useLibSQL:true,withSQLiteVecExtension:true});assert.equal(changed.compiledSelectionVerified,false);assert.equal(changed.finalArtifactVerified,false);assert.ok(!JSON.stringify(changed).includes('PRIVATE')&&!JSON.stringify(changed).includes(root));
+}));
+test('SQLite .5 owner and licence bytes use the bounded descriptor capture without a prior package scan',()=>sqliteSourceFixture(({direct})=>{
+ const original=fs.readFileSync;
+ try{
+  fs.readFileSync=(path,...args)=>{assert.ok(!String(path).endsWith('/LICENSE'),'Owner source bypassed bounded capture');return original(path,...args);};syncBuiltinESMExports();
+  assert.equal(direct().ownerNpmID,'npm:expo-sqlite@57.0.5');
+ }finally{fs.readFileSync=original;syncBuiltinESMExports();}
 }));
 test('SQLite .5 source observation rejects foreign selection, owner or lock drift, missing, linked and oversized files',()=>sqliteSourceFixture(({root,file,prefix,external,direct})=>{
  const rejects=(name,body)=>{const path=join(root,name),before=readFileSync(path);file(name,body);try{assert.throws(direct);}finally{file(name,before);}};

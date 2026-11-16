@@ -103,8 +103,8 @@ export function sqlitePodSourceEvidence(root,source,external,podLockSHA256){
  root=realpathSync(root);const modules=realpathSync(join(root,'node_modules')),owner=join(modules,'expo-sqlite');
  assert.equal(realpathSync(owner),owner);assert.deepEqual(Object.keys(external??{}),[':path']);
  assert.equal(realpathSync(source),join(owner,'ios'));assert.equal(realpathSync(resolve(root,'ios',external[':path'])),join(owner,'ios'));
- const pkg=npmNoticeInputs(root,[join(owner,'package.json')])[0],lock=JSON.parse(readFileSync(join(root,'package-lock.json'))).packages?.['node_modules/expo-sqlite'];
- assert.equal(pkg?.id,'npm:expo-sqlite@57.0.5');assert.equal(lock?.resolved,'https://registry.npmjs.org/expo-sqlite/-/expo-sqlite-57.0.5.tgz');
+ const lock=JSON.parse(readFileSync(join(root,'package-lock.json'))).packages?.['node_modules/expo-sqlite'];
+ assert.equal(lock?.version,'57.0.5');assert.equal(lock.resolved,'https://registry.npmjs.org/expo-sqlite/-/expo-sqlite-57.0.5.tgz');
  assert.equal(lock.integrity,'sha512-WYBPXDL0WCMmGSvBgmCXk06yUS4p9GCXUP7CNZBjnb30ZLAuibhsOSzVGDTHcCfs+O/wEC6DNMkNDsw+0xKp7g==');assert.match(podLockSHA256,/^[a-f0-9]{64}$/);
  const inputs=new Map(),files=[];
  for(const logical of ['node_modules/expo-sqlite/package.json','node_modules/expo-sqlite/LICENSE','node_modules/expo-sqlite/ios/ExpoSQLite.podspec','node_modules/expo-sqlite/vendor/sqlite3/sqlite3.c','node_modules/expo-sqlite/vendor/sqlite3/sqlite3.h','node_modules/expo-sqlite/ios/sqlite3.c','node_modules/expo-sqlite/ios/sqlite3.h','ios/Podfile.properties.json']){
@@ -121,10 +121,11 @@ export function sqlitePodSourceEvidence(root,source,external,podLockSHA256){
    assert.equal(realpathSync(path),expected);const body=bytes.subarray(0,size);inputs.set(logical,body);files.push({source:logical,bytes:size,sha256:digest(body)});
   }finally{closeSync(fd);}
  }
+ const pkg=JSON.parse(noticeText(inputs.get('node_modules/expo-sqlite/package.json')));assert.equal(pkg.name,'expo-sqlite');assert.equal(pkg.version,'57.0.5');
  const properties=JSON.parse(noticeText(inputs.get('ios/Podfile.properties.json')));assert.ok(properties&&typeof properties==='object'&&!Array.isArray(properties));
  const enabled=key=>properties['expo.sqlite.'+key]==='true',useSQLCipher=enabled('useSQLCipher'),useLibSQL=enabled('useLibSQL'),withSQLiteVecExtension=enabled('withSQLiteVecExtension');
  const copiedPairMatches=['c','h'].every(ext=>inputs.get('node_modules/expo-sqlite/ios/sqlite3.'+ext).equals(inputs.get('node_modules/expo-sqlite/vendor/sqlite3/sqlite3.'+ext)));
- return {schema:1,scope:'sqlite-pod-source-observation',discoveryOnly:true,component:'cocoapods:ExpoSQLite@57.0.5',ownerNpmID:pkg.id,sourceKind:'path',podLockSHA256,files,options:{useSQLCipher,useLibSQL,withSQLiteVecExtension},copiedPairMatches,compiledSelectionVerified:false,finalArtifactVerified:false};
+ return {schema:1,scope:'sqlite-pod-source-observation',discoveryOnly:true,component:'cocoapods:ExpoSQLite@57.0.5',ownerNpmID:`npm:${pkg.name}@${pkg.version}`,sourceKind:'path',podLockSHA256,files,options:{useSQLCipher,useLibSQL,withSQLiteVecExtension},copiedPairMatches,compiledSelectionVerified:false,finalArtifactVerified:false};
 }
 
 export function podNoticeInputs(root){
