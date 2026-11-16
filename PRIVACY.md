@@ -1,6 +1,6 @@
 # Puptime Privacy Policy
 
-Last updated: November 14, 2026
+Last updated: November 16, 2026
 
 Puptime is a puppy routine tracker developed by Patrick Chin. Local logging works without an account. This policy explains optional cloud accounts, the native app, and the public website.
 
@@ -83,6 +83,10 @@ You can also [delete your cloud account without the app](https://puptime.pages.d
 Cloudflare's recovery backups expire separately from live deletion. D1 account/authentication history can remain recoverable for up to seven days on Workers Free or thirty days on Workers Paid; SQLite Durable Object puppy data can remain recoverable for up to thirty days. Deletion does not immediately erase those provider-managed recovery copies. The retired account object keeps non-content metadata to reject old clients.
 
 Before sending a deletion request, the app saves the original account identifier, email and deletion state in its local database. If the response is interrupted, sync and ordinary sign-in remain paused across app restarts until the result is reconciled. With a still-valid original session, you can verify that same account by email and review a new deletion confirmation; verification never resumes deletion automatically. Once the service confirms deletion, the app records that acknowledgement before finishing local sign-out. The guard is removed after cleanup, and local puppy logs are kept.
+
+Puptime's configured PostHog project uses EU Cloud with **Discard client IP data** enabled for incoming events. Client IP addresses are excluded from stored events, but PostHog transformations can process an IP before it is discarded. See [PostHog's data-storage documentation](https://posthog.com/docs/privacy/data-storage).
+
+The project is on the Free plan, using the organization's default one-year event-retention window. Expiry is not an immediate-erasure guarantee: expired events may remain beyond that window, and deletion happens in batches. See [PostHog's event-retention documentation](https://posthog.com/docs/data/events-retention). Withdrawing analytics consent or deleting a Puptime cloud account does not erase anonymous analytics already received by PostHog.
 
 ## Changes
 
