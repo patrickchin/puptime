@@ -3,6 +3,16 @@ import test from 'node:test';
 import {readFileSync} from 'node:fs';
 import {parseAllDocuments} from 'yaml';
 
+test('guest→profile reuses the strict existing boundary before its mandatory destination assertion',()=>{
+ const commands=parseAllDocuments(readFileSync(new URL('../.maestro/helpers/conversational/to-reminders.yaml',import.meta.url),'utf8'))[1].toJS();
+ const preparer=readFileSync(new URL('../scripts/prepare-ios-production-auth-inventory.mjs',import.meta.url),'utf8');
+ const literal=preparer.match(/return text\.replace\(tap,`([\s\S]*?)`\);/)?.[1];assert.ok(literal);assert.ok(!literal.includes('${'));
+ const expected=parseAllDocuments('appId: com.patrickchin.puptime\n---\n'+literal)[1].toJS();assert.equal(expected.length,1);
+ assert.deepEqual(commands.slice(2,4),[expected[0],{assertVisible:{id:'preview.profile'}}]);
+ assert.deepEqual(commands[0],{extendedWaitUntil:{visible:{id:'preview.guest',enabled:true},timeout:30000}});
+ assert.equal(commands[1],'waitForAnimationToEnd');
+});
+
 type ProfileAgeState={profile:boolean;age:boolean;enabled?:boolean};
 type ProfileAgeHooks={beforeTap?:(state:ProfileAgeState)=>void;afterTap?:(state:ProfileAgeState,count:number)=>void;afterAnimation?:(state:ProfileAgeState)=>void};
 
