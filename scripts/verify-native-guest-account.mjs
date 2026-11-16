@@ -112,6 +112,10 @@ async function flow(name,env={}){
     try{if(hierarchy&&statSync(join(artifacts,hierarchy)).size<=2097152)ui={inspected:true,fields:nativeAuthUiFlags(JSON.parse(readFileSync(join(artifacts,hierarchy),'utf8')),{email,code})};}catch{/* Keep the actual driver failure; record no unprojected value. */}
     writeFileSync(join(output,'fixture-auth-readiness.json'),JSON.stringify({phase:name,flowSequence,ui,responses:authResponses},null,2)+'\n');
     if(name==='add-logs')try{writeFileSync(join(output,'fixture-add-logs-command.json'),JSON.stringify({phase:'add-logs',flowSequence,...readNativeCommandState(artifacts)},null,2)+'\n',{mode:0o600});}catch{/* Preserve the original flow failure and existing cleanup. */}
+    if(name==='comparison-preview'){
+      try{writeFileSync(join(output,'fixture-comparison-command.json'),JSON.stringify({phase:'comparison-preview',flowSequence,...readNativeCommandState(artifacts)},null,2)+'\n',{mode:0o600});}catch{/* Preserve the original flow failure and existing cleanup. */}
+      if(!android)try{simctl('io',device,'screenshot',join(output,'failure-comparison-preview.png'));}catch{/* Capture is best effort; preserve the actual driver failure. */}
+    }
     // These flows never enter a credential. Do not retain auth-code screenshots.
     if(!android&&['prepare','add-logs'].includes(name)){
       try{simctl('io',device,'screenshot',join(output,'failure-'+name+'.png'));}catch{}

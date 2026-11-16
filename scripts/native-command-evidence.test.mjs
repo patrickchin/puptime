@@ -37,7 +37,9 @@ test('discard secret-rich values, evaluated commands, errors, paths and arbitrar
 });
 
 test('identify only literal enable/open-account targets without exposing predicate text or runtime values',()=>{
- const ids=['screen.account','nav.account','account.enable','account.status','account.local.count','account.combine.dialog','account.combine.confirm'];
+ const comparisonIds=['account.connection.phone.name','account.connection.phone.count','account.connection.cloud.name','account.connection.cloud.count','account.combine.phone.name','account.combine.phone.count','account.combine.cloud.name','account.combine.cloud.count','account.combine.cancel','account.keepLocal'];
+ const ids=['screen.account','nav.account','account.enable','account.status','account.local.count','account.combine.dialog','account.combine.confirm',...comparisonIds];
+ const flow=readFileSync(new URL('../.maestro/account-preservation/comparison-preview.yaml',import.meta.url),'utf8');for(const id of comparisonIds)assert.ok(flow.includes('id: '+id+'\n'));
  const secret='private-identity@example.invalid 873921 cookie=private-session /private/auth';
  for(const id of ids)for(const [key,value,kind] of [
   ['tapOnElement',{selector:{idRegex:id,textRegex:secret}},'tap'],
@@ -48,7 +50,7 @@ test('identify only literal enable/open-account targets without exposing predica
   const entry=row(key,value,'FAILED',11);entry.metadata.error=secret;entry.metadata.evaluatedCommand={secret};
   const result=nativeCommandState([entry]);assert.deepEqual(result,{status:'FAILED',kind,targetId:id,sequence:11});assert.ok(!JSON.stringify(result).includes(secret));
  }
- for(const id of [secret,'account.enable.*','^account.enable$','account.enable/'+secret,'screen\\.(today|settings|account)','account.back']){
+ for(const id of [secret,'account.enable.*','^account.enable$','account.enable/'+secret,'screen\\.(today|settings|account)','account.back','account.connection.phone.secret','account.connection.*','account.combine.phone.name.extra']){
   const result=nativeCommandState([row('assertConditionCommand',{condition:{visible:{idRegex:id,textRegex:secret}}},'FAILED',11)]);
   assert.deepEqual(result,{status:'FAILED',kind:'assert',targetId:null,sequence:11});assert.ok(!JSON.stringify(result).includes(secret));
  }
@@ -96,22 +98,32 @@ test('pinned2.11 serialized scroll uses only scrollUntilVisible, never the inven
  assert.deepEqual(nativeCommandState([{command:{scrollUntilVisible:value,scrollUntilVisibleCommand:value},metadata}]),unknown,'A mixed command union remains ambiguous.');
 });
 
-test('actual add-logs failure catch emits only finite evidence and preserves the original error and cleanup on reader/writer failure',async()=>{
+test('actual diagnostic flow catches preserve original errors and cleanup on reader, writer and screenshot failures',async()=>{
  const sdk=readFileSync(new URL('./verify-native-guest-account.mjs',import.meta.url),'utf8'),start=sdk.indexOf('async function flow(name,env={}){'),end=sdk.indexOf("\nlet email=",start);assert.ok(start>0&&end>start);
  const body=sdk.slice(start,end),secret='synthetic-identity@example.invalid 873921 cookie=private-session /private/auth/trace';
- const execute=Function('name','privateDir','run','writeFileSync','readNativeCommandState','rmSync','existsSync','readdirSync','join','resolve','process',`return (async()=>{let activeFlow='startup',flowSequence=0,setupWindow;const device='synthetic',output='/synthetic-output',email='synthetic-identity@example.invalid',code='',android=true,requests=new Set(['/api/config']),authResponses=[],homedir=()=>'/synthetic-home',Date={now:()=>42},markStartup=()=>{},console={log(){}};${body};await flow(name);})();`);
- for(const options of [{},{readerFails:true},{writerFails:true},{name:'request'}]){
-  const name=options.name??'add-logs',root=mkdtempSync(join(tmpdir(),'puptime-flow-command-')),artifacts=join(root,'maestro-'+name+'-42'),writes=[];let reads=0,cleaned=0;
+ const execute=Function('name','privateDir','run','writeFileSync','readNativeCommandState','rmSync','existsSync','readdirSync','join','resolve','process','android','simctl',`return (async()=>{let activeFlow='startup',flowSequence=0,setupWindow;const device='synthetic',output='/synthetic-output',email='synthetic-identity@example.invalid',code='',requests=new Set(['/api/config']),authResponses=[],homedir=()=>'/synthetic-home',Date={now:()=>42},markStartup=()=>{},console={log(){}};${body};await flow(name);})();`);
+ for(const options of [{},{readerFails:true},{writerFails:true},{name:'request'},{name:'comparison-preview',android:false},{name:'comparison-preview',android:false,readerFails:true},{name:'comparison-preview',android:false,writerFails:true},{name:'comparison-preview',android:false,captureFails:true},{name:'comparison-preview',android:true},{name:'request',android:false},{name:'verify',android:false}]){
+  const name=options.name??'add-logs',file=name==='add-logs'?'fixture-add-logs-command.json':name==='comparison-preview'?'fixture-comparison-command.json':null,target=name==='comparison-preview'?'account.connection.phone.count':'account.local.count',root=mkdtempSync(join(tmpdir(),'puptime-flow-command-')),artifacts=join(root,'maestro-'+name+'-42'),writes=[],captures=[];let reads=0,cleaned=0;
   try{
-   mkdirSync(artifacts);writeFileSync(join(artifacts,'commands.json'),JSON.stringify([row('assertConditionCommand',{condition:{visible:{idRegex:'account.local.count',textRegex:secret}}},'FAILED',12)]));
+   mkdirSync(artifacts);writeFileSync(join(artifacts,'commands.json'),JSON.stringify([row('assertConditionCommand',{condition:{visible:{idRegex:target,textRegex:secret}}},'FAILED',12)]));
    const original=new Error(secret);for(const key of ['message','stack'])Object.defineProperty(original,key,{get(){throw new Error('Do not read raw Error fields');}});original.toJSON=()=>{throw new Error('Do not serialize the Error');};
-   const promise=execute(name,root,async()=>{throw original;},(path,text,mode)=>{if(options.writerFails&&path.endsWith('/fixture-add-logs-command.json'))throw new Error('Synthetic writer failure');writes.push({path,value:JSON.parse(text),mode});},path=>{reads++;assert.equal(path,artifacts);if(options.readerFails)throw new Error('Synthetic reader failure');return readNativeCommandState(path);},(path,options)=>{cleaned++;assert.equal(path,artifacts);rmSync(path,options);},path=>path===artifacts&&existsSync(path),()=>['commands.json'],join,resolve,{env:{}});
-   await assert.rejects(promise,error=>error===original);assert.equal(cleaned,1);assert.equal(existsSync(artifacts),false);assert.equal(reads,name==='add-logs'?1:0);
-   const evidence=writes.filter(row=>row.path.endsWith('/fixture-add-logs-command.json'));
-   if(name==='add-logs'&&!options.readerFails&&!options.writerFails)assert.deepEqual(evidence,[{path:'/synthetic-output/fixture-add-logs-command.json',value:{phase:'add-logs',flowSequence:1,status:'FAILED',kind:'assert',targetId:'account.local.count',sequence:12},mode:{mode:0o600}}]);else assert.deepEqual(evidence,[]);
+   const promise=execute(name,root,async()=>{throw original;},(path,text,mode)=>{if(options.writerFails&&path.endsWith('/'+file))throw new Error('Synthetic writer failure');writes.push({path,value:JSON.parse(text),mode});},path=>{reads++;assert.equal(path,artifacts);if(options.readerFails)throw new Error('Synthetic reader failure');return readNativeCommandState(path);},(path,options)=>{cleaned++;assert.equal(path,artifacts);rmSync(path,options);},path=>path===artifacts&&existsSync(path),()=>['commands.json','synthetic-hierarchy.json'],join,resolve,{env:{}},options.android??true,(...args)=>{captures.push(args);if(options.captureFails)throw new Error(secret);});
+   await assert.rejects(promise,error=>error===original);assert.equal(cleaned,1);assert.equal(existsSync(artifacts),false);assert.equal(reads,file?1:0);
+   const evidence=writes.filter(row=>row.path.endsWith('/'+file));
+   if(file&&!options.readerFails&&!options.writerFails)assert.deepEqual(evidence,[{path:'/synthetic-output/'+file,value:{phase:name,flowSequence:1,status:'FAILED',kind:'assert',targetId:target,sequence:12},mode:{mode:0o600}}]);else assert.deepEqual(evidence,[]);
+   assert.deepEqual(captures,name==='comparison-preview'&&options.android===false?[['io','synthetic','screenshot','/synthetic-output/failure-comparison-preview.png']]:[]);assert.ok(!writes.some(row=>row.path.endsWith('-hierarchy.txt')));
    assert.ok(!JSON.stringify(writes).includes(secret));assert.equal(writes.filter(row=>row.path.endsWith('/fixture-native-reach.json')).length,1);assert.equal(writes.filter(row=>row.path.endsWith('/fixture-auth-readiness.json')).length,1);
   }finally{rmSync(root,{recursive:true,force:true});}
  }
+});
+
+test('comparison preview and its only helper navigate and inspect without entering credentials',()=>{
+ const flow=readFileSync(new URL('../.maestro/account-preservation/comparison-preview.yaml',import.meta.url),'utf8'),helper=readFileSync(new URL('../.maestro/helpers/open-account.yaml',import.meta.url),'utf8');
+ assert.deepEqual([...flow.matchAll(/runFlow: (.+)/g)].map(match=>match[1]),['../helpers/open-account.yaml','../helpers/open-account.yaml']);
+ for(const source of [flow,helper])assert.doesNotMatch(source,/inputText|eraseText|runScript|TEST_EMAIL|MAESTRO_TEST_CODE|account\.(email|code|sendCode|verify)/);
+ const sdk=readFileSync(new URL('./verify-native-guest-account.mjs',import.meta.url),'utf8'),start=sdk.indexOf('async function verifyPuppyComparison(){'),end=sdk.indexOf('\nconst childEnv=',start);assert.ok(start>0&&end>start);const body=sdk.slice(start,end);
+ assert.equal((body.match(/flow\('comparison-preview'/g)??[]).length,1);assert.ok(body.indexOf('await signIn();')<body.indexOf("flow('comparison-preview'"));
+ assert.ok(sdk.includes("if(!android&&['prepare','add-logs'].includes(name)){"),'Comparison capture must never enter the legacy hierarchy-export branch.');
 });
 
 // Execute only the actual reader functions with request mocks, never SDK main or sockets.
