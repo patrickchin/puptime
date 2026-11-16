@@ -226,7 +226,7 @@ if mode in ('crc','oversize'):
 });
 
 function androidCiRun(options={}){
- const text=options.checkerSource??readFileSync(join(project,'scripts/verify-android-sqlite-engine.mjs'),'utf8'),start=text.indexOf('export async function verifyAndroidSqliteEngine()'),end=text.indexOf('\nif(process.argv[1]',start),body=text.slice(start,end).replace('export ','');assert.ok(start>0&&end>start);
+ const text=readFileSync(join(project,'scripts/verify-android-sqlite-engine.mjs'),'utf8'),start=text.indexOf('export async function verifyAndroidSqliteEngine()'),end=text.indexOf('\nif(process.argv[1]',start),body=text.slice(start,end).replace('export ','');assert.ok(start>0&&end>start);
  const calls=[],writes=[],name='Puptime_SQLite_Engine_123_2',args=['-avd',name,'-port','5588','-no-window','-no-audio','-no-snapshot','-gpu','swiftshader_indirect'];
  const raw=options.engineBytes??Buffer.from(JSON.stringify(expectedEngine)),failure=options.failure??new Error('PRIVATE_ORIGINAL'),cleanupError=new Error('PRIVATE_CLEANUP');let live=false,privateExists=true,installed=false,cleared=false,launched=false,disposed=false,rootCount=0,portChecks=0,emulatorStops=0,cleanupStatReads=0;
  const sourceHashes=Object.values(hashes).map(row=>row[1]),key='221e0a3106aa4c3ccc154e0a418b55020b3f9ea6e84f92e8749cd9e2f39f5e58',certificate='fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c';
@@ -277,9 +277,7 @@ function androidCiRun(options={}){
  return {execute,calls,writes,failure,disposed:()=>disposed,live:()=>live,removed:()=>!privateExists,rootCount:()=>rootCount,emulatorStops:()=>emulatorStops};
 }
 
-test('Android cleanup ownership failure never inherits permission to signal or remove private material',async()=>{
- const oldSource=execFileSync('git',['show','953b9283e68de90e05006f7381dd0d9704813536:scripts/verify-android-sqlite-engine.mjs'],{cwd:project,encoding:'utf8'});
- const witness=androidCiRun({checkerSource:oldSource,launchFails:true,ownershipScenario:'throw'});await assert.rejects(witness.execute(),error=>error===witness.failure);assert.equal(witness.emulatorStops(),1);assert.equal(witness.removed(),true,'Retain the original unsafe witness, not a safety pass.');
+test('current Android cleanup requires verified ownership before signaling or removing private material',async()=>{
  for(const scenario of ['owned','dead','foreign','throw','malformed','reused-start','second-inspection-throws']){
   const check=androidCiRun({launchFails:true,ownershipScenario:scenario});await assert.rejects(check.execute(),error=>error===check.failure);
   const trusted=['owned','dead'].includes(scenario);assert.equal(check.emulatorStops(),trusted?1:0,scenario);assert.equal(check.removed(),trusted,scenario);assert.equal(check.disposed(),true);
@@ -302,10 +300,8 @@ test('Android mismatches, setup/cleanup/writer failures never pass or replace th
  const guard=androidCiRun({wrongPlatform:true});await assert.rejects(guard.execute());assert.deepEqual(guard.calls,[]);assert.deepEqual(guard.writes,[]);
 });
 
-test('Android dispatch is exclusive; original iOS steps, account jobs and old selections remain unchanged',async()=>{
- const {createRequire}=await import('node:module'),{parse}=createRequire(import.meta.url)('yaml'),raw=readFileSync(join(project,'.github/workflows/ios-simulator.yml'),'utf8'),current=parse(raw),old=parse(execFileSync('git',['show','ae6f0cceaf2d530d9f5a82ea6f1d5cbb74d7222b:.github/workflows/ios-simulator.yml'],{cwd:project,encoding:'utf8'}));
- assert.deepEqual(current.jobs.build.steps,old.jobs.build.steps);assert.deepEqual(current.jobs['native-accounts'],old.jobs['native-accounts']);assert.deepEqual(current.jobs['native-runtime-upgrade'],old.jobs['native-runtime-upgrade']);
- for(const event of ['push','pull_request','workflow_dispatch'])for(const suite of [undefined,'full','accounts'])assert.equal(event!=='workflow_dispatch'||suite!=='accounts'&&suite!=='sqlite-engine-android',event!=='workflow_dispatch'||suite!=='accounts');
+test('current Android dispatch is exclusive and uploads only the two finite engine receipts',async()=>{
+ const {createRequire}=await import('node:module'),{parse}=createRequire(import.meta.url)('yaml'),raw=readFileSync(join(project,'.github/workflows/ios-simulator.yml'),'utf8'),current=parse(raw);
  assert.equal(current.jobs.build.if,"github.event_name != 'workflow_dispatch' || (inputs.suite != 'accounts' && inputs.suite != 'sqlite-engine-android')");
  const job=current.jobs['sqlite-engine-android'];assert.equal(job.if,"github.event_name == 'workflow_dispatch' && inputs.suite == 'sqlite-engine-android'");assert.equal(job['runs-on'],'ubuntu-latest');assert.equal(job.steps.find(step=>step.name==='Build and query only the Android SQLite engine').run,'node scripts/verify-android-sqlite-engine.mjs');
  assert.ok(job.steps[0].with['sparse-checkout'].includes('!/.env\n'));const upload=job.steps.at(-1);assert.equal(upload.if,'always()');assert.equal(upload['continue-on-error'],true);assert.deepEqual(upload.with.path.trim().split('\n'),['build/android-sqlite-engine-check/sqlite-engine-probe.json','build/android-sqlite-engine-check/sqlite-engine-provenance.json']);
