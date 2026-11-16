@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {mkdtempSync,mkdirSync,rmSync,symlinkSync,writeFileSync} from 'node:fs';
+import {EventEmitter} from 'node:events';
+import {existsSync,mkdtempSync,mkdirSync,readFileSync,rmSync,symlinkSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
-import {join} from 'node:path';
+import {join,resolve} from 'node:path';
 import {nativeCommandState,readNativeCommandState} from './native-command-evidence.mjs';
 
 const unknown={status:'UNKNOWN',kind:'unknown',targetId:null,sequence:0};
@@ -93,4 +94,51 @@ test('pinned2.11 serialized scroll uses only scrollUntilVisible, never the inven
  for(const secret of ['identity@example.invalid','654321','private body/header/cookie','secret'])assert.ok(!JSON.stringify(result).includes(secret));
  assert.deepEqual(nativeCommandState([{command:{scrollUntilVisibleCommand:value},metadata}]),unknown,'No legacy alias for a key absent from the pinned model.');
  assert.deepEqual(nativeCommandState([{command:{scrollUntilVisible:value,scrollUntilVisibleCommand:value},metadata}]),unknown,'A mixed command union remains ambiguous.');
+});
+
+test('actual add-logs failure catch emits only finite evidence and preserves the original error and cleanup on reader/writer failure',async()=>{
+ const sdk=readFileSync(new URL('./verify-native-guest-account.mjs',import.meta.url),'utf8'),start=sdk.indexOf('async function flow(name,env={}){'),end=sdk.indexOf("\nlet email=",start);assert.ok(start>0&&end>start);
+ const body=sdk.slice(start,end),secret='synthetic-identity@example.invalid 873921 cookie=private-session /private/auth/trace';
+ const execute=Function('name','privateDir','run','writeFileSync','readNativeCommandState','rmSync','existsSync','readdirSync','join','resolve','process',`return (async()=>{let activeFlow='startup',flowSequence=0,setupWindow;const device='synthetic',output='/synthetic-output',email='synthetic-identity@example.invalid',code='',android=true,requests=new Set(['/api/config']),authResponses=[],homedir=()=>'/synthetic-home',Date={now:()=>42},markStartup=()=>{},console={log(){}};${body};await flow(name);})();`);
+ for(const options of [{},{readerFails:true},{writerFails:true},{name:'request'}]){
+  const name=options.name??'add-logs',root=mkdtempSync(join(tmpdir(),'puptime-flow-command-')),artifacts=join(root,'maestro-'+name+'-42'),writes=[];let reads=0,cleaned=0;
+  try{
+   mkdirSync(artifacts);writeFileSync(join(artifacts,'commands.json'),JSON.stringify([row('assertConditionCommand',{condition:{visible:{idRegex:'account.local.count',textRegex:secret}}},'FAILED',12)]));
+   const original=new Error(secret);for(const key of ['message','stack'])Object.defineProperty(original,key,{get(){throw new Error('Do not read raw Error fields');}});original.toJSON=()=>{throw new Error('Do not serialize the Error');};
+   const promise=execute(name,root,async()=>{throw original;},(path,text,mode)=>{if(options.writerFails&&path.endsWith('/fixture-add-logs-command.json'))throw new Error('Synthetic writer failure');writes.push({path,value:JSON.parse(text),mode});},path=>{reads++;assert.equal(path,artifacts);if(options.readerFails)throw new Error('Synthetic reader failure');return readNativeCommandState(path);},(path,options)=>{cleaned++;assert.equal(path,artifacts);rmSync(path,options);},path=>path===artifacts&&existsSync(path),()=>['commands.json'],join,resolve,{env:{}});
+   await assert.rejects(promise,error=>error===original);assert.equal(cleaned,1);assert.equal(existsSync(artifacts),false);assert.equal(reads,name==='add-logs'?1:0);
+   const evidence=writes.filter(row=>row.path.endsWith('/fixture-add-logs-command.json'));
+   if(name==='add-logs'&&!options.readerFails&&!options.writerFails)assert.deepEqual(evidence,[{path:'/synthetic-output/fixture-add-logs-command.json',value:{phase:'add-logs',flowSequence:1,status:'FAILED',kind:'assert',targetId:'account.local.count',sequence:12},mode:{mode:0o600}}]);else assert.deepEqual(evidence,[]);
+   assert.ok(!JSON.stringify(writes).includes(secret));assert.equal(writes.filter(row=>row.path.endsWith('/fixture-native-reach.json')).length,1);assert.equal(writes.filter(row=>row.path.endsWith('/fixture-auth-readiness.json')).length,1);
+  }finally{rmSync(root,{recursive:true,force:true});}
+ }
+});
+
+// Execute only the actual reader functions with request mocks, never SDK main or sockets.
+function accountReader(name,request){
+ const sdk=readFileSync(new URL('./verify-native-guest-account.mjs',import.meta.url),'utf8');
+ const start=sdk.indexOf('async function '+name+'('),end=sdk.indexOf(name==='remote'?'\nasync function assertCloud(':'\nfunction drainReceipt(',start);assert.ok(start>0&&end>start);
+ return Function('request','secureRequest','backPort','front','certificate','assert','cookie','return ('+sdk.slice(start,end)+');')(request,request,1,'https://127.0.0.1:1',Buffer.from('synthetic-ca'),assert,'synthetic');
+}
+function accountRequest({body,error}={}){
+ const calls=[];
+ const request=(url,options,callback)=>{const req=new EventEmitter();calls.push({url,options,timeout:null});req.setTimeout=ms=>{calls.at(-1).timeout=ms;return req;};req.end=()=>queueMicrotask(()=>{if(error){req.emit('error',error);return;}const response=new EventEmitter();response.statusCode=200;callback(response);response.emit('data',JSON.stringify(body));response.emit('end');});return req;};
+ return {request,calls};
+}
+test('actual account verification readers use one-request agents with exact URLs, explicit headers, CA and inspection timeout',async()=>{
+ const session=accountRequest({body:{user:{id:'usr_synthetic'}}});
+ assert.deepEqual(await accountReader('inspectSession',session.request)('synthetic'),{status:200,body:{user:{id:'usr_synthetic'}}});
+ assert.deepEqual(session.calls,[{url:'http://127.0.0.1:1/api/account',options:{agent:false,headers:{cookie:'synthetic'}},timeout:15000}]);
+ for(const inspectBehindFault of [false,true]){
+  const remote=accountRequest({body:{changes:[],hasMore:false}});
+  assert.deepEqual(await accountReader('remote',remote.request)({inspectBehindFault,sessionCookie:'synthetic',allKinds:true}),[]);
+  assert.deepEqual(remote.calls,[{url:(inspectBehindFault?'http://127.0.0.1:1':'https://127.0.0.1:1')+'/api/sync/pull?after=0',options:{agent:false,...(!inspectBehindFault?{ca:Buffer.from('synthetic-ca')}:{}),headers:{cookie:'synthetic',origin:'https://127.0.0.1:1',host:'127.0.0.1:1'}},timeout:null}]);
+ }
+});
+test('actual account verification readers preserve request Error identity and never retry',async()=>{
+ const original=new Error('synthetic request failure');original.code='ECONNRESET';
+ for(const name of ['inspectSession','remote'])for(const inspectBehindFault of name==='remote'?[false,true]:[false]){
+  const mock=accountRequest({error:original}),argument=name==='remote'?{inspectBehindFault,sessionCookie:'synthetic',allKinds:true}:'synthetic';
+  await assert.rejects(accountReader(name,mock.request)(argument),error=>error===original);assert.equal(mock.calls.length,1);
+ }
 });
