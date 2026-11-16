@@ -122,6 +122,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
       - name: Run conversational onboarding into the real app
+        id: onboarding_combined
         timeout-minutes: 120
         env:
           CI: "1"
@@ -139,23 +140,47 @@ jobs:
           runtime_id=$(xcrun simctl list runtimes -j | jq -r '[.runtimes[] | select(.isAvailable and (.identifier | contains("iOS-26")))][-1].identifier // empty')
           test -n "$runtime_id"
           onboarding_device=$(xcrun simctl create "Puptime Onboarding CI $GITHUB_RUN_ID" com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro "$runtime_id")
-          trap 'xcrun simctl delete "$onboarding_device" >/dev/null 2>&1 || true' EXIT
+          onboarding_phase=UNKNOWN
+          trap 'onboarding_status=$?
+            xcrun simctl delete "$onboarding_device" >/dev/null 2>&1 || true
+            { printf "%s\n%s\n" "$onboarding_phase" "$onboarding_status" > build/onboarding-stage.txt; } 2>/dev/null || true
+            exit "$onboarding_status"' EXIT
           xcrun simctl boot "$onboarding_device"
           xcrun simctl bootstatus "$onboarding_device" -b
           xcrun simctl install "$onboarding_device" build/onboarding-ci/Puptime.app
+          onboarding_phase=conversational
           maestro test \
             --platform ios --device "$onboarding_device" \
             --format JUNIT --output build/onboarding-maestro-report.xml \
             --test-output-dir build/onboarding-maestro-results \
             .maestro/conversational
+          onboarding_phase=fault-recovery
           node scripts/verify-ios-conversational-failures.mjs \
             "$onboarding_device" --replace-synthetic build/onboarding-failure-results
+          onboarding_phase=onboarding-sign-in-fixture
           node scripts/verify-ios-guest-account.mjs \
             "$onboarding_device" build/onboarding-ci/Puptime.app \
             --replace-synthetic build/welcome-account-ios --onboarding-sign-in
+          onboarding_phase=guest-account-fixture
           node scripts/verify-ios-guest-account.mjs \
             "$onboarding_device" build/onboarding-ci/Puptime.app \
             --replace-synthetic build/guest-account-ios
+          onboarding_phase=completed
+      - name: Capture finite onboarding command boundary
+        if: always()
+        continue-on-error: true
+        env:
+          ONBOARDING_STEP_CONCLUSION: ${{ steps.onboarding_combined.conclusion }}
+        run: node scripts/native-onboarding-verdict.mjs
+      - name: Upload finite onboarding command boundary
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v6
+        with:
+          name: puptime-ios-onboarding-verdict
+          path: build/onboarding-verdict.json
+          if-no-files-found: warn
+          retention-days: 7
       - name: Verify native cloud account deletion preserves local history
         timeout-minutes: 60
         env:
