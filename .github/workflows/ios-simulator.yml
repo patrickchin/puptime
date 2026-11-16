@@ -84,6 +84,10 @@ jobs:
         run: |
           curl -fsSL "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Prepare fresh standard command custody
+        id: standard_command_prepare
+        continue-on-error: true
+        run: node scripts/native-flow-command-verdict.mjs --prepare-standard13
       - name: Run Maestro end-to-end tests
         id: standard_maestro
         timeout-minutes: 60
@@ -121,6 +125,26 @@ jobs:
           path: build/standard-verdict.json
           if-no-files-found: warn
           retention-days: 7
+      - name: Capture finite standard failed command
+        id: standard_command_capture
+        if: always()
+        continue-on-error: true
+        env:
+          FLOW_COMMAND_PREPARATION_OUTCOME: ${{ steps.standard_command_prepare.outcome }}
+        run: node scripts/native-flow-command-verdict.mjs --standard13
+      - name: Upload finite standard failed command
+        if: always() && steps.standard_command_capture.outcome == 'success'
+        continue-on-error: true
+        uses: actions/upload-artifact@v6
+        with:
+          name: puptime-ios-standard-failed-command
+          path: build/standard-failed-command.json
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Prepare fresh conversational command custody
+        id: conversational_command_prepare
+        continue-on-error: true
+        run: node scripts/native-flow-command-verdict.mjs --prepare-conversational17
       - name: Run conversational onboarding into the real app
         id: onboarding_combined
         timeout-minutes: 120
@@ -194,6 +218,22 @@ jobs:
         with:
           name: puptime-ios-conversational-verdict
           path: build/conversational-verdict.json
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Capture finite conversational failed command
+        id: conversational_command_capture
+        if: always()
+        continue-on-error: true
+        env:
+          FLOW_COMMAND_PREPARATION_OUTCOME: ${{ steps.conversational_command_prepare.outcome }}
+        run: node scripts/native-flow-command-verdict.mjs --conversational17
+      - name: Upload finite conversational failed command
+        if: always() && steps.conversational_command_capture.outcome == 'success'
+        continue-on-error: true
+        uses: actions/upload-artifact@v6
+        with:
+          name: puptime-ios-conversational-failed-command
+          path: build/conversational-failed-command.json
           if-no-files-found: warn
           retention-days: 7
       - name: Verify native cloud account deletion preserves local history
