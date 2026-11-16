@@ -60,7 +60,7 @@ export async function verifyIosSqliteEngine() {
   const task = installTaskCleanup(async () => {
     try { cleanup.processesStopped = stopBundle ? await stopBundle() : true; assert.ok(cleanup.processesStopped); }
     finally {
-      try { cleanup.simulatorDeleted = device ? deleteOwnedSimulator({ device, privateDirectory, preserve: false }).deleted : true; assert.ok(cleanup.simulatorDeleted); }
+      try { cleanup.simulatorDeleted = device ? deleteOwnedSimulator({ device, privateDirectory, preserve: false, command: (...args) => command('xcrun', ['simctl', ...args], 30000) }).deleted : true; assert.ok(cleanup.simulatorDeleted); }
       finally { rmSync(privateDirectory, { recursive: true, force: true }); cleanup.copyRemoved = !existsSync(privateDirectory); assert.ok(cleanup.copyRemoved); }
     }
   });
