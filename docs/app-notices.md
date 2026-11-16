@@ -1,7 +1,7 @@
 # App notice capture and final-artifact gate
 
 This is incomplete build preparation. The source JSON currently contains the
-reviewed font/icon notices only. Ninety-five exact iOS inputs have attribution
+reviewed font/icon notices only. Ninety-six exact iOS inputs have attribution
 reviews; remaining component review and the incomplete payload prevent sealing.
 Source tests, an internal simulator build, and finding licence filenames
 do not establish complete app-library notice coverage or store readiness.
@@ -83,16 +83,30 @@ Apache-2.0 text and all eight expressly scoped sections for core, TraceKit,
 UUIDv7, Sentry, Metro, Expo and AgentCat. No single normalized package licence
 expression is assigned. One public npm selector is appended, leaving all prior
 94 records and 172 pins, including the nonpublic PostHog hash/note, unchanged.
-The ledger now contains 173 total text pins. The separately captured
-`@posthog/core@1.61.0` and its `dist/vendor` boundary gain no review from this
-record or from sharing the same complete notice body.
+The separately captured `@posthog/core@1.61.0` and its `dist/vendor` boundary
+gain no review from this record or from sharing the same complete notice body.
 
-Five candidates remain held: `@expo/cli` has generated virtual sources; the
-installed widget source differs from the equal captured and official member
-hash; Gesture Handler, Reanimated and Zod have explicit copied-code attribution
-to resolve. No related native Pod is approved by these npm records.
+One iOS-only `react-native-android-widget@0.22.1` record covers the 22 captured
+source files on the explicitly selected clean iOS basis. Exact source members,
+package manifest and complete original MIT text match the official locked tar
+and two isolated clean iOS dependency copies and their manifests. The original
+1,093-byte notice retains all twenty CRLF sequences and the 2022 Stefan
+Aleksovski copyright. One public selector is appended; all prior 95 records,
+173 text pins and other ledger fields remain unchanged. There are now 174 total
+text pins, including the historical nonpublic selectors.
 
-Against the qualified82 inventory, 108 components plus one generated source
+This source review uses the official/captured `AndroidWidget.ts` preimage
+`3f4c432d…`. The tracked Android prebuild mod adds a separate 53-byte no-op
+method and produces `47c7f4e8…`; that modified Android source and the archive's
+41 native members remain outside this iOS review. Candidate source fingerprints
+still require separate qualification. No dependency copy, reset, prebuild or
+helper policy change is part of this append.
+
+Four candidates remain held: `@expo/cli` has generated virtual sources;
+Gesture Handler, Reanimated and Zod have explicit copied-code attribution to
+resolve. No related native Pod is approved by these npm records.
+
+Against the qualified82 inventory, 107 components plus one generated source
 remain unreviewed. Of 109 recorded vendor boundaries, only the twelve specific
 own-product boundaries above are reviewed; the other 97 remain held. No new
 discovery, Android, packaged-native, retained-resource, payload or sealing
