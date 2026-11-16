@@ -1,7 +1,7 @@
 # App notice capture and final-artifact gate
 
 This is incomplete build preparation. The source JSON currently contains the
-reviewed font/icon notices only. Seventy-four exact iOS inputs have attribution
+reviewed font/icon notices only. Ninety-four exact iOS inputs have attribution
 reviews; remaining component review and the incomplete payload prevent sealing.
 Source tests, an internal simulator build, and finding licence filenames
 do not establish complete app-library notice coverage or store readiness.
@@ -30,7 +30,7 @@ tarball/SRI public-source pins. All 63 selected files matched the qualified
 capture, installed bytes and official cached tar members. Root-agent source
 review read the twelve new distinct MIT texts; React/scheduler reuse the exact
 previously reviewed Meta text. A package's MIT label alone grants no approval.
-Hoist's BSD text remains deferred; no generic MIT or sibling allowlist is used.
+No generic MIT or sibling allowlist is used.
 
 One additional iOS record covers only `ExpoFileSystem@57.0.7` and its three exact
 own-product xcframework/slice boundaries, mapped to that package's original
@@ -65,7 +65,24 @@ native-source scanner reproduce all 25 qualified82 fingerprints. Existing public
 text pins are reused; no new text, native vendor or generated input is approved.
 Dependencies and expanded transitive compile/link inputs remain separate.
 
-Against the qualified82 inventory, 129 components plus one generated source
+Twenty more exact npm records cover only 210 captured, non-generated JavaScript
+files and their complete original notices. Root-agent source review verified
+package ownership, whole official tar/SRI, package manifests, selected member
+hashes and installed bytes. All eighteen distinct licence bodies were read in
+full: seventeen components use MIT, two ISC and one BSD-3-Clause. Twenty exact
+npm public-origin selectors are appended; all previous 74 component records and
+152 text pins remain unchanged, including the existing nonpublic Better Auth
+hash selector. Equal text hashes reuse original bytes without component or
+platform inheritance.
+
+Six candidates remain held: `@expo/cli` has generated virtual sources; the
+installed widget source differs from the equal captured and official member
+hash; Gesture Handler, Reanimated and Zod have explicit copied-code attribution
+to resolve; PostHog's complete mixed Apache/MIT notice requires its own scope
+review despite the MIT package label. No related native Pod is approved by
+these npm records.
+
+Against the qualified82 inventory, 109 components plus one generated source
 remain unreviewed. Of 109 recorded vendor boundaries, only the twelve specific
 own-product boundaries above are reviewed; the other 97 remain held. No new
 discovery, Android, packaged-native, retained-resource, payload or sealing

@@ -1982,6 +1982,286 @@
       ],
       "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
       "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:@better-auth/core@1.7.12",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/@better-auth/core/LICENSE.md",
+          "sha256": "7a07f7d9085cb3157e4377d944988c9712933141b0f7201955ceccfac92abde4"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/@better-auth/core/-/core-1.7.12.tgz",
+      "sectionSHA256": "7a07f7d9085cb3157e4377d944988c9712933141b0f7201955ceccfac92abde4"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:@better-auth/expo@1.7.12",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/@better-auth/expo/LICENSE.md",
+          "sha256": "7a07f7d9085cb3157e4377d944988c9712933141b0f7201955ceccfac92abde4"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/@better-auth/expo/-/expo-1.7.12.tgz",
+      "sectionSHA256": "7a07f7d9085cb3157e4377d944988c9712933141b0f7201955ceccfac92abde4"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:@better-fetch/fetch@1.3.2",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/@better-fetch/fetch/LICENSE",
+          "sha256": "54d710e643b5fd218f0c29cddea92432b2c730dddd594c7047c97993dd9f9a59"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/@better-fetch/fetch/-/fetch-1.3.2.tgz",
+      "sectionSHA256": "54d710e643b5fd218f0c29cddea92432b2c730dddd594c7047c97993dd9f9a59"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:@expo/devtools@57.0.1",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/@expo/devtools/LICENSE",
+          "sha256": "16feb932ce2ba7bc7712657bb28afe409eaa4334f9f05d0e1b7a5f12bf6132f4"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/@expo/devtools/-/devtools-57.0.1.tgz",
+      "sectionSHA256": "16feb932ce2ba7bc7712657bb28afe409eaa4334f9f05d0e1b7a5f12bf6132f4"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:@react-native-async-storage/async-storage@2.2.0",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/@react-native-async-storage/async-storage/LICENSE",
+          "sha256": "212dbf14b113759356207347826f21ac3c81151943fdb89ce25da5dc6214831c"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/@react-native-async-storage/async-storage/-/async-storage-2.2.0.tgz",
+      "sectionSHA256": "212dbf14b113759356207347826f21ac3c81151943fdb89ce25da5dc6214831c"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:@react-native-google-signin/google-signin@16.1.5",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/@react-native-google-signin/google-signin/LICENSE",
+          "sha256": "3680a16525f40f4115c71d7f229ed134afb6946e31ae2af83aa35ce0bc58d539"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/@react-native-google-signin/google-signin/-/google-signin-16.1.5.tgz",
+      "sectionSHA256": "3680a16525f40f4115c71d7f229ed134afb6946e31ae2af83aa35ce0bc58d539"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:@ungap/structured-clone@1.4.0",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/@ungap/structured-clone/LICENSE",
+          "sha256": "dc6d4961d8b6ee747231582ae9c53ce1d66bf76bc9f5a28f554c0e97210953bf"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/@ungap/structured-clone/-/structured-clone-1.4.0.tgz",
+      "sectionSHA256": "dc6d4961d8b6ee747231582ae9c53ce1d66bf76bc9f5a28f554c0e97210953bf"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:await-lock@2.2.2",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/await-lock/LICENSE",
+          "sha256": "396eefd21683c5f4de3640e7627638d07be75126f896d3ee0cf924cbff64e0a2"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/await-lock/-/await-lock-2.2.2.tgz",
+      "sectionSHA256": "396eefd21683c5f4de3640e7627638d07be75126f896d3ee0cf924cbff64e0a2"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:better-auth@1.7.12",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/better-auth/LICENSE.md",
+          "sha256": "7a07f7d9085cb3157e4377d944988c9712933141b0f7201955ceccfac92abde4"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/better-auth/-/better-auth-1.7.12.tgz",
+      "sectionSHA256": "7a07f7d9085cb3157e4377d944988c9712933141b0f7201955ceccfac92abde4"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:better-call@1.4.4",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/better-call/LICENSE",
+          "sha256": "ad800a5024c64adeb3eafa2b2b01893027a68631ff367a993020d1ec36e11266"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/better-call/-/better-call-1.4.4.tgz",
+      "sectionSHA256": "ad800a5024c64adeb3eafa2b2b01893027a68631ff367a993020d1ec36e11266"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:defu@6.1.7",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/defu/LICENSE",
+          "sha256": "46231df5a7733c3f52f11b71f3df61813007745b62b09031acfb45fb42d75082"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/defu/-/defu-6.1.7.tgz",
+      "sectionSHA256": "46231df5a7733c3f52f11b71f3df61813007745b62b09031acfb45fb42d75082"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:hoist-non-react-statics@3.3.2",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/hoist-non-react-statics/LICENSE.md",
+          "sha256": "eb32ff0ec52b6ea86e3d3e06c6ad1b68ee03798b6729af13919f6d5c14b368f3"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/hoist-non-react-statics/-/hoist-non-react-statics-3.3.2.tgz",
+      "sectionSHA256": "eb32ff0ec52b6ea86e3d3e06c6ad1b68ee03798b6729af13919f6d5c14b368f3"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:nanostores@1.5.5",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/nanostores/LICENSE",
+          "sha256": "181bc2685f0cea9d1beb28352420e3a7fb382b38895d2b430ed1b3bc39572af6"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/nanostores/-/nanostores-1.5.5.tgz",
+      "sectionSHA256": "181bc2685f0cea9d1beb28352420e3a7fb382b38895d2b430ed1b3bc39572af6"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:react-native-drawer-layout@4.2.12",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/react-native-drawer-layout/LICENSE",
+          "sha256": "41f321b33afaa5cdaeb7c1aecd6fd5c21467ff910fb677aa47c941d05b5032c0"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native-drawer-layout/-/react-native-drawer-layout-4.2.12.tgz",
+      "sectionSHA256": "41f321b33afaa5cdaeb7c1aecd6fd5c21467ff910fb677aa47c941d05b5032c0"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:react-native-is-edge-to-edge@1.3.1",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/react-native-is-edge-to-edge/LICENSE",
+          "sha256": "4efb635cc4fd67f738ce2af65f8b73514ee338d0d201b836ab3a823cfda771d1"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native-is-edge-to-edge/-/react-native-is-edge-to-edge-1.3.1.tgz",
+      "sectionSHA256": "4efb635cc4fd67f738ce2af65f8b73514ee338d0d201b836ab3a823cfda771d1"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:react-native-safe-area-context@5.7.0",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/react-native-safe-area-context/LICENSE",
+          "sha256": "f5c7a4d527258e11fdfe3d84eb73cd14fe6d64224ef051e59f6ee21fe378800c"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native-safe-area-context/-/react-native-safe-area-context-5.7.0.tgz",
+      "sectionSHA256": "f5c7a4d527258e11fdfe3d84eb73cd14fe6d64224ef051e59f6ee21fe378800c"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:react-native-worklets@0.10.1",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/react-native-worklets/LICENSE",
+          "sha256": "92c22d327a6644efda43527bfa6f136f4382359f40bc288eda0764f67be9c269"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native-worklets/-/react-native-worklets-0.10.1.tgz",
+      "sectionSHA256": "92c22d327a6644efda43527bfa6f136f4382359f40bc288eda0764f67be9c269"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:semver@7.8.5",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/semver/LICENSE",
+          "sha256": "4ec3d4c66cd87f5c8d8ad911b10f99bf27cb00cdfcff82621956e379186b016b"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/semver/-/semver-7.8.5.tgz",
+      "sectionSHA256": "4ec3d4c66cd87f5c8d8ad911b10f99bf27cb00cdfcff82621956e379186b016b"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:use-latest-callback@0.2.6",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/use-latest-callback/LICENSE",
+          "sha256": "29de249ac0cee0d56924ff07bdabc8f708ad58432c7a357f6065000c49b12e11"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/use-latest-callback/-/use-latest-callback-0.2.6.tgz",
+      "sectionSHA256": "29de249ac0cee0d56924ff07bdabc8f708ad58432c7a357f6065000c49b12e11"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:whatwg-url-minimum@0.1.2",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/whatwg-url-minimum/LICENSE.md",
+          "sha256": "c2ecf83f830f226f662c99d003162002c78edd8b59f1105621bdcc2c44043a7d"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/whatwg-url-minimum/-/whatwg-url-minimum-0.1.2.tgz",
+      "sectionSHA256": "c2ecf83f830f226f662c99d003162002c78edd8b59f1105621bdcc2c44043a7d"
     }
   ],
   "generatedSources": {
@@ -4168,6 +4448,206 @@
       "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
       "upstream": "https://registry.npmjs.org/expo-widgets/-/expo-widgets-57.0.26.tgz",
       "upstreamIntegrity": "sha512-gXVYxNeYR08QvohfnyyqTVxGgsF07PtK0Pg/i4vdFs2akT6mf/m4/vc3Co1F5lMDzbQSTpZyCDMxVOImv3F46g=="
+    },
+    {
+      "component": "npm:@better-auth/core@1.7.12",
+      "ecosystem": "npm",
+      "version": "1.7.12",
+      "public": true,
+      "source": "node_modules/@better-auth/core/LICENSE.md",
+      "sha256": "7a07f7d9085cb3157e4377d944988c9712933141b0f7201955ceccfac92abde4",
+      "upstream": "https://registry.npmjs.org/@better-auth/core/-/core-1.7.12.tgz",
+      "upstreamIntegrity": "sha512-SUStBGHJ13KnSO6+7U/1DSlfuOtln4jtOrFZqzQtxZVHZIrAoMjwHNGitlF+s7hvKbuC3Z14xjnqfLLqIqGfxw=="
+    },
+    {
+      "component": "npm:@better-auth/expo@1.7.12",
+      "ecosystem": "npm",
+      "version": "1.7.12",
+      "public": true,
+      "source": "node_modules/@better-auth/expo/LICENSE.md",
+      "sha256": "7a07f7d9085cb3157e4377d944988c9712933141b0f7201955ceccfac92abde4",
+      "upstream": "https://registry.npmjs.org/@better-auth/expo/-/expo-1.7.12.tgz",
+      "upstreamIntegrity": "sha512-2QIEoQ0wc2y3rGhc6tj8nvpx3MtPEregdfTcGQUKq0OqVdMmVxZwWORegLcEAb/j+ASoyE5VIboD9xn82p8NGQ=="
+    },
+    {
+      "component": "npm:@better-fetch/fetch@1.3.2",
+      "ecosystem": "npm",
+      "version": "1.3.2",
+      "public": true,
+      "source": "node_modules/@better-fetch/fetch/LICENSE",
+      "sha256": "54d710e643b5fd218f0c29cddea92432b2c730dddd594c7047c97993dd9f9a59",
+      "upstream": "https://registry.npmjs.org/@better-fetch/fetch/-/fetch-1.3.2.tgz",
+      "upstreamIntegrity": "sha512-Gs7n99b5tqUC6cQAPbV0uED3IraHB6xQbHLQ/C3l7ZFafHScOx9pQ+DYmP5blbLFShVWLqxNUlI9wi4xU/X+ow=="
+    },
+    {
+      "component": "npm:@expo/devtools@57.0.1",
+      "ecosystem": "npm",
+      "version": "57.0.1",
+      "public": true,
+      "source": "node_modules/@expo/devtools/LICENSE",
+      "sha256": "16feb932ce2ba7bc7712657bb28afe409eaa4334f9f05d0e1b7a5f12bf6132f4",
+      "upstream": "https://registry.npmjs.org/@expo/devtools/-/devtools-57.0.1.tgz",
+      "upstreamIntegrity": "sha512-GyUf+wFNkbttaX0jR7MZa9bm77U0IrLg6d2AjpxdyoXw/w4abHoXG0oFufwLMgP9zLTd5+Ct4X/ffNUTnlzZgg=="
+    },
+    {
+      "component": "npm:@react-native-async-storage/async-storage@2.2.0",
+      "ecosystem": "npm",
+      "version": "2.2.0",
+      "public": true,
+      "source": "node_modules/@react-native-async-storage/async-storage/LICENSE",
+      "sha256": "212dbf14b113759356207347826f21ac3c81151943fdb89ce25da5dc6214831c",
+      "upstream": "https://registry.npmjs.org/@react-native-async-storage/async-storage/-/async-storage-2.2.0.tgz",
+      "upstreamIntegrity": "sha512-gvRvjR5JAaUZF8tv2Kcq/Gbt3JHwbKFYfmb445rhOj6NUMx3qPLixmDx5pZAyb9at1bYvJ4/eTUipU5aki45xw=="
+    },
+    {
+      "component": "npm:@react-native-google-signin/google-signin@16.1.5",
+      "ecosystem": "npm",
+      "version": "16.1.5",
+      "public": true,
+      "source": "node_modules/@react-native-google-signin/google-signin/LICENSE",
+      "sha256": "3680a16525f40f4115c71d7f229ed134afb6946e31ae2af83aa35ce0bc58d539",
+      "upstream": "https://registry.npmjs.org/@react-native-google-signin/google-signin/-/google-signin-16.1.5.tgz",
+      "upstreamIntegrity": "sha512-9rmMwACzHK9Cbd0Yp7efg5uWgiYoLwmNAJh4gRCuMcSQH+qplpK7E4d1Q4tbsD8M9jvvVtRX2Z0AP9wwBKmPrQ=="
+    },
+    {
+      "component": "npm:@ungap/structured-clone@1.4.0",
+      "ecosystem": "npm",
+      "version": "1.4.0",
+      "public": true,
+      "source": "node_modules/@ungap/structured-clone/LICENSE",
+      "sha256": "dc6d4961d8b6ee747231582ae9c53ce1d66bf76bc9f5a28f554c0e97210953bf",
+      "upstream": "https://registry.npmjs.org/@ungap/structured-clone/-/structured-clone-1.4.0.tgz",
+      "upstreamIntegrity": "sha512-1mEZtMKPM09vDmQt5y7YvmN2+DFTP7Tg0EWXdic8/C6VRnpb33e4ghisCIE3WZjsE2N8mf+QV1Zqh7ZFYLWInQ=="
+    },
+    {
+      "component": "npm:await-lock@2.2.2",
+      "ecosystem": "npm",
+      "version": "2.2.2",
+      "public": true,
+      "source": "node_modules/await-lock/LICENSE",
+      "sha256": "396eefd21683c5f4de3640e7627638d07be75126f896d3ee0cf924cbff64e0a2",
+      "upstream": "https://registry.npmjs.org/await-lock/-/await-lock-2.2.2.tgz",
+      "upstreamIntegrity": "sha512-aDczADvlvTGajTDjcjpJMqRkOF6Qdz3YbPZm/PyW6tKPkx2hlYBzxMhEywM/tU72HrVZjgl5VCdRuMlA7pZ8Gw=="
+    },
+    {
+      "component": "npm:better-auth@1.7.12",
+      "ecosystem": "npm",
+      "version": "1.7.12",
+      "public": true,
+      "source": "node_modules/better-auth/LICENSE.md",
+      "sha256": "7a07f7d9085cb3157e4377d944988c9712933141b0f7201955ceccfac92abde4",
+      "upstream": "https://registry.npmjs.org/better-auth/-/better-auth-1.7.12.tgz",
+      "upstreamIntegrity": "sha512-f1fEG0QdTslzbmFA+vOGFFW/XXCWkG4kBxLeH9n1vp1otTH9+ZzV6EJ6797GStWeiYYgS5Vnt9xqE12KwSyAAw=="
+    },
+    {
+      "component": "npm:better-call@1.4.4",
+      "ecosystem": "npm",
+      "version": "1.4.4",
+      "public": true,
+      "source": "node_modules/better-call/LICENSE",
+      "sha256": "ad800a5024c64adeb3eafa2b2b01893027a68631ff367a993020d1ec36e11266",
+      "upstream": "https://registry.npmjs.org/better-call/-/better-call-1.4.4.tgz",
+      "upstreamIntegrity": "sha512-Gq4XdGFy4dmUxFEAX2nj0ycFcFbD9ZWh8YROouZoyXeF1M11TpYbplk0pDByTFF8Wz+MYa6W9052c9m7dD+mfw=="
+    },
+    {
+      "component": "npm:defu@6.1.7",
+      "ecosystem": "npm",
+      "version": "6.1.7",
+      "public": true,
+      "source": "node_modules/defu/LICENSE",
+      "sha256": "46231df5a7733c3f52f11b71f3df61813007745b62b09031acfb45fb42d75082",
+      "upstream": "https://registry.npmjs.org/defu/-/defu-6.1.7.tgz",
+      "upstreamIntegrity": "sha512-7z22QmUWiQ/2d0KkdYmANbRUVABpZ9SNYyH5vx6PZ+nE5bcC0l7uFvEfHlyld/HcGBFTL536ClDt3DEcSlEJAQ=="
+    },
+    {
+      "component": "npm:hoist-non-react-statics@3.3.2",
+      "ecosystem": "npm",
+      "version": "3.3.2",
+      "public": true,
+      "source": "node_modules/hoist-non-react-statics/LICENSE.md",
+      "sha256": "eb32ff0ec52b6ea86e3d3e06c6ad1b68ee03798b6729af13919f6d5c14b368f3",
+      "upstream": "https://registry.npmjs.org/hoist-non-react-statics/-/hoist-non-react-statics-3.3.2.tgz",
+      "upstreamIntegrity": "sha512-/gGivxi8JPKWNm/W0jSmzcMPpfpPLc3dY/6GxhX2hQ9iGj3aDfklV4ET7NjKpSinLpJ5vafa9iiGIEZg10SfBw=="
+    },
+    {
+      "component": "npm:nanostores@1.5.5",
+      "ecosystem": "npm",
+      "version": "1.5.5",
+      "public": true,
+      "source": "node_modules/nanostores/LICENSE",
+      "sha256": "181bc2685f0cea9d1beb28352420e3a7fb382b38895d2b430ed1b3bc39572af6",
+      "upstream": "https://registry.npmjs.org/nanostores/-/nanostores-1.5.5.tgz",
+      "upstreamIntegrity": "sha512-FixtE239Gl6Gz0ZGCK0WzvNwObNCIwVT+L7zQcf1QgcA6AzBxblzqe9OT88qiucNkhsjSOqiogSaF5jVbJiqSA=="
+    },
+    {
+      "component": "npm:react-native-drawer-layout@4.2.12",
+      "ecosystem": "npm",
+      "version": "4.2.12",
+      "public": true,
+      "source": "node_modules/react-native-drawer-layout/LICENSE",
+      "sha256": "41f321b33afaa5cdaeb7c1aecd6fd5c21467ff910fb677aa47c941d05b5032c0",
+      "upstream": "https://registry.npmjs.org/react-native-drawer-layout/-/react-native-drawer-layout-4.2.12.tgz",
+      "upstreamIntegrity": "sha512-qYmntEctkMSodN7pnC2llV21nswImLFPHJeT3PJXSJqZdU4jzDATR8iVi66sXkrtoOLJ2+EvXxgd7sMMpV4ViA=="
+    },
+    {
+      "component": "npm:react-native-is-edge-to-edge@1.3.1",
+      "ecosystem": "npm",
+      "version": "1.3.1",
+      "public": true,
+      "source": "node_modules/react-native-is-edge-to-edge/LICENSE",
+      "sha256": "4efb635cc4fd67f738ce2af65f8b73514ee338d0d201b836ab3a823cfda771d1",
+      "upstream": "https://registry.npmjs.org/react-native-is-edge-to-edge/-/react-native-is-edge-to-edge-1.3.1.tgz",
+      "upstreamIntegrity": "sha512-NIXU/iT5+ORyCc7p0z2nnlkouYKX425vuU1OEm6bMMtWWR9yvb+Xg5AZmImTKoF9abxCPqrKC3rOZsKzUYgYZA=="
+    },
+    {
+      "component": "npm:react-native-safe-area-context@5.7.0",
+      "ecosystem": "npm",
+      "version": "5.7.0",
+      "public": true,
+      "source": "node_modules/react-native-safe-area-context/LICENSE",
+      "sha256": "f5c7a4d527258e11fdfe3d84eb73cd14fe6d64224ef051e59f6ee21fe378800c",
+      "upstream": "https://registry.npmjs.org/react-native-safe-area-context/-/react-native-safe-area-context-5.7.0.tgz",
+      "upstreamIntegrity": "sha512-/9/MtQz8ODphjsLdZ+GZAIcC/RtoqW9EeShf7Uvnfgm/pzYrJ75y3PV/J1wuAV1T5Dye5ygq4EAW20RoBq0ABQ=="
+    },
+    {
+      "component": "npm:react-native-worklets@0.10.1",
+      "ecosystem": "npm",
+      "version": "0.10.1",
+      "public": true,
+      "source": "node_modules/react-native-worklets/LICENSE",
+      "sha256": "92c22d327a6644efda43527bfa6f136f4382359f40bc288eda0764f67be9c269",
+      "upstream": "https://registry.npmjs.org/react-native-worklets/-/react-native-worklets-0.10.1.tgz",
+      "upstreamIntegrity": "sha512-62mRM19bDpfpdI8HLkEErcdOsrAPDtE9lA/sw+5lLRpzBHNhxaoj9QyY2KjXqUmirelxkX4zuPGTC3VdA0feJA=="
+    },
+    {
+      "component": "npm:semver@7.8.5",
+      "ecosystem": "npm",
+      "version": "7.8.5",
+      "public": true,
+      "source": "node_modules/semver/LICENSE",
+      "sha256": "4ec3d4c66cd87f5c8d8ad911b10f99bf27cb00cdfcff82621956e379186b016b",
+      "upstream": "https://registry.npmjs.org/semver/-/semver-7.8.5.tgz",
+      "upstreamIntegrity": "sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA=="
+    },
+    {
+      "component": "npm:use-latest-callback@0.2.6",
+      "ecosystem": "npm",
+      "version": "0.2.6",
+      "public": true,
+      "source": "node_modules/use-latest-callback/LICENSE",
+      "sha256": "29de249ac0cee0d56924ff07bdabc8f708ad58432c7a357f6065000c49b12e11",
+      "upstream": "https://registry.npmjs.org/use-latest-callback/-/use-latest-callback-0.2.6.tgz",
+      "upstreamIntegrity": "sha512-FvRG9i1HSo0wagmX63Vrm8SnlUU3LMM3WyZkQ76RnslpBrX694AdG4A0zQBx2B3ZifFA0yv/BaEHGBnEax5rZg=="
+    },
+    {
+      "component": "npm:whatwg-url-minimum@0.1.2",
+      "ecosystem": "npm",
+      "version": "0.1.2",
+      "public": true,
+      "source": "node_modules/whatwg-url-minimum/LICENSE.md",
+      "sha256": "c2ecf83f830f226f662c99d003162002c78edd8b59f1105621bdcc2c44043a7d",
+      "upstream": "https://registry.npmjs.org/whatwg-url-minimum/-/whatwg-url-minimum-0.1.2.tgz",
+      "upstreamIntegrity": "sha512-XPEm0XFQWNVG292lII1PrRRJl3sItrs7CettZ4ncYxuDVpLyy+NwlGyut2hXI0JswcJUxeCH+CyOJK0ZzAXD6A=="
     }
   ],
   "retainedAndroidResources": {
