@@ -15,6 +15,22 @@ const expected={version:'3.51.3',sourceId:'2026-03-13 10:38:09 737ae4a34738ffa0c
 const engineHashes=['abc152fd93810c76628dcf415e66e6cdd3182ce1ede4f45a5ea8c64b83dc1dfe','1be81cbb8a2cc6d943cd9f15f48001aa14073bcba750d8b475e0f7892bfca606'];
 const templateKeySHA256='221e0a3106aa4c3ccc154e0a418b55020b3f9ea6e84f92e8749cd9e2f39f5e58',testCertificateSHA256='fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c';
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
+const gradleBuildSteps=['gradle-root','gradle-projects','gradle-selected-component','gradle-bundle-task','gradle-sqlite-flags','gradle-cmake-source','gradle-probe-entry','gradle-evidence-write','gradle-model-complete'];
+
+// Last entered source-owned boundary only; never an error or a completed-step claim.
+export function readAndroidBuildStep(path){
+ let descriptor;
+ try{
+  const initial=lstatSync(path);assert.ok(initial.isFile()&&!initial.isSymbolicLink()&&initial.size>0&&initial.size<=64);
+  descriptor=openSync(path,constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK);
+  const before=fstatSync(descriptor),buffer=Buffer.alloc(65);
+  for(const key of ['dev','ino','size','mtimeMs','ctimeMs'])assert.equal(before[key],initial[key]);
+  const length=readSync(descriptor,buffer,0,buffer.length,null);assert.equal(length,before.size);assert.equal(readSync(descriptor,buffer,length,1,null),0);
+  for(const after of [fstatSync(descriptor),lstatSync(path)])for(const key of ['dev','ino','size','mtimeMs','ctimeMs'])assert.equal(after[key],before[key]);
+  const step=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(buffer.subarray(0,length));return gradleBuildSteps.includes(step)?step:null;
+ }catch{return null;}
+ finally{if(descriptor!==undefined)try{closeSync(descriptor);}catch{}}
+}
 
 function stableFile(path,limit=256*1024*1024){
  const initial=lstatSync(path);assert.ok(initial.isFile()&&!initial.isSymbolicLink()&&initial.size>0&&initial.size<=limit);
@@ -40,27 +56,45 @@ export function validateAndroidSelection(value,root){
  return {name:'expo-sqlite',version:'57.0.5',localProject:true,sourceCMake:true,probeEntry:true,useLibSQL:false,useSQLCipher:false};
 }
 
-export function androidSelectionInit(root,output){
+export function androidSelectionInit(root,output,buildStepOutput){
  const hex=value=>Buffer.from(value).toString('hex');
  return `import groovy.json.JsonOutput
 import org.gradle.api.artifacts.component.ProjectComponentIdentifier
 def sourceRoot = new File(new String('${hex(root)}'.decodeHex(), 'UTF-8')).canonicalFile
 def evidence = new File(new String('${hex(output)}'.decodeHex(), 'UTF-8'))
+def breadcrumb = new File(new String('${hex(buildStepOutput)}'.decodeHex(), 'UTF-8'))
+def markBuildStep = { value ->
+  try {
+    if (breadcrumb.createNewFile()) {
+      breadcrumb.setReadable(false, false); breadcrumb.setWritable(false, false)
+      breadcrumb.setReadable(true, true); breadcrumb.setWritable(true, true)
+    }
+    breadcrumb.setText(value, 'UTF-8')
+  } catch (Throwable ignored) {}
+}
 gradle.projectsEvaluated { current ->
+  markBuildStep('gradle-root')
   if (current.rootProject.projectDir.canonicalFile != new File(sourceRoot, 'android').canonicalFile) return
+  markBuildStep('gradle-projects')
   def app = current.rootProject.findProject(':app')
   def sqlite = current.rootProject.findProject(':expo-sqlite')
   assert app != null && sqlite != null
   assert sqlite.projectDir.canonicalFile == new File(sourceRoot, 'node_modules/expo-sqlite/android').canonicalFile
+  markBuildStep('gradle-selected-component')
   def selected = app.configurations.getByName('releaseRuntimeClasspath').incoming.resolutionResult.allComponents.findAll {
     it.id instanceof ProjectComponentIdentifier && it.id.projectPath == ':expo-sqlite'
   }
   assert selected.size() == 1
   assert selected.first().id == sqlite.configurations.getByName('releaseRuntimeClasspath').incoming.resolutionResult.rootComponent.get().id
+  markBuildStep('gradle-bundle-task')
   def bundle = app.tasks.named('createBundleReleaseJsAndAssets').get()
+  markBuildStep('gradle-sqlite-flags')
   assert sqlite.ext.USE_LIBSQL == false && sqlite.ext.USE_SQLCIPHER == false
+  markBuildStep('gradle-cmake-source')
   assert sqlite.extensions.getByName('android').externalNativeBuild.cmake.path.canonicalFile == new File(sourceRoot, 'node_modules/expo-sqlite/android/CMakeLists.txt').canonicalFile
+  markBuildStep('gradle-probe-entry')
   assert bundle.entryFile.get().asFile.canonicalFile == new File(sourceRoot, 'index.sqlite-engine-probe.js').canonicalFile && bundle.devEnabled.get() == false
+  markBuildStep('gradle-evidence-write')
   assert evidence.createNewFile()
   evidence.setReadable(false, false); evidence.setWritable(false, false)
   assert evidence.setReadable(true, true) && evidence.setWritable(true, true)
@@ -68,6 +102,7 @@ gradle.projectsEvaluated { current ->
     cmake: sqlite.extensions.getByName('android').externalNativeBuild.cmake.path.canonicalPath,
     entry: bundle.entryFile.get().asFile.canonicalPath, selected: true,
     libsql: sqlite.ext.USE_LIBSQL, sqlcipher: sqlite.ext.USE_SQLCIPHER])
+  markBuildStep('gradle-model-complete')
 }
 `;
 }
@@ -120,8 +155,8 @@ async function portsFree(){
  for(const port of [5588,5589])for(const host of ['127.0.0.1','::1'])assert.ok(await new Promise(resolve=>{const server=createServer();server.once('error',()=>resolve(false));server.listen({port,host,exclusive:true},()=>server.close(()=>resolve(true)));}));
 }
 
-async function runOwned(binary,args,{cwd,env,timeout=120000,input,own}={}){
- const child=spawn(binary,args,{cwd,env,stdio:[input===undefined?'ignore':'pipe','ignore','ignore'],detached:true}),stop=ownProcess(child);let timer,failure;
+async function runOwned(binary,args,{cwd,env,timeout=120000,input,own,inheritOutput=false}={}){
+ const child=spawn(binary,args,{cwd,env,stdio:[input===undefined?'ignore':'pipe',inheritOutput?'inherit':'ignore',inheritOutput?'inherit':'ignore'],detached:true}),stop=ownProcess(child);let timer,failure;
  own?.(stop);
  try{
   await new Promise((pass,fail)=>{child.once('error',fail);child.stdin?.once('error',fail);child.once('close',code=>code===0?pass():fail(new Error('Owned command failed.')));timer=setTimeout(()=>{const error=new Error('Owned command timed out.');void stop().then(()=>fail(error),()=>fail(error));},timeout);if(input!==undefined)child.stdin.end(input);});
@@ -142,7 +177,8 @@ export async function verifyAndroidSqliteEngine(){
  const privateRoot=mkdtempSync(join(runner,'puptime-android-engine-')),avdHome=join(privateRoot,'avd'),name='Puptime_SQLite_Engine_'+runId+'_'+attempt,ownedStops=[];
  const args=['-avd',name,'-port','5588','-no-window','-no-audio','-no-snapshot','-gpu','swiftshader_indirect'];
  const cleanup={appStopped:false,processesStopped:false,emulatorExited:false,avdRemoved:false,portsReleased:false,privateMaterialRemoved:false};
- let child,stopEmulator,ownerStart,spawnError,failure,mayStop=false,phase='source',engineBytes,engineMatchesExpected=null,api=null,apkSHA256,installedApkSHA256,apk,selectedModule;
+ const buildStepOutput=join(privateRoot,'build-step.txt');
+ let child,stopEmulator,ownerStart,spawnError,failure,mayStop=false,phase='source',buildStep=null,engineBytes,engineMatchesExpected=null,api=null,apkSHA256,installedApkSHA256,apk,selectedModule;
  const inspect=()=>{
   // An unreadable inspection never inherits a prior permission to signal.
   mayStop=false;
@@ -170,9 +206,10 @@ export async function verifyAndroidSqliteEngine(){
   const hashes=()=>['sqlite3.c','sqlite3.h'].map(name=>stableFile(join(root,'node_modules/expo-sqlite/vendor/sqlite3',name),12*1024*1024));assert.deepEqual(hashes(),engineHashes);
   phase='prebuild';await run(process.execPath,['node_modules/expo/bin/cli','prebuild','--platform','android','--no-install'],{cwd:root,env,timeout:600000});
   assert.equal(stableFile(join(root,'android/app/debug.keystore'),16384),templateKeySHA256);
-  const selection=join(privateRoot,'selected-module.json'),init=join(privateRoot,'engine-inputs.gradle');writeFileSync(init,androidSelectionInit(root,selection),{flag:'wx',mode:0o600});
-  phase='build';await run(join(root,'android/gradlew'),[':app:assembleRelease','--no-daemon','-PreactNativeArchitectures=x86_64','--init-script',init],{cwd:join(root,'android'),env,timeout:1800000});
-  const selectedStat=lstatSync(selection);assert.ok(selectedStat.isFile()&&!selectedStat.isSymbolicLink()&&selectedStat.size<=8192);selectedModule=validateAndroidSelection(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(readFileSync(selection))),root);assert.deepEqual(hashes(),engineHashes);command('git',['diff','--quiet','HEAD','--']);
+  const selection=join(privateRoot,'selected-module.json'),init=join(privateRoot,'engine-inputs.gradle');writeFileSync(init,androidSelectionInit(root,selection,buildStepOutput),{flag:'wx',mode:0o600});
+  phase='build';buildStep='gradle-command';await run(join(root,'android/gradlew'),[':app:assembleRelease','--no-daemon','-PreactNativeArchitectures=x86_64','--init-script',init],{cwd:join(root,'android'),env,timeout:1800000,inheritOutput:true});
+  buildStep='selection-read';const selectedStat=lstatSync(selection);assert.ok(selectedStat.isFile()&&!selectedStat.isSymbolicLink()&&selectedStat.size<=8192);const selectedValue=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(readFileSync(selection)));
+  buildStep='selection-validate';selectedModule=validateAndroidSelection(selectedValue,root);buildStep='source-preservation';assert.deepEqual(hashes(),engineHashes);command('git',['diff','--quiet','HEAD','--']);
   phase='package';const apkPath=join(root,'android/app/build/outputs/apk/release/app-release.apk');apkSHA256=stableFile(apkPath);
   const certificate=command(join(tools,'apksigner'),['verify','--verbose','--print-certs',apkPath]);assert.equal((certificate.match(/Signer #[1-9]\d* certificate SHA-256 digest: ([a-f0-9]{64})/g)??[]).length,1);assert.ok(certificate.includes('Signer #1 certificate SHA-256 digest: '+testCertificateSHA256));
   const badging=command(join(tools,'aapt2'),['dump','badging',apkPath]);assert.match(badging,/^package: name='com\.patrickchin\.puptime' /);assert.match(badging,/^minSdkVersion:'24'$/m);assert.match(badging,/^targetSdkVersion:'36'$/m);
@@ -198,13 +235,13 @@ export async function verifyAndroidSqliteEngine(){
   assert.equal(adb(['shell','readlink','-f',receipt]).trim(),receipt);const before=androidReceiptStat(adb(['shell','stat','-c','%d %i %s %Y %Z %f',receipt]));
   const raw=adb(['exec-out','dd','if='+receipt,'bs=257','count=1'],{binaryOutput:true,maxBuffer:257});assert.equal(raw.length,before.size);assert.deepEqual(androidReceiptStat(adb(['shell','stat','-c','%d %i %s %Y %Z %f',receipt])),before);
   const local=join(privateRoot,'query-receipt.json');writeFileSync(local,raw,{flag:'wx',mode:0o600});engineBytes=readSqliteEngineReceipt(local);engineMatchesExpected=engineBytes.equals(Buffer.from(JSON.stringify(expected)));assert.equal(engineMatchesExpected,true,'Require the expected Android SQLite engine.');assert.equal(task.signal,null);
- }catch(error){failure=error;}
+ }catch(error){failure=error;if(phase==='build'&&buildStep==='gradle-command')buildStep=readAndroidBuildStep(buildStepOutput)??buildStep;}
  finally{
   try{await task.run();}catch(error){failure??=error;}finally{task.dispose();}
   try{
    command('git',['diff','--quiet','HEAD','--']);assert.deepEqual(['sqlite3.c','sqlite3.h'].map(name=>stableFile(join(root,'node_modules/expo-sqlite/vendor/sqlite3',name),12*1024*1024)),engineHashes);
    if(engineBytes&&Object.values(cleanup).every(value=>value===true))writeFileSync(join(output,'sqlite-engine-probe.json'),engineBytes,{flag:'wx',mode:0o600});
-   writeFileSync(join(output,'sqlite-engine-provenance.json'),JSON.stringify({schemaVersion:1,stage:'android-sqlite-engine-ci',status:failure?'failed':'passed',phase,checkoutCommit:source,checkoutTree:tree,runId,runAttempt:attempt,engineMatchesExpected,api,selectedModule:selectedModule?{...selectedModule,sourceHashes:engineHashes}:null,apk:apk?{...apk,sha256:apkSHA256,installedSHA256:installedApkSHA256??null,testCertificateSHA256}:null,cleanup},null,2)+'\n',{flag:'wx',mode:0o600});
+   writeFileSync(join(output,'sqlite-engine-provenance.json'),JSON.stringify({schemaVersion:2,stage:'android-sqlite-engine-ci',status:failure?'failed':'passed',phase,buildStep,checkoutCommit:source,checkoutTree:tree,runId,runAttempt:attempt,engineMatchesExpected,api,selectedModule:selectedModule?{...selectedModule,sourceHashes:engineHashes}:null,apk:apk?{...apk,sha256:apkSHA256,installedSHA256:installedApkSHA256??null,testCertificateSHA256}:null,cleanup},null,2)+'\n',{flag:'wx',mode:0o600});
   }catch(error){failure??=error;}
  }
  if(failure)throw failure;

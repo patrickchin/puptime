@@ -12,7 +12,7 @@ import {sqliteEngineReceipt} from './native-activity-probe/sqlite-engine.js';
 import {nativeHostInputs} from './native-runtime-inputs.mjs';
 import {readSqliteEngineReceipt} from './verify-ios-sqlite-engine.mjs';
 import {standardFixtureEnvironment} from './native-standard-suite.mjs';
-import {androidSelectionInit,validateAndroidSelection,androidReceiptStat,androidOffline,androidProcessIdentity} from './verify-android-sqlite-engine.mjs';
+import {androidSelectionInit,validateAndroidSelection,androidReceiptStat,androidOffline,androidProcessIdentity,readAndroidBuildStep} from './verify-android-sqlite-engine.mjs';
 import {EventEmitter} from 'node:events';
 
 const project=fileURLToPath(new URL('../',import.meta.url));
@@ -181,7 +181,7 @@ test('Android source selection is canonical, local, fixed-entry and rejects preb
  const value={project:module,cmake:join(module,'CMakeLists.txt'),entry:join(root,'index.sqlite-engine-probe.js'),selected:true,libsql:false,sqlcipher:false};
  assert.equal(validateAndroidSelection(value,root).probeEntry,true);
  for(const change of [{project:root},{cmake:join(root,'index.js')},{entry:join(root,'index.js')},{selected:false},{libsql:true},{sqlcipher:true},{private:'PRIVATE_VALUE'}])assert.throws(()=>validateAndroidSelection({...value,...change},root));
- const init=androidSelectionInit(root,join(root,'selected.json'));
+ const init=androidSelectionInit(root,join(root,'selected.json'),join(root,'build-step.txt'));
  assert.ok(init.indexOf("current.rootProject.projectDir.canonicalFile !=")<init.indexOf("findProject(':app')"));
  assert.match(init,/assert app != null && sqlite != null/);assert.match(init,/selected\.size\(\) == 1/);assert.match(init,/selected\.first\(\)\.id == sqlite\.configurations/);assert.match(init,/rootComponent\.get\(\)\.id/);assert.match(init,/createBundleReleaseJsAndAssets/);assert.match(init,/assert evidence\.createNewFile\(\)/);
  assert.ok(!init.includes('lenient')&&!init.includes('reselect')&&!init.includes('PRIVATE_VALUE'));
@@ -237,7 +237,7 @@ function androidCiRun(options={}){
  const read=path=>{
   if(path==='/root/package.json')return JSON.stringify({expo:{autolinking:{android:{buildFromSource:['expo-sqlite']}}}});
   if(path.endsWith('/expo-sqlite/package.json'))return '{"version":"57.0.5"}';
-  if(path.endsWith('selected-module.json'))return Buffer.from(JSON.stringify(selected));
+  if(path.endsWith('selected-module.json')){if(options.selectionReadFails)throw failure;return options.selectionBytes??Buffer.from(JSON.stringify(selected));}
   if(path.startsWith('/proc/')){
    if(!live)throw Object.assign(new Error('gone'),{code:'ENOENT'});
    const scenario=launched&&options.launchFails?options.ownershipScenario:undefined;
@@ -270,10 +270,10 @@ function androidCiRun(options={}){
  const writer=(path,bytes,settings)=>{assert.equal(settings.flag,'wx');assert.equal(settings.mode,0o600);if(path.includes('/build/android-sqlite-engine-check/')){if(options.writerFails)throw cleanupError;writes.push({path,value:JSON.parse(bytes)});}};
  const stable=path=>path.endsWith('/sqlite3.c')?sourceHashes[0]:path.endsWith('/sqlite3.h')?sourceHashes[1]:path.endsWith('debug.keystore')?key:path.endsWith('installed.apk')&&options.installedWrong?'b'.repeat(64):'a'.repeat(64);
  const spawnChild=(binary,argv,settings)=>{assert.equal(binary,'/sdk/emulator/emulator');assert.deepEqual(argv,args);assertEnv(settings.env);assert.equal(settings.detached,true);live=true;const child=new EventEmitter();child.pid=111;return child;};
- const run=async(binary,argv,settings)=>{assertEnv(settings.env);calls.push([binary,...argv]);settings.own(async()=>!options.commandCleanupFails);if(options.buildFails&&binary.endsWith('/gradlew'))throw failure;};
+ const run=async(binary,argv,settings)=>{assertEnv(settings.env);assert.equal(settings.inheritOutput,binary.endsWith('/gradlew')?true:undefined);calls.push([binary,...argv]);settings.own(async()=>!options.commandCleanupFails);if(options.buildFails&&binary.endsWith('/gradlew')||options.prebuildFails&&argv.includes('prebuild'))throw failure;};
  const cleanup=action=>{let once;return {signal:null,run:()=>once??=action(),dispose(){disposed=true;}};};
- const factory=Function('assert','process','realpathSync','lstatSync','existsSync','join','standardFixtureEnvironment','spawnSync','mkdirSync','mkdtempSync','readFileSync','readlinkSync','androidProcessIdentity','installTaskCleanup','runOwned','stableFile','engineHashes','templateKeySHA256','testCertificateSHA256','androidSelectionInit','writeFileSync','validateAndroidSelection','apkInspection','portsFree','spawn','ownProcess','androidOffline','androidReceiptStat','readSqliteEngineReceipt','expected','app','serial','rmSync','return ('+body+');');
- const execute=factory(assert,{platform:options.wrongPlatform?'darwin':'linux',env,cwd:()=>'/root',execPath:'/node',getuid:()=>1000},path=>path,()=>({isDirectory:()=>true,isSymbolicLink:()=>false,isFile:()=>true,size:512}),path=>path==='/private'||path==='/private/avd'?privateExists:path.startsWith('/sdk/emulator/'),join,standardFixtureEnvironment,command,()=>{},()=>'/private',read,()=>'/sdk/emulator/emulator',androidProcessIdentity,cleanup,run,stable,sourceHashes,key,certificate,androidSelectionInit,writer,value=>{assert.deepEqual(value,selected);if(options.selectionFails)throw failure;return {name:'expo-sqlite',version:'57.0.5',localProject:true};},'synthetic-python',async()=>{portChecks++;if(options.portFails&&portChecks===1)throw failure;},spawnChild,()=>async()=>{emulatorStops++;live=false;return !options.processCleanupFails;},androidOffline,androidReceiptStat,()=>raw,expectedEngine,'com.patrickchin.puptime','emulator-5588',path=>{assert.equal(path,'/private');privateExists=false;});
+ const factory=Function('assert','process','realpathSync','lstatSync','existsSync','join','standardFixtureEnvironment','spawnSync','mkdirSync','mkdtempSync','readFileSync','readlinkSync','androidProcessIdentity','installTaskCleanup','runOwned','stableFile','engineHashes','templateKeySHA256','testCertificateSHA256','androidSelectionInit','readAndroidBuildStep','writeFileSync','validateAndroidSelection','apkInspection','portsFree','spawn','ownProcess','androidOffline','androidReceiptStat','readSqliteEngineReceipt','expected','app','serial','rmSync','return ('+body+');');
+ const execute=factory(assert,{platform:options.wrongPlatform?'darwin':'linux',env,cwd:()=>'/root',execPath:'/node',getuid:()=>1000},path=>path,()=>({isDirectory:()=>true,isSymbolicLink:()=>false,isFile:()=>true,size:512}),path=>path==='/private'||path==='/private/avd'?privateExists:path.startsWith('/sdk/emulator/'),join,standardFixtureEnvironment,command,()=>{},()=>'/private',read,()=>'/sdk/emulator/emulator',androidProcessIdentity,cleanup,run,stable,sourceHashes,key,certificate,androidSelectionInit,path=>{assert.equal(path,'/private/build-step.txt');assert.equal(privateExists,true);return options.buildStep??null;},writer,value=>{assert.deepEqual(value,selected);if(options.selectionFails)throw failure;return {name:'expo-sqlite',version:'57.0.5',localProject:true};},'synthetic-python',async()=>{portChecks++;if(options.portFails&&portChecks===1)throw failure;},spawnChild,()=>async()=>{emulatorStops++;live=false;return !options.processCleanupFails;},androidOffline,androidReceiptStat,()=>raw,expectedEngine,'com.patrickchin.puptime','emulator-5588',path=>{assert.equal(path,'/private');privateExists=false;});
  return {execute,calls,writes,failure,disposed:()=>disposed,live:()=>live,removed:()=>!privateExists,rootCount:()=>rootCount,emulatorStops:()=>emulatorStops};
 }
 
@@ -287,7 +287,7 @@ test('current Android cleanup requires verified ownership before signaling or re
 
 test('actual Android probe orchestration is source-bound, one ABI/entry, cold, offline and finite',async()=>{
  const check=androidCiRun({rootClosed:true});await check.execute();assert.equal(check.rootCount(),1);assert.equal(check.disposed(),true);assert.equal(check.live(),false);assert.equal(check.removed(),true);
- const proof=check.writes.find(row=>row.path.endsWith('provenance.json')).value;assert.equal(proof.status,'passed');assert.equal(proof.api,36);assert.equal(proof.engineMatchesExpected,true);assert.ok(Object.values(proof.cleanup).every(value=>value===true));assert.equal(Object.keys(proof).length,13);assert.equal(check.writes.length,2);assert.ok(!JSON.stringify(check.writes).includes('PRIVATE'));
+ const proof=check.writes.find(row=>row.path.endsWith('provenance.json')).value;assert.equal(proof.status,'passed');assert.equal(proof.api,36);assert.equal(proof.engineMatchesExpected,true);assert.ok(Object.values(proof.cleanup).every(value=>value===true));assert.equal(proof.schemaVersion,2);assert.equal(proof.buildStep,'source-preservation');assert.equal(Object.keys(proof).length,14);assert.equal(check.writes.length,2);assert.ok(!JSON.stringify(check.writes).includes('PRIVATE'));
  const build=check.calls.find(row=>row[0].endsWith('/gradlew'));assert.deepEqual(build.slice(1,4),[':app:assembleRelease','--no-daemon','-PreactNativeArchitectures=x86_64']);assert.ok(!check.calls.some(row=>row.includes('bundleRelease')||row.includes('keytool')||row.includes('maestro')||row.includes('sqlite3')));
 });
 
@@ -300,6 +300,47 @@ test('Android mismatches, setup/cleanup/writer failures never pass or replace th
  const guard=androidCiRun({wrongPlatform:true});await assert.rejects(guard.execute());assert.deepEqual(guard.calls,[]);assert.deepEqual(guard.writes,[]);
 });
 
+test('Android build-step reader admits only stable regular bounded exact source-owned enums',t=>{
+ const root=realpathSync(mkdtempSync(join(tmpdir(),'puptime-build-step-')));t.after(()=>rmSync(root,{recursive:true,force:true}));const path=join(root,'step');
+ const steps=['gradle-root','gradle-projects','gradle-selected-component','gradle-bundle-task','gradle-sqlite-flags','gradle-cmake-source','gradle-probe-entry','gradle-evidence-write','gradle-model-complete'];
+ for(const value of steps){writeFileSync(path,value);assert.equal(readAndroidBuildStep(path),value);}
+ for(const value of ['', 'PRIVATE_TOKEN /private/path https://private.invalid', 'selection-read', 'gradle-root\n', 'GRADLE-ROOT', '\ufeffgradle-root', 'x'.repeat(65), Buffer.from([0xff,0xfe])]){writeFileSync(path,value);assert.equal(readAndroidBuildStep(path),null);}
+ assert.equal(readAndroidBuildStep(join(root,'missing')),null);assert.equal(readAndroidBuildStep(root),null);
+ writeFileSync(path,'gradle-root');const alias=join(root,'alias');symlinkSync(path,alias);assert.equal(readAndroidBuildStep(alias),null);
+ const original={lstatSync:fs.lstatSync,fstatSync:fs.fstatSync};let messageReads=0;
+ try{
+  fs.fstatSync=descriptor=>{const value=original.fstatSync(descriptor);return {...value,mtimeMs:value.mtimeMs+1};};syncBuiltinESMExports();assert.equal(readAndroidBuildStep(path),null);
+  fs.fstatSync=original.fstatSync;fs.lstatSync=()=>{const error=new Error();Object.defineProperty(error,'message',{get(){messageReads++;throw Error('PRIVATE');}});throw error;};syncBuiltinESMExports();assert.equal(readAndroidBuildStep(path),null);assert.equal(messageReads,0);
+ }finally{Object.assign(fs,original);syncBuiltinESMExports();}
+});
+
+test('Android generated Gradle breadcrumbs precede existing predicates and cannot replace model failures',()=>{
+ const init=androidSelectionInit('/source','/private/selected.json','/private/build-step.txt');
+ const boundaries=[['gradle-root','if (current.rootProject.projectDir.canonicalFile !='],['gradle-projects',"def app = current.rootProject.findProject(':app')"],['gradle-selected-component',"def selected = app.configurations.getByName('releaseRuntimeClasspath')"],['gradle-bundle-task',"def bundle = app.tasks.named('createBundleReleaseJsAndAssets')"],['gradle-sqlite-flags','assert sqlite.ext.USE_LIBSQL == false'],['gradle-cmake-source',"assert sqlite.extensions.getByName('android').externalNativeBuild"],['gradle-probe-entry','assert bundle.entryFile.get().asFile.canonicalFile'],['gradle-evidence-write','assert evidence.createNewFile()'],['gradle-model-complete',null]];
+ assert.deepEqual([...init.matchAll(/markBuildStep\('([^']+)'\)/g)].map(match=>match[1]),boundaries.map(row=>row[0]));
+ for(let i=0;i<boundaries.length;i++){
+  const [step,predicate]=boundaries[i],start=init.indexOf(`markBuildStep('${step}')`),end=i+1<boundaries.length?init.indexOf(`markBuildStep('${boundaries[i+1][0]}')`):init.length;
+  if(predicate){const at=init.indexOf(predicate);assert.ok(start<at&&at<end);}
+ }
+ assert.match(init,/breadcrumb\.setText\(value, 'UTF-8'\)\s*\} catch \(Throwable ignored\) \{\}/);
+ assert.ok(init.indexOf('evidence.text = JsonOutput.toJson')<init.indexOf("markBuildStep('gradle-model-complete')"));
+ assert.ok(!init.includes('println')&&!init.includes('stackTrace')&&!init.includes('getMessage'));
+});
+
+test('Android actual build diagnostics preserve original failures, finite schema and cleanup boundaries',async()=>{
+ const cases=[{options:{buildFails:true},step:'gradle-command'},{options:{buildFails:true,buildStep:'gradle-cmake-source'},step:'gradle-cmake-source'},{options:{selectionReadFails:true},step:'selection-read'},{options:{selectionFails:true},step:'selection-validate'}];
+ for(const {options,step} of cases){
+  const failure=new Error();Object.defineProperty(failure,'message',{get(){throw Error('Do not inspect PRIVATE message');}});const check=androidCiRun({...options,failure});await assert.rejects(check.execute(),error=>error===failure);
+  const value=check.writes.find(row=>row.path.endsWith('provenance.json')).value;
+  assert.equal(value.schemaVersion,2);assert.equal(value.phase,'build');assert.equal(value.buildStep,step);assert.equal(value.status,'failed');assert.equal(value.selectedModule,null);assert.equal(value.engineMatchesExpected,null);assert.equal(value.api,null);assert.equal(value.apk,null);assert.equal(check.disposed(),true);assert.equal(check.removed(),true);assert.ok(Object.values(value.cleanup).every(flag=>flag===true));
+  assert.deepEqual(Object.keys(value).sort(),['schemaVersion','stage','status','phase','buildStep','checkoutCommit','checkoutTree','runId','runAttempt','engineMatchesExpected','api','selectedModule','apk','cleanup'].sort());assert.ok(!JSON.stringify(value).includes('PRIVATE'));
+ }
+ const invalid=androidCiRun({selectionBytes:Buffer.from([0xff])});await assert.rejects(invalid.execute());assert.equal(invalid.writes.find(row=>row.path.endsWith('provenance.json')).value.buildStep,'selection-read');
+ const setup=androidCiRun({prebuildFails:true});await assert.rejects(setup.execute(),error=>error===setup.failure);assert.equal(setup.writes.find(row=>row.path.endsWith('provenance.json')).value.buildStep,null);
+ const complete=androidCiRun();await complete.execute();const value=complete.writes.find(row=>row.path.endsWith('provenance.json')).value;assert.equal(value.status,'passed');assert.equal(value.buildStep,'source-preservation');assert.equal(value.engineMatchesExpected,true);
+ for(const options of [{buildFails:true,writerFails:true},{buildFails:true,commandCleanupFails:true}]){const check=androidCiRun(options);await assert.rejects(check.execute(),error=>error===check.failure);assert.equal(check.disposed(),true);}
+});
+
 test('current Android dispatch is exclusive and uploads only the two finite engine receipts',async()=>{
  const {createRequire}=await import('node:module'),{parse}=createRequire(import.meta.url)('yaml'),raw=readFileSync(join(project,'.github/workflows/ios-simulator.yml'),'utf8'),current=parse(raw);
  assert.equal(current.jobs.build.if,"github.event_name != 'workflow_dispatch' || (inputs.suite != 'accounts' && inputs.suite != 'sqlite-engine-android')");
@@ -310,12 +351,12 @@ test('current Android dispatch is exclusive and uploads only the two finite engi
 
 test('Android owned child handles stdin, timeout and cleanup failures without masking the first error',async()=>{
  const text=readFileSync(join(project,'scripts/verify-android-sqlite-engine.mjs'),'utf8'),start=text.indexOf('async function runOwned('),end=text.indexOf('\n}\n',start)+2,body=text.slice(start,end);assert.ok(start>0&&end>start);
- for(const mode of ['success','spawn','stdin','timeout','cleanup','spawn-reject','timeout-reject','cleanup-reject']){
+ for(const inheritOutput of [false,true])for(const mode of ['success','spawn','stdin','timeout','cleanup','spawn-reject','timeout-reject','cleanup-reject']){
   const failure=new Error('PRIVATE_CHILD_FAILURE'),cleanupError=new Error('PRIVATE_CLEANUP_FAILURE');let stopped=0,registered=0,cleared=0,pending;
   const child=new EventEmitter();child.pid=123;child.stdin=new EventEmitter();child.stdin.end=value=>{assert.equal(value,'no\n');if(mode==='stdin')queueMicrotask(()=>child.stdin.emit('error',failure));};
-  const spawn=(binary,args,settings)=>{assert.equal(binary,'synthetic');assert.deepEqual(args,['fixed']);assert.equal(settings.detached,true);assert.deepEqual(settings.stdio,['pipe','ignore','ignore']);queueMicrotask(()=>{if(mode.startsWith('spawn'))child.emit('error',failure);else if(['success','cleanup','cleanup-reject'].includes(mode))child.emit('close',0);});return child;};
+  const spawn=(binary,args,settings)=>{assert.equal(binary,'synthetic');assert.deepEqual(args,['fixed']);assert.equal(settings.detached,true);assert.deepEqual(settings.stdio,['pipe',inheritOutput?'inherit':'ignore',inheritOutput?'inherit':'ignore']);queueMicrotask(()=>{if(mode.startsWith('spawn'))child.emit('error',failure);else if(['success','cleanup','cleanup-reject'].includes(mode))child.emit('close',0);});return child;};
   const run=Function('spawn','ownProcess','assert','setTimeout','clearTimeout','return ('+body+');')(spawn,()=>()=>pending??=Promise.resolve().then(()=>{stopped++;if(mode.endsWith('-reject'))throw cleanupError;return mode!=='cleanup';}),assert,fn=>{if(mode.startsWith('timeout'))queueMicrotask(fn);return 7;},value=>{assert.equal(value,7);cleared++;});
-  const result=run('synthetic',['fixed'],{cwd:'owned',env:{},input:'no\n',timeout:123,own:()=>{registered++;}});
+  const result=run('synthetic',['fixed'],{cwd:'owned',env:{},input:'no\n',timeout:123,...(inheritOutput?{inheritOutput:true}:{}),own:()=>{registered++;}});
   if(mode==='success')await result;else await assert.rejects(result,error=>['spawn','spawn-reject','stdin'].includes(mode)?error===failure:mode.startsWith('timeout')?error.message==='Owned command timed out.':mode==='cleanup-reject'?error===cleanupError:error.code==='ERR_ASSERTION');
   assert.equal(stopped,1);assert.equal(registered,1);assert.equal(cleared,1);
  }
