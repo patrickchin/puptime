@@ -23,6 +23,14 @@
     "expo-vector-icons": "a5416f6b586be51823285bc9a389bfd756eef80cfb7616ea90aaa11bae6189e1",
     "react-native-vector-icons": "000a66d1bc9e206b5963ba9370cd03350a4b26e205b5880e8e0f882a51951178"
   },
+  "platforms": {
+    "red-hat": ["ios", "android", "web"],
+    "material-community-icons": ["ios", "android", "web"],
+    "roboto": ["android"],
+    "apache-2": ["ios", "android", "web"],
+    "expo-vector-icons": ["ios", "android", "web"],
+    "react-native-vector-icons": ["ios", "android", "web"]
+  },
   "upstream": {
     "materialCommunityIcons": {
       "version": "7.4.47",

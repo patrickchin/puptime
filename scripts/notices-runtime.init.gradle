@@ -1,0 +1,120 @@
+// Discovery only: resolve selected release inputs, never compile or publish.
+import groovy.json.JsonOutput
+import java.security.MessageDigest
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+import org.gradle.api.artifacts.component.ProjectComponentIdentifier
+
+// Diagnostic output is optional and finite. Never serialize Throwable text.
+def recordNoticeFailure = { File mainRoot, String phase, Throwable failure ->
+    try {
+        def workspaceValue = gradle.rootProject.providers.environmentVariable('GITHUB_WORKSPACE').orNull
+        def source = gradle.rootProject.providers.environmentVariable('GITHUB_SHA').orNull
+        if (!workspaceValue || !(source ==~ /[a-f0-9]{40}/) || mainRoot == null) return
+        def workspace = new File(workspaceValue).canonicalFile
+        if (mainRoot != new File(workspace, 'android').canonicalFile) return
+        def output = new File(workspace, 'build/notices/android/failure.json')
+        if (output.canonicalFile != output.absoluteFile) return
+        def kind = { Throwable item -> item instanceof org.gradle.api.artifacts.ResolveException ? 'ResolveException' : item instanceof GradleException ? 'GradleException' : item instanceof IOException ? 'IOException' : item instanceof IllegalArgumentException ? 'IllegalArgumentException' : item instanceof IllegalStateException ? 'IllegalStateException' : item instanceof SecurityException ? 'SecurityException' : item instanceof Error ? 'Error' : 'Throwable' }
+        def sha = { String value -> MessageDigest.getInstance('SHA-256').digest(value.getBytes('UTF-8')).encodeHex().toString() }
+        def chain = [], current = failure, end = 'end', selection = null, selectionLeaves = 0
+        def seen = Collections.newSetFromMap(new IdentityHashMap<Throwable, Boolean>())
+        while (current != null) {
+            if (!seen.add(current)) { end = 'cycle'; break }
+            if (chain.size() == 8) { end = 'limit'; break }
+            chain.add([errorClass: kind(current), classSHA256: sha(current.getClass().getName())])
+            if (org.gradle.util.GradleVersion.current().version == '9.3.1' && current.getClass().getName() == 'org.gradle.internal.component.resolution.failure.exception.ArtifactSelectionException') {
+                selectionLeaves++
+                selection = null
+                if (selectionLeaves == 1) {
+                try {
+                    def detail = current.getFailure(), target = detail.getTargetComponent(), identity = null, componentKind = null
+                    def bounded = { value -> value instanceof String && !value.isEmpty() && value.length() <= 512 }
+                    if (target instanceof ModuleComponentIdentifier) {
+                        def group = target.getGroup(), module = target.getModule(), version = target.getVersion()
+                        if (bounded(group) && bounded(module) && bounded(version)) { identity = 'maven:' + group + ':' + module + '@' + version; componentKind = 'module' }
+                    } else if (target instanceof ProjectComponentIdentifier) {
+                        def buildPath = target.getBuild().getBuildPath(), projectPath = target.getProjectPath()
+                        if (buildPath == ':' && bounded(projectPath)) {
+                            def project = gradle.rootProject.findProject(projectPath)
+                            if (project != null && project.rootProject.is(gradle.rootProject) && project.path == projectPath) { identity = 'gradle-project:' + buildPath + ':' + projectPath; componentKind = 'main-project' }
+                        }
+                    }
+                    if (identity != null) selection = [failureClassSHA256: sha(detail.getClass().getName()), componentKind: componentKind, componentSHA256: sha(identity)]
+                } catch (Throwable ignored) { }
+                }
+            }
+            try { current = current.getCause() } catch (Throwable ignored) { end = 'unreadable'; break }
+        }
+        output.parentFile.mkdirs()
+        def collector = [phase: phase, errorClass: kind(failure), causeChain: chain, causeChainEnd: end]
+        if (selection != null) collector.selection = selection
+        output.text = JsonOutput.toJson([schema: 1, status: 'INCOMPLETE', complete: false, sourceCommit: source, platform: 'android', stage: 'setup', setup: [phase: 'gradle-resolution', errorCategory: 'command-failed', collector: collector]])
+    } catch (Throwable ignored) { }
+}
+
+gradle.projectsEvaluated {
+    File mainRoot
+    def reported = Collections.newSetFromMap(new IdentityHashMap<Throwable, Boolean>())
+    def observed = { String phase, Closure action ->
+        try { return action.call() } catch (Throwable failure) { if (reported.add(failure)) recordNoticeFailure(mainRoot, phase, failure); throw failure }
+    }
+    def app = observed('root-binding') {
+    // Init scripts also observe included plugin builds. Bind the intended main
+    // directory explicitly; a missing :app on THAT build still fails closed.
+    def invocation = gradle
+    while (invocation.parent != null) invocation = invocation.parent
+    def requestedRoot = invocation.startParameter.projectProperties['noticeMainProjectRoot']
+    if (!requestedRoot || !new File(requestedRoot.toString()).isAbsolute()) throw new GradleException('Explicit absolute main Android root required')
+    mainRoot = new File(requestedRoot.toString()).canonicalFile
+    if (!mainRoot.isDirectory()) throw new GradleException('Main Android root does not exist')
+    if (gradle.rootProject.projectDir.canonicalFile != mainRoot) return null
+    def selectedApp = gradle.rootProject.findProject(':app')
+    if (selectedApp == null) throw new GradleException('Missing Android app project')
+    return selectedApp
+    }
+    if (app == null) return
+    observed('task-registration') { app.tasks.register('writeNoticeRuntimeInputs') {
+        doLast {
+            def requested, configuration, artifacts
+            observed('runtime-resolution') {
+            requested = app.findProperty('noticeInputsOutput')
+            if (!requested) throw new GradleException('Explicit private notice output required')
+            configuration = app.configurations.getByName('releaseRuntimeClasspath')
+            artifacts = configuration.incoming.artifactView { componentFilter { it instanceof ModuleComponentIdentifier } }.artifacts.artifacts
+            }
+            observed('artifact-collection') {
+            def metadataOnly = []
+            def components = configuration.incoming.resolutionResult.allComponents.collect { component ->
+                def id = component.id
+                if (id instanceof ModuleComponentIdentifier) {
+                    def files = artifacts.findAll { it.id.componentIdentifier == id }.collect { artifact ->
+                        def sum = MessageDigest.getInstance('SHA-256')
+                        artifact.file.withInputStream { stream ->
+                            byte[] buffer = new byte[65536]; int count
+                            while ((count = stream.read(buffer)) != -1) sum.update(buffer, 0, count)
+                        }
+                        [file: artifact.file.absolutePath, sha256: sum.digest().encodeHex().toString()]
+                    }
+                    // BOM/constraint metadata contributes no packaged artifact.
+                    if (files.isEmpty()) { metadataOnly.add([group: id.group, name: id.module, version: id.version]); return null }
+                    return [group: id.group, name: id.module, version: id.version, artifacts: files]
+                }
+                if (id instanceof ProjectComponentIdentifier && id.projectPath != ':app') {
+                    def project = gradle.rootProject.findProject(id.projectPath)
+                    if (project == null) throw new GradleException('Unresolved native project input')
+                    def cmake = project.extensions.findByName('android')?.externalNativeBuild?.cmake
+                    // AGP's configured directory, or its documented module-local
+                    // default only when this project actually enables CMake.
+                    def staging = cmake?.path != null ? project.file(cmake.buildStagingDirectory ?: new File(project.projectDir, '.cxx')).canonicalPath : null
+                    return [projectBuildFile: project.buildFile.absolutePath, projectBuildDirectory: project.layout.buildDirectory.get().asFile.canonicalPath, projectCmakeStagingDirectory: staging]
+                }
+                if (id instanceof ProjectComponentIdentifier && id.projectPath == ':app') return null
+                throw new GradleException('Unknown release component input')
+            }.findAll { it != null }
+            def output = new File(requested.toString())
+            output.parentFile.mkdirs()
+            output.text = JsonOutput.toJson([schema: 1, configuration: 'releaseRuntimeClasspath', components: components, metadataOnly: metadataOnly])
+            }
+        }
+    } }
+}

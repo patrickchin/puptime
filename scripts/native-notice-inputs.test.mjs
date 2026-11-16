@@ -1,0 +1,429 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,symlinkSync,cpSync,readdirSync,renameSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join,dirname} from 'node:path';
+import {createRequire,syncBuiltinESMExports} from 'node:module';
+import test from 'node:test';
+import {podNoticeInputs,gradleNoticeInputs,unionNoticeInputs,inspectNoticeArchive,noticeInputStep,noticeFailureContext,podLinkedSources,podActualSelectors,sqlitePodSourceEvidence} from './native-notice-inputs.mjs';
+import {addKnownOwnNoticeFiles,assertPackagedNativeCoverage,assertSourceNoticePayload,digest,npmNoticeInputs,resolveNoticeCoverage,nativeSourceNotices,unreviewedOSSNoticeInputs,publicNoticeReport} from './app-notices.mjs';
+import {captureResolvedInputs,createNoticeSeal} from './capture-app-notices.mjs';
+const require=createRequire(import.meta.url),plist=require('@expo/plist');
+const mit=readFileSync(new URL('../node_modules/react-native/LICENSE',import.meta.url),'utf8');
+test('archive native hashing streams bounded bytes and preserves CRC, size and nonnative failure gates',()=>{
+ execFileSync('python3',[new URL('./notice-archive.test.py',import.meta.url).pathname],{stdio:['ignore','pipe','pipe'],timeout:30000});
+});
+const approval=(item,platform='ios')=>({schema:1,components:[{platform,component:item.id,reviewedVendors:item.vendors,nativeInputs:item.nativeInputs??{},notices:item.notices.map(({source,sha256})=>({source,sha256})),upstream:'https://example.invalid/pinned/native',sectionSHA256:digest([...item.notices].sort((a,b)=>a.source.localeCompare(b.source)).map(value=>value.body).join('\n\n'))}]});
+function fixture(run){
+ const root=mkdtempSync(join(tmpdir(),'puptime-native-notice-'));
+ const file=(path,body)=>{mkdirSync(join(root,path,'..'),{recursive:true});writeFileSync(join(root,path),typeof body==='string'||Buffer.isBuffer(body)?body:JSON.stringify(body));return join(root,path);};
+ try{return run({root,file});}finally{rmSync(root,{recursive:true,force:true});}
+}
+function sqliteSourceFixture(run){return fixture(({root,file})=>{
+ const prefix='node_modules/expo-sqlite',external={':path':'../'+prefix+'/ios'},lock={PODS:['ExpoSQLite (57.0.5)'],'EXTERNAL SOURCES':{ExpoSQLite:external}};
+ file(prefix+'/package.json',{name:'expo-sqlite',version:'57.0.5'});file(prefix+'/LICENSE','Synthetic own MIT fixture only\n');file(prefix+'/ios/ExpoSQLite.podspec','Synthetic source selector only\n');
+ file('package-lock.json',{packages:{[prefix]:{version:'57.0.5',resolved:'https://registry.npmjs.org/expo-sqlite/-/expo-sqlite-57.0.5.tgz',integrity:'sha512-WYBPXDL0WCMmGSvBgmCXk06yUS4p9GCXUP7CNZBjnb30ZLAuibhsOSzVGDTHcCfs+O/wEC6DNMkNDsw+0xKp7g=='}}});
+ for(const ext of ['c','h'])for(const folder of ['ios','vendor/sqlite3'])file(prefix+'/'+folder+'/sqlite3.'+ext,'Synthetic public-domain pair '+ext+'\n');
+ file(prefix+'/ios/NOTICE','Synthetic attribution fixture\n');file(prefix+'/ios/libsql.xcframework/Info.plist','Unreviewed synthetic vendor\n');file('ios/Podfile.properties.json',{});file('ios/Podfile.lock',lock);mkdirSync(join(root,'ios/Pods/Target Support Files'),{recursive:true});
+ return run({root,file,prefix,external,lock,direct:()=>sqlitePodSourceEvidence(root,join(root,prefix,'ios'),external,'a'.repeat(64)),capture:()=>podNoticeInputs(root)});
+});}
+test('SQLite .5 source observation survives actual Pod capture without attribution, seal or vendor inheritance',()=>sqliteSourceFixture(({root,prefix,capture})=>{
+ const provenance=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))),before=digest(JSON.stringify(provenance)),native=capture(),item=native.components[0],value=item.nativeInputs['cocoapods:ExpoSQLite'].sqliteSourceEvidence;
+ assert.equal(value.component,'cocoapods:ExpoSQLite@57.0.5');assert.equal(value.ownerNpmID,'npm:expo-sqlite@57.0.5');assert.equal(value.podLockSHA256,native.inputHashes.podLock);assert.equal(value.files.length,8);assert.equal(value.copiedPairMatches,true);assert.equal(value.discoveryOnly,true);assert.equal(value.compiledSelectionVerified,false);assert.equal(value.finalArtifactVerified,false);assert.deepEqual(value.options,{useSQLCipher:false,useLibSQL:false,withSQLiteVecExtension:false});
+ for(const entry of value.files){const body=readFileSync(join(root,entry.source));assert.deepEqual(Object.keys(entry),['source','bytes','sha256']);assert.equal(entry.bytes,body.length);assert.equal(entry.sha256,digest(body));}
+ assert.equal(item.nativeInputs['cocoapods:ExpoSQLite'].ownLicense,undefined);assert.ok(item.vendors.includes('libsql.xcframework'));
+ const coverage=resolveNoticeCoverage(native.components,provenance),report=publicNoticeReport({platform:'ios',sourceCommit:'a'.repeat(40),entry:'index.ts',lockSHA256:digest(readFileSync(join(root,'package-lock.json'))),coverage});
+ assert.equal(coverage.status,'INCOMPLETE');assert.equal(report.status,'INCOMPLETE');assert.equal(report.complete,false);assert.equal(report.discoveryOnly,true);assert.equal(report.components[0].nativeInputs['cocoapods:ExpoSQLite'].sqliteSourceEvidence,value);assert.equal(resolveNoticeCoverage([item],approval(item)).unresolved[0].reason,'missing-vendored-notice');
+ const exported=unreviewedOSSNoticeInputs([item],provenance);assert.ok(!JSON.stringify(exported).includes('Synthetic'));assert.equal(digest(JSON.stringify(provenance)),before);assert.ok(!JSON.stringify(value).includes(root));
+}));
+test('SQLite .5 source observation records changed copies and configured branches without inferring selected or licensed code',()=>sqliteSourceFixture(({root,file,prefix,direct})=>{
+ const original=direct();file(prefix+'/ios/sqlite3.c','Changed synthetic copy\n');let changed=direct();assert.equal(changed.copiedPairMatches,false);assert.notDeepEqual(changed.files,original.files);
+ file('ios/Podfile.properties.json',{'expo.sqlite.useSQLCipher':'true','expo.sqlite.useLibSQL':'true','expo.sqlite.withSQLiteVecExtension':'true','expo.sqlite.customBuildFlags':'PRIVATE_FLAGS','PRIVATE':'PRIVATE_VALUE'});changed=direct();assert.deepEqual(changed.options,{useSQLCipher:true,useLibSQL:true,withSQLiteVecExtension:true});assert.equal(changed.compiledSelectionVerified,false);assert.equal(changed.finalArtifactVerified,false);assert.ok(!JSON.stringify(changed).includes('PRIVATE')&&!JSON.stringify(changed).includes(root));
+}));
+test('SQLite .5 owner and licence bytes use the bounded descriptor capture without a prior package scan',()=>sqliteSourceFixture(({direct})=>{
+ const original=fs.readFileSync;
+ try{
+  fs.readFileSync=(path,...args)=>{assert.ok(!String(path).endsWith('/LICENSE'),'Owner source bypassed bounded capture');return original(path,...args);};syncBuiltinESMExports();
+  assert.equal(direct().ownerNpmID,'npm:expo-sqlite@57.0.5');
+ }finally{fs.readFileSync=original;syncBuiltinESMExports();}
+}));
+test('SQLite .5 source observation rejects foreign selection, owner or lock drift, missing, linked and oversized files',()=>sqliteSourceFixture(({root,file,prefix,external,direct})=>{
+ const rejects=(name,body)=>{const path=join(root,name),before=readFileSync(path);file(name,body);try{assert.throws(direct);}finally{file(name,before);}};
+ rejects(prefix+'/package.json',JSON.stringify({name:'private-owner',version:'57.0.5'}));rejects(prefix+'/package.json',JSON.stringify({name:'expo-sqlite',version:'57.0.4'}));
+ const lock=JSON.parse(readFileSync(join(root,'package-lock.json')));for(const patch of [{version:'57.0.4'},{resolved:'https://PRIVATE.invalid/'},{integrity:'PRIVATE'}])rejects('package-lock.json',JSON.stringify({...lock,packages:{[prefix]:{...lock.packages[prefix],...patch}}}));
+ for(const value of [{':podspec':'../'+prefix+'/ios/ExpoSQLite.podspec'},{...external,':git':'PRIVATE'},{':path':'../'+prefix}])assert.throws(()=>sqlitePodSourceEvidence(root,join(root,prefix,'ios'),value,'a'.repeat(64)));
+ rejects('ios/Podfile.properties.json',Buffer.from([0xff]));rejects(prefix+'/LICENSE',Buffer.alloc(1024*1024+1,120));rejects(prefix+'/ios/sqlite3.c',Buffer.alloc(16*1024*1024+1,120));
+ const path=join(root,prefix,'ios/sqlite3.h'),body=readFileSync(path);rmSync(path);assert.throws(direct);file(prefix+'/ios/sqlite3.h',body);const target=file(prefix+'/vendor/alternate.h',body);rmSync(path);symlinkSync(target,path);assert.throws(direct);rmSync(path);file(prefix+'/ios/sqlite3.h',body);
+}));
+const initialOwnComponents=new Set(['cocoapods:ExpoAppleAuthentication@57.0.2','cocoapods:ExpoFileSystem@57.0.7','cocoapods:ExpoAdapterGoogleSignIn@16.1.5']);
+function ownLicenseFixture(run,{batch=false}={}){return fixture(({root,file})=>{
+ const provenance={...JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))),components:[]},pins=provenance.knownLicenseSources.filter(value=>value.ownerNpmID&&value.component!=='cocoapods:Yoga@0.0.0'&&(batch?!initialOwnComponents.has(value.component):initialOwnComponents.has(value.component))),installed=JSON.parse(readFileSync(new URL('../package-lock.json',import.meta.url))),lock={PODS:[], 'EXTERNAL SOURCES':{}};
+ assert.equal(pins.length,batch?97:3);file('package-lock.json',{packages:Object.fromEntries(pins.map(pin=>[pin.packagePath,installed.packages[pin.packagePath]]))});mkdirSync(join(root,'ios/Pods/Target Support Files'),{recursive:true});
+ for(const pin of pins){const name=pin.component.slice('cocoapods:'.length,-pin.version.length-1);lock.PODS.push(name+' ('+pin.version+')');lock['EXTERNAL SOURCES'][name]={[':'+pin.sourceKind]:'../'+(pin.sourceKind==='path'?dirname(pin.podspecSource):pin.podspecSource)};for(const path of [pin.packageJSONSource,pin.podspecSource,pin.source])file(path,readFileSync(new URL('../'+path,import.meta.url)));file('ios/Pods/'+name+'/source.m','Synthetic alternate Pod root for source-form negatives');if(pin.sourceKind==='podspec')for(const arch of ['ios-arm64','ios-arm64_x86_64-simulator'])file('ios/Pods/'+name+'/'+name+'.xcframework/'+arch+'/'+name+'.framework/Info.plist','Synthetic framework source inventory');}
+ file('ios/Podfile.lock',lock);return run({root,file,pins,lock,provenance,capture:()=>podNoticeInputs(root).components});
+});}
+
+test('97 explicit RN and Expo own-package bindings resolve exact selected forms without component or vendor approval',()=>ownLicenseFixture(({root,pins,provenance,capture})=>{
+ const items=capture();assert.equal(items.length,97);assert.equal(new Set(pins.map(value=>value.ownerNpmID)).size,28);assert.equal(pins.filter(value=>value.sourceKind==='path').length,91);assert.equal(provenance.components.length,0);
+ for(const pin of pins){const item=items.find(value=>value.id===pin.component),bytes=readFileSync(new URL('../'+pin.source,import.meta.url));assert.ok(item);assert.equal(item.nativeInputs['cocoapods:'+item.name].ownLicense.ownerNpmID,pin.ownerNpmID);assert.ok(item.notices.some(notice=>notice.source===pin.source&&notice.sha256===pin.sha256&&Buffer.from(notice.body).equals(bytes)));assert.ok(!JSON.stringify(item).includes(root));}
+ const publicInput=unreviewedOSSNoticeInputs(items,provenance);assert.equal(publicInput.components.length,97);assert.equal(publicInput.complete,false);assert.equal(resolveNoticeCoverage(items,provenance).status,'INCOMPLETE');
+ const vendored=items.filter(item=>item.vendors.length);assert.equal(vendored.length,6);for(const item of vendored)assert.ok(resolveNoticeCoverage([item],approval(item)).unresolved.some(value=>value.reason==='missing-vendored-notice'));
+},{batch:true}));
+
+test('the explicit batch rejects changed spec, root, form, package version and licence bytes; unknown siblings gain no binding',()=>ownLicenseFixture(({file,pins,lock,capture})=>{
+ const selected=[pins.find(value=>value.ownerNpmID==='npm:react-native@0.86.3'&&value.sourceKind==='path'),pins.find(value=>value.ownerNpmID!=='npm:react-native@0.86.3'&&value.sourceKind==='path'),pins.find(value=>value.sourceKind==='podspec')];
+ const mutate=(path,bytes)=>{const before=readFileSync(path);writeFileSync(path,bytes);assert.throws(capture);writeFileSync(path,before);};
+ for(const pin of selected){const name=pin.component.slice('cocoapods:'.length,-pin.version.length-1);
+  for(const source of [pin.podspecSource,pin.source]){const path=file(source,readFileSync(new URL('../'+source,import.meta.url)));mutate(path,Buffer.concat([readFileSync(path),Buffer.from('\nChanged synthetic bytes')]));}
+  const pkgPath=file(pin.packageJSONSource,readFileSync(new URL('../'+pin.packageJSONSource,import.meta.url))),pkg=JSON.parse(readFileSync(pkgPath));mutate(pkgPath,JSON.stringify({...pkg,version:'999.0.0'}));
+  const alternate=pin.packagePath+'/alternate-pod-root';file(alternate+'/source.m','Synthetic adjacent source');for(const external of [{':path':'../'+alternate},{[pin.sourceKind==='path'?':podspec':':path']:'../'+(pin.sourceKind==='path'?pin.podspecSource:dirname(pin.podspecSource))}]){file('ios/Podfile.lock',{...lock,'EXTERNAL SOURCES':{...lock['EXTERNAL SOURCES'],[name]:external}});assert.throws(capture);}file('ios/Podfile.lock',lock);
+ }
+ const pin=selected[0],sibling='UnreviewedRNSibling';file('ios/Podfile.lock',{...lock,PODS:[...lock.PODS,sibling+' ('+pin.version+')'],'EXTERNAL SOURCES':{...lock['EXTERNAL SOURCES'],[sibling]:{':path':'../'+dirname(pin.podspecSource)}}});let item=capture().find(value=>value.name===sibling);assert.equal(item.nativeInputs['cocoapods:'+sibling].ownLicense,undefined);
+ const name=pin.component.slice('cocoapods:'.length,-pin.version.length-1);file('ios/Podfile.lock',{...lock,PODS:lock.PODS.map(value=>value===name+' ('+pin.version+')'?name+' (999.0.0)':value)});item=capture().find(value=>value.name===name);assert.equal(item.nativeInputs['cocoapods:'+name].ownLicense,undefined);
+},{batch:true}));
+
+test('three explicitly bound Pods retain exact own-package text without approving their vendor coverage',()=>ownLicenseFixture(({root,pins,provenance,capture})=>{
+ const items=capture();assert.equal(items.length,3);assert.equal(provenance.components.length,0);assert.equal(resolveNoticeCoverage(items,provenance).status,'INCOMPLETE');
+ for(const pin of pins){const item=items.find(value=>value.id===pin.component),bytes=readFileSync(new URL('../'+pin.source,import.meta.url));assert.equal(item.notices.length,1);assert.equal(item.notices[0].source,pin.source);assert.equal(item.notices[0].sha256,pin.sha256);assert.ok(Buffer.from(item.notices[0].body).equals(bytes));assert.equal(item.nativeInputs['cocoapods:'+item.name].ownLicense.ownerNpmID,pin.ownerNpmID);assert.ok(!JSON.stringify(item).includes(root));}
+ const filesystem=items.find(value=>value.name==='ExpoFileSystem');assert.equal(filesystem.vendors.length,3);assert.equal(resolveNoticeCoverage([filesystem],approval(filesystem)).unresolved[0].reason,'missing-vendored-notice');
+ const publicInput=unreviewedOSSNoticeInputs(items,provenance);assert.equal(publicInput.components.length,3);assert.equal(publicInput.complete,false);for(const value of publicInput.components)assert.equal(value.notices[0].body,items.find(item=>item.id===value.component).notices[0].body);
+}));
+
+for(const name of ['ExpoAppleAuthentication','ExpoFileSystem','ExpoAdapterGoogleSignIn'])test(`${name} own-license binding rejects changed bytes, owner and lock provenance`,()=>ownLicenseFixture(({root,file,pins,capture})=>{
+ const pin=pins.find(value=>value.component.startsWith('cocoapods:'+name+'@'));
+ const mutate=(path,bytes)=>{const before=readFileSync(join(root,path));file(path,bytes);assert.throws(capture);file(path,before);};
+ for(const path of [pin.packageJSONSource,pin.podspecSource,pin.source])mutate(path,Buffer.concat([readFileSync(join(root,path)),Buffer.from('\nPRIVATE_CHANGED_BYTES')]));
+ mutate(pin.source,Buffer.from([0xc3,0x28]));const pkg=JSON.parse(readFileSync(join(root,pin.packageJSONSource)));
+ for(const changed of [{...pkg,name:'private-other-owner'},{...pkg,version:'999.0.0'}])mutate(pin.packageJSONSource,JSON.stringify(changed));
+ const lock=JSON.parse(readFileSync(join(root,'package-lock.json')));for(const changed of [{version:'999.0.0'},{resolved:'https://example.invalid/PRIVATE'},{integrity:'PRIVATE_INTEGRITY'}])mutate('package-lock.json',JSON.stringify({...lock,packages:{...lock.packages,[pin.packagePath]:{...lock.packages[pin.packagePath],...changed}}}));
+ const outside=file('outside/LICENSE',readFileSync(join(root,pin.source)));rmSync(join(root,pin.source));symlinkSync(outside,join(root,pin.source));assert.throws(capture);rmSync(join(root,pin.source));
+}));
+
+test('own-license bindings reject source-form switches, extra selectors and wrong canonical Pod roots',()=>ownLicenseFixture(({root,file,pins,lock,capture})=>{
+ for(const pin of pins){const name=pin.component.slice('cocoapods:'.length,-pin.version.length-1),original=lock['EXTERNAL SOURCES'][name];
+  for(const changed of [{[pin.sourceKind==='path'?':podspec':':path']:'../'+(pin.sourceKind==='path'?pin.podspecSource:dirname(pin.podspecSource))},{...original,privateSelector:'PRIVATE_PATH'}]){file('ios/Podfile.lock',{...lock,'EXTERNAL SOURCES':{...lock['EXTERNAL SOURCES'],[name]:changed}});let failure;try{capture();}catch(error){failure=error;}assert.ok(failure);const safe=JSON.stringify(noticeFailureContext(failure));assert.ok(!safe.includes('PRIVATE')&&!safe.includes(root));}file('ios/Podfile.lock',lock);
+  if(pin.sourceKind==='path'){const wrong=pin.packagePath+'/wrong-pod-root';file(wrong+'/source.m','Synthetic adjacent source');file('ios/Podfile.lock',{...lock,'EXTERNAL SOURCES':{...lock['EXTERNAL SOURCES'],[name]:{':path':'../'+wrong}}});assert.throws(capture);file('ios/Podfile.lock',lock);}
+  else{const selected=join(root,'ios/Pods',name),outside=join(root,'outside-pod');renameSync(selected,outside);symlinkSync(outside,selected);assert.throws(capture);rmSync(selected);renameSync(outside,selected);}
+ }
+}));
+
+test('unknown sibling Pods and changed Pod versions never inherit an explicit package binding',()=>ownLicenseFixture(({file,pins,lock,capture})=>{
+ const pin=pins[0],sibling='UnboundSibling';file('ios/Podfile.lock',{...lock,PODS:[...lock.PODS,sibling+' ('+pin.version+')'],'EXTERNAL SOURCES':{...lock['EXTERNAL SOURCES'],[sibling]:{':path':'../'+dirname(pin.podspecSource)}}});assert.deepEqual(capture().find(value=>value.name===sibling).notices,[]);
+ for(const pin of pins){const name=pin.component.slice('cocoapods:'.length,-pin.version.length-1);file('ios/Podfile.lock',{...lock,PODS:lock.PODS.map(value=>value===name+' ('+pin.version+')'?name+' (999.0.0)':value)});assert.deepEqual(capture().find(value=>value.name===name).notices,[]);}file('ios/Podfile.lock',lock);
+}));
+
+test('resolved CocoaPods subspecs and actual generated plist text determine coverage; missing native inputs stay incomplete',()=>fixture(({root,file})=>{
+ assert.equal(podNoticeInputs(root).unresolved.length,1);
+ file('ios/Podfile.lock','PODS:\n  - QA/Core (1.2.3)\n  - QA/UI (1.2.3)\n  - Missing (4.5.6)\n');
+ file('ios/Pods/QA/NOTICE','A distinct vendored attribution\n');file('ios/Pods/QA/Dependency.xcframework/Info.plist','');
+ const text=plist.default.build;
+ file('ios/Pods/Target Support Files/Pods-Puptime/Pods-Puptime-acknowledgements.plist',text({PreferenceSpecifiers:[{Title:'Acknowledgements',FooterText:'Not a library'},{Title:'QA',FooterText:mit}]}));
+ const input=podNoticeInputs(root);assert.equal(input.components.length,2);
+ assert.ok(input.components.find(value=>value.name==='QA').notices.some(value=>value.body===mit));
+ assert.ok(input.components.find(value=>value.name==='QA').notices.some(value=>value.body==='A distinct vendored attribution\n'));
+ assert.deepEqual(input.components.find(value=>value.name==='QA').vendors,['Dependency.xcframework']);
+ assert.equal(input.components.find(value=>value.name==='Missing').notices.length,0);
+ assert.equal(resolveNoticeCoverage(input.components,{schema:1,components:[]}).status,'INCOMPLETE');
+}));
+
+test('actual AAR and nested JAR LICENSE plus NOTICE text are retained, with artifact digest and native-library provenance',()=>fixture(({root,file})=>{
+ const aar=join(root,'fixture.aar');
+ execFileSync('python3',['-c',`import io,zipfile,sys\nb=io.BytesIO()\nwith zipfile.ZipFile(b,'w') as z:z.writestr('META-INF/NOTICE','Nested attribution\\n')\nwith zipfile.ZipFile(sys.argv[1],'w') as z:\n z.writestr('META-INF/LICENSE',sys.argv[2]);z.writestr('classes.jar',b.getvalue());z.writestr('jni/arm64-v8a/libqa.so',b'\\x7fELFfixture')`,aar,mit]);
+ const input={schema:1,configuration:'releaseRuntimeClasspath',components:[{group:'qa',name:'native',version:'1.2.3',artifacts:[{file:aar,sha256:digest(readFileSync(aar))}]}]};
+ const path=file('private-gradle-input.json',input),read=gradleNoticeInputs(root,path);
+ assert.equal(read.components.length,1);assert.equal(read.components[0].notices.length,2);assert.equal(read.nativeFiles.length,1);
+ assert.ok(read.components[0].notices.some(value=>value.body===mit));assert.ok(read.components[0].notices.some(value=>value.body==='Nested attribution\n'));
+ assert.ok(!JSON.stringify(read).includes(root),'Public notice inputs must omit private artifact paths.');
+ input.components[0].artifacts[0].sha256='0'.repeat(64);file('private-gradle-input.json',input);assert.throws(()=>gradleNoticeInputs(root,path));
+}));
+
+test('real empty archive notices remain fingerprinted metadata, missing text and vendor review are never satisfied by them',()=>fixture(({root,file})=>{
+ const aar=join(root,'empty.aar'),input={schema:1,configuration:'releaseRuntimeClasspath',components:[{group:'qa',name:'empty',version:'1',artifacts:[]}]},path=join(root,'runtime.json');
+ const capture=(text=false,vendor=false,descriptor=false)=>{execFileSync('python3',['-c',`import zipfile,sys\nwith zipfile.ZipFile(sys.argv[1],'w') as z:\n z.writestr('third_party/vendor/LICENSE' if sys.argv[3]=='yes' else 'third_party_licenses.json' if sys.argv[4]=='yes' else 'third_party_licenses.txt',b'{}' if sys.argv[4]=='yes' else b'')\n if sys.argv[2]=='yes':z.writestr('LICENSE','Actual synthetic notice\\n')`,aar,text?'yes':'no',vendor?'yes':'no',descriptor?'yes':'no']);input.components[0].artifacts=[{file:aar,sha256:digest(readFileSync(aar))}];file('runtime.json',input);return gradleNoticeInputs(root,path).components[0];};
+ const empty=capture(),record={kind:'empty-bytes',source:'maven:qa:empty:1/empty.aar!third_party_licenses.txt',bytes:0,sha256:digest(''),crc32:'00000000'};assert.deepEqual(empty.notices,[]);assert.deepEqual(empty.nativeInputs,{noticeArchives:[{archiveSHA256:input.components[0].artifacts[0].sha256,nonTextNotices:[record]}]});assert.ok(!JSON.stringify(empty).includes(root));
+ assert.equal(resolveNoticeCoverage([empty],approval(empty,'android'),'android').unresolved[0].reason,'missing-notice-text');assert.equal(unreviewedOSSNoticeInputs([empty],{}).components.length,0);
+ const descriptor=capture(false,false,true);assert.deepEqual(descriptor.notices,[]);assert.deepEqual(descriptor.nativeInputs.noticeArchives[0].nonTextNotices[0],{kind:'empty-json-descriptor',source:'maven:qa:empty:1/empty.aar!third_party_licenses.json',bytes:2,sha256:digest('{}'),crc32:'a3a6bf43'});assert.equal(resolveNoticeCoverage([descriptor],approval(descriptor,'android'),'android').unresolved[0].reason,'missing-notice-text');
+ const actual=capture(true),reviewed=approval(actual,'android');assert.equal(actual.notices.length,1);assert.equal(resolveNoticeCoverage([actual],{schema:1,components:[]},'android').unresolved[0].reason,'unreviewed-component');assert.equal(resolveNoticeCoverage([actual],reviewed,'android').status,'READY');
+ for(const field of ['kind','source','bytes','sha256','crc32']){const changed=structuredClone(actual);changed.nativeInputs.noticeArchives[0].nonTextNotices[0][field]=field==='bytes'?1:'changed';assert.equal(resolveNoticeCoverage([changed],reviewed,'android').unresolved[0].reason,'native-source-digest-mismatch');}
+ const archiveDrift=structuredClone(actual);archiveDrift.nativeInputs.noticeArchives[0].archiveSHA256='changed';assert.equal(resolveNoticeCoverage([archiveDrift],reviewed,'android').unresolved[0].reason,'native-source-digest-mismatch');
+ for(const inputs of [{},{noticeArchives:[]},{noticeArchives:[{...actual.nativeInputs.noticeArchives[0],nonTextNotices:[]}]}]){const changed={...actual,nativeInputs:inputs};assert.equal(resolveNoticeCoverage([changed],reviewed,'android').unresolved[0].reason,'native-source-digest-mismatch');}
+ const vendored=capture(true,true);assert.deepEqual(vendored.vendors,['third_party/vendor/LICENSE']);assert.equal(resolveNoticeCoverage([vendored],approval(vendored,'android'),'android').unresolved[0].reason,'missing-vendored-notice');
+}));
+
+test('archive reader rejects duplicate/traversal input, and reads the exact final JSON resource without extraction',()=>fixture(({root})=>{
+ const path=join(root,'fixture.apk'),payload=JSON.stringify([{id:'qa',title:'QA',body:mit}])+'\n';
+ execFileSync('python3',['-c',`import zipfile,sys\nwith zipfile.ZipFile(sys.argv[1],'w') as z:z.writestr('assets/third_party_notices.json',sys.argv[2])`,path,payload]);
+ const result=inspectNoticeArchive(path,'assets/third_party_notices.json');assert.equal(result.payload.sha256,digest(payload));assert.equal(Buffer.from(result.payload.base64,'base64').toString(),payload);
+ for(const name of ['../private/LICENSE','/absolute/LICENSE','C:/private/LICENSE']){
+  execFileSync('python3',['-c',`import zipfile,sys\nwith zipfile.ZipFile(sys.argv[1],'w') as z:z.writestr(sys.argv[2],'text')`,path,name]);
+  assert.throws(()=>inspectNoticeArchive(path));
+ }
+ execFileSync('python3',['-W','ignore','-c',`import zipfile,sys\nwith zipfile.ZipFile(sys.argv[1],'w') as z:z.writestr('LICENSE','one');z.writestr('LICENSE','two')`,path]);
+ assert.throws(()=>inspectNoticeArchive(path));
+}));
+
+test('union of JS and autolinked native inputs cannot drop a NOTICE or accept conflicting bytes',()=>{
+ const base={id:'npm:qa@1',name:'qa',version:'1',ecosystem:'npm',vendors:[],notices:[{source:'node_modules/qa/LICENSE',sha256:digest(mit),body:mit}]};
+ const additional={...base,notices:[{source:'node_modules/qa/NOTICE',sha256:digest('extra'),body:'extra'}]};
+ assert.equal(unionNoticeInputs([base],[additional])[0].notices.length,2);
+ assert.throws(()=>unionNoticeInputs([base],[{...base,notices:[{...base.notices[0],sha256:'0'.repeat(64)}]}]));
+});
+
+test('autolinked Gradle inputs include nested native notices/vendors and bind source fingerprints without parent inheritance',()=>fixture(({root,file})=>{
+ file('package-lock.json',{packages:{'node_modules/qa':{version:'1'}}});file('node_modules/qa/package.json',{name:'qa',version:'1'});file('node_modules/qa/LICENSE',mit);
+ const build=file('node_modules/qa/android/build.gradle','// synthetic project\n');
+ file('node_modules/qa/android/src/main/cpp/NOTICE','Native subtree attribution\n');file('node_modules/qa/android/src/main/cpp/main.cpp','int original=1;');
+ file('node_modules/qa/android/.cxx-adjacent/source.cpp','int adjacent=1;');
+ file('node_modules/qa/android/third_party/child/child.cpp','int child=1;');
+ const input=file('gradle.json',{schema:1,configuration:'releaseRuntimeClasspath',components:[{projectBuildFile:build,projectBuildDirectory:join(root,'node_modules/qa/android/build'),projectCmakeStagingDirectory:join(root,'node_modules/qa/android/.cxx')}]});
+ const initial=gradleNoticeInputs(root,input).components[0];assert.ok(initial.notices.some(value=>value.body==='Native subtree attribution\n'));
+ assert.ok(initial.vendors.includes('android/third_party/child'));
+ const missing=approval(initial);missing.components[0].reviewedVendors=[];
+ assert.equal(resolveNoticeCoverage([initial],missing).unresolved[0].reason,'unreviewed-vendored-source');
+ assert.equal(resolveNoticeCoverage([initial],approval(initial)).unresolved[0].reason,'missing-vendored-notice');
+ file('node_modules/qa/android/third_party/child/LICENSE',mit);file('node_modules/qa/android/third_party/child/NOTICE','Child attribution\n');
+ const complete=gradleNoticeInputs(root,input).components[0],approved=approval(complete);
+ assert.equal(resolveNoticeCoverage([complete],approved).status,'READY');
+ file('node_modules/qa/android/build/generated/Unrelated.cpp','generated output');file('node_modules/qa/android/.cxx/Release/vendor/generated/no-license.cpp','generated CMake output');
+ assert.deepEqual(gradleNoticeInputs(root,input).components[0].nativeInputs,complete.nativeInputs);assert.equal(resolveNoticeCoverage(gradleNoticeInputs(root,input).components,approved).status,'READY');
+ assert.deepEqual(complete.nativeInputs['node_modules/qa/android'].excludedBuildPaths,['.cxx','build']);
+ file('node_modules/qa/android/.cxx-adjacent/source.cpp','int adjacent=2;');assert.equal(resolveNoticeCoverage(gradleNoticeInputs(root,input).components,approved).unresolved[0].reason,'native-source-digest-mismatch');file('node_modules/qa/android/.cxx-adjacent/source.cpp','int adjacent=1;');
+ file('node_modules/qa/android/src/main/cpp/main.cpp','int changed=2;');
+ assert.equal(resolveNoticeCoverage(gradleNoticeInputs(root,input).components,approved).unresolved[0].reason,'native-source-digest-mismatch');
+}));
+
+test('a custom AGP staging path does not exclude an unrelated directory merely named .cxx',()=>fixture(({root,file})=>{
+ file('package-lock.json',{packages:{'node_modules/qa':{version:'1'}}});file('node_modules/qa/package.json',{name:'qa',version:'1'});file('node_modules/qa/LICENSE',mit);
+ const build=file('node_modules/qa/android/build.gradle','// configured CMake staging\n');file('node_modules/qa/android/.cxx/source.cpp','int source=1;');
+ const input=file('gradle.json',{schema:1,configuration:'releaseRuntimeClasspath',components:[{projectBuildFile:build,projectCmakeStagingDirectory:join(root,'node_modules/qa/android/generated-cmake')}]});
+ const before=gradleNoticeInputs(root,input).components[0];file('node_modules/qa/android/generated-cmake/vendor/generated.cpp','generated');assert.deepEqual(gradleNoticeInputs(root,input).components[0].nativeInputs,before.nativeInputs);
+ file('node_modules/qa/android/.cxx/source.cpp','int source=2;');assert.notDeepEqual(gradleNoticeInputs(root,input).components[0].nativeInputs,before.nativeInputs);
+}));
+
+test('one stable union independently qualifies the same npm ID with different Android native inputs',()=>fixture(({root,file})=>{
+ file('package-lock.json',{packages:{'node_modules/qa':{version:'1'}}});file('node_modules/qa/package.json',{name:'qa',version:'1'});file('node_modules/qa/LICENSE',mit);
+ const js=file('node_modules/qa/index.js','module.exports=1;'),build=file('node_modules/qa/android/build.gradle','// native build\n');file('node_modules/qa/android/src/NOTICE','Android native notice\n');
+ const input=file('gradle.json',{schema:1,configuration:'releaseRuntimeClasspath',components:[{projectBuildFile:build}]});
+ const ios=npmNoticeInputs(root,[js])[0],android=gradleNoticeInputs(root,input).components[0];assert.equal(ios.id,android.id);assert.ok(android.notices.length>ios.notices.length);
+ const ledger={schema:1,components:[...approval(ios,'ios').components,...approval(android,'android').components]};
+ const iosCoverage=resolveNoticeCoverage([ios],ledger,'ios'),androidCoverage=resolveNoticeCoverage([android],ledger,'android');assert.equal(iosCoverage.status,'READY');assert.equal(androidCoverage.status,'READY');
+ assert.notEqual(iosCoverage.sections[0].id,androidCoverage.sections[0].id);
+ const font={id:'font',title:'Font',body:mit},fonts={notices:{font:digest(mit)},platforms:{font:['ios','android','web']}},payload=Buffer.from(JSON.stringify([font,...iosCoverage.sections,...androidCoverage.sections]));
+ assertSourceNoticePayload(payload,iosCoverage,ledger,fonts);assertSourceNoticePayload(payload,androidCoverage,ledger,fonts);
+ assert.equal(resolveNoticeCoverage([android],approval(ios,'ios'),'android').status,'INCOMPLETE');
+ assert.equal(resolveNoticeCoverage([android],approval(ios,'android'),'android').status,'INCOMPLETE');
+ assert.throws(()=>resolveNoticeCoverage([ios],{schema:1,components:[...ledger.components,ledger.components[1]]},'ios'));
+ assert.throws(()=>assertSourceNoticePayload(Buffer.from(JSON.stringify([font,...iosCoverage.sections])),iosCoverage,ledger,fonts));
+ const hidden=JSON.parse(payload);delete hidden[2].androidOnly;hidden[2].iosOnly=true;assert.throws(()=>assertSourceNoticePayload(Buffer.from(JSON.stringify(hidden)),androidCoverage,ledger,fonts));
+}));
+
+test('Pods use the same source-only vendor boundary rule and reject raw invalid UTF-8 notices/acknowledgements',()=>fixture(({root,file})=>{
+ file('ios/Podfile.lock','PODS:\n  - QA (1)\n');
+ const ack=plist.default.build({PreferenceSpecifiers:[{Title:'QA',FooterText:mit}]}),ackPath='ios/Pods/Target Support Files/Pods-Puptime/Pods-Puptime-acknowledgements.plist';file(ackPath,ack);
+ file('ios/Pods/QA/LICENSE',mit);file('ios/Pods/QA/vendor/child/file.cpp','int child=1;');
+ const initial=podNoticeInputs(root).components[0];assert.ok(initial.vendors.includes('vendor/child'));
+ const noReview=approval(initial);noReview.components[0].reviewedVendors=[];
+ assert.equal(resolveNoticeCoverage([initial],noReview).unresolved[0].reason,'unreviewed-vendored-source');
+ assert.equal(resolveNoticeCoverage([initial],approval(initial)).unresolved[0].reason,'missing-vendored-notice');
+ file('ios/Pods/QA/vendor/child/NOTICE','Actual child attribution\n');const complete=podNoticeInputs(root).components[0];assert.equal(resolveNoticeCoverage([complete],approval(complete)).status,'READY');
+ file('ios/Pods/QA/LICENSE',Buffer.from([0xff]));assert.throws(()=>podNoticeInputs(root),'Invalid source bytes must not be repaired into U+FFFD.');
+ file('ios/Pods/QA/LICENSE',mit);const bytes=Buffer.from(ack),at=bytes.indexOf('Copyright');assert.ok(at>0);file(ackPath,Buffer.concat([bytes.subarray(0,at),Buffer.from([0xff]),bytes.subarray(at+1)]));assert.throws(()=>podNoticeInputs(root));
+}));
+
+test('archive inventory includes extensionless main/appex Mach-O and unknown executables require coverage',()=>fixture(({root})=>{
+ const path=join(root,'fixture.ipa');
+ execFileSync('python3',['-c',`import zipfile,struct,sys\nfat=struct.pack('>II',0xcafebabe,2)+struct.pack('>IIIII',12,0,48,8,0)+struct.pack('>IIIII',7,0,56,8,0)+b'\\xcf\\xfa\\xed\\xfeabcd'*2\nwith zipfile.ZipFile(sys.argv[1],'w') as z:\n for name in ['Payload/Puptime.app/Puptime','Payload/Puptime.app/PlugIns/Unknown.appex/Unknown','Payload/Puptime.app/Frameworks/QA.framework/QA']:z.writestr(name,b'\\xcf\\xfa\\xed\\xfecontrolled')\n z.writestr('Payload/Puptime.app/fat-native',fat);z.writestr('Payload/Puptime.app/Qa.class',bytes.fromhex('cafebabe00000034000501000251410700010100106a6176612f6c616e672f4f626a6563740700030021000200040000000000000000'));z.writestr('Payload/Puptime.app/text','plain text')`,path]);
+ const result=inspectNoticeArchive(path);assert.equal(result.nativeFiles.length,4);assert.ok(!result.nativeFiles.some(value=>value.path.endsWith('.class')));
+ const component='native:qa@1',framework=result.nativeFiles.find(value=>value.path.includes('.framework/'));
+ const ledger={packagedNative:{ios:{[framework.path]:{components:[component],review:'https://example.invalid/pinned/native'}}}};
+ assert.throws(()=>assertPackagedNativeCoverage('ios',result.nativeFiles,[],{components:[{component}]},ledger),'Main and extension binaries cannot silently disappear from the inventory.');
+}));
+
+test('the exact raw JSON resource has its own 16 MiB bound and is not counted again as a generic 1 MiB notice',()=>fixture(({root})=>{
+ const path=join(root,'fixture.apk'),payload=join(root,'payload.json');
+ execFileSync('python3',['-c',`import json,zipfile,sys\nb=json.dumps([{'id':'large','title':'Large','body':'x'*(1024*1024+20)}]).encode();open(sys.argv[2],'wb').write(b)\nwith zipfile.ZipFile(sys.argv[1],'w') as z:z.writestr('assets/third_party_notices.json',b);z.writestr('META-INF/LICENSE','Actual small licence')`,path,payload]);
+ const result=inspectNoticeArchive(path,'assets/third_party_notices.json');assert.equal(result.payload.sha256,digest(readFileSync(payload)));assert.equal(result.notices.length,1);
+ execFileSync('python3',['-c',`import json,zipfile,sys\nwith zipfile.ZipFile(sys.argv[1],'w') as z:z.writestr('assets/third_party_notices.json',json.dumps([{'body':'x'*(17*1024*1024)}]))`,path]);
+ assert.throws(()=>inspectNoticeArchive(path,'assets/third_party_notices.json'));
+}));
+
+
+test('finite native failure context preserves the innermost operation without raw error or component text',()=>fixture(({root,file})=>{
+ file('ios/Podfile.lock','PODS:\n  - QA (1)\n');
+ file('ios/Pods/Target Support Files/Pods-QA/Pods-QA-acknowledgements.plist',plist.default.build({PreferenceSpecifiers:[]}));
+ file('ios/Pods/QA/LICENSE',Buffer.from([0xff]));
+ let failed;
+ try{noticeInputStep('native-inputs','ios',()=>podNoticeInputs(root));}catch(error){failed=error;}
+ assert.deepEqual(noticeFailureContext(failed),{operation:'pod-source-scan',component:'cocoapods',errorCategory:'invalid-utf8',componentSHA256:digest('cocoapods:QA@1')});
+ for(const code of ['ENOENT','EACCES','ERR_ASSERTION',undefined]){
+  try{noticeInputStep('pod-source-scan','cocoapods',()=>{throw Object.assign(new Error('constructor '+root+' SECRET_BODY ENV_SECRET'),{code,cause:{password:'SECRET_AUTH'}});},'PRIVATE_COMPONENT');}catch(error){
+   const text=JSON.stringify(noticeFailureContext(error));for(const secret of [root,'SECRET','PRIVATE_COMPONENT','constructor','cause','password'])assert.ok(!text.includes(secret));
+   assert.ok(['missing-input','unreadable-input','invalid-input','unsupported-input'].includes(noticeFailureContext(error).errorCategory));
+  }
+ }
+ try{noticeInputStep('source-path','metro',()=>{throw Object.assign(new TypeError('PRIVATE_MESSAGE'),{name:'PRIVATE_CLASS',code:'PRIVATE_CODE'});},undefined,'/PRIVATE_SOURCE');}catch(error){
+  const value=noticeFailureContext(error);assert.deepEqual(value,{operation:'source-path',component:'metro',errorCategory:'unsupported-input',errorClass:'TypeError',errorCode:'other',sourceSHA256:digest('/PRIVATE_SOURCE')});assert.ok(!JSON.stringify(value).includes('PRIVATE'));
+ }
+ assert.equal(noticeFailureContext(Object.assign(new Error('private'),{native:{operation:'arbitrary'}})),undefined);
+}));
+
+
+test('source diagnostics keep ReferenceError finite and snapshot changing or throwing Error fields once',()=>{
+ const capture=error=>{let caught;try{noticeInputStep('source-path','metro',()=>{throw error;},undefined,'/PRIVATE_SOURCE');}catch(value){caught=value;}assert.equal(caught,error);return noticeFailureContext(caught);};
+ const reference=Object.assign(new ReferenceError('PRIVATE_MESSAGE'),{name:'PRIVATE_CLASS',code:'PRIVATE_CODE',cause:{token:'PRIVATE_TOKEN'}});
+ const projected=capture(reference);assert.equal(projected.errorClass,'ReferenceError');assert.equal(projected.errorCode,'other');assert.ok(!JSON.stringify(projected).includes('PRIVATE'));
+ const reads={code:0,status:0,message:0},changing=new Error('PRIVATE_ORIGINAL');
+ Object.defineProperties(changing,{
+  code:{get(){return ++reads.code===1?'ERR_INVALID_ARG_TYPE':'PRIVATE_CHANGED_CODE';}},
+  status:{get(){reads.status++;return undefined;}},
+  message:{get(){reads.message++;return 'PRIVATE_CHANGED_MESSAGE';}},
+ });
+ const stable=capture(changing);assert.equal(stable.errorCode,'ERR_INVALID_ARG_TYPE');assert.deepEqual(reads,{code:1,status:1,message:1});assert.ok(!JSON.stringify(stable).includes('PRIVATE'));
+ for(const throwing of ['code','status','message']){
+  const counts={code:0,status:0,message:0},original=new Error('PRIVATE_ORIGINAL');
+  for(const field of Object.keys(counts))Object.defineProperty(original,field,{get(){counts[field]++;if(field===throwing)throw new ReferenceError('PRIVATE_GETTER_FAILURE');return field==='code'?'ERR_ASSERTION':field==='status'?23:'PRIVATE_MESSAGE';}});
+  const value=capture(original);assert.equal(value.errorCode,'other');assert.equal(value.errorCategory,'unsupported-input');assert.ok(!JSON.stringify(value).includes('PRIVATE'));
+  assert.equal(counts[throwing],1);assert.ok(Object.values(counts).every(count=>count<=1));
+ }
+});
+
+test('archive diagnostics preserve the original error and expose only fixed enums and verified hashes',()=>{
+ const hash=digest('SYNTHETIC_ARCHIVE'),id='maven:PRIVATE_GROUP:PRIVATE_MODULE@PRIVATE_VERSION',original=new Error('PRIVATE_MESSAGE'),reads={stdout:0,stderr:0,stack:0,status:0};
+ for(const key of ['stdout','stderr','stack'])Object.defineProperty(original,key,{get(){reads[key]++;throw new Error('PRIVATE_CHILD_OUTPUT');}});
+ Object.defineProperty(original,'status',{get(){return ++reads.status===1?7:'PRIVATE_CHANGED_STATUS';}});
+ let caught;try{noticeInputStep('native-inputs','android',()=>noticeInputStep('gradle-archive-scan','maven',()=>{throw original;},id,undefined,hash));}catch(error){caught=error;}
+ assert.equal(caught,original);assert.deepEqual(reads,{stdout:0,stderr:0,stack:0,status:1});assert.deepEqual(noticeFailureContext(caught),{operation:'gradle-archive-scan',component:'maven',errorCategory:'subprocess-failed',componentSHA256:digest(id),archiveSHA256:hash});assert.ok(!JSON.stringify(noticeFailureContext(caught)).includes('PRIVATE'));
+ for(const hashValue of [undefined,'PRIVATE_HASH',hash.toUpperCase(),{toString(){throw new Error('PRIVATE_COERCION');}}]){let invoked=false;assert.throws(()=>noticeInputStep('gradle-archive-scan','maven',()=>{invoked=true;},id,undefined,hashValue));assert.equal(invoked,false);}
+ for(const [operation,component,source] of [['pod-source-scan','cocoapods',undefined],['pod-source-scan','maven',undefined],['gradle-archive-scan','android',undefined],['gradle-archive-scan','maven','PRIVATE_PATH']])assert.throws(()=>noticeInputStep(operation,component,()=>{},id,source,hash));
+});
+
+test('actual Gradle archive inspection reports its verified component/archive hashes and keeps success and drift strict',()=>fixture(({root,file})=>{
+ const path=file('PRIVATE_ARCHIVE.aar','PRIVATE_NOT_A_ZIP'),hash=digest(readFileSync(path)),input={schema:1,configuration:'releaseRuntimeClasspath',components:[{group:'qa',name:'archive',version:'1',artifacts:[{file:path,sha256:hash}]}]},metadata=file('private-runtime.json',input);
+ let failure;try{noticeInputStep('native-inputs','android',()=>gradleNoticeInputs(root,metadata));}catch(error){failure=error;}
+ assert.equal(failure.status,1,'The original Python nonzero exit is preserved.');assert.deepEqual(noticeFailureContext(failure),{operation:'gradle-archive-scan',component:'maven',errorCategory:'subprocess-failed',componentSHA256:digest('maven:qa:archive@1'),archiveSHA256:hash});for(const secret of [root,'PRIVATE','Traceback','stderr','message'])assert.ok(!JSON.stringify(noticeFailureContext(failure)).includes(secret));
+ input.components[0].artifacts[0].sha256=digest('DIFFERENT_BYTES');file('private-runtime.json',input);let drift;try{noticeInputStep('native-inputs','android',()=>gradleNoticeInputs(root,metadata));}catch(error){drift=error;}assert.ok(drift.message.startsWith('Resolved artifact changed.'));assert.equal(noticeFailureContext(drift).operation,'native-inputs');assert.equal(noticeFailureContext(drift).archiveSHA256,undefined,'Unverified bytes cannot gain archive context.');
+ execFileSync('python3',['-c',"import zipfile,sys\nwith zipfile.ZipFile(sys.argv[1],'w') as z:z.writestr('META-INF/LICENSE','Actual synthetic notice\\n')",path]);const bytes=readFileSync(path);input.components[0].artifacts[0].sha256=digest(bytes);file('private-runtime.json',input);const result=gradleNoticeInputs(root,metadata);assert.equal(result.components[0].id,'maven:qa:archive@1');assert.deepEqual(result.components[0].notices,[{source:'maven:qa:archive:1/PRIVATE_ARCHIVE.aar!META-INF/LICENSE',sha256:digest('Actual synthetic notice\n'),body:'Actual synthetic notice\n'}]);assert.deepEqual(result.nativeFiles,[]);
+}));
+
+
+test('Pods follow only exact selected frameworks into the locked podspec package and still require vendor notices',()=>fixture(({root,file})=>{
+ const pkg='node_modules/qa-sdk',pod='ios/Pods/QA',list='ios/Pods/Target Support Files/QA/QA-xcframeworks-input-files.xcfilelist';
+ const lock={PODS:['QA (1)'],'EXTERNAL SOURCES':{QA:{':podspec':'../node_modules/qa-sdk/ios/QA.podspec'}}},packages={packages:{[pkg]:{version:'1'}}};
+ file('package-lock.json',packages);file(pkg+'/package.json',{name:'qa-sdk',version:'1'});file(pkg+'/LICENSE',mit);file(pkg+'/ios/QA.podspec','public synthetic podspec');file('ios/Podfile.lock',lock);
+ file('ios/Pods/Target Support Files/Pods-QA/Pods-QA-acknowledgements.plist',plist.default.build({PreferenceSpecifiers:[{Title:'QA',FooterText:mit}]}));file(pod+'/LICENSE',mit);
+ const target=pkg+'/prebuilds/spm-deps/Shared/debug/Shared.xcframework',binary=target+'/Shared',link=join(root,pod,'Shared.xcframework');file(binary,Buffer.from([0xcf,0xfa,0xed,0xfe,1]));symlinkSync(join(root,target),link);
+ const input='${PODS_ROOT}/Target Support Files/QA/QA-xcframeworks.sh\n${PODS_ROOT}/QA/Shared.xcframework\n';file(list,input);
+ const initial=podNoticeInputs(root).components[0],fingerprint=initial.nativeInputs['cocoapods:QA'];
+ assert.deepEqual(fingerprint.linkedSources,[{source:'Shared.xcframework',target,packagePath:pkg,component:'npm:qa-sdk@1'}]);assert.equal(fingerprint.frameworkInputList.sha256,digest(input));assert.equal(fingerprint.externalPodspec.component,'npm:qa-sdk@1');assert.equal(fingerprint.externalPodspec.sha256,digest('public synthetic podspec'));
+ assert.ok(!JSON.stringify(initial).includes(root));assert.ok(initial.vendors.includes('Shared.xcframework'));assert.deepEqual(initial.vendorNotices['Shared.xcframework'],[]);
+ assert.equal(resolveNoticeCoverage([initial],approval(initial)).unresolved[0].reason,'missing-vendored-notice','The owning package and Pod acknowledgement cannot license a separate vendor.');
+ file(target+'/LICENSE','Distinct vendor licence\n');const complete=podNoticeInputs(root).components[0],reviewed=approval(complete);assert.equal(resolveNoticeCoverage([complete],reviewed).status,'READY');
+ file(binary,Buffer.from([0xcf,0xfa,0xed,0xfe,2]));assert.equal(resolveNoticeCoverage(podNoticeInputs(root).components,reviewed).unresolved[0].reason,'native-source-digest-mismatch');file(binary,Buffer.from([0xcf,0xfa,0xed,0xfe,1]));
+ file(list,input+'\n');assert.equal(resolveNoticeCoverage(podNoticeInputs(root).components,reviewed).unresolved[0].reason,'native-source-digest-mismatch');file(list,input);
+ file(pkg+'/ios/QA.podspec','changed public synthetic podspec');assert.equal(resolveNoticeCoverage(podNoticeInputs(root).components,reviewed).unresolved[0].reason,'native-source-digest-mismatch');file(pkg+'/ios/QA.podspec','public synthetic podspec');
+ const descriptor=podLinkedSources(root,'QA',join(root,pod),lock['EXTERNAL SOURCES'].QA).linkedSources[0];
+ assert.throws(()=>nativeSourceNotices(root,join(root,pod),'cocoapods:QA'),'Undeclared boundary crossing is not generally accepted.');
+ const guarded=nativeSourceNotices(root,join(root,pod),'cocoapods:QA',{linkedSources:[{...descriptor,privateBody:'PRIVATE_BODY'}]});assert.ok(!JSON.stringify(guarded).includes('PRIVATE_BODY'));
+ for(const text of ['${PODS_ROOT}/QA/*.xcframework\n','${PODS_ROOT}/QA/Missing.xcframework\n','${PODS_ROOT}/QA/../Shared.xcframework\n']){file(list,text);assert.throws(()=>podLinkedSources(root,'QA',join(root,pod),lock['EXTERNAL SOURCES'].QA));}file(list,'${PODS_ROOT}/Target Support Files/QA/QA-xcframeworks.sh\n');assert.throws(()=>podNoticeInputs(root));file(list,input);
+ file('node_modules/other/package.json',{name:'other',version:'1'});file('node_modules/other/LICENSE',mit);file('node_modules/other/ios/Other.podspec','other');file('node_modules/other/Other.xcframework/Other','private');file('package-lock.json',{packages:{...packages.packages,'node_modules/other':{version:'1'}}});
+ rmSync(link);symlinkSync(join(root,'node_modules/other/Other.xcframework'),link);assert.throws(()=>podNoticeInputs(root),'A selected link cannot leave its exact podspec-owning package.');rmSync(link);symlinkSync(join(root,target),link);
+ file('ios/Podfile.lock',{...lock,'EXTERNAL SOURCES':{QA:{':podspec':'../node_modules/other/ios/Other.podspec'}}});assert.throws(()=>podNoticeInputs(root));file('ios/Podfile.lock',lock);
+ file(pkg+'/package.json',{name:'qa-sdk',version:'2'});assert.throws(()=>podNoticeInputs(root),'An installed owner differing from package-lock cannot qualify the link.');file(pkg+'/package.json',{name:'qa-sdk',version:'1'});
+ file(pkg+'/outside/NOTICE','Not inside the selected vendor root');symlinkSync(join(root,pkg,'outside'),join(root,target,'outside'));assert.throws(()=>podNoticeInputs(root),'Nested links cannot escape even into another part of the owner package.');
+}));
+
+test('only the two locked generated Pods admit their actual autolink/config/spec closure, without inheriting licences',()=>fixture(({root,file})=>{
+ const pins=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))).generatedPods,packages=[...pins.producerPackages,...pins.libraries],unique=[...new Map(packages.map(value=>[value.packagePath,value])).values()];
+ file('package.json',{name:'notice-fixture',version:'1'});file('package-lock.json',{packages:Object.fromEntries(unique.map(value=>[value.packagePath,{version:value.component.slice(value.component.lastIndexOf('@')+1)}]))});
+ for(const value of unique){file(value.packagePath+'/package.json',readFileSync(value.packagePath+'/package.json'));for(const notice of npmNoticeInputs(process.cwd(),[join(process.cwd(),value.packagePath,'package.json')])[0].notices)file(notice.source,notice.body);}
+ for(const value of pins.producerFiles)file(value.source,readFileSync(value.source));
+ for(const value of [...pins.producerTrees,...pins.coreSourceTrees,...pins.libraries.filter(value=>value.codegen)]){const target=value.source;mkdirSync(join(root,target),{recursive:true});cpSync(target,join(root,target),{recursive:true});for(const spec of value.podspecs??[])file(spec.source,readFileSync(spec.source));}
+ const names=['ReactAppDependencyProvider','ReactCodegen'],lock={PODS:names.map(name=>name+' (0.86.3)'),'EXTERNAL SOURCES':Object.fromEntries(names.map(name=>[name,{':path':'build/generated/ios/'+name}]))};file('ios/Podfile.lock',lock);mkdirSync(join(root,'ios/Pods/Target Support Files'),{recursive:true});
+ const metadata={root,reactNativePath:join(root,'node_modules/react-native'),dependencies:Object.fromEntries(pins.libraries.map(value=>[JSON.parse(readFileSync(value.packagePath+'/package.json')).name,{root:join(root,value.packagePath),platforms:{ios:{}}}])),project:{privateBody:'PRIVATE_EMAIL_AND_PATH'}};const metaPath='ios/build/generated/autolinking/autolinking.json';file(metaPath,metadata);
+ const provider='ios/build/generated/ios/ReactAppDependencyProvider',codegen='ios/build/generated/ios/ReactCodegen';
+ for(const [name,template] of Object.entries({'RCTAppDependencyProvider.h':'RCTAppDependencyProviderH.template','RCTAppDependencyProvider.mm':'RCTAppDependencyProviderMM.template','ReactAppDependencyProvider.podspec':'ReactAppDependencyProvider.podspec.template'})){let bytes=readFileSync('node_modules/react-native/scripts/codegen/templates/'+template);if(name.endsWith('.podspec'))bytes=Buffer.from(bytes.toString().replace('{react-native-version}','0.86.3').replace('{react-native-licence}','MIT'));file(provider+'/'+name,bytes);}
+ for(const name of ['ReactCodegen.podspec',...['RCTThirdPartyComponentsProvider','RCTModuleProviders','RCTModulesConformingToProtocolsProvider','RCTUnstableModulesRequiringMainQueueSetupProvider'].flatMap(value=>[value+'.h',value+'.mm'])])file(codegen+'/'+name,'Synthetic generated output; no native execution or licence approval.\n');
+ const capture=()=>podNoticeInputs(root).components,initial=capture();assert.equal(initial.length,2);
+ for(const item of initial){const value=item.nativeInputs['cocoapods:'+item.name].generated;assert.equal(value.libraries.length,9);assert.equal(value.libraries.filter(value=>value.codegen).length,7);assert.equal(resolveNoticeCoverage([item],approval(item)).unresolved[0].reason,'missing-vendored-notice');assert.ok(!JSON.stringify(item).includes(root)&&!JSON.stringify(item).includes('PRIVATE'));
+  if(item.name==='ReactCodegen'){file(codegen+'/RCTModuleProviders.h','Changed synthetic generated output');assert.notEqual(capture().find(v=>v.name===item.name).nativeInputs['cocoapods:ReactCodegen'].sha256,item.nativeInputs['cocoapods:ReactCodegen'].sha256);file(codegen+'/RCTModuleProviders.h','Synthetic generated output; no native execution or licence approval.\n');}
+ }
+ const rejects=()=>assert.throws(capture),mutate=(path,bytes)=>{const before=readFileSync(join(root,path));file(path,bytes);rejects();file(path,before);};
+ mutate(pins.producerFiles[0].source,'Changed generator bytes');mutate('node_modules/react-native/scripts/codegen/generate-artifacts-executor/index.js','Changed dispatcher');
+ const core=pins.coreSourceTrees[0].source,coreEntry=readdirSync(join(root,core),{recursive:true,withFileTypes:true}).find(value=>value.isFile());mutate(join(coreEntry.parentPath??coreEntry.path,coreEntry.name).slice(root.length+1),'Changed React Native core spec source');
+ mutate(pins.libraries.find(value=>value.codegen).podspecs[0].source,'Changed platform-selection podspec');
+ const source=pins.libraries.find(value=>value.codegen).source,entry=readdirSync(join(root,source),{recursive:true,withFileTypes:true}).find(value=>value.isFile());mutate(join(entry.parentPath??entry.path,entry.name).slice(root.length+1),'Changed selected spec input');
+ mutate(provider+'/RCTAppDependencyProvider.h','Modified provider');file(provider+'/unknown-output.h','unknown');rejects();rmSync(join(root,provider+'/unknown-output.h'));
+ const metaClone=()=>JSON.parse(JSON.stringify(metadata));
+ for(const change of [v=>delete v.dependencies.expo,v=>v.dependencies.unknown={root},v=>v.dependencies.expo.platforms.ios=null,v=>v.dependencies.expo.root=root,v=>v.root=join(root,'elsewhere')]){const v=metaClone();change(v);file(metaPath,v);rejects();}file(metaPath,metadata);
+ file('package.json',{name:'notice-fixture',codegenConfig:{jsSrcsDir:'src'}});rejects();file('package.json',{name:'notice-fixture',version:'1'});
+ const version=JSON.parse(JSON.stringify(lock));version.PODS[0]='ReactAppDependencyProvider (0.86.4)';file('ios/Podfile.lock',version);rejects();file('ios/Podfile.lock',lock);
+ mutate('node_modules/react-native/package.json',JSON.stringify({...JSON.parse(readFileSync('node_modules/react-native/package.json')),version:'0.86.4'}));
+ file('outside/private','PRIVATE_SOURCE');symlinkSync(join(root,'outside'),join(root,codegen,'escaping'));rejects();rmSync(join(root,codegen,'escaping'));
+ assert.throws(()=>nativeSourceNotices(root,join(root,codegen),'cocoapods:UnknownGenerated'));
+ assert.throws(()=>nativeSourceNotices(root,join(root,provider),'cocoapods:ReactCodegen'));
+ const absent=join(root,metaPath);rmSync(absent);rejects();file(metaPath,metadata);assert.equal(capture().length,2);
+}));
+
+test('the pinned RN selector uses actual autolinking metadata, with app config absent and core evidence kept separate',()=>fixture(({root,file})=>{
+ const pins=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))).generatedPods,utils=require('react-native/scripts/codegen/generate-artifacts-executor/utils.js');
+ const meta={root,reactNativePath:join(process.cwd(),'node_modules/react-native'),dependencies:Object.fromEntries(pins.libraries.map(value=>[JSON.parse(readFileSync(value.packagePath+'/package.json')).name,{root:join(process.cwd(),value.packagePath),platforms:{ios:{}}}]))};file('ios/build/generated/autolinking/autolinking.json',meta);
+ const log=console.log,warn=console.warn;let selected,config;
+ try{console.log=()=>{};console.warn=()=>{};config=utils.readReactNativeConfig(root,join(root,'ios'));selected=utils.findCodegenEnabledLibraries({name:'notice-fixture'},root,join(root,'ios'),config,{}).filter(value=>!utils.findDisabledLibrariesByPlatform(config,'ios').includes(value.name));}finally{console.log=log;console.warn=warn;}
+ assert.deepEqual(selected.map(value=>{const pkg=JSON.parse(readFileSync(join(value.libraryPath,'package.json')));return 'npm:'+pkg.name+'@'+pkg.version;}).sort(),pins.libraries.filter(value=>value.codegen).map(value=>value.component).sort());
+ assert.deepEqual(pins.coreSourceTrees.map(value=>value.source),['node_modules/react-native/src','node_modules/react-native/React/FBReactNativeSpec']);assert.ok(JSON.parse(readFileSync('node_modules/react-native/package.json')).codegenConfig.libraries.some(value=>value.name==='FBReactNativeSpec'));
+}));
+
+
+test('three Pod selectors expose only actual finite forms/owner matches/hashes and grant no attribution alone',()=>fixture(({root,file})=>{
+ const targets=[['ExpoRouter','57.0.28','expo-router','57.0.28','ios/ExpoRouter.podspec'],['ExpoUI','57.0.25','@expo/ui','57.0.25','ios/ExpoUI.podspec'],['Yoga','0.0.0','react-native','0.86.3','ReactCommon/yoga/Yoga.podspec']],versions=new Map(),external={};
+ for(const [name,version,npm,ownerVersion,spec] of targets){versions.set(name,version);file('node_modules/'+npm+'/package.json',{name:npm,version:ownerVersion});file('node_modules/'+npm+'/'+spec,'Public synthetic spec');external[name]={':path':'../node_modules/'+npm+'/'+dirname(spec)};}
+ const select=(values=external,current=versions)=>podActualSelectors(root,{'EXTERNAL SOURCES':values},current,'a'.repeat(64));
+ const good=select();assert.equal(good.length,3);for(const row of good){assert.equal(row.kind,'path');assert.equal(row.resolvedVersionMatches,true);assert.equal(row.canonicalOwnerMatches,true);assert.equal(row.selectedRelativePathMatches,true);assert.match(row.ownerPackageJSONSHA256,/^[a-f0-9]{64}$/);assert.match(row.selectedPodspecSHA256,/^[a-f0-9]{64}$/);assert.deepEqual(Object.keys(row),['component','resolvedVersionMatches','kind','canonicalOwnerMatches','selectedRelativePathMatches','podLockSHA256','ownerPackageJSONSHA256','selectedPodspecSHA256']);}
+ const yoga=external.Yoga;for(const [value,kind] of [[undefined,'missing'],[{':path':yoga[':path'],':podspec':'SECRET_LOCK'},'ambiguous'],[{':git':'https://SECRET.invalid'},'other'],[{':path':'/PRIVATE/FOREIGN/PATH'},'path'],[{':podspec':'../node_modules/react-native/ReactCommon/yoga/Yoga.podspec'},'podspec']]){const result=select({...external,Yoga:value}).find(row=>row.component==='cocoapods:Yoga@0.0.0');assert.equal(result.kind,kind);assert.equal(result.selectedRelativePathMatches,kind==='podspec');assert.ok(!JSON.stringify(result).includes('PRIVATE')&&!JSON.stringify(result).includes('SECRET')&&!JSON.stringify(result).includes(root));}
+ const newer=new Map(versions);newer.set('Yoga','UNKNOWN_PRIVATE_VERSION');const wrongVersion=select(external,newer).at(-1);assert.equal(wrongVersion.resolvedVersionMatches,false);assert.equal(wrongVersion.selectedPodspecSHA256,null);assert.ok(!JSON.stringify(wrongVersion).includes('UNKNOWN'));
+ file('node_modules/react-native/package.json',{name:'PRIVATE_FOREIGN_OWNER',version:'0.86.3'});const foreign=select().at(-1);assert.equal(foreign.canonicalOwnerMatches,false);assert.equal(foreign.ownerPackageJSONSHA256,null);assert.equal(foreign.selectedPodspecSHA256,null);assert.ok(!JSON.stringify(foreign).includes('PRIVATE'));
+}));
+
+function selectedOwnPodFixture(run){return fixture(({root,file})=>{
+ const provenance={...JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))),components:[]};provenance.knownLicenseSources=provenance.knownLicenseSources.slice(0,113);
+ const ids=['cocoapods:ExpoRouter@57.0.28','cocoapods:ExpoUI@57.0.25','cocoapods:Yoga@0.0.0'],pins=provenance.knownLicenseSources.filter(pin=>ids.includes(pin.component)),installed=JSON.parse(readFileSync(new URL('../package-lock.json',import.meta.url))),lock={PODS:[],'EXTERNAL SOURCES':{}};
+ assert.equal(pins.length,3);file('package-lock.json',{packages:Object.fromEntries(pins.map(pin=>{const own=pin.ownText??pin;return [own.packagePath,installed.packages[own.packagePath]];}))});mkdirSync(join(root,'ios/Pods/Target Support Files'),{recursive:true});
+ for(const pin of pins){const own=pin.ownText??pin,pod=own.pod??pin,name=pin.component.slice(10,-pin.version.length-1);lock.PODS.push(name+' ('+pin.version+')');lock['EXTERNAL SOURCES'][name]={':path':'../'+dirname(pod.podspecSource)};for(const path of [own.packageJSONSource,pod.podspecSource,pin.source])file(path,readFileSync(new URL('../'+path,import.meta.url)));file('ios/Pods/'+name+'/source.m','Synthetic alternate Pod root');}
+ file('ios/Podfile.lock',lock);
+ const native=()=>podNoticeInputs(root),capture=(ledger=provenance)=>addKnownOwnNoticeFiles(root,native().components,ledger);
+ return run({root,file,pins,lock,provenance,native,capture});
+});}
+
+test('three explicit Pod attributions bind live selectors and verbatim own text without granting coverage',()=>selectedOwnPodFixture(({root,pins,provenance,native,capture})=>{
+ const raw=native(),items=capture();assert.equal(provenance.knownLicenseSources.length,113);assert.deepEqual(provenance.components,[]);
+ for(const pin of pins){const item=items.find(value=>value.id===pin.component),selector=item.nativeInputs['cocoapods:'+item.name].actualSelector;assert.deepEqual(selector,raw.actualSelectors.find(value=>value.component===item.id));assert.equal(selector.podLockSHA256,raw.inputHashes.podLock);assert.equal(selector.kind,'path');assert.ok(item.notices.some(value=>value.source===pin.source&&value.sha256===pin.sha256&&Buffer.from(value.body).equals(readFileSync(join(root,pin.source)))));if(pin.ownText)assert.deepEqual(item.nativeInputs.ownAttribution.pod,pin.ownText.pod);else assert.equal(item.nativeInputs['cocoapods:'+item.name].ownLicense.ownerNpmID,pin.ownerNpmID);}
+ const review=unreviewedOSSNoticeInputs(items,provenance);assert.equal(review.components.length,3);assert.equal(review.complete,false);assert.ok(!JSON.stringify(review).includes(root));assert.equal(resolveNoticeCoverage(items,provenance).status,'INCOMPLETE');
+}));
+
+test('Pod own attribution rejects actual source form/root, owner, lock, spec and text drift on every capture',()=>selectedOwnPodFixture(({root,file,pins,lock,provenance,capture})=>{
+ const mutate=(path,body)=>{const original=readFileSync(join(root,path));file(path,body);assert.throws(capture);file(path,original);};
+ for(const pin of pins){const own=pin.ownText??pin,pod=own.pod??pin,name=pin.component.slice(10,-pin.version.length-1);
+  for(const path of [own.packageJSONSource,pod.podspecSource,pin.source])mutate(path,Buffer.concat([readFileSync(join(root,path)),Buffer.from('PRIVATE_CHANGED_BYTES')]));
+  const packageJSON=JSON.parse(readFileSync(join(root,own.packageJSONSource)));for(const delta of [{name:'PRIVATE_OTHER_OWNER'},{version:'999.0.0'}])mutate(own.packageJSONSource,JSON.stringify({...packageJSON,...delta}));
+  const npmLock=JSON.parse(readFileSync(join(root,'package-lock.json')));for(const field of ['version','resolved','integrity'])mutate('package-lock.json',JSON.stringify({...npmLock,packages:{...npmLock.packages,[own.packagePath]:{...npmLock.packages[own.packagePath],[field]:'PRIVATE_LOCK'}}}));
+  const alternate=own.packagePath+'/alternate';file(alternate+'/source.m','Synthetic adjacent source');
+  for(const selected of [{':podspec':'../'+pod.podspecSource},{':path':'../'+alternate},{...lock['EXTERNAL SOURCES'][name],':git':'PRIVATE_SELECTOR'}]){file('ios/Podfile.lock',{...lock,'EXTERNAL SOURCES':{...lock['EXTERNAL SOURCES'],[name]:selected}});assert.throws(capture);}file('ios/Podfile.lock',lock);
+  if(pin.ownText){for(const change of [p=>p.ownText.pod.sourceKind='podspec',p=>p.ownText.pod.podspecSHA256='a'.repeat(64),p=>p.ownText.ownerNpmID='npm:PRIVATE@1']){const changed=structuredClone(provenance);change(changed.knownLicenseSources.find(value=>value.component===pin.component));assert.throws(()=>capture(changed));}}
+ }
+}));
+
+test('unknown Pod siblings/versions gain no attribution and own text cannot clear a vendor boundary',()=>selectedOwnPodFixture(({file,pins,lock,provenance,capture})=>{
+ const pin=pins.find(value=>value.ownText),own=pin.ownText,name=pin.component.slice(10,-pin.version.length-1),source=dirname(own.pod.podspecSource),sibling='UnreviewedExpoSibling';file('ios/Podfile.lock',{...lock,PODS:[...lock.PODS,sibling+' ('+pin.version+')'],'EXTERNAL SOURCES':{...lock['EXTERNAL SOURCES'],[sibling]:{':path':'../'+source}}});const unknown=capture().find(value=>value.name===sibling);assert.deepEqual(unknown.notices,[]);assert.equal(unknown.nativeInputs.ownAttribution,undefined);assert.equal(unknown.nativeInputs['cocoapods:'+sibling].actualSelector,undefined);
+ file('ios/Podfile.lock',{...lock,PODS:lock.PODS.map(value=>value===name+' ('+pin.version+')'?name+' (999.0.0)':value)});const newer=capture().find(value=>value.name===name);assert.deepEqual(newer.notices,[]);assert.equal(newer.nativeInputs.ownAttribution,undefined);file('ios/Podfile.lock',lock);
+ file(source+'/Separate.xcframework/Info.plist','Synthetic separate vendor');const item=capture().find(value=>value.name===name);assert.equal(item.notices.length,1);assert.equal(resolveNoticeCoverage([item],approval(item)).unresolved[0].reason,'missing-vendored-notice');assert.deepEqual(provenance.components,[]);
+}));
+
+test('live Pod-lock selector provenance is fingerprinted and seal reinspection rejects drift',()=>selectedOwnPodFixture(({root,file,lock,provenance,capture})=>{
+ const git=(...args)=>execFileSync('git',['-c','core.hooksPath=/dev/null','-c','commit.gpgsign=false',...args],{cwd:root,stdio:['ignore','pipe','pipe']});
+ file('.gitignore','node_modules/\nbuild/\nios/Pods/\nios/Podfile.lock\n');file('package.json',{name:'synthetic-pod-notices',version:'1'});file('app.json',{expo:{plugins:[['expo-asset',{assets:['./assets/notices/third_party_notices.json']}]]}});file('scripts/font-icon-provenance.json',{notices:{},platforms:{},files:{}});const entry=file('index.ts','export const app=1;\n'),payload='assets/notices/third_party_notices.json';file(payload,'[]');
+ const items=capture(),approved={...provenance,components:items.map(item=>approval(item).components[0])};file('scripts/app-notice-provenance.json',approved);const recapture=()=>captureResolvedInputs(root,'ios',[entry,join(root,payload)]),coverage=recapture().coverage;assert.equal(coverage.status,'READY');file(payload,JSON.stringify(coverage.sections));git('init','--quiet');git('add','.');git('-c','user.name=Notice test','-c','user.email=notice-test@example.invalid','commit','--quiet','-m','Synthetic Pod notice source');
+ const initial=recapture(),seal=createNoticeSeal(root,'ios',initial);assert.equal(seal.complete,true);assert.equal(seal.inputHashes.podLock,initial.native.inputHashes.podLock);assert.ok(!JSON.stringify(seal).includes(root));
+ file('ios/Podfile.lock',{...lock,COCOAPODS:'Synthetic changed lock input'});const drift=recapture();assert.notEqual(drift.native.inputHashes.podLock,initial.native.inputHashes.podLock);assert.equal(drift.coverage.status,'INCOMPLETE');assert.ok(drift.coverage.unresolved.every(value=>value.reason==='native-source-digest-mismatch'));assert.throws(()=>createNoticeSeal(root,'ios',drift));
+ file('ios/Podfile.lock',lock);assert.deepEqual(createNoticeSeal(root,'ios',recapture()),seal);assert.deepEqual(provenance.components,[]);
+}));

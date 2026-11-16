@@ -1,0 +1,513 @@
+# App notice capture and final-artifact gate
+
+This is incomplete build preparation. The source JSON currently contains the
+reviewed font/icon notices only. Attribution reviews cover 121 exact iOS inputs;
+remaining component review and the incomplete payload prevent sealing.
+Source tests, an internal simulator build, and finding licence filenames
+do not establish complete app-library notice coverage or store readiness.
+
+The own-package source records additionally bind 97 selected RN/Expo Pods to
+28 exact public NPM owners. Package, podspec and original MIT text hashes match
+lock-integrity-verified published tarballs; each reviewed podspec reads its own
+package licence. The 91 literal directory/6 exact podspec forms use the existing
+strict binding helper. These records preserve own-package attribution only.
+The additional six npm and three Pod own-text records below do not approve
+component coverage. Metro prelude and every vendor/generated boundary remain
+independently unresolved. The offline payload is unchanged.
+
+The first component batch is iOS-only: `@react-native/assets-registry`,
+`js-polyfills`, `normalize-colors` and `virtualized-lists` at 0.86.3, plus
+`qrcode-generator` at 2.0.4. Their exact captured `ownAttribution` fingerprints
+and original MIT notices match discovery 43682437095 at source82cede4. All 20 selected
+JS files matched installed bytes and exact SHA512-pinned cached official tar
+members. None has a selected generated source, vendor boundary or extra native
+input. These five records grant no Android, vendor, generated, native-binary or
+retained-resource approval.
+
+The next fifteen explicit npm records cover the listed React/runtime/polyfill
+support packages, with original package LICENSE files and exact registry
+tarball/SRI public-source pins. All 63 selected files matched the qualified
+capture, installed bytes and official cached tar members. Root-agent source
+review read the twelve new distinct MIT texts; React/scheduler reuse the exact
+previously reviewed Meta text. A package's MIT label alone grants no approval.
+No generic MIT or sibling allowlist is used.
+
+One additional iOS record covers only `ExpoFileSystem@57.0.7` and its three exact
+own-product xcframework/slice boundaries, mapped to that package's original
+LICENSE. The selected 63-file source/product fingerprint and published inputs
+are pinned. External React/Hermes/framework dependencies gain no attribution.
+Three additional iOS records cover only `ExpoFont@57.0.4`,
+`ExpoModulesCore@57.0.18` and `ExpoModulesWorklets@57.0.18`, with nine exact
+own-product wrapper/slice mappings to the same owning package's original Expo
+MIT text. Exact published npm inputs, six product archives and all 277 selected
+public files reproduce the three captured native fingerprints. React, Hermes,
+JSI, React Native dependencies and system frameworks are excluded from these
+mappings; no generic inheritance is allowed.
+
+Twenty-five further exact npm records cover only their captured Expo JavaScript
+notice sets. Root-agent review matched all 267 selected non-generated JS files,
+package manifests and complete original notices to official cached tar/SRI
+inputs and installed bytes. Twenty-four reuse the original Expo MIT text; Speech
+Recognition preserves the distinct original 2024 jamsch MIT notice. Same-name
+native Pods, vendors and generated inputs remain separate. The 24 new public text pins
+name exact component/version/source/hash and official registry tar/SRI. The
+existing identical Expo SDK-57 public tuple is reused unchanged; its component
+record names the approved official tar, with the fresh SRI proof retained in
+source-review evidence.
+No generic MIT allowlist or name-based native inheritance is permitted.
+
+Twenty-five exact React Native 0.86.3 source-Pod records cover their selected
+`ReactCommon/react` trees. Whole official npm tar/SRI, package, podspec and
+original Meta MIT bytes were verified. Every own podspec reads its licence from
+the same pinned package JSON. All 357 captured file entries (338 unique files)
+match published and installed source; public tree projections and the unchanged
+native-source scanner reproduce all 25 qualified82 fingerprints. Existing public
+text pins are reused; no new text, native vendor or generated input is approved.
+Dependencies and expanded transitive compile/link inputs remain separate.
+
+Twenty more exact npm records cover only 210 captured, non-generated JavaScript
+files and their complete original notices. Root-agent source review verified
+package ownership, whole official tar/SRI, package manifests, selected member
+hashes and installed bytes. All eighteen distinct licence bodies were read in
+full: seventeen components use MIT, two ISC and one BSD-3-Clause. Twenty exact
+npm public-origin selectors are appended; all previous 74 component records and
+152 text pins remain unchanged, including the existing nonpublic Better Auth
+hash selector. Equal text hashes reuse original bytes without component or
+platform inheritance.
+
+One further iOS npm record covers only `posthog-react-native@4.84.1` and its 58
+captured JavaScript files. The unchanged source maps each identify one owning
+`packages/react-native/src` origin; imported modules remain separate. The full
+21,550-byte original notice is preserved, including its general PostHog/Mixpanel
+Apache-2.0 text and all eight expressly scoped sections for core, TraceKit,
+UUIDv7, Sentry, Metro, Expo and AgentCat. No single normalized package licence
+expression is assigned. One public npm selector is appended, leaving all prior
+94 records and 172 pins, including the nonpublic PostHog hash/note, unchanged.
+The separately captured `@posthog/core@1.61.0` and its `dist/vendor` boundary
+gain no review from this record or from sharing the same complete notice body.
+
+One iOS-only `react-native-android-widget@0.22.1` record covers the 22 captured
+source files on the explicitly selected clean iOS basis. Exact source members,
+package manifest and complete original MIT text match the official locked tar
+and two isolated clean iOS dependency copies and their manifests. The original
+1,093-byte notice retains all twenty CRLF sequences and the 2022 Stefan
+Aleksovski copyright. One public selector is appended; all prior 95 records,
+173 text pins and other ledger fields remain unchanged. There are now 174 total
+text pins, including the historical nonpublic selectors.
+
+This source review uses the official/captured `AndroidWidget.ts` preimage
+`3f4c432d…`. The tracked Android prebuild mod adds a separate 53-byte no-op
+method and produces `47c7f4e8…`; that modified Android source and the archive's
+41 native members remain outside this iOS review. Candidate source fingerprints
+still require separate qualification. No dependency copy, reset, prebuild or
+helper policy change is part of this append.
+
+Twenty-four more React Native 0.86.3 source-Pod records cover their exact captured
+own-source roots, with 169 file entries and 165 unique public files. All selected
+bytes match official cached members and installed source; the unchanged native
+scanner reproduces every recorded fingerprint. Each selected podspec reads its
+own pinned package JSON for the licence. The complete 1,088-byte original Meta MIT
+body is preserved and the 24 existing public selectors are reused. All previous
+96 component records, 174 total text pins and other ledger fields stay unchanged.
+Only these exact iOS source inputs are reviewed. The Hermes glue, six already
+published MIT plugin declarations marked generated, and imported interfaces do
+not approve Hermes engine/frameworks, generator outputs, dependencies or siblings.
+
+One additional iOS record covers the whole seven-file `React-jserrorhandler`
+0.86.3 source root without narrowing its native fingerprint. React Native's
+original import pins the stacktrace-parser source and fixtures; its parser
+retains TraceKit-derived code. The existing supplemental-notice helper preserves
+four complete original forms: the captured 1,088-byte Meta MIT, the 1,076-byte
+Georg Tavonius MIT, and both distinct TraceKit MIT forms (1,158 and 1,197 bytes).
+The README form retains original Andrey Tarantsov and all-contributors credit.
+The unchanged borrowed TraceKit function was matched to the pinned current
+source; the historical revision selection is temporal inference, not a
+maintainer-pinned import. Three exact component/source/hash public selectors
+and three verbatim supplemental copies are appended. The prior 120 component
+records, 174 total pins and other ledger fields stay unchanged; there are now
+177 total pins. Equal text grants no npm, sibling, vendor or Android inheritance.
+
+The whole `React-RCTBlob` source-Pod root remains held. It contains references
+to a Stack Overflow UUID solution, a URL-regex gist and a whatwg-url subset
+whose complete original attribution scopes need separate review. Its root and
+fingerprint have not been narrowed, and existing public text pins grant no
+component approval.
+
+Four earlier npm candidates remain held: `@expo/cli` has generated virtual sources;
+Gesture Handler, Reanimated and Zod have explicit copied-code attribution to
+resolve. No related native Pod is approved by these npm records.
+
+Against the qualified82 inventory, 82 components plus one generated source
+remain unreviewed. Of 109 recorded vendor boundaries, only the twelve specific
+own-product boundaries above are reviewed; the other 97 remain held. No new
+discovery, Android, packaged-native, retained-resource, payload or sealing
+approval is implied.
+
+## Stable offline resource
+
+`assets/notices/third_party_notices.json` is a **committed platform union** of
+plain `{id,title,body,androidOnly?,iosOnly?}` sections. The existing offline
+Settings view imports this exact file. Its current font/icon labels remain until
+actual library text is reviewed and added. Preserve all six existing sections.
+
+The existing `expo-asset` plugin also bundles those unmodified bytes. Expected
+paths are APK `assets/third_party_notices.json`, AAB
+`base/assets/third_party_notices.json`, and IPA
+`Payload/Puptime.app/third_party_notices.json`. The small duplicate resource avoids
+custom Hermes parsing. No tool rewrites source JSON, a generated native resource,
+or a signed package. This asset/config change requires a new matching native host
+and final package qualification; an older host is not equivalent.
+
+## Commands and failure behavior
+
+Run from the canonical project root, in the same production environment as its
+normal bundle. `index.ts`, production Hermes transform settings and the pinned
+Expo `createMetroServerAndBundleRequestAsync` implementation are reused. The graph
+pass emits no JS/Hermes bundle or native compilation. Its temporary server is
+closed in `finally` and on SIGINT/SIGTERM; it never creates a device. A private
+cache directory plus `EXPO_NO_METRO_WORKSPACE_ROOT=1` isolates worktree resolution.
+
+```sh
+# After normal pod install; discovery only, never a release certificate.
+node scripts/capture-app-notices.mjs collect ios
+
+# After normal Android prebuild; resolve inputs without compiling.
+# The raw Gradle input contains local cache paths: keep it private.
+umask 077
+mkdir -p build/notices/android/private
+(cd android && ./gradlew -I ../scripts/notices-runtime.init.gradle \
+  :app:writeNoticeRuntimeInputs --no-daemon \
+  -PnoticeMainProjectRoot="$PWD" \
+  -PnoticeInputsOutput="$PWD/../build/notices/android/private/runtime-inputs.json")
+node scripts/capture-app-notices.mjs collect android \
+  --gradle-input build/notices/android/private/runtime-inputs.json
+
+# Candidate gate, after reviewing/committing the union and ledger, before compile.
+node scripts/capture-app-notices.mjs seal android \
+  --gradle-input build/notices/android/private/runtime-inputs.json
+
+# After the ordinary single Gradle build; repeat verify for the AAB.
+node scripts/capture-app-notices.mjs verify android \
+  --gradle-input build/notices/android/private/runtime-inputs.json \
+  --archive android/app/build/outputs/apk/release/app-release.apk \
+  --bundle android/app/build/generated/assets/react/release/index.android.bundle \
+  --source-map android/app/build/generated/sourcemaps/react/release/index.android.bundle.map
+```
+
+`collect` writes `build/notices/<platform>/discovery.json`, always
+`status: INCOMPLETE`, `complete: false`, `discoveryOnly: true`. Even fully mapped
+discovery inputs are not certified. It produces neither a payload nor a seal.
+Unexpected graph/source/archive errors still fail the command. `failure.json`
+may add a `native` object containing fixed operation/component/category enums and
+an optional SHA-256 component identifier. Source-graph failures additionally use
+closed Error class/code enums and a SHA-256 of the supplied source string; no
+source path or filename is included. It never includes raw errors, messages,
+causes, paths, notice bodies or environment values. The most specific failing
+Pod operation survives outer graph/union context. No bound is raised on failure.
+
+Gradle archive inspection failures use the fixed `gradle-archive-scan`/`maven`
+context with the existing canonical component ID's SHA and the archive SHA
+already verified against its bytes. This wraps only the original Python call;
+its invocation, strict exit and exception remain unchanged. Child output
+and paths are not copied into this context.
+
+Native archive entries have a separate 192 MiB cap and SHA-256 is streamed in
+1 MiB chunks through ZIP EOF/CRC validation, requiring the declared byte count.
+Text (1 MiB each/16 MiB total), payload (16 MiB), bundle and nested JAR (128 MiB)
+bounds remain unchanged. The exact public React Android 0.86.3 release AAR
+(`59b66e453d8775a54df66a321c0d5002b98716d68c4bd9edb8e64d7110ff8d28`)
+has 32 native entries; its largest is 140,693,272 bytes, above the previous
+128 MiB shared bound. This establishes the scoped size failure, not complete
+notice coverage or a qualified app artifact.
+
+`CAFEBABE` also identifies JVM class bytes. After valid universal-native tables
+are checked first, the reader recognizes JVM structure independently of the
+filename: known version/pool tags and references, member and attribute framing,
+and exact EOF/CRC within the existing 128 MiB nested-input bound. It does not
+execute or semantically verify bytecode. Malformed or unknown ambiguous inputs
+still fail. The pinned [Kotlin producer](https://github.com/Kotlin/kotlinx.coroutines/blob/1.10.2/kotlinx-coroutines-core/jvm/src/debug/internal/AgentPremain.kt#L40)
+uses `DebugProbesKt.bin` as class bytes; this is a format distinction, not an
+archive-member exclusion or a notice-coverage approval.
+
+Non-text notice inputs use one `nonTextNotices` record shape: closed kind,
+logical source, declared bytes, exact SHA-256 and verified ZIP CRC, without body
+text. Kinds are `empty-bytes` and `empty-json-descriptor`; the latter recognizes
+only matched `.json` inputs whose valid UTF-8 JSON is an empty object or array.
+Other JSON and non-JSON candidates retain their existing behavior. Neither kind
+enters the text list or resource-coverage map. Maven component `nativeInputs`
+binds these records in `noticeArchives` with the verified source archive hash;
+a changed or dropped record invalidates its review. A component without text remains
+`missing-notice-text`, even with a ledger entry. Other text and vendored sources
+still require the normal explicit review. Final evidence retains non-text records
+separately; neither an empty file nor descriptor satisfies a required text resource.
+Nonempty invalid text and all existing archive/size limits remain strict.
+
+The Gradle init script requires an explicit absolute `noticeMainProjectRoot` and
+compares canonical project directories before registering its task. Other
+included builds are skipped; a missing `:app` on the selected root still fails.
+Android discovery setup uses a best-effort ERR trap to call the existing CLI's
+`setup-failure android --phase prebuild|gradle-resolution` mode. This writes only
+`stage:setup` and fixed phase/`command-failed` fields to the same `failure.json`.
+It neither interprets raw command output nor guesses the cause. The trap always
+exits with the original nonzero setup status, including if metadata writing
+fails. The fixed metadata upload remains separate from public notice bodies.
+If reached, the existing Gradle collector adds only a fixed root-binding,
+task-registration, runtime-resolution or artifact-collection phase and a closed
+public/base Throwable class. A standard `getCause()` chain includes at most eight
+entries, starting with the thrown object; each contains only that closed class
+enum and the SHA-256 of its fully qualified class name. Identity cycles, the
+eight-entry limit and throwing cause getters have fixed termination labels.
+Gradle 9.3.1's [multi-cause implementation](https://github.com/gradle/gradle/blob/v9.3.1/platforms/core-runtime/stdlib-java-extensions/src/main/java/org/gradle/internal/exceptions/DefaultMultiCauseException.java#L111)
+exposes only the first cause through `getCause()`, so this does not enumerate all
+resolution failures or prove a root cause. It reads no raw class name into the
+report, exception message or stack and always rethrows the same Throwable; a
+failed/outside-workspace metadata write is ignored.
+Only the observed exact Gradle 9.3.1 `ArtifactSelectionException` can add optional
+selection metadata: failure-class SHA, a fixed module/main-project kind and a
+component SHA. Module identity is `maven:group:module@version`; main-project
+identity is `gradle-project:` plus its build path, `:` and project path, after
+checking the actual main root/project binding. Getters are contained; unknown,
+unreadable or competing leaves omit this context. No display name, attribute,
+variant, message or raw coordinate is emitted. This identifies a failure family
+and component fingerprint, not a successful resolution or a demonstrated cause.
+The shell writer retains this context only after exact schema, source and enum
+validation, then reconstructs the finite report. Failures before these callbacks
+or during other Gradle/plugin configuration still have only the generic setup
+phase; absence of collector context is not evidence the collector caused them.
+No listener, service, configuration-cache setting, resolution or task gate is added.
+
+This uses Gradle's public [root project](https://docs.gradle.org/current/javadoc/org/gradle/api/invocation/Gradle.html#getRootProject())
+and [project directory](https://docs.gradle.org/current/javadoc/org/gradle/api/Project.html#getProjectDir()) APIs.
+The source-only root guard regression executes this actual init script through
+`groovy.ui.GroovyMain scripts/notices-runtime-root.test.groovy scripts/notices-runtime.init.gradle`
+with the installed Gradle distribution's `lib/*` and `lib/plugins/*` on the Java classpath. It stubs
+Gradle callbacks/task registration only; it starts no build or resolver.
+
+Reports expose
+relative source names, versions, hashes and finite unresolved reasons, not cache
+paths, licence source bodies, raw maps, environment values or application data.
+
+`seal` first retains that discovery report, then fails unless actual Metro and
+native inputs are complete, all vendors/text are reviewed, font pins match, the
+payload/ledger/package manifest/lock/app config/relevant source files equal Git
+HEAD in the canonical checkout root, and the view imports the same
+resource. A passing `seal.json` records that exact source/lock/native-input graph.
+All tracked working-tree content must equal HEAD, including build configuration
+outside the selected graph; ignored generated native/build outputs are permitted.
+Missing input metadata or a font-only placeholder cannot pass. A failed seal
+removes previous seal/final receipts. There is no generation or fallback mode.
+
+`verify` revalidates the same source, native inputs and committed payload, then
+requires the packaged raw JSON to match byte for byte. It compares the packaged
+bundle hash with the mapped build output and requires the final composed map's
+source contents to equal captured source bytes. Observed component IDs come from
+those actual map entries and mapped archive-native entries, not the expected
+coverage list. Code resolved from another
+checkout, stale embedded source text, new modules and unmapped native files fail.
+Missing asset-only packages and extra modules also fail. Only the current
+worktree and its explicitly identified installed `node_modules`
+root are accepted, with realpaths normalized. Raw source maps stay private.
+
+Native stripping may change a `.so` hash. Final Android ABI/library names are
+bound to the verified source AAR's actual libraries; final hashes are recorded
+separately. Additional generated/NDK/Swift/framework inputs need explicit reviewed
+component mappings in the ledger. Nothing is silently called app-owned. All nine
+previously shipped Android LICENSE/NOTICE resources must retain their bytes.
+The archive reader inspects Mach-O magic for every regular entry, including
+extensionless main/appex executables. The exact JSON resource has its own 16 MiB
+limit and is excluded from generic 1 MiB notice-file classification.
+Universal headers are distinguished from Java class files sharing `CAFEBABE`
+using bounded architecture-table offsets/sizes. Format references are Apple's
+[fat header](https://github.com/apple-oss-distributions/cctools/blob/main/include/mach-o/fat.h)
+and [JVMS 4.1](https://docs.oracle.com/javase/specs/jvms/se25/html/jvms-4.html#jvms-4.1).
+
+Java/static-native ownership cannot be independently recovered from DEX/static
+linked bytes here. Actual resolved Pod/Gradle inputs are re-inspected after
+packaging; IDs supported only by those inputs are separately listed under
+`resolvedBuildOnly` with their basis. Locked generated Metro providers are also
+explicit. Receipts record `independentFinalComponentInventory: false` and do not
+claim a newly regenerated Gradle resolution. Unknown/missing component IDs still
+fail; no generic omission waiver or independent native final-byte identity is
+implied by the complete *notice coverage* check.
+
+For an IPA, use `seal ios` after pod setup, set `SOURCEMAP_FILE` to a private
+absolute path for the normal Xcode build (the installed Expo/RN script composes
+Hermes maps), then `verify ios --archive <candidate.ipa> --bundle <built main.jsbundle>
+--source-map <composed map>`. This helper does not build, sign, upload or submit.
+Keep normal version, signing, audio, provider, device and store gates separate.
+
+## Reviewed ledger contract
+
+`scripts/app-notice-provenance.json` has a `components` array indexed by each
+record's explicit `platform` (`ios` or `android`) and unchanged actual `component`
+ID, such as `npm:react-native@0.86.3`. Duplicate platform/component pairs fail.
+Each record pins actual notice source/hash sets, `reviewedVendors`, native source
+`nativeInputs` fingerprints, `upstream` and `sectionSHA256`. Section IDs are
+`library-` plus the first 24 SHA-256 hex characters of `platform + ':' + component`.
+Each is explicitly `iosOnly` or `androidOnly` in the ONE committed JSON. This lets
+one npm ID have extra Android-native notices without weakening iOS comparison.
+The union must contain every reviewed platform section, not only the current
+target. Bodies are actual files sorted by logical source, joined with two newlines.
+Font visibility is independently pinned in `font-icon-provenance.json` too.
+
+When an AAR/JAR omits full text, an explicitly reviewed `additionalNoticeFiles`
+entry may point at an actual pinned upstream copy under `assets/notices/sources/`
+with `file`, `sha256`, `upstream`. It supplements discovered notices; it cannot
+replace a missing NOTICE with a package label or an assumed parent licence.
+
+Six exact npm records in `knownLicenseSources` also supplement missing own MIT
+text: `@expo/ui`, the four React Native subpackages listed there, and
+`qrcode-generator`. Their closed `ownText` selectors rehash the installed package
+manifest, selected package files and committed text, and match the actual lock
+version, tarball and integrity. Publisher `gitHead` and metadata SHA are manually
+reviewed declarations included in the component fingerprint; capture does not
+fetch or independently verify that remote metadata. The three pinned Expo,
+React Native and qrcode text files are attribution inputs only. They preserve
+discovered NOTICEs and vendor boundaries and do not approve any component,
+vendor, generated input or retained resource. Component review must bind the
+resulting text and provenance; seal and final verification recapture both.
+
+Three explicit Pod records additionally bind Yoga to its locked `react-native`
+package's original LICENSE, and ExpoRouter/ExpoUI to the reviewed Expo MIT text.
+Every capture reparses its actual Pod lock and requires the exact selected
+`:path`, installed owner and pinned podspec bytes. The same-capture finite
+`actualSelectors` evidence, including the Pod-lock hash, is retained in each
+component's `nativeInputs`; it cannot be supplied by a historical summary.
+Unknown siblings/versions gain no binding; changed forms, roots or owning bytes
+fail closed. Own attribution cannot approve vendors, generated inputs or retained
+resources (including ExpoFileSystem's three separate framework boundaries),
+and does not justify a separate discovery run.
+
+Generated Metro sources permit only the known `__prelude__` and Expo CLI’s exact
+NUL-prefixed `polyfill:external-require`, `polyfill:environment-variables` and
+`polyfill:assets-registry` IDs, with their exact
+installed generator path/hash. The Expo provider additionally pins its exact
+installed package path, name and version against package-lock and the committed
+component ID. The same pinned native polyfill function registers `external-require` and
+`environment-variables`;
+the app imports the MaterialCommunityIcons TTF, whose generated asset registry
+require is intercepted by the pinned resolver into the third. Source-only tests
+exercise those actual provider functions in memory without Metro or dynamic
+environment values. These are technical generated-source mappings, not reviewed notice
+coverage; component reviews do not approve their providers. Other virtual IDs are not accepted
+by a NUL/path wildcard. Final native files not identified from resolved AARs require an exact
+platform/path `packagedNative` mapping with covered `components` and a pinned
+`review` reference. Packaged-native mappings remain empty until reviewed discovery.
+
+Metro inputs are selected files, not every declared or installed package. Nested
+packages have their own licence boundary. CocoaPods inputs include resolved pod
+versions, generated acknowledgements, actual source notice files and vendored
+framework/library names. Raw Pod lock/plist/notice bytes must be valid UTF-8;
+invalid bytes are rejected before decoding, never repaired. A framework symlink
+may cross a Pod sandbox only when its exact literal path appears in the hashed
+CocoaPods xcframework input list and its target belongs to the locked external
+podspec's installed npm package. The link target, owning package, podspec and
+selected target bytes are fingerprinted. Undeclared links, targets outside that
+package and nested links escaping the selected framework remain rejected; a
+declared link does not supply the vendor's licence. Gradle inputs are the
+actual release runtime resolution and artifact hashes. External module archives
+use a strict module-only Gradle artifact view;
+the unfiltered resolution graph still supplies every selected local project's
+build/source/CMake inputs. No local AAR is required or silently approved before
+it is built. Unknown graph identifiers, missing projects and module-resolution
+errors still fail; no leniency, attribute override or variant reselection is used.
+A shared bounded scanner walks Pods and autolinked Gradle native subtrees, fingerprints source files, and
+finds source-only `vendor`/`third_party` children as well as binary vendors.
+Native roots are restricted to installed packages, Pods and identified local
+modules; arbitrary project data is not traversed.
+The two literal RN 0.86.3 roots `ReactAppDependencyProvider` and `ReactCodegen`
+under `ios/build/generated/ios/` also require their exact Podfile.lock declaration,
+locked producer package/config/template hashes and selected input fingerprints.
+The Provider must contain exactly its three expected template-derived files.
+ReactCodegen requires actual autolinking JSON with the pinned nine dependency
+configs, seven configured spec-source trees and platform podspecs, no app-level
+codegen config or native component crawler, plus separate RN core/spec evidence.
+A test invokes the pinned selector to prove this selection path; no missing
+metadata is replaced with guessed dependency discovery. Raw autolinking bodies
+and absolute roots stay private; only logical package/version identities and
+hashes enter reports. Unknown roots, changed pins and escaping links reject.
+All output bytes are fingerprinted, and each input owner remains a separate
+vendor boundary needing explicit notice review; admitting a generated source
+does not inherit a producer's licence or complete component review.
+Only the actual Gradle build-directory output, configured CMake staging path and
+Git metadata are excluded. The metadata exporter reads AGP's CMake configuration;
+its module-local `.cxx` default applies only when CMake is enabled. Canonical
+excluded paths are recorded; there is no `.cxx`/vendor wildcard. See the pinned
+[AGP CMake staging contract](https://developer.android.com/reference/tools/gradle-api/8.12/com/android/build/api/dsl/Cmake#buildStagingDirectory()).
+Vendor text must be present within its boundary, or explicitly mapped to a pinned
+actual supplemental notice using `vendorNoticeSources`; approving a vendor name
+alone cannot borrow the root licence. Missing source/text,
+unreviewed vendor boundaries and changed digests stay unresolved. A POM/SPDX label
+alone is insufficient. This is scoped notice evidence, not a complete transitive
+SBOM or an independent legal certification.
+
+## Proposed workflow wiring — not active in this preparation
+
+No native build/upload workflow is changed here. Review this exact behavior before wiring:
+
+1. Normal simulator CI: after `pod install`, run **collect only**, with an
+   explicit INCOMPLETE/non-release-qualified step name and job-summary notice.
+   Upload only sanitized `discovery.json`/finite failure metadata. Do not upload
+   `private/`, raw Gradle inputs, source maps or raw collector logs. A successful
+   internal test host does not certify rights coverage.
+2. Android candidate producer: after prebuild resolve the Gradle input, then
+   **seal before** the existing `assembleRelease bundleRelease`. Give seal and
+   build identical public build environment/entry/transform settings. Missing
+   metadata stops before compile, preserving sanitized discovery for review.
+   Commit the reviewed union/ledger first; do not plan a throwaway native build
+   or overwrite assets during the build.
+   The current producer edits `app.json` for its version override; that dirty
+   config is deliberately rejected. Its frozen-source/version policy must be
+   reviewed when wiring this gate; there is no ignore-dirty switch.
+3. After the ordinary build, run strict **verify for both APK and AAB before**
+   artifact uploads or the existing publisher. Only exact READY receipts and
+   package hashes qualify; no `continue-on-error` or placeholder success.
+4. A device/iOS release producer must similarly seal before compilation and
+   verify its actual IPA before sealing/submission. There is no current automated
+   device-build workflow to amend; wiring must name its actual producer rather
+   than imply a simulator receipt qualifies an IPA.
+5. Keep one affected offline-view UI proof plus final resource byte proof. Actual
+   new host/resource rendering, complete native input capture and final-artifact
+   execution are **pending**, not supplied by these source tests.
+
+## Separate unreviewed input artifacts — upload not enabled
+
+Discovery retains `build/notices/<platform>/private/unreviewed-inputs.json` in a
+0700 directory/0600 file. It contains original component notice inputs, explicitly
+INCOMPLETE/discoveryOnly, not view sections or a seal. Never upload `private/`.
+
+A separate `review/unreviewed-oss-notice-inputs.json` includes bodies only when
+the exact component/source/SHA is explicitly pinned as public in
+`knownLicenseSources`, with explicit ecosystem and version too. Public npm,
+CocoaPods and Maven originals use the same manual pin contract; metadata alone
+never implies public origin. The artifact allowlist contains only component/version/ecosystem,
+normalized logical notice source, exact SHA and original UTF-8 body. Uncertain
+or private-origin records expose only hashes and finite unresolved reasons. No
+body is redacted or rewritten. Limits are 256 public bodies/4 MiB; over-budget
+records remain hash-only. All captured input text is capped at 16 MiB.
+
+After review, an optional upload would use exactly the following path (not a
+directory glob), separately from any build qualification artifact:
+
+```yaml
+- uses: actions/upload-artifact@v6
+  if: always()
+  with:
+    name: unreviewed-oss-notice-inputs-ios
+    path: build/notices/ios/review/unreviewed-oss-notice-inputs.json
+    if-no-files-found: warn
+    retention-days: 3
+```
+
+Its content is always `INCOMPLETE`, `complete:false`, `discoveryOnly:true`.
+The analogous Android path substitutes `android` for `ios`. No raw maps/cache,
+source archives, owner paths, credentials or customer records are included. This
+artifact supports technical review after the hosted runner disappears; it is
+not a payload generator, legal certificate or release gate success.
+
+Current npm/lock/font inputs and prior packaged Android notices are available.
+Current generated CocoaPods acknowledgements, complete resolved Gradle artifacts,
+final candidate maps and native-runtime metadata were not preserved in the prior
+QA packet. Obtain them in the otherwise-required native setup. If incomplete,
+stop before candidate compilation, retain discovery, review/commit real text and
+resume the normal build; do not manufacture complete payloads now.

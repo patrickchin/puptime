@@ -2,12 +2,14 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFileSync,readdirSync} from 'node:fs';
 import test from 'node:test';
+import {assertSectionPlatforms} from '../scripts/app-notices.mjs';
 
 const root=new URL('../',import.meta.url);
 const read=(path:string)=>readFileSync(new URL(path,root));
 const hash=(value:Uint8Array|string)=>createHash('sha256').update(value).digest('hex');
 const provenance=JSON.parse(read('scripts/font-icon-provenance.json').toString());
-const notices=JSON.parse(read('src/font-icon-notices.json').toString()) as {id:string;body:string;androidOnly?:boolean}[];
+const notices=(JSON.parse(read('assets/notices/third_party_notices.json').toString()) as {id:string;body:string;androidOnly?:boolean}[])
+ .filter(section=>Object.hasOwn(provenance.notices,section.id));
 
 test('font bytes, glyphs, pinned dependencies and verbatim license copies require deliberate notice review on change',()=>{
  const lock=JSON.parse(read('package-lock.json').toString());
@@ -18,7 +20,7 @@ test('font bytes, glyphs, pinned dependencies and verbatim license copies requir
  for(const [path,expected] of Object.entries(provenance.files))assert.equal(hash(read(path)),expected,`${path}: review font/license provenance`);
  assert.equal(notices.length,Object.keys(provenance.notices).length);
  assert.equal(new Set(notices.map(section=>section.id)).size,notices.length);
- for(const section of notices)assert.equal(hash(section.body),provenance.notices[section.id],`${section.id}: license text changed`);
+ for(const section of notices){assert.equal(hash(section.body),provenance.notices[section.id],`${section.id}: license text changed`);assertSectionPlatforms(section,provenance.platforms[section.id]);}
  const body=(id:string)=>notices.find(section=>section.id===id)!.body;
  assert.equal(body('red-hat'),read('assets/fonts/RedHat-OFL.txt').toString());
  assert.equal(body('expo-vector-icons'),read('node_modules/@expo/vector-icons/LICENSE').toString());
