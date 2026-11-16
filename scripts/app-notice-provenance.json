@@ -2262,6 +2262,20 @@
       ],
       "upstream": "https://registry.npmjs.org/whatwg-url-minimum/-/whatwg-url-minimum-0.1.2.tgz",
       "sectionSHA256": "c2ecf83f830f226f662c99d003162002c78edd8b59f1105621bdcc2c44043a7d"
+    },
+    {
+      "platform": "ios",
+      "component": "npm:posthog-react-native@4.84.1",
+      "reviewedVendors": [],
+      "nativeInputs": {},
+      "notices": [
+        {
+          "source": "node_modules/posthog-react-native/LICENSE",
+          "sha256": "d3fb92ac01f0bef4078f89aac9f20f76da3383ad45becf6204abdf5495f43f8f"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/posthog-react-native/-/posthog-react-native-4.84.1.tgz",
+      "sectionSHA256": "d3fb92ac01f0bef4078f89aac9f20f76da3383ad45becf6204abdf5495f43f8f"
     }
   ],
   "generatedSources": {
@@ -4648,6 +4662,16 @@
       "sha256": "c2ecf83f830f226f662c99d003162002c78edd8b59f1105621bdcc2c44043a7d",
       "upstream": "https://registry.npmjs.org/whatwg-url-minimum/-/whatwg-url-minimum-0.1.2.tgz",
       "upstreamIntegrity": "sha512-XPEm0XFQWNVG292lII1PrRRJl3sItrs7CettZ4ncYxuDVpLyy+NwlGyut2hXI0JswcJUxeCH+CyOJK0ZzAXD6A=="
+    },
+    {
+      "component": "npm:posthog-react-native@4.84.1",
+      "ecosystem": "npm",
+      "version": "4.84.1",
+      "public": true,
+      "source": "node_modules/posthog-react-native/LICENSE",
+      "sha256": "d3fb92ac01f0bef4078f89aac9f20f76da3383ad45becf6204abdf5495f43f8f",
+      "upstream": "https://registry.npmjs.org/posthog-react-native/-/posthog-react-native-4.84.1.tgz",
+      "upstreamIntegrity": "sha512-AqPWpqnYhi2YnGFNB4pQVlQwKlkbHqJWD/bwsqWZ9/wYofcWel6Cy9DZmaWxdSQQIDJeV6JYZbdFYbRfYnts9g=="
     }
   ],
   "retainedAndroidResources": {

@@ -1,7 +1,7 @@
 # App notice capture and final-artifact gate
 
 This is incomplete build preparation. The source JSON currently contains the
-reviewed font/icon notices only. Ninety-four exact iOS inputs have attribution
+reviewed font/icon notices only. Ninety-five exact iOS inputs have attribution
 reviews; remaining component review and the incomplete payload prevent sealing.
 Source tests, an internal simulator build, and finding licence filenames
 do not establish complete app-library notice coverage or store readiness.
@@ -75,14 +75,24 @@ npm public-origin selectors are appended; all previous 74 component records and
 hash selector. Equal text hashes reuse original bytes without component or
 platform inheritance.
 
-Six candidates remain held: `@expo/cli` has generated virtual sources; the
+One further iOS npm record covers only `posthog-react-native@4.84.1` and its 58
+captured JavaScript files. The unchanged source maps each identify one owning
+`packages/react-native/src` origin; imported modules remain separate. The full
+21,550-byte original notice is preserved, including its general PostHog/Mixpanel
+Apache-2.0 text and all eight expressly scoped sections for core, TraceKit,
+UUIDv7, Sentry, Metro, Expo and AgentCat. No single normalized package licence
+expression is assigned. One public npm selector is appended, leaving all prior
+94 records and 172 pins, including the nonpublic PostHog hash/note, unchanged.
+The ledger now contains 173 total text pins. The separately captured
+`@posthog/core@1.61.0` and its `dist/vendor` boundary gain no review from this
+record or from sharing the same complete notice body.
+
+Five candidates remain held: `@expo/cli` has generated virtual sources; the
 installed widget source differs from the equal captured and official member
 hash; Gesture Handler, Reanimated and Zod have explicit copied-code attribution
-to resolve; PostHog's complete mixed Apache/MIT notice requires its own scope
-review despite the MIT package label. No related native Pod is approved by
-these npm records.
+to resolve. No related native Pod is approved by these npm records.
 
-Against the qualified82 inventory, 109 components plus one generated source
+Against the qualified82 inventory, 108 components plus one generated source
 remain unreviewed. Of 109 recorded vendor boundaries, only the twelve specific
 own-product boundaries above are reviewed; the other 97 remain held. No new
 discovery, Android, packaged-native, retained-resource, payload or sealing
