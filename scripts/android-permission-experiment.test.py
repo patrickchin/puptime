@@ -174,21 +174,23 @@ class PermissionTests(unittest.TestCase):
 
     def test_actual_node_helpers_control_gate_default_scope_and_original_error(self):
         source = r'''
+(async()=>{
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),path=require('node:path'),crypto=require('node:crypto');
 const source=fs.readFileSync(process.argv[1],'utf8'),context={assert,utilTypes:require('node:util').types,createHash:crypto.createHash,join:path.join};
 vm.createContext(context);vm.runInContext(source.slice(source.indexOf('const app='),source.indexOf('const [mode]='))+'\nglobalThis.api={commandFailure,permissionControl,permissionCapabilityPair,equivalentChanges};',context);
 const api=context.api,begin=source.indexOf("if(permissionExperimentSelected){\n exerciseEvidence.begin('permission-control-install')"),end=source.indexOf("\nexerciseEvidence.begin('bridge-install')",begin);assert(begin>0&&end>begin);
-const body=source.slice(begin,end),keys=['permissionExperimentSelected','exerciseEvidence','command','device','join','root','permissionExperiment','permissionControl','persistPermission','equal','before','snapshot','adb','hash','oldSHA','permissionOwner','pass','assert','app'];
-const run=new Function(...keys,body+';return "experiment-next";'),details={commandKind:'adb-install',installCodeDecline:'ambiguous-content',installCodeAmbiguity:{firstPredicate:'code-token-count',successToken:false,codeTokens:'multiple',failureMarkers:'multiple',publicCodes:['INSTALL_FAILED_DUPLICATE_PERMISSION'],unknownCodeObserved:false}};
+const body=source.slice(begin,end),keys=['permissionExperimentSelected','exerciseEvidence','command','device','join','root','permissionExperiment','permissionControl','persistPermission','equal','before','snapshot','installedApkHash','oldSHA','permissionOwner','pass','assert','app'];
+const run=new (Object.getPrototypeOf(async()=>{}).constructor)(...keys,body+';return "experiment-next";'),details={commandKind:'adb-install',installCodeDecline:'ambiguous-content',installCodeAmbiguity:{firstPredicate:'code-token-count',successToken:false,codeTokens:'multiple',failureMarkers:'multiple',publicCodes:['INSTALL_FAILED_DUPLICATE_PERMISSION'],unknownCodeObserved:false}};
 let cases=0;
 for(const defect of ['none','unknown-control','success-control','state','readback','owner']){
  let compared=false,passed=false;const original=api.commandFailure(new Error('PRIVATE ORIGINAL'),{status:1},defect==='unknown-control'?{}:details),stable={ownerObserved:true,expectedAppOwnsPermission:true,signatureOnly:true},experiment={originalOwner:stable};
- const values=[true,{begin(){},end(){}},(_binary,args)=>{if(args.includes('control6.apk')||args.some(v=>typeof v==='string'&&v.endsWith('/control6.apk'))){if(defect!=='success-control')throw original;return 'Success';}return Buffer.from('installed');},'emulator-5588',path.join,'/private/synthetic',experiment,api.permissionControl,()=>{},()=>{compared=true;if(defect==='state')throw original;},{},()=>({}),()=> 'package:/data/app/fixed/base.apk\n',()=>defect==='readback'?'wrong':'expected','expected',()=>defect==='owner'?{...stable,expectedAppOwnsPermission:false}:stable,()=>{passed=true;},assert,'com.patrickchin.puptime'];
- if(defect==='none'){assert.equal(run(...values),'experiment-next');assert(compared&&passed);assert.equal(experiment.control.installCode,undefined);assert.equal(experiment.control.evidence,'consistent-observed-set-only');}
- else{let caught;try{run(...values);}catch(error){caught=error;}assert(caught);assert.equal(passed,false);if(['unknown-control','state'].includes(defect))assert.equal(caught,original);}
- const before=JSON.stringify(experiment);values[0]=false;assert.equal(run(...values),'experiment-next');assert.equal(JSON.stringify(experiment),before);cases++;
+ const values=[true,{begin(){},end(){}},(_binary,args)=>{if(args.includes('control6.apk')||args.some(v=>typeof v==='string'&&v.endsWith('/control6.apk'))){if(defect!=='success-control')throw original;return 'Success';}return Buffer.from('installed');},'emulator-5588',path.join,'/private/synthetic',experiment,api.permissionControl,()=>{},()=>{compared=true;if(defect==='state')throw original;},{},()=>({}),async()=>defect==='readback'?'wrong':'expected','expected',()=>defect==='owner'?{...stable,expectedAppOwnsPermission:false}:stable,()=>{passed=true;},assert,'com.patrickchin.puptime'];
+ if(defect==='none'){assert.equal(await run(...values),'experiment-next');assert(compared&&passed);assert.equal(experiment.control.installCode,undefined);assert.equal(experiment.control.evidence,'consistent-observed-set-only');}
+ else{let caught;try{await run(...values);}catch(error){caught=error;}assert(caught);assert.equal(passed,false);if(['unknown-control','state'].includes(defect))assert.equal(caught,original);}
+ const before=JSON.stringify(experiment);values[0]=false;assert.equal(await run(...values),'experiment-next');assert.equal(JSON.stringify(experiment),before);cases++;
 }
 console.log(JSON.stringify({status:'passed',actualControlBlockCases:cases,defaultNewControlIO:0}));
+})().catch(()=>{process.exitCode=1;});
 '''
         result = subprocess.run(['node', '-e', source, str(HERE / 'verify-android-signing-upgrade.mjs')], text=True, capture_output=True, timeout=20)
         self.assertEqual(result.returncode, 0, 'Actual control block model failed (private details suppressed).')

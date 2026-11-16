@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {createHash,randomBytes} from 'node:crypto';
 import {execFileSync,spawnSync} from 'node:child_process';
-import {createReadStream,createWriteStream,existsSync,lstatSync,mkdirSync,openSync,closeSync,mkdtempSync,readFileSync,readdirSync,writeFileSync,chmodSync,readlinkSync,realpathSync,rmSync} from 'node:fs';
+import {constants as fsConstants,createReadStream,createWriteStream,existsSync,fstatSync,fchmodSync,lstatSync,mkdirSync,openSync,closeSync,mkdtempSync,readFileSync,readdirSync,writeFileSync,chmodSync,readlinkSync,realpathSync,rmSync} from 'node:fs';
 import {join,resolve,isAbsolute} from 'node:path';
 import {Readable,Transform} from 'node:stream';
 import {pipeline} from 'node:stream/promises';
@@ -94,7 +94,7 @@ function installCommandFailure(binary,args,result,phase,root){
  let commandKind='unrecognized';
  if(exact(install))commandKind='adb-install';
  else if(exact(['-s','emulator-5588','shell','pm','path',app]))commandKind='package-path';
- else if(typeof args?.[4]==='string'&&/^\/data\/app\/[^\n]+\/base\.apk$/.exec(args[4])?.[0]===args[4]&&exact(['-s','emulator-5588','exec-out','cat',args[4]]))commandKind='installed-apk-readback';
+ else if(typeof args?.[3]==='string'&&/^\/data\/app\/[^\n]+\/base\.apk$/.exec(args[3])?.[0]===args[3]&&typeof args?.[4]==='string'&&args[4].startsWith(root+'/')&&/^apk-readback-[A-Za-z0-9]{6}\/base\.apk$/.test(args[4].slice(root.length+1))&&exact(['-s','emulator-5588','pull',args[3],args[4]]))commandKind='installed-apk-readback';
  return {commandKind,...(commandKind==='adb-install'?installFailureProjection(result,path):{installCodeDecline:'not-install-command'})};
 }
 const commandFailures=new WeakMap();
@@ -264,7 +264,7 @@ function installCodeSelfCheck(){
  for(const [reason,value] of cases){const projected=installFailureProjection(value,path);assert.equal(projected.installCodeDecline,reason);if(reason!=='ambiguous-content')assert.deepEqual(projected,{installCodeDecline:reason});else{assert.deepEqual(finiteInstallAmbiguity(projected.installCodeAmbiguity),projected.installCodeAmbiguity);assert.equal(projected.installCode,undefined);}}
  for(const value of [undefined,null,'',path+'wrong',path+'\n'])assert.deepEqual(installFailureProjection(good,value),{installCodeDecline:'stderr-frame'});
  assert.deepEqual(installFailureProjection({...good,stdout:''},path),{installCode:'INSTALL_FAILED_UPDATE_INCOMPATIBLE'});
- for(const [argv,kind] of [[['-s','emulator-5588','shell','pm','path',app],'package-path'],[['-s','emulator-5588','exec-out','cat','/data/app/synthetic/base.apk'],'installed-apk-readback'],[['-s','wrong','install','-r',path],'unrecognized']])assert.deepEqual(installCommandFailure('adb',argv,good,'bridge-install',root),{commandKind:kind,installCodeDecline:'not-install-command'});
+ for(const [argv,kind] of [[['-s','emulator-5588','shell','pm','path',app],'package-path'],[['-s','emulator-5588','pull','/data/app/synthetic/base.apk',join(root,'apk-readback-ABC123/base.apk')],'installed-apk-readback'],[['-s','wrong','install','-r',path],'unrecognized']])assert.deepEqual(installCommandFailure('adb',argv,good,'bridge-install',root),{commandKind:kind,installCodeDecline:'not-install-command'});
  for(const phase of ['plain-B-reject','snapshot-old-created','constructor',secret,undefined])assert.equal(installCommandFailure('adb',args,good,phase,root),undefined);
  assert.deepEqual(finiteFailure(commandFailure(new Error(secret),good,{commandKind:secret,installCode:secret,installCodeDecline:secret})),{class:'command-failed',status:1});
  const record=exerciseRecorder(value=>{assert.ok(!JSON.stringify(value).includes(secret));});record.begin('bridge-install');const error=commandFailure(new Error(secret),good,installCommandFailure('adb',args,good,'bridge-install',root));record.fail(error);assert.equal(finiteFailure(error).installCode,'INSTALL_FAILED_UPDATE_INCOMPATIBLE');
@@ -328,7 +328,7 @@ const widgetSourceBlobs={
 };
 function assertWidgetSource(){for(const [name,blob] of Object.entries(widgetSourceBlobs)){const bytes=readFileSync(name);assert.equal(createHash('sha1').update('blob '+bytes.length+'\0').update(bytes).digest('hex'),blob,'Re-review widget serialization/selectors if '+name+' changes.');}}
 
-async function fileHash(path){const digest=createHash('sha256');for await(const chunk of createReadStream(path))digest.update(chunk);return digest.digest('hex');}
+async function fileHash(path,fd,size){const digest=createHash('sha256');for await(const chunk of createReadStream(path,fd===undefined?undefined:{fd,autoClose:false,start:0,end:size-1}))digest.update(chunk);return digest.digest('hex');}
 function validateRun(run,jobs,repo,source,id){
  assert.equal(run.id,Number(id));assert.equal(run.repository.full_name,repo);assert.equal(run.head_repository.full_name,repo);
  assert.equal(run.head_sha,source);assert.equal(run.path,'.github/workflows/android-apk.yml');
@@ -791,7 +791,23 @@ function flow(name,steps){
 const tap=id=>`- tapOn: {id: ${id}}\n`,scroll=id=>`- scrollUntilVisible:\n    element: {id: ${id}}\n    direction: DOWN\n    visibilityPercentage: 100\n    centerElement: true\n`;
 const settings=tap('nav.open')+'- assertVisible: {id: nav.close}\n'+scroll('nav.settings')+tap('nav.settings')+'- assertVisible: {id: screen.settings}\n';
 function launch(){adb('shell','am','start','-W','-n',app+'/.MainActivity');}
-async function install(path,replace=false){assert.match(adb('install',...(replace?['-r']:[]),path),/Success/);const installed=adb('shell','pm','path',app).trim();assert.match(installed,/^package:\/data\/app\/[^\n]+\/base\.apk$/);assert.equal(hash(command('adb',['-s',device,'exec-out','cat',installed.slice(8)],{binaryOutput:true})),await fileHash(path),'Installed APK must be the exact input.');} 
+async function installedApkHash(){
+ const installed=adb('shell','pm','path',app).trim();assert.match(installed,/^package:\/data\/app\/[^\n]+\/base\.apk$/);
+ const directory=mkdtempSync(join(root,'apk-readback-')),path=join(directory,'base.apk');
+ command('adb',['-s',device,'pull',installed.slice(8),path]);
+ const fd=openSync(path,fsConstants.O_RDONLY|fsConstants.O_NOFOLLOW|fsConstants.O_NONBLOCK);let actual,complete=false;
+ try{
+  const initial=fstatSync(fd,{bigint:true});assert.ok(initial.isFile()&&initial.nlink===1n&&initial.size>0n&&initial.size<=256n*1024n*1024n);
+  fchmodSync(fd,0o600);const before=fstatSync(fd,{bigint:true}),fields=['dev','ino','mode','nlink','uid','gid','size','mtimeNs','ctimeNs'];
+  for(const key of fields.filter(key=>key!=='mode'&&key!=='ctimeNs'))assert.equal(before[key],initial[key]);
+  actual=await fileHash(path,fd,Number(before.size));
+  for(const after of [fstatSync(fd,{bigint:true}),lstatSync(path,{bigint:true})])assert.deepEqual(fields.map(key=>after[key]),fields.map(key=>before[key]));
+  complete=true;
+ }finally{try{closeSync(fd);}catch(error){if(complete)throw error;}}
+ // On an earlier error, the existing owned-root cleanup removes partial data.
+ rmSync(directory,{recursive:true});return actual;
+}
+async function install(path,replace=false){assert.match(adb('install',...(replace?['-r']:[]),path),/Success/);assert.equal(await installedApkHash(),await fileHash(path),'Installed APK must be the exact input.');}
 function snapshot(label){
  exerciseEvidence.begin('snapshot-'+label);
  adb('shell','am','force-stop',app);const dest=join(root,'snapshot-'+label);mkdirSync(dest,{mode:0o700});const files={};
@@ -830,7 +846,7 @@ rejectUpdate(join(root,'plain6.apk'),before,'plain-B-rejected');
 if(permissionExperimentSelected){
  exerciseEvidence.begin('permission-control-install');let original;try{command('adb',['-s',device,'install','-r',join(root,'control6.apk')]);}catch(error){original=error;}try{permissionExperiment.control=permissionControl(original);}catch(error){throw original??error;}persistPermission();exerciseEvidence.end('permission-control-install');
  exerciseEvidence.begin('permission-control-preservation');equal(before,snapshot('permission-control-rejected'));
- const installed=adb('shell','pm','path',app).trim();assert.match(installed,/^package:\/data\/app\/[^\n]+\/base\.apk$/);assert.equal(hash(command('adb',['-s',device,'exec-out','cat',installed.slice(8)],{binaryOutput:true})),oldSHA);
+ assert.equal(await installedApkHash(),oldSHA);
  assert.deepEqual(permissionOwner('control'),permissionExperiment.originalOwner);Object.assign(permissionExperiment.control,{protectedStateUnchanged:true,installedOriginalUnchanged:true,ownerUnchanged:true});pass('permission-false-control-rejected',before);exerciseEvidence.end('permission-control-preservation');
 }
 exerciseEvidence.begin('bridge-install');await install(join(root,'bridge6.apk'),true);exerciseEvidence.end('bridge-install');exerciseEvidence.begin('bridge-before-launch-preservation');beforeManualLaunch(before,snapshot('bridge-before-launch'),'1.12.6/1012006',equal,launched);exerciseEvidence.end('bridge-before-launch-preservation');exerciseEvidence.begin('bridge-launch');launch();exerciseEvidence.end('bridge-launch');exerciseEvidence.begin('bridge-visible');flow('bridge-visible','- extendedWaitUntil:\n    visible: {id: screen.today}\n    timeout: 90000\n');exerciseEvidence.end('bridge-visible');const bridge=snapshot('bridge-launched');exerciseEvidence.begin('bridge-state-validation');launched(before,bridge,'1.12.6/1012006');exerciseEvidence.end('bridge-state-validation');
