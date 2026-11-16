@@ -5,10 +5,23 @@ import json
 import sys
 from xml.parsers import expat
 
+CONVERSATIONAL_FILES = [
+    '.maestro/conversational/' + name + '.yaml' for name in (
+        '01-dismiss-and-navigate', '02-log-from-spotlight', '03-skip-optional-setup',
+        '04-entry-profile-back', '05-ages-meals-and-cancel', '06-meals-only',
+        '07-skip-meals-keep-poop', '08-skip-grouped-meals', '09-all-reminder-options',
+        '10-notifications-allow', '11-notifications-deny', '12-notifications-blocked',
+        '13-spotlight-pee', '14-spotlight-poop', '15-interrupted-setup',
+        '16-native-time-boundaries', '17-sharing',
+    )
+]
 
-def project(data, expected):
+
+def project(data, expected, conversational=False):
     unknown = {"complete": False, "rows": []}
-    if len(data) > 2 * 1024 * 1024 or len(expected) not in (1, 13) or len(set(expected)) != len(expected):
+    if len(data) > 2 * 1024 * 1024 or len(set(expected)) != len(expected):
+        return unknown
+    if conversational and expected != CONVERSATIONAL_FILES or not conversational and len(expected) not in (1, 13):
         return unknown
     indexes = {name: index for index, name in enumerate(expected)}
     stack, rows, seen = [], [], set()
@@ -102,7 +115,8 @@ def project(data, expected):
 
 if __name__ == "__main__":
     try:
-        result = project(sys.stdin.buffer.read(2 * 1024 * 1024 + 1), sys.argv[1:])
+        conversational = sys.argv[1:2] == ['--conversational-fixed17']
+        result = project(sys.stdin.buffer.read(2 * 1024 * 1024 + 1), sys.argv[2:] if conversational else sys.argv[1:], conversational)
     except Exception:
         result = {"complete": False, "rows": []}
     sys.stdout.write(json.dumps(result, separators=(",", ":")))
