@@ -229,7 +229,7 @@ function androidCiRun(options={}){
  const text=readFileSync(join(project,'scripts/verify-android-sqlite-engine.mjs'),'utf8'),start=text.indexOf('export async function verifyAndroidSqliteEngine()'),end=text.indexOf('\nif(process.argv[1]',start);let body=text.slice(start,end).replace('export ','');assert.ok(start>0&&end>start);
  if(options.ddWithoutStatus){assert.equal(body.split("'count=1','status=none'").length,2);body=body.replace("'count=1','status=none'","'count=1'");}
  const calls=[],writes=[],name='Puptime_SQLite_Engine_123_2',args=['-avd',name,'-port','5588','-no-window','-no-audio','-no-snapshot','-gpu','swiftshader_indirect'];
- const raw=options.engineBytes??Buffer.from(JSON.stringify(expectedEngine)),failure=options.failure??new Error('PRIVATE_ORIGINAL'),cleanupError=new Error('PRIVATE_CLEANUP');let live=false,privateExists=true,installed=false,cleared=false,launched=false,disposed=false,rootCount=0,portChecks=0,emulatorStops=0,cleanupStatReads=0;
+ const raw=options.engineBytes??Buffer.from(JSON.stringify(expectedEngine)),failure=options.failure??new Error('PRIVATE_ORIGINAL'),cleanupError=new Error('PRIVATE_CLEANUP');let live=false,privateExists=true,installed=false,cleared=false,launched=false,disposed=false,rootCount=0,portChecks=0,emulatorStops=0,cleanupStatReads=0,receiptFailureInjected=false;
  const sourceHashes=Object.values(hashes).map(row=>row[1]),key='221e0a3106aa4c3ccc154e0a418b55020b3f9ea6e84f92e8749cd9e2f39f5e58',certificate='fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c';
  const env={GITHUB_ACTIONS:'true',GITHUB_REPOSITORY:'patrickchin/puptime',GITHUB_RUN_ID:'123',GITHUB_RUN_ATTEMPT:'2',ANDROID_HOME:'/sdk',RUNNER_TEMP:'/runner',PUPTIME_ANDROID_CMDLINE_BIN:'/sdk/cmdline/bin',EXPO_PUBLIC_CLOUD_API_URL:'https://PRIVATE_ORIGIN',EXPO_PUBLIC_UNKNOWN:'PRIVATE_VALUE',EXPO_PUBLIC_APP_POSTHOG_KEY:'PRIVATE_KEY',EXPO_OVERRIDE_METRO_CONFIG:'PRIVATE_CONFIG',NODE_PATH:'PRIVATE_PATH',NODE_OPTIONS:'PRIVATE_OPTIONS'};
  const assertEnv=value=>{assert.equal(value.EXPO_NO_DOTENV,'1');assert.equal(value.EXPO_PUBLIC_CLOUD_API_URL,'https://127.0.0.1:1');assert.equal(value.EXPO_PUBLIC_APP_POSTHOG_KEY,'');for(const key of ['EXPO_PUBLIC_UNKNOWN','EXPO_OVERRIDE_METRO_CONFIG','NODE_PATH','NODE_OPTIONS'])assert.equal(Object.hasOwn(value,key),false);assert.equal(value.ENTRY_FILE,'index.sqlite-engine-probe.js');};
@@ -241,6 +241,7 @@ function androidCiRun(options={}){
   if(path.endsWith('selected-module.json')){if(options.selectionReadFails)throw failure;return options.selectionBytes??Buffer.from(JSON.stringify(selected));}
   if(path.startsWith('/proc/')){
    if(!live)throw Object.assign(new Error('gone'),{code:'ENOENT'});
+   if(launched&&options.receiptFailure==='wait'&&!receiptFailureInjected){receiptFailureInjected=true;throw failure;}
    const scenario=launched&&options.launchFails?options.ownershipScenario:undefined;
    if(scenario==='throw')throw new Error('PRIVATE_INSPECTION_FAILURE');
    if(path.endsWith('/stat')){if(scenario)cleanupStatReads++;if(scenario==='second-inspection-throws'&&cleanupStatReads>2)throw new Error('PRIVATE_INSPECTION_FAILURE');return scenario==='malformed'?'malformed':stat(scenario==='dead'?'Z':'S',scenario==='reused-start'?'8':'7');}
@@ -264,7 +265,7 @@ function androidCiRun(options={}){
   if(a[0]==='install'){if(options.installFails)return {status:null,stdout:'',error:failure};installed=true;return result('Performing Streamed Install\nSuccess\n');}
   if(key.startsWith('shell rm -f ')){cleared=true;return result();}if(key.startsWith('shell am start ')){assert.equal(cleared,true);launched=true;if(options.launchFails)return {status:null,stdout:'',error:failure};return result();}
   if(a[0]==='shell'&&a[1]==='stat'){assert.equal(launched,true);return result('1 2 '+raw.length+' 3 4 81a4\n');}
-  if(key.startsWith('shell readlink -f '))return result(a.at(-1));if(a[0]==='exec-out'){assert.equal(settings.maxBuffer,257);return result(options.ddSummary&&!a.includes('status=none')?Buffer.concat([raw,Buffer.from('0+1 records in\n0+1 records out\n')]):raw);}
+  if(key.startsWith('shell readlink -f ')){if(options.receiptFailure==='path')return {status:null,stdout:'',error:failure};return result(a.at(-1));}if(a[0]==='exec-out'){if(options.receiptFailure==='read')return {status:null,stdout:Buffer.alloc(0),error:failure};assert.equal(settings.maxBuffer,257);return result(options.ddSummary&&!a.includes('status=none')?Buffer.concat([raw,Buffer.from('0+1 records in\n0+1 records out\n')]):raw);}
   if(key.startsWith('shell am force-stop ')){if(options.stopAppFails&&launched)return {status:1,stdout:''};return result();}
   if(['pull','shell'].includes(a[0]))return result();throw new Error('Unexpected synthetic command');
  };
@@ -300,11 +301,22 @@ test('Android raw exec-out suppresses dd summaries while retaining exact receipt
  const original=androidCiRun({ddSummary:true,ddWithoutStatus:true});
  await assert.rejects(original.execute(),error=>error.code==='ERR_ASSERTION'&&error.actual===raw.length+summary.length&&error.expected===raw.length);
  const failed=original.writes.find(row=>row.path.endsWith('provenance.json')).value;
- assert.equal(failed.status,'failed');assert.equal(failed.phase,'receipt');assert.equal(failed.engineMatchesExpected,null);assert.ok(Object.values(failed.cleanup).every(value=>value===true));assert.equal(original.writes.some(row=>row.path.endsWith('probe.json')),false);assert.equal(original.disposed(),true);assert.equal(original.removed(),true);
+ assert.equal(failed.status,'failed');assert.equal(failed.phase,'receipt-read');assert.equal(failed.engineMatchesExpected,null);assert.ok(Object.values(failed.cleanup).every(value=>value===true));assert.equal(original.writes.some(row=>row.path.endsWith('probe.json')),false);assert.equal(original.disposed(),true);assert.equal(original.removed(),true);
  const fixed=androidCiRun({ddSummary:true});await fixed.execute();
  const dd=fixed.calls.find(row=>row.includes('exec-out'));
  assert.deepEqual(dd,['/sdk/platform-tools/adb','-s','emulator-5588','exec-out','dd','if=/data/user/0/com.patrickchin.puptime/files/sqlite-engine-probe.json','bs=257','count=1','status=none']);
  assert.deepEqual(fixed.writes.find(row=>row.path.endsWith('probe.json')).value,expectedEngine);assert.equal(fixed.writes.find(row=>row.path.endsWith('provenance.json')).value.status,'passed');assert.equal(fixed.disposed(),true);assert.equal(fixed.removed(),true);
+});
+
+test('Android receipt phase groups preserve original failures, cleanup and the successful receipt phase',async()=>{
+ for(const [boundary,phase] of [['wait','receipt-wait'],['path','receipt-path'],['read','receipt-read']]){
+  const failure=new Error('PRIVATE_RECEIPT_FAILURE');Object.defineProperty(failure,'message',{get(){throw Error('No error inspection');}});
+  const check=androidCiRun({receiptFailure:boundary,failure});await assert.rejects(check.execute(),error=>error===failure);
+  const value=check.writes.find(row=>row.path.endsWith('provenance.json')).value;
+  assert.equal(value.status,'failed');assert.equal(value.phase,phase);assert.equal(value.engineMatchesExpected,null);assert.equal(Object.keys(value).length,14);assert.ok(Object.values(value.cleanup).every(flag=>flag===true));assert.equal(check.writes.some(row=>row.path.endsWith('probe.json')),false);
+  assert.equal(check.disposed(),true);assert.equal(check.removed(),true);assert.equal(check.live(),false);assert.ok(!JSON.stringify(check.writes).includes('PRIVATE'));
+ }
+ const success=androidCiRun();await success.execute();const value=success.writes.find(row=>row.path.endsWith('provenance.json')).value;assert.equal(value.status,'passed');assert.equal(value.phase,'receipt');assert.equal(value.engineMatchesExpected,true);
 });
 
 test('Android mismatches, setup/cleanup/writer failures never pass or replace the original failure',async()=>{

@@ -249,10 +249,10 @@ export async function verifyAndroidSqliteEngine(){
   const installed=adb(['shell','pm','path',app]).trim();assert.match(installed,/^package:\/data\/app\/[^\n]+\/base\.apk$/);const readback=join(privateRoot,'installed.apk');adb(['pull',installed.slice(8),readback]);installedApkSHA256=stableFile(readback);assert.equal(installedApkSHA256,apkSHA256);
   const receipt='/data/user/0/'+app+'/files/sqlite-engine-probe.json';adb(['shell','am','force-stop',app]);adb(['shell','rm','-f',receipt]);
   phase='launch';adb(['shell','am','start','-W','-n',app+'/.MainActivity']);
-  phase='receipt';await poll(60000,()=>{try{return androidReceiptStat(adb(['shell','stat','-c','%d %i %s %Y %Z %f',receipt])).size>0;}catch{return false;}});
-  assert.equal(adb(['shell','readlink','-f',receipt]).trim(),receipt);const before=androidReceiptStat(adb(['shell','stat','-c','%d %i %s %Y %Z %f',receipt]));
-  const raw=adb(['exec-out','dd','if='+receipt,'bs=257','count=1','status=none'],{binaryOutput:true,maxBuffer:257});assert.equal(raw.length,before.size);assert.deepEqual(androidReceiptStat(adb(['shell','stat','-c','%d %i %s %Y %Z %f',receipt])),before);
-  const local=join(privateRoot,'query-receipt.json');writeFileSync(local,raw,{flag:'wx',mode:0o600});engineBytes=readSqliteEngineReceipt(local);engineMatchesExpected=engineBytes.equals(Buffer.from(JSON.stringify(expected)));assert.equal(engineMatchesExpected,true,'Require the expected Android SQLite engine.');assert.equal(task.signal,null);
+  phase='receipt-wait';await poll(60000,()=>{try{return androidReceiptStat(adb(['shell','stat','-c','%d %i %s %Y %Z %f',receipt])).size>0;}catch{return false;}});
+  phase='receipt-path';assert.equal(adb(['shell','readlink','-f',receipt]).trim(),receipt);const before=androidReceiptStat(adb(['shell','stat','-c','%d %i %s %Y %Z %f',receipt]));
+  phase='receipt-read';const raw=adb(['exec-out','dd','if='+receipt,'bs=257','count=1','status=none'],{binaryOutput:true,maxBuffer:257});assert.equal(raw.length,before.size);assert.deepEqual(androidReceiptStat(adb(['shell','stat','-c','%d %i %s %Y %Z %f',receipt])),before);
+  phase='receipt';const local=join(privateRoot,'query-receipt.json');writeFileSync(local,raw,{flag:'wx',mode:0o600});engineBytes=readSqliteEngineReceipt(local);engineMatchesExpected=engineBytes.equals(Buffer.from(JSON.stringify(expected)));assert.equal(engineMatchesExpected,true,'Require the expected Android SQLite engine.');assert.equal(task.signal,null);
  }catch(error){failure=error;if(phase==='build'&&buildStep==='gradle-command')buildStep=readAndroidBuildStep(buildStepOutput)??buildStep;}
  finally{
   try{await task.run();}catch(error){failure??=error;}finally{task.dispose();}
