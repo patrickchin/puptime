@@ -132,6 +132,20 @@ export function androidReceiptStat(text){
  return {device,inode,size:Number(size),modified,changed,mode};
 }
 
+// Failure-only, last-entered probe stage. Never an engine receipt or an error body.
+export function readAndroidProbeStage(adb,now=Date.now){
+ const path='/data/user/0/'+app+'/files/sqlite-engine-stage.txt',deadline=now()+5000;
+ const read=(args,options={})=>{const remaining=deadline-now();assert.ok(remaining>0);const value=adb(args,{timeout:remaining,maxBuffer:256,...options});assert.ok(now()<=deadline);return value;};
+ try{
+  const before=androidReceiptStat(read(['shell','stat','-c','%d %i %s %Y %Z %f',path]));assert.ok(before.size<=64);
+  assert.equal(read(['shell','readlink','-f',path]).trim(),path);
+  const raw=read(['exec-out','dd','if='+path,'bs=65','count=1','status=none'],{binaryOutput:true,maxBuffer:65});assert.equal(raw.length,before.size);
+  assert.deepEqual(androidReceiptStat(read(['shell','stat','-c','%d %i %s %Y %Z %f',path])),before);
+  const stage=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(raw);
+  return ['file-create','database-open','query','close-after-query','close-after-query-error','receipt-write','complete'].includes(stage)?stage:null;
+ }catch{return null;}
+}
+
 export function androidOffline(value){
  const text=value.connectivity.replaceAll('\r',''),section=text.match(/^[ \t]*Current Networks:[ \t]*\n([\s\S]*?)^[ \t]*Status for known UIDs:[ \t]*$/m);
  assert.equal(value.airplane.trim(),'1');assert.equal(value.wifiPreference.trim(),'0');assert.equal(value.wifiStatus.replaceAll('\r','').split('\n')[0].trim(),'Wifi is disabled');
@@ -196,16 +210,16 @@ export async function verifyAndroidSqliteEngine(){
  const args=['-avd',name,'-port','5588','-no-window','-no-audio','-no-snapshot','-gpu','swiftshader_indirect'];
  const cleanup={appStopped:false,processesStopped:false,emulatorExited:false,avdRemoved:false,portsReleased:false,privateMaterialRemoved:false};
  const buildStepOutput=join(privateRoot,'build-step.txt');
- let child,stopEmulator,ownerStart,spawnError,failure,mayStop=false,phase='source',buildStep=null,engineBytes,engineMatchesExpected=null,api=null,apkSHA256,installedApkSHA256,apk,selectedModule;
+ let child,stopEmulator,ownerStart,spawnError,failure,mayStop=false,phase='source',buildStep=null,engineBytes,engineMatchesExpected=null,api=null,apkSHA256,installedApkSHA256,apk,selectedModule,receiptDiagnostic=null,receiptOwnershipFailed=false;
  const inspect=()=>{
   // An unreadable inspection never inherits a prior permission to signal.
   mayStop=false;
   if(!child?.pid)return null;
   try{const proc='/proc/'+child.pid,stat=readFileSync(join(proc,'stat'),'utf8');return androidProcessIdentity({stat,exe:readlinkSync(join(proc,'exe')),cmdline:readFileSync(join(proc,'cmdline'),'utf8'),environ:readFileSync(join(proc,'environ'),'utf8'),status:readFileSync(join(proc,'status'),'utf8'),afterStat:readFileSync(join(proc,'stat'),'utf8')},{executables:[emulator,join(sdk,'emulator/qemu/linux-x86_64/qemu-system-x86_64'),join(sdk,'emulator/qemu/linux-x86_64/qemu-system-x86_64-headless')].filter(existsSync).map(path=>realpathSync(path)),arguments:args,home:avdHome,uid:String(process.getuid())});}catch(error){if(error.code==='ENOENT'||error.code==='ESRCH')return null;throw error;}
  };
- const owned=()=>{if(spawnError)throw spawnError;const value=inspect();assert.ok(value?.alive&&value.owned&&(ownerStart===undefined||value.start===ownerStart),'Require the exact live task emulator.');ownerStart??=value.start;mayStop=true;};
+ const owned=()=>{try{if(spawnError)throw spawnError;const value=inspect();assert.ok(value?.alive&&value.owned&&(ownerStart===undefined||value.start===ownerStart),'Require the exact live task emulator.');ownerStart??=value.start;mayStop=true;}catch(error){if(phase==='receipt-wait')receiptOwnershipFailed=true;throw error;}};
  const adb=(args,settings)=>{owned();return command(adbPath,['-s',serial,...args],settings);};
- const poll=async(ms,read)=>{const deadline=Date.now()+ms;do{owned();if(await read())return;await new Promise(resolve=>setTimeout(resolve,250));}while(Date.now()<deadline);throw new Error('Bounded readback timed out.');};
+ const poll=async(ms,read)=>{const deadline=Date.now()+ms;do{try{owned();}catch(error){if(phase==='receipt-wait')receiptDiagnostic.waitOutcome='owned-guard-failed';throw error;}if(await read())return;await new Promise(resolve=>setTimeout(resolve,250));}while(Date.now()<deadline);if(phase==='receipt-wait')receiptDiagnostic.waitOutcome='deadline-expired';throw new Error('Bounded readback timed out.');};
  const task=installTaskCleanup(async()=>{
   mayStop=false;let commandsStopped=true;
   for(const stop of ownedStops)try{commandsStopped=(await stop())&&commandsStopped;}catch{commandsStopped=false;}
@@ -247,19 +261,19 @@ export async function verifyAndroidSqliteEngine(){
   assert.equal(adb(['shell','pm','path',app],{ok:[1]}),'');
   phase='install';assert.match(adb(['install',apkPath],{timeout:180000}),/^(?:Performing (?:Streamed|Push) Install\r?\n)?Success\s*$/);
   const installed=adb(['shell','pm','path',app]).trim();assert.match(installed,/^package:\/data\/app\/[^\n]+\/base\.apk$/);const readback=join(privateRoot,'installed.apk');adb(['pull',installed.slice(8),readback]);installedApkSHA256=stableFile(readback);assert.equal(installedApkSHA256,apkSHA256);
-  const receipt='/data/user/0/'+app+'/files/sqlite-engine-probe.json';adb(['shell','am','force-stop',app]);adb(['shell','rm','-f',receipt]);
+  const receipt='/data/user/0/'+app+'/files/sqlite-engine-probe.json';adb(['shell','am','force-stop',app]);adb(['shell','rm','-f',receipt]);adb(['shell','rm','-f','/data/user/0/'+app+'/files/sqlite-engine-stage.txt']);
   phase='launch';adb(['shell','am','start','-W','-n',app+'/.MainActivity']);
-  phase='receipt-wait';await poll(60000,()=>{try{return androidReceiptStat(adb(['shell','stat','-c','%d %i %s %Y %Z %f',receipt])).size>0;}catch{return false;}});
+  phase='receipt-wait';receiptDiagnostic={waitOutcome:null,probeStage:null};await poll(60000,()=>{try{return androidReceiptStat(adb(['shell','stat','-c','%d %i %s %Y %Z %f',receipt])).size>0;}catch{return false;}});receiptDiagnostic.waitOutcome='stat-ready';
   phase='receipt-path';assert.equal(adb(['shell','readlink','-f',receipt]).trim(),receipt);const before=androidReceiptStat(adb(['shell','stat','-c','%d %i %s %Y %Z %f',receipt]));
   phase='receipt-read';const raw=adb(['exec-out','dd','if='+receipt,'bs=257','count=1','status=none'],{binaryOutput:true,maxBuffer:257});assert.equal(raw.length,before.size);assert.deepEqual(androidReceiptStat(adb(['shell','stat','-c','%d %i %s %Y %Z %f',receipt])),before);
   phase='receipt';const local=join(privateRoot,'query-receipt.json');writeFileSync(local,raw,{flag:'wx',mode:0o600});engineBytes=readSqliteEngineReceipt(local);engineMatchesExpected=engineBytes.equals(Buffer.from(JSON.stringify(expected)));assert.equal(engineMatchesExpected,true,'Require the expected Android SQLite engine.');assert.equal(task.signal,null);
- }catch(error){failure=error;if(phase==='build'&&buildStep==='gradle-command')buildStep=readAndroidBuildStep(buildStepOutput)??buildStep;}
+ }catch(error){failure=error;if(phase==='build'&&buildStep==='gradle-command')buildStep=readAndroidBuildStep(buildStepOutput)??buildStep;if(phase==='receipt-wait'&&!receiptOwnershipFailed)try{owned();receiptDiagnostic.probeStage=readAndroidProbeStage(adb);}catch{}}
  finally{
   try{await task.run();}catch(error){failure??=error;}finally{task.dispose();}
   try{
    command('git',['diff','--quiet','HEAD','--']);assert.deepEqual(['sqlite3.c','sqlite3.h'].map(name=>stableFile(join(root,'node_modules/expo-sqlite/vendor/sqlite3',name),12*1024*1024)),engineHashes);
    if(engineBytes&&Object.values(cleanup).every(value=>value===true))writeFileSync(join(output,'sqlite-engine-probe.json'),engineBytes,{flag:'wx',mode:0o600});
-   writeFileSync(join(output,'sqlite-engine-provenance.json'),JSON.stringify({schemaVersion:2,stage:'android-sqlite-engine-ci',status:failure?'failed':'passed',phase,buildStep,checkoutCommit:source,checkoutTree:tree,runId,runAttempt:attempt,engineMatchesExpected,api,selectedModule:selectedModule?{...selectedModule,sourceHashes:engineHashes}:null,apk:apk?{...apk,sha256:apkSHA256,installedSHA256:installedApkSHA256??null,testCertificateSHA256}:null,cleanup},null,2)+'\n',{flag:'wx',mode:0o600});
+   writeFileSync(join(output,'sqlite-engine-provenance.json'),JSON.stringify({schemaVersion:3,stage:'android-sqlite-engine-ci',status:failure?'failed':'passed',phase,buildStep,checkoutCommit:source,checkoutTree:tree,runId,runAttempt:attempt,engineMatchesExpected,api,selectedModule:selectedModule?{...selectedModule,sourceHashes:engineHashes}:null,apk:apk?{...apk,sha256:apkSHA256,installedSHA256:installedApkSHA256??null,testCertificateSHA256}:null,cleanup,receiptDiagnostic:phase==='receipt-wait'?receiptDiagnostic:null},null,2)+'\n',{flag:'wx',mode:0o600});
   }catch(error){failure??=error;}
  }
  if(failure)throw failure;

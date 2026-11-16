@@ -12,7 +12,7 @@ import {sqliteEngineReceipt} from './native-activity-probe/sqlite-engine.js';
 import {nativeHostInputs} from './native-runtime-inputs.mjs';
 import {readSqliteEngineReceipt} from './verify-ios-sqlite-engine.mjs';
 import {standardFixtureEnvironment} from './native-standard-suite.mjs';
-import {androidSelectionInit,validateAndroidSelection,androidReceiptStat,androidOffline,androidProcessIdentity,readAndroidBuildStep} from './verify-android-sqlite-engine.mjs';
+import {androidSelectionInit,validateAndroidSelection,androidReceiptStat,androidOffline,androidProcessIdentity,readAndroidBuildStep,readAndroidProbeStage} from './verify-android-sqlite-engine.mjs';
 import {EventEmitter} from 'node:events';
 
 const project=fileURLToPath(new URL('../',import.meta.url));
@@ -103,17 +103,37 @@ const expectedEngine={version:'3.51.3',sourceId:'2026-03-13 10:38:09 737ae4a3473
 test('CI engine probe actual entry clears first and writes only after actual query and successful close',async()=>{
  const source=readFileSync(join(project,'index.sqlite-engine-probe.js'),'utf8'),start=source.indexOf('async function recordSqliteEngine()'),end=source.indexOf('\nregisterRootComponent(',start);assert.ok(start>0&&end>start);
  const body=source.slice(start,end),secret='private@example.invalid cookie=private /private/history';
- for(const kind of ['success','open','query','close','query-and-close','write']){
+ for(const kind of ['success','create','open','query','close','query-and-close','write']){
   const calls=[],failure=new Error(secret),closeError=new Error('synthetic close failure');
   for(const key of ['message','stack'])Object.defineProperty(failure,key,{get(){throw new Error('Never inspect the original Error');}});failure.toJSON=()=>{throw new Error('Never serialize the original Error');};
-  class File{constructor(root,name){assert.equal(root,'synthetic-documents');assert.equal(name,'sqlite-engine-probe.json');}create(options){assert.deepEqual(options,{overwrite:true});calls.push('clear');}write(text){calls.push('write');assert.deepEqual(JSON.parse(text),expectedEngine);assert.deepEqual(Object.keys(JSON.parse(text)),['version','sourceId']);if(kind==='write')throw failure;}}
+  class File{constructor(root,name){assert.equal(root,'synthetic-documents');assert.ok(['sqlite-engine-probe.json','sqlite-engine-stage.txt'].includes(name));this.marker=name.endsWith('.txt');}create(options){assert.deepEqual(options,{overwrite:true});if(this.marker)return;calls.push('clear');if(kind==='create')throw failure;}write(text){if(this.marker)return;calls.push('write');assert.deepEqual(JSON.parse(text),expectedEngine);assert.deepEqual(Object.keys(JSON.parse(text)),['version','sourceId']);if(kind==='write')throw failure;}}
   const database={read:async action=>{calls.push('query');if(kind.startsWith('query'))throw failure;return action({getFirstAsync:async query=>{assert.equal(query,'SELECT sqlite_version() AS version, sqlite_source_id() AS sourceId');return expectedEngine;}});},close:async()=>{calls.push('close');if(kind==='close'||kind==='query-and-close')throw closeError;}};
   const open=async(...args)=>{calls.push('open');assert.deepEqual(args,[undefined,'puptime-engine-probe.db']);if(kind==='open')throw failure;return{database};};
   const record=Function('File','Paths','openLocalDatabase','sqliteEngineReceipt','return ('+body+');')(File,{document:'synthetic-documents'},open,sqliteEngineReceipt);
   if(kind==='success')await record();else await assert.rejects(record(),error=>error===(kind==='close'?closeError:failure));
-  assert.deepEqual(calls,kind==='open'?['clear','open']:kind==='success'||kind==='write'?['clear','open','query','close','write']:['clear','open','query','close']);
+  assert.deepEqual(calls,kind==='create'?['clear']:kind==='open'?['clear','open']:kind==='success'||kind==='write'?['clear','open','query','close','write']:['clear','open','query','close']);
  }
  assert.deepEqual([...source.matchAll(/^import .* from '([^']+)'/gm)].map(match=>match[1]),['expo','react','expo-file-system','./src/local/open.native','./scripts/native-activity-probe/sqlite-engine']);
+});
+
+test('actual dedicated entry stages are fixed, best effort and preserve query-over-close errors',async()=>{
+ const source=readFileSync(join(project,'index.sqlite-engine-probe.js'),'utf8'),start=source.indexOf('async function recordSqliteEngine()'),end=source.indexOf('\nregisterRootComponent(',start),body=source.slice(start,end);
+ const stages=['file-create','database-open','query','close-after-query','close-after-query-error','receipt-write','complete'];
+ for(const kind of ['success','create','open','query','close','query-and-close','write'])for(const markerFailure of [null,'create','write'])for(const failAt of markerFailure?[1,2,3,4,5,6]:[0]){
+  const marks=[],calls=[],original=new Error(),closing=new Error(),markerError=new Error();let markerCount=0;
+  for(const error of [original,closing,markerError])for(const key of ['message','stack'])Object.defineProperty(error,key,{get(){throw Error('PRIVATE getter must not run');}});
+  class File{
+   constructor(root,name){assert.equal(root,'documents');assert.ok(['sqlite-engine-probe.json','sqlite-engine-stage.txt'].includes(name));this.marker=name.endsWith('.txt');}
+   create(options){assert.deepEqual(options,{overwrite:true});if(this.marker){this.index=++markerCount;if(markerFailure==='create'&&this.index===failAt)throw markerError;}else{calls.push('create');if(kind==='create')throw original;}}
+   write(value){if(this.marker){assert.ok(stages.includes(value));assert.ok(Buffer.byteLength(value)<=64);marks.push(value);if(markerFailure==='write'&&this.index===failAt)throw markerError;}else{calls.push('write');assert.deepEqual(JSON.parse(value),expectedEngine);if(kind==='write')throw original;}}
+  }
+  const database={read:async action=>{calls.push('query');if(kind.startsWith('query'))throw original;return action({getFirstAsync:async()=>expectedEngine});},close:async()=>{calls.push('close');if(kind==='close'||kind==='query-and-close')throw closing;}};
+  const record=Function('File','Paths','openLocalDatabase','sqliteEngineReceipt','return ('+body+');')(File,{document:'documents'},async()=>{calls.push('open');if(kind==='open')throw original;return{database};},sqliteEngineReceipt);
+  if(kind==='success')await record();else await assert.rejects(record(),error=>error===(kind==='close'?closing:original));
+  const expected=kind==='create'?['file-create']:kind==='open'?['file-create','database-open']:['file-create','database-open','query',kind.startsWith('query')?'close-after-query-error':'close-after-query',...(['success','write'].includes(kind)?['receipt-write']:[]),...(kind==='success'?['complete']:[])];
+  assert.deepEqual(marks,markerFailure==='create'?expected.filter((_,i)=>i+1!==failAt):expected);
+  assert.deepEqual(calls,kind==='create'?['create']:kind==='open'?['create','open']:['create','open','query','close',...(['success','write'].includes(kind)?['write']:[])]);
+ }
 });
 
 test('CI engine probe actual collector admits only stable canonical two-field native bytes',t=>{
@@ -229,7 +249,7 @@ function androidCiRun(options={}){
  const text=readFileSync(join(project,'scripts/verify-android-sqlite-engine.mjs'),'utf8'),start=text.indexOf('export async function verifyAndroidSqliteEngine()'),end=text.indexOf('\nif(process.argv[1]',start);let body=text.slice(start,end).replace('export ','');assert.ok(start>0&&end>start);
  if(options.ddWithoutStatus){assert.equal(body.split("'count=1','status=none'").length,2);body=body.replace("'count=1','status=none'","'count=1'");}
  const calls=[],writes=[],name='Puptime_SQLite_Engine_123_2',args=['-avd',name,'-port','5588','-no-window','-no-audio','-no-snapshot','-gpu','swiftshader_indirect'];
- const raw=options.engineBytes??Buffer.from(JSON.stringify(expectedEngine)),failure=options.failure??new Error('PRIVATE_ORIGINAL'),cleanupError=new Error('PRIVATE_CLEANUP');let live=false,privateExists=true,installed=false,cleared=false,launched=false,disposed=false,rootCount=0,portChecks=0,emulatorStops=0,cleanupStatReads=0,receiptFailureInjected=false;
+ const raw=options.engineBytes??Buffer.from(JSON.stringify(expectedEngine)),failure=options.failure??new Error('PRIVATE_ORIGINAL'),cleanupError=new Error('PRIVATE_CLEANUP');let live=false,privateExists=true,installed=false,cleared=false,launched=false,disposed=false,rootCount=0,portChecks=0,emulatorStops=0,cleanupStatReads=0,receiptFailureInjected=false,markerCleared=false,now=0,launchStatReads=0;
  const sourceHashes=Object.values(hashes).map(row=>row[1]),key='221e0a3106aa4c3ccc154e0a418b55020b3f9ea6e84f92e8749cd9e2f39f5e58',certificate='fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c';
  const env={GITHUB_ACTIONS:'true',GITHUB_REPOSITORY:'patrickchin/puptime',GITHUB_RUN_ID:'123',GITHUB_RUN_ATTEMPT:'2',ANDROID_HOME:'/sdk',RUNNER_TEMP:'/runner',PUPTIME_ANDROID_CMDLINE_BIN:'/sdk/cmdline/bin',EXPO_PUBLIC_CLOUD_API_URL:'https://PRIVATE_ORIGIN',EXPO_PUBLIC_UNKNOWN:'PRIVATE_VALUE',EXPO_PUBLIC_APP_POSTHOG_KEY:'PRIVATE_KEY',EXPO_OVERRIDE_METRO_CONFIG:'PRIVATE_CONFIG',NODE_PATH:'PRIVATE_PATH',NODE_OPTIONS:'PRIVATE_OPTIONS'};
  const assertEnv=value=>{assert.equal(value.EXPO_NO_DOTENV,'1');assert.equal(value.EXPO_PUBLIC_CLOUD_API_URL,'https://127.0.0.1:1');assert.equal(value.EXPO_PUBLIC_APP_POSTHOG_KEY,'');for(const key of ['EXPO_PUBLIC_UNKNOWN','EXPO_OVERRIDE_METRO_CONFIG','NODE_PATH','NODE_OPTIONS'])assert.equal(Object.hasOwn(value,key),false);assert.equal(value.ENTRY_FILE,'index.sqlite-engine-probe.js');};
@@ -241,7 +261,8 @@ function androidCiRun(options={}){
   if(path.endsWith('selected-module.json')){if(options.selectionReadFails)throw failure;return options.selectionBytes??Buffer.from(JSON.stringify(selected));}
   if(path.startsWith('/proc/')){
    if(!live)throw Object.assign(new Error('gone'),{code:'ENOENT'});
-   if(launched&&options.receiptFailure==='wait'&&!receiptFailureInjected){receiptFailureInjected=true;throw failure;}
+   if(launched&&path.endsWith('/stat'))launchStatReads++;
+   if(launched&&(options.receiptFailure==='wait'&&!receiptFailureInjected||options.receiptInnerOwnershipFails&&launchStatReads===3&&!receiptFailureInjected||options.diagnosticOwnershipFails&&now>=60000&&!receiptFailureInjected)){receiptFailureInjected=true;throw failure;}
    const scenario=launched&&options.launchFails?options.ownershipScenario:undefined;
    if(scenario==='throw')throw new Error('PRIVATE_INSPECTION_FAILURE');
    if(path.endsWith('/stat')){if(scenario)cleanupStatReads++;if(scenario==='second-inspection-throws'&&cleanupStatReads>2)throw new Error('PRIVATE_INSPECTION_FAILURE');return scenario==='malformed'?'malformed':stat(scenario==='dead'?'Z':'S',scenario==='reused-start'?'8':'7');}
@@ -263,9 +284,10 @@ function androidCiRun(options={}){
   if(key.includes('airplane_mode_on'))return result('1');if(key.includes('global wifi_on'))return result('0');if(key==='shell cmd wifi status')return result('Wifi is disabled');if(key==='shell dumpsys connectivity')return result('Active default network: none\nCurrent Networks:\nStatus for known UIDs:\n');
   if(key==='shell pm path com.patrickchin.puptime')return installed?result('package:/data/app/synthetic/base.apk\n'):result('',1);
   if(a[0]==='install'){if(options.installFails)return {status:null,stdout:'',error:failure};installed=true;return result('Performing Streamed Install\nSuccess\n');}
-  if(key.startsWith('shell rm -f ')){cleared=true;return result();}if(key.startsWith('shell am start ')){assert.equal(cleared,true);launched=true;if(options.launchFails)return {status:null,stdout:'',error:failure};return result();}
-  if(a[0]==='shell'&&a[1]==='stat'){assert.equal(launched,true);return result('1 2 '+raw.length+' 3 4 81a4\n');}
-  if(key.startsWith('shell readlink -f ')){if(options.receiptFailure==='path')return {status:null,stdout:'',error:failure};return result(a.at(-1));}if(a[0]==='exec-out'){if(options.receiptFailure==='read')return {status:null,stdout:Buffer.alloc(0),error:failure};assert.equal(settings.maxBuffer,257);return result(options.ddSummary&&!a.includes('status=none')?Buffer.concat([raw,Buffer.from('0+1 records in\n0+1 records out\n')]):raw);}
+  if(key.startsWith('shell rm -f ')){if(a.at(-1).endsWith('sqlite-engine-stage.txt'))markerCleared=true;else cleared=true;return result();}if(key.startsWith('shell am start ')){assert.equal(cleared,true);assert.equal(markerCleared,true);launched=true;if(options.launchFails)return {status:null,stdout:'',error:failure};return result();}
+  if(a.at(-1)?.includes('sqlite-engine-stage.txt')){assert.equal(privateExists,true);assert.equal(markerCleared,true);assert.ok(settings.timeout>0&&settings.timeout<=5000);if(options.markerReadFails)return {status:null,stdout:'',error:failure};const marker=Buffer.from(options.probeStage??'database-open');if(a[1]==='stat')return result('1 2 '+marker.length+' 3 4 81a4\n');if(a[1]==='readlink')return result(a.at(-1));}
+  if(a[0]==='shell'&&a[1]==='stat'){assert.equal(launched,true);if(options.receiptWaitExpires)return result('',1);return result('1 2 '+raw.length+' 3 4 81a4\n');}
+  if(key.startsWith('shell readlink -f ')){if(options.receiptFailure==='path')return {status:null,stdout:'',error:failure};return result(a.at(-1));}if(a[0]==='exec-out'){if(a.some(v=>v.includes('sqlite-engine-stage.txt'))){assert.ok(settings.timeout>0&&settings.timeout<=5000);assert.equal(settings.maxBuffer,65);if(options.markerReadFails)return {status:null,stdout:Buffer.alloc(0),error:failure};return result(Buffer.from(options.probeStage??'database-open'));}if(options.receiptFailure==='read')return {status:null,stdout:Buffer.alloc(0),error:failure};assert.equal(settings.maxBuffer,257);return result(options.ddSummary&&!a.includes('status=none')?Buffer.concat([raw,Buffer.from('0+1 records in\n0+1 records out\n')]):raw);}
   if(key.startsWith('shell am force-stop ')){if(options.stopAppFails&&launched)return {status:1,stdout:''};return result();}
   if(['pull','shell'].includes(a[0]))return result();throw new Error('Unexpected synthetic command');
  };
@@ -274,8 +296,8 @@ function androidCiRun(options={}){
  const spawnChild=(binary,argv,settings)=>{assert.equal(binary,'/sdk/emulator/emulator');assert.deepEqual(argv,args);assertEnv(settings.env);assert.equal(settings.detached,true);live=true;const child=new EventEmitter();child.pid=111;return child;};
  const run=async(binary,argv,settings)=>{assertEnv(settings.env);assert.equal(settings.inheritOutput,binary.endsWith('/gradlew')?true:undefined);calls.push([binary,...argv]);settings.own(async()=>!options.commandCleanupFails);if(options.buildFails&&binary.endsWith('/gradlew')||options.prebuildFails&&argv.includes('prebuild'))throw failure;};
  const cleanup=action=>{let once;return {signal:null,run:()=>once??=action(),dispose(){disposed=true;}};};
- const factory=Function('assert','process','realpathSync','lstatSync','existsSync','join','standardFixtureEnvironment','spawnSync','mkdirSync','mkdtempSync','readFileSync','readlinkSync','androidProcessIdentity','installTaskCleanup','runOwned','stableFile','engineHashes','templateKeySHA256','testCertificateSHA256','androidSelectionInit','readAndroidBuildStep','writeFileSync','validateAndroidSelection','apkInspection','portsFree','spawn','ownProcess','androidOffline','androidReceiptStat','readSqliteEngineReceipt','expected','app','serial','rmSync','return ('+body+');');
- const execute=factory(assert,{platform:options.wrongPlatform?'darwin':'linux',env,cwd:()=>'/root',execPath:'/node',getuid:()=>1000},path=>path,()=>({isDirectory:()=>true,isSymbolicLink:()=>false,isFile:()=>true,size:512}),path=>path==='/private'||path==='/private/avd'?privateExists:path.startsWith('/sdk/emulator/'),join,standardFixtureEnvironment,command,()=>{},()=>'/private',read,()=>'/sdk/emulator/emulator',androidProcessIdentity,cleanup,run,stable,sourceHashes,key,certificate,androidSelectionInit,path=>{assert.equal(path,'/private/build-step.txt');assert.equal(privateExists,true);return options.buildStep??null;},writer,value=>{assert.deepEqual(value,selected);if(options.selectionFails)throw failure;return {name:'expo-sqlite',version:'57.0.5',localProject:true};},'synthetic-python',async()=>{portChecks++;if(options.portFails&&portChecks===1)throw failure;},spawnChild,()=>async()=>{emulatorStops++;live=false;return !options.processCleanupFails;},androidOffline,androidReceiptStat,()=>raw,expectedEngine,'com.patrickchin.puptime','emulator-5588',path=>{assert.equal(path,'/private');privateExists=false;});
+ const factory=Function('assert','process','realpathSync','lstatSync','existsSync','join','standardFixtureEnvironment','spawnSync','mkdirSync','mkdtempSync','readFileSync','readlinkSync','androidProcessIdentity','installTaskCleanup','runOwned','stableFile','engineHashes','templateKeySHA256','testCertificateSHA256','androidSelectionInit','readAndroidBuildStep','writeFileSync','validateAndroidSelection','apkInspection','portsFree','spawn','ownProcess','androidOffline','androidReceiptStat','readSqliteEngineReceipt','expected','app','serial','rmSync','readAndroidProbeStage','Date','setTimeout','Error','return ('+body+');');
+ const execute=factory(assert,{platform:options.wrongPlatform?'darwin':'linux',env,cwd:()=>'/root',execPath:'/node',getuid:()=>1000},path=>path,()=>({isDirectory:()=>true,isSymbolicLink:()=>false,isFile:()=>true,size:512}),path=>path==='/private'||path==='/private/avd'?privateExists:path.startsWith('/sdk/emulator/'),join,standardFixtureEnvironment,command,()=>{},()=>'/private',read,()=>'/sdk/emulator/emulator',androidProcessIdentity,cleanup,run,stable,sourceHashes,key,certificate,androidSelectionInit,path=>{assert.equal(path,'/private/build-step.txt');assert.equal(privateExists,true);return options.buildStep??null;},writer,value=>{assert.deepEqual(value,selected);if(options.selectionFails)throw failure;return {name:'expo-sqlite',version:'57.0.5',localProject:true};},'synthetic-python',async()=>{portChecks++;if(options.portFails&&portChecks===1)throw failure;},spawnChild,()=>async()=>{emulatorStops++;live=false;return !options.processCleanupFails;},androidOffline,androidReceiptStat,()=>raw,expectedEngine,'com.patrickchin.puptime','emulator-5588',path=>{assert.equal(path,'/private');privateExists=false;},adb=>readAndroidProbeStage(adb,()=>now),{now:()=>now},(fn,ms)=>{assert.equal(ms,250);now+=ms;queueMicrotask(fn);},options.deadlineError?function(message){assert.equal(message,'Bounded readback timed out.');return options.deadlineError;}:Error);
  return {execute,calls,writes,failure,disposed:()=>disposed,live:()=>live,removed:()=>!privateExists,rootCount:()=>rootCount,emulatorStops:()=>emulatorStops};
 }
 
@@ -289,7 +311,7 @@ test('current Android cleanup requires verified ownership before signaling or re
 
 test('actual Android probe orchestration is source-bound, one ABI/entry, cold, offline and finite',async()=>{
  const check=androidCiRun({rootClosed:true});await check.execute();assert.equal(check.rootCount(),1);assert.equal(check.disposed(),true);assert.equal(check.live(),false);assert.equal(check.removed(),true);
- const proof=check.writes.find(row=>row.path.endsWith('provenance.json')).value;assert.equal(proof.status,'passed');assert.equal(proof.api,36);assert.equal(proof.engineMatchesExpected,true);assert.ok(Object.values(proof.cleanup).every(value=>value===true));assert.equal(proof.schemaVersion,2);assert.equal(proof.buildStep,'source-preservation');assert.equal(Object.keys(proof).length,14);assert.equal(check.writes.length,2);assert.ok(!JSON.stringify(check.writes).includes('PRIVATE'));
+ const proof=check.writes.find(row=>row.path.endsWith('provenance.json')).value;assert.equal(proof.status,'passed');assert.equal(proof.api,36);assert.equal(proof.engineMatchesExpected,true);assert.ok(Object.values(proof.cleanup).every(value=>value===true));assert.equal(proof.schemaVersion,3);assert.equal(proof.buildStep,'source-preservation');assert.equal(Object.keys(proof).length,15);assert.equal(proof.receiptDiagnostic,null);assert.equal(check.writes.length,2);assert.ok(!JSON.stringify(check.writes).includes('PRIVATE'));
  const build=check.calls.find(row=>row[0].endsWith('/gradlew'));assert.deepEqual(build.slice(1,4),[':app:assembleRelease','--no-daemon','-PreactNativeArchitectures=x86_64']);assert.deepEqual(build.slice(1),[':app:assembleRelease','--no-daemon','-PreactNativeArchitectures=x86_64','--no-configuration-cache','--init-script','/private/engine-inputs.gradle']);assert.ok(!check.calls.some(row=>row.includes('bundleRelease')||row.includes('keytool')||row.includes('maestro')||row.includes('sqlite3')));
 });
 
@@ -313,10 +335,51 @@ test('Android receipt phase groups preserve original failures, cleanup and the s
   const failure=new Error('PRIVATE_RECEIPT_FAILURE');Object.defineProperty(failure,'message',{get(){throw Error('No error inspection');}});
   const check=androidCiRun({receiptFailure:boundary,failure});await assert.rejects(check.execute(),error=>error===failure);
   const value=check.writes.find(row=>row.path.endsWith('provenance.json')).value;
-  assert.equal(value.status,'failed');assert.equal(value.phase,phase);assert.equal(value.engineMatchesExpected,null);assert.equal(Object.keys(value).length,14);assert.ok(Object.values(value.cleanup).every(flag=>flag===true));assert.equal(check.writes.some(row=>row.path.endsWith('probe.json')),false);
+  assert.equal(value.status,'failed');assert.equal(value.phase,phase);assert.equal(value.engineMatchesExpected,null);assert.equal(Object.keys(value).length,15);assert.ok(Object.values(value.cleanup).every(flag=>flag===true));assert.equal(check.writes.some(row=>row.path.endsWith('probe.json')),false);
   assert.equal(check.disposed(),true);assert.equal(check.removed(),true);assert.equal(check.live(),false);assert.ok(!JSON.stringify(check.writes).includes('PRIVATE'));
  }
  const success=androidCiRun();await success.execute();const value=success.writes.find(row=>row.path.endsWith('provenance.json')).value;assert.equal(value.status,'passed');assert.equal(value.phase,'receipt');assert.equal(value.engineMatchesExpected,true);
+});
+
+test('actual receipt wait distinguishes ownership rejection from deadline and reads no stale marker',async()=>{
+ const owner=androidCiRun({receiptFailure:'wait'});await assert.rejects(owner.execute(),error=>error===owner.failure);
+ const ownedProof=owner.writes.find(row=>row.path.endsWith('provenance.json')).value;
+ assert.deepEqual(ownedProof.receiptDiagnostic,{waitOutcome:'owned-guard-failed',probeStage:null});
+ assert.ok(!owner.calls.some(row=>row.includes('stat')&&row.at(-1).endsWith('sqlite-engine-stage.txt')));
+ for(const options of [{},{markerReadFails:true},{probeStage:'PRIVATE https://private.invalid'},{receiptInnerOwnershipFails:true},{diagnosticOwnershipFails:true}]){
+  const failure=new Error();Object.defineProperty(failure,'message',{get(){throw Error('PRIVATE getter');}});
+  const check=androidCiRun({receiptWaitExpires:true,failure,deadlineError:failure,...options});await assert.rejects(check.execute(),error=>error===failure);
+  const proof=check.writes.find(row=>row.path.endsWith('provenance.json')).value;
+  assert.equal(proof.status,'failed');assert.equal(proof.phase,'receipt-wait');assert.equal(proof.engineMatchesExpected,null);
+  assert.deepEqual(proof.receiptDiagnostic,{waitOutcome:'deadline-expired',probeStage:Object.keys(options).length?null:'database-open'});
+  assert.ok(Object.values(proof.cleanup).every(value=>value===true));assert.equal(check.disposed(),true);assert.equal(check.removed(),true);
+  const markerReads=check.calls.filter(row=>row.includes('stat')&&row.at(-1).endsWith('sqlite-engine-stage.txt'));
+  if(options.receiptInnerOwnershipFails||options.diagnosticOwnershipFails)assert.equal(markerReads.length,0);else assert.ok(markerReads.length>=1);
+  const deletion=check.calls.findIndex(row=>row.includes('rm')&&row.at(-1).endsWith('sqlite-engine-stage.txt')),launch=check.calls.findIndex(row=>row.includes('start'));
+  assert.ok(deletion>=0&&deletion<launch);assert.ok(!JSON.stringify(proof).includes('PRIVATE'));
+ }
+ const ready=androidCiRun();await ready.execute();assert.equal(ready.writes.find(row=>row.path.endsWith('provenance.json')).value.receiptDiagnostic,null);
+ assert.ok(!ready.calls.some(row=>row.includes('stat')&&row.at(-1).endsWith('sqlite-engine-stage.txt')));
+});
+
+test('failure marker reader uses one shared budget and rejects private, symlink, unstable and malformed bytes',()=>{
+ const path='/data/user/0/com.patrickchin.puptime/files/sqlite-engine-stage.txt',stages=['file-create','database-open','query','close-after-query','close-after-query-error','receipt-write','complete'];
+ const run=(raw,options={})=>{
+  const calls=[];let now=0,stats=0;
+  const value=readAndroidProbeStage((args,settings)=>{
+   calls.push({args,settings});assert.equal(settings.timeout,5000-now);assert.ok(settings.maxBuffer<=256);now+=options.latency??1000;
+   if(options.fail)throw options.fail;
+   if(args[1]==='stat'){stats++;return `1 2 ${options.zero?0:raw.length} ${options.unstable&&stats===2?9:3} 4 ${options.symlink?'a1ff':'81a4'}\n`;}
+   if(args[1]==='readlink')return options.foreign?'/private/foreign':path;
+   assert.deepEqual(args,['exec-out','dd','if='+path,'bs=65','count=1','status=none']);assert.equal(settings.binaryOutput,true);assert.equal(settings.maxBuffer,65);return options.short?raw.subarray(1):raw;
+  },()=>now);
+  assert.ok(calls.length<=4);return{value,calls,now};
+ };
+ for(const stage of stages){const result=run(Buffer.from(stage));assert.equal(result.value,stage);assert.deepEqual(result.calls.map(row=>row.settings.timeout),[5000,4000,3000,2000]);}
+ for(const raw of [Buffer.alloc(0),Buffer.alloc(65),Buffer.from([0xff]),Buffer.from('query\n'),Buffer.from('\ufeffquery'),Buffer.from('PRIVATE /private/path https://private.invalid')])assert.equal(run(raw).value,null);
+ for(const options of [{zero:true},{symlink:true},{foreign:true},{unstable:true},{short:true},{latency:2000}])assert.equal(run(Buffer.from('query'),options).value,null);
+ const failure=new Error();Object.defineProperty(failure,'message',{get(){throw Error('PRIVATE getter');}});assert.equal(run(Buffer.from('query'),{fail:failure}).value,null);
+ const timed=run(Buffer.from('query'),{latency:3000});assert.equal(timed.value,null);assert.equal(timed.calls.length,2);assert.ok(timed.calls.every(row=>row.settings.timeout<=5000));
 });
 
 test('Android mismatches, setup/cleanup/writer failures never pass or replace the original failure',async()=>{
@@ -377,8 +440,8 @@ test('Android actual build diagnostics preserve original failures, finite schema
  for(const {options,step} of cases){
   const failure=new Error();Object.defineProperty(failure,'message',{get(){throw Error('Do not inspect PRIVATE message');}});const check=androidCiRun({...options,failure});await assert.rejects(check.execute(),error=>error===failure);
   const value=check.writes.find(row=>row.path.endsWith('provenance.json')).value;
-  assert.equal(value.schemaVersion,2);assert.equal(value.phase,'build');assert.equal(value.buildStep,step);assert.equal(value.status,'failed');assert.equal(value.selectedModule,null);assert.equal(value.engineMatchesExpected,null);assert.equal(value.api,null);assert.equal(value.apk,null);assert.equal(check.disposed(),true);assert.equal(check.removed(),true);assert.ok(Object.values(value.cleanup).every(flag=>flag===true));
-  assert.deepEqual(Object.keys(value).sort(),['schemaVersion','stage','status','phase','buildStep','checkoutCommit','checkoutTree','runId','runAttempt','engineMatchesExpected','api','selectedModule','apk','cleanup'].sort());assert.ok(!JSON.stringify(value).includes('PRIVATE'));
+  assert.equal(value.schemaVersion,3);assert.equal(value.phase,'build');assert.equal(value.buildStep,step);assert.equal(value.status,'failed');assert.equal(value.selectedModule,null);assert.equal(value.engineMatchesExpected,null);assert.equal(value.api,null);assert.equal(value.apk,null);assert.equal(check.disposed(),true);assert.equal(check.removed(),true);assert.ok(Object.values(value.cleanup).every(flag=>flag===true));
+  assert.deepEqual(Object.keys(value).sort(),['schemaVersion','stage','status','phase','buildStep','checkoutCommit','checkoutTree','runId','runAttempt','engineMatchesExpected','api','selectedModule','apk','cleanup','receiptDiagnostic'].sort());assert.ok(!JSON.stringify(value).includes('PRIVATE'));
  }
  const invalid=androidCiRun({selectionBytes:Buffer.from([0xff])});await assert.rejects(invalid.execute());assert.equal(invalid.writes.find(row=>row.path.endsWith('provenance.json')).value.buildStep,'selection-read');
  const setup=androidCiRun({prebuildFails:true});await assert.rejects(setup.execute(),error=>error===setup.failure);assert.equal(setup.writes.find(row=>row.path.endsWith('provenance.json')).value.buildStep,null);
