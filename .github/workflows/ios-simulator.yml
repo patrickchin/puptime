@@ -78,6 +78,20 @@ jobs:
           path: build/Puptime-iOS-Simulator.zip
           if-no-files-found: error
           retention-days: 7
+      - name: Verify the actual iOS SQLite engine
+        timeout-minutes: 25
+        run: node scripts/verify-ios-sqlite-engine.mjs
+      - name: Upload finite SQLite engine verdict
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v6
+        with:
+          name: puptime-ios-sqlite-engine-verdict
+          path: |
+            build/sqlite-engine-check/sqlite-engine-probe.json
+            build/sqlite-engine-check/sqlite-engine-provenance.json
+          if-no-files-found: warn
+          retention-days: 7
       - name: Install Maestro
         env:
           MAESTRO_VERSION: "2.11.0"
