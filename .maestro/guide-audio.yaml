@@ -39,8 +39,16 @@ tags:
       id: learn.sources.toggle
     direction: DOWN
     visibilityPercentage: 100
+- waitForAnimationToEnd
 - tapOn:
     id: learn.sources.toggle
+    retryTapIfNoChange: true
+# The expanded panel can be taller than the viewport; require part of it first.
+- scrollUntilVisible:
+    element:
+      id: learn.sources
+    direction: DOWN
+    visibilityPercentage: 10
 - scrollUntilVisible:
     element:
       text: RSPCA.*
