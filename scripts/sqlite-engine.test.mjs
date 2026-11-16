@@ -226,7 +226,8 @@ if mode in ('crc','oversize'):
 });
 
 function androidCiRun(options={}){
- const text=readFileSync(join(project,'scripts/verify-android-sqlite-engine.mjs'),'utf8'),start=text.indexOf('export async function verifyAndroidSqliteEngine()'),end=text.indexOf('\nif(process.argv[1]',start),body=text.slice(start,end).replace('export ','');assert.ok(start>0&&end>start);
+ const text=readFileSync(join(project,'scripts/verify-android-sqlite-engine.mjs'),'utf8'),start=text.indexOf('export async function verifyAndroidSqliteEngine()'),end=text.indexOf('\nif(process.argv[1]',start);let body=text.slice(start,end).replace('export ','');assert.ok(start>0&&end>start);
+ if(options.ddWithoutStatus){assert.equal(body.split("'count=1','status=none'").length,2);body=body.replace("'count=1','status=none'","'count=1'");}
  const calls=[],writes=[],name='Puptime_SQLite_Engine_123_2',args=['-avd',name,'-port','5588','-no-window','-no-audio','-no-snapshot','-gpu','swiftshader_indirect'];
  const raw=options.engineBytes??Buffer.from(JSON.stringify(expectedEngine)),failure=options.failure??new Error('PRIVATE_ORIGINAL'),cleanupError=new Error('PRIVATE_CLEANUP');let live=false,privateExists=true,installed=false,cleared=false,launched=false,disposed=false,rootCount=0,portChecks=0,emulatorStops=0,cleanupStatReads=0;
  const sourceHashes=Object.values(hashes).map(row=>row[1]),key='221e0a3106aa4c3ccc154e0a418b55020b3f9ea6e84f92e8749cd9e2f39f5e58',certificate='fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c';
@@ -263,7 +264,7 @@ function androidCiRun(options={}){
   if(a[0]==='install'){if(options.installFails)return {status:null,stdout:'',error:failure};installed=true;return result('Performing Streamed Install\nSuccess\n');}
   if(key.startsWith('shell rm -f ')){cleared=true;return result();}if(key.startsWith('shell am start ')){assert.equal(cleared,true);launched=true;if(options.launchFails)return {status:null,stdout:'',error:failure};return result();}
   if(a[0]==='shell'&&a[1]==='stat'){assert.equal(launched,true);return result('1 2 '+raw.length+' 3 4 81a4\n');}
-  if(key.startsWith('shell readlink -f '))return result(a.at(-1));if(a[0]==='exec-out'){assert.equal(settings.maxBuffer,257);return result(raw);}
+  if(key.startsWith('shell readlink -f '))return result(a.at(-1));if(a[0]==='exec-out'){assert.equal(settings.maxBuffer,257);return result(options.ddSummary&&!a.includes('status=none')?Buffer.concat([raw,Buffer.from('0+1 records in\n0+1 records out\n')]):raw);}
   if(key.startsWith('shell am force-stop ')){if(options.stopAppFails&&launched)return {status:1,stdout:''};return result();}
   if(['pull','shell'].includes(a[0]))return result();throw new Error('Unexpected synthetic command');
  };
@@ -289,6 +290,21 @@ test('actual Android probe orchestration is source-bound, one ABI/entry, cold, o
  const check=androidCiRun({rootClosed:true});await check.execute();assert.equal(check.rootCount(),1);assert.equal(check.disposed(),true);assert.equal(check.live(),false);assert.equal(check.removed(),true);
  const proof=check.writes.find(row=>row.path.endsWith('provenance.json')).value;assert.equal(proof.status,'passed');assert.equal(proof.api,36);assert.equal(proof.engineMatchesExpected,true);assert.ok(Object.values(proof.cleanup).every(value=>value===true));assert.equal(proof.schemaVersion,2);assert.equal(proof.buildStep,'source-preservation');assert.equal(Object.keys(proof).length,14);assert.equal(check.writes.length,2);assert.ok(!JSON.stringify(check.writes).includes('PRIVATE'));
  const build=check.calls.find(row=>row[0].endsWith('/gradlew'));assert.deepEqual(build.slice(1,4),[':app:assembleRelease','--no-daemon','-PreactNativeArchitectures=x86_64']);assert.deepEqual(build.slice(1),[':app:assembleRelease','--no-daemon','-PreactNativeArchitectures=x86_64','--no-configuration-cache','--init-script','/private/engine-inputs.gradle']);assert.ok(!check.calls.some(row=>row.includes('bundleRelease')||row.includes('keytool')||row.includes('maestro')||row.includes('sqlite3')));
+});
+
+test('Android raw exec-out suppresses dd summaries while retaining exact receipt bytes and failure cleanup',async t=>{
+ const root=realpathSync(mkdtempSync(join(tmpdir(),'puptime-dd-receipt-')));t.after(()=>rmSync(root,{recursive:true,force:true}));
+ const path=join(root,'receipt.json'),raw=Buffer.from(JSON.stringify(expectedEngine)),summary=Buffer.from('0+1 records in\n0+1 records out\n');
+ writeFileSync(path,raw);assert.deepEqual(readSqliteEngineReceipt(path),raw);
+ writeFileSync(path,Buffer.concat([raw,summary]));assert.throws(()=>readSqliteEngineReceipt(path));
+ const original=androidCiRun({ddSummary:true,ddWithoutStatus:true});
+ await assert.rejects(original.execute(),error=>error.code==='ERR_ASSERTION'&&error.actual===raw.length+summary.length&&error.expected===raw.length);
+ const failed=original.writes.find(row=>row.path.endsWith('provenance.json')).value;
+ assert.equal(failed.status,'failed');assert.equal(failed.phase,'receipt');assert.equal(failed.engineMatchesExpected,null);assert.ok(Object.values(failed.cleanup).every(value=>value===true));assert.equal(original.writes.some(row=>row.path.endsWith('probe.json')),false);assert.equal(original.disposed(),true);assert.equal(original.removed(),true);
+ const fixed=androidCiRun({ddSummary:true});await fixed.execute();
+ const dd=fixed.calls.find(row=>row.includes('exec-out'));
+ assert.deepEqual(dd,['/sdk/platform-tools/adb','-s','emulator-5588','exec-out','dd','if=/data/user/0/com.patrickchin.puptime/files/sqlite-engine-probe.json','bs=257','count=1','status=none']);
+ assert.deepEqual(fixed.writes.find(row=>row.path.endsWith('probe.json')).value,expectedEngine);assert.equal(fixed.writes.find(row=>row.path.endsWith('provenance.json')).value.status,'passed');assert.equal(fixed.disposed(),true);assert.equal(fixed.removed(),true);
 });
 
 test('Android mismatches, setup/cleanup/writer failures never pass or replace the original failure',async()=>{
