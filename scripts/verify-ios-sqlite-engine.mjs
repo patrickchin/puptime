@@ -25,7 +25,11 @@ export function readSqliteEngineReceipt(path) {
     const after = fstatSync(descriptor), current = lstatSync(path);
     assert.ok(current.isFile() && !current.isSymbolicLink() && length === before.size && length <= 256);
     for (const field of ['dev', 'ino', 'size', 'mtimeMs', 'ctimeMs']) { assert.equal(after[field], before[field]); assert.equal(current[field], before[field]); }
-    const raw = bytes.subarray(0, length); assert.equal(new TextDecoder('utf-8', { fatal: true }).decode(raw), JSON.stringify(expected));
+    const raw = bytes.subarray(0, length), text = new TextDecoder('utf-8', { fatal: true }).decode(raw), value = JSON.parse(text);
+    assert.ok(value && Object.keys(value).sort().join(',') === 'sourceId,version');
+    assert.equal(typeof value.version, 'string'); assert.match(value.version, /^\d{1,3}\.\d{1,3}\.\d{1,3}$/);
+    assert.equal(typeof value.sourceId, 'string'); assert.match(value.sourceId, /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d [a-f0-9]{64}$/);
+    assert.equal(text, JSON.stringify({ version: value.version, sourceId: value.sourceId }));
     return raw;
   } finally { if (descriptor !== undefined) closeSync(descriptor); }
 }
@@ -56,7 +60,7 @@ export async function verifyIosSqliteEngine() {
   const output = join(root, 'build/sqlite-engine-check'); assert.ok(!existsSync(output)); mkdirSync(output, { mode: 0o700 });
   const privateDirectory = mkdtempSync(join(tmpdir(), 'puptime-engine-ci-')), copy = join(privateDirectory, 'Puptime.app');
   const cleanup = { processesStopped: false, simulatorDeleted: false, copyRemoved: false };
-  let device, stopBundle, failure, phase = 'source', hostHashes, engineBytes, probeBundleSHA256;
+  let device, stopBundle, failure, phase = 'source', hostHashes, engineBytes, probeBundleSHA256, engineMatchesExpected = null;
   const task = installTaskCleanup(async () => {
     try { cleanup.processesStopped = stopBundle ? await stopBundle() : true; assert.ok(cleanup.processesStopped); }
     finally {
@@ -83,14 +87,16 @@ export async function verifyIosSqliteEngine() {
     phase = 'launch'; command('xcrun', ['simctl', 'launch', device, 'com.patrickchin.puptime']);
     phase = 'receipt'; const deadline = Date.now() + 60000;
     while (!existsSync(receipt) || lstatSync(receipt).size === 0) { assert.ok(Date.now() < deadline && task.signal === null, 'Require the native engine receipt.'); await new Promise(done => setTimeout(done, 250)); }
-    engineBytes = readSqliteEngineReceipt(receipt); assert.equal(task.signal, null);
+    engineBytes = readSqliteEngineReceipt(receipt);
+    engineMatchesExpected = engineBytes.equals(Buffer.from(JSON.stringify(expected)));
+    assert.equal(engineMatchesExpected, true, 'Require the expected native SQLite engine.'); assert.equal(task.signal, null);
   } catch (error) { failure = error; }
   finally {
     try { await task.run(); } catch (error) { failure ??= error; } finally { task.dispose(); }
     try {
       if (hostHashes) assert.deepEqual(['Puptime', 'main.jsbundle'].map(name => hash(join(host, name))), hostHashes);
-      if (!failure) writeFileSync(join(output, 'sqlite-engine-probe.json'), engineBytes, { mode: 0o600, flag: 'wx' });
-      writeFileSync(join(output, 'sqlite-engine-provenance.json'), JSON.stringify({ schemaVersion: 1, stage: 'sqlite-engine-ci', status: failure ? 'failed' : 'passed', phase, checkoutCommit: source, checkoutTree: tree, runId, runAttempt: Number(attempt), device: device ?? null, nativeHostSHA256: hostHashes?.[0] ?? null, probeBundleSHA256: probeBundleSHA256 ?? null, cleanup }, null, 2) + '\n', { mode: 0o600, flag: 'wx' });
+      if (engineBytes && Object.values(cleanup).every(value => value === true)) writeFileSync(join(output, 'sqlite-engine-probe.json'), engineBytes, { mode: 0o600, flag: 'wx' });
+      writeFileSync(join(output, 'sqlite-engine-provenance.json'), JSON.stringify({ schemaVersion: 1, stage: 'sqlite-engine-ci', status: failure ? 'failed' : 'passed', engineMatchesExpected, phase, checkoutCommit: source, checkoutTree: tree, runId, runAttempt: Number(attempt), device: device ?? null, nativeHostSHA256: hostHashes?.[0] ?? null, probeBundleSHA256: probeBundleSHA256 ?? null, cleanup }, null, 2) + '\n', { mode: 0o600, flag: 'wx' });
     } catch (error) { failure ??= error; }
   }
   if (failure) throw failure;
