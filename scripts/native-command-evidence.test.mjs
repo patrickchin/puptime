@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {mkdtempSync,mkdirSync,rmSync,symlinkSync,writeFileSync} from 'node:fs';
+import {existsSync,mkdtempSync,mkdirSync,readFileSync,rmSync,symlinkSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
-import {join} from 'node:path';
+import {join,resolve} from 'node:path';
 import {nativeCommandState,readNativeCommandState} from './native-command-evidence.mjs';
 
 const unknown={status:'UNKNOWN',kind:'unknown',targetId:null,sequence:0};
@@ -93,4 +93,22 @@ test('pinned2.11 serialized scroll uses only scrollUntilVisible, never the inven
  for(const secret of ['identity@example.invalid','654321','private body/header/cookie','secret'])assert.ok(!JSON.stringify(result).includes(secret));
  assert.deepEqual(nativeCommandState([{command:{scrollUntilVisibleCommand:value},metadata}]),unknown,'No legacy alias for a key absent from the pinned model.');
  assert.deepEqual(nativeCommandState([{command:{scrollUntilVisible:value,scrollUntilVisibleCommand:value},metadata}]),unknown,'A mixed command union remains ambiguous.');
+});
+
+test('actual add-logs failure catch emits only finite evidence and preserves the original error and cleanup on reader/writer failure',async()=>{
+ const sdk=readFileSync(new URL('./verify-native-guest-account.mjs',import.meta.url),'utf8'),start=sdk.indexOf('async function flow(name,env={}){'),end=sdk.indexOf("\nlet email=",start);assert.ok(start>0&&end>start);
+ const body=sdk.slice(start,end),secret='synthetic-identity@example.invalid 873921 cookie=private-session /private/auth/trace';
+ const execute=Function('name','privateDir','run','writeFileSync','readNativeCommandState','rmSync','existsSync','readdirSync','join','resolve','process',`return (async()=>{let activeFlow='startup',flowSequence=0,setupWindow;const device='synthetic',output='/synthetic-output',email='synthetic-identity@example.invalid',code='',android=true,requests=new Set(['/api/config']),authResponses=[],homedir=()=>'/synthetic-home',Date={now:()=>42},markStartup=()=>{},console={log(){}};${body};await flow(name);})();`);
+ for(const options of [{},{readerFails:true},{writerFails:true},{name:'request'}]){
+  const name=options.name??'add-logs',root=mkdtempSync(join(tmpdir(),'puptime-flow-command-')),artifacts=join(root,'maestro-'+name+'-42'),writes=[];let reads=0,cleaned=0;
+  try{
+   mkdirSync(artifacts);writeFileSync(join(artifacts,'commands.json'),JSON.stringify([row('assertConditionCommand',{condition:{visible:{idRegex:'account.local.count',textRegex:secret}}},'FAILED',12)]));
+   const original=new Error(secret);for(const key of ['message','stack'])Object.defineProperty(original,key,{get(){throw new Error('Do not read raw Error fields');}});original.toJSON=()=>{throw new Error('Do not serialize the Error');};
+   const promise=execute(name,root,async()=>{throw original;},(path,text,mode)=>{if(options.writerFails&&path.endsWith('/fixture-add-logs-command.json'))throw new Error('Synthetic writer failure');writes.push({path,value:JSON.parse(text),mode});},path=>{reads++;assert.equal(path,artifacts);if(options.readerFails)throw new Error('Synthetic reader failure');return readNativeCommandState(path);},(path,options)=>{cleaned++;assert.equal(path,artifacts);rmSync(path,options);},path=>path===artifacts&&existsSync(path),()=>['commands.json'],join,resolve,{env:{}});
+   await assert.rejects(promise,error=>error===original);assert.equal(cleaned,1);assert.equal(existsSync(artifacts),false);assert.equal(reads,name==='add-logs'?1:0);
+   const evidence=writes.filter(row=>row.path.endsWith('/fixture-add-logs-command.json'));
+   if(name==='add-logs'&&!options.readerFails&&!options.writerFails)assert.deepEqual(evidence,[{path:'/synthetic-output/fixture-add-logs-command.json',value:{phase:'add-logs',flowSequence:1,status:'FAILED',kind:'assert',targetId:'account.local.count',sequence:12},mode:{mode:0o600}}]);else assert.deepEqual(evidence,[]);
+   assert.ok(!JSON.stringify(writes).includes(secret));assert.equal(writes.filter(row=>row.path.endsWith('/fixture-native-reach.json')).length,1);assert.equal(writes.filter(row=>row.path.endsWith('/fixture-auth-readiness.json')).length,1);
+  }finally{rmSync(root,{recursive:true,force:true});}
+ }
 });

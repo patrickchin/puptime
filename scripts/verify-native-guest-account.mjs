@@ -17,6 +17,7 @@ import {createLocalRuntime} from '../src/local/runtime-factory.ts';
 import {pushResponseSchema,pullPageSchema,mutationSchema} from '../src/cloud/protocol.ts';
 import {nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeDrained,assertEmptyIosRestoreSources,capturedJson,nativeAuthUiFlags} from './native-account-evidence.mjs';
 import {startupEvidence} from './native-startup-evidence.mjs';
+import {readNativeCommandState} from './native-command-evidence.mjs';
 import {assertArchivedSource,nativeCodeFingerprint} from './native-runtime-inputs.mjs';
 import {deleteOwnedSimulator,installTaskCleanup,ownProcess} from './native-task-cleanup.mjs';
 import {standardFixtureEnvironment,runStandardSuite} from './native-standard-suite.mjs';
@@ -110,6 +111,7 @@ async function flow(name,env={}){
     let ui={inspected:false};
     try{if(hierarchy&&statSync(join(artifacts,hierarchy)).size<=2097152)ui={inspected:true,fields:nativeAuthUiFlags(JSON.parse(readFileSync(join(artifacts,hierarchy),'utf8')),{email,code})};}catch{/* Keep the actual driver failure; record no unprojected value. */}
     writeFileSync(join(output,'fixture-auth-readiness.json'),JSON.stringify({phase:name,flowSequence,ui,responses:authResponses},null,2)+'\n');
+    if(name==='add-logs')try{writeFileSync(join(output,'fixture-add-logs-command.json'),JSON.stringify({phase:'add-logs',flowSequence,...readNativeCommandState(artifacts)},null,2)+'\n',{mode:0o600});}catch{/* Preserve the original flow failure and existing cleanup. */}
     // These flows never enter a credential. Do not retain auth-code screenshots.
     if(!android&&['prepare','add-logs'].includes(name)){
       try{simctl('io',device,'screenshot',join(output,'failure-'+name+'.png'));}catch{}

@@ -15,9 +15,12 @@ name: Account preservation add-logs
     id: account.back
     retryTapIfNoChange: true
 - extendedWaitUntil:
-    visible:
-      id: screen.today
+    notVisible:
+      id: screen.account
     timeout: 30000
+- waitForAnimationToEnd
+- assertVisible:
+    id: screen.today
 - repeat:
     times: ${BATCHES}
     commands:
