@@ -24,7 +24,9 @@ GitHub timestamp precision). Duplicate or stale artifacts fail closed; no
 artifact overwrite or deletion is introduced. The consumer rechecks run attempt,
 source and artifact metadata after download, before creating a simulator.
 
-The [current compiled-host producer at `ee31437`](https://github.com/patrickchin/puptime/actions/runs/43635534948) compiled and uploaded its host, then passed 12 of 13 standard flows. The CSV-import flow failed; conversational, SDK/account and deletion steps were not reached. This is usable compiled-host evidence under the explicit policy, not a full-suite or release pass. The older successful baseline remains historical evidence at its recorded source.
+The [retained main compiled-host example at `ee31437`](https://github.com/patrickchin/puptime/actions/runs/43635534948) compiled and uploaded its host, then passed 12 of 13 standard flows. The CSV-import flow failed; conversational, SDK/account and deletion steps were not reached. This is compiled-host evidence under the explicit policy while its inputs remain eligible, not a full-suite or release pass. The older successful baseline remains historical evidence at its recorded source.
+
+The [hosted iOS engine candidate at `ae6f0cc`, PR #254](https://github.com/patrickchin/puptime/actions/runs/43879930515) verified SQLite 3.51.3 with source ID `2026-03-13 10:38:09 737ae4a34738ffa0c3ff7f9bb18df914dd1cad163f28fd6b6e114a344fe6d618`. Its standard suite had 12 SUCCESS and only `05b-notifications` ERROR; both `00-onboarding` and `00-onboarding-notifications` succeeded. Conversational, SDK/account and deletion stages were SKIPPED. The cause remains UNKNOWN. This PR build is not an eligible main/push host under the policy above, and Android engine qualification remains open.
 
 Use the additional policy only deliberately:
 
@@ -49,11 +51,13 @@ Application assertions, flow/command/overall deadlines, Android and private
 authentication handoff timers are unchanged. Original-runtime verification honors
 a supplied driver bound instead of forcing 180 seconds.
 
+Historical final shared iOS account reopens used [reopen.yaml](../.maestro/account-preservation/reopen.yaml) with `launchApp`, `stopApp: false` and no preceding stop. They establish foreground preservation, not a cold restart. Explicit-stop outage, pending-work, detached-guest, mismatch and deletion branches, and terminate-before-install upgrades, retain their cold-start scope. The proposed shared explicit-stop correction is source-only and awaits native qualification.
+
 ## Case selection
 
 | Manual case | Evidence |
 | --- | --- |
-| `baseline` | Guest logging, native sign-in, explicit enrollment, signed-in logging, logout, same-account combine and a genuinely new-device restore of every original event. The restore preflight inspects all 14 tables and shared journal, widget timeline and backup history. The final restart checks event bodies and pending work. |
+| `baseline` | Guest logging, native sign-in, explicit enrollment, signed-in logging, logout, same-account combine and a genuinely new-device restore of every original event. The restore preflight inspects all 14 tables and shared journal, widget timeline and backup history. The final foreground reopen checks event bodies and pending work. |
 | `comparison` | Same-name and different-name histories, both cancellation paths, distinct puppy identities and explicit combination without duplicate or rewritten events. |
 | `offline` | HTTP and WebSocket outage, pending writes across restart, exact native acknowledgement/drain, committed response loss and identical replay, pending logout cancellation, online logout and fully disconnected logout/rejoin. |
 | `isolation` | Actual server session expiry, another native account's queue fence, no attempted enrollment/push, cancellation/restart, explicit logout and return to the original account. |
@@ -120,7 +124,7 @@ PUPTIME_ACCOUNT_SCENARIO=enrolled-upgrade \
 node scripts/run-hosted-ios-account-case.mjs
 ```
 
-The older native app runs first, creates and enrolls 12 logs through its actual SDK, then leaves three real offline operations pending. The newer runtime installs without uninstall, reset or reauthentication. Every table and pending payload must survive offline installation/opening; the actual newer SDK must use the original account, drain three exact acknowledgements and retain all 15 cloud events at revision 1. Final cold restart checks all 14 tables and remote events.
+The older native app runs first, creates and enrolls 12 logs through its actual SDK, then leaves three real offline operations pending. The newer runtime installs without uninstall, reset or reauthentication. Every table and pending payload must survive offline installation/opening; the actual newer SDK must use the original account, drain three exact acknowledgements and retain all 15 cloud events at revision 1. The final foreground reopen checks all 14 tables and remote events.
 
 A pass uses `stage: controlled-origin-enrolled-runtime-replacement`, `upgradeExecuted: true`, `originModified: true` and `originalInstalledBytes: false`. This case currently uses the local wrapper; it is not a new hosted workflow selection.
 
