@@ -12,6 +12,8 @@ import {sqliteEngineReceipt} from './native-activity-probe/sqlite-engine.js';
 import {nativeHostInputs} from './native-runtime-inputs.mjs';
 import {readSqliteEngineReceipt} from './verify-ios-sqlite-engine.mjs';
 import {standardFixtureEnvironment} from './native-standard-suite.mjs';
+import {androidSelectionInit,validateAndroidSelection,androidReceiptStat,androidOffline,androidProcessIdentity} from './verify-android-sqlite-engine.mjs';
+import {EventEmitter} from 'node:events';
 
 const project=fileURLToPath(new URL('../',import.meta.url));
 // Local source review can use a verified public package capsule without installing.
@@ -171,4 +173,138 @@ test('CI engine probe workflow uses its own compiled host before other suites an
  const {createRequire}=await import('node:module'),{parse}=createRequire(import.meta.url)('yaml'),steps=parse(readFileSync(join(project,'.github/workflows/ios-simulator.yml'),'utf8')).jobs.build.steps,index=steps.findIndex(step=>step.name==='Verify the actual iOS SQLite engine'),probe=steps[index],upload=steps[index+1];
  assert.equal(steps[index-1].name,'Upload compiled iOS host for testing');assert.equal(probe.run,'node scripts/verify-ios-sqlite-engine.mjs');assert.equal(probe['timeout-minutes'],25);assert.equal(upload.if,'always()');assert.equal(upload['continue-on-error'],true);assert.equal(upload.with.name,'puptime-ios-sqlite-engine-verdict');assert.deepEqual(upload.with.path.trim().split('\n'),['build/sqlite-engine-check/sqlite-engine-probe.json','build/sqlite-engine-check/sqlite-engine-provenance.json']);assert.equal(steps[index+2].name,'Install Maestro');
  const helper=readFileSync(join(project,'scripts/verify-ios-sqlite-engine.mjs'),'utf8');assert.match(helper,/assert\.equal\(process\.argv\.length, 2\)/);assert.ok(!helper.includes('run-hosted-ios-account-case'));assert.ok(!helper.includes('readFileSync(receipt'));
+});
+
+test('Android source selection is canonical, local, fixed-entry and rejects prebuilt/private/foreign input',t=>{
+ const root=realpathSync(mkdtempSync(join(tmpdir(),'puptime-android-selection-')));t.after(()=>rmSync(root,{recursive:true,force:true}));
+ const module=join(root,'node_modules/expo-sqlite/android');mkdirSync(module,{recursive:true});writeFileSync(join(module,'CMakeLists.txt'),'synthetic');writeFileSync(join(root,'index.sqlite-engine-probe.js'),'synthetic');writeFileSync(join(root,'index.js'),'unselected');
+ const value={project:module,cmake:join(module,'CMakeLists.txt'),entry:join(root,'index.sqlite-engine-probe.js'),selected:true,libsql:false,sqlcipher:false};
+ assert.equal(validateAndroidSelection(value,root).probeEntry,true);
+ for(const change of [{project:root},{cmake:join(root,'index.js')},{entry:join(root,'index.js')},{selected:false},{libsql:true},{sqlcipher:true},{private:'PRIVATE_VALUE'}])assert.throws(()=>validateAndroidSelection({...value,...change},root));
+ const init=androidSelectionInit(root,join(root,'selected.json'));
+ assert.ok(init.indexOf("current.rootProject.projectDir.canonicalFile !=")<init.indexOf("findProject(':app')"));
+ assert.match(init,/assert app != null && sqlite != null/);assert.match(init,/selected\.size\(\) == 1/);assert.match(init,/selected\.first\(\)\.id == sqlite\.configurations/);assert.match(init,/rootComponent\.get\(\)\.id/);assert.match(init,/createBundleReleaseJsAndAssets/);assert.match(init,/assert evidence\.createNewFile\(\)/);
+ assert.ok(!init.includes('lenient')&&!init.includes('reselect')&&!init.includes('PRIVATE_VALUE'));
+});
+
+test('Android fixed receipt, offline and emulator ownership guards fail closed',()=>{
+ assert.equal(androidReceiptStat('1 2 118 3 4 81a4\n').size,118);
+ for(const raw of ['1 2 0 3 4 81a4','1 2 257 3 4 81a4','1 2 118 3 4 a1ff','1 2 118 3 4 41ed','PRIVATE_VALUE','1 2 118 3 4 81a4\nPRIVATE_VALUE'])assert.throws(()=>androidReceiptStat(raw));
+ const offline={airplane:'1',wifiPreference:'0',wifiStatus:'Wifi is disabled\n',connectivity:'Active default network: none\nCurrent Networks:\nStatus for known UIDs:\n'};
+ assert.equal(androidOffline(offline),true);for(const patch of [{airplane:'0'},{wifiPreference:'1'},{wifiStatus:'Wifi is enabled'},{connectivity:offline.connectivity.replace('none','100')},{connectivity:offline.connectivity.replace('Current Networks:\n','Current Networks:\n  PRIVATE_NETWORK\n')}])assert.throws(()=>androidOffline({...offline,...patch}));
+ const stat=(state='S',start='7')=>'123 (emulator) '+[state,...Array(18).fill('0'),start].join(' '),expected={executables:['/sdk/emulator'],arguments:['-avd','owned'],home:'/owned/avd',uid:'1000'};
+ const files={stat:stat(),afterStat:stat(),exe:'/sdk/emulator',cmdline:'/sdk/emulator\0-avd\0owned\0',environ:'ANDROID_AVD_HOME=/owned/avd\0',status:'Uid:\t1000 1000 1000 1000\n'};
+ assert.equal(androidProcessIdentity(files,expected).owned,true);
+ for(const patch of [{exe:'/foreign'},{cmdline:files.cmdline+'PRIVATE_ARG\0'},{environ:'ANDROID_AVD_HOME=/foreign\0'},{status:'Uid: 0 0 0 0\n'}])assert.equal(androidProcessIdentity({...files,...patch},expected).owned,false);
+ assert.equal(androidProcessIdentity({...files,stat:stat('Z'),afterStat:stat('Z')},expected).alive,false);assert.throws(()=>androidProcessIdentity({...files,afterStat:stat('S','8')},expected));
+});
+
+test('Android actual APK parser validates x86_64 SQLite ELF/bundle, bounds and real CRC',t=>{
+ const root=mkdtempSync(join(tmpdir(),'puptime-engine-apk-'));t.after(()=>rmSync(root,{recursive:true,force:true}));
+ const text=readFileSync(join(project,'scripts/verify-android-sqlite-engine.mjs'),'utf8'),parser=text.match(/const apkInspection=String\.raw`([\s\S]*?)`;/)?.[1];assert.ok(parser);
+ const make=String.raw`import json,struct,sys,zipfile
+p=sys.argv[1]; mode=sys.argv[2]; elf=bytearray(64); elf[:6]=b'\x7fELF\x02\x01'; elf[18:20]=struct.pack('<H',62)
+if mode=='machine': elf[18:20]=struct.pack('<H',183)
+if mode=='class': elf[4]=1
+with zipfile.ZipFile(p,'w',compression=zipfile.ZIP_STORED) as z:
+ z.writestr('lib/x86_64/libexpo-sqlite.so',elf)
+ if mode!='missing': z.writestr('assets/index.android.bundle',b'synthetic-probe')
+ if mode=='otherabi': z.writestr('lib/arm64-v8a/other.so',elf)
+ if mode=='duplicate': z.writestr('lib/x86_64/libexpo-sqlite.so',elf)
+if mode in ('crc','oversize'):
+ b=bytearray(open(p,'rb').read())
+ if mode=='crc': b[30+len('lib/x86_64/libexpo-sqlite.so')+32]^=1
+ else:
+  i=b.index(b'PK\x01\x02');b[i+24:i+28]=struct.pack('<I',33*1024*1024)
+ open(p,'wb').write(b)
+`;
+ for(const mode of ['good','machine','class','missing','otherabi','duplicate','crc','oversize']){
+  const path=join(root,mode+'.apk');execFileSync('python3',['-I','-c',make,path,mode],{stdio:['ignore','ignore','ignore']});
+  const run=()=>execFileSync('python3',['-I','-c',parser,path],{encoding:'utf8',stdio:['ignore','pipe','ignore'],timeout:5000,maxBuffer:2048});
+  if(mode==='good'){const value=JSON.parse(run());assert.deepEqual(Object.keys(value).sort(),['abi','bundleSHA256','elfClass','elfMachine','sqliteLibrarySHA256']);assert.equal(value.abi,'x86_64');assert.equal(value.elfClass,64);assert.equal(value.elfMachine,62);assert.match(value.sqliteLibrarySHA256,/^[a-f0-9]{64}$/);}else assert.throws(run);
+ }
+});
+
+function androidCiRun(options={}){
+ const text=readFileSync(join(project,'scripts/verify-android-sqlite-engine.mjs'),'utf8'),start=text.indexOf('export async function verifyAndroidSqliteEngine()'),end=text.indexOf('\nif(process.argv[1]',start),body=text.slice(start,end).replace('export ','');assert.ok(start>0&&end>start);
+ const calls=[],writes=[],name='Puptime_SQLite_Engine_123_2',args=['-avd',name,'-port','5588','-no-window','-no-audio','-no-snapshot','-gpu','swiftshader_indirect'];
+ const raw=options.engineBytes??Buffer.from(JSON.stringify(expectedEngine)),failure=options.failure??new Error('PRIVATE_ORIGINAL'),cleanupError=new Error('PRIVATE_CLEANUP');let live=false,privateExists=true,installed=false,cleared=false,launched=false,disposed=false,rootCount=0,portChecks=0;
+ const sourceHashes=Object.values(hashes).map(row=>row[1]),key='221e0a3106aa4c3ccc154e0a418b55020b3f9ea6e84f92e8749cd9e2f39f5e58',certificate='fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c';
+ const env={GITHUB_ACTIONS:'true',GITHUB_REPOSITORY:'patrickchin/puptime',GITHUB_RUN_ID:'123',GITHUB_RUN_ATTEMPT:'2',ANDROID_HOME:'/sdk',RUNNER_TEMP:'/runner',PUPTIME_ANDROID_CMDLINE_BIN:'/sdk/cmdline/bin',EXPO_PUBLIC_CLOUD_API_URL:'https://PRIVATE_ORIGIN',EXPO_PUBLIC_UNKNOWN:'PRIVATE_VALUE',EXPO_PUBLIC_APP_POSTHOG_KEY:'PRIVATE_KEY',EXPO_OVERRIDE_METRO_CONFIG:'PRIVATE_CONFIG',NODE_PATH:'PRIVATE_PATH',NODE_OPTIONS:'PRIVATE_OPTIONS'};
+ const assertEnv=value=>{assert.equal(value.EXPO_NO_DOTENV,'1');assert.equal(value.EXPO_PUBLIC_CLOUD_API_URL,'https://127.0.0.1:1');assert.equal(value.EXPO_PUBLIC_APP_POSTHOG_KEY,'');for(const key of ['EXPO_PUBLIC_UNKNOWN','EXPO_OVERRIDE_METRO_CONFIG','NODE_PATH','NODE_OPTIONS'])assert.equal(Object.hasOwn(value,key),false);assert.equal(value.ENTRY_FILE,'index.sqlite-engine-probe.js');};
+ const stat=(state='S')=>'111 (emulator) '+[state,...Array(18).fill('0'),'7'].join(' ');
+ const selected={project:'/root/node_modules/expo-sqlite/android',cmake:'/root/node_modules/expo-sqlite/android/CMakeLists.txt',entry:'/root/index.sqlite-engine-probe.js',selected:true,libsql:false,sqlcipher:false};
+ const read=path=>{
+  if(path==='/root/package.json')return JSON.stringify({expo:{autolinking:{android:{buildFromSource:['expo-sqlite']}}}});
+  if(path.endsWith('/expo-sqlite/package.json'))return '{"version":"57.0.5"}';
+  if(path.endsWith('selected-module.json'))return Buffer.from(JSON.stringify(selected));
+  if(path.startsWith('/proc/')){if(!live)throw Object.assign(new Error('gone'),{code:'ENOENT'});if(path.endsWith('/stat'))return stat();if(path.endsWith('/cmdline'))return '/sdk/emulator/emulator\0'+args.join('\0')+'\0';if(path.endsWith('/environ'))return 'ANDROID_AVD_HOME=/private/avd\0';if(path.endsWith('/status'))return 'Uid: 1000 1000 1000 1000\n';}
+  throw new Error('Unexpected synthetic read');
+ };
+ const command=(binary,argv,settings)=>{
+  assertEnv(settings.env);calls.push([binary,...argv]);
+  const result=(stdout='',status=0)=>({stdout,stderr:'',status});
+  if(binary==='git')return result(argv[0]==='rev-parse'?(argv.at(-1)==='HEAD'?'1':'2').repeat(40)+'\n':'');
+  if(binary.endsWith('/apksigner'))return result('Signer #1 certificate SHA-256 digest: '+certificate+'\n');
+  if(binary.endsWith('/aapt2'))return result("package: name='com.patrickchin.puptime' versionCode='1'\nminSdkVersion:'24'\ntargetSdkVersion:'36'\n");
+  if(binary==='python3')return result(JSON.stringify({abi:'x86_64',elfClass:64,elfMachine:62,sqliteLibrarySHA256:'c'.repeat(64),bundleSHA256:'d'.repeat(64),...(options.apkPrivate?{secret:'PRIVATE_VALUE'}:{})}));
+  assert.equal(binary,'/sdk/platform-tools/adb');assert.deepEqual(argv.slice(0,2),['-s','emulator-5588']);const a=argv.slice(2),key=a.join(' ');
+  if(key==='emu avd name')return result(name+'\nOK\n');if(key==='emu kill'){live=false;return result();}
+  if(key==='root'){rootCount++;return options.rootClosed?{status:1,stdout:'',stderr:'adb: unable to connect for root: closed\n'}:result('restarting adbd as root\n');}
+  if(key==='shell getprop sys.boot_completed')return result('1');if(key==='shell id -u')return result('0');if(key==='shell getprop ro.build.version.sdk')return result(options.apiWrong?'35':'36');if(key==='shell getprop ro.product.cpu.abi')return result('x86_64');
+  if(key.includes('airplane_mode_on'))return result('1');if(key.includes('global wifi_on'))return result('0');if(key==='shell cmd wifi status')return result('Wifi is disabled');if(key==='shell dumpsys connectivity')return result('Active default network: none\nCurrent Networks:\nStatus for known UIDs:\n');
+  if(key==='shell pm path com.patrickchin.puptime')return installed?result('package:/data/app/synthetic/base.apk\n'):result('',1);
+  if(a[0]==='install'){if(options.installFails)return {status:null,stdout:'',error:failure};installed=true;return result('Performing Streamed Install\nSuccess\n');}
+  if(key.startsWith('shell rm -f ')){cleared=true;return result();}if(key.startsWith('shell am start ')){assert.equal(cleared,true);launched=true;if(options.launchFails)return {status:null,stdout:'',error:failure};return result();}
+  if(a[0]==='shell'&&a[1]==='stat'){assert.equal(launched,true);return result('1 2 '+raw.length+' 3 4 81a4\n');}
+  if(key.startsWith('shell readlink -f '))return result(a.at(-1));if(a[0]==='exec-out'){assert.equal(settings.maxBuffer,257);return result(raw);}
+  if(key.startsWith('shell am force-stop ')){if(options.stopAppFails&&launched)return {status:1,stdout:''};return result();}
+  if(['pull','shell'].includes(a[0]))return result();throw new Error('Unexpected synthetic command');
+ };
+ const writer=(path,bytes,settings)=>{assert.equal(settings.flag,'wx');assert.equal(settings.mode,0o600);if(path.includes('/build/android-sqlite-engine-check/')){if(options.writerFails)throw cleanupError;writes.push({path,value:JSON.parse(bytes)});}};
+ const stable=path=>path.endsWith('/sqlite3.c')?sourceHashes[0]:path.endsWith('/sqlite3.h')?sourceHashes[1]:path.endsWith('debug.keystore')?key:path.endsWith('installed.apk')&&options.installedWrong?'b'.repeat(64):'a'.repeat(64);
+ const spawnChild=(binary,argv,settings)=>{assert.equal(binary,'/sdk/emulator/emulator');assert.deepEqual(argv,args);assertEnv(settings.env);assert.equal(settings.detached,true);live=true;const child=new EventEmitter();child.pid=111;return child;};
+ const run=async(binary,argv,settings)=>{assertEnv(settings.env);calls.push([binary,...argv]);settings.own(async()=>!options.commandCleanupFails);if(options.buildFails&&binary.endsWith('/gradlew'))throw failure;};
+ const cleanup=action=>{let once;return {signal:null,run:()=>once??=action(),dispose(){disposed=true;}};};
+ const factory=Function('assert','process','realpathSync','lstatSync','existsSync','join','standardFixtureEnvironment','spawnSync','mkdirSync','mkdtempSync','readFileSync','readlinkSync','androidProcessIdentity','installTaskCleanup','runOwned','stableFile','engineHashes','templateKeySHA256','testCertificateSHA256','androidSelectionInit','writeFileSync','validateAndroidSelection','apkInspection','portsFree','spawn','ownProcess','androidOffline','androidReceiptStat','readSqliteEngineReceipt','expected','app','serial','rmSync','return ('+body+');');
+ const execute=factory(assert,{platform:options.wrongPlatform?'darwin':'linux',env,cwd:()=>'/root',execPath:'/node',getuid:()=>1000},path=>path,()=>({isDirectory:()=>true,isSymbolicLink:()=>false,isFile:()=>true,size:512}),path=>path==='/private'||path==='/private/avd'?privateExists:path.startsWith('/sdk/emulator/'),join,standardFixtureEnvironment,command,()=>{},()=>'/private',read,()=>'/sdk/emulator/emulator',androidProcessIdentity,cleanup,run,stable,sourceHashes,key,certificate,androidSelectionInit,writer,value=>{assert.deepEqual(value,selected);if(options.selectionFails)throw failure;return {name:'expo-sqlite',version:'57.0.5',localProject:true};},'synthetic-python',async()=>{portChecks++;if(options.portFails&&portChecks===1)throw failure;},spawnChild,()=>async()=>{live=false;return !options.processCleanupFails;},androidOffline,androidReceiptStat,()=>raw,expectedEngine,'com.patrickchin.puptime','emulator-5588',path=>{assert.equal(path,'/private');privateExists=false;});
+ return {execute,calls,writes,failure,disposed:()=>disposed,live:()=>live,removed:()=>!privateExists,rootCount:()=>rootCount};
+}
+
+test('actual Android probe orchestration is source-bound, one ABI/entry, cold, offline and finite',async()=>{
+ const check=androidCiRun({rootClosed:true});await check.execute();assert.equal(check.rootCount(),1);assert.equal(check.disposed(),true);assert.equal(check.live(),false);assert.equal(check.removed(),true);
+ const proof=check.writes.find(row=>row.path.endsWith('provenance.json')).value;assert.equal(proof.status,'passed');assert.equal(proof.api,36);assert.equal(proof.engineMatchesExpected,true);assert.ok(Object.values(proof.cleanup).every(value=>value===true));assert.equal(Object.keys(proof).length,13);assert.equal(check.writes.length,2);assert.ok(!JSON.stringify(check.writes).includes('PRIVATE'));
+ const build=check.calls.find(row=>row[0].endsWith('/gradlew'));assert.deepEqual(build.slice(1,4),[':app:assembleRelease','--no-daemon','-PreactNativeArchitectures=x86_64']);assert.ok(!check.calls.some(row=>row.includes('bundleRelease')||row.includes('keytool')||row.includes('maestro')||row.includes('sqlite3')));
+});
+
+test('Android mismatches, setup/cleanup/writer failures never pass or replace the original failure',async()=>{
+ const mismatch=androidCiRun({engineBytes:Buffer.from(JSON.stringify({...expectedEngine,version:'3.50.2'}))});await assert.rejects(mismatch.execute());assert.equal(mismatch.writes.find(row=>row.path.endsWith('provenance.json')).value.engineMatchesExpected,false);assert.equal(mismatch.writes.length,2);
+ for(const options of [{buildFails:true},{selectionFails:true},{installFails:true},{launchFails:true},{buildFails:true,writerFails:true},{launchFails:true,processCleanupFails:true,writerFails:true}]){
+  const failure=new Error('PRIVATE_ORIGINAL');Object.defineProperty(failure,'message',{get(){throw Error('No error inspection');}});const check=androidCiRun({...options,failure});await assert.rejects(check.execute(),error=>error===failure);assert.equal(check.disposed(),true);assert.equal(check.writes.some(row=>row.path.endsWith('probe.json')),false);
+ }
+ for(const options of [{apiWrong:true},{installedWrong:true},{portFails:true},{stopAppFails:true},{processCleanupFails:true},{commandCleanupFails:true},{apkPrivate:true}]){const check=androidCiRun(options);await assert.rejects(check.execute());const proof=check.writes.find(row=>row.path.endsWith('provenance.json')).value;assert.equal(proof.status,'failed');assert.equal(check.writes.some(row=>row.path.endsWith('probe.json')),false);assert.equal(check.live(),false);assert.ok(!JSON.stringify(check.writes).includes('PRIVATE'));if(options.apkPrivate)assert.equal(proof.apk,null);if(options.apiWrong)assert.equal(proof.api,null);}
+ const guard=androidCiRun({wrongPlatform:true});await assert.rejects(guard.execute());assert.deepEqual(guard.calls,[]);assert.deepEqual(guard.writes,[]);
+});
+
+test('Android dispatch is exclusive; original iOS steps, account jobs and old selections remain unchanged',async()=>{
+ const {createRequire}=await import('node:module'),{parse}=createRequire(import.meta.url)('yaml'),raw=readFileSync(join(project,'.github/workflows/ios-simulator.yml'),'utf8'),current=parse(raw),old=parse(execFileSync('git',['show','ae6f0cceaf2d530d9f5a82ea6f1d5cbb74d7222b:.github/workflows/ios-simulator.yml'],{cwd:project,encoding:'utf8'}));
+ assert.deepEqual(current.jobs.build.steps,old.jobs.build.steps);assert.deepEqual(current.jobs['native-accounts'],old.jobs['native-accounts']);assert.deepEqual(current.jobs['native-runtime-upgrade'],old.jobs['native-runtime-upgrade']);
+ for(const event of ['push','pull_request','workflow_dispatch'])for(const suite of [undefined,'full','accounts'])assert.equal(event!=='workflow_dispatch'||suite!=='accounts'&&suite!=='sqlite-engine-android',event!=='workflow_dispatch'||suite!=='accounts');
+ assert.equal(current.jobs.build.if,"github.event_name != 'workflow_dispatch' || (inputs.suite != 'accounts' && inputs.suite != 'sqlite-engine-android')");
+ const job=current.jobs['sqlite-engine-android'];assert.equal(job.if,"github.event_name == 'workflow_dispatch' && inputs.suite == 'sqlite-engine-android'");assert.equal(job['runs-on'],'ubuntu-latest');assert.equal(job.steps.find(step=>step.name==='Build and query only the Android SQLite engine').run,'node scripts/verify-android-sqlite-engine.mjs');
+ assert.ok(job.steps[0].with['sparse-checkout'].includes('!/.env\n'));const upload=job.steps.at(-1);assert.equal(upload.if,'always()');assert.equal(upload['continue-on-error'],true);assert.deepEqual(upload.with.path.trim().split('\n'),['build/android-sqlite-engine-check/sqlite-engine-probe.json','build/android-sqlite-engine-check/sqlite-engine-provenance.json']);
+ assert.ok(!JSON.stringify(job).includes('publish-android')&&!JSON.stringify(job).includes('bundleRelease'));
+});
+
+test('Android owned child handles stdin, timeout and cleanup failures without masking the first error',async()=>{
+ const text=readFileSync(join(project,'scripts/verify-android-sqlite-engine.mjs'),'utf8'),start=text.indexOf('async function runOwned('),end=text.indexOf('\n}\n',start)+2,body=text.slice(start,end);assert.ok(start>0&&end>start);
+ for(const mode of ['success','spawn','stdin','timeout','cleanup','spawn-reject','timeout-reject','cleanup-reject']){
+  const failure=new Error('PRIVATE_CHILD_FAILURE'),cleanupError=new Error('PRIVATE_CLEANUP_FAILURE');let stopped=0,registered=0,cleared=0,pending;
+  const child=new EventEmitter();child.pid=123;child.stdin=new EventEmitter();child.stdin.end=value=>{assert.equal(value,'no\n');if(mode==='stdin')queueMicrotask(()=>child.stdin.emit('error',failure));};
+  const spawn=(binary,args,settings)=>{assert.equal(binary,'synthetic');assert.deepEqual(args,['fixed']);assert.equal(settings.detached,true);assert.deepEqual(settings.stdio,['pipe','ignore','ignore']);queueMicrotask(()=>{if(mode.startsWith('spawn'))child.emit('error',failure);else if(['success','cleanup','cleanup-reject'].includes(mode))child.emit('close',0);});return child;};
+  const run=Function('spawn','ownProcess','assert','setTimeout','clearTimeout','return ('+body+');')(spawn,()=>()=>pending??=Promise.resolve().then(()=>{stopped++;if(mode.endsWith('-reject'))throw cleanupError;return mode!=='cleanup';}),assert,fn=>{if(mode.startsWith('timeout'))queueMicrotask(fn);return 7;},value=>{assert.equal(value,7);cleared++;});
+  const result=run('synthetic',['fixed'],{cwd:'owned',env:{},input:'no\n',timeout:123,own:()=>{registered++;}});
+  if(mode==='success')await result;else await assert.rejects(result,error=>['spawn','spawn-reject','stdin'].includes(mode)?error===failure:mode.startsWith('timeout')?error.message==='Owned command timed out.':mode==='cleanup-reject'?error===cleanupError:error.code==='ERR_ASSERTION');
+  assert.equal(stopped,1);assert.equal(registered,1);assert.equal(cleared,1);
+ }
 });
