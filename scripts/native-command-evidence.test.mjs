@@ -36,6 +36,19 @@ test('discard secret-rich values, evaluated commands, errors, paths and arbitrar
  assert.equal(nativeCommandState([{...entry,command:{assertConditionCommand:ambiguous}}]).targetId,null);
 });
 
+// cli-2.11.0 YamlFluentCommand.extendedWait maps notVisible to the same
+// AssertConditionCommand; ThemePicker owns this literal close-button testID.
+test('project the actual picker-dismissal notVisible boundary without disclosing unknown selectors',()=>{
+ const secret='private@example.invalid 873921 cookie=private-session /private/raw';
+ const entry=id=>{const value=row('assertConditionCommand',{condition:{notVisible:{idRegex:id,textRegex:secret}},timeout:'5000'},'FAILED',151);value.metadata.error=secret;value.metadata.evaluatedCommand={secret};return value;};
+ assert.deepEqual(nativeCommandState([entry('appearance.close')]),{status:'FAILED',kind:'assert',targetId:'appearance.close',sequence:151});
+ for(const id of [secret,'appearance.close.extra','^appearance.close$','appearance.*']){
+  const result=nativeCommandState([entry(id)]);assert.deepEqual(result,{status:'FAILED',kind:'assert',targetId:null,sequence:151});assert.ok(!JSON.stringify(result).includes(secret));
+ }
+ assert.deepEqual(nativeCommandState([{...entry('appearance.close'),command:{unknownCommand:{secret}}}]),unknown);
+ for(const records of [[entry('appearance.close'),running],[running,entry('appearance.close')]])assert.deepEqual(nativeCommandState(records),unknown);
+});
+
 test('identify only literal enable/open-account targets without exposing predicate text or runtime values',()=>{
  const comparisonIds=['account.connection.phone.name','account.connection.phone.count','account.connection.cloud.name','account.connection.cloud.count','account.combine.phone.name','account.combine.phone.count','account.combine.cloud.name','account.combine.cloud.count','account.combine.cancel','account.keepLocal'];
  const ids=['screen.account','nav.account','account.enable','account.status','account.local.count','account.combine.dialog','account.combine.confirm',...comparisonIds];

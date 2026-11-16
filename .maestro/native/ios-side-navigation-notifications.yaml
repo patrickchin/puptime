@@ -266,6 +266,10 @@ name: iOS side navigation and notification preferences
     id: settings.language.open
 - tapOn:
     id: appearance.language.es
+- extendedWaitUntil:
+    notVisible:
+      id: appearance.close
+    timeout: 5000
 - assertVisible:
     id: screen.settings
 - tapOn:
