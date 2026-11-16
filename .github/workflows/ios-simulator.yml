@@ -181,6 +181,21 @@ jobs:
           path: build/onboarding-verdict.json
           if-no-files-found: warn
           retention-days: 7
+      - name: Capture finite conversational flow verdict
+        if: always()
+        continue-on-error: true
+        env:
+          ONBOARDING_STEP_CONCLUSION: ${{ steps.onboarding_combined.conclusion }}
+        run: node scripts/native-standard-verdict.mjs --conversational-fixed17
+      - name: Upload finite conversational flow verdict
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v6
+        with:
+          name: puptime-ios-conversational-verdict
+          path: build/conversational-verdict.json
+          if-no-files-found: warn
+          retention-days: 7
       - name: Verify native cloud account deletion preserves local history
         timeout-minutes: 60
         env:

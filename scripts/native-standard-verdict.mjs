@@ -4,15 +4,21 @@ import {execFileSync} from 'node:child_process';
 import {closeSync,constants,fstatSync,lstatSync,mkdirSync,openSync,readSync,realpathSync,writeFileSync} from 'node:fs';
 import {join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {standardResults,standardSelection} from './native-standard-suite.mjs';
+import {conversationalFiles,conversationalResults,standardResults,standardSelection} from './native-standard-suite.mjs';
 
 const files=standardSelection('standard-all').files,limit=2*1024*1024;
 export function standardVerdict(xml,metadata={}){
- const result=standardResults(xml,files),statuses=new Map(result.flows.map(row=>[row.flow,row.status]));
+ return verdict(standardResults(xml,files),files,'standard-maestro-verdict',metadata);
+}
+export function conversationalVerdict(xml,metadata={}){
+ return verdict(conversationalResults(xml),conversationalFiles,'conversational-maestro-verdict',metadata);
+}
+function verdict(result,files,stage,metadata){
+ const statuses=new Map(result.flows.map(row=>[row.flow,row.status]));
  const sha=value=>typeof value==='string'&&/^[a-f0-9]{40}$/.test(value)?value:null;
  const attempt=metadata.runAttempt;
  return {
-  schemaVersion:1,stage:'standard-maestro-verdict',expectedFlows:files.length,complete:result.complete,
+  schemaVersion:1,stage,expectedFlows:files.length,complete:result.complete,
   flows:files.map(flow=>({flow,status:statuses.get(flow)??'UNKNOWN'})),
   stepConclusion:['success','failure','cancelled','skipped'].includes(metadata.stepConclusion)?metadata.stepConclusion:'UNKNOWN',
   checkoutCommit:sha(metadata.checkoutCommit),checkoutTree:sha(metadata.checkoutTree),
@@ -20,10 +26,10 @@ export function standardVerdict(xml,metadata={}){
   runAttempt:typeof attempt==='string'&&/^[1-9][0-9]{0,15}$/.test(attempt)&&Number.isSafeInteger(Number(attempt))?Number(attempt):null,
  };
 }
-function report(root){
+function report(root,filename){
  let descriptor;
  try{
-  const directory=join(root,'build'),path=join(directory,'maestro-report.xml');
+  const directory=join(root,'build'),path=join(directory,filename);
   assert.equal(realpathSync(directory),directory);assert.ok(lstatSync(directory).isDirectory()&&!lstatSync(directory).isSymbolicLink());
   descriptor=openSync(path,constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK);
   const before=fstatSync(descriptor);assert.ok(before.isFile()&&before.size<=limit);
@@ -37,14 +43,24 @@ function report(root){
  finally{if(descriptor!==undefined)closeSync(descriptor);}
 }
 export function writeStandardVerdict(root,environment){
+ return writeVerdict(root,environment,false);
+}
+export function writeConversationalVerdict(root,environment){
+ return writeVerdict(root,environment,true);
+}
+function writeVerdict(root,environment,conversational){
  root=realpathSync(root);let checkoutCommit,checkoutTree;
  try{[checkoutCommit,checkoutTree]=execFileSync('git',['rev-parse','HEAD','HEAD^{tree}'],{cwd:root,encoding:'utf8',timeout:10000,maxBuffer:1024,stdio:['ignore','pipe','ignore']}).trim().split('\n');}catch{}
- const value=standardVerdict(report(root),{checkoutCommit,checkoutTree,runId:environment.GITHUB_RUN_ID,runAttempt:environment.GITHUB_RUN_ATTEMPT,stepConclusion:environment.STANDARD_STEP_CONCLUSION});
+ const project=conversational?conversationalVerdict:standardVerdict;
+ const value=project(report(root,conversational?'onboarding-maestro-report.xml':'maestro-report.xml'),{checkoutCommit,checkoutTree,runId:environment.GITHUB_RUN_ID,runAttempt:environment.GITHUB_RUN_ATTEMPT,stepConclusion:conversational?environment.ONBOARDING_STEP_CONCLUSION:environment.STANDARD_STEP_CONCLUSION});
  const directory=join(root,'build');mkdirSync(directory,{recursive:true});assert.equal(realpathSync(directory),directory);assert.ok(!lstatSync(directory).isSymbolicLink());
- writeFileSync(join(directory,'standard-verdict.json'),JSON.stringify(value,null,2)+'\n',{mode:0o600,flag:'wx'});
+ writeFileSync(join(directory,conversational?'conversational-verdict.json':'standard-verdict.json'),JSON.stringify(value,null,2)+'\n',{mode:0o600,flag:'wx'});
  return value;
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
- try{assert.equal(process.argv.length,2);writeStandardVerdict(process.cwd(),process.env);}
+ try{
+  assert.ok(process.argv.length===2||process.argv.length===3&&process.argv[2]==='--conversational-fixed17');
+  (process.argv.length===2?writeStandardVerdict:writeConversationalVerdict)(process.cwd(),process.env);
+ }
  catch{console.error('Standard verdict evidence unavailable.');process.exitCode=1;}
 }
