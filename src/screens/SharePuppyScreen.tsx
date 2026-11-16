@@ -13,6 +13,7 @@ import {entityId} from '../entity-id';
 import {sharingUrl,type CreateShare,type PuppyShare} from '../sharing';
 import {useLocalization} from '../localization-context';
 import {headingStyle,spacing,type Theme} from '../theme';
+import {useTelemetryOverlay} from '../telemetry';
 
 export function SharePuppyScreen({cloud,theme,eventCount,onBack,initialKind='household'}:{cloud:CloudHandle;theme:Theme;eventCount:number;onBack:()=>void;initialKind?:'household'|'temporary'}){
  const {t,locale}=useLocalization(),state=useAccountSnapshot(cloud.controller);
@@ -21,6 +22,7 @@ export function SharePuppyScreen({cloud,theme,eventCount,onBack,initialKind='hou
  const [setup,setSetup]=useState(false),[shares,setShares]=useState<PuppyShare[]>([]),[loading,setLoading]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[link,setLink]=useState<string|null>(null),[revision,setRevision]=useState(0);
  const draft=useRef<CreateShare|null>(null),locked=useRef(false),mounted=useRef(true);
  const [shared,setShared]=useState(false);
+ useTelemetryOverlay('sharing',!setup);
  const account=state?.account,accountId=account?.user.id,pet=account?.pets[0];
  const ready=!!accountId&&!!pet&&state?.sync?.state==='active'&&state.sync.accountId===accountId&&!!cloud.sharing;
  const identity=useRef(accountId);identity.current=accountId;

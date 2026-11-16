@@ -83,6 +83,7 @@ import {
 } from './src/notification-config';
 import * as defaultStorage from './src/storage';
 import {EventsImportError,EventsStorageError} from './src/storage';
+import {EventDeletedError} from './src/storage-validation';
 import {useAccountSnapshot} from './src/cloud/use-account-snapshot';
 import {CareSessionHost,useCareSession} from './src/care-session';
 
@@ -494,7 +495,11 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
   };
 
   const deleteEvent = async (event: PuppyEvent) => {
-    await removeEvent(event.id);
+    try { await removeEvent(event.id); }
+    catch (error) {
+      if (!(error instanceof EventDeletedError)) productTelemetry.capture('app_error', { error_code: 'local_write_failed' });
+      throw error;
+    }
     setNapAdjustments(previous=>previous.filter(nap=>nap.id!==event.id));
     productTelemetry.capture('app_log_action', { action: 'delete', activity_type: event.type, result: 'success' });
     await refreshCommittedState();
@@ -532,10 +537,15 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     changes: PuppyEventChanges,
   ) => {
     const restoreCustomActivities=!!((changes.type??event.type)==='custom'&&changes.customLabel&&activityKey({type:'custom',customLabel:changes.customLabel})!==activityKey(event));
-    if (!nativeApp && restoreCustomActivities && changes.customLabel) {
-      setCustomActivities(await saveCustomActivity(changes.customLabel));
+    try {
+      if (!nativeApp && restoreCustomActivities && changes.customLabel) {
+        setCustomActivities(await saveCustomActivity(changes.customLabel));
+      }
+      await updateEvent(event.id,changes,{restoreCustomActivities});
+    } catch (error) {
+      if (!(error instanceof EventDeletedError)) productTelemetry.capture('app_error', { error_code: 'local_write_failed' });
+      throw error;
     }
-    await updateEvent(event.id,changes,{restoreCustomActivities});
     if('endedAt' in changes)setNapAdjustments(previous=>previous.filter(nap=>nap.id!==event.id));
     productTelemetry.capture('app_log_action', { action: 'update', activity_type: changes.type ?? event.type, result: 'success' });
     if (restoreCustomActivities && !customActivities.some(label => activityKey({ type: 'custom', customLabel: label }) === activityKey({ type: 'custom', customLabel: changes.customLabel }))) {
