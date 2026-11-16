@@ -183,7 +183,7 @@ test('Android source selection is canonical, local, fixed-entry and rejects preb
  for(const change of [{project:root},{cmake:join(root,'index.js')},{entry:join(root,'index.js')},{selected:false},{libsql:true},{sqlcipher:true},{private:'PRIVATE_VALUE'}])assert.throws(()=>validateAndroidSelection({...value,...change},root));
  const init=androidSelectionInit(root,join(root,'selected.json'),join(root,'build-step.txt'));
  assert.ok(init.indexOf("current.rootProject.projectDir.canonicalFile !=")<init.indexOf("findProject(':app')"));
- assert.match(init,/assert app != null && sqlite != null/);assert.match(init,/selected\.size\(\) == 1/);assert.match(init,/selected\.first\(\)\.id == sqlite\.configurations/);assert.match(init,/rootComponent\.get\(\)\.id/);assert.match(init,/createBundleReleaseJsAndAssets/);assert.match(init,/assert evidence\.createNewFile\(\)/);
+ assert.match(init,/assert app != null && sqlite != null/);assert.match(init,/selected\.size\(\) == 1/);assert.match(init,/selected\.first\(\)\.id == validatedSqlite\.id/);assert.match(init,/rootComponent\.get\(\)\.id/);assert.match(init,/createBundleReleaseJsAndAssets/);assert.match(init,/assert evidence\.createNewFile\(\)/);
  assert.ok(!init.includes('lenient')&&!init.includes('reselect')&&!init.includes('PRIVATE_VALUE'));
 });
 
@@ -288,7 +288,7 @@ test('current Android cleanup requires verified ownership before signaling or re
 test('actual Android probe orchestration is source-bound, one ABI/entry, cold, offline and finite',async()=>{
  const check=androidCiRun({rootClosed:true});await check.execute();assert.equal(check.rootCount(),1);assert.equal(check.disposed(),true);assert.equal(check.live(),false);assert.equal(check.removed(),true);
  const proof=check.writes.find(row=>row.path.endsWith('provenance.json')).value;assert.equal(proof.status,'passed');assert.equal(proof.api,36);assert.equal(proof.engineMatchesExpected,true);assert.ok(Object.values(proof.cleanup).every(value=>value===true));assert.equal(proof.schemaVersion,2);assert.equal(proof.buildStep,'source-preservation');assert.equal(Object.keys(proof).length,14);assert.equal(check.writes.length,2);assert.ok(!JSON.stringify(check.writes).includes('PRIVATE'));
- const build=check.calls.find(row=>row[0].endsWith('/gradlew'));assert.deepEqual(build.slice(1,4),[':app:assembleRelease','--no-daemon','-PreactNativeArchitectures=x86_64']);assert.ok(!check.calls.some(row=>row.includes('bundleRelease')||row.includes('keytool')||row.includes('maestro')||row.includes('sqlite3')));
+ const build=check.calls.find(row=>row[0].endsWith('/gradlew'));assert.deepEqual(build.slice(1,4),[':app:assembleRelease','--no-daemon','-PreactNativeArchitectures=x86_64']);assert.deepEqual(build.slice(1),[':app:assembleRelease','--no-daemon','-PreactNativeArchitectures=x86_64','--no-configuration-cache','--init-script','/private/engine-inputs.gradle']);assert.ok(!check.calls.some(row=>row.includes('bundleRelease')||row.includes('keytool')||row.includes('maestro')||row.includes('sqlite3')));
 });
 
 test('Android mismatches, setup/cleanup/writer failures never pass or replace the original failure',async()=>{
@@ -314,9 +314,26 @@ test('Android build-step reader admits only stable regular bounded exact source-
  }finally{Object.assign(fs,original);syncBuiltinESMExports();}
 });
 
+test('Android graph guards execute in their owning tasks and remain mandatory with full component identity',()=>{
+ const init=androidSelectionInit('/source','/private/selected.json','/private/build-step.txt');
+ const sqliteStart=init.indexOf("def sqliteValidation = sqlite.tasks.register('verifyPuptimeSqliteEngineSource')"),appStart=init.indexOf("def appValidation = app.tasks.register('verifyPuptimeSqliteEngineSelection')");
+ assert.ok(sqliteStart>0&&appStart>sqliteStart);assert.ok(!init.slice(0,sqliteStart).includes('.incoming.resolutionResult'));
+ const sqlite=init.slice(sqliteStart,appStart),app=init.slice(appStart);
+ assert.match(sqlite,/doLast \{\s*def identity = sqlite\.configurations\.getByName\('releaseRuntimeClasspath'\)\.incoming\.resolutionResult\.rootComponent\.get\(\)\.id/);
+ for(const predicate of ['assert sqlite.ext.USE_LIBSQL == false && sqlite.ext.USE_SQLCIPHER == false',"assert sqlite.extensions.getByName('android').externalNativeBuild.cmake.path.canonicalFile",'sqliteInputs.set([id: identity, project: sqlite.projectDir.canonicalPath,'])assert.ok(sqlite.includes(predicate));
+ assert.ok(!sqlite.includes('app.configurations')&&!sqlite.includes('evidence.text'));
+ assert.match(app,/dependsOn\(sqliteValidation\)\s*doLast \{/);assert.ok(app.includes("app.configurations.getByName('releaseRuntimeClasspath').incoming.resolutionResult.allComponents"));
+ assert.ok(app.includes("it.id instanceof ProjectComponentIdentifier && it.id.projectPath == ':expo-sqlite'"));
+ assert.ok(app.includes('assert selected.size() == 1'));assert.ok(app.includes('assert validatedSqlite != null && selected.first().id == validatedSqlite.id'));
+ assert.ok(app.indexOf('assert validatedSqlite != null')<app.indexOf('assert evidence.createNewFile()'));
+ assert.ok(app.includes("app.tasks.named('assembleRelease').configure { dependsOn(appValidation) }"));
+ for(const bypass of ['onlyIf','enabled = false','upToDateWhen','outputs.file','cacheIf','withMutableState','lenient','reselect'])assert.ok(!init.includes(bypass));
+ assert.equal((init.match(/doLast \{/g)??[]).length,2);assert.equal((init.match(/\.incoming\.resolutionResult/g)??[]).length,2);
+});
+
 test('Android generated Gradle breadcrumbs precede existing predicates and cannot replace model failures',()=>{
  const init=androidSelectionInit('/source','/private/selected.json','/private/build-step.txt');
- const boundaries=[['gradle-root','if (current.rootProject.projectDir.canonicalFile !='],['gradle-projects',"def app = current.rootProject.findProject(':app')"],['gradle-selected-component',"def selected = app.configurations.getByName('releaseRuntimeClasspath')"],['gradle-selected-count','assert selected.size() == 1'],['gradle-selected-identity','assert selected.first().id == sqlite.configurations'],['gradle-bundle-task',"def bundle = app.tasks.named('createBundleReleaseJsAndAssets')"],['gradle-sqlite-flags','assert sqlite.ext.USE_LIBSQL == false'],['gradle-cmake-source',"assert sqlite.extensions.getByName('android').externalNativeBuild"],['gradle-probe-entry','assert bundle.entryFile.get().asFile.canonicalFile'],['gradle-evidence-write','assert evidence.createNewFile()'],['gradle-model-complete',null]];
+ const boundaries=[['gradle-root','if (current.rootProject.projectDir.canonicalFile !='],['gradle-projects',"def app = current.rootProject.findProject(':app')"],['gradle-sqlite-flags','assert sqlite.ext.USE_LIBSQL == false'],['gradle-cmake-source',"assert sqlite.extensions.getByName('android').externalNativeBuild"],['gradle-selected-component',"def selected = app.configurations.getByName('releaseRuntimeClasspath')"],['gradle-selected-count','assert selected.size() == 1'],['gradle-selected-identity','assert validatedSqlite != null && selected.first().id == validatedSqlite.id'],['gradle-bundle-task',"def bundle = app.tasks.named('createBundleReleaseJsAndAssets')"],['gradle-probe-entry','assert bundle.entryFile.get().asFile.canonicalFile'],['gradle-evidence-write','assert evidence.createNewFile()'],['gradle-model-complete',null]];
  assert.deepEqual([...init.matchAll(/markBuildStep\('([^']+)'\)/g)].map(match=>match[1]),boundaries.map(row=>row[0]));
  for(let i=0;i<boundaries.length;i++){
   const [step,predicate]=boundaries[i],start=init.indexOf(`markBuildStep('${step}')`),end=i+1<boundaries.length?init.indexOf(`markBuildStep('${boundaries[i+1][0]}')`):init.length;

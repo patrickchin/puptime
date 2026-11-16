@@ -80,31 +80,47 @@ gradle.projectsEvaluated { current ->
   def sqlite = current.rootProject.findProject(':expo-sqlite')
   assert app != null && sqlite != null
   assert sqlite.projectDir.canonicalFile == new File(sourceRoot, 'node_modules/expo-sqlite/android').canonicalFile
-  markBuildStep('gradle-selected-component')
-  def selected = app.configurations.getByName('releaseRuntimeClasspath').incoming.resolutionResult.allComponents.findAll {
-    it.id instanceof ProjectComponentIdentifier && it.id.projectPath == ':expo-sqlite'
+  def sqliteInputs = new java.util.concurrent.atomic.AtomicReference()
+  def sqliteValidation = sqlite.tasks.register('verifyPuptimeSqliteEngineSource') {
+    doLast {
+      def identity = sqlite.configurations.getByName('releaseRuntimeClasspath').incoming.resolutionResult.rootComponent.get().id
+      markBuildStep('gradle-sqlite-flags')
+      assert sqlite.ext.USE_LIBSQL == false && sqlite.ext.USE_SQLCIPHER == false
+      markBuildStep('gradle-cmake-source')
+      assert sqlite.extensions.getByName('android').externalNativeBuild.cmake.path.canonicalFile == new File(sourceRoot, 'node_modules/expo-sqlite/android/CMakeLists.txt').canonicalFile
+      sqliteInputs.set([id: identity, project: sqlite.projectDir.canonicalPath,
+        cmake: sqlite.extensions.getByName('android').externalNativeBuild.cmake.path.canonicalPath,
+        libsql: sqlite.ext.USE_LIBSQL, sqlcipher: sqlite.ext.USE_SQLCIPHER])
+    }
   }
-  markBuildStep('gradle-selected-count')
-  assert selected.size() == 1
-  markBuildStep('gradle-selected-identity')
-  assert selected.first().id == sqlite.configurations.getByName('releaseRuntimeClasspath').incoming.resolutionResult.rootComponent.get().id
-  markBuildStep('gradle-bundle-task')
-  def bundle = app.tasks.named('createBundleReleaseJsAndAssets').get()
-  markBuildStep('gradle-sqlite-flags')
-  assert sqlite.ext.USE_LIBSQL == false && sqlite.ext.USE_SQLCIPHER == false
-  markBuildStep('gradle-cmake-source')
-  assert sqlite.extensions.getByName('android').externalNativeBuild.cmake.path.canonicalFile == new File(sourceRoot, 'node_modules/expo-sqlite/android/CMakeLists.txt').canonicalFile
-  markBuildStep('gradle-probe-entry')
-  assert bundle.entryFile.get().asFile.canonicalFile == new File(sourceRoot, 'index.sqlite-engine-probe.js').canonicalFile && bundle.devEnabled.get() == false
-  markBuildStep('gradle-evidence-write')
-  assert evidence.createNewFile()
-  evidence.setReadable(false, false); evidence.setWritable(false, false)
-  assert evidence.setReadable(true, true) && evidence.setWritable(true, true)
-  evidence.text = JsonOutput.toJson([project: sqlite.projectDir.canonicalPath,
-    cmake: sqlite.extensions.getByName('android').externalNativeBuild.cmake.path.canonicalPath,
-    entry: bundle.entryFile.get().asFile.canonicalPath, selected: true,
-    libsql: sqlite.ext.USE_LIBSQL, sqlcipher: sqlite.ext.USE_SQLCIPHER])
-  markBuildStep('gradle-model-complete')
+  def appValidation = app.tasks.register('verifyPuptimeSqliteEngineSelection') {
+    dependsOn(sqliteValidation)
+    doLast {
+      markBuildStep('gradle-selected-component')
+      def selected = app.configurations.getByName('releaseRuntimeClasspath').incoming.resolutionResult.allComponents.findAll {
+        it.id instanceof ProjectComponentIdentifier && it.id.projectPath == ':expo-sqlite'
+      }
+      markBuildStep('gradle-selected-count')
+      assert selected.size() == 1
+      markBuildStep('gradle-selected-identity')
+      def validatedSqlite = sqliteInputs.get()
+      assert validatedSqlite != null && selected.first().id == validatedSqlite.id
+      markBuildStep('gradle-bundle-task')
+      def bundle = app.tasks.named('createBundleReleaseJsAndAssets').get()
+      markBuildStep('gradle-probe-entry')
+      assert bundle.entryFile.get().asFile.canonicalFile == new File(sourceRoot, 'index.sqlite-engine-probe.js').canonicalFile && bundle.devEnabled.get() == false
+      markBuildStep('gradle-evidence-write')
+      assert evidence.createNewFile()
+      evidence.setReadable(false, false); evidence.setWritable(false, false)
+      assert evidence.setReadable(true, true) && evidence.setWritable(true, true)
+      evidence.text = JsonOutput.toJson([project: validatedSqlite.project,
+        cmake: validatedSqlite.cmake,
+        entry: bundle.entryFile.get().asFile.canonicalPath, selected: true,
+        libsql: validatedSqlite.libsql, sqlcipher: validatedSqlite.sqlcipher])
+      markBuildStep('gradle-model-complete')
+    }
+  }
+  app.tasks.named('assembleRelease').configure { dependsOn(appValidation) }
 }
 `;
 }
@@ -209,7 +225,7 @@ export async function verifyAndroidSqliteEngine(){
   phase='prebuild';await run(process.execPath,['node_modules/expo/bin/cli','prebuild','--platform','android','--no-install'],{cwd:root,env,timeout:600000});
   assert.equal(stableFile(join(root,'android/app/debug.keystore'),16384),templateKeySHA256);
   const selection=join(privateRoot,'selected-module.json'),init=join(privateRoot,'engine-inputs.gradle');writeFileSync(init,androidSelectionInit(root,selection,buildStepOutput),{flag:'wx',mode:0o600});
-  phase='build';buildStep='gradle-command';await run(join(root,'android/gradlew'),[':app:assembleRelease','--no-daemon','-PreactNativeArchitectures=x86_64','--init-script',init],{cwd:join(root,'android'),env,timeout:1800000,inheritOutput:true});
+  phase='build';buildStep='gradle-command';await run(join(root,'android/gradlew'),[':app:assembleRelease','--no-daemon','-PreactNativeArchitectures=x86_64','--no-configuration-cache','--init-script',init],{cwd:join(root,'android'),env,timeout:1800000,inheritOutput:true});
   buildStep='selection-read';const selectedStat=lstatSync(selection);assert.ok(selectedStat.isFile()&&!selectedStat.isSymbolicLink()&&selectedStat.size<=8192);const selectedValue=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(readFileSync(selection)));
   buildStep='selection-validate';selectedModule=validateAndroidSelection(selectedValue,root);buildStep='source-preservation';assert.deepEqual(hashes(),engineHashes);command('git',['diff','--quiet','HEAD','--']);
   phase='package';const apkPath=join(root,'android/app/build/outputs/apk/release/app-release.apk');apkSHA256=stableFile(apkPath);
