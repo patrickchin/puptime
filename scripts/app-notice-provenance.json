@@ -3226,6 +3226,74 @@
       ],
       "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
       "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:React-jserrorhandler@0.86.3",
+      "reviewedVendors": [],
+      "nativeInputs": {
+        "cocoapods:React-jserrorhandler": {
+          "sha256": "a054ece53943f028d185b7f972a7a9fe996e60e08b2f9700c8163b551d62b62a",
+          "files": 7,
+          "excludedBuildPaths": [],
+          "ownLicense": {
+            "ownerNpmID": "npm:react-native@0.86.3",
+            "packagePath": "node_modules/react-native",
+            "sourceKind": "path",
+            "packageJSON": {
+              "source": "node_modules/react-native/package.json",
+              "sha256": "416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144"
+            },
+            "podspec": {
+              "source": "node_modules/react-native/ReactCommon/jserrorhandler/React-jserrorhandler.podspec",
+              "sha256": "a60b0f0990350ee4f59996a03fde90d7656305c65c26c938c7561b1969354e80"
+            },
+            "license": {
+              "source": "node_modules/react-native/LICENSE",
+              "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+            },
+            "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+            "upstreamIntegrity": "sha512-JR5s3bM9ezud+Mw24GlNXNfthqPIKwrQgPPJcam+L97t2sKjjEavhCzBn+fyqZZRcM5+XlhYxpTxVkK7e1n38Q=="
+          }
+        }
+      },
+      "additionalNoticeFiles": [
+        {
+          "file": "assets/notices/sources/stacktrace-parser-MIT.txt",
+          "sha256": "e1898814043cb5500483d9c8517edda824b352f696d35e5043fcfb537c221531",
+          "upstream": "https://raw.githubusercontent.com/errwischt/stacktrace-parser/ad379de5e5ac056012bbeb12923cf502aefe4710/LICENSE"
+        },
+        {
+          "file": "assets/notices/sources/tracekit-MIT.txt",
+          "sha256": "fe2b7a00aefd0f36e725ded80a6017be8581a6289285c8df7d6bb6aa02bb4555",
+          "upstream": "https://raw.githubusercontent.com/csnover/TraceKit/43f52779df8437c727fc70a8190fedea2b3d3b29/LICENSE"
+        },
+        {
+          "file": "assets/notices/sources/tracekit-readme-MIT.txt",
+          "sha256": "5c4f8e417a7d5aab175df68e2e7fc927248b9e34160e9ba877cf5cecd9314fea",
+          "upstream": "https://github.com/csnover/TraceKit/blob/43f52779df8437c727fc70a8190fedea2b3d3b29/README.md#L94-L102"
+        }
+      ],
+      "notices": [
+        {
+          "source": "assets/notices/sources/stacktrace-parser-MIT.txt",
+          "sha256": "e1898814043cb5500483d9c8517edda824b352f696d35e5043fcfb537c221531"
+        },
+        {
+          "source": "assets/notices/sources/tracekit-MIT.txt",
+          "sha256": "fe2b7a00aefd0f36e725ded80a6017be8581a6289285c8df7d6bb6aa02bb4555"
+        },
+        {
+          "source": "assets/notices/sources/tracekit-readme-MIT.txt",
+          "sha256": "5c4f8e417a7d5aab175df68e2e7fc927248b9e34160e9ba877cf5cecd9314fea"
+        },
+        {
+          "source": "node_modules/react-native/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+      "sectionSHA256": "576f0da314aaa25d096f0dad7a11e951f58c6245802a40ac91a59768ed835aa6"
     }
   ],
   "generatedSources": {
@@ -5632,6 +5700,33 @@
       "sha256": "1893949b5f982bd87b686eb21acb84d60ec64d7525226a39329c8e352f7e62f1",
       "upstream": "https://registry.npmjs.org/react-native-android-widget/-/react-native-android-widget-0.22.1.tgz",
       "upstreamIntegrity": "sha512-BBMuqShRrxV23Z09Rn5zNHJaPegCnH3DhhZQgXbhw2GMh45Gez0RbwKTIWHftuW4nLrqWy6esz8XwecUZLiZKA=="
+    },
+    {
+      "component": "cocoapods:React-jserrorhandler@0.86.3",
+      "ecosystem": "cocoapods",
+      "version": "0.86.3",
+      "public": true,
+      "source": "assets/notices/sources/stacktrace-parser-MIT.txt",
+      "sha256": "e1898814043cb5500483d9c8517edda824b352f696d35e5043fcfb537c221531",
+      "upstream": "https://raw.githubusercontent.com/errwischt/stacktrace-parser/ad379de5e5ac056012bbeb12923cf502aefe4710/LICENSE"
+    },
+    {
+      "component": "cocoapods:React-jserrorhandler@0.86.3",
+      "ecosystem": "cocoapods",
+      "version": "0.86.3",
+      "public": true,
+      "source": "assets/notices/sources/tracekit-MIT.txt",
+      "sha256": "fe2b7a00aefd0f36e725ded80a6017be8581a6289285c8df7d6bb6aa02bb4555",
+      "upstream": "https://raw.githubusercontent.com/csnover/TraceKit/43f52779df8437c727fc70a8190fedea2b3d3b29/LICENSE"
+    },
+    {
+      "component": "cocoapods:React-jserrorhandler@0.86.3",
+      "ecosystem": "cocoapods",
+      "version": "0.86.3",
+      "public": true,
+      "source": "assets/notices/sources/tracekit-readme-MIT.txt",
+      "sha256": "5c4f8e417a7d5aab175df68e2e7fc927248b9e34160e9ba877cf5cecd9314fea",
+      "upstream": "https://github.com/csnover/TraceKit/blob/43f52779df8437c727fc70a8190fedea2b3d3b29/README.md#L94-L102"
     }
   ],
   "retainedAndroidResources": {

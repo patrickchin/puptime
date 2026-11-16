@@ -1,7 +1,7 @@
 # App notice capture and final-artifact gate
 
 This is incomplete build preparation. The source JSON currently contains the
-reviewed font/icon notices only. Attribution reviews cover 120 exact iOS inputs;
+reviewed font/icon notices only. Attribution reviews cover 121 exact iOS inputs;
 remaining component review and the incomplete payload prevent sealing.
 Source tests, an internal simulator build, and finding licence filenames
 do not establish complete app-library notice coverage or store readiness.
@@ -113,18 +113,31 @@ Only these exact iOS source inputs are reviewed. The Hermes glue, six already
 published MIT plugin declarations marked generated, and imported interfaces do
 not approve Hermes engine/frameworks, generator outputs, dependencies or siblings.
 
-Two additional whole source-Pod roots remain held: `React-RCTBlob` contains
-references to a Stack Overflow UUID solution, a URL-regex gist and a whatwg-url
-subset; `React-jserrorhandler` explicitly ports stacktrace-parser. The complete
-original attribution scopes need separate review. Neither root or fingerprint
-was narrowed to remove these sources, and their existing public text pins grant
-no component approval.
+One additional iOS record covers the whole seven-file `React-jserrorhandler`
+0.86.3 source root without narrowing its native fingerprint. React Native's
+original import pins the stacktrace-parser source and fixtures; its parser
+retains TraceKit-derived code. The existing supplemental-notice helper preserves
+four complete original forms: the captured 1,088-byte Meta MIT, the 1,076-byte
+Georg Tavonius MIT, and both distinct TraceKit MIT forms (1,158 and 1,197 bytes).
+The README form retains original Andrey Tarantsov and all-contributors credit.
+The unchanged borrowed TraceKit function was matched to the pinned current
+source; the historical revision selection is temporal inference, not a
+maintainer-pinned import. Three exact component/source/hash public selectors
+and three verbatim supplemental copies are appended. The prior 120 component
+records, 174 total pins and other ledger fields stay unchanged; there are now
+177 total pins. Equal text grants no npm, sibling, vendor or Android inheritance.
+
+The whole `React-RCTBlob` source-Pod root remains held. It contains references
+to a Stack Overflow UUID solution, a URL-regex gist and a whatwg-url subset
+whose complete original attribution scopes need separate review. Its root and
+fingerprint have not been narrowed, and existing public text pins grant no
+component approval.
 
 Four earlier npm candidates remain held: `@expo/cli` has generated virtual sources;
 Gesture Handler, Reanimated and Zod have explicit copied-code attribution to
 resolve. No related native Pod is approved by these npm records.
 
-Against the qualified82 inventory, 83 components plus one generated source
+Against the qualified82 inventory, 82 components plus one generated source
 remain unreviewed. Of 109 recorded vendor boundaries, only the twelve specific
 own-product boundaries above are reviewed; the other 97 remain held. No new
 discovery, Android, packaged-native, retained-resource, payload or sealing
