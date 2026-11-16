@@ -15,7 +15,7 @@ const expected={version:'3.51.3',sourceId:'2026-03-13 10:38:09 737ae4a34738ffa0c
 const engineHashes=['abc152fd93810c76628dcf415e66e6cdd3182ce1ede4f45a5ea8c64b83dc1dfe','1be81cbb8a2cc6d943cd9f15f48001aa14073bcba750d8b475e0f7892bfca606'];
 const templateKeySHA256='221e0a3106aa4c3ccc154e0a418b55020b3f9ea6e84f92e8749cd9e2f39f5e58',testCertificateSHA256='fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c';
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
-const gradleBuildSteps=['gradle-root','gradle-projects','gradle-selected-component','gradle-bundle-task','gradle-sqlite-flags','gradle-cmake-source','gradle-probe-entry','gradle-evidence-write','gradle-model-complete'];
+const gradleBuildSteps=['gradle-root','gradle-projects','gradle-selected-component','gradle-selected-count','gradle-selected-identity','gradle-bundle-task','gradle-sqlite-flags','gradle-cmake-source','gradle-probe-entry','gradle-evidence-write','gradle-model-complete'];
 
 // Last entered source-owned boundary only; never an error or a completed-step claim.
 export function readAndroidBuildStep(path){
@@ -84,7 +84,9 @@ gradle.projectsEvaluated { current ->
   def selected = app.configurations.getByName('releaseRuntimeClasspath').incoming.resolutionResult.allComponents.findAll {
     it.id instanceof ProjectComponentIdentifier && it.id.projectPath == ':expo-sqlite'
   }
+  markBuildStep('gradle-selected-count')
   assert selected.size() == 1
+  markBuildStep('gradle-selected-identity')
   assert selected.first().id == sqlite.configurations.getByName('releaseRuntimeClasspath').incoming.resolutionResult.rootComponent.get().id
   markBuildStep('gradle-bundle-task')
   def bundle = app.tasks.named('createBundleReleaseJsAndAssets').get()

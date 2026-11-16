@@ -302,7 +302,7 @@ test('Android mismatches, setup/cleanup/writer failures never pass or replace th
 
 test('Android build-step reader admits only stable regular bounded exact source-owned enums',t=>{
  const root=realpathSync(mkdtempSync(join(tmpdir(),'puptime-build-step-')));t.after(()=>rmSync(root,{recursive:true,force:true}));const path=join(root,'step');
- const steps=['gradle-root','gradle-projects','gradle-selected-component','gradle-bundle-task','gradle-sqlite-flags','gradle-cmake-source','gradle-probe-entry','gradle-evidence-write','gradle-model-complete'];
+ const steps=['gradle-root','gradle-projects','gradle-selected-component','gradle-selected-count','gradle-selected-identity','gradle-bundle-task','gradle-sqlite-flags','gradle-cmake-source','gradle-probe-entry','gradle-evidence-write','gradle-model-complete'];
  for(const value of steps){writeFileSync(path,value);assert.equal(readAndroidBuildStep(path),value);}
  for(const value of ['', 'PRIVATE_TOKEN /private/path https://private.invalid', 'selection-read', 'gradle-root\n', 'GRADLE-ROOT', '\ufeffgradle-root', 'x'.repeat(65), Buffer.from([0xff,0xfe])]){writeFileSync(path,value);assert.equal(readAndroidBuildStep(path),null);}
  assert.equal(readAndroidBuildStep(join(root,'missing')),null);assert.equal(readAndroidBuildStep(root),null);
@@ -316,7 +316,7 @@ test('Android build-step reader admits only stable regular bounded exact source-
 
 test('Android generated Gradle breadcrumbs precede existing predicates and cannot replace model failures',()=>{
  const init=androidSelectionInit('/source','/private/selected.json','/private/build-step.txt');
- const boundaries=[['gradle-root','if (current.rootProject.projectDir.canonicalFile !='],['gradle-projects',"def app = current.rootProject.findProject(':app')"],['gradle-selected-component',"def selected = app.configurations.getByName('releaseRuntimeClasspath')"],['gradle-bundle-task',"def bundle = app.tasks.named('createBundleReleaseJsAndAssets')"],['gradle-sqlite-flags','assert sqlite.ext.USE_LIBSQL == false'],['gradle-cmake-source',"assert sqlite.extensions.getByName('android').externalNativeBuild"],['gradle-probe-entry','assert bundle.entryFile.get().asFile.canonicalFile'],['gradle-evidence-write','assert evidence.createNewFile()'],['gradle-model-complete',null]];
+ const boundaries=[['gradle-root','if (current.rootProject.projectDir.canonicalFile !='],['gradle-projects',"def app = current.rootProject.findProject(':app')"],['gradle-selected-component',"def selected = app.configurations.getByName('releaseRuntimeClasspath')"],['gradle-selected-count','assert selected.size() == 1'],['gradle-selected-identity','assert selected.first().id == sqlite.configurations'],['gradle-bundle-task',"def bundle = app.tasks.named('createBundleReleaseJsAndAssets')"],['gradle-sqlite-flags','assert sqlite.ext.USE_LIBSQL == false'],['gradle-cmake-source',"assert sqlite.extensions.getByName('android').externalNativeBuild"],['gradle-probe-entry','assert bundle.entryFile.get().asFile.canonicalFile'],['gradle-evidence-write','assert evidence.createNewFile()'],['gradle-model-complete',null]];
  assert.deepEqual([...init.matchAll(/markBuildStep\('([^']+)'\)/g)].map(match=>match[1]),boundaries.map(row=>row[0]));
  for(let i=0;i<boundaries.length;i++){
   const [step,predicate]=boundaries[i],start=init.indexOf(`markBuildStep('${step}')`),end=i+1<boundaries.length?init.indexOf(`markBuildStep('${boundaries[i+1][0]}')`):init.length;
@@ -328,7 +328,7 @@ test('Android generated Gradle breadcrumbs precede existing predicates and canno
 });
 
 test('Android actual build diagnostics preserve original failures, finite schema and cleanup boundaries',async()=>{
- const cases=[{options:{buildFails:true},step:'gradle-command'},{options:{buildFails:true,buildStep:'gradle-cmake-source'},step:'gradle-cmake-source'},{options:{selectionReadFails:true},step:'selection-read'},{options:{selectionFails:true},step:'selection-validate'}];
+ const cases=[{options:{buildFails:true},step:'gradle-command'},{options:{buildFails:true,buildStep:'gradle-cmake-source'},step:'gradle-cmake-source'},{options:{buildFails:true,buildStep:'gradle-selected-count'},step:'gradle-selected-count'},{options:{buildFails:true,buildStep:'gradle-selected-identity'},step:'gradle-selected-identity'},{options:{selectionReadFails:true},step:'selection-read'},{options:{selectionFails:true},step:'selection-validate'}];
  for(const {options,step} of cases){
   const failure=new Error();Object.defineProperty(failure,'message',{get(){throw Error('Do not inspect PRIVATE message');}});const check=androidCiRun({...options,failure});await assert.rejects(check.execute(),error=>error===failure);
   const value=check.writes.find(row=>row.path.endsWith('provenance.json')).value;
