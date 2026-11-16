@@ -5,6 +5,9 @@ import {execFileSync} from 'node:child_process';
 import {closeSync,cpSync,lstatSync,openSync,readFileSync,readdirSync,readSync,rmSync} from 'node:fs';
 import {isAbsolute,join,relative,resolve,sep} from 'node:path';
 
+// Lifecycle source preparation changes compiled code even at the same package version.
+export const nativeHostInputs=['package.json','package-lock.json','app.json','app.config.*','eas.json','.npmrc','plugins','patches','assets','ios','scripts/prepare-sqlite-engine.mjs'];
+
 const command=(binary,args)=>execFileSync(binary,args,{encoding:'utf8',timeout:120000,stdio:['ignore','pipe','pipe']}).trim();
 const hash=path=>createHash('sha256').update(readFileSync(path)).digest('hex');
 const inside=(root,path)=>{const name=relative(root,path);return name===''||name!=='..'&&!name.startsWith('..'+sep)&&!isAbsolute(name);};

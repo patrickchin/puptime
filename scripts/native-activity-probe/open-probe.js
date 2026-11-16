@@ -1,8 +1,14 @@
 import {File,Paths} from 'expo-file-system';
 import {openLocalDatabase as originalOpen} from '../../src/local/open.native';
 import {readPurpose} from './sql-purpose';
+import {sqliteEngineReceipt} from './sqlite-engine';
 export async function openLocalDatabase(...args){
  const opened=await originalOpen(...args),original=opened.database;
+ try{
+  const engine=new File(Paths.document,'sqlite-engine-probe.json');
+  engine.create({overwrite:true});
+  engine.write(JSON.stringify(await sqliteEngineReceipt(original)));
+ }catch(error){await original.close().catch(()=>{});throw error;}
  const file=new File(Paths.document,'sql-query-probe.json');
  const state={scope:'actual iOS SQLite reads, no values or credentials',reads:[],decoded:0};let scheduled=false;
  function flush(){try{file.write(JSON.stringify(state));}catch{}}
