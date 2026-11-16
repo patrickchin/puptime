@@ -142,20 +142,22 @@ export async function verifyAndroidSqliteEngine(){
  const privateRoot=mkdtempSync(join(runner,'puptime-android-engine-')),avdHome=join(privateRoot,'avd'),name='Puptime_SQLite_Engine_'+runId+'_'+attempt,ownedStops=[];
  const args=['-avd',name,'-port','5588','-no-window','-no-audio','-no-snapshot','-gpu','swiftshader_indirect'];
  const cleanup={appStopped:false,processesStopped:false,emulatorExited:false,avdRemoved:false,portsReleased:false,privateMaterialRemoved:false};
- let child,stopEmulator,ownerStart,spawnError,failure,phase='source',engineBytes,engineMatchesExpected=null,api=null,apkSHA256,installedApkSHA256,apk,selectedModule;
+ let child,stopEmulator,ownerStart,spawnError,failure,mayStop=false,phase='source',engineBytes,engineMatchesExpected=null,api=null,apkSHA256,installedApkSHA256,apk,selectedModule;
  const inspect=()=>{
+  // An unreadable inspection never inherits a prior permission to signal.
+  mayStop=false;
   if(!child?.pid)return null;
   try{const proc='/proc/'+child.pid,stat=readFileSync(join(proc,'stat'),'utf8');return androidProcessIdentity({stat,exe:readlinkSync(join(proc,'exe')),cmdline:readFileSync(join(proc,'cmdline'),'utf8'),environ:readFileSync(join(proc,'environ'),'utf8'),status:readFileSync(join(proc,'status'),'utf8'),afterStat:readFileSync(join(proc,'stat'),'utf8')},{executables:[emulator,join(sdk,'emulator/qemu/linux-x86_64/qemu-system-x86_64'),join(sdk,'emulator/qemu/linux-x86_64/qemu-system-x86_64-headless')].filter(existsSync).map(path=>realpathSync(path)),arguments:args,home:avdHome,uid:String(process.getuid())});}catch(error){if(error.code==='ENOENT'||error.code==='ESRCH')return null;throw error;}
  };
- const owned=()=>{if(spawnError)throw spawnError;const value=inspect();assert.ok(value?.alive&&value.owned&&(ownerStart===undefined||value.start===ownerStart),'Require the exact live task emulator.');ownerStart??=value.start;};
+ const owned=()=>{if(spawnError)throw spawnError;const value=inspect();assert.ok(value?.alive&&value.owned&&(ownerStart===undefined||value.start===ownerStart),'Require the exact live task emulator.');ownerStart??=value.start;mayStop=true;};
  const adb=(args,settings)=>{owned();return command(adbPath,['-s',serial,...args],settings);};
  const poll=async(ms,read)=>{const deadline=Date.now()+ms;do{owned();if(await read())return;await new Promise(resolve=>setTimeout(resolve,250));}while(Date.now()<deadline);throw new Error('Bounded readback timed out.');};
  const task=installTaskCleanup(async()=>{
-  let mayStop=true,commandsStopped=true;
+  mayStop=false;let commandsStopped=true;
   for(const stop of ownedStops)try{commandsStopped=(await stop())&&commandsStopped;}catch{commandsStopped=false;}
   try{
-   if(child){const state=inspect();if(state?.alive){mayStop=state.owned&&state.start===ownerStart;assert.ok(mayStop);try{adb(['shell','am','force-stop',app]);cleanup.appStopped=true;}finally{try{adb(['emu','kill']);}catch{}}}else cleanup.appStopped=true;}
-   else cleanup.appStopped=true;
+   if(child){const state=inspect();if(state?.alive){mayStop=state.owned&&state.start===ownerStart;assert.ok(mayStop);try{adb(['shell','am','force-stop',app]);cleanup.appStopped=true;}finally{try{adb(['emu','kill']);}catch{}}}else{mayStop=ownerStart!==undefined&&(!state||state.start===ownerStart);cleanup.appStopped=true;}}
+   else{mayStop=true;cleanup.appStopped=true;}
   }finally{
    try{const emulatorStopped=mayStop&&(stopEmulator?await stopEmulator():true);cleanup.processesStopped=commandsStopped&&emulatorStopped;cleanup.emulatorExited=!inspect()?.alive;assert.ok(cleanup.processesStopped&&cleanup.emulatorExited);}
    finally{try{if(cleanup.emulatorExited&&cleanup.processesStopped){rmSync(privateRoot,{recursive:true,force:true});cleanup.avdRemoved=!existsSync(avdHome);cleanup.privateMaterialRemoved=!existsSync(privateRoot);}await portsFree();cleanup.portsReleased=true;}finally{assert.ok(Object.values(cleanup).every(value=>value===true));}}
