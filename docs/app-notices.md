@@ -1,8 +1,8 @@
 # App notice capture and final-artifact gate
 
 This is incomplete build preparation. The source JSON currently contains the
-reviewed font/icon notices only. Ninety-six exact iOS inputs have attribution
-reviews; remaining component review and the incomplete payload prevent sealing.
+reviewed font/icon notices only. Attribution reviews cover 120 exact iOS inputs;
+remaining component review and the incomplete payload prevent sealing.
 Source tests, an internal simulator build, and finding licence filenames
 do not establish complete app-library notice coverage or store readiness.
 
@@ -102,11 +102,29 @@ method and produces `47c7f4e8…`; that modified Android source and the archive'
 still require separate qualification. No dependency copy, reset, prebuild or
 helper policy change is part of this append.
 
-Four candidates remain held: `@expo/cli` has generated virtual sources;
+Twenty-four more React Native 0.86.3 source-Pod records cover their exact captured
+own-source roots, with 169 file entries and 165 unique public files. All selected
+bytes match official cached members and installed source; the unchanged native
+scanner reproduces every recorded fingerprint. Each selected podspec reads its
+own pinned package JSON for the licence. The complete 1,088-byte original Meta MIT
+body is preserved and the 24 existing public selectors are reused. All previous
+96 component records, 174 total text pins and other ledger fields stay unchanged.
+Only these exact iOS source inputs are reviewed. The Hermes glue, six already
+published MIT plugin declarations marked generated, and imported interfaces do
+not approve Hermes engine/frameworks, generator outputs, dependencies or siblings.
+
+Two additional whole source-Pod roots remain held: `React-RCTBlob` contains
+references to a Stack Overflow UUID solution, a URL-regex gist and a whatwg-url
+subset; `React-jserrorhandler` explicitly ports stacktrace-parser. The complete
+original attribution scopes need separate review. Neither root or fingerprint
+was narrowed to remove these sources, and their existing public text pins grant
+no component approval.
+
+Four earlier npm candidates remain held: `@expo/cli` has generated virtual sources;
 Gesture Handler, Reanimated and Zod have explicit copied-code attribution to
 resolve. No related native Pod is approved by these npm records.
 
-Against the qualified82 inventory, 107 components plus one generated source
+Against the qualified82 inventory, 83 components plus one generated source
 remain unreviewed. Of 109 recorded vendor boundaries, only the twelve specific
 own-product boundaries above are reviewed; the other 97 remain held. No new
 discovery, Android, packaged-native, retained-resource, payload or sealing

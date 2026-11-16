@@ -2290,6 +2290,942 @@
       ],
       "upstream": "https://registry.npmjs.org/react-native-android-widget/-/react-native-android-widget-0.22.1.tgz",
       "sectionSHA256": "1893949b5f982bd87b686eb21acb84d60ec64d7525226a39329c8e352f7e62f1"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:FBLazyVector@0.86.3",
+      "reviewedVendors": [],
+      "nativeInputs": {
+        "cocoapods:FBLazyVector": {
+          "sha256": "ccc8f46814fcc8ed29976be9be55afc8e50c72dc62136338f779e23655af319d",
+          "files": 3,
+          "excludedBuildPaths": [],
+          "ownLicense": {
+            "ownerNpmID": "npm:react-native@0.86.3",
+            "packagePath": "node_modules/react-native",
+            "sourceKind": "path",
+            "packageJSON": {
+              "source": "node_modules/react-native/package.json",
+              "sha256": "416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144"
+            },
+            "podspec": {
+              "source": "node_modules/react-native/Libraries/FBLazyVector/FBLazyVector.podspec",
+              "sha256": "45eaa07214c2fa1aa5eaaa1786fac9315b76b196e11b6c57fcc9db0b962f84dd"
+            },
+            "license": {
+              "source": "node_modules/react-native/LICENSE",
+              "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+            },
+            "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+            "upstreamIntegrity": "sha512-JR5s3bM9ezud+Mw24GlNXNfthqPIKwrQgPPJcam+L97t2sKjjEavhCzBn+fyqZZRcM5+XlhYxpTxVkK7e1n38Q=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/react-native/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:RCTDeprecation@0.86.3",
+      "reviewedVendors": [],
+      "nativeInputs": {
+        "cocoapods:RCTDeprecation": {
+          "sha256": "0238015064a6f81e44ce5b0ff42deb6bd51f9467392b2c28ccf2ab7c523b1d56",
+          "files": 4,
+          "excludedBuildPaths": [],
+          "ownLicense": {
+            "ownerNpmID": "npm:react-native@0.86.3",
+            "packagePath": "node_modules/react-native",
+            "sourceKind": "path",
+            "packageJSON": {
+              "source": "node_modules/react-native/package.json",
+              "sha256": "416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144"
+            },
+            "podspec": {
+              "source": "node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation/RCTDeprecation.podspec",
+              "sha256": "572fe3cb6685e2ccebb01e49f32282cc58f15da81b88002287593444035f9e09"
+            },
+            "license": {
+              "source": "node_modules/react-native/LICENSE",
+              "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+            },
+            "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+            "upstreamIntegrity": "sha512-JR5s3bM9ezud+Mw24GlNXNfthqPIKwrQgPPJcam+L97t2sKjjEavhCzBn+fyqZZRcM5+XlhYxpTxVkK7e1n38Q=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/react-native/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:RCTRequired@0.86.3",
+      "reviewedVendors": [],
+      "nativeInputs": {
+        "cocoapods:RCTRequired": {
+          "sha256": "b7403d26de6bca50682811c9f3eef1c2ea94057b9779446c6e448d81b602eea9",
+          "files": 2,
+          "excludedBuildPaths": [],
+          "ownLicense": {
+            "ownerNpmID": "npm:react-native@0.86.3",
+            "packagePath": "node_modules/react-native",
+            "sourceKind": "path",
+            "packageJSON": {
+              "source": "node_modules/react-native/package.json",
+              "sha256": "416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144"
+            },
+            "podspec": {
+              "source": "node_modules/react-native/Libraries/Required/RCTRequired.podspec",
+              "sha256": "9092287ef4b1bb2ddef88bc60113055a4a587278273125ad51b8055d360b080e"
+            },
+            "license": {
+              "source": "node_modules/react-native/LICENSE",
+              "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+            },
+            "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+            "upstreamIntegrity": "sha512-JR5s3bM9ezud+Mw24GlNXNfthqPIKwrQgPPJcam+L97t2sKjjEavhCzBn+fyqZZRcM5+XlhYxpTxVkK7e1n38Q=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/react-native/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:RCTSwiftUI@0.86.3",
+      "reviewedVendors": [],
+      "nativeInputs": {
+        "cocoapods:RCTSwiftUI": {
+          "sha256": "f08a98c24b72fd209b4a2828978245e4eca46031367e30af1156c8937273e64d",
+          "files": 2,
+          "excludedBuildPaths": [],
+          "ownLicense": {
+            "ownerNpmID": "npm:react-native@0.86.3",
+            "packagePath": "node_modules/react-native",
+            "sourceKind": "path",
+            "packageJSON": {
+              "source": "node_modules/react-native/package.json",
+              "sha256": "416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144"
+            },
+            "podspec": {
+              "source": "node_modules/react-native/ReactApple/RCTSwiftUI/RCTSwiftUI.podspec",
+              "sha256": "651180ecc69e26a3370fa68ff532df9891071859de5178831c43a2608e9bd57b"
+            },
+            "license": {
+              "source": "node_modules/react-native/LICENSE",
+              "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+            },
+            "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+            "upstreamIntegrity": "sha512-JR5s3bM9ezud+Mw24GlNXNfthqPIKwrQgPPJcam+L97t2sKjjEavhCzBn+fyqZZRcM5+XlhYxpTxVkK7e1n38Q=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/react-native/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:RCTSwiftUIWrapper@0.86.3",
+      "reviewedVendors": [],
+      "nativeInputs": {
+        "cocoapods:RCTSwiftUIWrapper": {
+          "sha256": "eef6ddd8e85e154b8162520cb1b9029c73d828dfbf5510447f7694e569cf376e",
+          "files": 3,
+          "excludedBuildPaths": [],
+          "ownLicense": {
+            "ownerNpmID": "npm:react-native@0.86.3",
+            "packagePath": "node_modules/react-native",
+            "sourceKind": "path",
+            "packageJSON": {
+              "source": "node_modules/react-native/package.json",
+              "sha256": "416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144"
+            },
+            "podspec": {
+              "source": "node_modules/react-native/ReactApple/RCTSwiftUIWrapper/RCTSwiftUIWrapper.podspec",
+              "sha256": "0e1bbcbb77a846c3f92f3c61925a5408ea84e4d9de377b051ff3cf871e1b71df"
+            },
+            "license": {
+              "source": "node_modules/react-native/LICENSE",
+              "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+            },
+            "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+            "upstreamIntegrity": "sha512-JR5s3bM9ezud+Mw24GlNXNfthqPIKwrQgPPJcam+L97t2sKjjEavhCzBn+fyqZZRcM5+XlhYxpTxVkK7e1n38Q=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/react-native/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:RCTTypeSafety@0.86.3",
+      "reviewedVendors": [],
+      "nativeInputs": {
+        "cocoapods:RCTTypeSafety": {
+          "sha256": "c2a86c16e8b7933dae71e390247aefafa28466ef15b9305bd076044554238ced",
+          "files": 5,
+          "excludedBuildPaths": [],
+          "ownLicense": {
+            "ownerNpmID": "npm:react-native@0.86.3",
+            "packagePath": "node_modules/react-native",
+            "sourceKind": "path",
+            "packageJSON": {
+              "source": "node_modules/react-native/package.json",
+              "sha256": "416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144"
+            },
+            "podspec": {
+              "source": "node_modules/react-native/Libraries/TypeSafety/RCTTypeSafety.podspec",
+              "sha256": "1813284bebc1095d08458f0c5958e8ec29ff656d5677e8c0d1b38e73ba30bfc7"
+            },
+            "license": {
+              "source": "node_modules/react-native/LICENSE",
+              "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+            },
+            "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+            "upstreamIntegrity": "sha512-JR5s3bM9ezud+Mw24GlNXNfthqPIKwrQgPPJcam+L97t2sKjjEavhCzBn+fyqZZRcM5+XlhYxpTxVkK7e1n38Q=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/react-native/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:React-callinvoker@0.86.3",
+      "reviewedVendors": [],
+      "nativeInputs": {
+        "cocoapods:React-callinvoker": {
+          "sha256": "5f1eed0645c6ee68f81ef7e2c944e28b464f45fe4048758434d0fed053c9997b",
+          "files": 5,
+          "excludedBuildPaths": [],
+          "ownLicense": {
+            "ownerNpmID": "npm:react-native@0.86.3",
+            "packagePath": "node_modules/react-native",
+            "sourceKind": "path",
+            "packageJSON": {
+              "source": "node_modules/react-native/package.json",
+              "sha256": "416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144"
+            },
+            "podspec": {
+              "source": "node_modules/react-native/ReactCommon/callinvoker/React-callinvoker.podspec",
+              "sha256": "0849a8edd2fdaf2ce6f31684dcf39f0243533b6af0b70d4f098425302c2fc7b9"
+            },
+            "license": {
+              "source": "node_modules/react-native/LICENSE",
+              "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+            },
+            "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+            "upstreamIntegrity": "sha512-JR5s3bM9ezud+Mw24GlNXNfthqPIKwrQgPPJcam+L97t2sKjjEavhCzBn+fyqZZRcM5+XlhYxpTxVkK7e1n38Q=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/react-native/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:React-hermes@0.86.3",
+      "reviewedVendors": [],
+      "nativeInputs": {
+        "cocoapods:React-hermes": {
+          "sha256": "f740b79cc80c3e88e634aa2e8d748d970b5bc26ad56d95b935f34bed3739df8d",
+          "files": 17,
+          "excludedBuildPaths": [],
+          "ownLicense": {
+            "ownerNpmID": "npm:react-native@0.86.3",
+            "packagePath": "node_modules/react-native",
+            "sourceKind": "path",
+            "packageJSON": {
+              "source": "node_modules/react-native/package.json",
+              "sha256": "416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144"
+            },
+            "podspec": {
+              "source": "node_modules/react-native/ReactCommon/hermes/React-hermes.podspec",
+              "sha256": "c0769799009387eb61e32e751d1ebee1d10ccd74b2609338b4b138600cee9bfc"
+            },
+            "license": {
+              "source": "node_modules/react-native/LICENSE",
+              "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+            },
+            "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+            "upstreamIntegrity": "sha512-JR5s3bM9ezud+Mw24GlNXNfthqPIKwrQgPPJcam+L97t2sKjjEavhCzBn+fyqZZRcM5+XlhYxpTxVkK7e1n38Q=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/react-native/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:React-jsi@0.86.3",
+      "reviewedVendors": [],
+      "nativeInputs": {
+        "cocoapods:React-jsi": {
+          "sha256": "d2d4710a3e078b48799954f72ec35c29d7cd30037ca3737168104bd3a7d90b06",
+          "files": 17,
+          "excludedBuildPaths": [],
+          "ownLicense": {
+            "ownerNpmID": "npm:react-native@0.86.3",
+            "packagePath": "node_modules/react-native",
+            "sourceKind": "path",
+            "packageJSON": {
+              "source": "node_modules/react-native/package.json",
+              "sha256": "416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144"
+            },
+            "podspec": {
+              "source": "node_modules/react-native/ReactCommon/jsi/React-jsi.podspec",
+              "sha256": "d313670e82ed88dede6ef6f7673cfa0d11c7dda52ca0b4da0ce00055bd59be60"
+            },
+            "license": {
+              "source": "node_modules/react-native/LICENSE",
+              "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+            },
+            "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+            "upstreamIntegrity": "sha512-JR5s3bM9ezud+Mw24GlNXNfthqPIKwrQgPPJcam+L97t2sKjjEavhCzBn+fyqZZRcM5+XlhYxpTxVkK7e1n38Q=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/react-native/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:React-jsiexecutor@0.86.3",
+      "reviewedVendors": [],
+      "nativeInputs": {
+        "cocoapods:React-jsiexecutor": {
+          "sha256": "9a11d22bf32a967b25a0572d069651e0ca1c00f7e4d8d7263fa6df36be35230f",
+          "files": 6,
+          "excludedBuildPaths": [],
+          "ownLicense": {
+            "ownerNpmID": "npm:react-native@0.86.3",
+            "packagePath": "node_modules/react-native",
+            "sourceKind": "path",
+            "packageJSON": {
+              "source": "node_modules/react-native/package.json",
+              "sha256": "416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144"
+            },
+            "podspec": {
+              "source": "node_modules/react-native/ReactCommon/jsiexecutor/React-jsiexecutor.podspec",
+              "sha256": "c0aa98c8e265d326937a5fb6f0cb6ef06f076049033395054d79a1bf4292cd56"
+            },
+            "license": {
+              "source": "node_modules/react-native/LICENSE",
+              "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+            },
+            "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+            "upstreamIntegrity": "sha512-JR5s3bM9ezud+Mw24GlNXNfthqPIKwrQgPPJcam+L97t2sKjjEavhCzBn+fyqZZRcM5+XlhYxpTxVkK7e1n38Q=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/react-native/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:React-jsinspectorcdp@0.86.3",
+      "reviewedVendors": [],
+      "nativeInputs": {
+        "cocoapods:React-jsinspectorcdp": {
+          "sha256": "f3ed7d1092747c9d3886ec24ed755fd6b6caf83eecceccca411aa6cb71753f1c",
+          "files": 4,
+          "excludedBuildPaths": [],
+          "ownLicense": {
+            "ownerNpmID": "npm:react-native@0.86.3",
+            "packagePath": "node_modules/react-native",
+            "sourceKind": "path",
+            "packageJSON": {
+              "source": "node_modules/react-native/package.json",
+              "sha256": "416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144"
+            },
+            "podspec": {
+              "source": "node_modules/react-native/ReactCommon/jsinspector-modern/cdp/React-jsinspectorcdp.podspec",
+              "sha256": "35f306217b0c682b20cb61152f5ab138edc4a775219cc3a061357285bcf0da55"
+            },
+            "license": {
+              "source": "node_modules/react-native/LICENSE",
+              "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+            },
+            "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+            "upstreamIntegrity": "sha512-JR5s3bM9ezud+Mw24GlNXNfthqPIKwrQgPPJcam+L97t2sKjjEavhCzBn+fyqZZRcM5+XlhYxpTxVkK7e1n38Q=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/react-native/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:React-jsinspectornetwork@0.86.3",
+      "reviewedVendors": [],
+      "nativeInputs": {
+        "cocoapods:React-jsinspectornetwork": {
+          "sha256": "7d98b91c8109da850cd4072cdd125eef9bb862e7945ba1e840448b8392e9fe47",
+          "files": 10,
+          "excludedBuildPaths": [],
+          "ownLicense": {
+            "ownerNpmID": "npm:react-native@0.86.3",
+            "packagePath": "node_modules/react-native",
+            "sourceKind": "path",
+            "packageJSON": {
+              "source": "node_modules/react-native/package.json",
+              "sha256": "416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144"
+            },
+            "podspec": {
+              "source": "node_modules/react-native/ReactCommon/jsinspector-modern/network/React-jsinspectornetwork.podspec",
+              "sha256": "b7c8deb68c68ca03072ceee353a6af60d88786fefe6c04d3193bb8b48824e427"
+            },
+            "license": {
+              "source": "node_modules/react-native/LICENSE",
+              "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+            },
+            "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+            "upstreamIntegrity": "sha512-JR5s3bM9ezud+Mw24GlNXNfthqPIKwrQgPPJcam+L97t2sKjjEavhCzBn+fyqZZRcM5+XlhYxpTxVkK7e1n38Q=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/react-native/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:React-jsitooling@0.86.3",
+      "reviewedVendors": [],
+      "nativeInputs": {
+        "cocoapods:React-jsitooling": {
+          "sha256": "216ebb6c166918c07620242c041b890a49ed21ad122a54a37740d4162488cb0e",
+          "files": 8,
+          "excludedBuildPaths": [],
+          "ownLicense": {
+            "ownerNpmID": "npm:react-native@0.86.3",
+            "packagePath": "node_modules/react-native",
+            "sourceKind": "path",
+            "packageJSON": {
+              "source": "node_modules/react-native/package.json",
+              "sha256": "416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144"
+            },
+            "podspec": {
+              "source": "node_modules/react-native/ReactCommon/jsitooling/React-jsitooling.podspec",
+              "sha256": "7c03c8139e3cbb6b20f73fbfba8c970c19566d6c7abb981aa50d523779618015"
+            },
+            "license": {
+              "source": "node_modules/react-native/LICENSE",
+              "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+            },
+            "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+            "upstreamIntegrity": "sha512-JR5s3bM9ezud+Mw24GlNXNfthqPIKwrQgPPJcam+L97t2sKjjEavhCzBn+fyqZZRcM5+XlhYxpTxVkK7e1n38Q=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/react-native/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:React-jsitracing@0.86.3",
+      "reviewedVendors": [],
+      "nativeInputs": {
+        "cocoapods:React-jsitracing": {
+          "sha256": "4f6bb7b242d3c75d4518ddca05fbc06fcdafb2d34a6fba2a31f4e7a8259246fb",
+          "files": 4,
+          "excludedBuildPaths": [],
+          "ownLicense": {
+            "ownerNpmID": "npm:react-native@0.86.3",
+            "packagePath": "node_modules/react-native",
+            "sourceKind": "path",
+            "packageJSON": {
+              "source": "node_modules/react-native/package.json",
+              "sha256": "416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144"
+            },
+            "podspec": {
+              "source": "node_modules/react-native/ReactCommon/hermes/executor/React-jsitracing.podspec",
+              "sha256": "5b788c2bdcd8c5b64a4b2c8b4ab7f8bb31dff314ec8887fece4bde2a6e18eea8"
+            },
+            "license": {
+              "source": "node_modules/react-native/LICENSE",
+              "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+            },
+            "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+            "upstreamIntegrity": "sha512-JR5s3bM9ezud+Mw24GlNXNfthqPIKwrQgPPJcam+L97t2sKjjEavhCzBn+fyqZZRcM5+XlhYxpTxVkK7e1n38Q=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/react-native/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:React-logger@0.86.3",
+      "reviewedVendors": [],
+      "nativeInputs": {
+        "cocoapods:React-logger": {
+          "sha256": "9fdd0aa303376e5e8e55a5010557a10c1652eff19b5a4f79deee31542164d3af",
+          "files": 4,
+          "excludedBuildPaths": [],
+          "ownLicense": {
+            "ownerNpmID": "npm:react-native@0.86.3",
+            "packagePath": "node_modules/react-native",
+            "sourceKind": "path",
+            "packageJSON": {
+              "source": "node_modules/react-native/package.json",
+              "sha256": "416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144"
+            },
+            "podspec": {
+              "source": "node_modules/react-native/ReactCommon/logger/React-logger.podspec",
+              "sha256": "72d25b4f44182ba1a5ce933653a24a9a287be4a22b6b5ba2467de601e600b3fb"
+            },
+            "license": {
+              "source": "node_modules/react-native/LICENSE",
+              "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+            },
+            "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+            "upstreamIntegrity": "sha512-JR5s3bM9ezud+Mw24GlNXNfthqPIKwrQgPPJcam+L97t2sKjjEavhCzBn+fyqZZRcM5+XlhYxpTxVkK7e1n38Q=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/react-native/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:React-oscompat@0.86.3",
+      "reviewedVendors": [],
+      "nativeInputs": {
+        "cocoapods:React-oscompat": {
+          "sha256": "def17d89475d644a34f2bb4008b7c17bbdbc298b6c2901e27d728bf9f25be433",
+          "files": 5,
+          "excludedBuildPaths": [],
+          "ownLicense": {
+            "ownerNpmID": "npm:react-native@0.86.3",
+            "packagePath": "node_modules/react-native",
+            "sourceKind": "path",
+            "packageJSON": {
+              "source": "node_modules/react-native/package.json",
+              "sha256": "416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144"
+            },
+            "podspec": {
+              "source": "node_modules/react-native/ReactCommon/oscompat/React-oscompat.podspec",
+              "sha256": "ee362e43a51fb5d8b7c93fa3d14872cde4c3da7e39aee580226e89dfe0ccf320"
+            },
+            "license": {
+              "source": "node_modules/react-native/LICENSE",
+              "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+            },
+            "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+            "upstreamIntegrity": "sha512-JR5s3bM9ezud+Mw24GlNXNfthqPIKwrQgPPJcam+L97t2sKjjEavhCzBn+fyqZZRcM5+XlhYxpTxVkK7e1n38Q=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/react-native/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:React-perflogger@0.86.3",
+      "reviewedVendors": [],
+      "nativeInputs": {
+        "cocoapods:React-perflogger": {
+          "sha256": "f8b64499b84f45070b5d6d67f8a3f583834af25eb3a388484688ec496e0aa1f1",
+          "files": 18,
+          "excludedBuildPaths": [],
+          "ownLicense": {
+            "ownerNpmID": "npm:react-native@0.86.3",
+            "packagePath": "node_modules/react-native",
+            "sourceKind": "path",
+            "packageJSON": {
+              "source": "node_modules/react-native/package.json",
+              "sha256": "416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144"
+            },
+            "podspec": {
+              "source": "node_modules/react-native/ReactCommon/reactperflogger/React-perflogger.podspec",
+              "sha256": "818c3b466e9ec5fc6c988cfe87872a4c979939698f9aff85603008b5536cc69c"
+            },
+            "license": {
+              "source": "node_modules/react-native/LICENSE",
+              "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+            },
+            "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+            "upstreamIntegrity": "sha512-JR5s3bM9ezud+Mw24GlNXNfthqPIKwrQgPPJcam+L97t2sKjjEavhCzBn+fyqZZRcM5+XlhYxpTxVkK7e1n38Q=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/react-native/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:React-RCTActionSheet@0.86.3",
+      "reviewedVendors": [],
+      "nativeInputs": {
+        "cocoapods:React-RCTActionSheet": {
+          "sha256": "a7e6611b90dd868bbc2bc276a2bca33ce5122aa887f371086cd1b73a10c411e3",
+          "files": 4,
+          "excludedBuildPaths": [],
+          "ownLicense": {
+            "ownerNpmID": "npm:react-native@0.86.3",
+            "packagePath": "node_modules/react-native",
+            "sourceKind": "path",
+            "packageJSON": {
+              "source": "node_modules/react-native/package.json",
+              "sha256": "416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144"
+            },
+            "podspec": {
+              "source": "node_modules/react-native/Libraries/ActionSheetIOS/React-RCTActionSheet.podspec",
+              "sha256": "ae8f95831b9c5e67733b0745bce6ab14b9f614fe942730abf73433d5dd5aaa4c"
+            },
+            "license": {
+              "source": "node_modules/react-native/LICENSE",
+              "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+            },
+            "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+            "upstreamIntegrity": "sha512-JR5s3bM9ezud+Mw24GlNXNfthqPIKwrQgPPJcam+L97t2sKjjEavhCzBn+fyqZZRcM5+XlhYxpTxVkK7e1n38Q=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/react-native/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:React-RCTAppDelegate@0.86.3",
+      "reviewedVendors": [],
+      "nativeInputs": {
+        "cocoapods:React-RCTAppDelegate": {
+          "sha256": "8d3237e0c7f2ed2e92eb6ee856f16bc99eb2fb505690387948ee725af71b4529",
+          "files": 15,
+          "excludedBuildPaths": [],
+          "ownLicense": {
+            "ownerNpmID": "npm:react-native@0.86.3",
+            "packagePath": "node_modules/react-native",
+            "sourceKind": "path",
+            "packageJSON": {
+              "source": "node_modules/react-native/package.json",
+              "sha256": "416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144"
+            },
+            "podspec": {
+              "source": "node_modules/react-native/Libraries/AppDelegate/React-RCTAppDelegate.podspec",
+              "sha256": "f2f9dfb16e1a610828ff9155e142f59b9689b34b2d84217064bed0a5fa8c6f9e"
+            },
+            "license": {
+              "source": "node_modules/react-native/LICENSE",
+              "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+            },
+            "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+            "upstreamIntegrity": "sha512-JR5s3bM9ezud+Mw24GlNXNfthqPIKwrQgPPJcam+L97t2sKjjEavhCzBn+fyqZZRcM5+XlhYxpTxVkK7e1n38Q=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/react-native/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:React-RCTLinking@0.86.3",
+      "reviewedVendors": [],
+      "nativeInputs": {
+        "cocoapods:React-RCTLinking": {
+          "sha256": "1703e45b36df93ab6825f66075fa7859c52d70675ee1f764679b7d6e812c2543",
+          "files": 5,
+          "excludedBuildPaths": [],
+          "ownLicense": {
+            "ownerNpmID": "npm:react-native@0.86.3",
+            "packagePath": "node_modules/react-native",
+            "sourceKind": "path",
+            "packageJSON": {
+              "source": "node_modules/react-native/package.json",
+              "sha256": "416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144"
+            },
+            "podspec": {
+              "source": "node_modules/react-native/Libraries/LinkingIOS/React-RCTLinking.podspec",
+              "sha256": "399f454e4f92f40c0ccb4a5937a86f7a3cc47062cb520fc440e5e1ae9b2495d1"
+            },
+            "license": {
+              "source": "node_modules/react-native/LICENSE",
+              "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+            },
+            "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+            "upstreamIntegrity": "sha512-JR5s3bM9ezud+Mw24GlNXNfthqPIKwrQgPPJcam+L97t2sKjjEavhCzBn+fyqZZRcM5+XlhYxpTxVkK7e1n38Q=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/react-native/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:React-RCTRuntime@0.86.3",
+      "reviewedVendors": [],
+      "nativeInputs": {
+        "cocoapods:React-RCTRuntime": {
+          "sha256": "dba843c2d9e4e5c41db68df4224c08eab5da50a665e528f5c17f3f4fb44f6045",
+          "files": 3,
+          "excludedBuildPaths": [],
+          "ownLicense": {
+            "ownerNpmID": "npm:react-native@0.86.3",
+            "packagePath": "node_modules/react-native",
+            "sourceKind": "path",
+            "packageJSON": {
+              "source": "node_modules/react-native/package.json",
+              "sha256": "416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144"
+            },
+            "podspec": {
+              "source": "node_modules/react-native/React/Runtime/React-RCTRuntime.podspec",
+              "sha256": "651da05b016101a7cfd6581b6be25da8f279b21ee107f36a4d2ee44ff29e26db"
+            },
+            "license": {
+              "source": "node_modules/react-native/LICENSE",
+              "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+            },
+            "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+            "upstreamIntegrity": "sha512-JR5s3bM9ezud+Mw24GlNXNfthqPIKwrQgPPJcam+L97t2sKjjEavhCzBn+fyqZZRcM5+XlhYxpTxVkK7e1n38Q=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/react-native/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:React-RCTSettings@0.86.3",
+      "reviewedVendors": [],
+      "nativeInputs": {
+        "cocoapods:React-RCTSettings": {
+          "sha256": "e8342fdff972ff6716c446b0ba291fc0ae8dee97f5909242c2da9345391a13dc",
+          "files": 10,
+          "excludedBuildPaths": [],
+          "ownLicense": {
+            "ownerNpmID": "npm:react-native@0.86.3",
+            "packagePath": "node_modules/react-native",
+            "sourceKind": "path",
+            "packageJSON": {
+              "source": "node_modules/react-native/package.json",
+              "sha256": "416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144"
+            },
+            "podspec": {
+              "source": "node_modules/react-native/Libraries/Settings/React-RCTSettings.podspec",
+              "sha256": "c2e761d1163778acab786d717ef890dee2640a77aa55a742f52bbecdf4563e1b"
+            },
+            "license": {
+              "source": "node_modules/react-native/LICENSE",
+              "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+            },
+            "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+            "upstreamIntegrity": "sha512-JR5s3bM9ezud+Mw24GlNXNfthqPIKwrQgPPJcam+L97t2sKjjEavhCzBn+fyqZZRcM5+XlhYxpTxVkK7e1n38Q=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/react-native/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:React-RCTVibration@0.86.3",
+      "reviewedVendors": [],
+      "nativeInputs": {
+        "cocoapods:React-RCTVibration": {
+          "sha256": "846ac424c1b1525e2c72583d7abcdb8792d2181b8c229194e8c55e81f9740e6c",
+          "files": 8,
+          "excludedBuildPaths": [],
+          "ownLicense": {
+            "ownerNpmID": "npm:react-native@0.86.3",
+            "packagePath": "node_modules/react-native",
+            "sourceKind": "path",
+            "packageJSON": {
+              "source": "node_modules/react-native/package.json",
+              "sha256": "416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144"
+            },
+            "podspec": {
+              "source": "node_modules/react-native/Libraries/Vibration/React-RCTVibration.podspec",
+              "sha256": "3975e69920a5d4a1db93d0f2b5b05b83189b289d90284a7917906e1b39cf38ae"
+            },
+            "license": {
+              "source": "node_modules/react-native/LICENSE",
+              "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+            },
+            "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+            "upstreamIntegrity": "sha512-JR5s3bM9ezud+Mw24GlNXNfthqPIKwrQgPPJcam+L97t2sKjjEavhCzBn+fyqZZRcM5+XlhYxpTxVkK7e1n38Q=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/react-native/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "platform": "ios",
+      "component": "cocoapods:React-runtimeexecutor@0.86.3",
+      "reviewedVendors": [],
+      "nativeInputs": {
+        "cocoapods:React-runtimeexecutor": {
+          "sha256": "9ce662b11a12198072286f855ad5f792410453f64759fcc6d88a06ed72cff850",
+          "files": 7,
+          "excludedBuildPaths": [],
+          "ownLicense": {
+            "ownerNpmID": "npm:react-native@0.86.3",
+            "packagePath": "node_modules/react-native",
+            "sourceKind": "path",
+            "packageJSON": {
+              "source": "node_modules/react-native/package.json",
+              "sha256": "416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144"
+            },
+            "podspec": {
+              "source": "node_modules/react-native/ReactCommon/runtimeexecutor/React-runtimeexecutor.podspec",
+              "sha256": "8d578ebf93a0ea92dafe10bb894712383dccee4b5d0d648930d137fdb63b9a22"
+            },
+            "license": {
+              "source": "node_modules/react-native/LICENSE",
+              "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+            },
+            "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+            "upstreamIntegrity": "sha512-JR5s3bM9ezud+Mw24GlNXNfthqPIKwrQgPPJcam+L97t2sKjjEavhCzBn+fyqZZRcM5+XlhYxpTxVkK7e1n38Q=="
+          }
+        }
+      },
+      "notices": [
+        {
+          "source": "node_modules/react-native/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ],
+      "upstream": "https://registry.npmjs.org/react-native/-/react-native-0.86.3.tgz",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
     }
   ],
   "generatedSources": {
