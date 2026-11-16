@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {existsSync,readFileSync,readdirSync,realpathSync,lstatSync,statSync} from 'node:fs';
+import {existsSync,readFileSync,readdirSync,realpathSync,lstatSync,statSync,openSync,readSync,fstatSync,closeSync,constants} from 'node:fs';
 import {basename,dirname,join,relative,resolve,sep} from 'node:path';
 import {createRequire} from 'node:module';
 import {digest,nativeNoticeInput,npmNoticeInputs,nativeSourceNotices,noticeText,capturedSource,safeRelative} from './app-notices.mjs';
@@ -97,6 +97,36 @@ export function podActualSelectors(root,lock,versions,podLockSHA256){
  });
 }
 
+// Observation only: normal Pod setup supplies the copied pair and options.
+// This neither approves the component nor excludes any scanned vendor root.
+export function sqlitePodSourceEvidence(root,source,external,podLockSHA256){
+ root=realpathSync(root);const modules=realpathSync(join(root,'node_modules')),owner=join(modules,'expo-sqlite');
+ assert.equal(realpathSync(owner),owner);assert.deepEqual(Object.keys(external??{}),[':path']);
+ assert.equal(realpathSync(source),join(owner,'ios'));assert.equal(realpathSync(resolve(root,'ios',external[':path'])),join(owner,'ios'));
+ const pkg=npmNoticeInputs(root,[join(owner,'package.json')])[0],lock=JSON.parse(readFileSync(join(root,'package-lock.json'))).packages?.['node_modules/expo-sqlite'];
+ assert.equal(pkg?.id,'npm:expo-sqlite@57.0.5');assert.equal(lock?.resolved,'https://registry.npmjs.org/expo-sqlite/-/expo-sqlite-57.0.5.tgz');
+ assert.equal(lock.integrity,'sha512-WYBPXDL0WCMmGSvBgmCXk06yUS4p9GCXUP7CNZBjnb30ZLAuibhsOSzVGDTHcCfs+O/wEC6DNMkNDsw+0xKp7g==');assert.match(podLockSHA256,/^[a-f0-9]{64}$/);
+ const inputs=new Map(),files=[];
+ for(const logical of ['node_modules/expo-sqlite/package.json','node_modules/expo-sqlite/LICENSE','node_modules/expo-sqlite/ios/ExpoSQLite.podspec','node_modules/expo-sqlite/vendor/sqlite3/sqlite3.c','node_modules/expo-sqlite/vendor/sqlite3/sqlite3.h','node_modules/expo-sqlite/ios/sqlite3.c','node_modules/expo-sqlite/ios/sqlite3.h','ios/Podfile.properties.json']){
+  const path=join(root,logical),expected=logical.startsWith('node_modules/')?join(owner,logical.slice('node_modules/expo-sqlite/'.length)):path;
+  assert.equal(realpathSync(path),expected);assert.ok(lstatSync(path).isFile()&&!lstatSync(path).isSymbolicLink());
+  const fd=openSync(path,constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK);
+  try{
+   const before=fstatSync(fd,{bigint:true}),maximum=/\/sqlite3\.[ch]$/.test(logical)?16*1024*1024:1024*1024;
+   assert.ok(before.isFile()&&before.size>0n&&before.size<=BigInt(maximum),'Native source inventory exceeds its bound.');
+   const bytes=Buffer.alloc(Number(before.size)+1);let size=0,count;
+   while(size<bytes.length&&(count=readSync(fd,bytes,size,bytes.length-size,null)))size+=count;
+   assert.equal(size,Number(before.size));const after=fstatSync(fd,{bigint:true}),current=lstatSync(path,{bigint:true});
+   for(const key of ['dev','ino','mode','size','mtimeNs','ctimeNs']){assert.equal(after[key],before[key]);assert.equal(current[key],before[key]);}
+   assert.equal(realpathSync(path),expected);const body=bytes.subarray(0,size);inputs.set(logical,body);files.push({source:logical,bytes:size,sha256:digest(body)});
+  }finally{closeSync(fd);}
+ }
+ const properties=JSON.parse(noticeText(inputs.get('ios/Podfile.properties.json')));assert.ok(properties&&typeof properties==='object'&&!Array.isArray(properties));
+ const enabled=key=>properties['expo.sqlite.'+key]==='true',useSQLCipher=enabled('useSQLCipher'),useLibSQL=enabled('useLibSQL'),withSQLiteVecExtension=enabled('withSQLiteVecExtension');
+ const copiedPairMatches=['c','h'].every(ext=>inputs.get('node_modules/expo-sqlite/ios/sqlite3.'+ext).equals(inputs.get('node_modules/expo-sqlite/vendor/sqlite3/sqlite3.'+ext)));
+ return {schema:1,scope:'sqlite-pod-source-observation',discoveryOnly:true,component:'cocoapods:ExpoSQLite@57.0.5',ownerNpmID:pkg.id,sourceKind:'path',podLockSHA256,files,options:{useSQLCipher,useLibSQL,withSQLiteVecExtension},copiedPairMatches,compiledSelectionVerified:false,finalArtifactVerified:false};
+}
+
 export function podNoticeInputs(root){
  const lockPath=join(root,'ios/Podfile.lock'),support=join(root,'ios/Pods/Target Support Files');
  if(!existsSync(lockPath)||!existsSync(support))return {components:[],unresolved:[{component:'native:ios',reason:'missing-resolved-pod-inputs'}],nativeFiles:[]};
@@ -127,7 +157,7 @@ export function podNoticeInputs(root){
    const own=podOwnLicense(root,name,version,source,external),{linkedSources,...metadata}=podLinkedSources(root,name,source,external),value=nativeSourceNotices(root,source,`cocoapods:${name}`,{linkedSources});
    if(own)value.notices.push(own.notice);
    const actualSelector=actualSelectors.find(row=>row.component===`cocoapods:${name}@${version}`);
-   Object.assign(value.nativeInputs[`cocoapods:${name}`],metadata,...(own?[{ownLicense:own.binding}]:[]),...(actualSelector?[{actualSelector}]:[]));return value;
+   Object.assign(value.nativeInputs[`cocoapods:${name}`],metadata,...(own?[{ownLicense:own.binding}]:[]),...(actualSelector?[{actualSelector}]:[]),...(name==='ExpoSQLite'&&version==='57.0.5'?[{sqliteSourceEvidence:sqlitePodSourceEvidence(root,source,external,podLockSHA256)}]:[]));return value;
   },`cocoapods:${name}@${version}`);
   components.push(noticeInputStep('pod-notices','cocoapods',()=>nativeNoticeInput({id:`cocoapods:${name}@${version}`,name,version,ecosystem:'cocoapods',...scan,notices:[...notices,...scan.notices].sort((a,b)=>a.source.localeCompare(b.source))}),`cocoapods:${name}@${version}`));
  }

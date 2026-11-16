@@ -5,8 +5,8 @@ import {tmpdir} from 'node:os';
 import {join,dirname} from 'node:path';
 import {createRequire} from 'node:module';
 import test from 'node:test';
-import {podNoticeInputs,gradleNoticeInputs,unionNoticeInputs,inspectNoticeArchive,noticeInputStep,noticeFailureContext,podLinkedSources,podActualSelectors} from './native-notice-inputs.mjs';
-import {addKnownOwnNoticeFiles,assertPackagedNativeCoverage,assertSourceNoticePayload,digest,npmNoticeInputs,resolveNoticeCoverage,nativeSourceNotices,unreviewedOSSNoticeInputs} from './app-notices.mjs';
+import {podNoticeInputs,gradleNoticeInputs,unionNoticeInputs,inspectNoticeArchive,noticeInputStep,noticeFailureContext,podLinkedSources,podActualSelectors,sqlitePodSourceEvidence} from './native-notice-inputs.mjs';
+import {addKnownOwnNoticeFiles,assertPackagedNativeCoverage,assertSourceNoticePayload,digest,npmNoticeInputs,resolveNoticeCoverage,nativeSourceNotices,unreviewedOSSNoticeInputs,publicNoticeReport} from './app-notices.mjs';
 import {captureResolvedInputs,createNoticeSeal} from './capture-app-notices.mjs';
 const require=createRequire(import.meta.url),plist=require('@expo/plist');
 const mit=readFileSync(new URL('../node_modules/react-native/LICENSE',import.meta.url),'utf8');
@@ -19,6 +19,35 @@ function fixture(run){
  const file=(path,body)=>{mkdirSync(join(root,path,'..'),{recursive:true});writeFileSync(join(root,path),typeof body==='string'||Buffer.isBuffer(body)?body:JSON.stringify(body));return join(root,path);};
  try{return run({root,file});}finally{rmSync(root,{recursive:true,force:true});}
 }
+function sqliteSourceFixture(run){return fixture(({root,file})=>{
+ const prefix='node_modules/expo-sqlite',external={':path':'../'+prefix+'/ios'},lock={PODS:['ExpoSQLite (57.0.5)'],'EXTERNAL SOURCES':{ExpoSQLite:external}};
+ file(prefix+'/package.json',{name:'expo-sqlite',version:'57.0.5'});file(prefix+'/LICENSE','Synthetic own MIT fixture only\n');file(prefix+'/ios/ExpoSQLite.podspec','Synthetic source selector only\n');
+ file('package-lock.json',{packages:{[prefix]:{version:'57.0.5',resolved:'https://registry.npmjs.org/expo-sqlite/-/expo-sqlite-57.0.5.tgz',integrity:'sha512-WYBPXDL0WCMmGSvBgmCXk06yUS4p9GCXUP7CNZBjnb30ZLAuibhsOSzVGDTHcCfs+O/wEC6DNMkNDsw+0xKp7g=='}}});
+ for(const ext of ['c','h'])for(const folder of ['ios','vendor/sqlite3'])file(prefix+'/'+folder+'/sqlite3.'+ext,'Synthetic public-domain pair '+ext+'\n');
+ file(prefix+'/ios/NOTICE','Synthetic attribution fixture\n');file(prefix+'/ios/libsql.xcframework/Info.plist','Unreviewed synthetic vendor\n');file('ios/Podfile.properties.json',{});file('ios/Podfile.lock',lock);mkdirSync(join(root,'ios/Pods/Target Support Files'),{recursive:true});
+ return run({root,file,prefix,external,lock,direct:()=>sqlitePodSourceEvidence(root,join(root,prefix,'ios'),external,'a'.repeat(64)),capture:()=>podNoticeInputs(root)});
+});}
+test('SQLite .5 source observation survives actual Pod capture without attribution, seal or vendor inheritance',()=>sqliteSourceFixture(({root,prefix,capture})=>{
+ const provenance=JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))),before=digest(JSON.stringify(provenance)),native=capture(),item=native.components[0],value=item.nativeInputs['cocoapods:ExpoSQLite'].sqliteSourceEvidence;
+ assert.equal(provenance.components.length,121);assert.equal(provenance.knownLicenseSources.length,177);assert.equal(value.component,'cocoapods:ExpoSQLite@57.0.5');assert.equal(value.ownerNpmID,'npm:expo-sqlite@57.0.5');assert.equal(value.podLockSHA256,native.inputHashes.podLock);assert.equal(value.files.length,8);assert.equal(value.copiedPairMatches,true);assert.equal(value.discoveryOnly,true);assert.equal(value.compiledSelectionVerified,false);assert.equal(value.finalArtifactVerified,false);assert.deepEqual(value.options,{useSQLCipher:false,useLibSQL:false,withSQLiteVecExtension:false});
+ for(const entry of value.files){const body=readFileSync(join(root,entry.source));assert.deepEqual(Object.keys(entry),['source','bytes','sha256']);assert.equal(entry.bytes,body.length);assert.equal(entry.sha256,digest(body));}
+ assert.equal(item.nativeInputs['cocoapods:ExpoSQLite'].ownLicense,undefined);assert.ok(item.vendors.includes('libsql.xcframework'));
+ const coverage=resolveNoticeCoverage(native.components,provenance),report=publicNoticeReport({platform:'ios',sourceCommit:'a'.repeat(40),entry:'index.ts',lockSHA256:digest(readFileSync(join(root,'package-lock.json'))),coverage});
+ assert.equal(coverage.status,'INCOMPLETE');assert.equal(report.status,'INCOMPLETE');assert.equal(report.complete,false);assert.equal(report.discoveryOnly,true);assert.equal(report.components[0].nativeInputs['cocoapods:ExpoSQLite'].sqliteSourceEvidence,value);assert.equal(resolveNoticeCoverage([item],approval(item)).unresolved[0].reason,'missing-vendored-notice');
+ const exported=unreviewedOSSNoticeInputs([item],provenance);assert.ok(!JSON.stringify(exported).includes('Synthetic'));assert.equal(digest(JSON.stringify(provenance)),before);assert.ok(!JSON.stringify(value).includes(root));
+}));
+test('SQLite .5 source observation records changed copies and configured branches without inferring selected or licensed code',()=>sqliteSourceFixture(({root,file,prefix,direct})=>{
+ const original=direct();file(prefix+'/ios/sqlite3.c','Changed synthetic copy\n');let changed=direct();assert.equal(changed.copiedPairMatches,false);assert.notDeepEqual(changed.files,original.files);
+ file('ios/Podfile.properties.json',{'expo.sqlite.useSQLCipher':'true','expo.sqlite.useLibSQL':'true','expo.sqlite.withSQLiteVecExtension':'true','expo.sqlite.customBuildFlags':'PRIVATE_FLAGS','PRIVATE':'PRIVATE_VALUE'});changed=direct();assert.deepEqual(changed.options,{useSQLCipher:true,useLibSQL:true,withSQLiteVecExtension:true});assert.equal(changed.compiledSelectionVerified,false);assert.equal(changed.finalArtifactVerified,false);assert.ok(!JSON.stringify(changed).includes('PRIVATE')&&!JSON.stringify(changed).includes(root));
+}));
+test('SQLite .5 source observation rejects foreign selection, owner or lock drift, missing, linked and oversized files',()=>sqliteSourceFixture(({root,file,prefix,external,direct})=>{
+ const rejects=(name,body)=>{const path=join(root,name),before=readFileSync(path);file(name,body);try{assert.throws(direct);}finally{file(name,before);}};
+ rejects(prefix+'/package.json',JSON.stringify({name:'private-owner',version:'57.0.5'}));rejects(prefix+'/package.json',JSON.stringify({name:'expo-sqlite',version:'57.0.4'}));
+ const lock=JSON.parse(readFileSync(join(root,'package-lock.json')));for(const patch of [{version:'57.0.4'},{resolved:'https://PRIVATE.invalid/'},{integrity:'PRIVATE'}])rejects('package-lock.json',JSON.stringify({...lock,packages:{[prefix]:{...lock.packages[prefix],...patch}}}));
+ for(const value of [{':podspec':'../'+prefix+'/ios/ExpoSQLite.podspec'},{...external,':git':'PRIVATE'},{':path':'../'+prefix}])assert.throws(()=>sqlitePodSourceEvidence(root,join(root,prefix,'ios'),value,'a'.repeat(64)));
+ rejects('ios/Podfile.properties.json',Buffer.from([0xff]));rejects(prefix+'/LICENSE',Buffer.alloc(1024*1024+1,120));rejects(prefix+'/ios/sqlite3.c',Buffer.alloc(16*1024*1024+1,120));
+ const path=join(root,prefix,'ios/sqlite3.h'),body=readFileSync(path);rmSync(path);assert.throws(direct);file(prefix+'/ios/sqlite3.h',body);const target=file(prefix+'/vendor/alternate.h',body);rmSync(path);symlinkSync(target,path);assert.throws(direct);rmSync(path);file(prefix+'/ios/sqlite3.h',body);
+}));
 const initialOwnComponents=new Set(['cocoapods:ExpoAppleAuthentication@57.0.2','cocoapods:ExpoFileSystem@57.0.7','cocoapods:ExpoAdapterGoogleSignIn@16.1.5']);
 function ownLicenseFixture(run,{batch=false}={}){return fixture(({root,file})=>{
  const provenance={...JSON.parse(readFileSync(new URL('./app-notice-provenance.json',import.meta.url))),components:[]},pins=provenance.knownLicenseSources.filter(value=>value.ownerNpmID&&value.component!=='cocoapods:Yoga@0.0.0'&&(batch?!initialOwnComponents.has(value.component):initialOwnComponents.has(value.component))),installed=JSON.parse(readFileSync(new URL('../package-lock.json',import.meta.url))),lock={PODS:[], 'EXTERNAL SOURCES':{}};
