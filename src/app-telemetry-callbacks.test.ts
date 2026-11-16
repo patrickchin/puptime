@@ -121,7 +121,7 @@ test('web custom write rejects once; edit/delete failure capture remains opt-in,
   }
 });
 
-test('actual sharing hooks use constant categories, exclude setup, and restore nested foreground timing', () => {
+test('actual sharing hooks own setup account time and restore sharing and nested foreground timing once', () => {
   let now = 0;
   const events: { event: ProductEvent; properties: ProductProperties }[] = [];
   const telemetry = createProductTelemetry((event, properties) => events.push({ event, properties }), () => now);
@@ -145,10 +145,14 @@ test('actual sharing hooks use constant categories, exclude setup, and restore n
   now = 200; const closeShared = mount('./screens/SharedPuppiesScreen.tsx');
   now = 300; closeShared?.();
   now = 400; closeSharing?.();
-  assert.deepEqual(events.filter(row => row.event === 'app_navigation').map(row => row.properties.to_screen), ['sharing', 'shared_puppies', 'sharing', 'pets']);
+  const closeAccount = mount('./screens/SharePuppyScreen.tsx', true);
+  now = 500; closeAccount?.();
+  const closeReturnedSharing = mount('./screens/SharePuppyScreen.tsx');
+  now = 600; const closeReturnedShared = mount('./screens/SharedPuppiesScreen.tsx');
+  now = 700; closeReturnedShared?.();
+  now = 800; closeReturnedSharing?.();
+  assert.deepEqual(events.filter(row => row.event === 'app_screen_view').map(row => row.properties.screen), ['pets', 'sharing', 'shared_puppies', 'sharing', 'pets', 'account', 'pets', 'sharing', 'shared_puppies', 'sharing', 'pets']);
   const time = (screen: string) => events.filter(row => row.event === 'app_screen_time' && row.properties.screen === screen).reduce((sum, row) => sum + Number(row.properties.duration_ms), 0);
-  assert.equal(time('sharing'), 200); assert.equal(time('shared_puppies'), 100);
-  const count = events.length;
-  assert.equal(mount('./screens/SharePuppyScreen.tsx', true), undefined);
-  assert.equal(events.length, count);
+  assert.equal(time('sharing'), 400); assert.equal(time('shared_puppies'), 200); assert.equal(time('account'), 100);
+  assert.equal(events.filter(row => row.event === 'app_screen_time').reduce((sum, row) => sum + Number(row.properties.duration_ms), 0), 800);
 });

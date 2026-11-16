@@ -22,7 +22,7 @@ export function SharePuppyScreen({cloud,theme,eventCount,onBack,initialKind='hou
  const [setup,setSetup]=useState(false),[shares,setShares]=useState<PuppyShare[]>([]),[loading,setLoading]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[link,setLink]=useState<string|null>(null),[revision,setRevision]=useState(0);
  const draft=useRef<CreateShare|null>(null),locked=useRef(false),mounted=useRef(true);
  const [shared,setShared]=useState(false);
- useTelemetryOverlay('sharing',!setup);
+ useTelemetryOverlay(setup?'account':'sharing',true);
  const account=state?.account,accountId=account?.user.id,pet=account?.pets[0];
  const ready=!!accountId&&!!pet&&state?.sync?.state==='active'&&state.sync.accountId===accountId&&!!cloud.sharing;
  const identity=useRef(accountId);identity.current=accountId;
