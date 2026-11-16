@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import {EventEmitter} from 'node:events';
 import {existsSync,mkdtempSync,mkdirSync,readFileSync,rmSync,symlinkSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
@@ -110,5 +111,34 @@ test('actual add-logs failure catch emits only finite evidence and preserves the
    if(name==='add-logs'&&!options.readerFails&&!options.writerFails)assert.deepEqual(evidence,[{path:'/synthetic-output/fixture-add-logs-command.json',value:{phase:'add-logs',flowSequence:1,status:'FAILED',kind:'assert',targetId:'account.local.count',sequence:12},mode:{mode:0o600}}]);else assert.deepEqual(evidence,[]);
    assert.ok(!JSON.stringify(writes).includes(secret));assert.equal(writes.filter(row=>row.path.endsWith('/fixture-native-reach.json')).length,1);assert.equal(writes.filter(row=>row.path.endsWith('/fixture-auth-readiness.json')).length,1);
   }finally{rmSync(root,{recursive:true,force:true});}
+ }
+});
+
+// Execute only the actual reader functions with request mocks, never SDK main or sockets.
+function accountReader(name,request){
+ const sdk=readFileSync(new URL('./verify-native-guest-account.mjs',import.meta.url),'utf8');
+ const start=sdk.indexOf('async function '+name+'('),end=sdk.indexOf(name==='remote'?'\nasync function assertCloud(':'\nfunction drainReceipt(',start);assert.ok(start>0&&end>start);
+ return Function('request','secureRequest','backPort','front','certificate','assert','cookie','return ('+sdk.slice(start,end)+');')(request,request,1,'https://127.0.0.1:1',Buffer.from('synthetic-ca'),assert,'synthetic');
+}
+function accountRequest({body,error}={}){
+ const calls=[];
+ const request=(url,options,callback)=>{const req=new EventEmitter();calls.push({url,options,timeout:null});req.setTimeout=ms=>{calls.at(-1).timeout=ms;return req;};req.end=()=>queueMicrotask(()=>{if(error){req.emit('error',error);return;}const response=new EventEmitter();response.statusCode=200;callback(response);response.emit('data',JSON.stringify(body));response.emit('end');});return req;};
+ return {request,calls};
+}
+test('actual account verification readers use one-request agents with exact URLs, explicit headers, CA and inspection timeout',async()=>{
+ const session=accountRequest({body:{user:{id:'usr_synthetic'}}});
+ assert.deepEqual(await accountReader('inspectSession',session.request)('synthetic'),{status:200,body:{user:{id:'usr_synthetic'}}});
+ assert.deepEqual(session.calls,[{url:'http://127.0.0.1:1/api/account',options:{agent:false,headers:{cookie:'synthetic'}},timeout:15000}]);
+ for(const inspectBehindFault of [false,true]){
+  const remote=accountRequest({body:{changes:[],hasMore:false}});
+  assert.deepEqual(await accountReader('remote',remote.request)({inspectBehindFault,sessionCookie:'synthetic',allKinds:true}),[]);
+  assert.deepEqual(remote.calls,[{url:(inspectBehindFault?'http://127.0.0.1:1':'https://127.0.0.1:1')+'/api/sync/pull?after=0',options:{agent:false,...(!inspectBehindFault?{ca:Buffer.from('synthetic-ca')}:{}),headers:{cookie:'synthetic',origin:'https://127.0.0.1:1',host:'127.0.0.1:1'}},timeout:null}]);
+ }
+});
+test('actual account verification readers preserve request Error identity and never retry',async()=>{
+ const original=new Error('synthetic request failure');original.code='ECONNRESET';
+ for(const name of ['inspectSession','remote'])for(const inspectBehindFault of name==='remote'?[false,true]:[false]){
+  const mock=accountRequest({error:original}),argument=name==='remote'?{inspectBehindFault,sessionCookie:'synthetic',allKinds:true}:'synthetic';
+  await assert.rejects(accountReader(name,mock.request)(argument),error=>error===original);assert.equal(mock.calls.length,1);
  }
 });

@@ -186,7 +186,7 @@ async function remote({inspectBehindFault=false,sessionCookie=cookie,allKinds=fa
   for(let pageNumber=0;pageNumber<100;pageNumber++){
   const page=await new Promise((resolvePage,reject)=>{
     const send=inspectBehindFault?request:secureRequest,origin=inspectBehindFault?'http://127.0.0.1:'+backPort:front;
-    const req=send(origin+'/api/sync/pull?after='+after,{...(!inspectBehindFault&&certificate?{ca:certificate}:{}),headers:{cookie:sessionCookie,origin:front,host:new URL(front).host}},response=>{
+    const req=send(origin+'/api/sync/pull?after='+after,{agent:false,...(!inspectBehindFault&&certificate?{ca:certificate}:{}),headers:{cookie:sessionCookie,origin:front,host:new URL(front).host}},response=>{
       let body='';response.on('data',data=>{body+=data;});response.on('end',()=>{try{assert.equal(response.statusCode,200);resolvePage(JSON.parse(body));}catch(error){reject(error);}});
     });req.on('error',reject);req.end();
   });changes.push(...page.changes);if(!page.hasMore)break;assert.ok(page.cursor>after);after=page.cursor;assert.ok(pageNumber<99,'Bound the local fixture reader.');
@@ -239,7 +239,7 @@ async function until(ready,message,timeout=45000){
 }
 async function transport(mode){fault=mode;if(mode==='offline')for(const socket of changeSockets)socket.destroy();await until(()=>activeForwarded===0,'Settle prior local proxy requests before capturing a transition.');}
 async function inspectSession(sessionCookie){
- return new Promise((resolveSession,reject)=>{const req=request('http://127.0.0.1:'+backPort+'/api/account',{headers:{cookie:sessionCookie}},response=>{let body='';response.on('data',part=>{body+=part;});response.on('end',()=>{try{resolveSession({status:response.statusCode,body:JSON.parse(body)});}catch(error){reject(error);}});});req.on('error',reject);req.setTimeout(15000,()=>req.destroy(new Error('Bound the synthetic session inspection.')));req.end();});
+ return new Promise((resolveSession,reject)=>{const req=request('http://127.0.0.1:'+backPort+'/api/account',{agent:false,headers:{cookie:sessionCookie}},response=>{let body='';response.on('data',part=>{body+=part;});response.on('end',()=>{try{resolveSession({status:response.statusCode,body:JSON.parse(body)});}catch(error){reject(error);}});});req.on('error',reject);req.setTimeout(15000,()=>req.destroy(new Error('Bound the synthetic session inspection.')));req.end();});
 }
 function drainReceipt(before,acceptedStart,pageStart){
  assert.equal(wireParseErrors,0,'Every captured sync response must be readable.');
