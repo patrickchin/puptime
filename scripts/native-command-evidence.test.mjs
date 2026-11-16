@@ -7,7 +7,7 @@ import {join,resolve} from 'node:path';
 import {nativeCommandState,readNativeCommandState,nativeFlowSources,readNativeFlowCommandState} from './native-command-evidence.mjs';
 import {prepareFlowCommandRoot,writeFlowCommandVerdict} from './native-flow-command-verdict.mjs';
 import {standardSelection,conversationalFiles} from './native-standard-suite.mjs';
-import {standardVerdict,conversationalVerdict} from './native-standard-verdict.mjs';
+import {standardVerdict,conversationalVerdict,writeStandardVerdict,writeConversationalVerdict} from './native-standard-verdict.mjs';
 import {execFileSync,spawnSync} from 'node:child_process';
 import {createRequire,syncBuiltinESMExports} from 'node:module';
 import {fileURLToPath} from 'node:url';
@@ -234,7 +234,7 @@ test('preparation rejects preexisting verdicts or carriers before creating custo
  });
 });
 test('actual producer binds fresh exclusive preparation, source/run/attempt and one exactERROR, exposing no other fields',()=>{
- for(const suite of ['standard13','conversational17'])for(const kind of ['valid','failed-preparation','wrong-source','wrong-run','partial','multiple','unknown-field','missing-custody','wrong-directory'])flowTemporary(root=>{
+ for(const suite of ['standard13','conversational17'])for(const kind of ['valid','failed-preparation','wrong-source','wrong-run','partial','multiple','unknown-field','missing-custody','wrong-marker','old-marker','missing-directory','wrong-directory'])flowTemporary(root=>{
   commandCheckout(root);const name=suite==='standard13'?'standard':'conversational',output=join(root,'build',suite==='standard13'?'maestro-results':'onboarding-maestro-results');
   const custody=prepareFlowCommandRoot(root,suite,commandEnv);const {selected}=fixedTree(output,suite);const value=writeSourceVerdict(root,suite,custody),report=join(root,'build',name+'-verdict.json');let environment=commandEnv;
   if(kind==='failed-preparation'){assert.throws(()=>prepareFlowCommandRoot(root,suite,commandEnv));environment={...commandEnv,FLOW_COMMAND_PREPARATION_OUTCOME:'failure'};}
@@ -244,11 +244,33 @@ test('actual producer binds fresh exclusive preparation, source/run/attempt and 
   if(kind==='multiple')value.flows[1].status='ERROR';
   if(kind==='unknown-field')value.private='private@example.invalid 123456 cookie=SECRET';
   if(kind==='missing-custody')rmSync(join(root,'build',name+'-command-custody.json'));
+  if(kind==='wrong-marker'||kind==='old-marker'){const marker={...custody,...(kind==='wrong-marker'?{checkoutCommit:'a'.repeat(40)}:{runAttempt:1})};writeFileSync(join(root,'build',name+'-command-custody.json'),JSON.stringify(marker));}
+  if(kind==='missing-directory')rmSync(output,{recursive:true});
   if(kind==='wrong-directory'){renameSync(output,output+'-old');mkdirSync(output);fixedTree(output,suite);}
   writeFileSync(report,JSON.stringify(value));const original=fs.openSync,opened=[];let result;
   try{fs.openSync=(path,...args)=>{if(String(path).endsWith('/commands.json'))opened.push(String(path));return original(path,...args);};syncBuiltinESMExports();result=writeFlowCommandVerdict(root,suite,environment);}finally{fs.openSync=original;syncBuiltinESMExports();}
   assert.equal(result.status,kind==='valid'?'FAILED':'UNKNOWN');assert.deepEqual(opened,kind==='valid'?[selected]:[]);assert.ok(!JSON.stringify(result).includes('SECRET'));
+  assert.equal(result.custodyConfirmed,!['failed-preparation','missing-custody','wrong-marker','old-marker','missing-directory','wrong-directory'].includes(kind));
   const file=join(root,'build',name+'-failed-command.json'),bytes=readFileSync(file);assert.equal(lstatSync(file).mode&0o777,0o600);assert.throws(()=>writeFlowCommandVerdict(root,suite,environment));assert.deepEqual(readFileSync(file),bytes);
+ });
+});
+
+test('actual stale raw JUnit reproduction is rejected before custody/root creation and never opens commands',()=>{
+ for(const [suite,name,report,project] of [['standard13','standard','maestro-report.xml',writeStandardVerdict],['conversational17','conversational','onboarding-maestro-report.xml',writeConversationalVerdict]])flowTemporary(root=>{
+  commandCheckout(root);mkdirSync(join(root,'build'));const rows=nativeFlowSources[suite],xml='<testsuites><testsuite tests="'+rows.length+'" failures="1">'+rows.map(([flow],i)=>'<testcase file="'+flow+'" status="'+(i===0?'ERROR':'SUCCESS')+'"/>').join('')+'</testsuite></testsuites>',file=join(root,'build',report);writeFileSync(file,xml);
+  assert.throws(()=>prepareFlowCommandRoot(root,suite,commandEnv));const output=join(root,'build',suite==='standard13'?'maestro-results':'onboarding-maestro-results');assert.equal(existsSync(output),false);assert.equal(existsSync(join(root,'build',name+'-command-custody.json')),false);
+  // Reproject the old XML with the unchanged real producer, as in the peer repro.
+  const old=project(root,{...commandEnv,STANDARD_STEP_CONCLUSION:'failure',ONBOARDING_STEP_CONCLUSION:'failure'});assert.equal(old.complete,true);assert.equal(old.flows[0].status,'ERROR');
+  const open=fs.openSync,opened=[];let value;try{fs.openSync=(path,...args)=>{if(String(path).endsWith('/commands.json'))opened.push(String(path));return open(path,...args);};syncBuiltinESMExports();value=writeFlowCommandVerdict(root,suite,{...commandEnv,FLOW_COMMAND_PREPARATION_OUTCOME:'failure'});}finally{fs.openSync=open;syncBuiltinESMExports();}
+  assert.equal(value.custodyConfirmed,false);assert.deepEqual({flowIndex:value.flowIndex,status:value.status,kind:value.kind,targetId:value.targetId,sequence:value.sequence,observedLeaves:value.observedLeaves},absentFlow);assert.deepEqual(opened,[]);assert.equal(existsSync(output),false);assert.equal(readFileSync(file,'utf8'),xml);
+ });
+});
+
+test('fresh actual JUnit projection confirms custody before error selection, including allSUCCESS without a command claim',()=>{
+ for(const [suite,report,project] of [['standard13','maestro-report.xml',writeStandardVerdict],['conversational17','onboarding-maestro-report.xml',writeConversationalVerdict]])for(const errorIndex of [-1,0])flowTemporary(root=>{
+  commandCheckout(root);prepareFlowCommandRoot(root,suite,commandEnv);const output=join(root,'build',suite==='standard13'?'maestro-results':'onboarding-maestro-results'),{selected}=fixedTree(output,suite),rows=nativeFlowSources[suite],xml='<testsuites><testsuite tests="'+rows.length+'" failures="'+Number(errorIndex>=0)+'">'+rows.map(([flow],i)=>'<testcase file="'+flow+'" status="'+(i===errorIndex?'ERROR':'SUCCESS')+'"/>').join('')+'</testsuite></testsuites>';writeFileSync(join(root,'build',report),xml);project(root,{...commandEnv,STANDARD_STEP_CONCLUSION:errorIndex<0?'success':'failure',ONBOARDING_STEP_CONCLUSION:errorIndex<0?'success':'failure'});
+  const open=fs.openSync,opened=[];let value;try{fs.openSync=(path,...args)=>{if(String(path).endsWith('/commands.json'))opened.push(String(path));return open(path,...args);};syncBuiltinESMExports();value=writeFlowCommandVerdict(root,suite,commandEnv);}finally{fs.openSync=open;syncBuiltinESMExports();}
+  assert.equal(value.custodyConfirmed,true);assert.equal(value.status,errorIndex<0?'UNKNOWN':'FAILED');assert.deepEqual(opened,errorIndex<0?[]:[selected]);if(errorIndex<0){assert.equal(value.flowIndex,null);assert.deepEqual(value.observedLeaves,{nonCausal:true,complete:false,rows:[]});}
  });
 });
 

@@ -6,7 +6,7 @@ import {join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {nativeFlowSources,readNativeFlowCommandState} from './native-command-evidence.mjs';
 
-const modes={standard13:['standard','maestro-results','standard-maestro-verdict'],conversational17:['conversational','onboarding-maestro-results','conversational-maestro-verdict']};
+const modes={standard13:['standard','maestro-results','standard-maestro-verdict','maestro-report.xml'],conversational17:['conversational','onboarding-maestro-results','conversational-maestro-verdict','onboarding-maestro-report.xml']};
 const keys=(value,expected)=>value&&typeof value==='object'&&!Array.isArray(value)&&JSON.stringify(Object.keys(value).sort())===JSON.stringify([...expected].sort());
 const fields=['checkoutCommit','checkoutTree','runId','runAttempt'];
 function binding(root,environment){
@@ -29,22 +29,24 @@ function readJson(path,limit){
 }
 function selection(suite){assert.ok(Object.hasOwn(modes,suite));return modes[suite];}
 export function prepareFlowCommandRoot(root,suite,environment){
- root=realpathSync(root);const [name,output]=selection(suite),metadata=binding(root,environment);assert.ok(Object.values(metadata).every(value=>value!==null));
+ root=realpathSync(root);const [name,output,,rawReport]=selection(suite),metadata=binding(root,environment);assert.ok(Object.values(metadata).every(value=>value!==null));
  const directory=build(root),path=join(directory,output);
  for(const suffix of ['-command-custody.json','-verdict.json','-failed-command.json'])assert.throws(()=>lstatSync(join(directory,name+suffix)),{code:'ENOENT'});
+ assert.throws(()=>lstatSync(join(directory,rawReport)),{code:'ENOENT'});
  mkdirSync(path,{mode:0o700});
  const stat=lstatSync(path),value={schemaVersion:1,stage:name+'-command-custody',...metadata,directory:{dev:String(stat.dev),ino:String(stat.ino)}};
  writeFileSync(join(directory,name+'-command-custody.json'),JSON.stringify(value,null,2)+'\n',{mode:0o600,flag:'wx'});return value;
 }
 export function writeFlowCommandVerdict(root,suite,environment){
  root=realpathSync(root);const [name,output,stage]=selection(suite),metadata=binding(root,environment),directory=build(root),sources=nativeFlowSources[suite];
- let command={flowIndex:null,status:'UNKNOWN',kind:'unknown',targetId:null,sequence:0,observedLeaves:{nonCausal:true,complete:false,rows:[]}};
+ let custodyConfirmed=false,command={flowIndex:null,status:'UNKNOWN',kind:'unknown',targetId:null,sequence:0,observedLeaves:{nonCausal:true,complete:false,rows:[]}};
  try{
   assert.equal(environment.FLOW_COMMAND_PREPARATION_OUTCOME,'success');assert.ok(Object.values(metadata).every(value=>value!==null));
   const custody=readJson(join(directory,name+'-command-custody.json'),4096);
   assert.ok(keys(custody,['schemaVersion','stage',...fields,'directory']));assert.equal(custody.schemaVersion,1);assert.equal(custody.stage,name+'-command-custody');
   assert.ok(keys(custody.directory,['dev','ino'])&&Object.values(custody.directory).every(value=>typeof value==='string'&&/^[0-9]{1,30}$/.test(value)));
   for(const field of fields)assert.equal(custody[field],metadata[field]);
+  const path=join(directory,output),stat=lstatSync(path);assert.ok(stat.isDirectory()&&!stat.isSymbolicLink());assert.equal(realpathSync(path),path);assert.deepEqual({dev:String(stat.dev),ino:String(stat.ino)},custody.directory);custodyConfirmed=true;
   const value=readJson(join(directory,name+'-verdict.json'),32768);
   assert.ok(keys(value,['schemaVersion','stage','expectedFlows','complete','flows','stepConclusion',...fields]));assert.equal(value.schemaVersion,1);assert.equal(value.stage,stage);assert.equal(value.expectedFlows,sources.length);assert.equal(value.complete,true);
   assert.ok(['success','failure','cancelled','skipped','UNKNOWN'].includes(value.stepConclusion));for(const field of fields)assert.equal(value[field],metadata[field]);
@@ -53,7 +55,7 @@ export function writeFlowCommandVerdict(root,suite,environment){
   const failed=value.flows.map((row,index)=>row.status==='ERROR'?index:-1).filter(index=>index>=0);assert.equal(failed.length,1);
   command=readNativeFlowCommandState(join(directory,output),suite,failed[0],custody.directory);
  }catch{/* Missing, stale, partial or ambiguous input is not a failed command. */}
- const value={schemaVersion:1,stage:name+'-failed-command',expectedFlows:sources.length,...command,...metadata};
+ const value={schemaVersion:1,stage:name+'-failed-command',expectedFlows:sources.length,custodyConfirmed,...command,...metadata};
  writeFileSync(join(directory,name+'-failed-command.json'),JSON.stringify(value,null,2)+'\n',{mode:0o600,flag:'wx'});return value;
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
