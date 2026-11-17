@@ -249,7 +249,7 @@ function androidCiRun(options={}){
  const text=readFileSync(join(project,'scripts/verify-android-sqlite-engine.mjs'),'utf8'),start=text.indexOf('export async function verifyAndroidSqliteEngine()'),end=text.indexOf('\nif(process.argv[1]',start);let body=text.slice(start,end).replace('export ','');assert.ok(start>0&&end>start);
  if(options.ddWithoutStatus){assert.equal(body.split("'count=1','status=none'").length,2);body=body.replace("'count=1','status=none'","'count=1'");}
  const calls=[],writes=[],name='Puptime_SQLite_Engine_123_2',args=['-avd',name,'-port','5588','-no-window','-no-audio','-no-snapshot','-gpu','swiftshader_indirect'];
- const raw=options.engineBytes??Buffer.from(JSON.stringify(expectedEngine)),failure=options.failure??new Error('PRIVATE_ORIGINAL'),cleanupError=new Error('PRIVATE_CLEANUP');let live=false,privateExists=true,installed=false,cleared=false,launched=false,disposed=false,rootCount=0,portChecks=0,emulatorStops=0,cleanupStatReads=0,receiptFailureInjected=false,markerCleared=false,now=0,launchStatReads=0;
+ const raw=options.engineBytes??Buffer.from(JSON.stringify(expectedEngine)),failure=options.failure??new Error('PRIVATE_ORIGINAL'),cleanupError=new Error('PRIVATE_CLEANUP');let live=false,privateExists=true,installed=false,cleared=false,launched=false,disposed=false,rootCount=0,portChecks=0,emulatorStops=0,cleanupStatReads=0,receiptFailureInjected=false,markerCleared=false,now=0,launchStatReads=0,cleanupActive=false,installOwnershipInjected=false,asserted=null;
  const sourceHashes=Object.values(hashes).map(row=>row[1]),key='221e0a3106aa4c3ccc154e0a418b55020b3f9ea6e84f92e8749cd9e2f39f5e58',certificate='fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c';
  const env={GITHUB_ACTIONS:'true',GITHUB_REPOSITORY:'patrickchin/puptime',GITHUB_RUN_ID:'123',GITHUB_RUN_ATTEMPT:'2',ANDROID_HOME:'/sdk',RUNNER_TEMP:'/runner',PUPTIME_ANDROID_CMDLINE_BIN:'/sdk/cmdline/bin',EXPO_PUBLIC_CLOUD_API_URL:'https://PRIVATE_ORIGIN',EXPO_PUBLIC_UNKNOWN:'PRIVATE_VALUE',EXPO_PUBLIC_APP_POSTHOG_KEY:'PRIVATE_KEY',EXPO_OVERRIDE_METRO_CONFIG:'PRIVATE_CONFIG',NODE_PATH:'PRIVATE_PATH',NODE_OPTIONS:'PRIVATE_OPTIONS'};
  const assertEnv=value=>{assert.equal(value.EXPO_NO_DOTENV,'1');assert.equal(value.EXPO_PUBLIC_CLOUD_API_URL,'https://127.0.0.1:1');assert.equal(value.EXPO_PUBLIC_APP_POSTHOG_KEY,'');for(const key of ['EXPO_PUBLIC_UNKNOWN','EXPO_OVERRIDE_METRO_CONFIG','NODE_PATH','NODE_OPTIONS'])assert.equal(Object.hasOwn(value,key),false);assert.equal(value.ENTRY_FILE,'index.sqlite-engine-probe.js');};
@@ -261,6 +261,7 @@ function androidCiRun(options={}){
   if(path.endsWith('selected-module.json')){if(options.selectionReadFails)throw failure;return options.selectionBytes??Buffer.from(JSON.stringify(selected));}
   if(path.startsWith('/proc/')){
    if(!live)throw Object.assign(new Error('gone'),{code:'ENOENT'});
+   if(options.installOwnershipFails&&!installOwnershipInjected&&!installed&&calls.at(-1)?.slice(3).join(' ')==='shell pm path com.patrickchin.puptime'){installOwnershipInjected=true;throw failure;}
    if(launched&&path.endsWith('/stat'))launchStatReads++;
    if(launched&&(options.receiptFailure==='wait'&&!receiptFailureInjected||options.receiptInnerOwnershipFails&&launchStatReads===3&&!receiptFailureInjected||options.diagnosticOwnershipFails&&now>=60000&&!receiptFailureInjected)){receiptFailureInjected=true;throw failure;}
    const scenario=launched&&options.launchFails?options.ownershipScenario:undefined;
@@ -271,7 +272,7 @@ function androidCiRun(options={}){
   throw new Error('Unexpected synthetic read');
  };
  const command=(binary,argv,settings)=>{
-  assertEnv(settings.env);calls.push([binary,...argv]);
+  assertEnv(settings.env);assert.equal(Object.hasOwn(settings,'installPhase'),false);calls.push([binary,...argv]);
   const result=(stdout='',status=0)=>({stdout,stderr:'',status});
   if(binary==='git')return result(argv[0]==='rev-parse'?(argv.at(-1)==='HEAD'?'1':'2').repeat(40)+'\n':'');
   if(binary.endsWith('/apksigner'))return result('Signer #1 certificate SHA-256 digest: '+certificate+'\n');
@@ -282,23 +283,26 @@ function androidCiRun(options={}){
   if(key==='root'){rootCount++;return options.rootClosed?{status:1,stdout:'',stderr:'adb: unable to connect for root: closed\n'}:result('restarting adbd as root\n');}
   if(key==='shell getprop sys.boot_completed')return result('1');if(key==='shell id -u')return result('0');if(key==='shell getprop ro.build.version.sdk')return result(options.apiWrong?'35':'36');if(key==='shell getprop ro.product.cpu.abi')return result('x86_64');
   if(key.includes('airplane_mode_on'))return result('1');if(key.includes('global wifi_on'))return result('0');if(key==='shell cmd wifi status')return result('Wifi is disabled');if(key==='shell dumpsys connectivity')return result('Active default network: none\nCurrent Networks:\nStatus for known UIDs:\n');
-  if(key==='shell pm path com.patrickchin.puptime')return installed?result('package:/data/app/synthetic/base.apk\n'):result('',1);
-  if(a[0]==='install'){if(options.installFails)return {status:null,stdout:'',error:failure};installed=true;return result('Performing Streamed Install\nSuccess\n');}
-  if(key.startsWith('shell rm -f ')){if(a.at(-1).endsWith('sqlite-engine-stage.txt'))markerCleared=true;else cleared=true;return result();}if(key.startsWith('shell am start ')){assert.equal(cleared,true);assert.equal(markerCleared,true);launched=true;if(options.launchFails)return {status:null,stdout:'',error:failure};return result();}
+  if(key==='shell pm path com.patrickchin.puptime'){if(installed&&options.pmFails)return {status:null,stdout:'',error:failure};return installed?result(options.pmOutput??'package:/data/app/synthetic/base.apk\n'):result('',1);}
+  if(a[0]==='install'){assert.equal(settings.timeout,180000);assert.deepEqual(settings.stdio,['ignore','pipe','ignore']);assert.equal(settings.maxBuffer,16384);if(options.installFails)return {status:null,stdout:'',error:failure};if(Object.hasOwn(options,'installStatus')){installed=options.installStatus===0;return {stdout:options.installOutput??'',stderr:'',status:options.installStatus};}installed=true;return result(options.installOutput??'Performing Streamed Install\nSuccess\n');}
+  if(key.startsWith('shell rm -f ')){if(options.prelaunchDelete===(a.at(-1).endsWith('sqlite-engine-stage.txt')?'marker':'receipt'))return {status:null,stdout:'',error:failure};if(a.at(-1).endsWith('sqlite-engine-stage.txt'))markerCleared=true;else cleared=true;return result();}if(key.startsWith('shell am start ')){assert.equal(cleared,true);assert.equal(markerCleared,true);launched=true;if(options.launchFails)return {status:null,stdout:'',error:failure};return result();}
   if(a.at(-1)?.includes('sqlite-engine-stage.txt')){assert.equal(privateExists,true);assert.equal(markerCleared,true);assert.ok(settings.timeout>0&&settings.timeout<=5000);if(options.markerReadFails)return {status:null,stdout:'',error:failure};const marker=Buffer.from(options.probeStage??'database-open');if(a[1]==='stat')return result('1 2 '+marker.length+' 3 4 81a4\n');if(a[1]==='readlink')return result(a.at(-1));}
   if(a[0]==='shell'&&a[1]==='stat'){assert.equal(launched,true);if(options.receiptWaitExpires)return result('',1);return result('1 2 '+raw.length+' 3 4 81a4\n');}
   if(key.startsWith('shell readlink -f ')){if(options.receiptFailure==='path')return {status:null,stdout:'',error:failure};return result(a.at(-1));}if(a[0]==='exec-out'){if(a.some(v=>v.includes('sqlite-engine-stage.txt'))){assert.ok(settings.timeout>0&&settings.timeout<=5000);assert.equal(settings.maxBuffer,65);if(options.markerReadFails)return {status:null,stdout:Buffer.alloc(0),error:failure};return result(Buffer.from(options.probeStage??'database-open'));}if(options.receiptFailure==='read')return {status:null,stdout:Buffer.alloc(0),error:failure};assert.equal(settings.maxBuffer,257);return result(options.ddSummary&&!a.includes('status=none')?Buffer.concat([raw,Buffer.from('0+1 records in\n0+1 records out\n')]):raw);}
-  if(key.startsWith('shell am force-stop ')){if(options.stopAppFails&&launched)return {status:1,stdout:''};return result();}
+  if(key.startsWith('shell am force-stop ')){if(options.prelaunchStopFails&&!cleanupActive)return {status:null,stdout:'',error:failure};if(options.cleanupStopFails&&cleanupActive||options.stopAppFails&&launched)return {status:1,stdout:''};return result();}
+  if(a[0]==='pull'&&options.pullFails)return {status:null,stdout:'',error:failure};
   if(['pull','shell'].includes(a[0]))return result();throw new Error('Unexpected synthetic command');
  };
  const writer=(path,bytes,settings)=>{assert.equal(settings.flag,'wx');assert.equal(settings.mode,0o600);if(path.includes('/build/android-sqlite-engine-check/')){if(options.writerFails)throw cleanupError;writes.push({path,value:JSON.parse(bytes)});}};
- const stable=path=>path.endsWith('/sqlite3.c')?sourceHashes[0]:path.endsWith('/sqlite3.h')?sourceHashes[1]:path.endsWith('debug.keystore')?key:path.endsWith('installed.apk')&&options.installedWrong?'b'.repeat(64):'a'.repeat(64);
+ const stable=path=>{if(path.endsWith('installed.apk')&&options.readbackFails)throw failure;return path.endsWith('/sqlite3.c')?sourceHashes[0]:path.endsWith('/sqlite3.h')?sourceHashes[1]:path.endsWith('debug.keystore')?key:path.endsWith('installed.apk')&&options.installedWrong?'b'.repeat(64):'a'.repeat(64);};
  const spawnChild=(binary,argv,settings)=>{assert.equal(binary,'/sdk/emulator/emulator');assert.deepEqual(argv,args);assertEnv(settings.env);assert.equal(settings.detached,true);live=true;const child=new EventEmitter();child.pid=111;return child;};
  const run=async(binary,argv,settings)=>{assertEnv(settings.env);assert.equal(settings.inheritOutput,binary.endsWith('/gradlew')?true:undefined);calls.push([binary,...argv]);settings.own(async()=>!options.commandCleanupFails);if(options.buildFails&&binary.endsWith('/gradlew')||options.prebuildFails&&argv.includes('prebuild'))throw failure;};
- const cleanup=action=>{let once;return {signal:null,run:()=>once??=action(),dispose(){disposed=true;}};};
+ const cleanup=action=>{let once;return {signal:null,run:()=>once??=(cleanupActive=true,action()),dispose(){disposed=true;}};};
  const factory=Function('assert','process','realpathSync','lstatSync','existsSync','join','standardFixtureEnvironment','spawnSync','mkdirSync','mkdtempSync','readFileSync','readlinkSync','androidProcessIdentity','installTaskCleanup','runOwned','stableFile','engineHashes','templateKeySHA256','testCertificateSHA256','androidSelectionInit','readAndroidBuildStep','writeFileSync','validateAndroidSelection','apkInspection','portsFree','spawn','ownProcess','androidOffline','androidReceiptStat','readSqliteEngineReceipt','expected','app','serial','rmSync','readAndroidProbeStage','Date','setTimeout','Error','return ('+body+');');
- const execute=factory(assert,{platform:options.wrongPlatform?'darwin':'linux',env,cwd:()=>'/root',execPath:'/node',getuid:()=>1000},path=>path,()=>({isDirectory:()=>true,isSymbolicLink:()=>false,isFile:()=>true,size:512}),path=>path==='/private'||path==='/private/avd'?privateExists:path.startsWith('/sdk/emulator/'),join,standardFixtureEnvironment,command,()=>{},()=>'/private',read,()=>'/sdk/emulator/emulator',androidProcessIdentity,cleanup,run,stable,sourceHashes,key,certificate,androidSelectionInit,path=>{assert.equal(path,'/private/build-step.txt');assert.equal(privateExists,true);return options.buildStep??null;},writer,value=>{assert.deepEqual(value,selected);if(options.selectionFails)throw failure;return {name:'expo-sqlite',version:'57.0.5',localProject:true};},'synthetic-python',async()=>{portChecks++;if(options.portFails&&portChecks===1)throw failure;},spawnChild,()=>async()=>{emulatorStops++;live=false;return !options.processCleanupFails;},androidOffline,androidReceiptStat,()=>raw,expectedEngine,'com.patrickchin.puptime','emulator-5588',path=>{assert.equal(path,'/private');privateExists=false;},adb=>readAndroidProbeStage(adb,()=>now),{now:()=>now},(fn,ms)=>{assert.equal(ms,250);now+=ms;queueMicrotask(fn);},options.deadlineError?function(message){assert.equal(message,'Bounded readback timed out.');return options.deadlineError;}:Error);
- return {execute,calls,writes,failure,disposed:()=>disposed,live:()=>live,removed:()=>!privateExists,rootCount:()=>rootCount,emulatorStops:()=>emulatorStops};
+ const sourceAssert=options.trackAssertions?Object.create(assert):assert;
+ if(options.trackAssertions)for(const name of ['ok','match','equal'])sourceAssert[name]=(...args)=>{try{return assert[name](...args);}catch(error){asserted=error;throw error;}};
+ const execute=factory(sourceAssert,{platform:options.wrongPlatform?'darwin':'linux',env,cwd:()=>'/root',execPath:'/node',getuid:()=>1000},path=>path,()=>({isDirectory:()=>true,isSymbolicLink:()=>false,isFile:()=>true,size:512}),path=>path==='/private'||path==='/private/avd'?privateExists:path.startsWith('/sdk/emulator/'),join,standardFixtureEnvironment,command,()=>{},()=>'/private',read,()=>'/sdk/emulator/emulator',androidProcessIdentity,cleanup,run,stable,sourceHashes,key,certificate,androidSelectionInit,path=>{assert.equal(path,'/private/build-step.txt');assert.equal(privateExists,true);return options.buildStep??null;},writer,value=>{assert.deepEqual(value,selected);if(options.selectionFails)throw failure;return {name:'expo-sqlite',version:'57.0.5',localProject:true};},'synthetic-python',async()=>{portChecks++;if(options.portFails&&portChecks===1)throw failure;},spawnChild,()=>async()=>{emulatorStops++;live=false;return !options.processCleanupFails;},androidOffline,androidReceiptStat,()=>raw,expectedEngine,'com.patrickchin.puptime','emulator-5588',path=>{assert.equal(path,'/private');privateExists=false;},adb=>readAndroidProbeStage(adb,()=>now),{now:()=>now},(fn,ms)=>{assert.equal(ms,250);now+=ms;queueMicrotask(fn);},options.deadlineError?function(message){assert.equal(message,'Bounded readback timed out.');return options.deadlineError;}:Error);
+ return {execute,calls,writes,failure,disposed:()=>disposed,live:()=>live,removed:()=>!privateExists,rootCount:()=>rootCount,emulatorStops:()=>emulatorStops,asserted:()=>asserted};
 }
 
 test('current Android cleanup requires verified ownership before signaling or removing private material',async()=>{
@@ -400,6 +404,59 @@ test('actual Android stat argv survives ADB shell joining at all receipt and mar
   const old=run(row.slice(4).map(value=>value==="'"+format+"'"?format:value));
   assert.equal(old.error,undefined);assert.equal(old.status,81);assert.equal(old.stdout,'');assert.equal(old.stderr,'');
   const fixed=run(row.slice(4));assert.equal(fixed.error,undefined);assert.equal(fixed.status,0);assert.equal(fixed.stderr,'');assert.equal(androidReceiptStat(fixed.stdout).size,17);
+ }
+});
+
+test('Android install result categories retain the exact Error and never inspect private getters',async()=>{
+ for(const code of ['ETIMEDOUT','ENOENT','ENOBUFS','PRIVATE https://private.invalid',null]){
+  const failure=new Error();Object.defineProperty(failure,'code',{value:code});for(const key of ['message','stack'])Object.defineProperty(failure,key,{get(){throw Error('PRIVATE getter');}});
+  const check=androidCiRun({installFails:true,failure});await assert.rejects(check.execute(),error=>error===failure);
+  const proof=check.writes.find(row=>row.path.endsWith('provenance.json')).value;
+  assert.equal(proof.phase,code==='ETIMEDOUT'?'install-command-timeout':'install-command-error');assert.equal(proof.status,'failed');assert.equal(proof.receiptDiagnostic,null);assert.equal(proof.apk.installedSHA256,null);assert.equal(proof.engineMatchesExpected,null);assert.ok(Object.values(proof.cleanup).every(value=>value===true));assert.ok(!JSON.stringify(proof).includes('PRIVATE'));
+ }
+ for(const kind of ['own-getter','inherited-getter','descriptor-throws']){
+  let reads=0;const original=new Error();Object.defineProperty(original,'message',{get(){throw Error('PRIVATE getter');}});
+  if(kind==='own-getter')Object.defineProperty(original,'code',{get(){reads++;throw Error('PRIVATE code');}});
+  if(kind==='inherited-getter'){const prototype=Object.create(Error.prototype);Object.defineProperty(prototype,'code',{get(){reads++;return 'ETIMEDOUT';}});Object.setPrototypeOf(original,prototype);}
+  const failure=kind==='descriptor-throws'?new Proxy(original,{getOwnPropertyDescriptor(){throw Error('PRIVATE descriptor');}}):original;
+  const check=androidCiRun({installFails:true,failure});await assert.rejects(check.execute(),error=>error===failure);
+  assert.equal(reads,0);assert.equal(check.writes.find(row=>row.path.endsWith('provenance.json')).value.phase,'install-command-error');assert.equal(check.disposed(),true);assert.equal(check.removed(),true);
+ }
+ for(const status of [1,17,null,undefined]){
+  const check=androidCiRun({installStatus:status,trackAssertions:true});await assert.rejects(check.execute(),error=>error===check.asserted());
+  const proof=check.writes.find(row=>row.path.endsWith('provenance.json')).value;assert.equal(proof.phase,Number.isInteger(status)?'install-command-nonzero':'install-command-no-exit');assert.equal(proof.status,'failed');assert.ok(Object.values(proof.cleanup).every(value=>value===true));
+ }
+});
+
+test('Android actual install operations distinguish output, path, pull, readback and prelaunch failures',async()=>{
+ const cases=[
+  [{installOwnershipFails:true},'install-command',true],
+  [{installOutput:'PRIVATE /private/path https://private.invalid'},'install-output',false],
+  [{installOutput:'Performing Incremental Install\nSuccess\n'},'install-output',false],
+  [{pmFails:true},'install-path-read',true],
+  [{pmOutput:'PRIVATE /private/path'},'install-path-validate',false],
+  [{pullFails:true},'install-pull',true],
+  [{readbackFails:true},'install-readback',true],
+  [{installedWrong:true},'install-hash-match',false],
+  [{prelaunchStopFails:true},'install-prelaunch-stop',true],
+  [{prelaunchDelete:'receipt'},'install-receipt-delete',true],
+  [{prelaunchDelete:'marker'},'install-marker-delete',true],
+ ];
+ for(const [options,phase,originalError] of cases){
+  const failure=new Error();Object.defineProperty(failure,'code',{value:'ETIMEDOUT'});Object.defineProperty(failure,'message',{get(){throw Error('PRIVATE getter');}});
+  const check=androidCiRun({...options,failure,trackAssertions:true});await assert.rejects(check.execute(),error=>error===(originalError?failure:check.asserted()));
+  const proof=check.writes.find(row=>row.path.endsWith('provenance.json')).value;
+  assert.equal(proof.phase,phase);assert.equal(proof.status,'failed');assert.equal(proof.schemaVersion,3);assert.equal(Object.keys(proof).length,15);assert.equal(proof.receiptDiagnostic,null);assert.equal(proof.engineMatchesExpected,null);assert.ok(Object.values(proof.cleanup).every(value=>value===true));assert.equal(check.writes.some(row=>row.path.endsWith('probe.json')),false);assert.equal(check.disposed(),true);assert.equal(check.removed(),true);assert.equal(check.live(),false);assert.ok(!JSON.stringify(proof).includes('PRIVATE'));
+  if(options.installOwnershipFails)assert.ok(!check.calls.some(row=>row[3]==='install'));
+ }
+ const success=androidCiRun();await success.execute();const proof=success.writes.find(row=>row.path.endsWith('provenance.json')).value;assert.equal(proof.phase,'receipt');assert.equal(proof.status,'passed');assert.equal(proof.engineMatchesExpected,true);assert.ok(Object.values(proof.cleanup).every(value=>value===true));
+});
+
+test('Android install diagnostics never promote failed cleanup or replace a timeout with cleanup or writer errors',async()=>{
+ for(const options of [{cleanupStopFails:true},{writerFails:true},{cleanupStopFails:true,writerFails:true}]){
+  const failure=Object.assign(new Error(),{code:'ETIMEDOUT'});Object.defineProperty(failure,'message',{get(){throw Error('PRIVATE getter');}});
+  const check=androidCiRun({installFails:true,failure,...options});await assert.rejects(check.execute(),error=>error===failure);assert.equal(check.disposed(),true);assert.equal(check.removed(),true);assert.equal(check.live(),false);assert.equal(check.writes.some(row=>row.path.endsWith('probe.json')),false);
+  if(!options.writerFails){const proof=check.writes.find(row=>row.path.endsWith('provenance.json')).value;assert.equal(proof.phase,'install-command-timeout');assert.equal(proof.status,'failed');assert.equal(proof.cleanup.appStopped,false);assert.ok(Object.entries(proof.cleanup).filter(([key])=>key!=='appStopped').every(([,value])=>value===true));}
  }
 });
 

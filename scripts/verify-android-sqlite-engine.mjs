@@ -202,7 +202,17 @@ export async function verifyAndroidSqliteEngine(){
  const root=realpathSync(process.cwd()),sdk=realpathSync(process.env.ANDROID_HOME??''),runner=realpathSync(process.env.RUNNER_TEMP??'');assert.ok(lstatSync(join(root,'node_modules')).isDirectory()&&!lstatSync(join(root,'node_modules')).isSymbolicLink());
  assert.equal(existsSync(join(root,'.env')),false);
  const env=standardFixtureEnvironment(process.env,'https://127.0.0.1:1');for(const key of ['EXPO_OVERRIDE_METRO_CONFIG','NODE_OPTIONS','NODE_PATH'])delete env[key];Object.assign(env,{CI:'1',EXPO_NO_TELEMETRY:'1',EXPO_NO_METRO_WORKSPACE_ROOT:'1',ENTRY_FILE:'index.sqlite-engine-probe.js'});
- const command=(binary,args,{timeout=30000,maxBuffer=16384,binaryOutput=false,ok=[0],cwd=root}={})=>{const result=spawnSync(binary,args,{cwd,env,timeout,maxBuffer,encoding:binaryOutput?undefined:'utf8',stdio:['ignore','pipe','ignore']});if(result.error)throw result.error;assert.ok(ok.includes(result.status),'Bounded command failed.');return result.stdout;};
+ const command=(binary,args,{timeout=30000,maxBuffer=16384,binaryOutput=false,ok=[0],cwd=root,installPhase=false}={})=>{
+  if(installPhase)phase='install-command-run';
+  const result=spawnSync(binary,args,{cwd,env,timeout,maxBuffer,encoding:binaryOutput?undefined:'utf8',stdio:['ignore','pipe','ignore']});
+  if(installPhase){
+   if(result.error){
+    phase='install-command-error';
+    try{if(Object.getOwnPropertyDescriptor(result.error,'code')?.value==='ETIMEDOUT')phase='install-command-timeout';}catch{}
+   }else if(!ok.includes(result.status))phase=Number.isInteger(result.status)?'install-command-nonzero':'install-command-no-exit';
+  }
+  if(result.error)throw result.error;assert.ok(ok.includes(result.status),'Bounded command failed.');return result.stdout;
+ };
  const source=command('git',['rev-parse','HEAD']).trim(),tree=command('git',['rev-parse','HEAD^{tree}']).trim();assert.match(source,/^[a-f0-9]{40}$/);assert.match(tree,/^[a-f0-9]{40}$/);command('git',['diff','--quiet','HEAD','--']);
  const output=join(root,'build/android-sqlite-engine-check');assert.ok(!existsSync(output));mkdirSync(output,{recursive:true,mode:0o700});
  const emulator=join(sdk,'emulator/emulator'),adbPath=join(sdk,'platform-tools/adb'),tools=join(sdk,'build-tools/36.0.0'),avdmanager=join(realpathSync(process.env.PUPTIME_ANDROID_CMDLINE_BIN??''),'avdmanager');assert.ok(realpathSync(avdmanager).startsWith(sdk+'/'));
@@ -259,9 +269,17 @@ export async function verifyAndroidSqliteEngine(){
   adb(['shell','svc','wifi','disable']);adb(['shell','svc','data','disable']);adb(['shell','cmd','connectivity','airplane-mode','enable']);
   await poll(30000,()=>{try{return androidOffline({airplane:adb(['shell','settings','get','global','airplane_mode_on']),wifiPreference:adb(['shell','settings','get','global','wifi_on']),wifiStatus:adb(['shell','cmd','wifi','status']),connectivity:adb(['shell','dumpsys','connectivity'],{maxBuffer:256*1024})});}catch{return false;}});
   assert.equal(adb(['shell','pm','path',app],{ok:[1]}),'');
-  phase='install';assert.match(adb(['install',apkPath],{timeout:180000}),/^(?:Performing (?:Streamed|Push) Install\r?\n)?Success\s*$/);
-  const installed=adb(['shell','pm','path',app]).trim();assert.match(installed,/^package:\/data\/app\/[^\n]+\/base\.apk$/);const readback=join(privateRoot,'installed.apk');adb(['pull',installed.slice(8),readback]);installedApkSHA256=stableFile(readback);assert.equal(installedApkSHA256,apkSHA256);
-  const receipt='/data/user/0/'+app+'/files/sqlite-engine-probe.json';adb(['shell','am','force-stop',app]);adb(['shell','rm','-f',receipt]);adb(['shell','rm','-f','/data/user/0/'+app+'/files/sqlite-engine-stage.txt']);
+  phase='install-command';const installOutput=adb(['install',apkPath],{timeout:180000,installPhase:true});
+  phase='install-output';assert.match(installOutput,/^(?:Performing (?:Streamed|Push) Install\r?\n)?Success\s*$/);
+  phase='install-path-read';const installed=adb(['shell','pm','path',app]).trim();
+  phase='install-path-validate';assert.match(installed,/^package:\/data\/app\/[^\n]+\/base\.apk$/);const readback=join(privateRoot,'installed.apk');
+  phase='install-pull';adb(['pull',installed.slice(8),readback]);
+  phase='install-readback';installedApkSHA256=stableFile(readback);
+  phase='install-hash-match';assert.equal(installedApkSHA256,apkSHA256);
+  const receipt='/data/user/0/'+app+'/files/sqlite-engine-probe.json';
+  phase='install-prelaunch-stop';adb(['shell','am','force-stop',app]);
+  phase='install-receipt-delete';adb(['shell','rm','-f',receipt]);
+  phase='install-marker-delete';adb(['shell','rm','-f','/data/user/0/'+app+'/files/sqlite-engine-stage.txt']);
   phase='launch';adb(['shell','am','start','-W','-n',app+'/.MainActivity']);
   phase='receipt-wait';receiptDiagnostic={waitOutcome:null,probeStage:null};await poll(60000,()=>{try{return androidReceiptStat(adb(['shell','stat','-c',"'%d %i %s %Y %Z %f'",receipt])).size>0;}catch{return false;}});receiptDiagnostic.waitOutcome='stat-ready';
   phase='receipt-path';assert.equal(adb(['shell','readlink','-f',receipt]).trim(),receipt);const before=androidReceiptStat(adb(['shell','stat','-c',"'%d %i %s %Y %Z %f'",receipt]));
