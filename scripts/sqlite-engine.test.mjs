@@ -382,6 +382,27 @@ test('failure marker reader uses one shared budget and rejects private, symlink,
  const timed=run(Buffer.from('query'),{latency:3000});assert.equal(timed.value,null);assert.equal(timed.calls.length,2);assert.ok(timed.calls.every(row=>row.settings.timeout<=5000));
 });
 
+test('actual Android stat argv survives ADB shell joining at all receipt and marker sites',async()=>{
+ const success=androidCiRun();await success.execute();
+ const expired=androidCiRun({receiptWaitExpires:true});await assert.rejects(expired.execute(),error=>error.message==='Bounded readback timed out.');
+ const receipt='/data/user/0/com.patrickchin.puptime/files/sqlite-engine-probe.json',marker='/data/user/0/com.patrickchin.puptime/files/sqlite-engine-stage.txt';
+ const rows=[...success.calls.filter(row=>row[3]==='shell'&&row[4]==='stat'&&row.at(-1)===receipt),...expired.calls.filter(row=>row[3]==='shell'&&row[4]==='stat'&&row.at(-1)===marker)];
+ assert.equal(rows.length,5);
+ const format='%d %i %s %Y %Z %f';
+ const stub=String.raw`stat() {
+ [ "$#" -eq 3 ] && [ "$1" = '-c' ] && [ "$2" = '%d %i %s %Y %Z %f' ] && [ "$3" = "$PUPTIME_EXPECTED_STAT_PATH" ] || return 81
+ printf '1 2 17 3 4 81a4\n'
+}`;
+ for(const row of rows){
+  assert.ok([receipt,marker].includes(row.at(-1)));assert.deepEqual(row.slice(3,7),['shell','stat','-c',"'"+format+"'"]);
+  // Android16 adb_shell joins argv with spaces, then adbd executes shell -c.
+  const run=argv=>spawnSync('/bin/sh',['-c',stub+'\n'+argv.join(' ')],{env:{PUPTIME_EXPECTED_STAT_PATH:row.at(-1)},encoding:'utf8',timeout:3000,stdio:['ignore','pipe','pipe']});
+  const old=run(row.slice(4).map(value=>value==="'"+format+"'"?format:value));
+  assert.equal(old.error,undefined);assert.equal(old.status,81);assert.equal(old.stdout,'');assert.equal(old.stderr,'');
+  const fixed=run(row.slice(4));assert.equal(fixed.error,undefined);assert.equal(fixed.status,0);assert.equal(fixed.stderr,'');assert.equal(androidReceiptStat(fixed.stdout).size,17);
+ }
+});
+
 test('Android mismatches, setup/cleanup/writer failures never pass or replace the original failure',async()=>{
  const mismatch=androidCiRun({engineBytes:Buffer.from(JSON.stringify({...expectedEngine,version:'3.50.2'}))});await assert.rejects(mismatch.execute());assert.equal(mismatch.writes.find(row=>row.path.endsWith('provenance.json')).value.engineMatchesExpected,false);assert.equal(mismatch.writes.length,2);
  for(const options of [{buildFails:true},{selectionFails:true},{installFails:true},{launchFails:true},{buildFails:true,writerFails:true},{launchFails:true,processCleanupFails:true,writerFails:true}]){
