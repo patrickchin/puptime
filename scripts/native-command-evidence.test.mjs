@@ -4,6 +4,7 @@ import {EventEmitter} from 'node:events';
 import {existsSync,mkdtempSync,mkdirSync,readFileSync,readdirSync,rmSync,symlinkSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
+import {parseAllDocuments} from 'yaml';
 import {nativeCommandState,readNativeCommandState} from './native-command-evidence.mjs';
 
 // Proxy regression: execute the real source without starting its native/worker main.
@@ -93,6 +94,43 @@ const unknown={status:'UNKNOWN',kind:'unknown',targetId:null,sequence:0};
 const row=(key,value,status,sequenceNumber=0)=>({command:{[key]:value},metadata:{status,sequenceNumber}});
 const failed=row('scrollUntilVisible',{selector:{idRegex:'fontLicenses.react-native-vector-icons'}},'FAILED',26);
 const running=row('tapOnElement',{selector:{idRegex:'account.sendCode'}},'RUNNING',27);
+
+test('project literal case16 flow targets without exposing adjacent values or choosing retry leaves',()=>{
+ const root=new URL('../.maestro/',import.meta.url),files=new Set(['conversational/16-native-time-boundaries.yaml','helpers/conversational/start.yaml','helpers/conversational/finish-alone.yaml','helpers/conversational/skip-sharing.yaml','helpers/conversational/assert-normal.yaml']);
+ const visited=new Set(),ids=new Set();
+ function flow(url){
+  assert.ok(url.href.startsWith(root.href));const name=url.href.slice(root.href.length);assert.ok(files.has(name));if(visited.has(name))return;visited.add(name);
+  function walk(value){
+   if(Array.isArray(value)){value.forEach(walk);return;}
+   if(!value||typeof value!=='object')return;
+   for(const [key,item] of Object.entries(value)){
+    if(key==='id'){assert.equal(typeof item,'string');assert.match(item,/^[A-Za-z0-9][A-Za-z0-9._-]*$/);ids.add(item);}
+    if(key==='runFlow'){const path=typeof item==='string'?item:item?.file;if(path!==undefined){assert.equal(typeof path,'string');flow(new URL(path,url));}}
+    walk(item);
+   }
+  }
+  for(const document of parseAllDocuments(readFileSync(url,'utf8'))){assert.deepEqual(document.errors,[]);walk(document.toJSON());}
+ }
+ flow(new URL('conversational/16-native-time-boundaries.yaml',root));assert.deepEqual(visited,files);assert.equal(ids.size,29);
+ const secret='private-synthetic@example.invalid 839201 cookie=private-value';
+ for(const id of ids)for(const [key,value,kind] of [
+  ['tapOnElement',{selector:{idRegex:id,textRegex:secret}},'tap'],
+  ['scrollUntilVisible',{selector:{idRegex:id,textRegex:secret}},'scroll'],
+  ['assertConditionCommand',{condition:{visible:{idRegex:id,textRegex:secret}}},'assert'],
+  ['assertConditionCommand',{condition:{notVisible:{idRegex:id,textRegex:secret}}},'assert'],
+ ]){
+  const entry=row(key,value,'FAILED',9);entry.metadata.error=secret;entry.metadata.evaluatedCommand={input:secret};
+  const result=nativeCommandState([entry]);assert.deepEqual(result,{status:'FAILED',kind,targetId:id,sequence:9});assert.ok(!JSON.stringify(result).includes(secret));
+ }
+ assert.ok(ids.has('preview.skip'));
+ for(const id of [secret,'preview.skip.extra','preview.skip-extra','^preview.skip$','preview.*','${PRIVATE_VALUE}']){
+  const result=nativeCommandState([row('tapOnElement',{selector:{idRegex:id,textRegex:'preview.skip'}},'FAILED',9)]);
+  assert.deepEqual(result,{status:'FAILED',kind:'tap',targetId:null,sequence:9});assert.ok(!JSON.stringify(result).includes(secret));
+ }
+ assert.equal(nativeCommandState([row('tapOnElement',{selector:{textRegex:'preview.skip'}},'FAILED',9)]).targetId,null);
+ const failed=row('tapOnElement',{selector:{idRegex:'preview.skip'}},'FAILED',9),running=row('tapOnElement',{selector:{idRegex:'preview.continue'}},'RUNNING',99);
+ for(const records of [[failed,running],[running,failed],[failed,failed]])assert.deepEqual(nativeCommandState(records),unknown);
+});
 
 test('project actual leaf status/sequence, never infer failure or order competing unfinished leaves',()=>{
  assert.deepEqual(nativeCommandState([row('runFlowCommand',{},'FAILED',8),failed]),{status:'FAILED',kind:'scroll',targetId:'fontLicenses.react-native-vector-icons',sequence:26});
