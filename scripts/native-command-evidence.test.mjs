@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {EventEmitter} from 'node:events';
-import {existsSync,mkdtempSync,mkdirSync,readFileSync,rmSync,symlinkSync,writeFileSync} from 'node:fs';
+import {existsSync,mkdtempSync,mkdirSync,readFileSync,readdirSync,rmSync,symlinkSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {nativeCommandState,readNativeCommandState} from './native-command-evidence.mjs';
@@ -57,6 +57,32 @@ test('fixture proxy settles truncated upstream responses and records finite outc
  }
 });
 // End proxy regression.
+
+test('actual onboarding failure catch emits only command flags and preserves the original failure and cleanup',async t=>{
+ const {runInNewContext}=await import('node:vm');
+ const source=readFileSync(new URL('./verify-native-guest-account.mjs',import.meta.url),'utf8'),start=source.indexOf('async function flow('),end=source.indexOf('\nlet email=',start);assert.ok(start>0&&end>start);
+ const secret='PRIVATE identity@example.invalid 654321 cookie=private /private/path';
+ for(const [phase,id] of [['onboarding-request','account.email.open'],['onboarding-request','preview.account'],['onboarding-verify','preview.name']]){
+  const yaml=readFileSync(new URL('../.maestro/account-preservation/'+phase+'.yaml',import.meta.url),'utf8');assert.ok(yaml.includes('id: '+id+'\n'));
+  for(const mode of ['known','ambiguous','writer-fails']){
+   const root=mkdtempSync(join(tmpdir(),'puptime-onboarding-command-'));t.after(()=>rmSync(root,{recursive:true,force:true}));
+   const privateDir=join(root,'private'),artifacts=join(privateDir,'maestro-'+phase+'-1000'),output=join(root,'output');mkdirSync(artifacts,{recursive:true});mkdirSync(output);
+   const entry={command:{tapOnElement:{selector:{idRegex:id,textRegex:secret},input:secret}},metadata:{status:'FAILED',sequenceNumber:7,error:secret,evaluatedCommand:{inputTextCommand:{text:secret}}}};
+   writeFileSync(join(artifacts,'commands.json'),JSON.stringify(mode==='ambiguous'?[entry,entry]:[entry]));
+   const original=new Error(secret),writerError=new Error('PRIVATE writer failure');let removed=0,receiptWrites=0;
+   const context={join,homedir:()=>join(root,'home'),existsSync,readdirSync,Date:{now:()=>1000},markStartup(){},run:async()=>{throw original;},device:'synthetic-device',email:secret,code:secret,privateDir,process:{env:{}},resolve,output,requests:new Set(['/api/config','/api/account']),authResponses:[],readFileSync,readNativeCommandState,android:false,phase,
+    writeFileSync(path,bytes,options){if(path.endsWith('fixture-onboarding-command.json')){receiptWrites++;assert.deepEqual(Object.keys(options).sort(),['flag','mode']);assert.equal(options.flag,'wx');assert.equal(options.mode,0o600);if(mode==='writer-fails')throw writerError;}writeFileSync(path,bytes,options);},
+    rmSync(path,options){assert.equal(path,artifacts);removed++;rmSync(path,options);}};
+   const promise=runInNewContext("(async()=>{let activeFlow='startup',flowSequence=0;"+source.slice(start,end)+';await flow(phase);})()',context);
+   await assert.rejects(promise,error=>error===original);assert.equal(receiptWrites,1);assert.equal(removed,1);assert.equal(existsSync(artifacts),false);
+   const receipt=join(output,'fixture-onboarding-command.json');assert.equal(existsSync(receipt),mode!=='writer-fails');
+   if(mode!=='writer-fails'){
+    const raw=readFileSync(receipt,'utf8'),value=JSON.parse(raw);assert.ok(!raw.includes('PRIVATE')&&!raw.includes('identity@example.invalid')&&!raw.includes('654321')&&!raw.includes('cookie=')&&!raw.includes('/private/path'));
+    assert.deepEqual(value,{phase,flowSequence:1,...(mode==='ambiguous'?{status:'UNKNOWN',kind:'unknown',targetId:null,sequence:0}:{status:'FAILED',kind:'tap',targetId:id,sequence:7})});
+   }
+  }
+ }
+});
 
 const unknown={status:'UNKNOWN',kind:'unknown',targetId:null,sequence:0};
 const row=(key,value,status,sequenceNumber=0)=>({command:{[key]:value},metadata:{status,sequenceNumber}});
