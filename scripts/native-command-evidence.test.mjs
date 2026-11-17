@@ -15,7 +15,7 @@ test('fixture proxy settles truncated upstream responses and records finite outc
  const unused=()=>{throw new Error('Unexpected synthetic proxy branch.');};
  const make=Function('request','front','backPort','upgrading','capturedJson','mutationSchema','wireFailure','pushResponseSchema','pullPageSchema',declarations+"\nactiveFlow='onboarding-request';flowSequence=1;\n"+source.slice(start,end)+'\nreturn {forward,read:()=>({activeForwarded,responses:authResponses})};');
  async function run(mode){
-  const servers=[],sockets=new Set(),timers=new Set();let observer,truncated=false;
+  const servers=[],sockets=new Set(),timers=new Set();let observer,truncated=false,closed;const responseClosed=new Promise(resolve=>{closed=resolve;});
   const row={headers:false,bytes:0,status:null,terminal:null,settledBeforeDeadline:false,active:null,responses:null,cleanup:null};
   const own=server=>{servers.push(server);server.on('connection',socket=>sockets.add(socket));return server;};
   const listen=async server=>{await new Promise((yes,no)=>{server.once('error',no);server.listen(0,'127.0.0.1',yes);});return server.address().port;};
@@ -25,22 +25,24 @@ test('fixture proxy settles truncated upstream responses and records finite outc
     if(mode==='complete')res.writeHead(200,{'content-type':'application/json'}).end('{"synthetic":true}');
     else if(mode==='before-headers')req.socket.destroy();
     else{
-     res.writeHead(200,{'content-type':'application/json','content-length':'64'});res.flushHeaders();res.write('{"synthetic":');
-     const timer=setTimeout(()=>{truncated=true;res.socket?.destroy();timers.delete(timer);},50);timers.add(timer);
+     res.writeHead(mode==='client-abandon'?302:200,{'content-type':'application/json','content-length':'64'});res.flushHeaders();res.write('{"synthetic":');
+     if(mode!=='client-abandon'){const timer=setTimeout(()=>{truncated=true;res.socket?.destroy();timers.delete(timer);},50);timers.add(timer);}
     }
    }));
-   const backPort=await listen(backend),proxy=own(createServer((req,res)=>observer.forward(req,res))),frontPort=await listen(proxy);
+   const backPort=await listen(backend),proxy=own(createServer((req,res)=>{res.once('close',closed);observer.forward(req,res);})),frontPort=await listen(proxy);
    observer=make(request,'http://127.0.0.1:'+frontPort,backPort,false,unused,{parse:unused},unused,{parse:unused},{parse:unused});
    await new Promise(resolve=>{
     let settled=false,deadline=false,response;
     const finish=terminal=>{if(settled)return;settled=true;row.terminal=terminal;row.settledBeforeDeadline=!deadline;clearTimeout(timer);timers.delete(timer);resolve();};
     const req=request('http://127.0.0.1:'+frontPort+'/api/auth/email-otp/send-verification-otp',{method:'POST',agent:false,headers:{'content-type':'application/json'}},res=>{
      response=res;row.headers=true;row.status=res.statusCode;res.on('data',b=>{row.bytes+=b.length;});res.once('end',()=>finish('end'));res.once('aborted',()=>finish('aborted'));res.once('error',()=>finish('response-error'));res.once('close',()=>finish('close'));
+     if(mode==='client-abandon'){res.destroy();req.destroy();}
     });
     req.once('error',()=>finish('request-error'));
     const timer=setTimeout(()=>{deadline=true;req.destroy();response?.destroy();setImmediate(()=>finish('control-cancel'));},1000);timers.add(timer);req.end('{"synthetic":true}');
    });
-   await new Promise(setImmediate);const state=observer.read();row.active=state.activeForwarded;row.responses=state.responses;row.truncated=truncated;return row;
+   if(mode==='client-abandon')await Promise.race([responseClosed,new Promise((_,reject)=>{const timer=setTimeout(()=>reject(new Error('Synthetic downstream close deadline.')),1000);timers.add(timer);})]);
+   await new Promise(setImmediate);const state=observer.read();row.active=state.activeForwarded;row.responses=state.responses.map(value=>({...value}));row.truncated=truncated;return row;
   }finally{
    for(const timer of timers)clearTimeout(timer);timers.clear();for(const socket of sockets)socket.destroy();
    await Promise.all(servers.map(server=>!server.listening?Promise.resolve():new Promise(resolve=>{server.close(resolve);server.closeAllConnections();})));await new Promise(setImmediate);
@@ -52,7 +54,10 @@ test('fixture proxy settles truncated upstream responses and records finite outc
  assert.equal(truncated.settledBeforeDeadline,true,'Require downstream settlement after actual upstream truncation.');
  assert.equal(complete.responses[0].upstream,'complete');assert.ok(['response-error','response-closed'].includes(truncated.responses[0].upstream));
  const before=await run('before-headers');assert.equal(before.status,502);assert.equal(before.terminal,'end');assert.equal(before.settledBeforeDeadline,true);assert.equal(before.active,0);assert.equal(before.cleanup,true);assert.equal(before.responses[0].upstream,'request-error');
- for(const value of [complete,truncated,before]){
+ const abandoned=await run('client-abandon');assert.equal(abandoned.headers,true);assert.equal(abandoned.status,302);assert.equal(abandoned.settledBeforeDeadline,true);assert.equal(abandoned.cleanup,true);
+ assert.equal(abandoned.responses[0].state,'closed');assert.equal(abandoned.responses[0].status,302,'Retain the observed HTTP status after client abandonment; close is not completion.');
+ assert.equal(complete.responses[0].state,'completed');assert.equal(complete.responses[0].status,200);assert.equal(before.responses[0].state,'completed');assert.equal(before.responses[0].status,502);
+ for(const value of [complete,truncated,before,abandoned]){
   assert.equal(value.responses.length,1);const response=value.responses[0];assert.deepEqual(Object.keys(response),['phase','flowSequence','route','method','status','state','upstream']);assert.ok(['pending','headers','complete','request-error','response-error','response-closed'].includes(response.upstream));
  }
 });

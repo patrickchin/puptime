@@ -538,7 +538,7 @@ try{
     if(route&&['GET','POST'].includes(req.method)){
       const entry=authResponse={phase:activeFlow,flowSequence,route,method:req.method,status:null,state:'pending',upstream:'pending'};
       authResponses.push(entry);if(authResponses.length>64)authResponses.shift();
-      const record=completed=>{if(entry.state!=='pending')return;entry.status=completed?res.statusCode:null;entry.state=completed?'completed':'closed';};
+      const record=completed=>{if(entry.state!=='pending')return;if(completed)entry.status=res.statusCode;entry.state=completed?'completed':'closed';};
       res.once('finish',()=>record(true));res.once('close',()=>record(false));
     }
 
@@ -559,7 +559,7 @@ try{
     // Wrangler rewrites a matching Origin using the upstream scheme. Forwarding
     // the actual backend Host keeps the original HTTPS Origin intact.
     const outgoing=request('http://127.0.0.1:'+backPort+req.url,{method:req.method,headers:{...req.headers,host:'127.0.0.1:'+backPort}},incoming=>{
-      if(authResponse)authResponse.upstream='headers';
+      if(authResponse){authResponse.upstream='headers';authResponse.status=incoming.statusCode??null;}
       const chunks=[];if(pushing||pulling||photoRequest||deletingRequest)incoming.on('data',part=>chunks.push(part));
       incoming.on('end',()=>{
         if(authResponse)authResponse.upstream='complete';
