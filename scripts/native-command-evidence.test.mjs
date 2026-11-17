@@ -6,6 +6,58 @@ import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {nativeCommandState,readNativeCommandState} from './native-command-evidence.mjs';
 
+// Proxy regression: execute the real source without starting its native/worker main.
+test('fixture proxy settles truncated upstream responses and records finite outcomes',async()=>{
+ const {createServer,request}=await import('node:http');
+ const source=readFileSync(new URL('./verify-native-guest-account.mjs',import.meta.url),'utf8');
+ const declarations=source.slice(source.indexOf('let worker,workerError,'),source.indexOf('function wireFailure('));
+ const start=source.indexOf('  const forward=(req,res)=>{'),end=source.indexOf('\n  proxy=secureServer',start);assert.ok(start>0&&end>start);
+ const unused=()=>{throw new Error('Unexpected synthetic proxy branch.');};
+ const make=Function('request','front','backPort','upgrading','capturedJson','mutationSchema','wireFailure','pushResponseSchema','pullPageSchema',declarations+"\nactiveFlow='onboarding-request';flowSequence=1;\n"+source.slice(start,end)+'\nreturn {forward,read:()=>({activeForwarded,responses:authResponses})};');
+ async function run(mode){
+  const servers=[],sockets=new Set(),timers=new Set();let observer,truncated=false;
+  const row={headers:false,bytes:0,status:null,terminal:null,settledBeforeDeadline:false,active:null,responses:null,cleanup:null};
+  const own=server=>{servers.push(server);server.on('connection',socket=>sockets.add(socket));return server;};
+  const listen=async server=>{await new Promise((yes,no)=>{server.once('error',no);server.listen(0,'127.0.0.1',yes);});return server.address().port;};
+  try{
+   const backend=own(createServer((req,res)=>{
+    assert.equal(req.method,'POST');assert.equal(req.url,'/api/auth/email-otp/send-verification-otp');req.resume();
+    if(mode==='complete')res.writeHead(200,{'content-type':'application/json'}).end('{"synthetic":true}');
+    else if(mode==='before-headers')req.socket.destroy();
+    else{
+     res.writeHead(200,{'content-type':'application/json','content-length':'64'});res.flushHeaders();res.write('{"synthetic":');
+     const timer=setTimeout(()=>{truncated=true;res.socket?.destroy();timers.delete(timer);},50);timers.add(timer);
+    }
+   }));
+   const backPort=await listen(backend),proxy=own(createServer((req,res)=>observer.forward(req,res))),frontPort=await listen(proxy);
+   observer=make(request,'http://127.0.0.1:'+frontPort,backPort,false,unused,{parse:unused},unused,{parse:unused},{parse:unused});
+   await new Promise(resolve=>{
+    let settled=false,deadline=false,response;
+    const finish=terminal=>{if(settled)return;settled=true;row.terminal=terminal;row.settledBeforeDeadline=!deadline;clearTimeout(timer);timers.delete(timer);resolve();};
+    const req=request('http://127.0.0.1:'+frontPort+'/api/auth/email-otp/send-verification-otp',{method:'POST',agent:false,headers:{'content-type':'application/json'}},res=>{
+     response=res;row.headers=true;row.status=res.statusCode;res.on('data',b=>{row.bytes+=b.length;});res.once('end',()=>finish('end'));res.once('aborted',()=>finish('aborted'));res.once('error',()=>finish('response-error'));res.once('close',()=>finish('close'));
+    });
+    req.once('error',()=>finish('request-error'));
+    const timer=setTimeout(()=>{deadline=true;req.destroy();response?.destroy();setImmediate(()=>finish('control-cancel'));},1000);timers.add(timer);req.end('{"synthetic":true}');
+   });
+   await new Promise(setImmediate);const state=observer.read();row.active=state.activeForwarded;row.responses=state.responses;row.truncated=truncated;return row;
+  }finally{
+   for(const timer of timers)clearTimeout(timer);timers.clear();for(const socket of sockets)socket.destroy();
+   await Promise.all(servers.map(server=>!server.listening?Promise.resolve():new Promise(resolve=>{server.close(resolve);server.closeAllConnections();})));await new Promise(setImmediate);
+   row.cleanup=servers.every(s=>!s.listening)&&[...sockets].every(s=>s.destroyed)&&timers.size===0;
+  }
+ }
+ const complete=await run('complete');assert.equal(complete.terminal,'end');assert.equal(complete.status,200);assert.equal(complete.settledBeforeDeadline,true);assert.equal(complete.active,0);assert.equal(complete.cleanup,true);
+ const truncated=await run('truncated');assert.equal(truncated.truncated,true);assert.equal(truncated.headers,true);assert.ok(truncated.bytes>0&&truncated.bytes<64);assert.equal(truncated.active,0);assert.equal(truncated.cleanup,true);
+ assert.equal(truncated.settledBeforeDeadline,true,'Require downstream settlement after actual upstream truncation.');
+ assert.equal(complete.responses[0].upstream,'complete');assert.ok(['response-error','response-closed'].includes(truncated.responses[0].upstream));
+ const before=await run('before-headers');assert.equal(before.status,502);assert.equal(before.terminal,'end');assert.equal(before.settledBeforeDeadline,true);assert.equal(before.active,0);assert.equal(before.cleanup,true);assert.equal(before.responses[0].upstream,'request-error');
+ for(const value of [complete,truncated,before]){
+  assert.equal(value.responses.length,1);const response=value.responses[0];assert.deepEqual(Object.keys(response),['phase','flowSequence','route','method','status','state','upstream']);assert.ok(['pending','headers','complete','request-error','response-error','response-closed'].includes(response.upstream));
+ }
+});
+// End proxy regression.
+
 const unknown={status:'UNKNOWN',kind:'unknown',targetId:null,sequence:0};
 const row=(key,value,status,sequenceNumber=0)=>({command:{[key]:value},metadata:{status,sequenceNumber}});
 const failed=row('scrollUntilVisible',{selector:{idRegex:'fontLicenses.react-native-vector-icons'}},'FAILED',26);

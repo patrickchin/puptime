@@ -532,9 +532,10 @@ try{
   const forward=(req,res)=>{
     requests.add(req.url);
     const pathname=new URL(req.url,front).pathname,route=Object.hasOwn(authRoutes,pathname)?authRoutes[pathname]:undefined;
+    let authResponse;
     if(req.method==='POST'){if(route==='send-code')identityRequests.sendCode++;if(route==='verify-code')identityRequests.verifyCode++;if(route==='sign-out')identityRequests.signOut++;}
     if(route&&['GET','POST'].includes(req.method)){
-      const entry={phase:activeFlow,flowSequence,route,method:req.method,status:null,state:'pending'};
+      const entry=authResponse={phase:activeFlow,flowSequence,route,method:req.method,status:null,state:'pending',upstream:'pending'};
       authResponses.push(entry);if(authResponses.length>64)authResponses.shift();
       const record=completed=>{if(entry.state!=='pending')return;entry.status=completed?res.statusCode:null;entry.state=completed?'completed':'closed';};
       res.once('finish',()=>record(true));res.once('close',()=>record(false));
@@ -557,8 +558,10 @@ try{
     // Wrangler rewrites a matching Origin using the upstream scheme. Forwarding
     // the actual backend Host keeps the original HTTPS Origin intact.
     const outgoing=request('http://127.0.0.1:'+backPort+req.url,{method:req.method,headers:{...req.headers,host:'127.0.0.1:'+backPort}},incoming=>{
+      if(authResponse)authResponse.upstream='headers';
       const chunks=[];if(pushing||pulling||photoRequest||deletingRequest)incoming.on('data',part=>chunks.push(part));
       incoming.on('end',()=>{
+        if(authResponse)authResponse.upstream='complete';
         if(newerNativePush&&incoming.statusCode===200&&typeof req.headers.cookie==='string')newerSdkCookie=req.headers.cookie;
         if(incoming.statusCode===200&&(pushing||pulling))try{const bytes=Buffer.concat(chunks),parsed=capturedJson(bytes,incoming.headers['content-encoding']);if(pushing)wireAccepted.push(...pushResponseSchema.parse(parsed).accepted);else wirePages.push(pullPageSchema.parse(parsed));}catch{wireFailure('response',pushing?'push':'pull',incoming.headers['content-encoding'],Buffer.concat(chunks).length);}
         if(photoRequest)photoTransfers.push({method:req.method,path:req.url,status:incoming.statusCode,...(req.method==='POST'?{requestSHA256:createHash('sha256').update(Buffer.concat(body)).digest('hex')}:{responseSHA256:createHash('sha256').update(Buffer.concat(chunks)).digest('hex')})});
@@ -567,10 +570,11 @@ try{
         else if(dropping){res.writeHead(incoming.statusCode,incoming.headers);res.end(Buffer.concat(chunks));}
         finish();
       });
-      incoming.on('error',finish);incoming.on('close',finish);
+      incoming.on('error',()=>{if(authResponse)authResponse.upstream='response-error';finish();res.destroy();});
+      incoming.on('close',()=>{if(!incoming.complete){if(authResponse&&authResponse.upstream!=='response-error')authResponse.upstream='response-closed';res.destroy();}finish();});
       if(!dropping){res.writeHead(incoming.statusCode,incoming.headers);incoming.pipe(res);}
     });
-    outgoing.on('error',()=>{finish();if(!res.headersSent)res.writeHead(502);res.end();});req.pipe(outgoing);
+    outgoing.on('error',()=>{if(authResponse?.upstream==='pending')authResponse.upstream='request-error';finish();if(!res.headersSent)res.writeHead(502);res.end();});req.pipe(outgoing);
   };
   proxy=secureServer({key:readFileSync(keyPath),cert:Buffer.concat([readFileSync(certPath),certificate])},forward);
   proxy.on('tlsClientError',error=>{if(standard){try{writeFileSync(join(output,'fixture-tls-error.json'),JSON.stringify({category:'tls-client-error'})+'\n');}catch{}}else writeFileSync(join(output,'fixture-tls-error.txt'),error.message);});
