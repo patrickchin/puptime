@@ -18,7 +18,7 @@ jobs:
         run: |
           git fetch --no-tags --depth=1 origin d3b291103f23a0e1e2ad14ce28810dc7572d0f02
           node scripts/verify-old-preference-compatibility.mjs
-      - run: node --test scripts/native-task-cleanup.test.mjs scripts/native-command-evidence.test.mjs scripts/native-startup-evidence.test.mjs scripts/native-standard-suite.test.mjs scripts/native-standard-verdict.test.mjs scripts/native-onboarding-verdict.test.mjs
+      - run: node --test scripts/native-task-cleanup.test.mjs scripts/native-account-evidence.test.mjs scripts/native-command-evidence.test.mjs scripts/native-startup-evidence.test.mjs scripts/native-standard-suite.test.mjs scripts/native-standard-verdict.test.mjs scripts/native-onboarding-verdict.test.mjs
       - run: node --test scripts/native-host-policy.test.mjs
       - run: python3 scripts/android-permission-experiment.test.py
       - run: npm run typecheck

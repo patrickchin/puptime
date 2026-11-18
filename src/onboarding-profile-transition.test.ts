@@ -13,6 +13,14 @@ test('guest→profile reuses the strict existing boundary before its mandatory d
  assert.equal(commands[1],'waitForAnimationToEnd');
 });
 
+test('native time boundaries require the canonical profile and age destinations before answering',()=>{
+ const commands=parseAllDocuments(readFileSync(new URL('../.maestro/conversational/16-native-time-boundaries.yaml',import.meta.url),'utf8'))[1].toJS();
+ const canonical=parseAllDocuments(readFileSync(new URL('../.maestro/helpers/conversational/to-reminders.yaml',import.meta.url),'utf8'))[1].toJS();
+ assert.deepEqual(commands[0],{runFlow:{file:'../helpers/conversational/start.yaml',env:{NOTIFICATIONS:'deny'}}});
+ assert.deepEqual(commands.slice(1,5),canonical.slice(2,6));
+ assert.deepEqual(commands.slice(5,7),[{tapOn:{id:'preview.choice.adult'}},{tapOn:{id:'preview.choice.meals-1'}}]);
+});
+
 type ProfileAgeState={profile:boolean;age:boolean;enabled?:boolean};
 type ProfileAgeHooks={beforeTap?:(state:ProfileAgeState)=>void;afterTap?:(state:ProfileAgeState,count:number)=>void;afterAnimation?:(state:ProfileAgeState)=>void};
 

@@ -24,7 +24,7 @@ on:
       account_case:
         description: Isolated account case
         type: choice
-        options: [all, baseline, comparison, offline, isolation, photos, deletion, upgrade, standard-csv, standard-all]
+        options: [all, baseline, comparison, offline, isolation, photos, deletion, upgrade, standard-csv, standard-all, onboarding-sign-in]
         default: all
       upgrade_stage:
         description: Original-runtime archive inspection or actual data-preserving replacement
