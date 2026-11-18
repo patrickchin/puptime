@@ -5,10 +5,59 @@ name: Native hour minute AM PM and midnight windows
     file: "../helpers/conversational/start.yaml"
     env:
       NOTIFICATIONS: "deny"
-- tapOn:
-    id: "preview.guest"
-- tapOn:
-    id: "preview.skip"
+# Reuse the guarded welcome/profile/age boundary before choosing any time.
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: preview.welcome
+          commands:
+            - runFlow:
+                when:
+                  notVisible:
+                    id: preview.profile
+                commands:
+                  - tapOn:
+                      id: preview.guest
+                      enabled: true
+                      retryTapIfNoChange: true
+                  - waitForAnimationToEnd:
+                      timeout: 5000
+      - extendedWaitUntil:
+          visible:
+            id: preview.profile
+          timeout: 5000
+- assertVisible:
+    id: preview.profile
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: preview.profile
+          commands:
+            - waitForAnimationToEnd
+            - runFlow:
+                when:
+                  notVisible:
+                    id: preview.prompt
+                    text: How old is your pup?
+                commands:
+                  - assertVisible:
+                      id: preview.profile
+                  - tapOn:
+                      id: preview.skip
+                      text: ^I’ll add their name later$
+                      enabled: true
+      - assertVisible:
+          id: preview.prompt
+          text: How old is your pup?
+- assertVisible:
+    id: preview.prompt
+    text: How old is your pup?
 - tapOn:
     id: "preview.choice.adult"
 - tapOn:

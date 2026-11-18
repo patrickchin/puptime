@@ -3,6 +3,8 @@ import test from 'node:test';
 import {gzipSync,deflateSync,brotliCompressSync} from 'node:zlib';
 import {STARTER_SCHEDULE,DEFAULT_WIDGET_ACTIONS} from '../src/domain.ts';
 import {DEFAULT_NOTIFICATION_PREFERENCES} from '../src/notification-config.ts';
+import {accountEnglish,accountChinese,accountSpanish} from '../src/cloud/account-copy.ts';
+import {accountProblemKey} from '../src/cloud/account-status.ts';
 import {DatabaseSync} from 'node:sqlite';
 import {mkdtempSync,mkdirSync,rmSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
@@ -140,4 +142,37 @@ test('sign-out diagnostics expose only fixed control flags and public confirmati
  const titleOnly=nativeAuthUiFlags({children:[button,{attributes:{text:'Sign out on this device?'}}]});
  assert.deepEqual(titleOnly.signOutConfirmation,{titleVisible:true,cancelVisible:false,actionVisible:false});
  assert.deepEqual(nativeAuthUiFlags({attributes:{text:'Sign out on this device? '+secret}}).signOutConfirmation,absent);
+});
+
+
+test('account error message buckets use exact current public copy for each rendered problem',()=>{
+ const problems=['invalid-request','invalid-email','invalid-code','code-expired','too-many-attempts','network','account-mismatch','sign-out-failed','remote-sign-out-unconfirmed','deletion-unconfirmed','deletion-failed','export-failed','local-storage','social-incomplete','link-incomplete','server-error','sign-in-failed'];
+ for(const problem of problems)for(const copy of [accountEnglish,accountChinese,accountSpanish]){
+  const key=accountProblemKey(problem),text=copy[key];assert.equal(typeof text,'string');
+  const result=nativeAuthUiFlags({attributes:{'resource-id':'account.error',text,accessibilityText:text,enabled:'true'}});
+  assert.equal(result.accountErrorMessageBucket,key);
+  assert.deepEqual(result['account.error'],{present:true,enabled:true,focused:false});
+  assert.ok(!JSON.stringify(result).includes(text));
+ }
+ // Several AccountProblem values deliberately share one message. Never infer
+ // a particular SDK error, HTTP status, transport failure or causal diagnosis.
+ for(const problem of ['provider-unavailable','server-error','invalid-response','account-deleted','forbidden'])assert.equal(accountProblemKey(problem),'account.error.service');
+});
+
+test('account error message buckets fail closed for absent duplicate hidden or nonexact labels',()=>{
+ const text=accountEnglish['account.error.network'],email='private-synthetic@example.invalid',code='839201';
+ const node=attributes=>({attributes:{'resource-id':'account.error',...attributes}});
+ const unknown=[{},node({}),node({value:text}),node({text:email}),node({text:text+' '+email}),node({text:' '+text}),node({text:text+'\n'}),node({text:text.slice(0,-1)}),node({text,accessibilityText:accountSpanish['account.error.network']}),node({text,accessibilityText:code}),node({text,visible:'false'}),{attributes:{displayed:false},children:[node({text})]},{children:[node({text}),node({text})]},{children:[node({text}),node({text:'unknown'})]},{children:[{attributes:{'resource-id':'account.email.input',text}},{attributes:{'resource-id':'account.error',text:email}}]},{attributes:{'resource-id':'not-account.error',text}}];
+ for(const hierarchy of unknown){
+  const result=nativeAuthUiFlags(hierarchy,{email,code});assert.equal(result.accountErrorMessageBucket,'UNKNOWN');
+  for(const secret of [email,code,text,'unknown'])assert.ok(!JSON.stringify(result).includes(secret));
+ }
+});
+
+test('account error message buckets ignore adjacent private attributes and keep existing flags',()=>{
+ const text=accountEnglish['account.error.network'],email='private-adjacent@example.invalid',code='839201';
+ const result=nativeAuthUiFlags({children:[{attributes:{'resource-id':'account.error',accessibilityText:text,value:email,unknown:code}},{attributes:{'resource-id':'account.email.input',text:email}},{attributes:{'resource-id':'other',text:code}}]},{email,code});
+ assert.equal(result.accountErrorMessageBucket,'account.error.network');
+ assert.deepEqual(result['account.email.input'],{present:true,enabled:false,focused:false,valueCategory:'nonempty',exactExpectedMatch:true});
+ for(const secret of [text,email,code])assert.ok(!JSON.stringify(result).includes(secret));
 });
