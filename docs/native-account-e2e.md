@@ -26,7 +26,9 @@ source and artifact metadata after download, before creating a simulator.
 
 The [retained main compiled-host example at `ee31437`](https://github.com/patrickchin/puptime/actions/runs/43635534948) compiled and uploaded its host, then passed 12 of 13 standard flows. The CSV-import flow failed; conversational, SDK/account and deletion steps were not reached. This is compiled-host evidence under the explicit policy while its inputs remain eligible, not a full-suite or release pass. The older successful baseline remains historical evidence at its recorded source.
 
-The [hosted iOS engine candidate at `ae6f0cc`, PR #254](https://github.com/patrickchin/puptime/actions/runs/43879930515) verified SQLite 3.51.3 with source ID `2026-03-13 10:38:09 737ae4a34738ffa0c3ff7f9bb18df914dd1cad163f28fd6b6e114a344fe6d618`. Its standard suite had 12 SUCCESS and only `05b-notifications` ERROR; both `00-onboarding` and `00-onboarding-notifications` succeeded. Conversational, SDK/account and deletion stages were SKIPPED. The cause remains UNKNOWN. This PR build is not an eligible main/push host under the policy above, and Android engine qualification remains open.
+The [recorded iOS engine candidate at `740364d`, PR #254](https://github.com/patrickchin/puptime/actions/runs/43921205352) verified SQLite 3.51.3 and the expected source ID; its finite reports recorded all 13 standard and 17 conversational flows as SUCCESS. The combined onboarding/account command failed afterward; its exact later phase and cause remain UNKNOWN. Account/deletion, full suite and release acceptance are not established. This PR build remains outside the eligible main/push host policy above.
+
+The [recorded Android engine query at `a6683e2`, PR #257](https://github.com/patrickchin/puptime/actions/runs/44088351408) verified SQLite 3.51.3 and the expected source ID in an installed API 36/x86_64 APK, with installed bytes matching the tested artifact and owned cleanup complete. This isolated query does not qualify production keys, ARM/provider flows, numeric upgrades or store delivery.
 
 Use the additional policy only deliberately:
 

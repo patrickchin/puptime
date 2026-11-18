@@ -5,6 +5,7 @@ import {join} from 'node:path';
 import {gunzipSync,inflateSync,brotliDecompressSync} from 'node:zlib';
 import {STARTER_SCHEDULE,DEFAULT_WIDGET_ACTIONS} from '../src/domain.ts';
 import {DEFAULT_NOTIFICATION_PREFERENCES} from '../src/notification-config.ts';
+import {accountEnglish,accountChinese,accountSpanish} from '../src/cloud/account-copy.ts';
 
 export const nativeTables=['metadata','puppies','events','routines','settings','pet_settings','local_revisions','local_sync_owner','local_sync_pets','local_sync_outbox','local_sync_records','local_sync_acks','local_sync_baseline','sqlite_sequence'];
 const associationTables=['local_sync_owner','local_sync_pets','local_sync_outbox','local_sync_records','local_sync_acks','local_sync_baseline'];
@@ -123,15 +124,25 @@ export function capturedJson(body,contentEncoding){
  return JSON.parse(body.toString('utf8'));
 }
 
-// Project only allowlisted readiness flags; never retain input values or labels.
+// A copy key is a message bucket, not a unique AccountProblem or SDK error.
+const accountErrorKeys=['account.error.sync','account.error.email','account.error.code','account.error.expiredCode','account.error.attempts','account.error.network','account.error.mismatch','account.error.signOut','account.error.remoteSignOut','account.delete.unconfirmed','account.delete.failed','account.error.export','account.error.storage','account.error.socialIncomplete','account.error.linkIncomplete','account.error.service','account.error.signIn'];
+const accountErrorCopies=[accountEnglish,accountChinese,accountSpanish].flatMap(copy=>accountErrorKeys.map(key=>[copy[key],key]));
+
+// Project only allowlisted readiness flags and an exact public-copy bucket;
+// never retain input values, labels, arbitrary errors or neighboring text.
 export function nativeAuthUiFlags(hierarchy,{email='',code=''}={}){
  const fields=Object.fromEntries(['account.email.input','account.code.input','account.sendCode','account.verify','account.refresh','account.error','account.identity','account.signOut'].map(id=>[id,{present:false}]));
  const copies=[['Sign out on this device?','Cancel','Sign out'],['¿Cerrar sesión en este dispositivo?','Cancelar','Cerrar sesión'],['在这台设备上退出登录？','取消','退出登录']];
- const observed=copies.map(()=>[false,false,false]);
+ const observed=copies.map(()=>[false,false,false]),errorBuckets=[];
  function visit(node,visible=true,insideSignOut=false){
   const a=node?.attributes??{},id=a['resource-id'];
   visible=visible&&a.visible!==false&&a.visible!=='false'&&a.displayed!==false&&a.displayed!=='false';
   insideSignOut=insideSignOut||id==='account.signOut';
+  if(id==='account.error'){
+   const labels=[...new Set([a.text,a.accessibilityText].filter(value=>typeof value==='string'))];
+   const matches=new Set(accountErrorCopies.filter(([text])=>labels.length===1&&text===labels[0]).map(([,key])=>key));
+   errorBuckets.push(visible&&matches.size===1?[...matches][0]:'UNKNOWN');
+  }
   if(visible&&!insideSignOut)copies.forEach((copy,i)=>copy.forEach((text,j)=>{if(a.text===text||a.accessibilityText===text)observed[i][j]=true;}));
   if(Object.hasOwn(fields,id)){
    const flags={present:true,enabled:a.enabled===true||a.enabled==='true',focused:a.focused===true||a.focused==='true'};
@@ -147,5 +158,5 @@ export function nativeAuthUiFlags(hierarchy,{email='',code=''}={}){
  }
  visit(hierarchy);
  const confirmation=observed.find(([title])=>title)??[false,false,false];
- return {...fields,signOutConfirmation:{titleVisible:confirmation[0],cancelVisible:confirmation[1],actionVisible:confirmation[2]}};
+ return {...fields,signOutConfirmation:{titleVisible:confirmation[0],cancelVisible:confirmation[1],actionVisible:confirmation[2]},accountErrorMessageBucket:errorBuckets.length===1?errorBuckets[0]:'UNKNOWN'};
 }
