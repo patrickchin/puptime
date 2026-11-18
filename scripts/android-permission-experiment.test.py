@@ -107,7 +107,7 @@ class PermissionTests(unittest.TestCase):
                 path = root / name
                 with warnings.catch_warnings(), zipfile.ZipFile(path, 'w') as z:
                     warnings.simplefilter('ignore', UserWarning)
-                    for key, value in entries: z.writestr(key, value)
+                    for key, value in entries: z.writestr(zipfile.ZipInfo(key, date_time=(1980, 1, 1, 0, 0, 0)), value)
                     z.comment = comment
                 path.chmod(0o600)
             entries = [('AndroidManifest.xml', b'SAME_BINARY_MANIFEST'), ('classes.dex', b'SAME_CODE'), ('META-INF/SIGNATURE.RSA', b'SAME_SIGNATURE')]
