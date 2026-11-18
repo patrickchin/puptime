@@ -41,12 +41,14 @@ The Maestro cases in `.maestro/account-preservation` exercise these paths:
 5. Create six more logs as a guest. Sign in to the same account, explicitly
    confirm the same puppy and combine histories. Verify all 21 IDs and contents
    locally and remotely, without duplicates or rewriting earlier events.
-6. Sign out, back up the source database, clear local app state and repeat
-   onboarding. Assert the new local database has zero events. Sign in again and
-   recover all 21 logs from the account. Verify the exact event fields and IDs,
+6. Sign out, back up the source database, use a fresh disposable iOS simulator
+   and repeat onboarding. Assert the new local database has zero events. Sign in
+   again and recover all 21 logs from the account. Verify the exact event fields and IDs,
    unchanged remote revisions, an empty upload queue and the same account owner.
-7. Cold restart and navigate the normal app. Verify the recovered history and
-   authenticated state remain intact.
+7. Reopen and navigate the normal app. Verify the recovered history and
+   authenticated state remain intact. The historical shared iOS reopen does not
+   stop the running process, so this final check establishes foreground
+   preservation.
 
 Cloud upload remains an explicit confirmation after sign-in. An existing cloud
 puppy also requires the same-puppy confirmation. The test covers real email
