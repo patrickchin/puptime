@@ -2,12 +2,13 @@
   "expo": {
     "name": "Puptime",
     "slug": "puptime",
-    "version": "1.12.0",
+    "version": "1.12.6",
     "description": "Log puppy activities from the app or Home Screen.",
     "scheme": "puptime",
     "icon": "./assets/puptime-icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "buildNumber": "2",
       "supportsTablet": true,
       "usesAppleSignIn": true,
       "bundleIdentifier": "com.patrickchin.puptime",

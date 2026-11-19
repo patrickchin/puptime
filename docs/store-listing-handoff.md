@@ -1,6 +1,6 @@
 # Store listing source and handoff
 
-Prepared November 15, 2026 against `e7a95c8`. These are reviewable candidate drafts, not saved store settings, an uploaded build or publication authorization. Live console findings belong in the private release brief; omit account identifiers, financial details, screenshots, inboxes and credentials from public files and PRs.
+Prepared November 19, 2026 against `5e67cfc`. These are reviewable candidate drafts, not saved store settings, an uploaded build or publication authorization. Live console findings belong in the private release brief; omit account identifiers, financial details, screenshots, inboxes and credentials from public files and PRs.
 
 ## Concrete metadata
 
@@ -17,6 +17,22 @@ Prepared November 15, 2026 against `e7a95c8`. These are reviewable candidate dra
 Apple limits the description to 4,000 characters, promotional text to 170 and keywords to 100 bytes. Google limits name/short/full description to 30/80/4,000 characters. These drafts fit those limits; recheck after edits. [Apple field reference](https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information), [Google listing fields](https://support.google.com/googleplay/android-developer/answer/9859152?hl=en).
 
 The copy describes local offline logging plus optional cloud activation and default-off usage analytics. It must not be replaced with a blanket “no account, server or analytics” claim. Account-free local use and optional service collection can coexist. Final privacy declarations follow the actual submitted binary and enabled services in the [worksheet](store-readiness.md#app-privacy--data-safety-worksheet), not just the promotional text.
+
+## Reviewer access and support handoff
+
+Complete these fields in the existing private release evidence sheet before copying the review notes or listing into a console. Every acceptance field below is **pending** until tied to the submitted candidate; source text and older test receipts do not fill it. Keep credentials, inbox access, account identifiers, contact details and console findings outside git.
+
+| Handoff field | Prepared source or expected reviewer path | Acceptance still needed |
+| --- | --- | --- |
+| Exact candidate | Release source, artifact SHA-256, package/bundle identifier, version/build, signing and target service | Record the inspected artifact and selected uploaded build; confirm fixtures and test collectors are absent. |
+| Account-free use | Fresh setup → name the puppy → continue locally → log activity → inspect Log/Timeline. Local logging does not require account access. | Verify that path and offline/restart behavior on the exact candidate. Supply platform-specific navigation only after checking it. |
+| Optional cloud review access | Settings → My account → an offered sign-in method → explicitly enable cloud access | Supply a durable, private review-access procedure for the actual service and supported sign-in methods. Verify delivery and access during the review window; local fake email, an owner's account or an expiring code pasted into notes is insufficient. Do not disable authentication to make access easier. |
+| Connection comparison | Compare the device and cloud histories before explicitly combining them; cancellation keeps this device local | Use synthetic history and confirm the candidate's names, counts and history details are understandable. Do not present matching names alone as proof of identity. |
+| Account deletion | My account → Delete cloud account; external resource: `https://puptime.pages.dev/delete-account` | Verify the deployed capability, actual controlled-inbox delivery, fresh verification, explicit deletion and retained local records. If demonstrating deletion, use a separately disposable identity so the durable review access remains available. Do not copy the draft's web-deletion description as live acceptance. |
+| Support and lost access | Existing source support links point to public GitHub issues; the dedicated private lost-access intake is unconfigured | Verify a monitored private contact destination and its ownership/retention procedure, then reconcile source URLs and store fields. Public issues must not collect account addresses, activity history or diagnostics. Do not invent an inbox or response deadline. |
+| Privacy and rights | [Declaration worksheet and asset gates](store-readiness.md); existing privacy policy and PR #157 media | Reconcile final enabled services, App Privacy/Data Safety answers, reachable policy/support/deletion URLs, notices and media rights with the exact artifact. |
+
+The review notes are a starting script, not a report that every described service is deployed. Keep the account-free route clear, then give reviewers working access to optional features included in the submission. Actual private access/contact fields go only in the intended store's restricted reviewer/contact fields; never include the owner's provider credentials. The approved PR #157 screenshots and preview can be reused after candidate-accuracy and rights checks; this handoff does not require new media production.
 
 ## Pricing direction
 
