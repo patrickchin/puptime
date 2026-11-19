@@ -14,6 +14,8 @@ Signature/archive checks and the existing known-restricted-audio guard must pass
 
 If release creation fails after tag creation, preserve the tag and verified artifacts. Stop and review the source/digest before using the separate explicitly authorized existing-tag publication path; do not delete/retarget the tag or rebuild silently. Retrying this fresh-tag path will refuse the existing tag.
 
+The existing-tag publisher requires the reviewed source SHA, current run attempt, APK and qualification artifact IDs and whole-ZIP SHA-256 digests, and the APK's own SHA-256. It accepts only a successful artifact-only manual Android APK run from this repository. Before creating a release it checks the tag's resolved commit, current producer/job/artifact metadata and expiry, complete downloaded ZIP digests, build receipts, and the APK's measured package/version/versionCode and verified signer against those receipts. It repeats the metadata/tag checks immediately before publication and shares the release lock. These checks establish custody; they do not approve installation, production signing, runtime behavior, rights or store delivery. The separate publication authorization still applies.
+
 ## Disposable signing-transition evidence
 
 The separate [disposable proof workflow](../.github/workflows/android-signing-proof.yml) consumes two already completed artifact-only runs. It pins the immutable app source separately from the reviewed driver source. Its full-tree guard permits only the two named tooling edits, the regular-file command-evidence helper and, for the explicitly selected experiment, the permission-evidence helper; every other path, blob and mode must match the app source. It does not build another app or adopt a production signing key.
