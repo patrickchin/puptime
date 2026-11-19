@@ -21,6 +21,7 @@ jobs:
       - run: node --test scripts/native-task-cleanup.test.mjs scripts/native-account-evidence.test.mjs scripts/native-command-evidence.test.mjs scripts/native-startup-evidence.test.mjs scripts/native-standard-suite.test.mjs scripts/native-standard-verdict.test.mjs scripts/native-onboarding-verdict.test.mjs
       - run: node --test scripts/native-host-policy.test.mjs
       - run: python3 scripts/android-permission-experiment.test.py
+      - run: python3 scripts/test_android_release_custody.py
       - run: npm run typecheck
       - run: npm run typecheck:ios
       - run: npm test
