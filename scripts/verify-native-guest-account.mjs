@@ -113,6 +113,7 @@ async function flow(name,env={}){
     writeFileSync(join(output,'fixture-auth-readiness.json'),JSON.stringify({phase:name,flowSequence,ui,responses:authResponses},null,2)+'\n');
     if(name==='onboarding-request'||name==='onboarding-verify')try{writeFileSync(join(output,'fixture-onboarding-command.json'),JSON.stringify({phase:name,flowSequence,...readNativeCommandState(artifacts)},null,2)+'\n',{flag:'wx',mode:0o600});}catch{/* Preserve the original flow failure and existing cleanup. */}
     if(name==='add-logs')try{writeFileSync(join(output,'fixture-add-logs-command.json'),JSON.stringify({phase:'add-logs',flowSequence,...readNativeCommandState(artifacts)},null,2)+'\n',{mode:0o600});}catch{/* Preserve the original flow failure and existing cleanup. */}
+    if(name==='sign-out')try{writeFileSync(join(output,'fixture-sign-out-command.json'),JSON.stringify({phase:'sign-out',flowSequence,...readNativeCommandState(artifacts)},null,2)+'\n',{flag:'wx',mode:0o600});}catch{/* Preserve the original flow failure and existing cleanup. */}
     if(name==='comparison-preview'){
       try{writeFileSync(join(output,'fixture-comparison-command.json'),JSON.stringify({phase:'comparison-preview',flowSequence,...readNativeCommandState(artifacts)},null,2)+'\n',{mode:0o600});}catch{/* Preserve the original flow failure and existing cleanup. */}
       if(!android)try{simctl('io',device,'screenshot',join(output,'failure-comparison-preview.png'));}catch{/* Capture is best effort; preserve the actual driver failure. */}
