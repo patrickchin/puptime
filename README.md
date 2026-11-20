@@ -4,9 +4,11 @@ Puptime is a puppy activity log for potty breaks, meals, walks, and daily routin
 
 ## Existing offline release
 
-The screenshots, features, and Android installation instructions below describe the published offline release. Android, widgets, and nap-related changes are deferred during the account-enabled iPhone rollout.
+The features and Android installation instructions below describe the published offline release. Android, widgets, and nap-related changes are deferred during the account-enabled iPhone rollout.
 
 ### Screenshots
+
+The native app captures show current source with artificial example logs. The widget and Settings images are older reference captures.
 
 <table>
   <tr>
@@ -25,7 +27,7 @@ The screenshots, features, and Android installation instructions below describe 
     <th>Settings</th>
   </tr>
   <tr>
-    <td><img src="assets/screenshots/insights-timeline.png" width="260" alt="Puptime timing timeline comparing activity across ten days"></td>
+    <td><img src="assets/screenshots/insights-timeline.png" width="260" alt="Puptime timing timeline comparing example activity across recorded days"></td>
     <td><img src="assets/screenshots/schedule.png" width="260" alt="Puptime editable daily routine with suggested times and progress"></td>
     <td><img src="assets/screenshots/appearance.png" width="260" alt="Puptime Settings screen with theme, language, widget, and notification controls"></td>
   </tr>
