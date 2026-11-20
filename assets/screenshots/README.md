@@ -1,22 +1,44 @@
 # Website app captures
 
 The five website screenshots (`today`, `activity`, `insights-summary`,
-`insights-timeline`, and `schedule`) were retaken on October 21, 2026 from
-the current app source on a dedicated iPhone 17 simulator running iOS 26.5.
-Each PNG is a full-resolution 1206 × 2622 native capture.
+`insights-timeline`, and `schedule`) were captured on November 20, 2026 from
+native iOS app source `4a8450dfafc6d2f49313309a1518edf59001fdc2` on a dedicated
+iPhone 17 Pro simulator running iOS 26.5. Each PNG is an unedited,
+full-resolution 1206 × 2622 native capture in the current light theme.
 
-The journal contains 338 real CSV records from September 11 through October 11.
-Their dates, activity types, and times are preserved. Personal note text is
-omitted from the public captures; the source CSV and simulator database stay
-outside version control. The routine uses the app's suggestions from that history.
+The journal is wholly artificial: 175 example potty and meal logs for the
+fictional puppy Biscuit, covering 14 completed days and seven activities today.
+Short example notes and small timing variations are defined directly in
+[`scripts/seed-website-screenshots.mjs`](../../scripts/seed-website-screenshots.mjs).
+No personal history, CSV, account, export, or live service supplied the data.
+The routine uses the app's suggestions from this artificial history.
 
-For the captures, the local simulator app's clock is anchored to October 11
-at 13:10 in Asia/Shanghai so the last recorded day can appear as Today. This is
-a capture-only clock override; the published app has no override or demo data.
-The native runtime is the existing 1.11.30 simulator build, with a fresh
-production JavaScript bundle and assets exported from the current checkout.
+The capture-only entry point freezes the app clock at November 20, 2026,
+13:10 in Asia/Shanghai. The native status bar shows the same time, Wi-Fi,
+and full battery. The ordinary app entry point, styling, and components are
+unchanged; no fixture or clock override is included in the shipped app.
+The native sequence is in
+[`scripts/capture-website-screenshots.yaml`](../../scripts/capture-website-screenshots.yaml).
+The seeder accepts only the named task simulator and refuses an existing database.
 
-The PNGs contain the app screen only. The website adds a metal rim, proportional
-black bezels, side buttons, camera cutout, home indicator, and shadow in CSS,
-keeping the original pixels available at native resolution. The widget and appearance reference images
-are older captures and are not displayed on the website.
+The native host is version 1.12.0/build 1 from the trusted main/push
+[run 43918521099](https://github.com/patrickchin/puptime/actions/runs/43918521099),
+at source `13ddfcc541140596ff5001b60c045fba754ae912`, attempt 1, under the
+explicit `compiled-for-testing` policy. Its simulator artifact's SHA-256 is
+`2fc0026b631101de4e7f5d203cc658bcef2effb1f9135c6942fd18524a8eed85`.
+Native configuration, dependencies, plugins, and source assets matched the app
+source above before the new screenshots were installed in this repository.
+Current production-mode JavaScript was embedded into a copy of that host with
+the capture-only clock, an unreachable loopback cloud origin, and analytics
+unconfigured. Native executable code and Info.plist were verified unchanged;
+strict deep signatures and the installed JavaScript hash were verified.
+The captured JavaScript SHA-256 is
+`c976803af855f61abaf7099482cff5a8fd6b8c8210f6f1b3b681f23d0693978f`.
+This is media-capture provenance, not release or full end-to-end qualification;
+the host run's later onboarding failure remains separate.
+
+The PNGs contain the app screen only, without cropping, resizing, recolouring,
+or a drawn interface. The website adds its existing phone rim, bezels, side
+buttons, camera cutout, home indicator, and shadow in CSS. The widget and
+appearance images are older reference captures and are not displayed on the
+website. The task simulator was deleted after capture.

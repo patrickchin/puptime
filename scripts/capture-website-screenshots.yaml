@@ -1,0 +1,44 @@
+appId: com.patrickchin.puptime
+name: Artificial website screenshot sequence
+---
+- launchApp
+- extendedWaitUntil:
+    visible: {id: screen.today}
+    timeout: 90000
+- extendedWaitUntil:
+    notVisible: {id: activity.loading}
+    timeout: 30000
+- waitForAnimationToEnd
+- takeScreenshot: today
+- tapOn: {id: history.day.today}
+- waitForAnimationToEnd
+- takeScreenshot: activity
+- tapOn: {id: nav.switch}
+- extendedWaitUntil:
+    visible: {id: screen.timeline}
+    timeout: 30000
+- extendedWaitUntil:
+    notVisible: {id: activity.loading}
+    timeout: 30000
+- waitForAnimationToEnd
+- takeScreenshot: insights-timeline
+- tapOn: {id: nav.open, retryTapIfNoChange: true}
+- tapOn: {id: nav.insights, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    visible: {id: screen.insights}
+    timeout: 30000
+- extendedWaitUntil:
+    notVisible: {id: activity.loading}
+    timeout: 30000
+- waitForAnimationToEnd
+- takeScreenshot: insights-summary
+- tapOn: {id: nav.open, retryTapIfNoChange: true}
+- tapOn: {id: nav.schedule, retryTapIfNoChange: true}
+- extendedWaitUntil:
+    visible: {id: screen.schedule}
+    timeout: 30000
+- extendedWaitUntil:
+    notVisible: {id: activity.loading}
+    timeout: 30000
+- waitForAnimationToEnd
+- takeScreenshot: schedule

@@ -100,7 +100,7 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
             {previews.map((preview, index) => <button type="button" key={preview.name} aria-pressed={selected === index} aria-controls="app-preview" onClick={() => setSelected(index)}>{preview.name}<span aria-hidden="true">↗</span></button>)}
           </div>
           <p className="preview-description" aria-live="polite" aria-atomic="true">{previews[selected].description}</p>
-          <p className="small-copy">From the app, with real puppy logs.</p>
+          <p className="small-copy">From the app, with example puppy logs.</p>
         </div>
         <figure className="app-preview" id="app-preview" data-reveal>
           <PhoneFrame><img key={selected} src={previews[selected].image} alt={`Puptime ${previews[selected].name} screen`} width="1206" height="2622" /></PhoneFrame>
@@ -117,7 +117,7 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
           <article className="rhythm-story">
             <h3 data-reveal>Spot the potty patterns</h3>
             <div className="story-content">
-              <PhoneFrame reveal><img src={timingImage} alt="Puptime timeline showing real puppy activity with varied daily timings" width="1206" height="2622" loading="lazy" /></PhoneFrame>
+              <PhoneFrame reveal><img src={timingImage} alt="Puptime timeline showing example puppy activity" width="1206" height="2622" loading="lazy" /></PhoneFrame>
               <p data-reveal>Compare activity across recorded days. Look for recurring potty times, with estimates kept separate from recorded logs.</p>
             </div>
           </article>
