@@ -49,7 +49,7 @@ export default function DeleteAccount(){
  });}
  function cancel(){void act('signout',async()=>{await client.current!.cancel();reset();});}
  return <div className="marketing-site care-page deletion-page">
-  <Head><title>Delete your account | Puptime</title><meta name="robots" content="noindex, nofollow"/><meta name="referrer" content="no-referrer"/><link rel="icon" href="/brand-icon.png" type="image/png"/></Head>
+  <Head><title>Delete your account | Puptime</title><meta name="robots" content="noindex, nofollow"/><meta name="referrer" content="no-referrer"/></Head>
   <style>{marketingStyles+css}</style>
   <header className="site-header"><a className="site-brand" href="/"><img src="/brand-icon.png" width="38" height="38" alt=""/>Puptime</a><nav aria-label="Website"><a href="/">Home</a><a href="https://github.com/patrickchin/puptime/blob/main/PRIVACY.md">Privacy</a></nav></header>
   <main className="deletion-content" aria-busy={busy}>

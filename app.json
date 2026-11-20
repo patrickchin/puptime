@@ -27,9 +27,9 @@
         "android.permission.SYSTEM_ALERT_WINDOW"
       ],
       "adaptiveIcon": {
-        "backgroundColor": "#234B3B",
+        "backgroundColor": "#1B4B3B",
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "monochromeImage": "./assets/android-icon-themed.png"
       },
       "predictiveBackGestureEnabled": true
     },
