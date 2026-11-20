@@ -14,7 +14,6 @@ export function WebsiteMetadata({ path }: { path: string }) {
   };
   return <Head>
     <title>{title}</title>
-    <link rel="icon" href="/brand-icon.png" type="image/png" />
     <meta name="description" content={description} />
     <link rel="canonical" href={url} />
     <meta property="og:site_name" content="Puptime" />

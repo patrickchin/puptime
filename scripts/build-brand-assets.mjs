@@ -1,10 +1,22 @@
-// Size-only derivatives of the approved app artwork; Android layers are editable SVGs.
+// Generate the website and Android assets from the approved app artwork.
 import sharp from 'sharp';
 
+const appIcon = 'assets/puptime-icon.png';
+const monochromeIcon = 'assets/brand/adaptive-monochrome.svg';
+
+// Cut out the light matte at the corners before downsampling the tab icon.
+const faviconMask = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024"><rect width="1024" height="1024" rx="200"/></svg>');
+const favicon = await sharp(appIcon).ensureAlpha()
+  .composite([{ input: faviconMask, blend: 'dest-in' }])
+  .png().toBuffer();
+
 await Promise.all([
-  sharp('assets/puptime-icon.png').resize(256, 256).png().toFile('public/brand-icon.png'),
-  sharp('assets/puptime-icon.png').resize(512, 512).png().toFile('public/social-preview.png'),
-  sharp('assets/puptime-icon.png').resize(48, 48).png().toFile('assets/favicon.png'),
+  sharp(appIcon).resize(256, 256).png().toFile('public/brand-icon.png'),
+  sharp(appIcon).resize(512, 512).png().toFile('public/social-preview.png'),
+  sharp(favicon).resize(48, 48).png().toFile('assets/favicon.png'),
   sharp('assets/brand/adaptive-foreground.svg').resize(1024, 1024).png().toFile('assets/android-icon-foreground.png'),
-  sharp('assets/brand/adaptive-monochrome.svg').resize(432, 432).png().toFile('assets/android-icon-monochrome.png'),
+  sharp(monochromeIcon).resize(432, 432).png().toFile('assets/android-icon-monochrome.png'),
+  // Match the color layer's launcher padding and retain the clock cutout.
+  sharp(monochromeIcon).resize(380, 380).extend({ top: 26, bottom: 26, left: 26, right: 26, background: 'transparent' })
+    .png().toFile('assets/android-icon-themed.png'),
 ]);

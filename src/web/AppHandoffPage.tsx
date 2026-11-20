@@ -9,7 +9,7 @@ export function AppHandoffPage({ invitation=false }: { invitation?:boolean }) {
  useEffect(()=>{if(invitation){setHref(nativeCareLink(window.location.href));setReady(true);}},[invitation]);
  const invalid=ready&&!href;
  return <div className="marketing-site care-page app-handoff">
-  <Head><title>{`${invitation?'Shared puppy care':'Your account'} | Puptime`}</title><meta name="robots" content="noindex, nofollow"/><meta name="referrer" content="no-referrer"/><link rel="icon" href="/brand-icon.png" type="image/png"/></Head>
+  <Head><title>{`${invitation?'Shared puppy care':'Your account'} | Puptime`}</title><meta name="robots" content="noindex, nofollow"/><meta name="referrer" content="no-referrer"/></Head>
   <style>{marketingStyles+css}</style>
   <header className="site-header"><a className="site-brand" href="/"><img src="/brand-icon.png" width="38" height="38" alt=""/>Puptime</a><nav aria-label="Website"><a href="/">Home</a><a href="/puppy-care/">Puppy care</a></nav></header>
   <main className="handoff-content">
