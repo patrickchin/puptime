@@ -103,3 +103,11 @@ test('handled failures send only a known code and obey foreground consent', () =
   telemetry.capture('app_error', failure);
   assert.equal(events.length, withdrawn);
 });
+
+test('sharing categories remain coarse and do not admit sharing controls or private properties', () => {
+  for (const screen of ['sharing', 'shared_puppies']) {
+    assert.deepEqual(sanitizeProductEvent('app_screen_view', { screen, pet_id: 'PRIVATE_PET', member: 'PRIVATE_NAME', invite: 'PRIVATE_TOKEN' }), { screen, schema_version: 1 });
+    assert.equal(sanitizeProductEvent('app_press', { screen, control: 'sharing.revoke.PRIVATE_SHARE' }), null);
+    assert.equal(sanitizeProductEvent('app_screen_view', { screen: screen + '.PRIVATE_NAME' }), null);
+  }
+});

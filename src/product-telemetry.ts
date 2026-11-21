@@ -1,5 +1,5 @@
 // Product events describe UI behavior, never customer records or entered text.
-export const telemetryScreens = ['startup', 'log', 'timeline', 'insights', 'schedule', 'pets', 'notifications', 'learn', 'settings', 'account', 'onboarding', 'theme_picker', 'language_picker', 'log_editor', 'log_history', 'routine_editor', 'guide', 'widget_settings', 'backups'] as const;
+export const telemetryScreens = ['startup', 'log', 'timeline', 'insights', 'schedule', 'pets', 'notifications', 'learn', 'settings', 'account', 'onboarding', 'theme_picker', 'language_picker', 'log_editor', 'log_history', 'routine_editor', 'guide', 'widget_settings', 'backups', 'sharing', 'shared_puppies'] as const;
 export type TelemetryScreen = typeof telemetryScreens[number];
 export const telemetryActivities = ['pee', 'poop', 'meal', 'pottyTrip', 'walk', 'nap', 'custom'];
 export const telemetryActions = ['create', 'update', 'delete', 'undo', 'nap_end', 'custom_activity_create', 'import'];
