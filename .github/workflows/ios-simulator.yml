@@ -10,7 +10,7 @@ on:
       suite:
         description: Test suite (PRs always retain the full suite)
         type: choice
-        options: [full, accounts]
+        options: [full, accounts, sqlite-engine-android]
         default: full
       native_host_run_id:
         description: Main iOS run supplying the unchanged native host (full success by default)
@@ -34,7 +34,7 @@ on:
 
 jobs:
   build:
-    if: github.event_name != 'workflow_dispatch' || inputs.suite != 'accounts'
+    if: github.event_name != 'workflow_dispatch' || (inputs.suite != 'accounts' && inputs.suite != 'sqlite-engine-android')
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v6
@@ -417,3 +417,71 @@ jobs:
           path: build/native-runtime-replacement
           if-no-files-found: warn
           retention-days: 3
+
+  sqlite-engine-android:
+    if: github.event_name == 'workflow_dispatch' && inputs.suite == 'sqlite-engine-android'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    env:
+      CI: '1'
+      EXPO_NO_DOTENV: '1'
+      EXPO_NO_TELEMETRY: '1'
+      EXPO_PUBLIC_CLOUD_API_URL: https://127.0.0.1:1
+      EXPO_PUBLIC_APP_POSTHOG_KEY: ''
+      EXPO_PUBLIC_APP_POSTHOG_HOST: ''
+      EXPO_PUBLIC_POSTHOG_KEY: ''
+      EXPO_PUBLIC_POSTHOG_HOST: ''
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/.env
+            !/.env.*
+            !/**/.env
+            !/**/.env.*
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: npm ci
+      - name: Prepare established API36 x86 tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          puptime_sdkmanager=$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)
+          test -n "$puptime_sdkmanager"
+          puptime_cmdline_bin=$(dirname "$puptime_sdkmanager")
+          for puptime_tool in "$puptime_cmdline_bin/sdkmanager" "$puptime_cmdline_bin/avdmanager" "$ANDROID_HOME/platform-tools/adb"; do
+            test -x "$puptime_tool"
+          done
+          echo "PUPTIME_ANDROID_CMDLINE_BIN=$puptime_cmdline_bin" >> "$GITHUB_ENV"
+          "$puptime_sdkmanager" 'emulator' 'build-tools;36.0.0' 'system-images;android-36;google_apis;x86_64'
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends libpulse0
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm-sqlite-engine.rules >/dev/null
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -x "$ANDROID_HOME/emulator/emulator"
+      - name: Build and query only the Android SQLite engine
+        run: node scripts/verify-android-sqlite-engine.mjs
+      - name: Upload finite Android SQLite engine verdict
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v6
+        with:
+          name: puptime-android-sqlite-engine-verdict
+          path: |
+            build/android-sqlite-engine-check/sqlite-engine-probe.json
+            build/android-sqlite-engine-check/sqlite-engine-provenance.json
+          if-no-files-found: warn
+          retention-days: 7
