@@ -1,4 +1,5 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import type { Ref } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { Pressable } from './TelemetryPressable';
 import type { Theme } from '../theme';
@@ -13,6 +14,7 @@ export function SettingsRow({
   theme,
   wrap=false,
   disabled=false,
+  buttonRef,
 }: {
   testID: string;
   wrap?: boolean;
@@ -23,9 +25,11 @@ export function SettingsRow({
   hint?: string;
   onPress: () => void;
   theme: Theme;
+  buttonRef?: Ref<View>;
 }) {
   return (
     <Pressable
+      ref={buttonRef}
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={`${label}. ${detail}`}
