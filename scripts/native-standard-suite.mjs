@@ -9,6 +9,7 @@ import {readNativeCommandState} from './native-command-evidence.mjs';
 // Pinned2.11 TestSuiteInteractor→FileUtils makes in-workspace flow.filePath
 // relative to WorkingDirectory.baseDir (user.dir), including these .maestro paths.
 const standardFiles=['00-onboarding','00-onboarding-notifications','01-navigation','02-log-crud','03-simple-log','04-schedule','05-settings','05b-notifications','05c-timed-reminders','06-insights-and-timeline','07-csv-recovery','08-appearance-modes'].map(name=>'.maestro/ios/'+name+'.yaml').concat('.maestro/guide-audio.yaml');
+export const conversationalFiles=Object.freeze(['01-dismiss-and-navigate','02-log-from-spotlight','03-skip-optional-setup','04-entry-profile-back','05-ages-meals-and-cancel','06-meals-only','07-skip-meals-keep-poop','08-skip-grouped-meals','09-all-reminder-options','10-notifications-allow','11-notifications-deny','12-notifications-blocked','13-spotlight-pee','14-spotlight-poop','15-interrupted-setup','16-native-time-boundaries','17-sharing'].map(name=>'.maestro/conversational/'+name+'.yaml'));
 export function standardSelection(scenario){
  assert.ok(['standard-csv','standard-all'].includes(scenario),'Select only a fixed standard case.');
  return {mode:scenario==='standard-csv'?'--standard-csv':'--standard-all',target:scenario==='standard-csv'?'.maestro/ios/07-csv-recovery.yaml':'.maestro',files:scenario==='standard-csv'?['.maestro/ios/07-csv-recovery.yaml']:[...standardFiles],timeoutMs:60*60*1000};
@@ -27,8 +28,16 @@ export function standardResults(xml,files){
  const unknown={complete:false,flows:[]};
  if(typeof xml!=='string'||Buffer.byteLength(xml)>2*1024*1024||!Array.isArray(files))return unknown;
  if(JSON.stringify(files)!==JSON.stringify(standardFiles)&&JSON.stringify(files)!==JSON.stringify(standardSelection('standard-csv').files))return unknown;
+ return reportResults(xml,files,[]);
+}
+export function conversationalResults(xml){
+ return reportResults(xml,conversationalFiles,['--conversational-fixed17']);
+}
+function reportResults(xml,files,mode){
+ const unknown={complete:false,flows:[]};
+ if(typeof xml!=='string'||Buffer.byteLength(xml)>2*1024*1024)return unknown;
  try{
-  const raw=execFileSync('python3',['-I',fileURLToPath(new URL('./native-standard-report.py',import.meta.url)),...files],{input:xml,encoding:'utf8',timeout:10000,maxBuffer:16384,stdio:['pipe','pipe','ignore']});
+  const raw=execFileSync('python3',['-I',fileURLToPath(new URL('./native-standard-report.py',import.meta.url)),...mode,...files],{input:xml,encoding:'utf8',timeout:10000,maxBuffer:16384,stdio:['pipe','pipe','ignore']});
   const result=JSON.parse(raw);if(typeof result.complete!=='boolean'||!Array.isArray(result.rows)||result.rows.length>files.length)return unknown;
   const seen=new Set(),flows=[];
   for(const row of result.rows){
