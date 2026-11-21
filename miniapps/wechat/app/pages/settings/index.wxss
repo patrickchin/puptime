@@ -1,0 +1,8 @@
+.settings-heading { font-size: 18px; font-weight: 700; margin: 16px 0 12px; }
+.settings-heading:first-child { margin-top: 0; }
+.settings-panel { margin-bottom: 24px; background: white; }
+.setting-row { display: flex; align-items: center; gap: 12px; width: 100% !important; margin: 0 !important; min-height: 60px; padding: 14px 16px; text-align: left; font-size: 15px; border-radius: 0; }
+.setting-row + .setting-row { border-top: 1px solid var(--line); }
+.setting-row > text:first-child { flex: 1; }
+.setting-value { color: var(--muted); font-size: 14px; max-width: 45%; overflow-wrap: anywhere; }
+.setting-row image { width: 20px; height: 20px; }

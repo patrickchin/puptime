@@ -1,0 +1,41 @@
+{
+  "description": "Puptime local-only WeChat prototype",
+  "projectname": "puptime-wechat-prototype",
+  "appid": "touristappid",
+  "compileType": "miniprogram",
+  "miniprogramRoot": "app/",
+  "setting": {
+    "es6": true,
+    "minified": true,
+    "urlCheck": true,
+    "enhance": true,
+    "postcss": false,
+    "compileWorklet": false,
+    "uglifyFileName": false,
+    "uploadWithSourceMap": true,
+    "packNpmManually": false,
+    "packNpmRelationList": [],
+    "minifyWXSS": true,
+    "minifyWXML": true,
+    "localPlugins": false,
+    "disableUseStrict": false,
+    "useCompilerPlugins": false,
+    "condition": false,
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    }
+  },
+  "packOptions": {
+    "ignore": [
+      {
+        "value": "tests",
+        "type": "folder"
+      }
+    ],
+    "include": []
+  },
+  "simulatorPluginLibVersion": {},
+  "editorSetting": {}
+}

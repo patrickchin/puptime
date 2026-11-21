@@ -1,0 +1,5 @@
+<view class="row">
+  <view class="activity-icon {{event.type}}"><image class="activity-image" src="/assets/{{event.type}}.png" aria-hidden="true" /></view>
+  <view class="body"><text class="label">{{event.label}}</text><text class="time">{{event.time}} · {{sourceLabel}}</text><view wx:if="{{event.note}}" class="note-row"><image class="note-icon" src="/assets/note.png" aria-hidden="true" /><text class="note">{{event.note}}</text></view></view>
+  <view class="row-actions"><button class="icon-button" hover-class="pressed" bindtap="edit" aria-label="{{editLabel}}: {{event.label}}, {{event.time}}"><image class="action-icon" src="/assets/edit.png" aria-hidden="true" /></button><button class="icon-button" hover-class="pressed" bindtap="remove" aria-label="{{removeLabel}}: {{event.label}}, {{event.time}}"><image class="action-icon" src="/assets/delete.png" aria-hidden="true" /></button></view>
+</view>
