@@ -87,7 +87,14 @@ try {
     }
     await page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished)));
     await page.screenshot({ path: `${output}/${width}-app-preview.png` });
-    passed.push(`${width}px: wheel, PageDown, footer, back to top, app anchor, and all four previews.`);
+    const concept = page.getByRole('img', { name: 'Illustrative Poop & Eat timeline concept with routine windows', exact: true });
+    await concept.scrollIntoViewIfNeeded();
+    await concept.evaluate(image => image.decode());
+    assert.deepEqual(await concept.evaluate(image => ({ width: image.naturalWidth, height: image.naturalHeight })), { width: 851, height: 1848 }, 'Keep the illustrative story image at its approved dimensions.');
+    assert.ok(await concept.evaluate(image => Math.abs(image.clientWidth / image.clientHeight - 851 / 1848) < 0.01), 'Preserve the concept image proportions.');
+    await page.getByText('Illustrative timeline concept with routine windows.', { exact: true }).waitFor();
+    await page.locator('.rhythm-story').first().screenshot({ path: `${output}/${width}-timeline-concept.png` });
+    passed.push(`${width}px: wheel, PageDown, footer, back to top, app anchor, all four native previews, and illustrative timeline story.`);
     console.log('PASS', passed.at(-1));
   }
   await page.setViewportSize({ width: 390, height: 844 });
