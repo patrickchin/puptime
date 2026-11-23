@@ -68,6 +68,7 @@ body:has(.marketing-site){overflow-y:auto}
 .story-content{display:grid;grid-template-columns:1fr .9fr;gap:24px;align-items:center}
 .story-content.reverse .phone-frame{order:2}
 .story-content p{font-size:var(--body)}
+.story-caption{display:block;font-size:var(--small);margin-top:16px}
 .care-chapter{background:var(--paper);display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center;min-height:0}
 .care-art{width:100%;min-width:0}
 .care-art img{display:block;width:100%;height:auto;aspect-ratio:1;object-fit:contain;border-radius:16px}

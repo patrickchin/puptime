@@ -14,7 +14,7 @@ const assetUrl = (asset: string | { uri: string }): string => typeof asset === '
 const icon = '/brand-icon.png';
 const puppy = assetUrl(require('./assets/mascots/scruffy-terrier.png'));
 const careImage = assetUrl(require('./assets/puppy-care/potty.jpg'));
-const timingImage = assetUrl(require('./assets/screenshots/insights-timeline.png'));
+const timingImage = assetUrl(require('./assets/screenshots/timeline-routine-concept.png'));
 const routineImage = assetUrl(require('./assets/screenshots/schedule.png'));
 const previews = [
   { name: 'Today', image: assetUrl(require('./assets/screenshots/today.png')), description: 'Keep potty breaks, meals, and notes together. Look back when you need to know what happened and when.' },
@@ -117,8 +117,8 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
           <article className="rhythm-story">
             <h3 data-reveal>Spot the potty patterns</h3>
             <div className="story-content">
-              <PhoneFrame reveal><img src={timingImage} alt="Puptime timeline showing example puppy activity" width="1206" height="2622" loading="lazy" /></PhoneFrame>
-              <p data-reveal>Compare activity across recorded days. Look for recurring potty times, with estimates kept separate from recorded logs.</p>
+              <PhoneFrame reveal><img src={timingImage} alt="Illustrative Poop & Eat timeline concept with routine windows" width="851" height="1848" loading="lazy" /></PhoneFrame>
+              <p data-reveal>Compare activity across recorded days. Look for recurring potty times.<small className="story-caption">Illustrative timeline concept with routine windows.</small></p>
             </div>
           </article>
           <article className="rhythm-story">

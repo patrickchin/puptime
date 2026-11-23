@@ -1,7 +1,7 @@
 # Website app captures
 
-The five website screenshots (`today`, `activity`, `insights-summary`,
-`insights-timeline`, and `schedule`) were captured on November 20, 2026 from
+The four website app previews (`today`, `activity`, `insights-summary`, and
+`schedule`) and retained native `insights-timeline` reference were captured on November 20, 2026 from
 native iOS app source `4a8450dfafc6d2f49313309a1518edf59001fdc2` on a dedicated
 iPhone 17 Pro simulator running iOS 26.5. Each PNG is an unedited,
 full-resolution 1206 × 2622 native capture in the current light theme.
@@ -37,8 +37,23 @@ The captured JavaScript SHA-256 is
 This is media-capture provenance, not release or full end-to-end qualification;
 the host run's later onboarding failure remains separate.
 
-The PNGs contain the app screen only, without cropping, resizing, recolouring,
+These native captures contain the app screen only, without cropping, resizing, recolouring,
 or a drawn interface. The website adds its existing phone rim, bezels, side
 buttons, camera cutout, home indicator, and shadow in CSS. The widget and
 appearance images are older reference captures and are not displayed on the
 website. The task simulator was deleted after capture.
+
+## Illustrative timeline concept
+
+`timeline-routine-concept.png` is the specifically approved **851 × 1848**
+illustrative image used only in the website's **Spot the potty patterns** story.
+It is a generative raster edit of a Timeline preview, with routine windows,
+illustrative activity marks added to empty past days, and automatic missing-log
+hints hidden for the preview. The image presents a concept rather than exact
+activity history or an unedited current-app capture. App behavior is unchanged.
+
+The visible caption and alternative text identify it as illustrative. Its content
+credentials are preserved. SHA-256:
+`4904345d735ba1e20f286229f3df57b01e6de0bee6008adafb00e42185b6c3a1`.
+The four native app previews and original native timeline reference remain
+unchanged.
