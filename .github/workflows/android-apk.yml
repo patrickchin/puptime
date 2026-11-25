@@ -192,7 +192,7 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
-          if ! (cd android && ./gradlew -I "$PUPTIME_NOTICE_PRIVATE/tools/scripts/notices-runtime.init.gradle" :app:writeNoticeRuntimeInputs --no-daemon --no-configuration-cache --no-build-cache -PnoticeMainProjectRoot="$PWD" -PnoticeInputsOutput="$PUPTIME_NOTICE_PRIVATE/runtime-inputs.json") > "$PUPTIME_NOTICE_PRIVATE/gradle-private.log" 2>&1; then
+          if ! (cd android && ./gradlew -I "$PUPTIME_NOTICE_PRIVATE/tools/scripts/notices-runtime.init.gradle" -I ../scripts/android-notice-ndk.init.gradle :app:writeNoticeRuntimeInputs :app:writeNoticeNdkInputs --no-daemon --no-configuration-cache --no-build-cache -PnoticeMainProjectRoot="$PWD" -PnoticeInputsOutput="$PUPTIME_NOTICE_PRIVATE/runtime-inputs.json") > "$PUPTIME_NOTICE_PRIVATE/gradle-private.log" 2>&1; then
             node "$PUPTIME_NOTICE_PRIVATE/tools/scripts/capture-app-notices.mjs" setup-failure android --phase gradle-resolution
             echo 'Android dependency resolution failed; finite diagnostic only, no raw output uploaded.' >&2
             exit 1
