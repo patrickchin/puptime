@@ -1,6 +1,6 @@
 # Puptime Privacy Policy
 
-Last updated: November 16, 2026
+Last updated: November 25, 2026
 
 Puptime is a puppy routine tracker developed by Patrick Chin. Local logging works without an account. This policy explains optional cloud accounts, the native app, and the public website.
 

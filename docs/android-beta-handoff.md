@@ -8,6 +8,8 @@ Use the existing package `com.patrickchin.puptime`, default language English (Un
 
 Reuse only the specifically approved PR #157 screenshots and preview after checking that they depict the accepted app, and checking the soundtrack rights. The website's design concept is not a screenshot of the app. A new demo, domain, paid account-management tool or narration purchase is unnecessary.
 
+PR #157's captured screenshot/preview package is for iPhone and iPad; it does not establish Android capture or current-candidate accuracy. Do not relabel it as measured Android media. Initial internal testing can start before full app setup and may show a temporary name/listing before the first review. Prepare the listing now, but do not make new promotional media a prerequisite where the actual console does not require it. [Google internal-test guidance](https://support.google.com/googleplay/android-developer/answer/9845334?hl=en).
+
 The console handoff needs a monitored support email, the verified privacy-policy URL, the qualified external account-deletion URL, actual target countries and the accurate audience/content-rating answers. Do not put private contact addresses, reviewer credentials or QA identities into this document. The Account Holder supplies or confirms legal identity, required terms/declarations and signing-key authority. Do not accept terms through automation.
 
 ## Prepared Data Safety choices
