@@ -63,3 +63,21 @@ name: Settings, puppy profile, sharing and Account
 - assertVisible: {id: screen.pets}
 - tapOn: {id: nav.puppy}
 - assertVisible: {id: settings.puppy.name, text: Ellie renamed}
+- tapOn: {id: settings.puppy.photo.choose}
+- tapOn: ^Remove photo$
+- assertVisible: ^Remove profile photo\?$
+- tapOn: ^Remove photo$
+- assertNotVisible: {id: puppy.photo.image}
+- tapOn: {id: settings.puppy.photo.choose}
+- extendedWaitUntil:
+    visible: {id: Photos}
+    timeout: 30000
+- tapOn: {id: PXGGridLayout-Info, index: 0}
+- extendedWaitUntil:
+    visible: ^Choose$
+    timeout: 30000
+- tapOn: ^Choose$
+- extendedWaitUntil:
+    visible: {id: puppy.photo.image}
+    timeout: 30000
+- assertNotVisible: {id: settings.puppy.photo.error}
