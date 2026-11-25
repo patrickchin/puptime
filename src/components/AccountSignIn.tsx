@@ -40,10 +40,10 @@ export function AccountSignIn({cloud,theme,showError=true,showIntro=true,onEmail
             {state.config.providers.email?compactButton('account.email.open',t('account.emailShort'),t('account.continueEmail'),'email-outline',onEmailPress):null}
           </View>:null}
           {!onEmailPress&&!emailOnly&&state.config.providers.apple?(Platform.OS==='ios'?(nativeAppleAvailable?<AppleAuthentication.AppleAuthenticationButton
-            testID="account.apple" buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
-            buttonStyle={theme.isDark?AppleAuthentication.AppleAuthenticationButtonStyle.WHITE:AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
-            cornerRadius={theme.presentation.controlRadius} accessibilityState={{disabled:busy||!state.online,busy}}
-            pointerEvents={busy||!state.online?'none':'auto'} style={{height:52,width:'100%',opacity:busy||!state.online?0.5:1}}
+            testID="account.apple" buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+            buttonStyle={theme.isDark?AppleAuthentication.AppleAuthenticationButtonStyle.WHITE:AppleAuthentication.AppleAuthenticationButtonStyle.WHITE_OUTLINE}
+            cornerRadius={6} accessibilityState={{disabled:busy||!state.online,busy}}
+            pointerEvents={busy||!state.online?'none':'auto'} style={{height:44,alignSelf:'stretch',marginHorizontal:4,opacity:busy||!state.online?0.5:1}}
             onPress={()=>{if(!busy&&state.online)void cloud.controller!.signInSocial('apple');}}/>:null)
             :<AccountButton theme={theme} testID="account.apple" label={t('account.apple')} icon="apple" disabled={busy||!state.online} onPress={()=>{void cloud.controller!.signInSocial('apple');}}/>):null}
           {!onEmailPress&&!emailOnly&&state.config.providers.google?(Platform.OS==='ios'?<GoogleSigninButton testID="account.google" size={GoogleSigninButton.Size.Wide} color={theme.isDark?GoogleSigninButton.Color.Dark:GoogleSigninButton.Color.Light} disabled={busy||!state.online} accessibilityState={{disabled:busy||!state.online,busy}} style={{height:52,width:'100%'}} onPress={()=>{if(!busy&&state.online)void cloud.controller!.signInSocial('google');}}/>:<AccountButton theme={theme} testID="account.google" label={t('account.google')} icon="google" disabled={busy||!state.online} onPress={()=>{void cloud.controller!.signInSocial('google');}}/>):null}

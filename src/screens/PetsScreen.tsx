@@ -1,28 +1,38 @@
-import {ScrollView,StyleSheet,Text,View} from 'react-native';
+import {KeyboardAvoidingView,Platform,ScrollView,StyleSheet} from 'react-native';
+import {PuppyIdentity} from '../components/PuppyIdentity';
 import {PuppyNameSetting} from '../components/PuppyNameSetting';
+import {SettingsGroup} from '../components/SettingsGroup';
 import {SettingsRow} from '../components/SettingsRow';
 import type {CloudHandle} from '../cloud/handle';
 import {useLocalization} from '../localization-context';
-import {spacing,surfaceTreatment,type Theme} from '../theme';
+import {spacing,type Theme} from '../theme';
+import {SharedPuppiesScreen} from './SharedPuppiesScreen';
 
-// The production journal still owns one pet. Keep its real profile together;
-// additional-pet creation remains in the separate in-memory design preview.
-export function PetsScreen({theme,cloud,eventCount,onShare,onOpenShared,onOpenAccount,shared=false,sharedName}:{shared?:boolean;sharedName?:string;theme:Theme;cloud:CloudHandle;eventCount:number;onShare:()=>void;onOpenShared:()=>void;onOpenAccount?:()=>void}){
- const {t,locale}=useLocalization();
- const card=[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}];
- return <ScrollView testID="screen.pets" contentContainerStyle={styles.content}>
-  <View>
-   {shared?<Text accessibilityRole="header" style={[styles.name,{color:theme.text}]}>{sharedName}</Text>:<PuppyNameSetting theme={theme} cloud={cloud}/>}
-   <Text style={[styles.count,{color:theme.textMuted}]}>{t(eventCount===1?'account.logsOne':'account.logsMany',{count:new Intl.NumberFormat(locale).format(eventCount)})}</Text>
-  </View>
-  <View style={styles.section}>
-   <Text accessibilityRole="header" style={[styles.heading,{color:theme.text}]}>{t('pets.sharing')}</Text>
-   <View style={card}>
-    {!shared?<><SettingsRow theme={theme} testID="puppy.share" icon="account-multiple-plus-outline" label={t('sharing.title')} detail={t('pets.shareDetail')} onPress={onShare} wrap/><View style={[styles.divider,{backgroundColor:theme.border}]}/></>:null}
-    <SettingsRow theme={theme} testID="puppy.shared" icon="paw-outline" label={t('sharing.sharedTitle')} detail={t('pets.sharedDetail')} onPress={onOpenShared} wrap/>
-   </View>
-  </View>
-  {cloud.available&&onOpenAccount?<View style={card}><SettingsRow theme={theme} testID="puppy.account" icon="account-circle-outline" label={t('account.title')} detail={t('settings.accountDetail')} onPress={onOpenAccount} wrap/></View>:null}
- </ScrollView>;
+export function PetsScreen({theme,cloud,shared,onOpenProfile,onOpenAccount,onOpenJournal}:{
+  theme:Theme;cloud:CloudHandle;shared:boolean;onOpenProfile:()=>void;onOpenAccount:()=>void;onOpenJournal:()=>void;
+}){
+  const {t}=useLocalization();
+  return <ScrollView testID="screen.pets" contentContainerStyle={styles.content}>
+    <SettingsGroup theme={theme} label={t('pets.owned')} rows={[{
+      key:'owner',visible:true,content:shared
+        ?<SettingsRow theme={theme} testID="shared.ownPuppy" icon="paw-outline" label={t('sharing.ownPuppy')}
+          detail={t('account.onDevice')} onPress={onOpenProfile} wrap/>
+        :<PuppyIdentity theme={theme} showName onPress={onOpenProfile}/>,
+    }]}/>
+    <SharedPuppiesScreen cloud={cloud} theme={theme} onBack={onOpenJournal} onOpenAccount={onOpenAccount}/>
+  </ScrollView>;
 }
-const styles=StyleSheet.create({content:{width:'100%',maxWidth:720,alignSelf:'center',padding:spacing.md,gap:spacing.lg,paddingBottom:spacing.xl},name:{fontSize:28,lineHeight:36,fontWeight:'700'},count:{fontSize:15,lineHeight:22,paddingHorizontal:8},section:{gap:spacing.sm},heading:{fontSize:18,lineHeight:25,fontWeight:'700'},card:{borderWidth:1,borderRadius:22,padding:8},divider:{height:StyleSheet.hairlineWidth,marginHorizontal:8}});
+
+export function PuppyProfileScreen({theme,cloud,onShare}:{theme:Theme;cloud:CloudHandle;onShare:()=>void}){
+  return <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':undefined} style={styles.fill}>
+    <ScrollView testID="screen.puppyProfile" keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={styles.profile}>
+      <PuppyNameSetting theme={theme} cloud={cloud} onShare={onShare}/>
+    </ScrollView>
+  </KeyboardAvoidingView>;
+}
+
+const styles=StyleSheet.create({
+  fill:{flex:1},
+  content:{width:'100%',maxWidth:720,alignSelf:'center',paddingHorizontal:spacing.md,paddingBottom:spacing.xl},
+  profile:{width:'100%',maxWidth:720,alignSelf:'center',padding:spacing.md,paddingBottom:spacing.xl},
+});

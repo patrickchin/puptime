@@ -16,7 +16,7 @@ test('the real iOS sign-in component uses official Apple and Google controls and
   react:{useState:(value:unknown)=>{const i=cursor++;hooks[i]??={value};return [hooks[i].value,(next:unknown)=>{hooks[i].value=next;}];},useEffect:(effect:()=>void)=>{const i=cursor++;if(!hooks[i]){hooks[i]=true;effects.push(effect);}}},
   'react/jsx-runtime':{jsx,jsxs:jsx},'@expo/vector-icons':{MaterialCommunityIcons:'Icon'},
   'react-native':{Platform:{OS:'ios'},StyleSheet:{create:(value:unknown)=>value},Keyboard:{dismiss:()=>{}},...Object.fromEntries(['ActivityIndicator','Pressable','Text','TextInput','View'].map(value=>[value,value]))},
-  'expo-apple-authentication':{isAvailableAsync:async()=>true,AppleAuthenticationButton:nativeButton,AppleAuthenticationButtonType:{CONTINUE:1},AppleAuthenticationButtonStyle:{BLACK:2,WHITE:0}},
+  'expo-apple-authentication':{isAvailableAsync:async()=>true,AppleAuthenticationButton:nativeButton,AppleAuthenticationButtonType:{SIGN_IN:0},AppleAuthenticationButtonStyle:{WHITE_OUTLINE:1,WHITE:0}},
   '@react-native-google-signin/google-signin':{GoogleSigninButton:googleButton},
   '../cloud/use-account-snapshot':{useAccountSnapshot:()=>state},'../localization-context':{useLocalization:()=>({t:(key:string)=>key})},
  };
@@ -28,7 +28,7 @@ test('the real iOS sign-in component uses official Apple and Google controls and
  const render=()=>{cursor=0;return nodes(module.exports.AccountSignIn({theme:lightTheme,cloud:{controller:{signInSocial:async(provider:string)=>{calls.push(provider);}}}}));};
  assert.ok(!render().some(node=>node.props?.testID==='account.apple'));
  for(const effect of effects)effect();await Promise.resolve();
- const button=render().find(node=>node.props?.testID==='account.apple');assert.ok(button);assert.equal(button.type,nativeButton);assert.equal(button.props.buttonType,1);assert.equal(button.props.style.height,52);
+ const button=render().find(node=>node.props?.testID==='account.apple');assert.ok(button);assert.equal(button.type,nativeButton);assert.equal(button.props.buttonType,0);assert.equal(button.props.style.height,44);
  button.props.onPress();assert.deepEqual(calls,['apple']);
  state.busy=true;const busy=render().find(node=>node.props?.testID==='account.apple');assert.equal(busy.props.accessibilityState.disabled,true);assert.equal(busy.props.pointerEvents,'none');busy.props.onPress();assert.equal(calls.length,1);
  state.busy=false;state.online=false;render().find(node=>node.props?.testID==='account.apple').props.onPress();assert.equal(calls.length,1);

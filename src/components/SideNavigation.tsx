@@ -8,12 +8,13 @@ import {useLocalization} from '../localization-context';
 import {headingStyle,navigationIcon,type Theme} from '../theme';
 import type {Tab} from './BottomNav';
 
-export type AppTab=Tab|'notifications'|'pets';
-const destinations:AppTab[]=['log','pets','timeline','insights','schedule','notifications','learn'];
+type DrawerTab=Tab|'notifications'|'pets';
+export type AppTab=DrawerTab|'account'|'sharing'|'puppyProfile';
+const destinations:DrawerTab[]=['log','pets','timeline','insights','schedule','notifications','learn'];
 
 export function SideNavigation({open,enabled,tab,settingsVisible,theme,onOpen,onClose,onChange,onSettings,onAccount,children}:{
- open:boolean;enabled:boolean;tab:AppTab|'account';settingsVisible:boolean;theme:Theme;
- onOpen:()=>void;onClose:()=>void;onChange:(tab:AppTab)=>void;onSettings:()=>void;onAccount?:()=>void;children:ReactNode;
+ open:boolean;enabled:boolean;tab:AppTab;settingsVisible:boolean;theme:Theme;
+ onOpen:()=>void;onClose:()=>void;onChange:(tab:DrawerTab)=>void;onSettings:()=>void;onAccount?:()=>void;children:ReactNode;
 }){
  const {t}=useLocalization(),{width}=useWindowDimensions(),insets=useSafeAreaInsets();
  const [reduceMotion,setReduceMotion]=useState(true);
@@ -26,7 +27,7 @@ export function SideNavigation({open,enabled,tab,settingsVisible,theme,onOpen,on
   return()=>{active=false;subscription.remove();foreground.remove();};
  },[]);
  if(Platform.OS==='web')return children;
- const item=(key:AppTab|'settings'|'account')=>{
+ const item=(key:DrawerTab|'settings'|'account')=>{
   const selected=key==='settings'?settingsVisible:key==='account'?!settingsVisible&&tab==='account':!settingsVisible&&tab===key;
   const label=key==='settings'?t('settings.title'):key==='account'?t('account.title'):key==='notifications'?t('notifications.title'):t(`nav.${key}`);
   const icon=key==='settings'?'cog-outline':key==='account'?'account-circle-outline':key==='notifications'?'bell-outline':key==='pets'?'paw-outline':navigationIcon(theme,key);

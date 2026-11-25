@@ -1,12 +1,9 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {Alert,Image,KeyboardAvoidingView,Platform,ScrollView,Share,StyleSheet,Text,TextInput,View} from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import qrcode from 'qrcode-generator';
 import {AccountButton} from '../components/AccountSignIn';
 import {Pressable} from '../components/TelemetryPressable';
-import {AccountScreen} from './AccountScreen';
-import {SharedPuppiesScreen} from './SharedPuppiesScreen';
 import {ScreenHeader} from '../components/ScreenHeader';
 import {useAccountSnapshot} from '../cloud/use-account-snapshot';
 import type {CloudHandle} from '../cloud/handle';
@@ -15,13 +12,12 @@ import {sharingUrl,type CreateShare,type PuppyShare} from '../sharing';
 import {useLocalization} from '../localization-context';
 import {headingStyle,spacing,type Theme} from '../theme';
 
-export function SharePuppyScreen({cloud,theme,eventCount,onBack,initialKind='household'}:{cloud:CloudHandle;theme:Theme;eventCount:number;onBack:()=>void;initialKind?:'household'|'temporary'}){
+export function SharePuppyScreen({cloud,theme,onBack,onOpenAccount,initialKind='household'}:{cloud:CloudHandle;theme:Theme;onBack:()=>void;onOpenAccount:()=>void;initialKind?:'household'|'temporary'}){
  const {t,locale}=useLocalization(),state=useAccountSnapshot(cloud.controller);
  const [kind,setKind]=useState(initialKind),[label,setLabel]=useState(''),[permission,setPermission]=useState<'view'|'contribute'>('contribute');
  const [days,setDays]=useState<number|null>(1),[end,setEnd]=useState(()=>new Date(Date.now()+86400000)),[picker,setPicker]=useState<'date'|'time'|null>(null);
- const [setup,setSetup]=useState(false),[shares,setShares]=useState<PuppyShare[]>([]),[loading,setLoading]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[link,setLink]=useState<string|null>(null),[revision,setRevision]=useState(0);
+ const [shares,setShares]=useState<PuppyShare[]>([]),[loading,setLoading]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[link,setLink]=useState<string|null>(null),[revision,setRevision]=useState(0);
  const draft=useRef<CreateShare|null>(null),locked=useRef(false),mounted=useRef(true);
- const [shared,setShared]=useState(false);
  const account=state?.account,accountId=account?.user.id,pet=account?.pets[0];
  const ready=!!accountId&&!!pet&&state?.sync?.state==='active'&&state.sync.accountId===accountId&&!!cloud.sharing;
  const identity=useRef(accountId);identity.current=accountId;
@@ -50,13 +46,11 @@ export function SharePuppyScreen({cloud,theme,eventCount,onBack,initialKind='hou
   try{await cloud.sharing!.revoke(expected,id);if(mounted.current&&identity.current===expected){setShares(current=>current.map(row=>row.id===id?{...row,revoked:true}:row));if(draft.current?.id===id)setLink(null);}}
   catch{if(mounted.current)setError(t('sharing.error'));}finally{locked.current=false;if(mounted.current)setBusy(false);}
  }
- if(shared)return <SharedPuppiesScreen cloud={cloud} theme={theme} onBack={()=>setShared(false)}/>;
- if(setup)return <AccountScreen cloud={cloud} theme={theme} eventCount={eventCount} onBack={()=>setSetup(false)} onOpenActivity={onBack}/>;
- return <SafeAreaView style={[styles.root,{backgroundColor:theme.background}]} edges={['top','bottom']}><KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':'height'} style={styles.root}>
+ return <KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':'height'} style={styles.root}>
   <ScreenHeader theme={theme} title={t('sharing.title')} testID="sharing.back" onBack={onBack} style={styles.header}/>
  <ScrollView testID="screen.sharing" keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
   {error?<Text accessibilityRole="alert" style={[styles.body,{color:theme.danger}]}>{error}</Text>:null}
-  {!ready?<View style={styles.stack}><Text style={[styles.body,{color:theme.textMuted}]}>{t('sharing.setupBody')}</Text>{button('sharing.setup',t('sharing.setup'),()=>setSetup(true),true)}</View>:<>
+  {!ready?<View style={styles.stack}><Text style={[styles.body,{color:theme.textMuted}]}>{t('sharing.setupBody')}</Text>{button('sharing.setup',t('sharing.setup'),onOpenAccount,true)}</View>:<>
    <View accessibilityRole="radiogroup" style={styles.stack}>{(['household','temporary'] as const).map(value=><View key={value}>
     {choice(`sharing.kind.${value}`,t(value==='household'?'sharing.household':'sharing.temporary'),kind===value,()=>setKind(value))}
     {kind===value?<Text style={[styles.body,{color:theme.textMuted,marginTop:8}]}>{t(value==='household'?'sharing.householdBody':'sharing.temporaryBody')}</Text>:null}
@@ -87,7 +81,6 @@ export function SharePuppyScreen({cloud,theme,eventCount,onBack,initialKind='hou
    })}
    {button('sharing.refresh',t('sharing.retry'),()=>setRevision(value=>value+1))}
   </>}
-  {button('sharing.shared',t('sharing.openShared'),()=>setShared(true))}
- </ScrollView></KeyboardAvoidingView></SafeAreaView>;
+ </ScrollView></KeyboardAvoidingView>;
 }
 const styles=StyleSheet.create({root:{flex:1},header:{paddingHorizontal:spacing.md,paddingTop:spacing.md,paddingBottom:spacing.sm,width:'100%',maxWidth:720,alignSelf:'center'},content:{width:'100%',maxWidth:720,alignSelf:'center',padding:spacing.md,gap:12,paddingBottom:32},body:{fontSize:16,lineHeight:24},label:{fontSize:16,lineHeight:23,fontWeight:'700'},section:{fontSize:21,lineHeight:28,marginTop:20},input:{minHeight:52,borderWidth:1,borderRadius:12,padding:14,fontSize:16},stack:{gap:12},options:{gap:8},choice:{minHeight:50,padding:14,borderRadius:12,borderWidth:1,flexDirection:'row',alignItems:'center',gap:12,marginBottom:8},card:{padding:16,borderWidth:1,borderRadius:16,gap:12},qr:{width:240,height:240,maxWidth:'100%',alignSelf:'center',backgroundColor:'white'}});

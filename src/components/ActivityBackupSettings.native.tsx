@@ -7,7 +7,7 @@ import { getLocalRuntime } from '../local/runtime.native';
 import type { BackupSummary } from '../local/activity-backups';
 import { useLocalization } from '../localization-context';
 import { shareEventsCsv } from '../share-export';
-import { spacing, surfaceTreatment, type Theme } from '../theme';
+import { spacing, type Theme } from '../theme';
 import { SettingsRow } from './SettingsRow';
 
 export function ActivityBackupSettings({ theme, onRestored }: { theme: Theme; onRestored?: () => Promise<void> }) {
@@ -56,10 +56,8 @@ export function ActivityBackupSettings({ theme, onRestored }: { theme: Theme; on
   const pets=[...new Map(backups.map(backup=>[backup.petId,backup.puppyName])).entries()];
   const visibleBackups=selectedPet?backups.filter(backup=>backup.petId===selectedPet):backups;
   return <>
-    <View style={[styles.card, surfaceTreatment(theme), { backgroundColor: theme.surfaceRaised, borderColor: theme.border }]}>
-      <SettingsRow testID="settings.backups.open" icon="backup-restore" label={t('backup.title')} detail={t('backup.detail')} wrap theme={theme}
+    <SettingsRow testID="settings.backups.open" icon="backup-restore" label={t('backup.title')} detail={t('backup.detail')} wrap theme={theme}
         onPress={() => { Keyboard.dismiss(); setSelectedPet(null);setVisible(true); void reload(); }} />
-    </View>
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { if (!busy) setVisible(false); }}>
       <SafeAreaView style={[styles.page, { backgroundColor: theme.surface }]}>
         <View style={styles.header}>

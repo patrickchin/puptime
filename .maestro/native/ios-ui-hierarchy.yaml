@@ -14,8 +14,10 @@ name: UI hierarchy on iPhone
 - takeScreenshot: ios-menu
 - tapOn: {id: nav.pets}
 - assertVisible: {id: screen.pets}
+- tapOn: {id: nav.puppy}
 - assertVisible: {id: settings.puppy.name}
 - takeScreenshot: ios-pet-profile
+- tapOn: {id: nav.back}
 - tapOn: {id: nav.open, retryTapIfNoChange: true}
 - tapOn: {id: nav.account}
 - assertVisible: {id: screen.account}

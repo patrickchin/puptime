@@ -1,124 +1,65 @@
 appId: com.patrickchin.puptime
-name: Account, puppy and settings navigation stays connected
+name: Settings, puppy profile, sharing and Account
 ---
-# Use a dedicated, completed synthetic journal with a profile photo and history.
-# Pass --test-output-dir under ~/Pictures/Screenshots/Codex/ for screenshots.
+# Run on a dedicated simulator with a completed synthetic journal and a saved photo.
 - launchApp
 - extendedWaitUntil:
-    visible:
-      id: nav.open
+    visible: {id: screen.today}
     timeout: 90000
-- tapOn:
-    id: nav.open
-- tapOn:
-    id: nav.settings
-- assertVisible:
-    id: settings.account.open
-- assertVisible:
-    id: settings.pets.open
+- tapOn: {id: nav.open}
+- tapOn: {id: nav.settings}
+- assertVisible: {id: settings.account.open}
+- assertVisible: {id: settings.pets.open}
 - takeScreenshot: settings
-- tapOn:
-    id: settings.account.open
-- assertVisible:
-    id: account.local.summary
-- assertVisible:
-    id: puppy.photo.image
-- assertVisible:
-    id: account.pets.open
+- tapOn: {id: settings.account.open}
+- assertVisible: {id: screen.account}
+- assertNotVisible: {id: account.pets.open}
 - takeScreenshot: account
-- tapOn:
-    id: account.pets.open
-- assertVisible:
-    id: screen.pets
-- tapOn:
-    id: nav.back
-- assertVisible:
-    id: screen.settings
-- tapOn:
-    id: settings.account.open
-- tapOn:
-    id: account.back
-- assertVisible:
-    id: settings.pets.open
-- tapOn:
-    id: settings.pets.open
-- assertVisible:
-    id: screen.pets
-- assertVisible:
-    id: settings.puppy.photo.choose
-- assertVisible:
-    id: puppy.share
-- assertVisible:
-    id: puppy.shared
+- tapOn: {id: account.back}
+- assertVisible: {id: screen.settings}
+- tapOn: {id: settings.pets.open}
+- assertVisible: {id: screen.pets}
+- assertVisible: {id: puppy.shared.signIn}
+- assertNotVisible: {id: puppy.share}
 - takeScreenshot: pets
-- tapOn:
-    id: puppy.share
-- assertVisible:
-    id: sharing.back
+- tapOn: {id: nav.puppy}
+- assertVisible: {id: screen.puppyProfile}
+- assertVisible: {id: settings.puppy.photo.choose}
+- takeScreenshot: profile
+- tapOn: {id: settings.puppy.photo.choose}
+- assertVisible: Change photo
+- assertVisible: Remove photo
+- takeScreenshot: photo-actions
+- tapOn: Cancel
+- tapOn: {id: settings.puppy.name}
+- assertVisible: {id: settings.puppy.name.input}
+- assertVisible: {id: screen.puppyProfile}
+- takeScreenshot: inline-name
+- eraseText: 40
+- inputText: Ellie renamed
+- tapOn: {id: settings.puppy.name.save}
+- assertVisible: {id: settings.puppy.name, text: Ellie renamed}
+- tapOn: {id: puppy.share}
+- assertVisible: {id: screen.sharing}
+- assertNotVisible: {id: sharing.shared}
 - takeScreenshot: share
-- tapOn:
-    id: sharing.shared
-- assertVisible:
-    id: shared.back
-- takeScreenshot: shared
-- tapOn:
-    id: shared.back
-- assertVisible:
-    id: sharing.back
-- tapOn:
-    id: sharing.back
-- assertVisible:
-    id: puppy.shared
-- tapOn:
-    id: puppy.shared
-- assertVisible:
-    id: screen.sharedPuppies
-- tapOn:
-    id: shared.back
-- tapOn:
-    id: puppy.account
-- assertVisible:
-    id: account.pets.open
-- tapOn:
-    id: account.pets.open
-- assertVisible:
-    id: screen.pets
-- tapOn:
-    id: nav.back
-- assertVisible:
-    id: screen.settings
-- scrollUntilVisible:
-    element:
-      id: settings.history.open
-    direction: DOWN
-- tapOn:
-    id: settings.history.open
-- assertVisible:
-    id: screen.eventHistory
-- takeScreenshot: history
-- tapOn:
-    id: history\.recent\.[0-9]+
-    index: 0
-- assertVisible:
-    id: history.panel
-- takeScreenshot: history-detail
-- tapOn:
-    id: history.back
-- assertVisible:
-    id: screen.eventHistory
-- tapOn:
-    id: history.recent.back
-- assertVisible:
-    id: screen.settings
-- tapOn:
-    id: settings.back
-- assertVisible:
-    id: header.puppy
-- tapOn:
-    id: header.puppy
-- assertVisible:
-    id: screen.pets
-- tapOn:
-    id: nav.back
-- assertVisible:
-    id: nav.open
+- tapOn: {id: sharing.setup}
+- assertVisible: {id: screen.account}
+- tapOn: {id: account.back}
+- assertVisible: {id: screen.sharing}
+- tapOn: {id: sharing.back}
+- assertVisible: {id: screen.puppyProfile}
+- tapOn: {id: nav.back}
+- assertVisible: {id: screen.pets}
+- tapOn: {id: nav.back}
+- assertVisible: {id: screen.settings}
+- tapOn: {id: settings.back}
+- tapOn: {id: nav.open}
+- tapOn: {id: nav.account}
+- assertVisible: {id: screen.account}
+- tapOn: {id: account.back}
+- assertVisible: {id: screen.today}
+- tapOn: {id: header.puppy}
+- assertVisible: {id: screen.pets}
+- tapOn: {id: nav.puppy}
+- assertVisible: {id: settings.puppy.name, text: Ellie renamed}
