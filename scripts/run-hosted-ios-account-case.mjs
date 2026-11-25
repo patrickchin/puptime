@@ -7,7 +7,7 @@ import {tmpdir} from 'node:os';
 import {dirname,isAbsolute,join,resolve} from 'node:path';
 import {deleteOwnedSimulator,installTaskCleanup,ownProcess} from './native-task-cleanup.mjs';
 import {startupEvidence} from './native-startup-evidence.mjs';
-import {nativeCodeFingerprint} from './native-runtime-inputs.mjs';
+import {nativeCodeFingerprint,nativeHostInputs} from './native-runtime-inputs.mjs';
 import {assertNativeHostRun,assertNativeHostPolicy,assertSameHostAttempt} from './native-host-policy.mjs';
 import {standardSelection} from './native-standard-suite.mjs';
 
@@ -28,8 +28,7 @@ assertNativeHostRun(run,policy,repository);
 command('git',['fetch','--no-tags','--depth=1','origin',run.head_sha]);
 // These produce the compiled native host. Candidate JavaScript is re-bundled by
 // the existing account runner, so it is identified separately in the receipt.
-const nativeInputs=['package.json','package-lock.json','app.json','app.config.*','eas.json','.npmrc','plugins','patches','assets','ios'];
-const changedNativeInputs=command('git',['diff','--name-only',run.head_sha,source,'--',...nativeInputs]);
+const changedNativeInputs=command('git',['diff','--name-only',run.head_sha,source,'--',...nativeHostInputs]);
 assert.equal(changedNativeInputs,'','Native inputs changed: use a newly qualified native host.');
 const artifacts=api(`actions/runs/${runId}/artifacts?per_page=100`);
 const jobs=policy==='compiled-for-testing'?api(`actions/runs/${runId}/attempts/${run.run_attempt}/jobs?per_page=100`):undefined;
