@@ -20,8 +20,11 @@ jobs:
           node scripts/verify-old-preference-compatibility.mjs
       - run: node --test scripts/native-task-cleanup.test.mjs scripts/native-account-evidence.test.mjs scripts/native-command-evidence.test.mjs scripts/native-startup-evidence.test.mjs scripts/native-standard-suite.test.mjs scripts/native-standard-verdict.test.mjs scripts/native-onboarding-verdict.test.mjs scripts/ios-app-group-privacy.test.mjs
       - name: Check isolated helper files with finite results
+        env:
+          HELPER_SOURCE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           helper_group_exit=0
+          helper_result_rows=''
           for helper_test_file in \
             scripts/native-host-policy.test.mjs \
             scripts/android-notice-discovery.test.mjs \
@@ -31,14 +34,40 @@ jobs:
             scripts/android-beta-disposable-acceptance.test.mjs
           do
             if node --test "$helper_test_file" >/dev/null 2>&1; then
-              printf '%s PASS 0\n' "$helper_test_file"
+              helper_file_status=PASS
+              helper_file_exit=0
             else
               helper_file_exit=$?
-              printf '%s FAIL %d\n' "$helper_test_file" "$helper_file_exit"
+              helper_file_status=FAIL
               helper_group_exit=1
             fi
+            printf '%s %s %d\n' "$helper_test_file" "$helper_file_status" "$helper_file_exit"
+            helper_result_rows="${helper_result_rows}${helper_result_rows:+,}{\"file\":\"$helper_test_file\",\"status\":\"$helper_file_status\",\"exit\":$helper_file_exit}"
           done
+          HELPER_RESULT_ROWS="$helper_result_rows" node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {execFileSync} from 'node:child_process';
+          import {mkdirSync,writeFileSync} from 'node:fs';
+          const expected=['scripts/native-host-policy.test.mjs','scripts/android-notice-discovery.test.mjs','scripts/android-engine-query.test.mjs','scripts/native-csv-recovery.test.mjs','scripts/native-beta-upgrade.test.mjs','scripts/android-beta-disposable-acceptance.test.mjs'];
+          const results=JSON.parse('['+process.env.HELPER_RESULT_ROWS+']');
+          assert.deepEqual(results.map(row=>row.file),expected);
+          for(const row of results){assert.deepEqual(Object.keys(row),['file','status','exit']);assert.ok(['PASS','FAIL'].includes(row.status));assert.ok(Number.isInteger(row.exit)&&row.exit>=0&&row.exit<=255);assert.equal(row.status==='PASS',row.exit===0);}
+          const [checkoutCommit,checkoutTree]=execFileSync('git',['rev-parse','HEAD','HEAD^{tree}'],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim().split('\n');
+          const sourceHead=process.env.HELPER_SOURCE_HEAD,runId=process.env.GITHUB_RUN_ID,runAttempt=Number(process.env.GITHUB_RUN_ATTEMPT);
+          for(const value of [sourceHead,checkoutCommit,checkoutTree])assert.match(value,/^[a-f0-9]{40}$/);
+          assert.match(runId,/^[1-9][0-9]{0,19}$/);assert.ok(Number.isSafeInteger(runAttempt)&&runAttempt>0);
+          const bytes=JSON.stringify({schema:1,stage:'helper-file-results',sourceHead,checkoutCommit,checkoutTree,runId,runAttempt,results})+'\n';
+          assert.ok(Buffer.byteLength(bytes)<=4096);mkdirSync('build',{recursive:true});writeFileSync('build/helper-results.json',bytes,{flag:'wx',mode:0o600});
+          NODE
           exit "$helper_group_exit"
+      - name: Upload finite helper results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: puptime-helper-results
+          path: build/helper-results.json
+          if-no-files-found: warn
+          retention-days: 7
       - run: python3 scripts/android-permission-experiment.test.py
       - run: python3 scripts/test_android_release_custody.py
       - run: python3 scripts/test_android_engine_probe_copy.py
