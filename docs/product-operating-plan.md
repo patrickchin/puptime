@@ -6,7 +6,7 @@
 
 The next three priorities are:
 
-1. **Qualify the integrated iOS runtime.** Include the completed navigation merge, identify and fix actual source-CI failures, then run loaded-engine, native account/offline/retry/cancellation, CSV recovery and populated guest/enrolled upgrade checks with artificial records. Preserve exact history, settings, pending payloads, backups and cold restart; keep local-service fixtures separate from production-provider evidence.
+1. **Qualify the integrated iOS runtime.** Coordinate with the concurrent navigation PR, identify and fix actual source-CI failures, then run loaded-engine, native account/offline/retry/cancellation, CSV recovery and populated guest/enrolled upgrade checks with artificial records. Preserve exact history, settings, pending payloads, backups and cold restart; keep local-service fixtures separate from production-provider evidence.
 2. **Qualify the exact iOS distribution build.** Inspect signing, App Group/keychain continuity, production endpoints, fixture/audio exclusion and applicable iOS notices/privacy manifests, then verify the specific TestFlight installation. Simulator build number `3` is a synthetic test tuple, not a selected production build number. Reconcile actual App Store Connect/EAS history and the applicable existing iOS installation baseline before choosing or signing the distribution candidate.
 3. **Prepare Apple store entry and the handoff.** Verify membership, App Store Connect access, agreements, enabled service/provider access, privacy/deletion, reviewer instructions and suitable approved media. Prepare concrete owner-only identity/legal/publication actions for approval. No upload, TestFlight availability or App Store acceptance is established by a successful simulator build.
 
