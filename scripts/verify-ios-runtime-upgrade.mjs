@@ -14,7 +14,7 @@ import {assertArchivedSource,nativeTextSection,nativeCodeFingerprint,nativeHostI
 import {deleteOwnedSimulator,installTaskCleanup,ownProcess} from './native-task-cleanup.mjs';
 import {readNativeCommandState} from './native-command-evidence.mjs';
 import {eventDataFromSql,eventSqlColumns,eventSqlDefinition} from '../src/record-sql.ts';
-import {parseEvents} from '../src/storage-validation.ts';
+import {digestBytes,documentFiles,protectedDocumentFiles,assertDeviceClock,assertClockEnvelope,prepareDeviceClock,assertPreserved,assertOldDaily as assertOldDailyState,assertNumericUpgrade as assertNumericUpgradeState} from './native-upgrade-evidence.mjs';
 
 const repository='patrickchin/puptime',app='com.patrickchin.puptime';
 const originalCuts=[
@@ -24,9 +24,9 @@ const originalCuts=[
 // This ordinary archive is uploaded before any preview/fixture re-bundling.
 // Its entire workflow must also succeed; an uploaded archive alone is not acceptance.
 const numericTarget={name:'newer',source:'f8ba094042df97f0300a2ccc01d1124dbc18ac24',event:'pull_request',branch:'codex/sqlite-engine-maintenance',run:44461658975,attempt:1,checkout:'abcd4447052d0ce9d6773177197774fa6a3a6250',tree:'532f419ed533a3695d2d3ed7fbb2fbf5827e90f0',artifact:14502365649,bytes:49760202,digest:'6c33c79ef8ce4b8e3da7c3cfe11ac335deccbfb961ad40cd33e11e5d4b440ffd',expiresAt:'2026-11-26T05:31:31Z',version:'1.12.6',build:'2'};
-// Fresh baseline producer is bound; archive bytes and final MAIN target remain
-// deliberately unbound until their successful, unexpired artifacts are reviewed.
-const betaOlder={name:'older',source:'cb8034b45a5c74e0ab2c7c60759b5276e3b85664',producerSource:'4f8b051bae6495cb5db8edf32a32b030e6a2cf5f',event:'workflow_dispatch',branch:'codex/android-beta-core-acceptance-20261125',run:45616778542,attempt:1,checkout:'cb8034b45a5c74e0ab2c7c60759b5276e3b85664',tree:'b0ecf72dddcb015b01c65b7b206cff0ee1b0300f',artifact:null,bytes:null,digest:null,expiresAt:null,version:'1.12.5',build:'1',artifactName:'puptime-ios-125-upgrade-baseline',baselineReceipt:true};
+// Fresh baseline metadata is bound for hosted input verification, not inspected
+// or executed here. Final MAIN target remains deliberately unbound.
+const betaOlder={name:'older',source:'cb8034b45a5c74e0ab2c7c60759b5276e3b85664',producerSource:'4f8b051bae6495cb5db8edf32a32b030e6a2cf5f',event:'workflow_dispatch',branch:'codex/android-beta-core-acceptance-20261125',run:45616778542,attempt:1,checkout:'cb8034b45a5c74e0ab2c7c60759b5276e3b85664',tree:'b0ecf72dddcb015b01c65b7b206cff0ee1b0300f',artifact:15026200874,bytes:67197526,digest:'b637d8213b0b83e9fc815506c3acfea58cf8b7f55c6757828a82ad253412a34f',expiresAt:'2026-12-02T13:17:09Z',version:'1.12.5',build:'1',artifactName:'puptime-ios-125-upgrade-baseline',baselineReceipt:true};
 const betaNewer={name:'newer',source:null,event:'push',branch:'main',run:null,attempt:null,checkout:null,tree:null,artifact:null,bytes:null,digest:null,expiresAt:null,version:'1.13.0',build:'3'};
 const nativeInputs=[...nativeHostInputs,'.env'];
 const [mode='--inspect-only',destination=process.env.GITHUB_ACTIONS==='true'?'build/native-runtime-replacement':join(homedir(),'Pictures/Screenshots/Codex/puptime-runtime-replacement')]=process.argv.slice(2);
@@ -36,6 +36,8 @@ const numeric=mode==='--numeric-upgrade'||beta;
 const cuts=beta?[betaOlder,betaNewer]:numeric?[{...originalCuts[1],name:'older',attempt:1,bytes:67784040,expiresAt:'2026-11-20T10:31:10Z',version:'1.12.0',build:'1'},numericTarget]:originalCuts;
 const preparing=mode==='--prepare-enrolled';
 const oldVersion=beta?'1.12.5/1':'1.12.0/1',newVersion=beta?'1.13.0/3':'1.12.6/2';
+const assertOldDaily=(before,clock)=>assertOldDailyState(before,clock,{oldVersion});
+const assertNumericUpgrade=(before,after,clocks)=>assertNumericUpgradeState(before,after,{...clocks,oldVersion,newVersion});
 const command=(binary,args,options={})=>execFileSync(binary,args,{encoding:'utf8',timeout:120000,stdio:['ignore','pipe','pipe'],...options}).trim();
 const hash=path=>createHash('sha256').update(readFileSync(path)).digest('hex');
 const simctl=(...args)=>command('xcrun',['simctl',...args]);
@@ -70,85 +72,6 @@ function assertBaselineProducer(cut,artifact,api){
 }
 function assertBaselineReceipt(cut,value,actual){
  assert.deepEqual(value,{schemaVersion:1,stage:'shipped-source-ios-baseline-build',upgradeExecuted:false,releaseQualified:false,producerHead:cut.producerSource,runId:String(cut.run),runAttempt:String(cut.attempt),source:cut.source,sourceTree:cut.tree,version:cut.version,build:cut.build,bundleIdentifier:app,versionOnlyTestConfiguration:true,appConfigSHA256:actual.config,packageSHA256:'64c0fa8d471b5485bfe53b7eb26f8696a29e39a8aad82e1868900244351c2f4b',lockSHA256:'4aa46ded544d07533aa899f3acdbd7d70d1791f95d1e0ccdd5d4cf3a3392a2f2',javaScriptSHA256:actual.js,nativeExecutableSHA256:actual.native,archiveSHA256:actual.archive,scope:'Fresh iOS build from the shipped Android 1.12.5 source tree with explicit test version/build configuration. No JS fixture injection, installation, upgrade, provider or store acceptance. Historical assets are test inputs, never a release candidate.'});
-}
-const backupPath=/^activity-backups\/bkp_[a-f0-9]{32}\.json$/;
-const digestBytes=bytes=>createHash('sha256').update(bytes).digest('hex');
-function documentFiles(directory){
- return Object.fromEntries((existsSync(directory)?readdirSync(directory,{recursive:true,withFileTypes:true}):[]).flatMap(entry=>{
-  assert.ok(!entry.isSymbolicLink()&&(entry.isDirectory()||entry.isFile()),'Reject untracked nonregular saved files.');
-  if(entry.isDirectory())return [];
-  const parent=entry.parentPath??entry.path,path=join(parent,entry.name),name=path.slice(directory.length+1);
-  return [[name,hash(path)]];
- }).sort(([left],[right])=>left.localeCompare(right)));
-}
-const protectedDocumentFiles=directory=>Object.fromEntries(Object.entries(documentFiles(directory)).filter(([name])=>!/^SQLite\/puptime-v2\.db(?:-wal|-shm|-journal)?$/.test(name)));
-function strictBackup(raw){
- assert.equal(typeof raw,'string');const value=JSON.parse(raw);
- assert.deepEqual(Object.keys(value).sort(),['format','version','createdAt','petId','puppyName','reason','appVersion','events'].sort());
- assert.equal(raw,JSON.stringify(value),'Require the exact compact JSON emitted by the original backup writer.');
- assert.equal(value.format,'puptime-activity');assert.equal(value.version,1);
- assert.ok(Number.isSafeInteger(value.createdAt)&&value.createdAt>=0&&value.createdAt<=8640000000000000);
- assert.match(value.petId,/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/);assert.ok(typeof value.puppyName==='string'&&value.puppyName.length>0&&value.puppyName.length<=256);
- assert.ok(['daily','before-update','account-change','cloud-replace','import','recovery','delete'].includes(value.reason));
- assert.ok(typeof value.appVersion==='string'&&value.appVersion.length>0&&value.appVersion.length<=128);
- assert.deepEqual(parseEvents(value.events),value.events);return value;
-}
-function assertDeviceClock(clock,previous){
- assert.deepEqual(Object.keys(clock).sort(),['date','timeZone','offsetSeconds','timestamp'].sort());
- assert.ok(Number.isSafeInteger(clock.timestamp)&&clock.timestamp>=0&&clock.timestamp<=8640000000000000);
- assert.ok(typeof clock.timeZone==='string'&&clock.timeZone.length>0&&clock.timeZone.length<=128);
- assert.ok(Number.isInteger(clock.offsetSeconds)&&Math.abs(clock.offsetSeconds)<=86400);
- assert.equal(clock.date,new Date(clock.timestamp+clock.offsetSeconds*1000).toISOString().slice(0,10));
- if(previous){for(const key of ['date','timeZone','offsetSeconds'])assert.equal(clock[key],previous[key],'The actual device-local day and time zone must remain unchanged.');assert.ok(clock.timestamp>=previous.timestamp,'The device clock must not move backwards.');}
- return clock;
-}
-function assertOldDaily(before,clock){
- assertDeviceClock(clock);assert.equal(before.tables.puppies.length,1);const puppy=before.tables.puppies[0];
- assert.deepEqual(before.tables.metadata.filter(row=>row.key==='active_pet_id').map(row=>row.value),[puppy.id]);
- assert.equal(before.tables.events.length,12);assert.ok(before.tables.events.every(row=>row.pet_id===puppy.id));
- assert.deepEqual(before.tables.metadata.filter(row=>row.key==='backup_app_version').map(row=>row.value),[oldVersion]);
- assert.deepEqual(Object.keys(before.backups).sort(),Object.keys(before.files).filter(name=>name.startsWith('activity-backups/')).sort());
- const daily=[];
- for(const [name,raw] of Object.entries(before.backups)){
-  assert.match(name,backupPath);assert.equal(before.files[name],digestBytes(raw));const backup=strictBackup(raw);
-  assert.equal(backup.petId,puppy.id);assert.equal(backup.appVersion,oldVersion);assert.ok(backup.events.length>0);
-  assert.ok(backup.createdAt<=clock.timestamp,'An old backup cannot come from the future.');
-  if(backup.reason==='daily'&&new Date(backup.createdAt+clock.offsetSeconds*1000).toISOString().slice(0,10)===clock.date)daily.push(backup);
- }
- assert.equal(daily.length,1,'Establish one genuine old-runtime daily backup on this device-local date.');
-}
-function assertNumericUpgrade(before,after,{started,finished}){
- assertDeviceClock(finished,started);assertOldDaily(before,started);
- const added=Object.keys(after.files).filter(name=>!Object.hasOwn(before.files,name));assert.equal(added.length,1,'Only the before-update backup file may be added.');
- const name=added[0];assert.match(name,backupPath);assert.equal(after.files[name],digestBytes(after.backups[name]));const backup=strictBackup(after.backups[name]);
- const puppy=before.tables.puppies[0];assert.equal(backup.reason,'before-update');assert.equal(backup.appVersion,newVersion);assert.equal(backup.petId,puppy.id);assert.equal(backup.puppyName,puppy.name);
- assert.ok(backup.createdAt>=started.timestamp&&backup.createdAt<=finished.timestamp,'The safety backup must be created inside the actual first-launch interval.');
- const events=[...before.tables.events].sort((left,right)=>right.at-left.at||Buffer.compare(Buffer.from(right.id),Buffer.from(left.id))).map(({id,...row})=>({id,...eventDataFromSql(row)}));
- assert.deepEqual(backup.events,events,'Preserve all original events in the production backup order.');
- assert.deepEqual(after.tables.metadata.filter(row=>row.key==='backup_app_version').map(row=>row.value),[newVersion]);
- const files={...after.files},backups={...after.backups};delete files[name];delete backups[name];
- const normalized={...after,files,backups,tables:{...after.tables,metadata:after.tables.metadata.map(row=>row.key==='backup_app_version'?{...row,value:oldVersion}:row)}};
- assertPreserved(before,normalized,{paletteChange:true});return name;
-}
-function assertClockEnvelope(value,device,nonce){assert.deepEqual(Object.keys(value).sort(),['clock','device','nonce']);assert.equal(value.nonce,nonce);assert.equal(value.device,device);return assertDeviceClock(value.clock);}
-function prepareDeviceClock(directory,device,nonce,assertLease){
- assert.match(device,/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i);assert.match(nonce,/^[a-f0-9]{32}$/);assertLease();
- const source=join(directory,'device-clock.swift'),binary=join(directory,'device-clock');
- writeFileSync(source,`import Foundation
-let now = Date()
-let zone = TimeZone.current
-var calendar = Calendar(identifier: .gregorian)
-calendar.timeZone = zone
-let parts = calendar.dateComponents([.year, .month, .day], from: now)
-let value: [String: Any] = ["date": String(format: "%04d-%02d-%02d", parts.year!, parts.month!, parts.day!), "timeZone": zone.identifier, "offsetSeconds": zone.secondsFromGMT(for: now), "timestamp": Int64(floor(now.timeIntervalSince1970 * 1000))]
-let envelope: [String: Any] = ["nonce": "${nonce}", "device": "${device}", "clock": value]
-FileHandle.standardOutput.write(try JSONSerialization.data(withJSONObject: envelope, options: [.sortedKeys]))
-`,{mode:0o600,flag:'wx'});
- const sdk=command('xcrun',['--sdk','iphonesimulator','--show-sdk-path']);
- command('xcrun',['--sdk','iphonesimulator','swiftc','-sdk',sdk,'-target','arm64-apple-ios17.0-simulator',source,'-o',binary]);
- command('codesign',['--force','--sign','-',binary]);
- const sourceSHA256=hash(source),binarySHA256=hash(binary);
- return {sourceSHA256,binarySHA256,read(){assertLease();assert.equal(hash(source),sourceSHA256);assert.equal(hash(binary),binarySHA256);return assertClockEnvelope(JSON.parse(simctl('spawn',device,binary)),device,nonce);}};
 }
 function numericSelfCheck(){
  const timestamp=Date.UTC(2026,10,19,12),clock={date:'2026-11-19',timeZone:'Etc/UTC',offsetSeconds:0,timestamp},finished={...clock,timestamp:timestamp+1000};
@@ -218,15 +141,6 @@ function prepareEnrolled(cuts,output,source){
  const manifest={schemaVersion:1,status:'prepared',stage:'controlled-origin-enrolled-preparation',upgradeExecuted:false,appsInstalled:false,javaScriptModified:false,driverSource:source,driverScriptSHA256:hash(new URL(import.meta.url)),packageSHA256,lockSHA256,runtimes:cuts.map(cut=>cut.preparation),scope:'Private inputs only. A later case must independently verify these files before exact-source controlled-origin exports and installation; this is not an original-byte, enrolled-runtime, numeric/store, current-candidate or provider-authentication pass.'};
  writeFileSync(join(output,'enrolled-inputs.json'),JSON.stringify(manifest,null,2)+'\n',{mode:0o600,flag:'wx'});
  console.log('PASS controlled-origin enrolled preparation only; no runtime replacement executed.');
-}
-function assertPreserved(before,after,{paletteChange=false}={}){
- const protectedState=value=>({...value,widgetTimelines:Object.fromEntries(Object.entries(value.widgetTimelines).map(([key,entries])=>[key,entries.map(props=>{
-  if(!paletteChange)return props;
-  const {appearance}=props;assert.ok(appearance?.light&&appearance?.dark,'Retain both widget appearances.');
-  const colours=value=>{const {background,surface,...layout}=value;assert.equal(typeof background,'string');assert.equal(typeof surface,'string');return layout;};
-  return {...props,appearance:{...appearance,light:colours(appearance.light),dark:colours(appearance.dark)}};
- })]))});
- assert.deepEqual(protectedState(after),protectedState(before),'Preserve every table/row/sequence counter, saved file, photo and widget activity field.');
 }
 function assertPreferences(settings){
  const value=key=>{const row=settings.find(row=>row.key===key);assert.ok(row,'The older UI must persist each nondefault preference.');return row.value;};
