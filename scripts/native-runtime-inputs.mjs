@@ -6,7 +6,7 @@ import {chmodSync,closeSync,cpSync,lstatSync,mkdirSync,openSync,readFileSync,rea
 import {isAbsolute,join,relative,resolve,sep} from 'node:path';
 
 // Lifecycle source preparation changes compiled code even at the same package version.
-export const nativeHostInputs=['package.json','package-lock.json','app.json','app.config.*','eas.json','.npmrc','plugins','patches','assets','ios','scripts/prepare-sqlite-engine.mjs'];
+export const nativeHostInputs=['package.json','package-lock.json','app.json','app.config.*','eas.json','.npmrc','plugins','patches','assets','ios','scripts/prepare-sqlite-engine.mjs','src/font-icon-notices.json','src/android-software-notices.json'];
 
 const command=(binary,args)=>execFileSync(binary,args,{encoding:'utf8',timeout:120000,stdio:['ignore','pipe','pipe']}).trim();
 const hash=path=>createHash('sha256').update(readFileSync(path)).digest('hex');

@@ -75,13 +75,14 @@ test('symlinked package/source paths and Git failure cannot mutate the fixture',
  }
 });
 
-test('both native host guards bind lifecycle preparation and patch bytes while allowing JS-only changes',t=>{
+test('both native host guards bind lifecycle preparation, patches and packaged notice bytes while allowing JS-only changes',t=>{
  const root=realpathSync(mkdtempSync(join(tmpdir(),'puptime-native-inputs-')));t.after(()=>rmSync(root,{recursive:true,force:true}));git(root,'init','--quiet');
- for(const name of ['scripts/prepare-sqlite-engine.mjs',patchName,'App.tsx']){mkdirSync(dirname(join(root,name)),{recursive:true});writeFileSync(join(root,name),'baseline\n');}
+ const compiled=['scripts/prepare-sqlite-engine.mjs',patchName,'src/font-icon-notices.json','src/android-software-notices.json'];
+ for(const name of [...compiled,'App.tsx']){mkdirSync(dirname(join(root,name)),{recursive:true});writeFileSync(join(root,name),'baseline\n');}
  git(root,'add','.');git(root,'-c','user.name=Source QA','-c','user.email=qa@example.invalid','commit','--quiet','-m','source fixture');
  const changed=()=>git(root,'diff','--name-only','HEAD','--',...nativeHostInputs);
  writeFileSync(join(root,'App.tsx'),'new JavaScript\n');assert.equal(changed(),'');
- for(const name of ['scripts/prepare-sqlite-engine.mjs',patchName]){writeFileSync(join(root,name),'changed native input\n');assert.equal(changed(),name);writeFileSync(join(root,name),'baseline\n');}
+ for(const name of compiled){writeFileSync(join(root,name),'changed native input\n');assert.equal(changed(),name);writeFileSync(join(root,name),'baseline\n');}
  for(const name of ['run-hosted-ios-account-case.mjs','verify-ios-runtime-upgrade.mjs'])assert.match(readFileSync(join(project,'scripts',name),'utf8'),/\.\.\.nativeHostInputs/);
 });
 
