@@ -9,6 +9,7 @@ import {parseEvents} from '../src/storage-validation.ts';
 const command=(binary,args)=>execFileSync(binary,args,{encoding:'utf8',timeout:120000,stdio:['ignore','pipe','pipe']}).trim();
 const hash=path=>createHash('sha256').update(readFileSync(path)).digest('hex');
 const simctl=(...args)=>command('xcrun',['simctl',...args]);
+const repository='patrickchin/puptime',app='com.patrickchin.puptime';
 const backupPath=/^activity-backups\/bkp_[a-f0-9]{32}\.json$/;
 export const digestBytes=bytes=>createHash('sha256').update(bytes).digest('hex');
 export function documentFiles(directory){
@@ -96,4 +97,39 @@ export function assertPreserved(before,after,{paletteChange=false}={}){
   return {...props,appearance:{...appearance,light:colours(appearance.light),dark:colours(appearance.dark)}};
  })]))});
  assert.deepEqual(protectedState(after),protectedState(before),'Preserve every table/row/sequence counter, saved file, photo and widget activity field.');
+}
+
+// Source-bound beta inputs. A missing final target intentionally rejects execution.
+const betaOlder={name:'older',source:'cb8034b45a5c74e0ab2c7c60759b5276e3b85664',producerSource:'4f8b051bae6495cb5db8edf32a32b030e6a2cf5f',event:'workflow_dispatch',branch:'codex/android-beta-core-acceptance-20261125',run:45616778542,attempt:1,checkout:'cb8034b45a5c74e0ab2c7c60759b5276e3b85664',tree:'b0ecf72dddcb015b01c65b7b206cff0ee1b0300f',artifact:15026200874,bytes:67197526,digest:'b637d8213b0b83e9fc815506c3acfea58cf8b7f55c6757828a82ad253412a34f',expiresAt:'2026-12-02T13:17:09Z',version:'1.12.5',build:'1',artifactName:'puptime-ios-125-upgrade-baseline',baselineReceipt:true};
+const betaNewer={name:'newer',source:null,event:'push',branch:'main',run:null,attempt:null,checkout:null,tree:null,artifact:null,bytes:null,digest:null,expiresAt:null,version:'1.13.0',build:'3'};
+export const betaUpgradeCuts=[betaOlder,betaNewer];
+export function assertNumericPins(selected){
+ for(const cut of selected){
+  assert.ok(Number.isSafeInteger(cut.artifact)&&cut.artifact>0&&Number.isSafeInteger(cut.bytes)&&cut.bytes>0,'Bind the actual numeric-upgrade artifact ID and byte size before execution.');
+  for(const field of ['checkout','tree'])assert.match(cut[field]??'',/^[a-f0-9]{40}$/,'Bind the actual compiled checkout and tree before execution.');
+  assert.match(cut.digest??'',/^[a-f0-9]{64}$/,'Bind the full ordinary archive SHA-256 before execution.');
+ }
+}
+export function assertNumericMetadata(cut,run,artifact,now=Date.now()){
+ assertNumericPins([cut]);assert.equal(run.id,cut.run);assert.equal(run.run_attempt,cut.attempt);assert.equal(run.status,'completed');assert.equal(run.conclusion,'success');
+ assert.equal(run.head_sha,cut.producerSource??cut.source);assert.equal(run.event,cut.event);assert.equal(run.head_branch,cut.branch);assert.equal(run.path,'.github/workflows/ios-simulator.yml');assert.equal(run.head_repository?.full_name,repository);
+ assert.equal(artifact.id,cut.artifact);assert.equal(artifact.name,cut.artifactName??'puptime-ios-simulator');assert.equal(artifact.size_in_bytes,cut.bytes);assert.equal(artifact.digest,'sha256:'+cut.digest);assert.equal(artifact.expired,false);assert.equal(artifact.expires_at,cut.expiresAt);assert.ok(Date.parse(artifact.expires_at)>now,'Numeric runtime archives must remain unexpired.');
+ assert.equal(artifact.workflow_run.id,cut.run);assert.equal(artifact.workflow_run.head_sha,cut.producerSource??cut.source);assert.equal(artifact.workflow_run.head_branch,cut.branch);
+}
+export function assertBaselineProducer(cut,artifact,api){
+ if(!cut.baselineReceipt)return;
+ const workflow=command('git',['show',cut.producerSource+':.github/workflows/ios-simulator.yml']);
+ assert.equal(createHash('sha256').update(workflow+'\n').digest('hex'),'f102cd88f2aeb36bbf6fa1a40c7649c9bf6d3d665ab42012a76b6150e9290d22');
+ const jobs=api(`actions/runs/${cut.run}/attempts/${cut.attempt}/jobs?per_page=100`);
+ assert.equal(jobs.total_count,jobs.jobs.length);assert.equal(jobs.jobs.length,4);
+ const matches=jobs.jobs.filter(job=>job.name==='upgrade-baseline');assert.equal(matches.length,1);const job=matches[0];
+ assert.equal(job.status,'completed');assert.equal(job.conclusion,'success');
+ assert.ok(jobs.jobs.filter(value=>value!==job).every(value=>value.status==='completed'&&value.conclusion==='skipped'));
+ const uploads=job.steps.filter(step=>step.name==='Run actions/upload-artifact@v6');assert.equal(uploads.length,1);const upload=uploads[0];
+ assert.equal(upload.status,'completed');assert.equal(upload.conclusion,'success');
+ const created=Date.parse(artifact.created_at),start=Date.parse(upload.started_at)-1000,end=Date.parse(upload.completed_at)+1000;
+ assert.ok(Number.isFinite(created)&&Number.isFinite(start)&&Number.isFinite(end)&&created>=start&&created<=end);
+}
+export function assertBaselineReceipt(cut,value,actual){
+ assert.deepEqual(value,{schemaVersion:1,stage:'shipped-source-ios-baseline-build',upgradeExecuted:false,releaseQualified:false,producerHead:cut.producerSource,runId:String(cut.run),runAttempt:String(cut.attempt),source:cut.source,sourceTree:cut.tree,version:cut.version,build:cut.build,bundleIdentifier:app,versionOnlyTestConfiguration:true,appConfigSHA256:actual.config,packageSHA256:'64c0fa8d471b5485bfe53b7eb26f8696a29e39a8aad82e1868900244351c2f4b',lockSHA256:'4aa46ded544d07533aa899f3acdbd7d70d1791f95d1e0ccdd5d4cf3a3392a2f2',javaScriptSHA256:actual.js,nativeExecutableSHA256:actual.native,archiveSHA256:actual.archive,scope:'Fresh iOS build from the shipped Android 1.12.5 source tree with explicit test version/build configuration. No JS fixture injection, installation, upgrade, provider or store acceptance. Historical assets are test inputs, never a release candidate.'});
 }

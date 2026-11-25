@@ -1,0 +1,4 @@
+appId: com.patrickchin.puptime
+---
+- runFlow: reopen-offline.yaml
+- stopApp

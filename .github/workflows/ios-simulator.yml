@@ -29,7 +29,7 @@ on:
       upgrade_stage:
         description: Original-runtime archive inspection or actual data-preserving replacement
         type: choice
-        options: [inspect, exercise, beta]
+        options: [inspect, exercise, beta, beta-enrolled]
         default: inspect
 
 jobs:
@@ -333,12 +333,12 @@ jobs:
           node scripts/verify-ios-runtime-upgrade.mjs --self-check
           node scripts/verify-ios-runtime-upgrade.mjs --beta-self-check
       - uses: actions/setup-java@v6
-        if: inputs.upgrade_stage == 'exercise' || inputs.upgrade_stage == 'beta'
+        if: inputs.upgrade_stage == 'exercise' || inputs.upgrade_stage == 'beta' || inputs.upgrade_stage == 'beta-enrolled'
         with:
           distribution: temurin
           java-version: '17'
       - name: Install existing Maestro driver
-        if: inputs.upgrade_stage == 'exercise' || inputs.upgrade_stage == 'beta'
+        if: inputs.upgrade_stage == 'exercise' || inputs.upgrade_stage == 'beta' || inputs.upgrade_stage == 'beta-enrolled'
         env:
           MAESTRO_VERSION: '2.11.0'
         run: |
@@ -348,6 +348,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           UPGRADE_STAGE: ${{ inputs.upgrade_stage }}
+          PUPTIME_NATIVE_HOST_RUN_ID: ${{ inputs.native_host_run_id }}
+          PUPTIME_NATIVE_HOST_POLICY: ${{ inputs.native_host_policy }}
           MAESTRO_CLI_NO_ANALYTICS: '1'
           MAESTRO_DRIVER_STARTUP_TIMEOUT: '300000'
         run: |
@@ -355,6 +357,15 @@ jobs:
             inspect) node scripts/verify-ios-runtime-upgrade.mjs --inspect-only build/native-runtime-replacement ;;
             exercise) node scripts/verify-ios-runtime-upgrade.mjs --replace-synthetic build/native-runtime-replacement ;;
             beta) node scripts/verify-ios-runtime-upgrade.mjs --beta-upgrade build/native-runtime-replacement ;;
+            beta-enrolled)
+              beta_enrolled_directory="$RUNNER_TEMP/puptime-beta-enrolled-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+              test ! -e "$beta_enrolled_directory"
+              trap 'rm -rf "$beta_enrolled_directory"' EXIT
+              node scripts/verify-ios-runtime-upgrade.mjs --prepare-beta-enrolled "$beta_enrolled_directory"
+              PUPTIME_ENROLLED_RUNTIME_INPUTS="$beta_enrolled_directory/enrolled-inputs.json" \
+              PUPTIME_NATIVE_HOST_ARCHIVE="$beta_enrolled_directory/inputs/newer-artifact.zip" \
+              PUPTIME_ACCOUNT_SCENARIO=beta-enrolled-upgrade node scripts/run-hosted-ios-account-case.mjs
+              ;;
             *) exit 2 ;;
           esac
       - name: Upload bounded runtime receipts (inspection is not an upgrade pass)
@@ -362,7 +373,9 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: native-runtime-${{ inputs.upgrade_stage }}-${{ github.run_id }}
-          path: build/native-runtime-replacement
+          path: |
+            build/native-runtime-replacement
+            build/isolated-native-account/beta-enrolled-upgrade
           if-no-files-found: warn
           retention-days: 3
 

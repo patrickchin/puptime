@@ -10,13 +10,15 @@ import {startupEvidence} from './native-startup-evidence.mjs';
 import {nativeCodeFingerprint,nativeHostInputs} from './native-runtime-inputs.mjs';
 import {assertNativeHostRun,assertNativeHostPolicy,assertSameHostAttempt} from './native-host-policy.mjs';
 import {standardSelection} from './native-standard-suite.mjs';
+import {betaUpgradeCuts,assertNumericPins} from './native-upgrade-evidence.mjs';
 
 const repository=process.env.GITHUB_REPOSITORY,runId=process.env.PUPTIME_NATIVE_HOST_RUN_ID;
 assert.equal(repository,'patrickchin/puptime','Run only in the intended repository.');
 assert.match(runId??'',/^\d+$/);
 const scenario=process.env.PUPTIME_ACCOUNT_SCENARIO;
-assert.ok(['baseline','comparison','offline','isolation','photos','deletion','enrolled-upgrade','standard-csv','standard-all','onboarding-sign-in','csv-recovery'].includes(scenario));
-const csvRecovering=scenario==='csv-recovery';
+assert.ok(['baseline','comparison','offline','isolation','photos','deletion','enrolled-upgrade','standard-csv','standard-all','onboarding-sign-in','csv-recovery','beta-enrolled-upgrade'].includes(scenario));
+const csvRecovering=scenario==='csv-recovery',betaEnrolled=scenario==='beta-enrolled-upgrade';
+if(betaEnrolled){assertNumericPins(betaUpgradeCuts);assert.equal(runId,String(betaUpgradeCuts[1].run));}
 const standard=scenario==='standard-csv'||scenario==='standard-all'||csvRecovering;
 const output=resolve('build/isolated-native-account',scenario);if(standard)assert.ok(!existsSync(output),'Use a fresh standard-case output.');mkdirSync(output,{recursive:true});
 const privateDirectory=mkdtempSync(join(tmpdir(),'puptime-native-host-'));
@@ -56,12 +58,13 @@ const {proof}=assertNativeHostPolicy({policy,run:currentRun,artifacts:{total_cou
 const provenance={...proof,scenario,candidateSource:source,nativeSource:run.head_sha,nativeHostRunId:runId,artifactId:artifact.id,artifactDigest:artifact.digest,archiveSource:process.env.PUPTIME_NATIVE_HOST_ARCHIVE?'verified-local-cache':'download',nativeInputsUnchanged:true,nativeExecutableSHA256:hash(join(host,'Puptime')),nativeCode,scope:scenario==='enrolled-upgrade'?'Driver source with privately prepared historical native/source inputs; the selected-main artifact is a reference attestation, and the prepared older native host is installed first. Actual native email SDK and isolated local HTTPS service; controlled-origin runtime qualification only.':'Actual native email SDK + ephemeral local HTTPS Better Auth/D1/SQLite DO; synthetic identity and history only; no production, provider OAuth or release qualification.'};
 if(standard)provenance.scope='Full production App with unchanged standard guest flows, native storage/navigation and SDK using an ephemeral local HTTPS service. App PostHog is unconfigured. No email sign-in, provider, production or release qualification.';
 let initialHost=host;
-if(scenario==='enrolled-upgrade'){
+if(scenario==='enrolled-upgrade'||betaEnrolled){
  const path=process.env.PUPTIME_ENROLLED_RUNTIME_INPUTS;assert.ok(path&&isAbsolute(path));assert.equal(realpathSync(path),path);assert.equal(statSync(path).mode&0o777,0o600);assert.equal(statSync(dirname(path)).mode&0o777,0o700);assert.ok(statSync(path).size<2097152);
- const inputs=JSON.parse(readFileSync(path,'utf8'));assert.equal(inputs.status,'prepared');assert.equal(inputs.stage,'controlled-origin-enrolled-preparation');assert.equal(inputs.upgradeExecuted,false);assert.equal(inputs.appsInstalled,false);assert.equal(inputs.javaScriptModified,false);
- const older=inputs.runtimes[0];assert.equal(older.name,'older');assert.equal(older.source,'008b4a0b7f4d8a77cc8c13d95f39001534d8fd70');
+ const inputs=JSON.parse(readFileSync(path,'utf8'));assert.equal(inputs.status,'prepared');assert.equal(inputs.stage,betaEnrolled?'controlled-origin-beta-enrolled-preparation':'controlled-origin-enrolled-preparation');assert.equal(inputs.upgradeExecuted,false);assert.equal(inputs.appsInstalled,false);assert.equal(inputs.javaScriptModified,false);
+ const older=inputs.runtimes[0];assert.equal(older.name,'older');assert.equal(older.source,betaEnrolled?betaUpgradeCuts[0].source:'008b4a0b7f4d8a77cc8c13d95f39001534d8fd70');
+ if(betaEnrolled){assert.deepEqual(older.input,betaUpgradeCuts[0]);assert.equal(inputs.driverScriptSHA256,hash('scripts/verify-ios-runtime-upgrade.mjs'));}
  initialHost=join(dirname(path),'inputs/older/host/Puptime.app');assert.equal(older.host,initialHost);assert.equal(realpathSync(initialHost),initialHost);
- assert.equal(hash(join(initialHost,'Puptime')),'1d278f77e8e1358a1855c854462bde2c85e689f7e270fd2ea88ab0982c814971');assert.equal(hash(join(initialHost,'main.jsbundle')),'793aea3e98318fca08598782e4629e40542182bc2cbd3697f4f3533593ca5da7');command('codesign',['--verify','--deep','--strict',initialHost]);
+ assert.equal(hash(join(initialHost,'Puptime')),betaEnrolled?older.original.nativeExecutableSHA256:'1d278f77e8e1358a1855c854462bde2c85e689f7e270fd2ea88ab0982c814971');assert.equal(hash(join(initialHost,'main.jsbundle')),betaEnrolled?older.original.javaScriptSHA256:'793aea3e98318fca08598782e4629e40542182bc2cbd3697f4f3533593ca5da7');command('codesign',['--verify','--deep','--strict',initialHost]);
  assert.equal(command('plutil',['-extract','CFBundleIdentifier','raw','-o','-',join(initialHost,'Info.plist')]),'com.patrickchin.puptime');
  provenance.initialHistoricalSource=older.source;provenance.initialHistoricalNativeSHA256=hash(join(initialHost,'Puptime'));
 }
@@ -90,16 +93,16 @@ try{
  catch(error){
   // This is before app install or identity setup: retain actual OS progress, not
   // Node's truncated rendering of the child-process error's stdout property.
-  if(!standard)writeFileSync(join(output,'simulator-boot-failure.log'),String(error.stdout??'').slice(-65536)+'\n'+String(error.stderr??'').slice(-8192));
+  if(!standard&&!betaEnrolled)writeFileSync(join(output,'simulator-boot-failure.log'),String(error.stdout??'').slice(-65536)+'\n'+String(error.stderr??'').slice(-8192));
   let state='unavailable';try{const all=JSON.parse(command('xcrun',['simctl','list','devices','available','-j'],{timeout:15000}));state=Object.values(all.devices).flat().find(item=>item.udid===device)?.state??'missing';}catch{}
   writeFileSync(join(output,'simulator-boot-failure.json'),JSON.stringify({stage:'simulator-boot',appInstalled:false,elapsedMs:Date.now()-bootStarted,category:error.code==='ETIMEDOUT'?'timeout':'command-failed',state},null,2)+'\n');throw error;
  }
  markStartup('host-install');
  command('xcrun',['simctl','install',device,initialHost]);
- const mode=csvRecovering?['--csv-recovery']:standard?[standardSelection(scenario).mode]:{baseline:[],comparison:['--puppy-comparison'],offline:['--offline-lifecycle'],isolation:['--account-isolation'],photos:['--photo-lifecycle'],deletion:['--deletion-faults'],'enrolled-upgrade':['--enrolled-runtime-upgrade'],'onboarding-sign-in':['--onboarding-sign-in']}[scenario];
+ const mode=csvRecovering?['--csv-recovery']:standard?[standardSelection(scenario).mode]:{baseline:[],comparison:['--puppy-comparison'],offline:['--offline-lifecycle'],isolation:['--account-isolation'],photos:['--photo-lifecycle'],deletion:['--deletion-faults'],'enrolled-upgrade':['--enrolled-runtime-upgrade'],'beta-enrolled-upgrade':['--beta-enrolled-runtime-upgrade'],'onboarding-sign-in':['--onboarding-sign-in']}[scenario];
  const args=['scripts/verify-ios-guest-account.mjs',device,initialHost,'--replace-synthetic',output,...mode];
  markStartup('sdk-spawn');
- await new Promise((resolveCase,reject)=>{const child=spawn(process.execPath,args,{stdio:csvRecovering?['ignore','pipe','pipe']:'inherit',detached:true,env:{...process.env,CI:'1'}});if(csvRecovering){child.stdout.resume();child.stderr.resume();}stopCaseChild=ownProcess(child,{graceMs:120000});child.once('spawn',()=>markStartup('sdk-process'));child.once('error',reject);child.once('close',async (code,signal)=>{const stopped=await stopCaseChild();code===0&&stopped?resolveCase():reject(Object.assign(new Error(`Native ${scenario} case failed (${code}).`),{status:code,signal}));});});
+ await new Promise((resolveCase,reject)=>{const child=spawn(process.execPath,args,{stdio:csvRecovering||betaEnrolled?['ignore','pipe','pipe']:'inherit',detached:true,env:{...process.env,CI:'1'}});if(csvRecovering||betaEnrolled){child.stdout.resume();child.stderr.resume();}stopCaseChild=ownProcess(child,{graceMs:120000});child.once('spawn',()=>markStartup('sdk-process'));child.once('error',reject);child.once('close',async (code,signal)=>{const stopped=await stopCaseChild();code===0&&stopped?resolveCase():reject(Object.assign(new Error(`Native ${scenario} case failed (${code}).`),{status:code,signal}));});});
  markStartup('case-result');
  assert.equal(JSON.parse(readFileSync(join(output,'verification.json'),'utf8')).status,'passed');assert.equal(task.signal,null);completed=true;markStartup('case-result','passed');
 }finally{await task.run();task.dispose();}

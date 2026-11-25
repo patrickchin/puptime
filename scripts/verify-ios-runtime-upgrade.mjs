@@ -10,11 +10,11 @@ import {homedir,tmpdir} from 'node:os';
 import {basename,dirname,isAbsolute,join,relative,resolve,sep} from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
 import {nativeSnapshot,nativeTables} from './native-account-evidence.mjs';
-import {assertArchivedSource,nativeTextSection,nativeCodeFingerprint,nativeHostInputs} from './native-runtime-inputs.mjs';
+import {assertArchivedSource,nativeTextSection,nativeCodeFingerprint,nativeHostInputs,archiveHistoricalSource,assertRuntimeZip} from './native-runtime-inputs.mjs';
 import {deleteOwnedSimulator,installTaskCleanup,ownProcess} from './native-task-cleanup.mjs';
 import {readNativeCommandState} from './native-command-evidence.mjs';
 import {eventDataFromSql,eventSqlColumns,eventSqlDefinition} from '../src/record-sql.ts';
-import {digestBytes,documentFiles,protectedDocumentFiles,assertDeviceClock,assertClockEnvelope,prepareDeviceClock,assertPreserved,assertOldDaily as assertOldDailyState,assertNumericUpgrade as assertNumericUpgradeState} from './native-upgrade-evidence.mjs';
+import {digestBytes,documentFiles,protectedDocumentFiles,assertDeviceClock,assertClockEnvelope,prepareDeviceClock,assertPreserved,assertOldDaily as assertOldDailyState,assertNumericUpgrade as assertNumericUpgradeState,betaUpgradeCuts,assertNumericPins,assertNumericMetadata,assertBaselineProducer,assertBaselineReceipt} from './native-upgrade-evidence.mjs';
 
 const repository='patrickchin/puptime',app='com.patrickchin.puptime';
 const originalCuts=[
@@ -26,15 +26,14 @@ const originalCuts=[
 const numericTarget={name:'newer',source:'f8ba094042df97f0300a2ccc01d1124dbc18ac24',event:'pull_request',branch:'codex/sqlite-engine-maintenance',run:44461658975,attempt:1,checkout:'abcd4447052d0ce9d6773177197774fa6a3a6250',tree:'532f419ed533a3695d2d3ed7fbb2fbf5827e90f0',artifact:14502365649,bytes:49760202,digest:'6c33c79ef8ce4b8e3da7c3cfe11ac335deccbfb961ad40cd33e11e5d4b440ffd',expiresAt:'2026-11-26T05:31:31Z',version:'1.12.6',build:'2'};
 // Fresh baseline metadata is bound for hosted input verification, not inspected
 // or executed here. Final MAIN target remains deliberately unbound.
-const betaOlder={name:'older',source:'cb8034b45a5c74e0ab2c7c60759b5276e3b85664',producerSource:'4f8b051bae6495cb5db8edf32a32b030e6a2cf5f',event:'workflow_dispatch',branch:'codex/android-beta-core-acceptance-20261125',run:45616778542,attempt:1,checkout:'cb8034b45a5c74e0ab2c7c60759b5276e3b85664',tree:'b0ecf72dddcb015b01c65b7b206cff0ee1b0300f',artifact:15026200874,bytes:67197526,digest:'b637d8213b0b83e9fc815506c3acfea58cf8b7f55c6757828a82ad253412a34f',expiresAt:'2026-12-02T13:17:09Z',version:'1.12.5',build:'1',artifactName:'puptime-ios-125-upgrade-baseline',baselineReceipt:true};
-const betaNewer={name:'newer',source:null,event:'push',branch:'main',run:null,attempt:null,checkout:null,tree:null,artifact:null,bytes:null,digest:null,expiresAt:null,version:'1.13.0',build:'3'};
+const [betaOlder,betaNewer]=betaUpgradeCuts.map(value=>({...value}));
 const nativeInputs=[...nativeHostInputs,'.env'];
 const [mode='--inspect-only',destination=process.env.GITHUB_ACTIONS==='true'?'build/native-runtime-replacement':join(homedir(),'Pictures/Screenshots/Codex/puptime-runtime-replacement')]=process.argv.slice(2);
-assert.ok(['--inspect-only','--replace-synthetic','--prepare-enrolled','--numeric-upgrade','--beta-upgrade','--beta-self-check','--self-check'].includes(mode));
-const beta=mode==='--beta-upgrade'||mode==='--beta-self-check';
+assert.ok(['--inspect-only','--replace-synthetic','--prepare-enrolled','--prepare-beta-enrolled','--numeric-upgrade','--beta-upgrade','--beta-self-check','--self-check'].includes(mode));
+const beta=['--beta-upgrade','--beta-self-check','--prepare-beta-enrolled'].includes(mode);
 const numeric=mode==='--numeric-upgrade'||beta;
 const cuts=beta?[betaOlder,betaNewer]:numeric?[{...originalCuts[1],name:'older',attempt:1,bytes:67784040,expiresAt:'2026-11-20T10:31:10Z',version:'1.12.0',build:'1'},numericTarget]:originalCuts;
-const preparing=mode==='--prepare-enrolled';
+const preparing=mode==='--prepare-enrolled'||mode==='--prepare-beta-enrolled';
 const oldVersion=beta?'1.12.5/1':'1.12.0/1',newVersion=beta?'1.13.0/3':'1.12.6/2';
 const assertOldDaily=(before,clock)=>assertOldDailyState(before,clock,{oldVersion});
 const assertNumericUpgrade=(before,after,clocks)=>assertNumericUpgradeState(before,after,{...clocks,oldVersion,newVersion});
@@ -43,36 +42,6 @@ const hash=path=>createHash('sha256').update(readFileSync(path)).digest('hex');
 const simctl=(...args)=>command('xcrun',['simctl',...args]);
 const jsonPlist=path=>JSON.parse(command('plutil',['-convert','json','-o','-',path]));
 const inside=(root,path)=>{const name=relative(root,path);return name===''||name!=='..'&&!name.startsWith('..'+sep)&&!isAbsolute(name);};
-function assertNumericPins(selected=cuts){
- for(const cut of selected){
-  assert.ok(Number.isSafeInteger(cut.artifact)&&cut.artifact>0&&Number.isSafeInteger(cut.bytes)&&cut.bytes>0,'Bind the actual numeric-upgrade artifact ID and byte size before execution.');
-  for(const field of ['checkout','tree'])assert.match(cut[field]??'',/^[a-f0-9]{40}$/,'Bind the actual compiled checkout and tree before execution.');
-  assert.match(cut.digest??'',/^[a-f0-9]{64}$/,'Bind the full ordinary archive SHA-256 before execution.');
- }
-}
-function assertNumericMetadata(cut,run,artifact,now=Date.now()){
- assertNumericPins([cut]);assert.equal(run.id,cut.run);assert.equal(run.run_attempt,cut.attempt);assert.equal(run.status,'completed');assert.equal(run.conclusion,'success');
- assert.equal(run.head_sha,cut.producerSource??cut.source);assert.equal(run.event,cut.event);assert.equal(run.head_branch,cut.branch);assert.equal(run.path,'.github/workflows/ios-simulator.yml');assert.equal(run.head_repository?.full_name,repository);
- assert.equal(artifact.id,cut.artifact);assert.equal(artifact.name,cut.artifactName??'puptime-ios-simulator');assert.equal(artifact.size_in_bytes,cut.bytes);assert.equal(artifact.digest,'sha256:'+cut.digest);assert.equal(artifact.expired,false);assert.equal(artifact.expires_at,cut.expiresAt);assert.ok(Date.parse(artifact.expires_at)>now,'Numeric runtime archives must remain unexpired.');
- assert.equal(artifact.workflow_run.id,cut.run);assert.equal(artifact.workflow_run.head_sha,cut.producerSource??cut.source);assert.equal(artifact.workflow_run.head_branch,cut.branch);
-}
-function assertBaselineProducer(cut,artifact,api){
- if(!cut.baselineReceipt)return;
- const workflow=command('git',['show',cut.producerSource+':.github/workflows/ios-simulator.yml']);
- assert.equal(createHash('sha256').update(workflow+'\n').digest('hex'),'f102cd88f2aeb36bbf6fa1a40c7649c9bf6d3d665ab42012a76b6150e9290d22');
- const jobs=api(`actions/runs/${cut.run}/attempts/${cut.attempt}/jobs?per_page=100`);
- assert.equal(jobs.total_count,jobs.jobs.length);assert.equal(jobs.jobs.length,4);
- const matches=jobs.jobs.filter(job=>job.name==='upgrade-baseline');assert.equal(matches.length,1);const job=matches[0];
- assert.equal(job.status,'completed');assert.equal(job.conclusion,'success');
- assert.ok(jobs.jobs.filter(value=>value!==job).every(value=>value.status==='completed'&&value.conclusion==='skipped'));
- const uploads=job.steps.filter(step=>step.name==='Run actions/upload-artifact@v6');assert.equal(uploads.length,1);const upload=uploads[0];
- assert.equal(upload.status,'completed');assert.equal(upload.conclusion,'success');
- const created=Date.parse(artifact.created_at),start=Date.parse(upload.started_at)-1000,end=Date.parse(upload.completed_at)+1000;
- assert.ok(Number.isFinite(created)&&Number.isFinite(start)&&Number.isFinite(end)&&created>=start&&created<=end);
-}
-function assertBaselineReceipt(cut,value,actual){
- assert.deepEqual(value,{schemaVersion:1,stage:'shipped-source-ios-baseline-build',upgradeExecuted:false,releaseQualified:false,producerHead:cut.producerSource,runId:String(cut.run),runAttempt:String(cut.attempt),source:cut.source,sourceTree:cut.tree,version:cut.version,build:cut.build,bundleIdentifier:app,versionOnlyTestConfiguration:true,appConfigSHA256:actual.config,packageSHA256:'64c0fa8d471b5485bfe53b7eb26f8696a29e39a8aad82e1868900244351c2f4b',lockSHA256:'4aa46ded544d07533aa899f3acdbd7d70d1791f95d1e0ccdd5d4cf3a3392a2f2',javaScriptSHA256:actual.js,nativeExecutableSHA256:actual.native,archiveSHA256:actual.archive,scope:'Fresh iOS build from the shipped Android 1.12.5 source tree with explicit test version/build configuration. No JS fixture injection, installation, upgrade, provider or store acceptance. Historical assets are test inputs, never a release candidate.'});
-}
 function numericSelfCheck(){
  const timestamp=Date.UTC(2026,10,19,12),clock={date:'2026-11-19',timeZone:'Etc/UTC',offsetSeconds:0,timestamp},finished={...clock,timestamp:timestamp+1000};
  const db=new DatabaseSync(':memory:');let rows,events;
@@ -123,22 +92,13 @@ function prepareEnrolled(cuts,output,source){
  const lockSHA256=hash('package-lock.json'),packageSHA256=hash('package.json');
  for(const cut of cuts){
   const directory=dirname(dirname(cut.host)),sourceRoot=join(directory,'source'),archive=join(directory,'source.tar');
-  mkdirSync(sourceRoot,{mode:0o700});
-  const fd=openSync(archive,'wx',0o600);
-  try{execFileSync('git',['archive','--format=tar',cut.source],{timeout:120000,stdio:['ignore',fd,'pipe']});}finally{closeSync(fd);}
-  command('tar',['-xf',archive,'-C',sourceRoot]);rmSync(archive);chmodSync(sourceRoot,0o700);
-  const sourceFiles=Object.fromEntries(command('git',['ls-tree','-rz',cut.source]).split('\0').filter(Boolean).map(entry=>{
-   const match=entry.match(/^(100644|100755) blob ([a-f0-9]{40})\t(.+)$/s);assert.ok(match,'Reject unsupported historical source entry modes.');
-   return [match[3],{mode:match[1],blobSHA1:match[2]}];
-  }));
-  assertArchivedSource(sourceRoot,sourceFiles);
-  assert.equal(hash(join(sourceRoot,'package-lock.json')),lockSHA256,'Share dependencies only across the exact historical and driver lock.');
-  assert.equal(hash(join(sourceRoot,'package.json')),packageSHA256,'Preserve the exact historical package contract.');
+  const sourceFiles=archiveHistoricalSource(cut.source,sourceRoot,archive);
+  const cutPackageSHA256=hash(join(sourceRoot,'package.json')),cutLockSHA256=hash(join(sourceRoot,'package-lock.json'));
   const nativeCode=nativeCodeFingerprint(cut.host,directory);
   assert.ok(Object.hasOwn(nativeCode,cut.provenance.executable),'Attest the main executable as well as embedded native code.');
-  cut.preparation={name:cut.name,host:cut.host,sourceRoot,sourceFiles,source:cut.source,tree:cut.tree,packageSHA256,lockSHA256,appGroup:cut.group,infoPlistSHA256:hash(join(cut.host,'Info.plist')),signature:{deepStrictVerified:true,codeResourcesSHA256:hash(join(cut.host,'_CodeSignature/CodeResources'))},nativeCode,original:cut.provenance};
+  cut.preparation={name:cut.name,host:cut.host,sourceRoot,sourceFiles,source:cut.source,tree:cut.tree,packageSHA256:cutPackageSHA256,lockSHA256:cutLockSHA256,...(beta?{input:betaUpgradeCuts.find(value=>value.name===cut.name)}:{}),appGroup:cut.group,infoPlistSHA256:hash(join(cut.host,'Info.plist')),signature:{deepStrictVerified:true,codeResourcesSHA256:hash(join(cut.host,'_CodeSignature/CodeResources'))},nativeCode,original:cut.provenance};
  }
- const manifest={schemaVersion:1,status:'prepared',stage:'controlled-origin-enrolled-preparation',upgradeExecuted:false,appsInstalled:false,javaScriptModified:false,driverSource:source,driverScriptSHA256:hash(new URL(import.meta.url)),packageSHA256,lockSHA256,runtimes:cuts.map(cut=>cut.preparation),scope:'Private inputs only. A later case must independently verify these files before exact-source controlled-origin exports and installation; this is not an original-byte, enrolled-runtime, numeric/store, current-candidate or provider-authentication pass.'};
+ const manifest={schemaVersion:beta?2:1,status:'prepared',stage:beta?'controlled-origin-beta-enrolled-preparation':'controlled-origin-enrolled-preparation',upgradeExecuted:false,appsInstalled:false,javaScriptModified:false,driverSource:source,driverScriptSHA256:hash(new URL(import.meta.url)),packageSHA256,lockSHA256,runtimes:cuts.map(cut=>cut.preparation),scope:'Private inputs only. A later case must independently verify these files before exact-source controlled-origin exports and installation; this is not an original-byte, enrolled-runtime, numeric/store, current-candidate or provider-authentication pass.'};
  writeFileSync(join(output,'enrolled-inputs.json'),JSON.stringify(manifest,null,2)+'\n',{mode:0o600,flag:'wx'});
  console.log('PASS controlled-origin enrolled preparation only; no runtime replacement executed.');
 }
@@ -200,7 +160,7 @@ async function selfCheck(){
  console.log('PASS runtime/source/native-text guards: palette-only change, exact source blobs/modes and bounded named-preview exception.');
 }
 async function verify(){
- if(numeric)assertNumericPins();
+ if(numeric)assertNumericPins(cuts);
  assert.equal(process.env.GITHUB_REPOSITORY??repository,repository);
  let output=resolve(destination);
  if(preparing){
@@ -208,7 +168,7 @@ async function verify(){
   output=join(realpathSync(dirname(output)),basename(output));
   for(const root of [command('git',['rev-parse','--show-toplevel']),process.env.GITHUB_WORKSPACE].filter(Boolean))assert.ok(!inside(realpathSync(root),output),'Private inputs must stay outside checkout and uploaded build receipt roots.');
   assert.ok(!existsSync(output),'Preparation owns a fresh destination, never supplied existing hosts or source roots.');
-  assert.ok(process.env.PUPTIME_RUNTIME_ARTIFACT_CACHE,'Preparation requires the existing verified archive cache; do not download another copy.');
+  if(!beta)assert.ok(process.env.PUPTIME_RUNTIME_ARTIFACT_CACHE,'Historical preparation requires the existing verified archive cache.');
   assert.equal(command('git',['status','--porcelain','--untracked-files=all']),'','Commit the exact preparation driver before creating reusable inputs.');
   mkdirSync(output,{mode:0o700});
  }else mkdirSync(output,{recursive:true});
@@ -237,7 +197,7 @@ async function verify(){
   if(cut.baselineReceipt){try{command('git',['cat-file','-e',cut.producerSource+'^{commit}']);}catch{command('git',['fetch','--no-tags','origin',cut.producerSource]);}assertBaselineProducer(cut,artifact,api);}
   const archive=join(cache,cut.name+'-artifact.zip');
   if(!existsSync(archive)){
-   assert.ok(!preparing,'Preparation requires both completed cached archives.');
+   assert.ok(!preparing||beta,'Historical preparation requires both completed cached archives.');
    const partial=archive+'.part',fd=openSync(partial,'wx',0o600);
    try{execFileSync('gh',['api',`repos/${repository}/actions/artifacts/${cut.artifact}/zip`,...rawFlags],{timeout:600000,stdio:['ignore',fd,'pipe']});}finally{closeSync(fd);}
    assert.equal(hash(partial),cut.digest,'Verify the complete download before adding it to the artifact cache.');renameSync(partial,archive);
@@ -245,8 +205,10 @@ async function verify(){
   assert.equal(hash(archive),cut.digest,'Verify exact original GitHub archive bytes, including cached files.');
   if(numeric)assert.equal(statSync(archive).size,cut.bytes);
   const directory=join(privateDir,cut.name);mkdirSync(directory);
+  if(beta)assertRuntimeZip(archive,cut.baselineReceipt?'baseline':'host');
   command('unzip',['-q',archive,'-d',directory]);
   const inner=join(directory,'Puptime-iOS-Simulator.zip');assert.ok(existsSync(inner));
+  if(beta)assertRuntimeZip(inner,'inner');
   command('ditto',['-x','-k',inner,join(directory,'host')]);cut.host=join(directory,'host/Puptime.app');
   command('codesign',['--verify','--deep','--strict',cut.host]);
   const info=jsonPlist(join(cut.host,'Info.plist')),binary=join(cut.host,info.CFBundleExecutable);

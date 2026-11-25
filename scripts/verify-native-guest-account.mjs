@@ -19,17 +19,18 @@ import {pushResponseSchema,pullPageSchema,mutationSchema} from '../src/cloud/pro
 import {nativeSnapshot,assertNativeTransition,assertNativeDetached,assertNativeDrained,assertEmptyIosRestoreSources,capturedJson,nativeAuthUiFlags} from './native-account-evidence.mjs';
 import {startupEvidence} from './native-startup-evidence.mjs';
 import {readNativeCommandState} from './native-command-evidence.mjs';
-import {assertArchivedSource,nativeCodeFingerprint} from './native-runtime-inputs.mjs';
+import {assertArchivedSource,nativeCodeFingerprint,nativeHostInputs,historicalSourceFiles} from './native-runtime-inputs.mjs';
 import {deleteOwnedSimulator,installTaskCleanup,ownProcess} from './native-task-cleanup.mjs';
 import {standardFixtureEnvironment,runStandardSuite} from './native-standard-suite.mjs';
+import {betaUpgradeCuts,assertNumericPins,assertNumericMetadata,assertBaselineProducer,documentFiles,protectedDocumentFiles,prepareDeviceClock,assertDeviceClock,assertOldDaily,assertNumericUpgrade,assertPreserved} from './native-upgrade-evidence.mjs';
 
 const [platform,initialDevice,host,consent,destination='build/guest-account-'+platform,onboarding]=process.argv.slice(2);
 let device=initialDevice;
 assert.ok(['ios','android'].includes(platform));
-assert.ok(onboarding===undefined||['--onboarding-sign-in','--account-deletion','--puppy-comparison','--offline-lifecycle','--account-isolation','--photo-lifecycle','--deletion-faults','--enrolled-runtime-upgrade','--standard-csv','--standard-all','--csv-recovery'].includes(onboarding));
-const csvRecovering=onboarding==='--csv-recovery';
+assert.ok(onboarding===undefined||['--onboarding-sign-in','--account-deletion','--puppy-comparison','--offline-lifecycle','--account-isolation','--photo-lifecycle','--deletion-faults','--enrolled-runtime-upgrade','--beta-enrolled-runtime-upgrade','--standard-csv','--standard-all','--csv-recovery'].includes(onboarding));
+const csvRecovering=onboarding==='--csv-recovery',betaEnrolled=onboarding==='--beta-enrolled-runtime-upgrade';
 const standard=onboarding==='--standard-csv'||onboarding==='--standard-all'||csvRecovering;
-const android=platform==='android',deleting=onboarding==='--account-deletion',onboardingSignIn=onboarding==='--onboarding-sign-in',comparing=onboarding==='--puppy-comparison',offline=onboarding==='--offline-lifecycle',isolating=onboarding==='--account-isolation',photographing=onboarding==='--photo-lifecycle',deletionFaults=onboarding==='--deletion-faults',upgrading=onboarding==='--enrolled-runtime-upgrade';
+const android=platform==='android',deleting=onboarding==='--account-deletion',onboardingSignIn=onboarding==='--onboarding-sign-in',comparing=onboarding==='--puppy-comparison',offline=onboarding==='--offline-lifecycle',isolating=onboarding==='--account-isolation',photographing=onboarding==='--photo-lifecycle',deletionFaults=onboarding==='--deletion-faults',upgrading=onboarding==='--enrolled-runtime-upgrade'||betaEnrolled;
 assert.ok(!(comparing||offline||isolating||photographing||deletionFaults||upgrading)||!android,'Extended lifecycle cases use the dedicated iOS verification path.');
 assert.ok(!standard||!android,'The fixed standard selections are iOS only.');
 assert.equal(consent,'--replace-synthetic','Use PLATFORM DEVICE HOST --replace-synthetic [OUTPUT].');
@@ -84,13 +85,13 @@ function run(binary,args,env=process.env,cwd=process.cwd(),timeoutMs=binary==='m
   return new Promise((resolveRun,reject)=>{
     if(task.signal){reject(new Error('Native task interrupted.'));return;}
     const child=spawn(binary,args,{env,cwd,detached:true,stdio:['ignore','pipe','pipe']}),stop=ownProcess(child);activeStops.add(stop);let raw='',timedOut=false;
-    if(standard){child.stdout.resume();child.stderr.resume();}
+    if(standard||betaEnrolled){child.stdout.resume();child.stderr.resume();}
     else{child.stdout.on('data',data=>{raw+=data;});child.stderr.on('data',data=>{raw+=data;});}
     // Include hosted driver startup as well as the flow's own bounded assertions.
     const timer=setTimeout(()=>{timedOut=true;void stop();},timeoutMs);
     child.once('error',error=>{clearTimeout(timer);activeStops.delete(stop);reject(error);});child.once('close',async (status,signal)=>{clearTimeout(timer);const stopped=await stop();activeStops.delete(stop);if(status===0&&stopped&&!timedOut&&!task.signal)resolveRun(raw);else{
       raw=redacted(raw);
-      if(!standard)writeFileSync(join(output,'failure-redacted.log'),raw,{mode:0o600});reject(Object.assign(new Error(standard?`${binary} failed (${status}); see finite receipts.`:`${binary} failed (${status}); see redacted log.`),{status,signal,...(timedOut?{code:'ETIMEDOUT'}:{})}));
+      if(!standard&&!betaEnrolled)writeFileSync(join(output,'failure-redacted.log'),raw,{mode:0o600});reject(Object.assign(new Error(standard?`${binary} failed (${status}); see finite receipts.`:`${binary} failed (${status}); see redacted log.`),{status,signal,...(timedOut?{code:'ETIMEDOUT'}:{})}));
     }});
   });
 }
@@ -105,12 +106,12 @@ async function flow(name,env={}){
     markStartup('case-assertions');
     if(name==='prepare')setupWindow={startedAt,finishedAt:Date.now()};
     const screenshots=['native-delete-confirmation.png','native-delete-verify.png','native-deleted-account.png','recovered-account-history.png','my-account-returned-log.png','my-account-signed-in.png','my-account-guest.png','my-account-config-retry.png','same-name-summary.png','same-name-confirmation.png','mismatched-name-summary.png','mismatched-name-confirmation.png','offline-preserved-history.png','pending-signout-cancelled.png','native-photo-saved.png'];
-    for(const path of readdirSync(artifacts,{recursive:true}).filter(path=>!csvRecovering&&screenshots.some(name=>String(path).endsWith(name))))
+    for(const path of readdirSync(artifacts,{recursive:true}).filter(path=>!csvRecovering&&!betaEnrolled&&screenshots.some(name=>String(path).endsWith(name))))
       cpSync(join(artifacts,path),join(output,String(path).split('/').at(-1)));
     console.log('PASS native account phase: '+name);
   }catch(error){
-    if(csvRecovering){
-      try{writeFileSync(join(output,'csv-failed-command.json'),JSON.stringify({phase:name,flowSequence,...readNativeCommandState(artifacts)})+'\n',{mode:0o600});}catch{/* Preserve the original flow failure. */}
+    if(csvRecovering||betaEnrolled){
+      try{writeFileSync(join(output,csvRecovering?'csv-failed-command.json':'beta-enrolled-failed-command.json'),JSON.stringify({phase:name,flowSequence,...readNativeCommandState(artifacts)})+'\n',{mode:0o600});}catch{/* Preserve the original flow failure. */}
       throw error;
     }
     writeFileSync(join(output,'fixture-native-reach.json'),JSON.stringify({phase:name,configReached:requests.has('/api/config'),sessionReached:[...requests].some(path=>path.startsWith('/api/auth/get-session')),accountReached:requests.has('/api/account')},null,2)+'\n');
@@ -392,41 +393,55 @@ function readEnrolledInputs(){
  assert.equal(realpathSync(path),path,'Use the canonical private manifest path.');
  assert.equal(statSync(path).mode&0o777,0o600);assert.equal(statSync(dirname(path)).mode&0o777,0o700);assert.ok(statSync(path).size<2097152);
  const value=JSON.parse(readFileSync(path,'utf8'));
- assert.deepEqual([value.schemaVersion,value.status,value.stage,value.upgradeExecuted,value.appsInstalled,value.javaScriptModified],[1,'prepared','controlled-origin-enrolled-preparation',false,false,false]);
+ assert.deepEqual([value.schemaVersion,value.status,value.stage,value.upgradeExecuted,value.appsInstalled,value.javaScriptModified],[betaEnrolled?2:1,'prepared',betaEnrolled?'controlled-origin-beta-enrolled-preparation':'controlled-origin-enrolled-preparation',false,false,false]);
  assert.match(value.driverSource,/^[a-f0-9]{40}$/);
- for(const file of ['scripts/verify-ios-runtime-upgrade.mjs','scripts/native-runtime-inputs.mjs'])assert.equal(sha256(file),createHash('sha256').update(execFileSync('git',['show',value.driverSource+':'+file])).digest('hex'),'Revalidate the committed preparation code, not an unrelated manifest.');
+ for(const file of ['scripts/verify-ios-runtime-upgrade.mjs','scripts/native-runtime-inputs.mjs','scripts/native-upgrade-evidence.mjs'])assert.equal(sha256(file),createHash('sha256').update(execFileSync('git',['show',value.driverSource+':'+file])).digest('hex'),'Revalidate the committed preparation code, not an unrelated manifest.');
  assert.equal(value.driverScriptSHA256,sha256('scripts/verify-ios-runtime-upgrade.mjs'));
  assert.equal(value.packageSHA256,sha256('package.json'));assert.equal(value.lockSHA256,sha256('package-lock.json'));
  assert.equal(value.runtimes.length,2);
- for(const [index,expected] of enrolledCuts.entries()){
+ if(betaEnrolled)assertNumericPins(betaUpgradeCuts);
+ for(const [index,expected] of (betaEnrolled?betaUpgradeCuts:enrolledCuts).entries()){
   const cut=value.runtimes[index],root=join(dirname(path),'inputs',expected.name);
   assert.deepEqual([cut.name,cut.source,cut.tree],[expected.name,expected.source,expected.tree]);
   assert.equal(cut.host,join(root,'host/Puptime.app'));assert.equal(cut.sourceRoot,join(root,'source'));
   assert.equal(realpathSync(cut.host),cut.host);assert.equal(realpathSync(cut.sourceRoot),cut.sourceRoot);
   assert.equal(inspectCommand('git',['rev-parse',cut.source+'^{tree}']),cut.tree);
-  const files=Object.fromEntries(inspectCommand('git',['ls-tree','-rz',cut.source]).split('\0').filter(Boolean).map(row=>{const match=row.match(/^(100644|100755) blob ([a-f0-9]{40})\t(.+)$/s);assert.ok(match);return [match[3],{mode:match[1],blobSHA1:match[2]}];}));
+  const files=historicalSourceFiles(cut.source);
   assert.deepEqual(cut.sourceFiles,files);assertArchivedSource(cut.sourceRoot,files);
-  assert.equal(sha256(join(cut.sourceRoot,'package.json')),value.packageSHA256);assert.equal(sha256(join(cut.sourceRoot,'package-lock.json')),value.lockSHA256);
+  assert.equal(sha256(join(cut.sourceRoot,'package.json')),cut.packageSHA256);assert.equal(sha256(join(cut.sourceRoot,'package-lock.json')),cut.lockSHA256);
+  if(betaEnrolled){
+   assert.deepEqual(cut.input,expected);
+   const api=path=>JSON.parse(inspectCommand('gh',['api','repos/patrickchin/puptime/'+path]));
+   const artifact=api('actions/artifacts/'+expected.artifact);assertNumericMetadata(expected,api('actions/runs/'+expected.run),artifact);assertBaselineProducer(expected,artifact,api);
+   assert.deepEqual([cut.original.actualCheckoutSource,cut.original.actualCheckoutTree,cut.original.outerSHA256],[expected.checkout,expected.tree,expected.digest]);
+   assert.equal(cut.original.runAttempt,expected.attempt);assert.equal(cut.original.outerBytes,expected.bytes);
+   if(index===1)assert.equal(inspectCommand('git',['diff','--name-only',cut.source,'--','src',...nativeHostInputs]),'','The newer historical source must match current product/native inputs.');
+  }else{assert.equal(cut.packageSHA256,value.packageSHA256);assert.equal(cut.lockSHA256,value.lockSHA256);}
   inspectCommand('codesign',['--verify','--deep','--strict',cut.host]);
   assert.equal(cut.signature.deepStrictVerified,true);assert.equal(sha256(join(cut.host,'_CodeSignature/CodeResources')),cut.signature.codeResourcesSHA256);
   assert.equal(sha256(join(cut.host,'Info.plist')),cut.infoPlistSHA256);assert.equal(cut.appGroup,'group.com.patrickchin.puptime');
   assert.equal(inspectCommand('plutil',['-extract','CFBundleIdentifier','raw','-o','-',join(cut.host,'Info.plist')]),app);
   assert.equal(inspectCommand('plutil',['-extract','ExpoWidgetsAppGroupIdentifier','raw','-o','-',join(cut.host,'Info.plist')]),cut.appGroup);
   assert.match(inspectCommand('xcrun',['vtool','-show-build',join(cut.host,'Puptime')]),/platform\s+IOSSIMULATOR/);
-  assert.equal(sha256(join(cut.host,'Puptime')),expected.native);assert.equal(sha256(join(cut.host,'main.jsbundle')),expected.js);
-  assert.equal(cut.original.nativeExecutableSHA256,expected.native);assert.equal(cut.original.javaScriptSHA256,expected.js);
+  assert.equal(sha256(join(cut.host,'Puptime')),betaEnrolled?cut.original.nativeExecutableSHA256:expected.native);assert.equal(sha256(join(cut.host,'main.jsbundle')),betaEnrolled?cut.original.javaScriptSHA256:expected.js);
+  if(betaEnrolled){for(const [key,expectedValue] of [['CFBundleShortVersionString',expected.version],['CFBundleVersion',expected.build]])assert.equal(inspectCommand('plutil',['-extract',key,'raw','-o','-',join(cut.host,'Info.plist')]),expectedValue);}
+  else{assert.equal(cut.original.nativeExecutableSHA256,expected.native);assert.equal(cut.original.javaScriptSHA256,expected.js);}
   assert.deepEqual(nativeCodeFingerprint(cut.host,mkdtempSync(join(privateDir,'native-original-'))),cut.nativeCode);
  }
  return value;
 }
 function embeddedEntitlements(binary){return inspectCommand('otool',['-arch','arm64','-s','__TEXT','__entitlements',binary]).split('\n').filter(line=>/^[a-f0-9]{8,16}\s/i.test(line)).map(line=>line.trim().split(/\s+/).slice(1).join('')).join('');}
 async function historicalBundle(name,bundleEnv){
+ if(betaEnrolled)bundleEnv=standardFixtureEnvironment(bundleEnv,front);
  const cut=runtimeInputs.runtimes.find(value=>value.name===name);assert.ok(cut);assertArchivedSource(cut.sourceRoot,cut.sourceFiles);
  const directory=mkdtempSync(join(privateDir,'runtime-'+name+'-')),source=join(directory,'source'),bundle=join(directory,'Puptime.app');
  cpSync(cut.sourceRoot,source,{recursive:true});cpSync(cut.host,bundle,{recursive:true});
- symlinkSync(realpathSync('node_modules'),join(source,'node_modules'),'dir');
+ if(betaEnrolled){
+  await run('npm',['ci','--no-audit','--no-fund'],standardFixtureEnvironment({...process.env,CI:'1'},front),source,600000);
+  assert.equal(sha256(join(source,'package.json')),cut.packageSHA256);assert.equal(sha256(join(source,'package-lock.json')),cut.lockSHA256);
+ }else symlinkSync(realpathSync('node_modules'),join(source,'node_modules'),'dir');
  const originalEntitlements=embeddedEntitlements(join(bundle,'Puptime'));assert.ok(originalEntitlements);
- await run('node',[resolve('node_modules/expo/bin/cli'),'export:embed','--entry-file','index.ts','--platform','ios','--dev','false','--bytecode','--reset-cache','--max-workers','2','--bundle-output',join(bundle,'main.jsbundle'),'--assets-dest',bundle],bundleEnv,source);
+ await run('node',[betaEnrolled?join(source,'node_modules/expo/bin/cli'):resolve('node_modules/expo/bin/cli'),'export:embed','--entry-file','index.ts','--platform','ios','--dev','false','--bytecode','--reset-cache','--max-workers','2','--bundle-output',join(bundle,'main.jsbundle'),'--assets-dest',bundle],bundleEnv,source);
  assert.ok(readFileSync(join(bundle,'main.jsbundle')).includes(Buffer.from(front)),'Use the same controlled origin in both exact historical sources.');
  await run('codesign',['--force','--deep','--sign','-',bundle]);inspectCommand('codesign',['--verify','--deep','--strict',bundle]);
  assert.equal(sha256(join(bundle,'Info.plist')),cut.infoPlistSHA256);assert.equal(embeddedEntitlements(join(bundle,'Puptime')),originalEntitlements);
@@ -438,22 +453,50 @@ async function historicalBundle(name,bundleEnv){
  return bundle;
 }
 function assertInstalledHistorical(name){const {bundle,proof}=runtimeBundles.get(name),installed=simctl('get_app_container',device,app,'app');assert.equal(sha256(join(installed,'main.jsbundle')),proof.controlledJavaScriptSHA256);assert.equal(sha256(join(installed,'Puptime')),proof.resignedExecutableSHA256);assert.equal(sha256(join(installed,'Info.plist')),sha256(join(bundle,'Info.plist')));proof.installedVerified=true;}
+function enrolledProtectedSnapshot(){
+ const tables=snapshot().tables,documents=join(simctl('get_app_container',device,app,'data'),'Documents'),shared=simctl('get_app_container',device,app,runtimeInputs.runtimes[0].appGroup);
+ const files=protectedDocumentFiles(documents),backups=Object.fromEntries(Object.keys(files).filter(name=>name.startsWith('activity-backups/')).map(name=>{const path=join(documents,name);assert.ok(statSync(path).size<=2097152);return [name,readFileSync(path,'utf8')];}));
+ const defaults=JSON.parse(inspectCommand('plutil',['-convert','json','-o','-',join(shared,'Library/Preferences',runtimeInputs.runtimes[0].appGroup+'.plist')])),widgetTimelines={};
+ for(const [key,entries] of Object.entries(defaults).filter(([key])=>/^__expo_widgets_.*_timeline$/.test(key))){assert.ok(Array.isArray(entries)&&entries.length);widgetTimelines[key]=entries.map(entry=>{assert.ok(entry.props);return entry.props;});}
+ assert.ok(Object.keys(widgetTimelines).length,'Inspect actual shared widget history.');
+ return {tables,files,backups,pendingWidgetFiles:documentFiles(join(shared,'ExpoWidgets/PuptimePending')),widgetTimelines};
+}
 async function verifyEnrolledRuntimeUpgrade(){
+ let clockProbe,previousClock,queuedProtected;
+ const clock=()=>{const value=clockProbe.read();assertDeviceClock(value,previousClock);previousClock=value;return value;};
+ if(betaEnrolled){
+  const directory=join(privateDir,'enrolled-clock');mkdirSync(directory);
+  const assertLease=()=>{assert.equal(device,initialDevice);const matches=Object.values(JSON.parse(simctl('list','devices','-j')).devices).flat().filter(value=>value.udid===device);assert.equal(matches.length,1);assert.equal(matches[0].name,'Puptime Account beta-enrolled-upgrade CI '+process.env.GITHUB_RUN_ID);};
+  clockProbe=prepareDeviceClock(directory,device,crypto.randomUUID().replaceAll('-',''),assertLease);clock();
+ }
  assertInstalledHistorical('older');await flow('prepare');await flow('add-logs',{BATCHES:'4',EXPECTED_COUNT:'12'});await signIn();await flow('enable',{EXPECTED_COUNT:'12'});
  const enrolled=snapshot(),owner=enrolled.owner[0].account_id,cloudBefore=await assertCloud(enrolled.events);assert.equal(enrolled.pending,0);
  await transport('offline');await flow('add-logs',{BATCHES:'1',EXPECTED_COUNT:'15'});await until(()=>snapshot().pending===3,'Capture three original old-runtime pending mutations.');
  simctl('terminate',device,app);const queued=snapshot(),acceptedStart=wireAccepted.length,pageStart=wirePages.length;
+ if(betaEnrolled){queuedProtected=enrolledProtectedSnapshot();assertOldDaily(queuedProtected,clock(),{oldVersion:'1.12.5/1',expectedEvents:15});}
  assert.equal((await remote({inspectBehindFault:true})).length,12);const identityBefore={...identityRequests},enrollBefore=requestCounts.enroll;
  const bundle=await historicalBundle('newer',{...childEnv,CI:'false',EXPO_PUBLIC_CLOUD_API_URL:front});
  simctl('install',device,bundle);assertInstalledHistorical('newer');assertNativeTransition(queued.tables,snapshot().tables);
- runtimePhase='newer';await flow('reopen-offline',{EXPECTED_COUNT:'15'});assertNativeTransition(queued.tables,snapshot().tables);assert.deepEqual(identityRequests,identityBefore);assert.equal(requestCounts.enroll,enrollBefore);
- await transport('online');await flow('resume-sync');const drained=drainReceipt(queued,acceptedStart,pageStart);assert.deepEqual(drained.events,queued.events);assert.equal(drained.owner[0].account_id,owner);
+ if(betaEnrolled)assertPreserved(queuedProtected,enrolledProtectedSnapshot());
+ const started=betaEnrolled?clock():undefined;
+ runtimePhase='newer';await flow(betaEnrolled?'beta-enrolled-offline':'reopen-offline',{EXPECTED_COUNT:'15'});
+ if(betaEnrolled)assertNumericUpgrade(queuedProtected,enrolledProtectedSnapshot(),{started,finished:clock(),oldVersion:'1.12.5/1',newVersion:'1.13.0/3',expectedEvents:15});
+ else assertNativeTransition(queued.tables,snapshot().tables);
+ assert.deepEqual(identityRequests,identityBefore);assert.equal(requestCounts.enroll,enrollBefore);
+ // The legitimate first-launch backup checkpoint is now the queue baseline.
+ const awaiting=betaEnrolled?snapshot():queued;
+ await transport('online');await flow(betaEnrolled?'reopen':'resume-sync',{EXPECTED_COUNT:'15'});
+ const drained=drainReceipt(awaiting,acceptedStart,pageStart);assert.deepEqual(drained.events,queued.events);assert.equal(drained.owner[0].account_id,owner);
  assert.ok(newerSdkCookie,'Observe the actual newer native SDK successful push cookie, not a retained inspector credential.');const identity=await inspectSession(newerSdkCookie);assert.equal(identity.status,200);assert.equal(identity.body.user.id,owner);
  const cloudAfter=await assertCloud(drained.events);for(const record of cloudBefore)assert.deepEqual(cloudAfter.find(value=>value.id===record.id),record);
  assert.deepEqual(identityRequests,identityBefore);assert.equal(requestCounts.enroll,enrollBefore);
- const stable=snapshot();await flow('reopen',{EXPECTED_COUNT:'15'});assertNativeTransition(stable.tables,snapshot().tables);assert.deepEqual(await remote(),cloudAfter);assert.deepEqual(identityRequests,identityBefore);assert.equal(requestCounts.enroll,enrollBefore);
- receipts.push({phase:'enrolled-runtime-replacement',oldLocalEvents:15,oldRemoteEvents:12,pendingPreserved:3,all14TablesChecked:true,savedSdkIdentityVerified:true,noReauthenticationOrEnrollment:true,finalCloudEvents:15,finalRestartExact14Tables:true});
- checks.push('Exact historical old/new sources on their separately attested native hosts, rebuilt only for the same temporary HTTPS origin; real old UI/SDK enrolls12logs and leaves3offline writes. Without uninstall/reset/re-auth, installing newer preserves every table/payload/generation, actual newer SDK drains3exact acknowledgements under the original account, and15cloud records/revisions plus all14tables survive cold restart. Controlled origin/ad-hoc resign, not untouched-original, numeric store, provider or current-candidate qualification.');
+ if(betaEnrolled)simctl('terminate',device,app);
+ const stable=snapshot(),stableProtected=betaEnrolled?enrolledProtectedSnapshot():undefined;
+ await flow('reopen',{EXPECTED_COUNT:'15'});
+ if(betaEnrolled){simctl('terminate',device,app);assertPreserved(stableProtected,enrolledProtectedSnapshot(),{paletteChange:true});clock();}
+ assertNativeTransition(stable.tables,snapshot().tables);assert.deepEqual(await remote(),cloudAfter);assert.deepEqual(identityRequests,identityBefore);assert.equal(requestCounts.enroll,enrollBefore);
+ receipts.push({phase:betaEnrolled?'beta-enrolled-numeric-upgrade':'enrolled-runtime-replacement',oldLocalEvents:15,oldRemoteEvents:12,pendingPreserved:3,all14TablesChecked:true,savedSdkIdentityVerified:true,noReauthenticationOrEnrollment:true,finalCloudEvents:15,finalRestartExact14Tables:true,...(betaEnrolled?{from:'1.12.5/1',to:'1.13.0/3',oneExactBeforeUpdateBackup:true,priorBackupsPreserved:true,explicitStopBeforeFinalRestart:true,ownLockedDependencies:true}: {})});
+ checks.push('Exact historical source/native pairs, each using its own locked dependencies for beta, rebuilt only for one temporary HTTPS origin. Real old UI/SDK enrolls12logs and leaves3offline writes. Installing newer without uninstall/reset/re-auth preserves the queue and history; actual newer SDK drains3exact acknowledgements under the original account;15cloud records/revisions and all14tables survive the final restart. Beta additionally checks one exact numeric-update backup and explicit cold restart. Controlled origin/ad-hoc resign, not untouched-original, production signing, provider or store qualification.');
 }
 function deletionState(tables){const row=tables.metadata.find(row=>row.key==='cloud_account_deletion');assert.ok(row);const state=JSON.parse(row.value);assert.equal(state.stage,'unconfirmed');return state;}
 async function verifyDeletionFaults(){
@@ -671,7 +714,7 @@ try{
   assert.ok(auth);
   // Expo ignores --reset-cache in CI. Fixture bundles must re-inline the local
   // backend URL rather than reuse transforms from the production build.
-  const bundleEnv={...childEnv,CI:'false',EXPO_PUBLIC_CLOUD_API_URL:front};
+  const bundleEnv=betaEnrolled?standardFixtureEnvironment({...childEnv,CI:'false'},front):{...childEnv,CI:'false',EXPO_PUBLIC_CLOUD_API_URL:front};
   if(standard)markStandardStage('production-app-bundle');
   if(android){
     adb('reverse','tcp:'+frontPort,'tcp:'+frontPort);
@@ -802,7 +845,7 @@ try{
   }
   assert.equal(task.signal,null);
   rmSync(join(output,'failure-redacted.log'),{force:true});
-  writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',checks,receipts,...(upgrading?{stage:'controlled-origin-enrolled-runtime-replacement',upgradeExecuted:true,originModified:true,originalInstalledBytes:false,runtimes:runtimeProvenance}:{}),scope:upgrading?'Exact historical source/native pairs with controlled-origin release JS and ad-hoc signing; actual native SDK and isolated local HTTPS Better Auth/D1/SQLite DO. No credential injection, owner data, provider OAuth, untouched-original, numeric store or final current-candidate qualification.':android?'Android Debug native host with normal embedded release JS and isolated local HTTPS Better Auth/D1/SQLite DO; actual native email SDK and Keystore. Its temporary CA is trusted only in the ignored Debug source set, restored after the run. Production onboarding is tested separately in the Release APK. No real email, production account, session injection or mocked sync.':'Release bundle and actual native email SDK with isolated local HTTPS Better Auth/D1/SQLite DO. Simulator trusts the fixture certificate. No real email, production account, session injection or mocked sync.'},null,2)+'\n');
+  writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',checks,receipts,...(upgrading?{stage:betaEnrolled?'controlled-origin-beta-enrolled-numeric-upgrade':'controlled-origin-enrolled-runtime-replacement',upgradeExecuted:true,originModified:true,originalInstalledBytes:false,runtimes:runtimeProvenance}:{}),scope:upgrading?'Exact historical source/native pairs with controlled-origin release JS and ad-hoc signing; actual native SDK and isolated local HTTPS Better Auth/D1/SQLite DO. No credential injection, owner data, provider OAuth, untouched-original, numeric store or final current-candidate qualification.':android?'Android Debug native host with normal embedded release JS and isolated local HTTPS Better Auth/D1/SQLite DO; actual native email SDK and Keystore. Its temporary CA is trusted only in the ignored Debug source set, restored after the run. Production onboarding is tested separately in the Release APK. No real email, production account, session injection or mocked sync.':'Release bundle and actual native email SDK with isolated local HTTPS Better Auth/D1/SQLite DO. Simulator trusts the fixture certificate. No real email, production account, session injection or mocked sync.'},null,2)+'\n');
   completed=true;markStartup('case-result','passed');
   console.log('PASS '+(upgrading?'controlled-origin enrolled runtime replacement':deletionFaults?'pending native deletion cancellation, retries and lost response':photographing?'native profile photo failure, roundtrip and restore':isolating?'expired session and account isolation':offline?'offline writes, replay and pending logout':deleting?'native account deletion':comparing?'named puppy comparison':onboardingSignIn?'welcome sign-in and session recovery':android?'guest account preservation and empty-database recovery':'guest account preservation and inspected empty-device recovery')+': '+output);
   }

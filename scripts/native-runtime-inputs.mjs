@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
-import {closeSync,cpSync,lstatSync,openSync,readFileSync,readdirSync,readSync,rmSync} from 'node:fs';
+import {chmodSync,closeSync,cpSync,lstatSync,mkdirSync,openSync,readFileSync,readdirSync,readSync,rmSync} from 'node:fs';
 import {isAbsolute,join,relative,resolve,sep} from 'node:path';
 
 // Lifecycle source preparation changes compiled code even at the same package version.
@@ -12,6 +12,53 @@ const command=(binary,args)=>execFileSync(binary,args,{encoding:'utf8',timeout:1
 const hash=path=>createHash('sha256').update(readFileSync(path)).digest('hex');
 const inside=(root,path)=>{const name=relative(root,path);return name===''||name!=='..'&&!name.startsWith('..'+sep)&&!isAbsolute(name);};
 const regularFiles=root=>readdirSync(root,{recursive:true,withFileTypes:true}).filter(entry=>entry.isFile()).map(entry=>relative(root,join(entry.parentPath??entry.path,entry.name))).sort();
+
+export function historicalSourceFiles(source){
+ assert.match(source,/^[a-f0-9]{40}$/);
+ return Object.fromEntries(command('git',['ls-tree','-rz',source]).split('\0').filter(Boolean).flatMap(row=>{
+  const match=row.match(/^(100644|100755) blob ([a-f0-9]{40})\t(.+)$/s);assert.ok(match,'Reject unsupported historical source modes.');
+  const name=match[3];assert.ok(!isAbsolute(name)&&!name.split('/').includes('..'));
+  // Exclude even example dotenv files BEFORE archive extraction, not afterward.
+  if(name.split('/').some(part=>part==='owner.env'||part==='.env'||part.startsWith('.env.')))return [];
+  return [[name,{mode:match[1],blobSHA1:match[2]}]];
+ }));
+}
+export function archiveHistoricalSource(source,sourceRoot,archive){
+ const files=historicalSourceFiles(source);assert.ok(Object.keys(files).length>0);
+ mkdirSync(sourceRoot,{mode:0o700});const fd=openSync(archive,'wx',0o600);
+ try{execFileSync('git',['archive','--format=tar',source,'--',...Object.keys(files)],{timeout:120000,stdio:['ignore',fd,'pipe']});}finally{closeSync(fd);}
+ try{command('tar',['-xf',archive,'-C',sourceRoot]);}finally{rmSync(archive,{force:true});}
+ chmodSync(sourceRoot,0o700);assertArchivedSource(sourceRoot,files);return files;
+}
+
+export function assertRuntimeZip(path,kind){
+ assert.ok(['baseline','host','inner'].includes(kind));
+ // Validate bounded public CI inputs before either unzip or ditto can write paths.
+ command('python3',['-c',String.raw`import pathlib,posixpath,stat,sys,zipfile
+path,kind=sys.argv[1:]
+assert pathlib.Path(path).stat().st_size<=80*1024*1024
+with zipfile.ZipFile(path) as z:
+ items=z.infolist();names=[i.filename for i in items]
+ assert len(items)<=10000 and len(names)==len(set(names))
+ if kind!='inner':
+  assert sorted(names)==sorted(['Puptime-iOS-Simulator.zip']+(['upgrade-baseline.json'] if kind=='baseline' else []))
+  assert all(i.file_size<=(16384 if i.filename.endswith('.json') else 80*1024*1024) for i in items)
+ assert sum(i.file_size for i in items)<=512*1024*1024
+ for i in items:
+  p=pathlib.PurePosixPath(i.filename);mode=i.external_attr>>16
+  assert not p.is_absolute() and '..' not in p.parts and '\\' not in i.filename and not i.flag_bits&1
+  assert i.compress_type in (zipfile.ZIP_STORED,zipfile.ZIP_DEFLATED)
+  assert stat.S_IFMT(mode) in (0,stat.S_IFREG,stat.S_IFDIR,stat.S_IFLNK)
+  if kind=='inner':
+   assert p.parts and p.parts[0] in ('Puptime.app','__MACOSX')
+   if stat.S_ISLNK(mode):
+    assert i.file_size<=4096
+    target=z.read(i).decode('utf8');resolved=pathlib.PurePosixPath(posixpath.normpath(posixpath.join(str(p.parent),target)))
+    assert not pathlib.PurePosixPath(target).is_absolute() and resolved.parts[0]=='Puptime.app' and '..' not in resolved.parts
+  else: assert not stat.S_ISLNK(mode)
+ assert z.testzip() is None
+`,path,kind]);
+}
 
 export function assertArchivedSource(root,expected){
  assert.ok(!readdirSync(root,{recursive:true,withFileTypes:true}).some(entry=>entry.isSymbolicLink()),'Historical sources cannot contain unverified symlinks.');

@@ -128,6 +128,25 @@ node scripts/verify-ios-runtime-upgrade.mjs --prepare-enrolled <absolute-new-pri
 
 Preparation creates a private manifest and source/host inputs. It cannot install an app, export JavaScript or qualify an upgrade. Its receipt says `stage: controlled-origin-enrolled-preparation` and `upgradeExecuted: false`.
 
+The prepared beta path uses `--prepare-beta-enrolled`, followed by the wrapper's
+`beta-enrolled-upgrade` case. It is source-only until both pinned artifacts are
+admitted; the final main target is deliberately unbound. Its older input is a
+fresh iOS build from the shipped 1.12.5 source, not a published iOS binary.
+Before extracting source, preparation excludes all dotenv examples/configuration
+and `owner.env`. Each cut installs its own exact locked dependencies and uses its
+own Expo CLI for the controlled-origin export. The hosted `upgrade_stage=beta-enrolled`
+selection prepares these private inputs and removes them on exit; it never uploads
+the input hosts, local account state or exports.
+
+The beta case must preserve fifteen events, the original SDK session and three
+pending payloads during the numeric 1.12.5/1 → 1.13.0/3 update. First launch permits
+only the exact version checkpoint, one validated before-update backup and the
+documented widget palette fields. Real SDK replay must drain the three writes
+without reauthentication or enrollment, then explicit-stop restart must retain
+all fourteen tables, files, prior backups and shared widget activity. This is
+controlled local service evidence; it does not establish production OAuth,
+Android signing, store delivery or owner-phone recovery.
+
 ```sh
 GITHUB_REPOSITORY=patrickchin/puptime \
 PUPTIME_NATIVE_HOST_RUN_ID=<matching-successful-main-ios-run> \
