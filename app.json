@@ -17,6 +17,14 @@
       "config": {
         "usesNonExemptEncryption": false
       },
+      "privacyManifests": {
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": ["1C8F.1"]
+          }
+        ]
+      },
       "buildNumber": "3"
     },
     "android": {
@@ -39,6 +47,7 @@
       "output": "static"
     },
     "plugins": [
+      "./plugins/withIosAppGroupPrivacy",
       "./plugins/withAndroidQuickLogNotification",
       "./plugins/withQuickLogNotification",
       "./plugins/withAndroidExactReminders",
