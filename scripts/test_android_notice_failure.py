@@ -77,6 +77,8 @@ class FiniteFailure(unittest.TestCase):
         upload = workflow.split('      - name: Upload public license discovery inputs only (INCOMPLETE)\n', 1)[1].split('      - name:', 1)[0]
         self.assertIn('id: notice_diagnostic', diagnostic)
         self.assertIn("if: ${{ always() && inputs.discovery_only == true && steps.notice_diagnostic.outcome == 'success' }}", upload)
+        self.assertIn("${{ steps.notice_metro.outcome == 'success' && 'build/notices/android/review/unreviewed-oss-notice-inputs.json' || '' }}", upload)
+        self.assertIn("${{ steps.notice_projection.outcome == 'success' && 'build/notices/android/review/dependency-inventory.json' || '' }}", upload)
         with tempfile.TemporaryDirectory(prefix='puptime-notice-upload-rejection-') as directory:
             root = Path(directory)
             output = root / 'build/notices/android/review/failure.json'
