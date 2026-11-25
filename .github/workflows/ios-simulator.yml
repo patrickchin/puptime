@@ -10,7 +10,7 @@ on:
       suite:
         description: Test suite (PRs always retain the full suite)
         type: choice
-        options: [full, accounts]
+        options: [full, accounts, upgrade-baseline]
         default: full
       native_host_run_id:
         description: Main iOS run supplying the unchanged native host (full success by default)
@@ -34,7 +34,7 @@ on:
 
 jobs:
   build:
-    if: github.event_name != 'workflow_dispatch' || inputs.suite != 'accounts'
+    if: github.event_name != 'workflow_dispatch' || inputs.suite == 'full'
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v6
@@ -362,3 +362,96 @@ jobs:
           path: build/native-runtime-replacement
           if-no-files-found: warn
           retention-days: 3
+
+  upgrade-baseline:
+    if: github.event_name == 'workflow_dispatch' && inputs.suite == 'upgrade-baseline'
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: cb8034b45a5c74e0ab2c7c60759b5276e3b85664
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/.env
+            !/.env.*
+            !/owner.env
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Verify the shipped source and set its test version
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {createHash} from 'node:crypto';
+          import {execFileSync} from 'node:child_process';
+          import {existsSync,readFileSync,writeFileSync} from 'node:fs';
+          const git=(...args)=>execFileSync('git',args,{encoding:'utf8'}).trim();
+          assert.equal(git('rev-parse','HEAD'),'cb8034b45a5c74e0ab2c7c60759b5276e3b85664');
+          assert.equal(git('rev-parse','HEAD^{tree}'),'b0ecf72dddcb015b01c65b7b206cff0ee1b0300f');
+          assert.equal(git('status','--porcelain'),'');
+          for(const name of ['.env','.env.example','owner.env'])assert.equal(existsSync(name),false);
+          const pins={'app.json':'76192dfc9545dd192822780af3ecec8c523b7fddb2eef9bc65313f94eb09aeaf','package.json':'64c0fa8d471b5485bfe53b7eb26f8696a29e39a8aad82e1868900244351c2f4b','package-lock.json':'4aa46ded544d07533aa899f3acdbd7d70d1791f95d1e0ccdd5d4cf3a3392a2f2'};
+          for(const [name,expected] of Object.entries(pins))assert.equal(createHash('sha256').update(readFileSync(name)).digest('hex'),expected);
+          const config=JSON.parse(readFileSync('app.json','utf8'));
+          assert.equal(config.expo.version,'1.12.0');
+          assert.equal(config.expo.ios.buildNumber,undefined);
+          config.expo.version='1.12.5';config.expo.ios.buildNumber='1';
+          writeFileSync('app.json',JSON.stringify(config,null,2)+'\n');
+          assert.equal(git('diff','--name-only'),'app.json');
+          NODE
+      - run: npm ci
+      - run: npx expo prebuild --platform ios --no-install
+        env:
+          CI: "1"
+      - run: pod install --project-directory=ios
+      - name: Build the ordinary old runtime
+        run: |
+          xcodebuild \
+            -workspace ios/Puptime.xcworkspace \
+            -scheme Puptime \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/ios-simulator \
+            -jobs 2 \
+            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGN_IDENTITY=- \
+            build
+          codesign --verify --deep --strict build/ios-simulator/Build/Products/Release-iphonesimulator/Puptime.app
+          ditto -c -k --sequesterRsrc --keepParent \
+            build/ios-simulator/Build/Products/Release-iphonesimulator/Puptime.app \
+            build/Puptime-iOS-Simulator.zip
+          unzip -tq build/Puptime-iOS-Simulator.zip
+      - name: Attest the source-built baseline
+        run: |
+          python3 <<'PY'
+          import hashlib,json,os,pathlib,plistlib,subprocess
+          root=pathlib.Path('build/ios-simulator/Build/Products/Release-iphonesimulator/Puptime.app')
+          digest=lambda p:hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest()
+          git=lambda *args:subprocess.check_output(['git',*args],text=True).strip()
+          assert git('rev-parse','HEAD')=='cb8034b45a5c74e0ab2c7c60759b5276e3b85664'
+          assert git('rev-parse','HEAD^{tree}')=='b0ecf72dddcb015b01c65b7b206cff0ee1b0300f'
+          assert git('diff','--name-only')=='app.json'
+          with (root/'Info.plist').open('rb') as f:info=plistlib.load(f)
+          assert info['CFBundleIdentifier']=='com.patrickchin.puptime'
+          assert info['CFBundleShortVersionString']=='1.12.5' and info['CFBundleVersion']=='1'
+          assert not any(pathlib.Path(p).exists() for p in ['.env','.env.example','owner.env'])
+          original=json.loads(subprocess.check_output(['git','show','HEAD:app.json']))
+          original['expo']['version']='1.12.5';original['expo']['ios']['buildNumber']='1'
+          assert json.loads(pathlib.Path('app.json').read_text())==original
+          assert digest('package.json')=='64c0fa8d471b5485bfe53b7eb26f8696a29e39a8aad82e1868900244351c2f4b'
+          assert digest('package-lock.json')=='4aa46ded544d07533aa899f3acdbd7d70d1791f95d1e0ccdd5d4cf3a3392a2f2'
+          value={'schemaVersion':1,'stage':'shipped-source-ios-baseline-build','upgradeExecuted':False,'releaseQualified':False,'producerHead':os.environ['GITHUB_SHA'],'runId':os.environ['GITHUB_RUN_ID'],'runAttempt':os.environ['GITHUB_RUN_ATTEMPT'],'source':git('rev-parse','HEAD'),'sourceTree':git('rev-parse','HEAD^{tree}'),'version':'1.12.5','build':'1','bundleIdentifier':info['CFBundleIdentifier'],'versionOnlyTestConfiguration':True,'appConfigSHA256':digest('app.json'),'packageSHA256':digest('package.json'),'lockSHA256':digest('package-lock.json'),'javaScriptSHA256':digest(root/'main.jsbundle'),'nativeExecutableSHA256':digest(root/info['CFBundleExecutable']),'archiveSHA256':digest('build/Puptime-iOS-Simulator.zip'),'scope':'Fresh iOS build from the shipped Android 1.12.5 source tree with explicit test version/build configuration. No JS fixture injection, installation, upgrade, provider or store acceptance. Historical assets are test inputs, never a release candidate.'}
+          pathlib.Path('build/upgrade-baseline.json').write_text(json.dumps(value,indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@v6
+        with:
+          name: puptime-ios-125-upgrade-baseline
+          path: |
+            build/Puptime-iOS-Simulator.zip
+            build/upgrade-baseline.json
+          if-no-files-found: error
+          retention-days: 7
