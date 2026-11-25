@@ -200,6 +200,11 @@ async function verifyNativeCsvRecovery(){
  assert.throws(()=>csvToEvents(invalidCsv.toString('utf8')),CsvImportError,'The malformed fixture must actually fail the production parser.');
  phase('seed');
  await flow('prepare');await flow('add-logs',{BATCHES:'4',EXPECTED_COUNT:'12'});
+ const seeded=snapshot(),meal=seeded.events.filter(row=>row.type==='meal').sort((a,b)=>b.at-a.at||Buffer.compare(Buffer.from(b.id),Buffer.from(a.id)))[0];assert.ok(meal);
+ const seedNote='Morning meal, "all done" — 小狗 🐾';
+ await flow('csv-open-settings');await flow('csv-edit',{CSV_NOTE:seedNote});
+ await until(()=>snapshot().events.find(row=>row.id===meal.id)?.note===seedNote,'The native editor must save a nonempty quoted Unicode note before export.');
+ assert.deepEqual(snapshot().events,seeded.events.map(row=>row.id===meal.id?{...row,note:seedNote}:row));
  const original=snapshot();assert.equal(original.events.length,12);assert.equal(original.owner.length,0);assert.equal(original.pending,0);
  phase('export');
  await flow('csv-open-settings');await flow('csv-export');
@@ -208,10 +213,14 @@ async function verifyNativeCsvRecovery(){
  const names=readdirSync(cache).filter(name=>/^puptime-activity-\d{4}-\d\d-\d\d\.csv$/.test(name));assert.equal(names.length,1);
  const file=join(cache,names[0]);assert.ok(lstatSync(file).isFile()&&statSync(file).size>0&&statSync(file).size<=2097152);
  csvDownload=readFileSync(file);assert.equal(csvDownload.length,statSync(file).size);
+ assert.ok(csvDownload.toString('utf8').includes('"Morning meal, ""all done"" — 小狗 🐾"'),'Export the actual escaped UI note.');
  const events=rows=>rows.map(({id,...row})=>({id,...eventDataFromSql(row)})).sort((a,b)=>Buffer.compare(Buffer.from(a.id),Buffer.from(b.id)));
  assert.deepEqual(csvToEvents(csvDownload.toString('utf8')).sort((a,b)=>Buffer.compare(Buffer.from(a.id),Buffer.from(b.id))),events(original.events));
  phase('fresh-device');
  await freshIosRestoreDevice();await flow('prepare');emptyRestorePreflight();
+ const recipient=snapshot().tables,recipientId=recipient.metadata.find(row=>row.key==='active_pet_id')?.value;
+ assert.equal(recipient.puppies.length,1);assert.equal(recipient.puppies[0].id,recipientId);assert.notEqual(recipientId,original.tables.puppies[0].id);
+ const assertRecipient=expected=>{const actual=snapshot();assert.deepEqual(actual.events,expected,'Restore every CSV ID and body.');assert.equal(actual.tables.events.length,expected.length);assert.ok(actual.tables.events.every(row=>row.pet_id===recipientId),'Import only into the recipient active puppy.');assert.deepEqual(actual.tables.puppies,recipient.puppies,'CSV must not replace the recipient puppy profile.');assert.deepEqual(actual.tables.pet_settings,recipient.pet_settings);assert.deepEqual(actual.tables.metadata.filter(row=>row.key==='active_pet_id'),recipient.metadata.filter(row=>row.key==='active_pet_id'));};
  for(const kind of ['valid','invalid']){
   phase('download-'+kind);
   const name=kind==='valid'?'puptime-qa-recovery.csv':'puptime-qa-invalid.csv';
@@ -220,21 +229,20 @@ async function verifyNativeCsvRecovery(){
  }
  phase('import');
  await flow('csv-open-settings');await flow('csv-import',{CSV_NAME:'puptime-qa-recovery',ADDED:'12',SKIPPED:'0'});
- assert.deepEqual(snapshot().events,original.events,'The real picker/import must restore every exported activity field and ID.');
- const meal=original.events.filter(row=>row.type==='meal').sort((a,b)=>b.at-a.at||Buffer.compare(Buffer.from(b.id),Buffer.from(a.id)))[0];assert.ok(meal);
+ assertRecipient(original.events);
  phase('edit');
- const editedNote='CSV recovery edited locally';await flow('csv-edit');
+ const editedNote='CSV recovery edited locally';await flow('csv-edit',{CSV_NOTE:editedNote});
  await until(()=>snapshot().events.find(row=>row.id===meal.id)?.note===editedNote,'The native editor must save its imported entry.');
  const edited=original.events.map(row=>row.id===meal.id?{...row,note:editedNote}:row);assert.deepEqual(snapshot().events,edited);
  phase('repeat-import');
  await flow('csv-open-settings');await flow('csv-import',{CSV_NAME:'puptime-qa-recovery',ADDED:'0',SKIPPED:'12'});
- assert.deepEqual(snapshot().events,edited,'Repeat import must retain the edited value, original IDs and exact count.');
+ assertRecipient(edited);
  phase('invalid-import');
  const beforeInvalid=snapshot();await flow('csv-invalid',{CSV_NAME:'puptime-qa-invalid'});
  assert.deepEqual(snapshot().tables,beforeInvalid.tables,'Malformed CSV must change none of the fourteen database tables.');
  phase('restart');
- await flow('reopen-guest',{EXPECTED_COUNT:'12',OFFLINE:'false'});assert.deepEqual(snapshot().events,edited);assert.equal(snapshot().owner.length,0);assert.equal(snapshot().pending,0);
- const result={schemaVersion:1,exportedEvents:12,restoredEvents:12,exportedBytes:csvDownload.length,exportedSHA256:createHash('sha256').update(csvDownload).digest('hex'),realExport:true,platformDownload:true,realDocumentPicker:true,freshTaskDevice:true,editedIdPreserved:true,editedNotePreserved:true,repeatAdded:0,malformedCsvRejected:true,invalidImportExact14Tables:true,restartPreserved:true,noRawCsvUploaded:true,releaseQualified:false};
+ await flow('reopen-guest',{EXPECTED_COUNT:'12',OFFLINE:'false'});assertRecipient(edited);assert.equal(snapshot().owner.length,0);assert.equal(snapshot().pending,0);
+ const result={schemaVersion:1,exportedEvents:12,restoredEvents:12,exportedBytes:csvDownload.length,exportedSHA256:createHash('sha256').update(csvDownload).digest('hex'),realExport:true,escapedUnicodeNoteRoundtrip:true,recipientPetVerified:true,recipientProfilePreserved:true,platformDownload:true,realDocumentPicker:true,freshTaskDevice:true,editedIdPreserved:true,editedNotePreserved:true,repeatAdded:0,malformedCsvRejected:true,invalidImportExact14Tables:true,restartPreserved:true,noRawCsvUploaded:true,releaseQualified:false};
  writeFileSync(join(output,'csv-recovery.json'),JSON.stringify(result,null,2)+'\n');
  phase('complete','passed');
  return {flows:['csv-export','csv-download','csv-import','csv-edit','csv-repeat-import','csv-invalid','csv-restart']};

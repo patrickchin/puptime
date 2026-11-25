@@ -1,5 +1,6 @@
 appId: com.patrickchin.puptime
 ---
+- assertTrue: ${typeof CSV_NOTE === 'string' && CSV_NOTE.length > 0 && CSV_NOTE.length <= 200}
 - tapOn:
     id: settings.back
 - tapOn:
@@ -25,7 +26,7 @@ appId: com.patrickchin.puptime
 - tapOn:
     id: editor.note.input
 - eraseText
-- setClipboard: CSV recovery edited locally
+- setClipboard: ${CSV_NOTE}
 - pasteText
 - scrollUntilVisible:
     element:
