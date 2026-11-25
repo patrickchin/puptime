@@ -63,16 +63,20 @@ with zipfile.ZipFile(root/'chain.zip','w') as z:
  }finally{rmSync(root,{recursive:true,force:true});}
 });
 
-test('actual beta child cleanup removes only its private inputs after process/DB closure on success and failure',async()=>{
+test('actual beta and CSV child cleanup removes private inputs after process/DB closure while preserving receipts and legacy schemas',async()=>{
  const source=readFileSync(new URL('./verify-native-guest-account.mjs',import.meta.url),'utf8'),start=source.indexOf('const task=installTaskCleanup(async()=>{'),end=source.indexOf('\ntry{',start);assert.ok(start>=0&&end>start);
  const body=source.slice(start,end)+';await task.run();',AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
- for(const completed of [true,false])for(const denied of [false,true]){
+ for(const scenario of ['beta','csv','legacy'])for(const completed of [true,false])for(const denied of scenario==='legacy'?[false]:[false,true]){
   const root=mkdtempSync(join(tmpdir(),'puptime-beta-child-cleanup-')),privateDir=join(root,'private'),output=join(root,'receipts'),order=[],status={};mkdirSync(privateDir);mkdirSync(output);
   writeFileSync(join(privateDir,'auth.db'),'synthetic');writeFileSync(join(privateDir,'fixture.key'),'synthetic');mkdirSync(join(privateDir,'old-node_modules'));
-  const parameters={installTaskCleanup:run=>({run}),changeSockets:[],proxy:undefined,activeStops:[async()=>{order.push('processes');return true;}],stopWorker:undefined,auth:{close(){order.push('database');}},android:false,restoreNative:[],temporaryDevices:[],deleteOwnedSimulator:()=>{throw Error('No simulator belongs to this control.');},privateDir,completed,existsSync,betaEnrolled:true,rmSync:(path,options)=>{assert.equal(path,privateDir);assert.deepEqual(order,['processes','database']);if(denied)throw Error('Injected removal failure');rmSync(path,options);},writeFileSync,join,output,process:status};
+  const finiteFailure='{"phase":"csv-import","status":"UNKNOWN"}\n';writeFileSync(join(output,'csv-failed-command.json'),finiteFailure);
+  const parameters={installTaskCleanup:run=>({run}),changeSockets:[],proxy:undefined,activeStops:[async()=>{order.push('processes');return true;}],stopWorker:undefined,auth:{close(){order.push('database');}},android:false,restoreNative:[],temporaryDevices:[],deleteOwnedSimulator:()=>{throw Error('No simulator belongs to this control.');},privateDir,completed,existsSync,betaEnrolled:scenario==='beta',csvRecovering:scenario==='csv',rmSync:(path,options)=>{assert.equal(path,privateDir);assert.deepEqual(order,['processes','database']);if(denied)throw Error('Injected removal failure');rmSync(path,options);},writeFileSync,join,output,process:status};
   try{
    await new AsyncFunction(...Object.keys(parameters),body)(...Object.values(parameters));
-   const result=JSON.parse(readFileSync(join(output,'sdk-task-cleanup.json')));assert.equal(result.databaseClosed,true);assert.equal(result.privateDirectoryRemoved,!denied);assert.equal(result.status,denied?'failed':'passed');assert.equal(existsSync(privateDir),denied);assert.equal(status.exitCode,denied?1:undefined);
+   const result=JSON.parse(readFileSync(join(output,'sdk-task-cleanup.json')));
+   if(scenario==='legacy')assert.deepEqual(result,{status:'passed',processesStopped:true,nativeRestored:true,simulators:[]});
+   else{assert.equal(result.databaseClosed,true);assert.equal(result.privateDirectoryRemoved,!denied);assert.equal(result.status,denied?'failed':'passed');}
+   assert.equal(existsSync(privateDir),scenario==='legacy'||denied);assert.equal(status.exitCode,denied?1:undefined);assert.equal(readFileSync(join(output,'csv-failed-command.json'),'utf8'),finiteFailure);
   }finally{rmSync(root,{recursive:true,force:true});}
  }
 });

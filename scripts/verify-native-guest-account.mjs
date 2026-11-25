@@ -598,9 +598,9 @@ const task=installTaskCleanup(async()=>{
  for(const [path,original] of restoreNative.reverse())try{if(original===null)rmSync(path,{force:true});else writeFileSync(path,original);}catch{nativeRestored=false;}
  const simulators=temporaryDevices.map(device=>deleteOwnedSimulator({device,privateDirectory:privateDir,preserve:!completed}));
  let privateDirectoryRemoved=!existsSync(privateDir);
- if(betaEnrolled&&processesStopped&&databaseClosed&&nativeRestored&&simulators.every(value=>value.deleted))try{rmSync(privateDir,{recursive:true,force:true});privateDirectoryRemoved=!existsSync(privateDir);}catch{privateDirectoryRemoved=false;}
- const passed=processesStopped&&nativeRestored&&simulators.every(value=>value.deleted)&&(!betaEnrolled||databaseClosed&&privateDirectoryRemoved);
- writeFileSync(join(output,'sdk-task-cleanup.json'),JSON.stringify({status:passed?'passed':'failed',processesStopped,nativeRestored,simulators,...(betaEnrolled?{databaseClosed,privateDirectoryRemoved}:{})},null,2)+'\n');
+ if((betaEnrolled||csvRecovering)&&processesStopped&&databaseClosed&&nativeRestored&&simulators.every(value=>value.deleted))try{rmSync(privateDir,{recursive:true,force:true});privateDirectoryRemoved=!existsSync(privateDir);}catch{privateDirectoryRemoved=false;}
+ const passed=processesStopped&&nativeRestored&&simulators.every(value=>value.deleted)&&(!(betaEnrolled||csvRecovering)||databaseClosed&&privateDirectoryRemoved);
+ writeFileSync(join(output,'sdk-task-cleanup.json'),JSON.stringify({status:passed?'passed':'failed',processesStopped,nativeRestored,simulators,...(betaEnrolled||csvRecovering?{databaseClosed,privateDirectoryRemoved}:{})},null,2)+'\n');
  if(!passed)process.exitCode=1;
 });
 try{
