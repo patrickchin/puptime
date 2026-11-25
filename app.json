@@ -131,7 +131,8 @@
           "cameraPermission": false,
           "microphonePermission": "Allow Puptime to use the microphone when you dictate a log note."
         }
-      ]
+      ],
+      "./plugins/withAndroidFontNotices"
     ],
     "owner": "patchin",
     "extra": {

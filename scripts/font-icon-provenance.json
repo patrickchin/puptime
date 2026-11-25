@@ -43,5 +43,15 @@
       "licenseUrl": "https://github.com/androidx/media/blob/1.9.0/LICENSE",
       "licenseSha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
     }
-  }
+  },
+  "archiveFonts": {
+    "d7d9f3bb3f2ce90276c839ea7280eac971d5682793caa1cce715be31305a9c4b": "red-hat",
+    "0a1be6fefba807ad3557b6ea1f1a4483e7a1c41eb884afcfd85fe2d376dee202": "red-hat",
+    "846d7101f3391a62ca5ffa5847e9accd6f85c3dbd352bd9cde05e7f7fbc2084e": "red-hat",
+    "61e8aba5a4e981fe22cf7c8e8bcdbea00476e75c62c37f01bf7ee33361d68428": "material-community-icons",
+    "acbf6c59d8c5765ffa9af2a839249e2800e0b107aad4045cf5c070765fa29322": "roboto"
+  },
+  "requiredAndroidFonts": [
+    "material-community-icons"
+  ]
 }

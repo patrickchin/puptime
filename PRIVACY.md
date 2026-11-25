@@ -12,7 +12,7 @@ Without cloud sync, activity logs, notes, and routine settings stay on your devi
 
 Where configured, you can sign in with an email code, Google, or Apple. Puptime stores your email address, name, provider identity, and authentication/session records to operate your account. Email codes are delivered through Resend; Google and Apple handle their own sign-in and consent screens. Puptime requests basic identity/profile and email access, not access to your mailbox or files.
 
-Signing in does not upload puppy history or activate cloud sync. In account-enabled iPhone builds, choosing cloud sync uploads your puppy's profile (including an optional profile photo), activity, notes, routines, and supported preferences. Cloudflare D1 stores account/authentication records, and Cloudflare Durable Objects store synchronized puppy data and version history. Different sign-in methods are connected only through an explicit authenticated action; they are not silently joined by matching email addresses.
+Signing in does not upload puppy history or activate cloud sync. In account-enabled native builds, choosing cloud sync uploads your puppy's profile (including an optional profile photo), activity, notes, routines, and supported preferences. Cloudflare D1 stores account/authentication records, and Cloudflare Durable Objects store synchronized puppy data and version history. Different sign-in methods are connected only through an explicit authenticated action; they are not silently joined by matching email addresses.
 
 Account actions happen in the native app: sign-in, explicit provider linking, cloud export, sign-out and cloud-account deletion. The official authentication SDK keeps native credentials in platform secure storage. The website also offers a limited [account-deletion page](https://puptime.pages.dev/delete-account): it verifies an existing account by email and uses an HttpOnly browser session cookie to authorize an explicit deletion. The page does not create an account, load puppy history or edit private data. It does not write email addresses or codes into URLs or browser storage, or load usage analytics. Account and care links otherwise offer to open Puptime.
 
@@ -70,7 +70,7 @@ When you choose **Export CSV** in Insights, Puptime creates an activity backup i
 
 When you choose **Import CSV**, the system file picker lets you select a Puptime activity backup. Puptime copies the selected file into temporary app storage, validates it, and adds entries whose identifiers are not already stored. Existing entries and edits are kept. Imported entries follow the same optional sync choice as other activity; the original file is not uploaded.
 
-**Export cloud data** in the native account screen prepares the saved cloud snapshot and its version history, then opens the system share sheet. It is available without active cloud access. Changes that have not synchronized from an iPhone are not part of that cloud snapshot. The exported file is private data; the destination you choose handles it under its own practices.
+**Export cloud data** in the native account screen prepares the saved cloud snapshot and its version history, then opens the system share sheet. It is available without active cloud access. Changes that have not synchronized from this device are not part of that cloud snapshot. The exported file is private data; the destination you choose handles it under its own practices.
 
 ## Retention and deletion
 
@@ -94,4 +94,4 @@ If Puptime's data practices change, this policy will be updated before the relev
 
 ## Contact
 
-For privacy or support questions, use the [Puptime support page](https://github.com/patrickchin/puptime/issues).
+For general privacy or support questions, use the [Puptime support page](https://github.com/patrickchin/puptime/issues). Do not post account addresses, verification codes, private logs or diagnostic exports in a public issue. The [account-deletion page](https://puptime.pages.dev/delete-account) provides the private, email-verified account-deletion flow described above.

@@ -13,7 +13,7 @@ export function FontIconLicenses({theme}:{theme:Theme}) {
  const close=()=>setVisible(false);
  return <>
   <SettingsRow testID="settings.fontLicenses.open" buttonRef={trigger} icon="license" label={t('settings.fontLicenses')} detail={t('settings.fontLicensesDetail')} onPress={()=>setVisible(true)} theme={theme} wrap/>
-  <Modal visible={visible} presentationStyle="pageSheet" animationType="slide" supportedOrientations={['portrait','landscape-left','landscape-right']} onRequestClose={close}
+  <Modal visible={visible} presentationStyle="pageSheet" animationType="none" supportedOrientations={['portrait','landscape-left','landscape-right']} onRequestClose={close}
    onShow={()=>{if(heading.current)AccessibilityInfo.sendAccessibilityEvent(heading.current,'focus');}}
    onDismiss={()=>{if(trigger.current)AccessibilityInfo.sendAccessibilityEvent(trigger.current,'focus');}}>
    <SafeAreaView testID="screen.fontLicenses" accessibilityViewIsModal onAccessibilityEscape={close} style={[styles.page,{backgroundColor:theme.background}]}>

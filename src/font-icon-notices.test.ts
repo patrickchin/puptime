@@ -27,6 +27,14 @@ test('font bytes, glyphs, pinned dependencies and verbatim license copies requir
  assert.equal(hash(body('apache-2')),provenance.upstream.androidRoboto.licenseSha256);
  assert.ok(body('roboto').includes(provenance.upstream.androidRoboto.copyright));
  assert.deepEqual(notices.filter(section=>section.androidOnly).map(section=>section.id),['roboto']);
+ assert.deepEqual(provenance.archiveFonts,{
+  [provenance.files['assets/fonts/RedHatText-Regular.ttf']]:'red-hat',
+  [provenance.files['assets/fonts/RedHatDisplay-Bold.ttf']]:'red-hat',
+  [provenance.files['assets/fonts/RedHatText-SemiBold.ttf']]:'red-hat',
+  [provenance.upstream.materialCommunityIcons.fontSha256]:'material-community-icons',
+  [provenance.upstream.androidRoboto.fontSha256]:'roboto',
+ });
+ assert.deepEqual(provenance.requiredAndroidFonts,['material-community-icons']);
 });
 
 test('application imports only the used icon family rather than the all-font barrel',()=>{
