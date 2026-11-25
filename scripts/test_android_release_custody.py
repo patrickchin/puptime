@@ -266,6 +266,16 @@ class BetaWorkflowBoundary(unittest.TestCase):
         return subprocess.run(['/bin/bash', '--noprofile', '--norc', '-eo', 'pipefail', '-c', script],
                               env=env, capture_output=True, timeout=10).returncode
 
+    def test_actual_unsigned_discovery_admission_guard(self):
+        valid = {'GITHUB_EVENT_NAME': 'workflow_dispatch', 'GITHUB_SHA': 'a' * 40,
+                 'PUPTIME_EXPECTED_SOURCE': 'a' * 40, 'PUPTIME_SIGNING': 'qa-template', 'PUPTIME_PUBLISH': 'false'}
+        title = 'Admit exact unsigned discovery source'
+        self.assertEqual(self.run_source_step(title, valid), 0)
+        for key, wrong in [('GITHUB_EVENT_NAME', 'pull_request'), ('PUPTIME_EXPECTED_SOURCE', 'b' * 40),
+                           ('PUPTIME_SIGNING', 'beta-upload'), ('PUPTIME_PUBLISH', 'true')]:
+            with self.subTest(key=key):
+                self.assertNotEqual(self.run_source_step(title, {**valid, key: wrong}), 0)
+
     def test_actual_source_admission_and_template_publication_guards(self):
         valid = {'GITHUB_EVENT_NAME': 'workflow_dispatch', 'GITHUB_REF': 'refs/heads/main',
                  'GITHUB_SHA': 'a' * 40, 'PUPTIME_EXPECTED_SOURCE': 'a' * 40,
