@@ -5,6 +5,7 @@ from pathlib import Path
 import tempfile
 import unittest
 import zipfile
+from unittest.mock import patch
 
 SPEC = importlib.util.spec_from_file_location('probe_copy', Path(__file__).with_name('android-engine-probe-copy.py'))
 probe = importlib.util.module_from_spec(SPEC)
@@ -84,6 +85,30 @@ class PrivateEngineCopy(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.create()
         self.assertFalse(self.output.exists())
+        self.assertEqual(probe.sha(self.original.read_bytes()), self.original_sha)
+
+    def test_exclusive_open_race_never_unlinks_the_other_creator(self):
+        original_open = Path.open
+        sentinel = b'other creator sentinel'
+        def racing_open(path, *args, **kwargs):
+            if path == self.output and args and args[0] == 'xb':
+                with original_open(path, 'wb') as target:
+                    target.write(sentinel)
+            return original_open(path, *args, **kwargs)
+        with patch.object(Path, 'open', racing_open), self.assertRaises(FileExistsError):
+            self.create()
+        self.assertEqual(self.output.read_bytes(), sentinel)
+
+    def test_replaced_destination_survives_failure_cleanup(self):
+        sentinel = b'replacement creator sentinel'
+        def replace_then_fail(*args):
+            replacement = self.root / 'replacement.fixture'
+            replacement.write_bytes(sentinel)
+            replacement.replace(self.output)
+            raise ValueError('synthetic verification failure')
+        with patch.object(probe, 'verify_copy', replace_then_fail), self.assertRaises(ValueError):
+            self.create()
+        self.assertEqual(self.output.read_bytes(), sentinel)
         self.assertEqual(probe.sha(self.original.read_bytes()), self.original_sha)
 
     def test_unknown_member_path_and_missing_native_file_fail(self):

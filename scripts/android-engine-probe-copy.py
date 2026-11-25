@@ -1,5 +1,6 @@
 """Private QA copy only. Never signs, installs, queries or modifies the product APK."""
 import hashlib
+import os
 from pathlib import Path, PurePosixPath
 import re
 import stat
@@ -83,15 +84,34 @@ def create_copy(product, bundle, destination, expected_product_sha):
     member_manifest(product)
     if file_sha(product) != expected_product_sha:
         raise ValueError('Product APK differs from the admitted artifact.')
+    target, created = None, None
     try:
-        with destination.open('xb') as target:
-            destination.chmod(0o600)
-            with zipfile.ZipFile(product) as original, zipfile.ZipFile(target, 'w') as output:
-                for item in original.infolist():
-                    if SIGNATURE.fullmatch(item.filename):
-                        continue
-                    output.writestr(item, bundle.read_bytes() if item.filename == BUNDLE else original.read(item))
-        return verify_copy(product, destination, expected_product_sha, expected_bundle_sha)
+        target = destination.open('xb')
+        info = os.fstat(target.fileno())
+        created = info.st_dev, info.st_ino
+        os.fchmod(target.fileno(), 0o600)
+        with zipfile.ZipFile(product) as original, zipfile.ZipFile(target, 'w') as output:
+            for item in original.infolist():
+                if SIGNATURE.fullmatch(item.filename):
+                    continue
+                output.writestr(item, bundle.read_bytes() if item.filename == BUNDLE else original.read(item))
+        target.flush()
+        result = verify_copy(product, destination, expected_product_sha, expected_bundle_sha)
+        current = destination.lstat()
+        if (current.st_dev, current.st_ino) != created:
+            raise ValueError('QA destination was replaced.')
+        return result
     except BaseException:
-        destination.unlink(missing_ok=True)
+        # Keep our descriptor open while checking ownership: a replacement cannot
+        # reuse this inode, and a failed exclusive open never owns the destination.
+        if created is not None:
+            try:
+                current = destination.lstat()
+                if (current.st_dev, current.st_ino) == created:
+                    destination.unlink()
+            except FileNotFoundError:
+                pass
         raise
+    finally:
+        if target is not None:
+            target.close()
