@@ -73,7 +73,9 @@ jobs:
           test "$GITHUB_REF" = refs/heads/main
           test "$PUPTIME_EXPECTED_SOURCE" = "$GITHUB_SHA"
           test "$PUPTIME_PUBLISH" = false
-          [[ "$PUPTIME_UPLOAD_CERT_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          if [[ ! "$PUPTIME_UPLOAD_CERT_SHA256" =~ ^[a-f0-9]{64}$ ]]; then
+            exit 1
+          fi
           test "$PUPTIME_UPLOAD_CERT_SHA256" != fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c
       - name: Choose release version
         id: release
