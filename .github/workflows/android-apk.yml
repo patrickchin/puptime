@@ -149,6 +149,7 @@ jobs:
         env:
           CI: "1"
       - name: Stage immutable notice discovery tools
+        timeout-minutes: 5
         if: ${{ inputs.discovery_only == true }}
         shell: bash
         run: |
@@ -180,6 +181,7 @@ jobs:
             git show "$puptime_tools_source:$puptime_file" > "$puptime_file"
           done
       - name: Resolve Android license dependencies without compiling
+        timeout-minutes: 20
         if: ${{ inputs.discovery_only == true }}
         shell: bash
         run: |
@@ -192,6 +194,7 @@ jobs:
           node "$PUPTIME_NOTICE_PRIVATE/tools/scripts/capture-app-notices.mjs" collect android --gradle-input "$PUPTIME_NOTICE_PRIVATE/runtime-inputs.json"
           node scripts/android-notice-discovery.mjs
       - name: Upload public license discovery inputs only (INCOMPLETE)
+        timeout-minutes: 3
         if: ${{ success() && inputs.discovery_only == true }}
         uses: actions/upload-artifact@v6
         with:
@@ -202,13 +205,15 @@ jobs:
           if-no-files-found: error
           retention-days: 3
       - name: Remove owned private discovery inputs
+        timeout-minutes: 2
         if: ${{ always() && inputs.discovery_only == true }}
         shell: bash
         run: |
           set -euo pipefail
           puptime_private="$RUNNER_TEMP/puptime-notice-discovery-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-          rm -rf -- "$puptime_private"
+          rm -rf -- "$puptime_private" build/notices/android/private
           test ! -e "$puptime_private"
+          test ! -e build/notices/android/private
       - name: Build QA artifacts with the existing template signer
         if: ${{ inputs.signing != 'beta-upload' && inputs.discovery_only != true }}
         run: ./gradlew assembleRelease bundleRelease --no-daemon
