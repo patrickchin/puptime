@@ -1,0 +1,15 @@
+appId: com.patrickchin.puptime
+---
+- assertTrue: ${CSV_NAME === 'puptime-qa-recovery' || CSV_NAME === 'puptime-qa-invalid'}
+- tapOn:
+    id: settings.import
+    enabled: true
+- extendedWaitUntil:
+    visible: ^Search$
+    timeout: 30000
+- tapOn: ^Search$
+- inputText: puptime-qa-
+- extendedWaitUntil:
+    visible: ^${CSV_NAME}([.]csv)?(,.*)?$
+    timeout: 30000
+- tapOn: ^${CSV_NAME}([.]csv)?(,.*)?$

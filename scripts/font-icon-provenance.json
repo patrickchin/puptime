@@ -1,0 +1,57 @@
+{
+  "scope": "Font and icon source inputs only. Final Android APK/AAB inventory is a separate packaging gate; iOS/web do not include Android Media3 Roboto.",
+  "packages": {
+    "@expo/vector-icons": "15.1.1",
+    "expo-audio": "57.0.5"
+  },
+  "files": {
+    "assets/fonts/RedHatText-Regular.ttf": "d7d9f3bb3f2ce90276c839ea7280eac971d5682793caa1cce715be31305a9c4b",
+    "assets/fonts/RedHatDisplay-Bold.ttf": "0a1be6fefba807ad3557b6ea1f1a4483e7a1c41eb884afcfd85fe2d376dee202",
+    "assets/fonts/RedHatText-SemiBold.ttf": "846d7101f3391a62ca5ffa5847e9accd6f85c3dbd352bd9cde05e7f7fbc2084e",
+    "assets/fonts/RedHat-OFL.txt": "435fbfb7e66988b2a06686a4cb966faec733f35d8fe100a1601573c27f3e0bb8",
+    "node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf": "61e8aba5a4e981fe22cf7c8e8bcdbea00476e75c62c37f01bf7ee33361d68428",
+    "node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/MaterialCommunityIcons.json": "f9bfcef0eb31e71d9f5c0801949020877a5fbe35964ce3ed60566dd5d7c8be8b",
+    "node_modules/@expo/vector-icons/LICENSE": "a5416f6b586be51823285bc9a389bfd756eef80cfb7616ea90aaa11bae6189e1",
+    "node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/LICENSE": "000a66d1bc9e206b5963ba9370cd03350a4b26e205b5880e8e0f882a51951178",
+    "node_modules/expo-audio/android/build.gradle": "6ca1b2685c5cd6f8dc0554bee3c57b465b45e8a7d0950ef50e797f55e156ca16"
+  },
+  "notices": {
+    "red-hat": "435fbfb7e66988b2a06686a4cb966faec733f35d8fe100a1601573c27f3e0bb8",
+    "material-community-icons": "3bae6305bcaa6d10219b999f65c342034c2d40b1c0e8567fa08605e73ccba829",
+    "roboto": "ddd34e66e69a7f3dda3cd38f33c2ee8b705bf8d576b594f4d977a3ab49de16b4",
+    "apache-2": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "expo-vector-icons": "a5416f6b586be51823285bc9a389bfd756eef80cfb7616ea90aaa11bae6189e1",
+    "react-native-vector-icons": "000a66d1bc9e206b5963ba9370cd03350a4b26e205b5880e8e0f882a51951178"
+  },
+  "upstream": {
+    "materialCommunityIcons": {
+      "version": "7.4.47",
+      "fontUrl": "https://github.com/Templarian/MaterialDesign-Webfont/blob/v7.4.47/fonts/materialdesignicons-webfont.ttf",
+      "fontGitBlob": "bba7dcf6c6e6a8352938d681a39aa4aead4f33ed",
+      "fontSha256": "61e8aba5a4e981fe22cf7c8e8bcdbea00476e75c62c37f01bf7ee33361d68428",
+      "licenseUrl": "https://github.com/Templarian/MaterialDesign-Webfont/blob/v7.4.47/LICENSE",
+      "licenseSha256": "3bae6305bcaa6d10219b999f65c342034c2d40b1c0e8567fa08605e73ccba829"
+    },
+    "androidRoboto": {
+      "module": "androidx.media3:media3-ui:1.9.0",
+      "introducedBy": "expo-audio 57.0.5 android/build.gradle",
+      "archiveEntry": "res/font/roboto_medium_numbers.ttf",
+      "fontUrl": "https://github.com/androidx/media/blob/1.9.0/libraries/ui/src/main/res/font/roboto_medium_numbers.ttf",
+      "fontGitBlob": "b61ac79ddf1fb7fe0b90370806f6da05ac2ef8b3",
+      "fontSha256": "acbf6c59d8c5765ffa9af2a839249e2800e0b107aad4045cf5c070765fa29322",
+      "copyright": "Copyright 2011 Google Inc. All Rights Reserved.",
+      "licenseUrl": "https://github.com/androidx/media/blob/1.9.0/LICENSE",
+      "licenseSha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    }
+  },
+  "archiveFonts": {
+    "d7d9f3bb3f2ce90276c839ea7280eac971d5682793caa1cce715be31305a9c4b": "red-hat",
+    "0a1be6fefba807ad3557b6ea1f1a4483e7a1c41eb884afcfd85fe2d376dee202": "red-hat",
+    "846d7101f3391a62ca5ffa5847e9accd6f85c3dbd352bd9cde05e7f7fbc2084e": "red-hat",
+    "61e8aba5a4e981fe22cf7c8e8bcdbea00476e75c62c37f01bf7ee33361d68428": "material-community-icons",
+    "acbf6c59d8c5765ffa9af2a839249e2800e0b107aad4045cf5c070765fa29322": "roboto"
+  },
+  "requiredAndroidFonts": [
+    "material-community-icons"
+  ]
+}

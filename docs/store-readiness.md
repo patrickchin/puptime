@@ -2,6 +2,8 @@
 
 Source checklist reconciled November 19, 2026 against repository main `5e67cfc`. This is preparation, not a console submission, legal agreement, paid-service order or release authorization. Repository metadata does not establish the settings saved in either store. Keep live account/console evidence private; the public checklist records gates rather than personal account statuses. See the [listing handoff](store-listing-handoff.md) for concrete source fields, pending reviewer/support acceptance and the source-to-console process. Core privacy implementation and its canonical policy remain in [PRIVACY.md](../PRIVACY.md) and [app telemetry](app-telemetry.md).
 
+The [November 25 free Android internal-beta handoff](android-beta-handoff.md) prepares the existing listing, declaration choices, private reviewer/service script and tester instructions. The [scoped Android font/icon contract](android-font-notices.md) adds an offline view and byte-preserved archive payload; complete shipped-software notice coverage and final-artifact acceptance remain separate gates. An app active exclusively on Play internal testing is exempt from the public Data Safety section; prepare truthful answers now for any later closed/open/production track. This does not waive functional, privacy or rights obligations.
+
 ## Independent release gates
 
 | Gate | Repository evidence | Remaining acceptance |

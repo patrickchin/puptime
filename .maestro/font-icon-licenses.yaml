@@ -1,0 +1,71 @@
+appId: com.patrickchin.puptime
+name: Offline licenses and credits
+tags:
+  - android
+  - ios
+---
+# Run on a task-owned fixture with the matching candidate already installed.
+# This flow never clears storage, signs in or contacts a provider.
+- launchApp:
+    permissions: {}
+- runFlow:
+    when:
+      visible:
+        id: 'screen\.(firstLaunch|onboarding)|preview.guest'
+    file: helpers/skip-onboarding.yaml
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.settings
+- assertVisible:
+    id: screen.settings
+- scrollUntilVisible:
+    element:
+      id: settings.fontLicenses.open
+    direction: DOWN
+    visibilityPercentage: 100
+- tapOn:
+    id: settings.fontLicenses.open
+- assertVisible:
+    id: screen.fontLicenses
+- assertVisible:
+    id: fontLicenses.red-hat
+- scrollUntilVisible:
+    element:
+      id: fontLicenses.material-community-icons
+    direction: DOWN
+    visibilityPercentage: 100
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: fontLicenses.roboto
+          direction: DOWN
+          visibilityPercentage: 100
+- scrollUntilVisible:
+    element:
+      id: fontLicenses.react-native-vector-icons
+    direction: DOWN
+    visibilityPercentage: 100
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: fontLicenses.android-software-01b4bb058a35cf06dde9e344
+          direction: DOWN
+          visibilityPercentage: 100
+      - scrollUntilVisible:
+          element:
+            id: fontLicenses.text.android-software-01b4bb058a35cf06dde9e344
+          direction: DOWN
+          visibilityPercentage: 1
+- tapOn:
+    id: fontLicenses.close
+- assertNotVisible:
+    id: screen.fontLicenses
+- assertVisible:
+    id: screen.settings

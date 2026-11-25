@@ -2,7 +2,7 @@
   "expo": {
     "name": "Puptime",
     "slug": "puptime",
-    "version": "1.12.0",
+    "version": "1.13.0",
     "description": "Log puppy activities from the app or Home Screen.",
     "scheme": "puptime",
     "icon": "./assets/puptime-icon.png",
@@ -16,11 +16,20 @@
       },
       "config": {
         "usesNonExemptEncryption": false
-      }
+      },
+      "privacyManifests": {
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": ["1C8F.1"]
+          }
+        ]
+      },
+      "buildNumber": "3"
     },
     "android": {
       "package": "com.patrickchin.puptime",
-      "versionCode": 1012000,
+      "versionCode": 1013000,
       "blockedPermissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
@@ -38,6 +47,7 @@
       "output": "static"
     },
     "plugins": [
+      "./plugins/withIosAppGroupPrivacy",
       "./plugins/withAndroidQuickLogNotification",
       "./plugins/withQuickLogNotification",
       "./plugins/withAndroidExactReminders",
@@ -131,7 +141,8 @@
           "cameraPermission": false,
           "microphonePermission": "Allow Puptime to use the microphone when you dictate a log note."
         }
-      ]
+      ],
+      "./plugins/withAndroidFontNotices"
     ],
     "owner": "patchin",
     "extra": {

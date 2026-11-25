@@ -1,0 +1,36 @@
+// Task-only public SDK provenance. No app/native compilation or configuration changes.
+import groovy.json.JsonOutput
+import java.nio.file.Files
+import java.nio.file.StandardOpenOption
+
+gradle.projectsEvaluated {
+    def invocation = gradle
+    while (invocation.parent != null) invocation = invocation.parent
+    def requested = invocation.startParameter.projectProperties['noticeMainProjectRoot']
+    def workspace = System.getenv('GITHUB_WORKSPACE')
+    if (!requested || !workspace) throw new GradleException('Missing admitted notice root')
+    def mainRoot = new File(workspace, 'android').canonicalFile
+    if (new File(requested.toString()).canonicalFile != mainRoot) throw new GradleException('Wrong notice root')
+    if (gradle.rootProject.projectDir.canonicalFile != mainRoot) return
+    def app = gradle.rootProject.findProject(':app')
+    if (app == null) throw new GradleException('Missing app for notice metadata')
+    app.tasks.register('writeNoticeNdkInputs') {
+        doLast {
+            def privateRoot = System.getenv('PUPTIME_NOTICE_PRIVATE')
+            if (!privateRoot) throw new GradleException('Missing private notice destination')
+            def directory = new File(privateRoot)
+            if (!directory.isDirectory() || directory.canonicalFile != directory.absoluteFile) throw new GradleException('Invalid private notice destination')
+            def run = System.getenv('GITHUB_RUN_ID'), attempt = System.getenv('GITHUB_RUN_ATTEMPT'), temporary = System.getenv('RUNNER_TEMP')
+            if (!(run ==~ /[0-9]+/) || !(attempt ==~ /[0-9]+/) || !temporary || directory != new File(temporary, 'puptime-notice-discovery-' + run + '-' + attempt).canonicalFile) throw new GradleException('Wrong private notice destination')
+            def android = app.extensions.getByName('android')
+            def sdk = app.extensions.getByName('androidComponents').sdkComponents
+            def metadata = [schema: 1, project: ':app', configuredVersion: android.ndkVersion,
+                sdkRoot: sdk.sdkDirectory.get().asFile.canonicalPath,
+                ndkRoot: sdk.ndkDirectory.get().asFile.canonicalPath]
+            // Only this private reference crosses to the bounded projector.
+            // Never print SDK paths, licence bodies or the private JSON.
+            def output = new File(directory, 'ndk-inputs.json').toPath()
+            Files.write(output, JsonOutput.toJson(metadata).getBytes('UTF-8'), StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)
+        }
+    }
+}

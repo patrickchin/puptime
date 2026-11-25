@@ -1,0 +1,14 @@
+appId: com.patrickchin.puptime
+---
+- tapOn:
+    id: settings.export
+    enabled: true
+- extendedWaitUntil:
+    visible: ^(Close|Cancel)$
+    timeout: 30000
+- tapOn: ^(Close|Cancel)$
+- extendedWaitUntil:
+    visible:
+      id: settings.export
+      enabled: true
+    timeout: 30000

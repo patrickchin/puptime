@@ -1,4 +1,4 @@
-import {MaterialCommunityIcons} from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import {useEffect,useState,type Ref} from 'react';
 import {ActivityIndicator,Keyboard,Platform,StyleSheet,Text,TextInput,View} from 'react-native';
 import { Pressable } from './TelemetryPressable';

@@ -7,6 +7,19 @@ on:
         description: Artifact version (for example 1.12.0); leave blank for the next patch
         required: false
         type: string
+      discovery_only:
+        description: Resolve public license inputs only; no APK/AAB build or signing
+        type: boolean
+        default: false
+      signing:
+        description: QA template or proposed beta upload signer (never publishes)
+        type: choice
+        options: [qa-template, beta-upload]
+        default: qa-template
+      expected_source:
+        description: Exact reviewed source SHA required for beta-upload or discovery
+        type: string
+        required: false
       publish:
         description: Publish a GitHub release and create its tag if needed
         required: false
@@ -26,6 +39,13 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Configure this environment to admit main only and require owner approval
+    # BEFORE adding its signing secrets. QA has no signing credentials.
+    environment: ${{ inputs.signing == 'beta-upload' && 'android-beta-signing' || 'android-qa' }}
+    env:
+      EXPO_NO_DOTENV: "1"
+      EXPO_PUBLIC_CLOUD_API_URL: https://puptime.pages.dev
+      EXPO_PUBLIC_CLOUD_ALLOW_LOCAL: "0"
     outputs:
       tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
@@ -37,7 +57,44 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.sha }}
           persist-credentials: false
+      - name: Admit exact unsigned discovery source
+        id: notice_admission
+        if: ${{ inputs.discovery_only == true }}
+        env:
+          PUPTIME_EXPECTED_SOURCE: ${{ inputs.expected_source }}
+          PUPTIME_SIGNING: ${{ inputs.signing }}
+          PUPTIME_PUBLISH: ${{ inputs.publish }}
+        run: |
+          test "$GITHUB_EVENT_NAME" = workflow_dispatch
+          test "$PUPTIME_EXPECTED_SOURCE" = "$GITHUB_SHA"
+          test "$PUPTIME_SIGNING" = qa-template
+          test "$PUPTIME_PUBLISH" = false
+      - name: Keep template QA artifacts out of public releases
+        if: ${{ inputs.signing != 'beta-upload' }}
+        env:
+          PUPTIME_PUBLISH: ${{ inputs.publish }}
+        run: |
+          if [[ "$PUPTIME_PUBLISH" == true ]]; then
+            echo 'Template-signed QA artifacts cannot be published as a release. Qualify the intended delivery and signing first.' >&2
+            exit 1
+          fi
+      - name: Admit exact beta source before accessing signing credentials
+        if: ${{ inputs.signing == 'beta-upload' }}
+        env:
+          PUPTIME_EXPECTED_SOURCE: ${{ inputs.expected_source }}
+          PUPTIME_PUBLISH: ${{ inputs.publish }}
+          PUPTIME_UPLOAD_CERT_SHA256: ${{ vars.PUPTIME_UPLOAD_CERT_SHA256 }}
+        run: |
+          test "$GITHUB_EVENT_NAME" = workflow_dispatch
+          test "$GITHUB_REF" = refs/heads/main
+          test "$PUPTIME_EXPECTED_SOURCE" = "$GITHUB_SHA"
+          test "$PUPTIME_PUBLISH" = false
+          if [[ ! "$PUPTIME_UPLOAD_CERT_SHA256" =~ ^[a-f0-9]{64}$ ]]; then
+            exit 1
+          fi
+          test "$PUPTIME_UPLOAD_CERT_SHA256" != fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c
       - name: Choose release version
+        if: ${{ inputs.discovery_only != true }}
         id: release
         shell: bash
         env:
@@ -68,6 +125,7 @@ jobs:
             echo "base_tag=$base_tag"
           } >> "$GITHUB_OUTPUT"
       - name: Set artifact version
+        if: ${{ inputs.discovery_only != true }}
         env:
           PUPTIME_VERSION: ${{ steps.release.outputs.version }}
         run: |
@@ -81,22 +139,150 @@ jobs:
           NODE
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version-file: .node-version
           cache: npm
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
       - run: npm ci
+        id: notice_install
       - run: npx expo prebuild --platform android --no-install
+        id: notice_prebuild
         env:
           CI: "1"
-      - run: ./gradlew assembleRelease bundleRelease --no-daemon
+      - name: Stage immutable notice discovery tools
+        id: notice_tools
+        timeout-minutes: 5
+        if: ${{ inputs.discovery_only == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          puptime_tools_source=dba1d8ca454b08aad3e624e262f62b5a97875efe
+          git fetch --no-tags --depth=1 origin "$puptime_tools_source"
+          puptime_private="$RUNNER_TEMP/puptime-notice-discovery-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          mkdir -m 700 "$puptime_private"
+          export PUPTIME_NOTICE_PRIVATE="$puptime_private"
+          export GRADLE_USER_HOME="$puptime_private/gradle"
+          mkdir -m 700 "$GRADLE_USER_HOME"
+          printf '%s\n' "PUPTIME_NOTICE_PRIVATE=$PUPTIME_NOTICE_PRIVATE" "GRADLE_USER_HOME=$GRADLE_USER_HOME" >> "$GITHUB_ENV"
+          for puptime_file in scripts/capture-app-notices.mjs scripts/app-notices.mjs scripts/native-notice-inputs.mjs scripts/notice-archive.py scripts/native-task-cleanup.mjs scripts/app-notice-provenance.json scripts/notices-runtime.init.gradle; do
+            mkdir -p "$puptime_private/tools/$(dirname "$puptime_file")"
+            git show "$puptime_tools_source:$puptime_file" > "$puptime_private/tools/$puptime_file"
+          done
+          ln -s "$GITHUB_WORKSPACE/node_modules" "$puptime_private/tools/node_modules"
+          # Data-only inputs for the pinned INCOMPLETE collector. Never overwrite
+          # a candidate file or import an old app/native runtime into this tree.
+          git cat-file -e HEAD:scripts/font-icon-provenance.json
+          git diff --quiet HEAD -- scripts/font-icon-provenance.json
+          test ! -L scripts/font-icon-provenance.json
+          test -f scripts/font-icon-provenance.json
+          # collect reads the actual committed candidate font ledger unchanged.
+          for puptime_file in scripts/app-notice-provenance.json $(git ls-tree -r --name-only "$puptime_tools_source" assets/notices/sources); do
+            test ! -e "$puptime_file"
+            mkdir -p "$(dirname "$puptime_file")"
+            git show "$puptime_tools_source:$puptime_file" > "$puptime_file"
+          done
+      - name: Resolve Android license dependencies without compiling
+        id: notice_gradle
+        timeout-minutes: 20
+        if: ${{ inputs.discovery_only == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          if ! (cd android && ./gradlew -I "$PUPTIME_NOTICE_PRIVATE/tools/scripts/notices-runtime.init.gradle" -I ../scripts/android-notice-ndk.init.gradle :app:writeNoticeRuntimeInputs :app:writeNoticeNdkInputs --no-daemon --no-configuration-cache --no-build-cache -PnoticeMainProjectRoot="$PWD" -PnoticeInputsOutput="$PUPTIME_NOTICE_PRIVATE/runtime-inputs.json") > "$PUPTIME_NOTICE_PRIVATE/gradle-private.log" 2>&1; then
+            node "$PUPTIME_NOTICE_PRIVATE/tools/scripts/capture-app-notices.mjs" setup-failure android --phase gradle-resolution
+            echo 'Android dependency resolution failed; finite diagnostic only, no raw output uploaded.' >&2
+            exit 1
+          fi
+      - name: Collect locked Android Metro and notice inputs
+        id: notice_metro
+        timeout-minutes: 10
+        if: ${{ inputs.discovery_only == true }}
+        run: node "$PUPTIME_NOTICE_PRIVATE/tools/scripts/capture-app-notices.mjs" collect android --gradle-input "$PUPTIME_NOTICE_PRIVATE/runtime-inputs.json"
+      - name: Project bounded public Android dependency metadata
+        id: notice_projection
+        timeout-minutes: 2
+        if: ${{ inputs.discovery_only == true }}
+        run: node scripts/android-notice-discovery.mjs
+      - name: Record finite Android discovery diagnostics
+        id: notice_diagnostic
+        timeout-minutes: 2
+        if: ${{ always() && inputs.discovery_only == true }}
+        env:
+          PUPTIME_NOTICE_SOURCE_ADMISSION: ${{ steps.notice_admission.outcome }}
+          PUPTIME_NOTICE_LOCKED_INSTALL: ${{ steps.notice_install.outcome }}
+          PUPTIME_NOTICE_PREBUILD: ${{ steps.notice_prebuild.outcome }}
+          PUPTIME_NOTICE_TOOL_STAGING: ${{ steps.notice_tools.outcome }}
+          PUPTIME_NOTICE_GRADLE_RESOLUTION: ${{ steps.notice_gradle.outcome }}
+          PUPTIME_NOTICE_METRO_COLLECTION: ${{ steps.notice_metro.outcome }}
+          PUPTIME_NOTICE_PUBLIC_PROJECTION: ${{ steps.notice_projection.outcome }}
+        run: python3 scripts/record-android-notice-failure.py
+      - name: Upload public license discovery inputs only (INCOMPLETE)
+        timeout-minutes: 3
+        if: ${{ always() && inputs.discovery_only == true && steps.notice_diagnostic.outcome == 'success' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: puptime-android-notice-discovery-INCOMPLETE
+          path: |
+            ${{ steps.notice_metro.outcome == 'success' && 'build/notices/android/review/unreviewed-oss-notice-inputs.json' || '' }}
+            ${{ steps.notice_projection.outcome == 'success' && 'build/notices/android/review/dependency-inventory.json' || '' }}
+            build/notices/android/review/failure.json
+          if-no-files-found: error
+          retention-days: 3
+      - name: Remove owned private discovery inputs
+        timeout-minutes: 2
+        if: ${{ always() && inputs.discovery_only == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          puptime_private="$RUNNER_TEMP/puptime-notice-discovery-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          rm -rf -- "$puptime_private" build/notices/android/private
+          test ! -e "$puptime_private"
+          test ! -e build/notices/android/private
+      - name: Build QA artifacts with the existing template signer
+        if: ${{ inputs.signing != 'beta-upload' && inputs.discovery_only != true }}
+        run: ./gradlew assembleRelease bundleRelease --no-daemon
         env:
           EXPO_PUBLIC_APP_POSTHOG_KEY: ${{ vars.EXPO_PUBLIC_APP_POSTHOG_KEY }}
           EXPO_PUBLIC_APP_POSTHOG_HOST: ${{ vars.EXPO_PUBLIC_APP_POSTHOG_HOST || 'https://eu.i.posthog.com' }}
         working-directory: android
+      - name: Build proposed beta artifacts with private upload credentials
+        if: ${{ inputs.signing == 'beta-upload' }}
+        shell: bash
+        env:
+          PUPTIME_UPLOAD_KEYSTORE_BASE64: ${{ secrets.PUPTIME_UPLOAD_KEYSTORE_BASE64 }}
+          PUPTIME_UPLOAD_STORE_PASSWORD: ${{ secrets.PUPTIME_UPLOAD_STORE_PASSWORD }}
+          PUPTIME_UPLOAD_KEY_PASSWORD: ${{ secrets.PUPTIME_UPLOAD_KEY_PASSWORD }}
+          PUPTIME_UPLOAD_KEY_ALIAS: ${{ secrets.PUPTIME_UPLOAD_KEY_ALIAS }}
+          EXPO_PUBLIC_APP_POSTHOG_KEY: ${{ vars.EXPO_PUBLIC_APP_POSTHOG_KEY }}
+          EXPO_PUBLIC_APP_POSTHOG_HOST: ${{ vars.EXPO_PUBLIC_APP_POSTHOG_HOST || 'https://eu.i.posthog.com' }}
+        run: |
+          set -euo pipefail
+          umask 077
+          puptime_private="$RUNNER_TEMP/puptime-beta-signing-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          mkdir -m 700 "$puptime_private"
+          trap 'rm -rf -- "$puptime_private"' EXIT
+          export GRADLE_USER_HOME="$puptime_private/gradle"
+          export PUPTIME_UPLOAD_STORE_FILE="$puptime_private/upload.p12"
+          test -n "$PUPTIME_UPLOAD_KEYSTORE_BASE64"
+          printf '%s' "$PUPTIME_UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$PUPTIME_UPLOAD_STORE_FILE"
+          unset PUPTIME_UPLOAD_KEYSTORE_BASE64
+          printf '\napply from: rootProject.file("../scripts/android-beta-signing.gradle")\n' >> android/app/build.gradle
+          cd android
+          ./gradlew assembleRelease bundleRelease --no-daemon --no-configuration-cache --no-build-cache --project-cache-dir "$puptime_private/project-cache"
+      - name: Remove private signing material after success, failure or cancellation
+        if: ${{ always() && inputs.signing == 'beta-upload' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          puptime_private="$RUNNER_TEMP/puptime-beta-signing-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          rm -rf -- "$puptime_private"
+          test ! -e "$puptime_private"
       - name: Verify artifacts and record qualification metadata
+        if: ${{ inputs.discovery_only != true }}
         id: verify
         shell: bash
         run: |
@@ -131,17 +317,25 @@ jobs:
             configuredVersionCode: expo.android.versionCode,
           }, null, 2) + '\n');
           NODE
+      - name: Require the approved upload certificate on both beta artifacts
+        if: ${{ inputs.signing == 'beta-upload' }}
+        env:
+          PUPTIME_UPLOAD_CERT_SHA256: ${{ vars.PUPTIME_UPLOAD_CERT_SHA256 }}
+        run: python3 scripts/verify-android-beta-signing.py
       - uses: actions/upload-artifact@v6
+        if: ${{ inputs.discovery_only != true }}
         with:
           name: puptime-android-apk
           path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
       - uses: actions/upload-artifact@v6
+        if: ${{ inputs.discovery_only != true }}
         with:
           name: puptime-android-aab
           path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
       - uses: actions/upload-artifact@v6
+        if: ${{ inputs.discovery_only != true }}
         with:
           name: puptime-android-qualification
           path: qualification/

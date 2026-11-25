@@ -1,0 +1,15 @@
+appId: com.apple.mobilesafari
+---
+# Safari creates a genuine Files download; the runner serves only its own export.
+- runFlow:
+    when:
+      visible: ^Continue$
+    commands:
+      - tapOn: ^Continue$
+- extendedWaitUntil:
+    visible: ^Download$
+    timeout: 30000
+- tapOn: ^Download$
+- extendedWaitUntil:
+    notVisible: ^Download$
+    timeout: 30000

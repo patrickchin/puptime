@@ -235,5 +235,63 @@ class PublicationBoundary(unittest.TestCase):
                 publisher.pins_from_environment(env)
 
 
+class BetaCertificateBoundary(unittest.TestCase):
+    def test_exact_both_signers_and_fail_closed_controls(self):
+        spec = importlib.util.spec_from_file_location('beta', Path(__file__).with_name('verify-android-beta-signing.py'))
+        beta = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(beta)
+        import base64
+        der = b'finite synthetic certificate bytes, never a private key'
+        expected = SHA(der)
+        apk = 'Signer #1 certificate SHA-256 digest: ' + expected + '\n'
+        pem = '-----BEGIN CERTIFICATE-----\n' + base64.b64encode(der).decode() + '\n-----END CERTIFICATE-----\n'
+        beta.verify_beta_signers(expected, apk, pem)
+        for certificate, report, certificate_pem in [
+            ('', apk, pem), (beta.TEMPLATE_CERT, apk, pem), ('f' * 64, apk, pem),
+            (expected, '', pem), (expected, apk.replace(expected, 'f' * 64), pem),
+            (expected, apk + apk.replace('#1', '#2'), pem),
+            (expected, apk, ''), (expected, apk, pem + pem),
+            (expected, apk, pem.replace(base64.b64encode(der).decode(), 'ZmFrZQ==')),
+        ]:
+            with self.subTest(certificate=certificate), self.assertRaises(ValueError):
+                beta.verify_beta_signers(certificate, report, certificate_pem)
+
+
+class BetaWorkflowBoundary(unittest.TestCase):
+    def run_source_step(self, title, env):
+        import subprocess
+        workflow = (Path(__file__).parents[1] / '.github/workflows/android-apk.yml').read_text()
+        step = workflow.split('      - name: ' + title + '\n', 1)[1].split('      - ', 1)[0]
+        script = '\n'.join(line[10:] for line in step.split('        run: |\n', 1)[1].splitlines())
+        return subprocess.run(['/bin/bash', '--noprofile', '--norc', '-eo', 'pipefail', '-c', script],
+                              env=env, capture_output=True, timeout=10).returncode
+
+    def test_actual_unsigned_discovery_admission_guard(self):
+        valid = {'GITHUB_EVENT_NAME': 'workflow_dispatch', 'GITHUB_SHA': 'a' * 40,
+                 'PUPTIME_EXPECTED_SOURCE': 'a' * 40, 'PUPTIME_SIGNING': 'qa-template', 'PUPTIME_PUBLISH': 'false'}
+        title = 'Admit exact unsigned discovery source'
+        self.assertEqual(self.run_source_step(title, valid), 0)
+        for key, wrong in [('GITHUB_EVENT_NAME', 'pull_request'), ('PUPTIME_EXPECTED_SOURCE', 'b' * 40),
+                           ('PUPTIME_SIGNING', 'beta-upload'), ('PUPTIME_PUBLISH', 'true')]:
+            with self.subTest(key=key):
+                self.assertNotEqual(self.run_source_step(title, {**valid, key: wrong}), 0)
+
+    def test_actual_source_admission_and_template_publication_guards(self):
+        valid = {'GITHUB_EVENT_NAME': 'workflow_dispatch', 'GITHUB_REF': 'refs/heads/main',
+                 'GITHUB_SHA': 'a' * 40, 'PUPTIME_EXPECTED_SOURCE': 'a' * 40,
+                 'PUPTIME_PUBLISH': 'false', 'PUPTIME_UPLOAD_CERT_SHA256': 'c' * 64}
+        title = 'Admit exact beta source before accessing signing credentials'
+        self.assertEqual(self.run_source_step(title, valid), 0)
+        for key, wrong in [('GITHUB_EVENT_NAME', 'pull_request'), ('GITHUB_REF', 'refs/heads/unreviewed'),
+                           ('PUPTIME_EXPECTED_SOURCE', 'b' * 40), ('PUPTIME_PUBLISH', 'true'),
+                           ('PUPTIME_UPLOAD_CERT_SHA256', ''), ('PUPTIME_UPLOAD_CERT_SHA256', 'f' * 63),
+                           ('PUPTIME_UPLOAD_CERT_SHA256', 'fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c')]:
+            with self.subTest(key=key, wrong=wrong):
+                self.assertNotEqual(self.run_source_step(title, {**valid, key: wrong}), 0)
+        title = 'Keep template QA artifacts out of public releases'
+        self.assertEqual(self.run_source_step(title, {'PUPTIME_PUBLISH': 'false'}), 0)
+        self.assertNotEqual(self.run_source_step(title, {'PUPTIME_PUBLISH': 'true'}), 0)
+
+
 if __name__ == '__main__':
     unittest.main()

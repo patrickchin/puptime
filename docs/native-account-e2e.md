@@ -66,6 +66,7 @@ Historical final shared iOS account reopens used [reopen.yaml](../.maestro/accou
 | `photos` | Real UIKit selection/crop and decoded JPEG, upload failures, exact transmitted bytes, corrupt-download rejection and byte-exact recovery on a fresh device. |
 | `deletion` | Pending-delete cancellation, pre-commit failure and explicit retry, accepted deletion with a lost response, continued local logging and the unresolved safety barrier across restart. |
 | `upgrade` | The separately pinned original-archive guest runtime replacement described below. |
+| `csv-recovery` | Prepared, not yet run: twelve native UI logs are exported through the real sharing flow, downloaded by Safari onto a fresh task device, selected through the real Files picker and imported into App storage. A native edit must survive repeat import; malformed CSV must leave all fourteen tables unchanged; an explicit-stop restart must preserve the recovered IDs and values. Only finite counts/digests are retained. |
 
 `all` selects the six account cases, excluding `upgrade`.
 
@@ -90,6 +91,16 @@ node scripts/run-hosted-ios-account-case.mjs
 The optional archive path replaces only acquisition; metadata, digest, signature and native-input validation still run. The wrapper owns simulator creation and cleanup. Keep its output directory fresh between executions.
 
 ## Original guest runtime replacement
+
+The prepared `upgrade_stage=beta` route uses a fresh iOS build from the shipped
+1.12.5 source tree and an ordinary 1.13.0/build 3 target. The old build has an
+explicit 1.12.5/build 1 test configuration; it is not a published iOS artifact.
+Its producer receipt binds that distinction, the old source/dependency graph,
+and the actual JavaScript/native bytes. Archive and target pins remain unbound
+until successful, unexpired inputs are reviewed, so execution currently refuses
+before any artifact access or simulator creation. Source self-checks are not an
+executed upgrade. This guest route does not qualify the separately required
+enrolled-account upgrade, Android signing or store delivery.
 
 `verify-ios-runtime-upgrade.mjs` pins two actual original archived apps, including the older PR build's compiled checkout tree. Inspection and execution have separate receipts:
 
@@ -116,6 +127,25 @@ node scripts/verify-ios-runtime-upgrade.mjs --prepare-enrolled <absolute-new-pri
 ```
 
 Preparation creates a private manifest and source/host inputs. It cannot install an app, export JavaScript or qualify an upgrade. Its receipt says `stage: controlled-origin-enrolled-preparation` and `upgradeExecuted: false`.
+
+The prepared beta path uses `--prepare-beta-enrolled`, followed by the wrapper's
+`beta-enrolled-upgrade` case. It is source-only until both pinned artifacts are
+admitted; the final main target is deliberately unbound. Its older input is a
+fresh iOS build from the shipped 1.12.5 source, not a published iOS binary.
+Before extracting source, preparation excludes all dotenv examples/configuration
+and `owner.env`. Each cut installs its own exact locked dependencies and uses its
+own Expo CLI for the controlled-origin export. The hosted `upgrade_stage=beta-enrolled`
+selection prepares these private inputs and removes them on exit; it never uploads
+the input hosts, local account state or exports.
+
+The beta case must preserve fifteen events, the original SDK session and three
+pending payloads during the numeric 1.12.5/1 → 1.13.0/3 update. First launch permits
+only the exact version checkpoint, one validated before-update backup and the
+documented widget palette fields. Real SDK replay must drain the three writes
+without reauthentication or enrollment, then explicit-stop restart must retain
+all fourteen tables, files, prior backups and shared widget activity. This is
+controlled local service evidence; it does not establish production OAuth,
+Android signing, store delivery or owner-phone recovery.
 
 ```sh
 GITHUB_REPOSITORY=patrickchin/puptime \
