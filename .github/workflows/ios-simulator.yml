@@ -367,6 +367,14 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.suite == 'upgrade-baseline'
     runs-on: macos-26
     timeout-minutes: 60
+    env:
+      EXPO_NO_DOTENV: "1"
+      EXPO_PUBLIC_CLOUD_API_URL: ""
+      EXPO_PUBLIC_CLOUD_ALLOW_LOCAL: ""
+      EXPO_PUBLIC_APP_POSTHOG_KEY: ""
+      EXPO_PUBLIC_APP_POSTHOG_HOST: ""
+      EXPO_PUBLIC_POSTHOG_KEY: ""
+      EXPO_PUBLIC_POSTHOG_HOST: ""
     steps:
       - uses: actions/checkout@v6
         with:
