@@ -233,6 +233,20 @@ function assertPreferences(settings){
  assert.equal(value('puptime.theme.v1'),'dark');assert.equal(value('puptime.language.v1'),'es');
  assert.ok(JSON.parse(value('puptime.widgetActions.v1')).includes('walk'));assert.equal(JSON.parse(value('puptime.notificationPreferences.v1')).reminderLeadMinutes,15);
 }
+async function postCreateFailureSelfCheck(){
+ const source=readFileSync(new URL(import.meta.url),'utf8'),signature='\nasync function verify(){',body=source.slice(source.lastIndexOf(signature)+signature.length);
+ const start=body.indexOf(' const activeStops=new Set();'),end=body.indexOf(' const numericMetadata=',start),tail=' }finally{await task.run();task.dispose();}';
+ assert.ok(start>=0&&end>start&&body.includes(tail));
+ const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
+ const execute=new AsyncFunction('assert','randomBytes','simctl','beta','numeric','runtime','installTaskCleanup','deleteOwnedSimulator','privateDir','output','existsSync','rmSync','writeFileSync','join','provenance','fixtureProof','process',body.slice(start,end)+tail);
+ const device='00000000-0000-4000-8000-000000000001',failure=new Error('Injected immediately after owned cleanup registration'),commands=[],receipts=[];
+ const counts=['SIGINT','SIGTERM'].map(name=>process.listenerCount(name));let created=0,privateExists=true;
+ await assert.rejects(()=>execute(assert,()=>Buffer.from('a'.repeat(32),'hex'),(...args)=>{assert.equal(args[0],'create');created++;return device;},true,true,{identifier:'synthetic-runtime'},installTaskCleanup,value=>deleteOwnedSimulator({...value,command:(...args)=>{commands.push(args);return '';}}),'/owned/beta-upgrade','/owned/receipts',()=>privateExists,()=>{privateExists=false;},(path,text)=>receipts.push(JSON.parse(text)),join,{set device(value){assert.equal(value.udid,device);throw failure;}},{},{exitCode:0}),error=>error===failure);
+ assert.equal(created,1);assert.deepEqual(commands,[['terminate',device,app],['shutdown',device],['delete',device]]);
+ assert.equal(privateExists,false);assert.equal(receipts.length,1);assert.equal(receipts[0].status,'passed');assert.equal(receipts[0].deleted,true);
+ assert.deepEqual(['SIGINT','SIGTERM'].map(name=>process.listenerCount(name)),counts);
+ console.log('PASS injected post-create failure deletes exactly its captured simulator and private copy; no native command executed.');
+}
 function freshBaselineSelfCheck(){
  const actual={config:'a'.repeat(64),js:'b'.repeat(64),native:'c'.repeat(64),archive:'d'.repeat(64)};
  const value={schemaVersion:1,stage:'shipped-source-ios-baseline-build',upgradeExecuted:false,releaseQualified:false,producerHead:betaOlder.producerSource,runId:String(betaOlder.run),runAttempt:'1',source:betaOlder.source,sourceTree:betaOlder.tree,version:'1.12.5',build:'1',bundleIdentifier:app,versionOnlyTestConfiguration:true,appConfigSHA256:actual.config,packageSHA256:'64c0fa8d471b5485bfe53b7eb26f8696a29e39a8aad82e1868900244351c2f4b',lockSHA256:'4aa46ded544d07533aa899f3acdbd7d70d1791f95d1e0ccdd5d4cf3a3392a2f2',javaScriptSHA256:actual.js,nativeExecutableSHA256:actual.native,archiveSHA256:actual.archive,scope:'Fresh iOS build from the shipped Android 1.12.5 source tree with explicit test version/build configuration. No JS fixture injection, installation, upgrade, provider or store acceptance. Historical assets are test inputs, never a release candidate.'};
@@ -243,8 +257,8 @@ function freshBaselineSelfCheck(){
  for(const change of [v=>{v.nonce='b'.repeat(32);},v=>{v.device='00000000-0000-4000-8000-000000000002';},v=>{v.extra=1;},v=>{delete v.clock;},v=>{v.clock.date='2026-11-24';}]){const bad=structuredClone(envelope);change(bad);assert.throws(()=>assertClockEnvelope(bad,device,nonce));rejected++;}
  console.log(`PASS fresh125 baseline and nonce/device clock guards: ${rejected} rejected mutations; no archive or native execution.`);
 }
-function selfCheck(){
- numericSelfCheck();freshBaselineSelfCheck();
+async function selfCheck(){
+ numericSelfCheck();freshBaselineSelfCheck();await postCreateFailureSelfCheck();
  const before={tables:Object.fromEntries(nativeTables.map(table=>[table,[]])),files:{'dog-photos/img_test.jpg':'original-bytes'},widgetTimelines:{quick:[{pending:[],lastEventAt:{pee:123},appearance:{light:{background:'old',surface:'old',controlRadius:12},dark:{background:'dark',surface:'dark',controlRadius:12}}}]}};
  const after=structuredClone(before);after.widgetTimelines.quick[0].appearance.light.background='new';after.widgetTimelines.quick[0].appearance.dark.surface='new';
  assertPreserved(before,after,{paletteChange:true});assert.throws(()=>assertPreserved(before,after));
@@ -379,12 +393,21 @@ async function verify(){
  const input=decode(fixture,'input-photo');assert.equal(input.width,32);assert.equal(input.height,32);
  const runtimes=JSON.parse(simctl('list','runtimes','-j')).runtimes;
  const runtime=runtimes.filter(value=>value.isAvailable&&value.identifier.includes('iOS-26')).at(-1);assert.ok(runtime);
+ const fixtureProof={photoFixtureSHA256:hash(fixture),photoSelectionFlowSHA256:hash(selectPhoto),preferenceFlowSHA256:hash(preferenceFlow)};
+ const activeStops=new Set();
  const leaseNonce=randomBytes(16).toString('hex'),deviceName=(beta?'Puptime Beta Upgrade ':numeric?'Puptime Numeric Upgrade ':'Puptime Runtime Replacement ')+leaseNonce;
  const device=simctl('create',deviceName,'com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro',runtime.identifier);
  assert.match(device,/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i);
+ const task=installTaskCleanup(async()=>{
+  const processesStopped=(await Promise.all([...activeStops].map(stop=>stop()))).every(Boolean);
+  const simulator=deleteOwnedSimulator({device,privateDirectory:privateDir,preserve:false});
+  let privateDirectoryRemoved=!existsSync(privateDir);if(beta&&processesStopped&&simulator.deleted){try{rmSync(privateDir,{recursive:true});privateDirectoryRemoved=true;}catch{privateDirectoryRemoved=false;}}
+  writeFileSync(join(output,'task-cleanup.json'),JSON.stringify({status:processesStopped&&simulator.deleted&&(!beta||privateDirectoryRemoved)?'passed':'failed',processesStopped,...simulator,privateDirectoryRemoved},null,2)+'\n');
+  if(!processesStopped||!simulator.deleted||beta&&!privateDirectoryRemoved)process.exitCode=1;
+ });
+ try{
  const assertDeviceLease=()=>{const devices=Object.values(JSON.parse(simctl('list','devices','-j')).devices).flat().filter(value=>value.udid===device);assert.equal(devices.length,1);assert.equal(devices[0].name,deviceName);};
- provenance.device={udid:device,runtime:runtime.identifier};provenance.photoFixtureSHA256=hash(fixture);provenance.photoSelectionFlowSHA256=hash(selectPhoto);provenance.preferenceFlowSHA256=hash(preferenceFlow);
- const activeStops=new Set();
+ provenance.device={udid:device,runtime:runtime.identifier};Object.assign(provenance,fixtureProof);
  const numericMetadata=()=>{if(numeric)for(const cut of cuts){const artifact=api(`actions/artifacts/${cut.artifact}`);assertNumericMetadata(cut,api(`actions/runs/${cut.run}`),artifact);assertBaselineProducer(cut,artifact,api);}};
  const runCommand=async(binary,args,timeout=120000,env=process.env)=>{
   assert.equal(task.signal,null);const child=spawn(binary,args,{detached:true,stdio:['ignore','pipe','pipe'],env}),stop=ownProcess(child);activeStops.add(stop);child.stdout.resume();child.stderr.resume();let timedOut=false;
@@ -436,14 +459,6 @@ async function verify(){
   return {tables,files,...backups,pendingWidgetFiles:documentFiles(join(shared,'ExpoWidgets/PuptimePending')),photo:{id:photo.value,jpegSHA256:hash(image),...decoded},widgetTimelines};
  }
  function installed(cut){const path=simctl('get_app_container',device,app,'app');assert.equal(hash(join(path,'main.jsbundle')),cut.provenance.javaScriptSHA256,'Run the original embedded JS, never a substituted bundle.');assert.equal(hash(join(path,cut.provenance.executable)),cut.provenance.nativeExecutableSHA256,'Run the original native executable.');if(numeric){command('codesign',['--verify','--deep','--strict',path]);assert.equal(hash(join(path,'Info.plist')),cut.provenance.infoPlistSHA256);for(const [name,digest] of Object.entries(cut.provenance.extensionInfoSHA256))assert.equal(hash(join(path,'PlugIns',name,'Info.plist')),digest);assert.deepEqual(nativeCodeFingerprint(path,mkdtempSync(join(privateDir,'installed-native-'))),cut.provenance.nativeCode);}}
- const task=installTaskCleanup(async()=>{
-  const processesStopped=(await Promise.all([...activeStops].map(stop=>stop()))).every(Boolean);
-  const simulator=deleteOwnedSimulator({device,privateDirectory:privateDir,preserve:false});
-  let privateDirectoryRemoved=!existsSync(privateDir);if(beta&&processesStopped&&simulator.deleted){try{rmSync(privateDir,{recursive:true});privateDirectoryRemoved=true;}catch{privateDirectoryRemoved=false;}}
-  writeFileSync(join(output,'task-cleanup.json'),JSON.stringify({status:processesStopped&&simulator.deleted&&(!beta||privateDirectoryRemoved)?'passed':'failed',processesStopped,...simulator,privateDirectoryRemoved},null,2)+'\n');
-  if(!processesStopped||!simulator.deleted||beta&&!privateDirectoryRemoved)process.exitCode=1;
- });
- try{
   writeFileSync(join(output,'native-provenance.json'),JSON.stringify(provenance,null,2)+'\n');
   simctl('boot',device);await runCommand('xcrun',['simctl','bootstatus',device,'-b'],300000);simctl('ui',device,'appearance','light');
   if(numeric){clockProbe=prepareDeviceClock(privateDir,device,leaseNonce,assertDeviceLease);deviceClock();}
@@ -472,4 +487,4 @@ async function verify(){
   console.log('PASS original iOS runtime replacement: '+output);
  }finally{await task.run();task.dispose();}
 }
-if(mode==='--self-check'||mode==='--beta-self-check')selfCheck();else await verify();
+if(mode==='--self-check'||mode==='--beta-self-check')await selfCheck();else await verify();
