@@ -2,20 +2,59 @@
 
 The puppy avatar, Settings, and the drawer lead to a small set of pages with distinct jobs. Settings is the index for app preferences. My Account is for the person and their cloud connection. Pets is the list of puppies they own or care for.
 
-| Destination | How to open it | What it does |
-| --- | --- | --- |
-| Log and Timeline | Drawer or Log/Timeline switch | Record, edit and browse activity for the active puppy |
-| Insights | Drawer | Review activity patterns |
-| Routine | Drawer or Notifications | Plan activities, edit times and enable routine reminders |
-| Notifications | Drawer or Settings | Manage delivery, permissions, nudges and timed reminders |
-| Puppy care | Drawer | Browse and read care guides |
-| Settings | Drawer | Choose appearance, language and widget actions, manage backups and CSV, see recent changes, control analytics and open help |
-| My Account | Drawer, Settings, or sharing setup | Sign in, link providers, manage cloud sync, export cloud data or delete the cloud account |
-| Pets | Drawer, Settings, or puppy avatar | Open the owned puppy’s profile or switch to a puppy under Shared with you |
-| Puppy profile | Owned puppy row in Pets | Edit the name in place, change or remove the photo, and open sharing for this puppy |
-| Share puppy | Puppy profile or optional first-run sharing | Set up cloud sharing, invite carers and revoke their access |
-| Invitation review | Invitation link | Sign in if needed and accept the invitation |
-| Recent changes | Settings | Review local changes and open per-log version history |
+## How to reach each page on iOS
+
+```mermaid
+flowchart TD
+    drawer["Navigation drawer"] --> log["Log"]
+    drawer --> timeline["Timeline"]
+    drawer --> insights["Insights"]
+    drawer --> routine["Routine"]
+    drawer --> notifications["Notifications"]
+    drawer --> care["Puppy care"]
+    drawer --> settings["Settings"]
+    drawer --> account["My Account"]
+    drawer --> pets["Pets"]
+    log <-->|"Log and Timeline switch"| timeline
+    avatar["Puppy avatar"] --> pets
+    settings --> account
+    settings --> pets
+    settings --> notifications
+    settings --> recent["Recent changes"]
+    settings -->|"App guide"| guide["App guide"]
+    notifications --> routine
+    notifications --> pets
+    pets -->|"Your puppies"| profile["Puppy profile"]
+    pets -->|"Shared with you"| sharedLog["Shared puppy’s Log"]
+    pets -->|"Sign in to see shared puppies"| account
+    profile --> share["Share puppy"]
+    firstRun["First-run setup"] -->|"Optional sharing"| share
+    share -->|"Sign in to share"| account
+    link["Invitation link"] --> invitation["Invitation review"]
+    invitation -->|"Accept invitation"| sharedLog
+```
+
+## What each page does
+
+```mermaid
+flowchart LR
+    log["Log"] --> logActions["Record or edit the active puppy’s activity"]
+    timeline["Timeline"] --> timelineActions["Browse past activity and open log details"]
+    insights["Insights"] --> insightActions["Review activity patterns"]
+    routine["Routine"] --> routineActions["Plan activities, edit times and set routine reminders"]
+    notifications["Notifications"] --> notificationActions["Manage delivery, permissions, nudges and timed reminders"]
+    care["Puppy care"] --> careActions["Browse and read care guides"]
+    settings["Settings"] --> settingActions["Set appearance, language and widget actions. Manage backups, CSV, help and privacy."]
+    recent["Recent changes"] --> recentActions["Review local changes and open log version history"]
+    account["My Account"] --> accountActions["Sign in, link providers, manage sync, export cloud data or delete the cloud account"]
+    pets["Pets"] --> petsActions["Open your puppy’s profile or switch to a puppy shared with you"]
+    profile["Puppy profile"] --> profileActions["Edit the name, change or remove the photo, or open sharing"]
+    share["Share puppy"] --> shareActions["Set up cloud sharing, invite carers and revoke access"]
+    invitation["Invitation review"] --> invitationActions["Sign in if needed and accept an invitation"]
+    sharedLog["Shared puppy’s Log"] --> sharedActions["View shared activity and add entries when your role allows it"]
+    firstRun["First-run setup"] --> firstRunActions["Start a local puppy journal or connect an account"]
+    guide["App guide"] --> guideActions["Walk through app features"]
+```
 
 The Settings groups share one component for uppercase headings, card insets and separators. Search keeps data controls mounted during a transfer and shows separators only between visible rows.
 

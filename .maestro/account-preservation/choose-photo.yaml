@@ -20,6 +20,12 @@ name: Save an imported synthetic JPEG through the real iOS picker and crop
     visible:
       id: screen.pets
     timeout: 30000
+- runFlow:
+    when:
+      visible:
+        id: nav.puppy
+    commands:
+      - tapOn: {id: nav.puppy}
 - scrollUntilVisible:
     element:
       id: settings.puppy.photo.choose
@@ -44,10 +50,8 @@ name: Save an imported synthetic JPEG through the real iOS picker and crop
     retryTapIfNoChange: true
 - extendedWaitUntil:
     visible:
-      id: settings.puppy.photo.(remove|error)
+      id: puppy.photo.image
     timeout: 90000
-- assertVisible:
-    id: settings.puppy.photo.remove
 - assertNotVisible:
     id: settings.puppy.photo.error
 - takeScreenshot: native-photo-saved
@@ -58,6 +62,12 @@ name: Save an imported synthetic JPEG through the real iOS picker and crop
 - tapOn:
     id: nav.back
     retryTapIfNoChange: true
+- runFlow:
+    when:
+      visible:
+        id: screen.pets
+    commands:
+      - tapOn: {id: nav.back}
 - extendedWaitUntil:
     visible:
       id: screen.today

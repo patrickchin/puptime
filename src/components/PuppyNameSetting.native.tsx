@@ -53,7 +53,7 @@ export function PuppyNameSetting({theme,cloud,onShare}:PuppyNameSettingProps) {
   return <View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border,borderRadius:theme.presentation.cardRadius}]}>
     <PuppyPhotoSetting theme={theme}/>
     {draft===null?<Pressable testID="settings.puppy.name" accessibilityRole="button"
-      accessibilityLabel={name?undefined:t(failed?'puppy.loadError':'puppy.loading')}
+      accessibilityLabel={name??t(failed?'puppy.loadError':'puppy.loading')}
       accessibilityHint={name?t('puppy.editName'):undefined}
       disabled={!name&&!failed} onPress={()=>name?edit(name):void reload()}
       style={({pressed})=>[styles.nameRow,pressed&&{backgroundColor:theme.primarySoft}]}>
