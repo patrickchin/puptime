@@ -13,7 +13,7 @@ export const settingsSearchEnglish = {
   'settings.search.analytics': 'privacy usage tracking telemetry diagnostics data collection',
   'settings.search.guide': 'help tutorial onboarding walkthrough learn',
   'settings.search.privacy': 'privacy policy personal data storage',
-  'settings.search.fontLicenses': 'font icon licenses licences copyright attribution credits open source',
+  'settings.search.fontLicenses': 'font icon software libraries licenses licences copyright attribution credits open source',
   'settings.search.account': 'account sign in login email cloud sync subscription backup',
 };
 
@@ -32,7 +32,7 @@ export const settingsSearchChinese: typeof settingsSearchEnglish = {
   'settings.search.analytics': '隐私 使用 跟踪 遥测 诊断 数据收集',
   'settings.search.guide': '帮助 教程 入门 引导 学习',
   'settings.search.privacy': '隐私 政策 个人 数据 存储',
-  'settings.search.fontLicenses': '字体 图标 许可 授权 版权 开源 鸣谢',
+  'settings.search.fontLicenses': '字体 图标 软件 依赖库 许可 授权 版权 开源 鸣谢',
   'settings.search.account': '账户 登录 邮箱 云端 同步 订阅 备份',
 };
 
@@ -51,6 +51,6 @@ export const settingsSearchSpanish: typeof settingsSearchEnglish = {
   'settings.search.analytics': 'privacidad uso seguimiento telemetría diagnóstico recopilación datos',
   'settings.search.guide': 'ayuda tutorial introducción recorrido aprender',
   'settings.search.privacy': 'privacidad política datos personales almacenamiento',
-  'settings.search.fontLicenses': 'fuentes iconos licencias derechos autor créditos código abierto',
+  'settings.search.fontLicenses': 'fuentes iconos software bibliotecas licencias derechos autor créditos código abierto',
   'settings.search.account': 'cuenta iniciar sesión correo nube sincronización suscripción copia seguridad',
 };

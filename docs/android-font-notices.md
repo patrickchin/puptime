@@ -1,6 +1,6 @@
 # Android font and icon notice contract
 
-The offline Settings → Open source licenses view reads `src/font-icon-notices.json`. It retains verbatim Red Hat, Material Design Icons/Pictogrammers, Apache 2.0 and vector-icon wrapper notices, including the Android Media3 numeric Roboto attribution. License bodies and font/package source hashes are pinned in `scripts/font-icon-provenance.json`; changes require explicit review. Android software-library text follows these font sections under its [separate coverage contract](android-software-notices.md).
+The offline Settings → Licenses and credits view reads `src/font-icon-notices.json`. It retains verbatim Red Hat, Material Design Icons/Pictogrammers, Apache 2.0 and vector-icon wrapper notices, including the Android Media3 numeric Roboto attribution. License bodies and font/package source hashes are pinned in `scripts/font-icon-provenance.json`; changes require explicit review. Android software-library text follows these font sections under its [separate coverage contract](android-software-notices.md).
 
 Application imports select only `@expo/vector-icons/MaterialCommunityIcons`. This avoids pulling the all-family barrel into the JavaScript graph and does not replace any glyphs. Old unused font files remain source assets; the exact archive inventory decides which bytes ship.
 

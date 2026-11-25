@@ -19,6 +19,7 @@ test('settings search finds labels, partial words, synonyms, and one-edit typos'
   assert.ok(search('data collection').includes('analytics'));
   assert.ok(search('sign in').includes('account'));
   assert.ok(search('font license').includes('fontLicenses'));
+  assert.ok(search('software licenses').includes('fontLicenses'));
   assert.ok(search('图标', 'zh-Hans').includes('fontLicenses'));
   assert.ok(search('licencias', 'es').includes('fontLicenses'));
 });

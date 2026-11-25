@@ -1,5 +1,5 @@
 appId: com.patrickchin.puptime
-name: Offline font and icon licenses
+name: Offline licenses and credits
 tags:
   - android
   - ios
@@ -49,6 +49,20 @@ tags:
       id: fontLicenses.react-native-vector-icons
     direction: DOWN
     visibilityPercentage: 100
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: fontLicenses.android-software-01b4bb058a35cf06dde9e344
+          direction: DOWN
+          visibilityPercentage: 100
+      - scrollUntilVisible:
+          element:
+            id: fontLicenses.text.android-software-01b4bb058a35cf06dde9e344
+          direction: DOWN
+          visibilityPercentage: 1
 - tapOn:
     id: fontLicenses.close
 - assertNotVisible:
