@@ -208,6 +208,7 @@ jobs:
         if: ${{ inputs.discovery_only == true }}
         run: node scripts/android-notice-discovery.mjs
       - name: Record finite Android discovery diagnostics
+        id: notice_diagnostic
         timeout-minutes: 2
         if: ${{ always() && inputs.discovery_only == true }}
         env:
@@ -221,7 +222,7 @@ jobs:
         run: python3 scripts/record-android-notice-failure.py
       - name: Upload public license discovery inputs only (INCOMPLETE)
         timeout-minutes: 3
-        if: ${{ always() && inputs.discovery_only == true }}
+        if: ${{ always() && inputs.discovery_only == true && steps.notice_diagnostic.outcome == 'success' }}
         uses: actions/upload-artifact@v6
         with:
           name: puptime-android-notice-discovery-INCOMPLETE

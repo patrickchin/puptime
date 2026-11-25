@@ -71,6 +71,25 @@ class FiniteFailure(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertEqual(output.read_bytes(), data)
 
+    def test_preexisting_invalid_receipt_rejects_cli_and_workflow_cannot_admit_upload(self):
+        workflow = (Path(__file__).parents[1] / '.github/workflows/android-apk.yml').read_text()
+        diagnostic = workflow.split('      - name: Record finite Android discovery diagnostics\n', 1)[1].split('      - name:', 1)[0]
+        upload = workflow.split('      - name: Upload public license discovery inputs only (INCOMPLETE)\n', 1)[1].split('      - name:', 1)[0]
+        self.assertIn('id: notice_diagnostic', diagnostic)
+        self.assertIn("if: ${{ always() && inputs.discovery_only == true && steps.notice_diagnostic.outcome == 'success' }}", upload)
+        with tempfile.TemporaryDirectory(prefix='puptime-notice-upload-rejection-') as directory:
+            root = Path(directory)
+            output = root / 'build/notices/android/review/failure.json'
+            output.parent.mkdir(parents=True)
+            sentinel = b'{"PRIVATE":"unvalidated existing receipt"}'
+            output.write_bytes(sentinel)
+            env = {'GITHUB_SHA': SOURCE, 'GITHUB_RUN_ID': '123', 'GITHUB_RUN_ATTEMPT': '1'}
+            script = Path(__file__).with_name('record-android-notice-failure.py').resolve()
+            result = subprocess.run([sys.executable, str(script)], cwd=root, env=env, capture_output=True, timeout=10)
+            self.assertNotEqual(result.returncode, 0)  # GitHub step outcome=failure; upload requires success.
+            self.assertEqual(output.read_bytes(), sentinel)
+            self.assertNotIn(b'PRIVATE', result.stdout + result.stderr)
+
     def test_raw_fields_are_never_used_outside_gradle_stage(self):
         result = failure.receipt(SOURCE, '123', '1', ['success'] * 5 + ['failure', 'skipped'], self.value())
         self.assertEqual(result['stage'], 'metro-collection')
