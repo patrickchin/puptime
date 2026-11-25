@@ -20,6 +20,7 @@ jobs:
           node scripts/verify-old-preference-compatibility.mjs
       - run: node --test scripts/native-task-cleanup.test.mjs scripts/native-account-evidence.test.mjs scripts/native-command-evidence.test.mjs scripts/native-startup-evidence.test.mjs scripts/native-standard-suite.test.mjs scripts/native-standard-verdict.test.mjs scripts/native-onboarding-verdict.test.mjs scripts/ios-app-group-privacy.test.mjs
       - name: Check isolated helper files with finite results
+        id: helper_results
         env:
           HELPER_SOURCE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
@@ -44,7 +45,7 @@ jobs:
             printf '%s %s %d\n' "$helper_test_file" "$helper_file_status" "$helper_file_exit"
             helper_result_rows="${helper_result_rows}${helper_result_rows:+,}{\"file\":\"$helper_test_file\",\"status\":\"$helper_file_status\",\"exit\":$helper_file_exit}"
           done
-          HELPER_RESULT_ROWS="$helper_result_rows" node --input-type=module <<'NODE'
+          if HELPER_RESULT_ROWS="$helper_result_rows" node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           import {execFileSync} from 'node:child_process';
           import {mkdirSync,writeFileSync} from 'node:fs';
@@ -59,9 +60,14 @@ jobs:
           const bytes=JSON.stringify({schema:1,stage:'helper-file-results',sourceHead,checkoutCommit,checkoutTree,runId,runAttempt,results})+'\n';
           assert.ok(Buffer.byteLength(bytes)<=4096);mkdirSync('build',{recursive:true});writeFileSync('build/helper-results.json',bytes,{flag:'wx',mode:0o600});
           NODE
+          then
+            printf 'receipt_ready=true\n' >> "$GITHUB_OUTPUT"
+          else
+            exit 1
+          fi
           exit "$helper_group_exit"
       - name: Upload finite helper results
-        if: always()
+        if: always() && steps.helper_results.outputs.receipt_ready == 'true'
         uses: actions/upload-artifact@v6
         with:
           name: puptime-helper-results
