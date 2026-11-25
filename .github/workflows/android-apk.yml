@@ -162,14 +162,19 @@ jobs:
           export GRADLE_USER_HOME="$puptime_private/gradle"
           mkdir -m 700 "$GRADLE_USER_HOME"
           printf '%s\n' "PUPTIME_NOTICE_PRIVATE=$PUPTIME_NOTICE_PRIVATE" "GRADLE_USER_HOME=$GRADLE_USER_HOME" >> "$GITHUB_ENV"
-          for puptime_file in scripts/capture-app-notices.mjs scripts/app-notices.mjs scripts/native-notice-inputs.mjs scripts/notice-archive.py scripts/native-task-cleanup.mjs scripts/app-notice-provenance.json scripts/font-icon-provenance.json scripts/notices-runtime.init.gradle; do
+          for puptime_file in scripts/capture-app-notices.mjs scripts/app-notices.mjs scripts/native-notice-inputs.mjs scripts/notice-archive.py scripts/native-task-cleanup.mjs scripts/app-notice-provenance.json scripts/notices-runtime.init.gradle; do
             mkdir -p "$puptime_private/tools/$(dirname "$puptime_file")"
             git show "$puptime_tools_source:$puptime_file" > "$puptime_private/tools/$puptime_file"
           done
           ln -s "$GITHUB_WORKSPACE/node_modules" "$puptime_private/tools/node_modules"
           # Data-only inputs for the pinned INCOMPLETE collector. Never overwrite
           # a candidate file or import an old app/native runtime into this tree.
-          for puptime_file in scripts/app-notice-provenance.json scripts/font-icon-provenance.json $(git ls-tree -r --name-only "$puptime_tools_source" assets/notices/sources); do
+          git cat-file -e HEAD:scripts/font-icon-provenance.json
+          git diff --quiet HEAD -- scripts/font-icon-provenance.json
+          test ! -L scripts/font-icon-provenance.json
+          test -f scripts/font-icon-provenance.json
+          # collect reads the actual committed candidate font ledger unchanged.
+          for puptime_file in scripts/app-notice-provenance.json $(git ls-tree -r --name-only "$puptime_tools_source" assets/notices/sources); do
             test ! -e "$puptime_file"
             mkdir -p "$(dirname "$puptime_file")"
             git show "$puptime_tools_source:$puptime_file" > "$puptime_file"
