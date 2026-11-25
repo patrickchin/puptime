@@ -235,5 +235,27 @@ class PublicationBoundary(unittest.TestCase):
                 publisher.pins_from_environment(env)
 
 
+class BetaCertificateBoundary(unittest.TestCase):
+    def test_exact_both_signers_and_fail_closed_controls(self):
+        spec = importlib.util.spec_from_file_location('beta', Path(__file__).with_name('verify-android-beta-signing.py'))
+        beta = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(beta)
+        import base64
+        der = b'finite synthetic certificate bytes, never a private key'
+        expected = SHA(der)
+        apk = 'Signer #1 certificate SHA-256 digest: ' + expected + '\n'
+        pem = '-----BEGIN CERTIFICATE-----\n' + base64.b64encode(der).decode() + '\n-----END CERTIFICATE-----\n'
+        beta.verify_beta_signers(expected, apk, pem)
+        for certificate, report, certificate_pem in [
+            ('', apk, pem), (beta.TEMPLATE_CERT, apk, pem), ('f' * 64, apk, pem),
+            (expected, '', pem), (expected, apk.replace(expected, 'f' * 64), pem),
+            (expected, apk + apk.replace('#1', '#2'), pem),
+            (expected, apk, ''), (expected, apk, pem + pem),
+            (expected, apk, pem.replace(base64.b64encode(der).decode(), 'ZmFrZQ==')),
+        ]:
+            with self.subTest(certificate=certificate), self.assertRaises(ValueError):
+                beta.verify_beta_signers(certificate, report, certificate_pem)
+
+
 if __name__ == '__main__':
     unittest.main()

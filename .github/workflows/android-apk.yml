@@ -7,6 +7,15 @@ on:
         description: Artifact version (for example 1.12.0); leave blank for the next patch
         required: false
         type: string
+      signing:
+        description: QA template or proposed beta upload signer (never publishes)
+        type: choice
+        options: [qa-template, beta-upload]
+        default: qa-template
+      expected_source:
+        description: Exact reviewed main SHA required for beta-upload
+        type: string
+        required: false
       publish:
         description: Publish a GitHub release and create its tag if needed
         required: false
@@ -26,6 +35,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Configure this environment to admit main only and require owner approval
+    # BEFORE adding its signing secrets. QA has no signing credentials.
+    environment: ${{ inputs.signing == 'beta-upload' && 'android-beta-signing' || 'android-qa' }}
     outputs:
       tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
@@ -37,6 +49,19 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.sha }}
           persist-credentials: false
+      - name: Admit exact beta source before accessing signing credentials
+        if: ${{ inputs.signing == 'beta-upload' }}
+        env:
+          PUPTIME_EXPECTED_SOURCE: ${{ inputs.expected_source }}
+          PUPTIME_PUBLISH: ${{ inputs.publish }}
+          PUPTIME_UPLOAD_CERT_SHA256: ${{ vars.PUPTIME_UPLOAD_CERT_SHA256 }}
+        run: |
+          test "$GITHUB_EVENT_NAME" = workflow_dispatch
+          test "$GITHUB_REF" = refs/heads/main
+          test "$PUPTIME_EXPECTED_SOURCE" = "$GITHUB_SHA"
+          test "$PUPTIME_PUBLISH" = false
+          [[ "$PUPTIME_UPLOAD_CERT_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          test "$PUPTIME_UPLOAD_CERT_SHA256" != fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c
       - name: Choose release version
         id: release
         shell: bash
@@ -91,11 +116,44 @@ jobs:
       - run: npx expo prebuild --platform android --no-install
         env:
           CI: "1"
-      - run: ./gradlew assembleRelease bundleRelease --no-daemon
+      - name: Build QA artifacts with the existing template signer
+        if: ${{ inputs.signing != 'beta-upload' }}
+        run: ./gradlew assembleRelease bundleRelease --no-daemon
         env:
           EXPO_PUBLIC_APP_POSTHOG_KEY: ${{ vars.EXPO_PUBLIC_APP_POSTHOG_KEY }}
           EXPO_PUBLIC_APP_POSTHOG_HOST: ${{ vars.EXPO_PUBLIC_APP_POSTHOG_HOST || 'https://eu.i.posthog.com' }}
         working-directory: android
+      - name: Build proposed beta artifacts with private upload credentials
+        if: ${{ inputs.signing == 'beta-upload' }}
+        shell: bash
+        env:
+          PUPTIME_UPLOAD_KEYSTORE_BASE64: ${{ secrets.PUPTIME_UPLOAD_KEYSTORE_BASE64 }}
+          PUPTIME_UPLOAD_STORE_PASSWORD: ${{ secrets.PUPTIME_UPLOAD_STORE_PASSWORD }}
+          PUPTIME_UPLOAD_KEY_PASSWORD: ${{ secrets.PUPTIME_UPLOAD_KEY_PASSWORD }}
+          PUPTIME_UPLOAD_KEY_ALIAS: ${{ secrets.PUPTIME_UPLOAD_KEY_ALIAS }}
+          EXPO_PUBLIC_APP_POSTHOG_KEY: ${{ vars.EXPO_PUBLIC_APP_POSTHOG_KEY }}
+          EXPO_PUBLIC_APP_POSTHOG_HOST: ${{ vars.EXPO_PUBLIC_APP_POSTHOG_HOST || 'https://eu.i.posthog.com' }}
+        run: |
+          set -euo pipefail
+          umask 077
+          puptime_private="$RUNNER_TEMP/puptime-beta-signing-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          mkdir -m 700 "$puptime_private"
+          trap 'rm -rf -- "$puptime_private"' EXIT
+          export PUPTIME_UPLOAD_STORE_FILE="$puptime_private/upload.p12"
+          test -n "$PUPTIME_UPLOAD_KEYSTORE_BASE64"
+          printf '%s' "$PUPTIME_UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$PUPTIME_UPLOAD_STORE_FILE"
+          unset PUPTIME_UPLOAD_KEYSTORE_BASE64
+          printf '\napply from: rootProject.file("../scripts/android-beta-signing.gradle")\n' >> android/app/build.gradle
+          cd android
+          ./gradlew assembleRelease bundleRelease --no-daemon --no-configuration-cache --no-build-cache
+      - name: Remove private signing material after success, failure or cancellation
+        if: ${{ always() && inputs.signing == 'beta-upload' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          puptime_private="$RUNNER_TEMP/puptime-beta-signing-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          rm -rf -- "$puptime_private"
+          test ! -e "$puptime_private"
       - name: Verify artifacts and record qualification metadata
         id: verify
         shell: bash
@@ -131,6 +189,11 @@ jobs:
             configuredVersionCode: expo.android.versionCode,
           }, null, 2) + '\n');
           NODE
+      - name: Require the approved upload certificate on both beta artifacts
+        if: ${{ inputs.signing == 'beta-upload' }}
+        env:
+          PUPTIME_UPLOAD_CERT_SHA256: ${{ vars.PUPTIME_UPLOAD_CERT_SHA256 }}
+        run: python3 scripts/verify-android-beta-signing.py
       - uses: actions/upload-artifact@v6
         with:
           name: puptime-android-apk

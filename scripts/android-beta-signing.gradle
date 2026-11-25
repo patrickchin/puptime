@@ -1,0 +1,25 @@
+// Applied only by the admitted beta-upload workflow after Expo prebuild.
+// Values stay in the runner environment; never write passwords to Gradle files.
+def signingEnv = System.getenv()
+def requiredSigning = ['PUPTIME_UPLOAD_STORE_FILE', 'PUPTIME_UPLOAD_STORE_PASSWORD',
+                       'PUPTIME_UPLOAD_KEY_ALIAS', 'PUPTIME_UPLOAD_KEY_PASSWORD']
+if (requiredSigning.any { !signingEnv[it] }) {
+    throw new GradleException('Puptime beta signing credentials are incomplete.')
+}
+def privateStore = new File(signingEnv.PUPTIME_UPLOAD_STORE_FILE)
+if (!privateStore.isAbsolute() || !privateStore.isFile() ||
+    java.nio.file.Files.isSymbolicLink(privateStore.toPath())) {
+    throw new GradleException('Puptime beta keystore must be a private regular file.')
+}
+android {
+    signingConfigs {
+        puptimeBetaUpload {
+            storeFile privateStore
+            storeType 'PKCS12'
+            storePassword signingEnv.PUPTIME_UPLOAD_STORE_PASSWORD
+            keyAlias signingEnv.PUPTIME_UPLOAD_KEY_ALIAS
+            keyPassword signingEnv.PUPTIME_UPLOAD_KEY_PASSWORD
+        }
+    }
+    buildTypes.release.signingConfig = signingConfigs.puptimeBetaUpload
+}
