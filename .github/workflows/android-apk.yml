@@ -265,13 +265,14 @@ jobs:
           puptime_private="$RUNNER_TEMP/puptime-beta-signing-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
           mkdir -m 700 "$puptime_private"
           trap 'rm -rf -- "$puptime_private"' EXIT
+          export GRADLE_USER_HOME="$puptime_private/gradle"
           export PUPTIME_UPLOAD_STORE_FILE="$puptime_private/upload.p12"
           test -n "$PUPTIME_UPLOAD_KEYSTORE_BASE64"
           printf '%s' "$PUPTIME_UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$PUPTIME_UPLOAD_STORE_FILE"
           unset PUPTIME_UPLOAD_KEYSTORE_BASE64
           printf '\napply from: rootProject.file("../scripts/android-beta-signing.gradle")\n' >> android/app/build.gradle
           cd android
-          ./gradlew assembleRelease bundleRelease --no-daemon --no-configuration-cache --no-build-cache
+          ./gradlew assembleRelease bundleRelease --no-daemon --no-configuration-cache --no-build-cache --project-cache-dir "$puptime_private/project-cache"
       - name: Remove private signing material after success, failure or cancellation
         if: ${{ always() && inputs.signing == 'beta-upload' }}
         shell: bash
