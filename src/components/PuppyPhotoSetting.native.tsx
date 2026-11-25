@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Text, View } from 'react-native';
+import { ActionSheetIOS, ActivityIndicator, Alert, Platform, StyleSheet, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Pressable } from './TelemetryPressable';
 import { removePuppyPhotoFile } from '../photo-files.native';
 import { choosePuppyPhoto } from '../choose-puppy-photo.native';
@@ -26,18 +27,43 @@ export function PuppyPhotoSetting({theme}:{theme:Theme}) {
     } catch {if(selected)try{removePuppyPhotoFile(selected);}catch{}setError(true);}
     finally {locked.current=false;setBusy(false);}
   }
-  const button=(id:string,label:string,onPress:()=>void)=><Pressable testID={id} accessibilityRole="button" disabled={busy||!profile} accessibilityState={{disabled:busy||!profile,busy}} onPress={onPress}
-    style={({pressed})=>({minHeight:48,justifyContent:'center',paddingHorizontal:8,borderRadius:12,opacity:busy?0.5:1,backgroundColor:pressed?theme.primarySoft:undefined})}><Text style={{fontSize:16,color:theme.primary,fontWeight:'600'}}>{label}</Text></Pressable>;
-  return <View style={{padding:8,gap:8}}>
-    <View style={{flexDirection:'row',alignItems:'center',gap:16}}>
-      <PuppyAvatar uri={photoUri} size={72} theme={theme}/>
-      <View style={{flex:1,gap:4}}>
-        <Text style={{fontSize:16,lineHeight:22,fontWeight:'800',color:theme.text}}>{t('puppy.photo')}</Text>
-        {busy?<ActivityIndicator accessibilityLabel={t('common.saving')} color={theme.primary}/>:failed?<Pressable testID="settings.puppy.photo.retry" accessibilityRole="button" onPress={()=>void reload()} style={{minHeight:48,justifyContent:'center'}}><Text style={{color:theme.primary}}>{t('puppy.retry')}</Text></Pressable>:
-          button('settings.puppy.photo.choose',t(profile?.photoId?'puppy.changePhoto':'puppy.addPhoto'),()=>void change())}
+  function editPhoto() {
+    if(failed){void reload();return;}
+    if(!profile?.photoId){void change();return;}
+    const remove=()=>Alert.alert(t('puppy.removePhotoTitle'),undefined,[
+      {text:t('app.cancel'),style:'cancel'},
+      {text:t('puppy.removePhoto'),style:'destructive',onPress:()=>void change(true)},
+    ]);
+    if(Platform.OS==='ios'){
+      ActionSheetIOS.showActionSheetWithOptions({
+        options:[t('puppy.changePhoto'),t('puppy.removePhoto'),t('app.cancel')],
+        destructiveButtonIndex:1,cancelButtonIndex:2,userInterfaceStyle:theme.isDark?'dark':'light',
+      },index=>{if(index===0)void change();if(index===1)remove();});
+    }else{
+      Alert.alert(t('puppy.editPhoto'),undefined,[
+        {text:t('app.cancel'),style:'cancel'},
+        {text:t('puppy.changePhoto'),onPress:()=>void change()},
+        {text:t('puppy.removePhoto'),style:'destructive',onPress:remove},
+      ]);
+    }
+  }
+  const disabled=busy||(!profile&&!failed);
+  return <View style={styles.container}>
+    <Pressable testID="settings.puppy.photo.choose" accessibilityRole="button"
+      accessibilityLabel={t(failed?'puppy.retry':profile?.photoId?'puppy.editPhoto':'puppy.addPhoto')}
+      accessibilityState={{disabled,busy}} disabled={disabled} onPress={editPhoto}
+      style={({pressed})=>[styles.target,pressed&&{opacity:0.7}]}>
+      <PuppyAvatar uri={photoUri} size={80} theme={theme}/>
+      <View style={[styles.badge,{backgroundColor:theme.primary,borderColor:theme.surfaceRaised}]}>
+        {busy?<ActivityIndicator size="small" color={theme.onPrimary}/>:<MaterialCommunityIcons
+          name={failed?'refresh':'camera-outline'} size={18} color={theme.onPrimary} accessible={false}/>}
       </View>
-    </View>
-    {profile?.photoId?button('settings.puppy.photo.remove',t('puppy.removePhoto'),()=>Alert.alert(t('puppy.removePhotoTitle'),undefined,[{text:t('app.cancel'),style:'cancel'},{text:t('puppy.removePhoto'),style:'destructive',onPress:()=>void change(true)}])):null}
+    </Pressable>
     {error?<Text testID="settings.puppy.photo.error" accessibilityRole="alert" style={{fontSize:15,lineHeight:22,color:theme.danger}}>{t('puppy.photoError')}</Text>:null}
   </View>;
 }
+const styles=StyleSheet.create({
+  container:{gap:8},
+  target:{width:84,height:84,justifyContent:'center'},
+  badge:{position:'absolute',right:0,bottom:0,width:32,height:32,borderRadius:16,borderWidth:2,alignItems:'center',justifyContent:'center'},
+});

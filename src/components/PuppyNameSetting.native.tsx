@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AppState, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Pressable } from './TelemetryPressable';
 
 import { useAccountSnapshot } from '../cloud/use-account-snapshot';
@@ -7,10 +7,11 @@ import { getLocalRuntime, subscribeLocalWrites } from '../local/runtime.native';
 import { useLocalization } from '../localization-context';
 import { spacing, surfaceTreatment } from '../theme';
 import type { PuppyNameSettingProps } from './puppy-name-setting-props';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SettingsRow } from './SettingsRow';
 import { PuppyPhotoSetting } from './PuppyPhotoSetting.native';
 
-export function PuppyNameSetting({theme,cloud}:PuppyNameSettingProps) {
+export function PuppyNameSetting({theme,cloud,onShare}:PuppyNameSettingProps) {
   const {t}=useLocalization();
   const account=useAccountSnapshot(cloud?.controller??null);
   const remoteName=account?.local?.name;
@@ -49,19 +50,20 @@ export function PuppyNameSetting({theme,cloud}:PuppyNameSettingProps) {
     } catch {if(mounted.current)setError('save');}
     finally {locked.current=false;if(mounted.current)setSaving(false);}
   }
-  return <><View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border}]}>
+  return <View style={[styles.card,surfaceTreatment(theme),{backgroundColor:theme.surfaceRaised,borderColor:theme.border,borderRadius:theme.presentation.cardRadius}]}>
     <PuppyPhotoSetting theme={theme}/>
-    <SettingsRow testID="settings.puppy.name" icon="paw-outline" label={t('puppy.name')} detail={name??t(failed?'puppy.loadError':'puppy.loading')} disabled={saving||(!name&&!failed)} onPress={()=>name?edit(name):void reload()} theme={theme} wrap/>
-  </View>
-  <Modal visible={draft!==null} transparent animationType="fade" statusBarTranslucent onRequestClose={closeEditor}>
-    <KeyboardAvoidingView testID="settings.puppy.name.editor" behavior={Platform.OS==='ios'?'padding':'height'} style={styles.scrim} accessibilityViewIsModal>
-      <Pressable style={StyleSheet.absoluteFill} onPress={closeEditor}/>
-      <View style={[styles.editor,{backgroundColor:theme.surfaceRaised,borderRadius:theme.presentation.cardRadius}]}>
-        <Text accessibilityRole="header" maxFontSizeMultiplier={1.5} style={[styles.title,{color:theme.text}]}>{t('puppy.name')}</Text>
-        <TextInput maxFontSizeMultiplier={2} testID="settings.puppy.name.input" accessibilityLabel={t('puppy.name')} autoFocus
-          value={draft??''} onChangeText={value=>{setDraft(value);setError(null);}} editable={!saving} maxLength={256} autoCapitalize="words" autoCorrect={false}
-          returnKeyType="done" onSubmitEditing={()=>void save()}
-          style={[styles.input,{color:theme.text,borderColor:theme.border,borderRadius:theme.presentation.controlRadius}]}/>
+    {draft===null?<Pressable testID="settings.puppy.name" accessibilityRole="button"
+      accessibilityLabel={name??t(failed?'puppy.loadError':'puppy.loading')}
+      accessibilityHint={name?t('puppy.editName'):undefined}
+      disabled={!name&&!failed} onPress={()=>name?edit(name):void reload()}
+      style={({pressed})=>[styles.nameRow,pressed&&{backgroundColor:theme.primarySoft}]}>
+      <Text maxFontSizeMultiplier={2} style={[styles.title,{color:theme.text,fontFamily:theme.presentation.headingFont}]}>{name??t(failed?'puppy.loadError':'puppy.loading')}</Text>
+      {name?<MaterialCommunityIcons name="pencil-outline" size={20} color={theme.primary} accessible={false}/>:null}
+    </Pressable>:<View testID="settings.puppy.name.editor" style={styles.editor}>
+      <TextInput maxFontSizeMultiplier={2} testID="settings.puppy.name.input" accessibilityLabel={t('puppy.name')} autoFocus
+        value={draft} onChangeText={value=>{setDraft(value);setError(null);}} editable={!saving} maxLength={256} autoCapitalize="words" autoCorrect={false}
+        returnKeyType="done" onSubmitEditing={()=>void save()}
+        style={[styles.input,{color:theme.text,borderColor:theme.border,borderRadius:theme.presentation.controlRadius}]}/>
         {error?<View accessibilityRole="alert">
           {error==='save'?<Text style={[styles.error,{color:theme.danger}]}>{t('puppy.saveError')}</Text>:null}
           <Text testID="settings.puppy.name.error" style={[styles.error,{color:theme.danger}]}>{t(error==='constraint'?'puppy.nameConstraint':'puppy.saveErrorBody')}</Text>
@@ -70,15 +72,16 @@ export function PuppyNameSetting({theme,cloud}:PuppyNameSettingProps) {
           <Pressable testID="settings.puppy.name.cancel" accessibilityRole="button" disabled={saving} accessibilityState={{disabled:saving}} onPress={closeEditor} style={styles.button}><Text style={{color:theme.primary}}>{t('app.cancel')}</Text></Pressable>
           <Pressable testID="settings.puppy.name.save" accessibilityRole="button" disabled={saving} accessibilityState={{disabled:saving,busy:saving}} onPress={()=>void save()} style={styles.button}><Text style={{color:theme.primary}}>{t(saving?'common.saving':'notifications.saveNote')}</Text></Pressable>
         </View>
-      </View>
-    </KeyboardAvoidingView>
-  </Modal></>;
+    </View>}
+    {onShare&&name&&draft===null?<SettingsRow theme={theme} testID="puppy.share" icon="account-multiple-plus-outline"
+      label={t('pets.shareNamed',{name})} detail={t('pets.shareDetail')} onPress={onShare} wrap/>:null}
+  </View>;
 }
 
 const styles=StyleSheet.create({
- card:{borderWidth:1,borderRadius:22,padding:8,marginBottom:spacing.sm},
- scrim:{flex:1,backgroundColor:'rgba(0,0,0,0.4)',alignItems:'center',justifyContent:'center',padding:spacing.lg},
- editor:{width:'100%',maxWidth:360,padding:spacing.lg,gap:spacing.md},title:{fontSize:20,lineHeight:26,fontWeight:'700'},
- error:{fontSize:15,lineHeight:22},input:{minHeight:48,borderWidth:1,paddingHorizontal:12,fontSize:17},actions:{flexDirection:'row',justifyContent:'flex-end',gap:4},
+ card:{borderWidth:1,padding:spacing.md,gap:spacing.sm},
+ nameRow:{minHeight:48,flexDirection:'row',alignItems:'center',gap:12,paddingHorizontal:8,borderRadius:12},
+ editor:{gap:spacing.sm},title:{flex:1,fontSize:26,lineHeight:34,fontWeight:'700'},
+ error:{fontSize:15,lineHeight:22},input:{minHeight:48,borderWidth:1,paddingHorizontal:12,paddingVertical:8,fontSize:24,fontWeight:'700'},actions:{flexDirection:'row',justifyContent:'flex-end',gap:4},
  button:{minWidth:76,minHeight:48,alignItems:'center',justifyContent:'center',paddingHorizontal:12},
 });

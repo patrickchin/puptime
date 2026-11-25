@@ -169,10 +169,12 @@ name: Android screen hierarchy and settings placement
 - tapOn: {id: nav.open}
 - tapOn: {id: nav.pets}
 - assertVisible: {id: screen.pets}
+- tapOn: {id: nav.puppy}
 - assertVisible: {id: settings.puppy.name}
 - tapOn: {id: settings.puppy.name}
 - assertVisible: {id: settings.puppy.name.input}
 - tapOn: {id: settings.puppy.name.cancel}
+- tapOn: {id: nav.back}
 - tapOn: {id: nav.open}
 - tapOn: {id: nav.account}
 - assertVisible: {id: screen.account}

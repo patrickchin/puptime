@@ -19,11 +19,13 @@ name: iOS puppy rename saves explicitly and survives restart
     id: nav.open
 - tapOn:
     id: nav.pets
+- tapOn:
+    id: nav.puppy
 - assertVisible:
     id: settings.puppy.name
 - tapOn:
     id: settings.puppy.name
-- assertVisible: Puppy’s name
+- assertVisible: {id: settings.puppy.name.input}
 - eraseText: 20
 - inputText: Mochi
 - tapOn: Save
@@ -36,6 +38,8 @@ name: iOS puppy rename saves explicitly and survives restart
     id: nav.open
 - tapOn:
     id: nav.pets
+- tapOn:
+    id: nav.puppy
 - assertVisible:
     id: settings.puppy.name
     text: .*Mochi.*

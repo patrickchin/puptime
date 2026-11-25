@@ -1,0 +1,83 @@
+appId: com.patrickchin.puptime
+name: Settings, puppy profile, sharing and Account
+---
+# Run on a dedicated simulator with a completed synthetic journal and a saved photo.
+- launchApp
+- extendedWaitUntil:
+    visible: {id: screen.today}
+    timeout: 90000
+- tapOn: {id: nav.open}
+- tapOn: {id: nav.settings}
+- assertVisible: {id: settings.account.open}
+- assertVisible: {id: settings.pets.open}
+- takeScreenshot: settings
+- tapOn: {id: settings.account.open}
+- assertVisible: {id: screen.account}
+- assertNotVisible: {id: account.pets.open}
+- takeScreenshot: account
+- tapOn: {id: account.back}
+- assertVisible: {id: screen.settings}
+- tapOn: {id: settings.pets.open}
+- assertVisible: {id: screen.pets}
+- assertVisible: {id: puppy.shared.signIn}
+- assertNotVisible: {id: puppy.share}
+- takeScreenshot: pets
+- tapOn: {id: nav.puppy}
+- assertVisible: {id: screen.puppyProfile}
+- assertVisible: {id: settings.puppy.photo.choose}
+- takeScreenshot: profile
+- tapOn: {id: settings.puppy.photo.choose}
+- assertVisible: Change photo
+- assertVisible: Remove photo
+- takeScreenshot: photo-actions
+- tapOn: Cancel
+- tapOn: {id: settings.puppy.name}
+- assertVisible: {id: settings.puppy.name.input}
+- assertVisible: {id: screen.puppyProfile}
+- takeScreenshot: inline-name
+- eraseText: 40
+- inputText: Ellie renamed
+- tapOn: {id: settings.puppy.name.save}
+- assertVisible: {id: settings.puppy.name, text: Ellie renamed}
+- tapOn: {id: puppy.share}
+- assertVisible: {id: screen.sharing}
+- assertNotVisible: {id: sharing.shared}
+- takeScreenshot: share
+- tapOn: {id: sharing.setup}
+- assertVisible: {id: screen.account}
+- tapOn: {id: account.back}
+- assertVisible: {id: screen.sharing}
+- tapOn: {id: sharing.back}
+- assertVisible: {id: screen.puppyProfile}
+- tapOn: {id: nav.back}
+- assertVisible: {id: screen.pets}
+- tapOn: {id: nav.back}
+- assertVisible: {id: screen.settings}
+- tapOn: {id: settings.back}
+- tapOn: {id: nav.open}
+- tapOn: {id: nav.account}
+- assertVisible: {id: screen.account}
+- tapOn: {id: account.back}
+- assertVisible: {id: screen.today}
+- tapOn: {id: header.puppy}
+- assertVisible: {id: screen.pets}
+- tapOn: {id: nav.puppy}
+- assertVisible: {id: settings.puppy.name, text: Ellie renamed}
+- tapOn: {id: settings.puppy.photo.choose}
+- tapOn: ^Remove photo$
+- assertVisible: ^Remove profile photo\?$
+- tapOn: ^Remove photo$
+- assertNotVisible: {id: puppy.photo.image}
+- tapOn: {id: settings.puppy.photo.choose}
+- extendedWaitUntil:
+    visible: {id: Photos}
+    timeout: 30000
+- tapOn: {id: PXGGridLayout-Info, index: 0}
+- extendedWaitUntil:
+    visible: ^Choose$
+    timeout: 30000
+- tapOn: ^Choose$
+- extendedWaitUntil:
+    visible: {id: puppy.photo.image}
+    timeout: 30000
+- assertNotVisible: {id: settings.puppy.photo.error}

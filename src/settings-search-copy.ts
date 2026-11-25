@@ -14,6 +14,7 @@ export const settingsSearchEnglish = {
   'settings.search.guide': 'help tutorial onboarding walkthrough learn',
   'settings.search.privacy': 'privacy policy personal data storage',
   'settings.search.account': 'account sign in login email cloud sync subscription backup',
+  'settings.search.pets': 'puppy pet dog profile name photo share',
 };
 
 export const settingsSearchChinese: typeof settingsSearchEnglish = {
@@ -32,6 +33,7 @@ export const settingsSearchChinese: typeof settingsSearchEnglish = {
   'settings.search.guide': '帮助 教程 入门 引导 学习',
   'settings.search.privacy': '隐私 政策 个人 数据 存储',
   'settings.search.account': '账户 登录 邮箱 云端 同步 订阅 备份',
+  'settings.search.pets': '幼犬 宠物 名字 照片 共享',
 };
 
 export const settingsSearchSpanish: typeof settingsSearchEnglish = {
@@ -50,4 +52,5 @@ export const settingsSearchSpanish: typeof settingsSearchEnglish = {
   'settings.search.guide': 'ayuda tutorial introducción recorrido aprender',
   'settings.search.privacy': 'privacidad política datos personales almacenamiento',
   'settings.search.account': 'cuenta iniciar sesión correo nube sincronización suscripción copia seguridad',
+  'settings.search.pets': 'cachorro mascota perro perfil nombre foto compartir',
 };

@@ -22,11 +22,20 @@ name: Account preservation sign-out
 - assertVisible:
     id: account.signOut
     enabled: true
-- tapOn:
-    id: account.signOut
-    enabled: true
-    retryTapIfNoChange: true
-- assertVisible: ^Sign out on this device\?$
+- retry:
+    maxRetries: 1
+    commands:
+      - runFlow:
+          when:
+            notVisible: ^Sign out on this device\?$
+          commands:
+            - tapOn:
+                id: account.signOut
+                enabled: true
+                retryTapIfNoChange: true
+      - extendedWaitUntil:
+          visible: ^Sign out on this device\?$
+          timeout: 30000
 - waitForAnimationToEnd
 - tapOn:
     retryTapIfNoChange: true

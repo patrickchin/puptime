@@ -10,6 +10,8 @@ name: Open saved puppy settings on populated history
     id: nav.open
 - tapOn:
     id: nav.pets
+- tapOn:
+    id: nav.puppy
 - assertVisible:
     id: settings.puppy.name
     text: .*Mochi.*

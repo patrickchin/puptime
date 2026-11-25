@@ -2,14 +2,17 @@ import {useEffect,useRef,useState} from 'react';
 import {ScrollView,StyleSheet,Text,View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {AccountButton,AccountSignIn} from '../components/AccountSignIn';
+import {SettingsGroup} from '../components/SettingsGroup';
+import {SettingsRow} from '../components/SettingsRow';
+import {ScreenHeader} from '../components/ScreenHeader';
 import {useAccountSnapshot} from '../cloud/use-account-snapshot';
 import type {CloudHandle} from '../cloud/handle';
 import {useCareSession} from '../care-session';
 import type {SharedPuppy} from '../sharing';
 import {useLocalization} from '../localization-context';
-import {headingStyle,spacing,type Theme} from '../theme';
+import {spacing,type Theme} from '../theme';
 
-export function SharedPuppiesScreen({cloud,theme,onBack,initialShareId,inviteToken}:{cloud:CloudHandle;theme:Theme;onBack:()=>void;initialShareId?:string;inviteToken?:string}){
+export function SharedPuppiesScreen({cloud,theme,onBack,onOpenAccount,initialShareId,inviteToken}:{cloud:CloudHandle;theme:Theme;onBack:()=>void;onOpenAccount?:()=>void;initialShareId?:string;inviteToken?:string}){
  const {t}=useLocalization(),session=useCareSession(),state=useAccountSnapshot(cloud.controller),accountId=state?.account?.user.id??(state?.problem&&['account-deleted','forbidden'].includes(state.problem)?session.selection?.accountId:undefined);
  const [puppies,setPuppies]=useState<SharedPuppy[]>([]),[loading,setLoading]=useState(false),[error,setError]=useState(false),[retry,setRetry]=useState(0),[opening,setOpening]=useState<string|null>(null);
  const autoOpened=useRef(false),locked=useRef(false);
@@ -18,7 +21,8 @@ export function SharedPuppiesScreen({cloud,theme,onBack,initialShareId,inviteTok
   try{await session.activate(puppy,accountId);onBack();}catch{setError(true);}finally{locked.current=false;setOpening(null);}
  }
  useEffect(()=>{
-  if(!accountId||!cloud.sharing)return;let current=true;setLoading(true);setError(false);
+  if(!accountId||!cloud.sharing){setPuppies([]);return;}
+  let current=true;setPuppies([]);setLoading(true);setError(false);
   void(async()=>{
    try{
     const result=await cloud.sharing!.puppies(accountId);
@@ -31,14 +35,30 @@ export function SharedPuppiesScreen({cloud,theme,onBack,initialShareId,inviteTok
   locked.current=true;setOpening(initialShareId);setError(false);
   try{await cloud.sharing.accept(accountId,initialShareId,inviteToken);setRetry(value=>value+1);}catch{setError(true);}finally{locked.current=false;setOpening(null);}
  }
+ if(onOpenAccount){
+  return <SettingsGroup theme={theme} label={t('pets.received')} rows={[
+   {key:'sign-in',visible:!accountId,content:<SettingsRow theme={theme} testID="puppy.shared.signIn" icon="account-circle-outline"
+     label={t('account.signIn')} detail={t('pets.sharedDetail')} onPress={onOpenAccount} wrap/>},
+   {key:'status',visible:!!accountId&&(loading||!!opening||error||!puppies.length),content:
+    <Text style={[styles.inlineStatus,{color:error?theme.danger:theme.textMuted}]} accessibilityLiveRegion="polite">
+     {t(error?'sharing.error':loading||opening?'sharing.loading':'sharing.noShared')}
+    </Text>},
+   ...puppies.map(puppy=>({key:puppy.id,visible:!!accountId,content:
+    <SettingsRow theme={theme} testID={`shared.puppy.${puppy.id}`} icon="paw-outline" label={puppy.name}
+     detail={puppy.kind==='household'?t('sharing.permanent'):t('sharing.ends',{date:new Date(puppy.expiresAt!).toLocaleString()})}
+     disabled={loading||!!opening} onPress={()=>{void open(puppy);}} wrap/>})),
+   {key:'retry',visible:!!accountId&&error,content:<AccountButton theme={theme} testID="shared.refresh" label={t('sharing.refresh')} onPress={()=>setRetry(value=>value+1)}/>},
+  ]}/>;
+ }
  return <SafeAreaView style={[styles.root,{backgroundColor:theme.background}]} edges={['top','bottom']}>
-  <View style={styles.header}><AccountButton theme={theme} testID="shared.back" label={t('account.back')} onPress={onBack}/><Text accessibilityRole="header" style={[styles.title,headingStyle(theme),{color:theme.text}]}>{t('sharing.sharedTitle')}</Text></View>
+  <ScreenHeader theme={theme} title={t('sharing.sharedTitle')} testID="shared.back" onBack={onBack} style={styles.header}/>
   <ScrollView keyboardShouldPersistTaps="handled" testID="screen.sharedPuppies" contentContainerStyle={styles.content}>
+   <Text style={[styles.body,{color:theme.textMuted}]}>{t('pets.sharedDetail')}</Text>
    {!accountId?<><Text style={[styles.body,{color:theme.textMuted}]}>{t('sharing.signInShared')}</Text><AccountSignIn cloud={cloud} theme={theme} showIntro={false}/></>:<>
     {error?<Text accessibilityRole="alert" style={[styles.body,{color:theme.danger}]}>{t('sharing.error')}</Text>:null}
     {loading||opening?<Text accessibilityRole="progressbar" style={[styles.body,{color:theme.textMuted}]}>{t('sharing.loading')}</Text>:null}
     {initialShareId&&inviteToken&&!puppies.some(puppy=>puppy.id===initialShareId)?<AccountButton theme={theme} primary testID="shared.accept" label={t('sharing.accept')} disabled={loading||!!opening} onPress={()=>{void accept();}}/>:null}
-    {puppies.map(puppy=><View key={puppy.id}><AccountButton theme={theme} testID={`shared.puppy.${puppy.id}`} label={puppy.name} disabled={loading||!!opening} onPress={()=>{void open(puppy);}}/><Text style={[styles.body,{color:theme.textMuted}]}>{puppy.kind==='household'?t('sharing.permanent'):t('sharing.ends',{date:new Date(puppy.expiresAt!).toLocaleString()})}</Text></View>)}
+    {puppies.map(puppy=><View key={puppy.id} style={styles.puppy}><AccountButton theme={theme} testID={`shared.puppy.${puppy.id}`} label={puppy.name} disabled={loading||!!opening} onPress={()=>{void open(puppy);}}/><Text style={[styles.body,{color:theme.textMuted}]}>{puppy.kind==='household'?t('sharing.permanent'):t('sharing.ends',{date:new Date(puppy.expiresAt!).toLocaleString()})}</Text></View>)}
     {!loading&&!puppies.length&&!inviteToken?<Text style={[styles.body,{color:theme.textMuted}]}>{t('sharing.noShared')}</Text>:null}
     <AccountButton theme={theme} testID="shared.refresh" label={t('sharing.refresh')} disabled={loading||!!opening} onPress={()=>setRetry(value=>value+1)}/>
     {session.selection?<AccountButton theme={theme} testID="shared.ownPuppy" label={t('sharing.ownPuppy')} disabled={!!opening} onPress={()=>{void session.leave().then(onBack);}}/>:null}
@@ -46,4 +66,4 @@ export function SharedPuppiesScreen({cloud,theme,onBack,initialShareId,inviteTok
   </ScrollView>
  </SafeAreaView>;
 }
-const styles=StyleSheet.create({root:{flex:1},header:{padding:spacing.md,gap:8},content:{padding:spacing.md,gap:12,width:'100%',maxWidth:720,alignSelf:'center'},title:{fontSize:28,fontWeight:'700'},body:{fontSize:16,lineHeight:24}});
+const styles=StyleSheet.create({root:{flex:1},header:{padding:spacing.md,width:'100%',maxWidth:720,alignSelf:'center'},content:{padding:spacing.md,gap:12,width:'100%',maxWidth:720,alignSelf:'center'},body:{fontSize:16,lineHeight:24},puppy:{gap:spacing.sm},inlineStatus:{fontSize:14,lineHeight:20,padding:spacing.sm}});

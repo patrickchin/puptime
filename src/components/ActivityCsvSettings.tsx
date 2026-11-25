@@ -7,10 +7,11 @@ import {shareEventsCsv} from '../share-export';
 import {surfaceTreatment, type Theme} from '../theme';
 import {SettingsRow} from './SettingsRow';
 
-export function ActivityCsvSettings({theme, eventCount, onImport, loadExportEvents=loadEvents}: {
+export function ActivityCsvSettings({theme, eventCount, onImport, loadExportEvents=loadEvents, grouped=false}: {
   theme: Theme;
   eventCount: number;
   onImport: () => Promise<void>;
+  grouped?: boolean;
   loadExportEvents?: () => Promise<PuppyEvent[]>;
 }) {
   const {t} = useLocalization();
@@ -30,7 +31,7 @@ export function ActivityCsvSettings({theme, eventCount, onImport, loadExportEven
       setBusy(null);
     }
   }
-  return <View style={[styles.card, surfaceTreatment(theme), {backgroundColor: theme.surfaceRaised, borderColor: theme.border}]}>
+  return <View style={!grouped && [styles.card, surfaceTreatment(theme), {backgroundColor: theme.surfaceRaised, borderColor: theme.border}]}>
     <SettingsRow testID="settings.export" icon="file-export-outline" label={t('insights.exportButton')}
       detail={t(busy === 'export' ? 'settings.exporting' : eventCount ? 'insights.exportHint' : 'insights.noExport')}
       disabled={busy !== null || !eventCount} onPress={() => void transfer('export')} theme={theme} wrap />

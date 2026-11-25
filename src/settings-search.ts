@@ -11,7 +11,8 @@ const settingsSearchKeys = {
   analytics: ['telemetry.title', 'settings.helpPrivacy'],
   guide: ['settings.guide', 'settings.guideDetail', 'settings.helpPrivacy'],
   privacy: ['account.privacy', 'settings.privacyDetail', 'settings.helpPrivacy'],
-  account: ['account.title', 'account.signIn'],
+  account: ['account.title', 'account.signIn', 'settings.accountDetail'],
+  pets: ['nav.pets', 'settings.petsDetail', 'puppy.name', 'puppy.photo', 'sharing.title'],
 } as const satisfies Record<string, readonly MessageKey[]>;
 
 export type SettingSearchId = keyof typeof settingsSearchKeys;

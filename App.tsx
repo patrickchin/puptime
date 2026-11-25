@@ -48,7 +48,7 @@ import type { FinishOnboardingOptions } from './src/onboarding';
 import { ScheduleScreen } from './src/screens/ScheduleScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { PuppyIdentity } from './src/components/PuppyIdentity';
-import {PetsScreen} from './src/screens/PetsScreen';
+import {PetsScreen,PuppyProfileScreen} from './src/screens/PetsScreen';
 import {SharePuppyScreen} from './src/screens/SharePuppyScreen';
 import {SharedPuppiesScreen} from './src/screens/SharedPuppiesScreen';
 import {shareIdSchema} from './src/sharing';
@@ -109,8 +109,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
   const [preferencePicker, setPreferencePicker] = useState<'theme' | 'language' | null>(null);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [historyVisible,setHistoryVisible]=useState(false);
-  const [accountVisible,setAccountVisible]=useState(false);
-  const [sharingKind,setSharingKind]=useState<'household'|'temporary'|null>(null);
+  const [sharingKind,setSharingKind]=useState<'household'|'temporary'>('household');
   const [sharedView,setSharedView]=useState<{id?:string;token?:string}|null>(null);
   useEffect(()=>{
     const open=(url:string)=>{try{const link=new URL(url);if(link.protocol==='puptime:'&&link.hostname==='care'){const id=shareIdSchema.parse(link.searchParams.get('invite'));setSharedView({id,token:link.hash.slice(1)||undefined});}}catch{}};
@@ -278,8 +277,8 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
 
 
   useEffect(() => {
-    productTelemetry.setScreen(onboardingVisible === null ? 'startup' : onboardingVisible ? 'onboarding' : accountVisible && cloud.available ? 'account' : preferencePicker === 'theme' ? 'theme_picker' : preferencePicker === 'language' ? 'language_picker' : historyVisible ? 'log_history' : settingsVisible ? 'settings' : tab);
-  }, [onboardingVisible, accountVisible, preferencePicker, cloud.available, historyVisible, settingsVisible, tab]);
+    productTelemetry.setScreen(onboardingVisible === null ? 'startup' : onboardingVisible ? 'onboarding' : preferencePicker === 'theme' ? 'theme_picker' : preferencePicker === 'language' ? 'language_picker' : historyVisible ? 'log_history' : settingsVisible ? 'settings' : tab==='sharing'||tab==='puppyProfile'?'pets':tab);
+  }, [onboardingVisible, preferencePicker, historyVisible, settingsVisible, tab]);
 
   const openJournal=useCallback(async()=>{
     if(startupLoading.current)return;
@@ -335,6 +334,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     setSettingsVisible(true);
   };
   const openTab = (nextTab: AppTab) => {
+    if (!settingsVisible && nextTab === tab) return;
     setNavigationHistory(history => [...history, settingsVisible ? 'settings' : tab]);
     setSettingsVisible(false);
     setTab(nextTab);
@@ -351,7 +351,6 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if(showSpotlight){setShowSpotlight(false);return true;}
       if(drawerOpen){setDrawerOpen(false);return true;}
-      if(accountVisible){setAccountVisible(false);return true;}
       if(historyVisible){setHistoryVisible(false);return true;}
       if (preferencePicker !== null) {
         setPreferencePicker(null);
@@ -368,7 +367,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
       return false;
     });
     return () => subscription.remove();
-  }, [showSpotlight,accountVisible,drawerOpen,historyVisible,onboardingVisible, preferencePicker, navigationHistory, settingsVisible, tab]);
+  }, [showSpotlight,drawerOpen,historyVisible,onboardingVisible, preferencePicker, navigationHistory, settingsVisible, tab]);
 
   useEffect(() => {
     configureNotificationActions(language).catch(() => undefined);
@@ -384,10 +383,9 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
   const handleNotificationResponse = useCallback(async (response: Notifications.NotificationResponse) => {
     const data = response.notification.request.content.data;
     if(nativeApp&&data?.kind===CUSTOM_TIMED_REMINDER_NOTIFICATION_KIND){
-      setNavigationHistory([]);setDrawerOpen(false);setAccountVisible(false);setHistoryVisible(false);setSettingsVisible(false);setTab('notifications');return;
+      setNavigationHistory([]);setDrawerOpen(false);setHistoryVisible(false);setSettingsVisible(false);setTab('notifications');return;
     }
     if (data?.kind === POTTY_REMINDER_NOTIFICATION_KIND || data?.kind === QUIET_STATUS_KIND) {
-      setAccountVisible(false);
       setHistoryVisible(false);
       setSettingsVisible(false);
       setNavigationHistory([]);
@@ -430,7 +428,6 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
       await updateEvent(event.id, { note: normalizeNote(response.userText) });
       await refreshCommittedState();
     }
-    setAccountVisible(false);
     setHistoryVisible(false);
     setSettingsVisible(false);
     setNavigationHistory([]);
@@ -727,7 +724,10 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     await refresh();
     setFirstLaunch(null);setOnboardingVisible(false);setGuideOpenedFromSettings(false);
     navigateToTab('log');setShowSpotlight(draft.showGuide);
-    if(draft.sharingKind){setShowSpotlight(false);setSharingKind(draft.sharingKind);}
+    if(draft.sharingKind){
+      setShowSpotlight(false);setSharingKind(draft.sharingKind);
+      setTab('sharing');setNavigationHistory(['log']);
+    }
   };
 
   const screen = useMemo(() => {
@@ -737,7 +737,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
         <SettingsScreen
           {...{showHeader:!nativeApp,onBackupsRestored:refreshCommittedState,onOpenHistory:eventHistory?()=>setHistoryVisible(true):undefined,notificationDelivery:nativeApp?notificationDelivery:undefined,
             onNotificationDeliveryChange:changeNotificationDelivery,routineReminderCount:schedule.filter(entry=>entry.reminder).length,
-            onOpenSchedule:()=>openTab('schedule'),
+            onOpenSchedule:()=>openTab('schedule'),onOpenPets:()=>openTab('pets'),
             onOpenNotifications:()=>openTab('notifications'),
             onImport:importActivity,eventCount}}
           theme={theme}
@@ -749,7 +749,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
           notificationPermission={notificationPermission}
           onBack={goBack}
           cloudHandle={cloud}
-          onOpenAccount={()=>setAccountVisible(true)}
+          onOpenAccount={()=>openTab('account')}
           onOpenPicker={setPreferencePicker}
           onWidgetActionsChange={changeWidgetActions}
           onNotificationPreferencesChange={changeNotificationPreferences}
@@ -765,7 +765,15 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
         />
       );
     }
-    if(tab==='pets')return <PetsScreen theme={theme} cloud={cloud} eventCount={eventCount} shared={!!care} sharedName={care?.name} onShare={()=>setSharingKind('household')} onOpenShared={()=>setSharedView({})}/>;
+    if(tab==='account')return <AccountScreen cloud={cloud} theme={theme} eventCount={eventCount} onBack={goBack} onOpenActivity={()=>navigateToTab('log')}/>;
+    if(tab==='sharing')return <SharePuppyScreen cloud={cloud} theme={theme} initialKind={sharingKind} onBack={goBack} onOpenAccount={()=>openTab('account')}/>;
+    if(tab==='puppyProfile')return care?null:<PuppyProfileScreen theme={theme} cloud={cloud} onShare={()=>{
+      setSharingKind('household');openTab('sharing');
+    }}/>;
+    if(tab==='pets')return <PetsScreen theme={theme} cloud={cloud} shared={!!care} onOpenProfile={()=>{
+      if(care){void careSession.leave().catch(()=>Alert.alert(translate(language,'sharing.error')));return;}
+      openTab('puppyProfile');
+    }} onOpenAccount={()=>openTab('account')} onOpenJournal={()=>navigateToTab('log')}/>;
     if(tab==='notifications')return <NotificationsScreen theme={theme} petId={petId} notificationPreferences={notificationPreferences}
       notificationPermission={notificationPermission} notificationDelivery={notificationDelivery}
       quietStatusEnabled={quietStatusEnabled} onQuietStatusChange={nativeApp?changeQuietStatus:undefined}
@@ -845,6 +853,8 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
     schedule,
     settingsVisible,
     navigationHistory,
+    sharingKind,
+    careSession,
     eventCount,
     tab,
     theme,
@@ -871,16 +881,16 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
           <View ref={spotlightContainer} collapsable={false} style={styles.screen}>
           <BlurTargetView ref={blurTarget} style={styles.screen}>
           <SideNavigation open={drawerOpen} enabled={onboardingVisible===false} tab={tab} settingsVisible={settingsVisible} theme={theme}
-            onOpen={()=>setDrawerOpen(true)} onClose={()=>setDrawerOpen(false)} onChange={navigateToTab} onSettings={()=>{setHistoryVisible(false);setNavigationHistory([tab]);setSettingsVisible(true);}} onAccount={()=>setAccountVisible(true)}>
-          {nativeApp&&onboardingVisible===false&&!historyVisible?<View style={styles.navigationHeader}>
+            onOpen={()=>setDrawerOpen(true)} onClose={()=>setDrawerOpen(false)} onChange={navigateToTab} onSettings={()=>{setHistoryVisible(false);setNavigationHistory([tab]);setSettingsVisible(true);}} onAccount={()=>openTab('account')}>
+          {nativeApp&&onboardingVisible===false&&!historyVisible&&(settingsVisible||(tab!=='account'&&tab!=='sharing'))?<View style={styles.navigationHeader}>
             <Pressable testID={settingsVisible?'settings.back':navigationHistory.length?'nav.back':'nav.open'} accessibilityRole="button"
               accessibilityLabel={translate(language,settingsVisible||navigationHistory.length>0?'settings.back':'nav.open')}
               onPress={()=>{if(settingsVisible||navigationHistory.length)goBack();else setDrawerOpen(true);}}
               style={({pressed})=>[styles.menuButton,{backgroundColor:pressed?theme.primarySoft:theme.surface,borderRadius:theme.presentation.controlRadius}]}>
               <MaterialCommunityIcons accessible={false} name={settingsVisible||navigationHistory.length>0?'arrow-left':'menu'} size={25} color={theme.primary} accessibilityElementsHidden importantForAccessibility="no"/>
             </Pressable>
-            <Text testID="nav.title" accessibilityRole="header" maxFontSizeMultiplier={1.5} style={[styles.navigationTitle,{color:theme.text,minWidth:70}]}>{translate(language,settingsVisible?'settings.title':tab==='notifications'?'notifications.title':tab==='learn'?'learn.title':`nav.${tab}`)}</Text>
-            <PuppyIdentity theme={theme} onPress={tab==='pets'&&!settingsVisible?undefined:()=>openTab('pets')}/>
+            <Text testID="nav.title" accessibilityRole="header" maxFontSizeMultiplier={1.5} style={[styles.navigationTitle,{color:theme.text,minWidth:70}]}>{translate(language,settingsVisible?'settings.title':tab==='notifications'?'notifications.title':tab==='learn'?'learn.title':tab==='puppyProfile'?'pets.manageProfile':tab==='account'?'account.title':tab==='sharing'?'sharing.title':`nav.${tab}`)}</Text>
+            {settingsVisible||(tab!=='pets'&&tab!=='puppyProfile')?<PuppyIdentity theme={theme} onPress={()=>openTab('pets')}/>:null}
           </View>:null}
           <View style={styles.screen}>
             {onboardingVisible === null ? nativeApp?<View testID="setup.loading" style={styles.startup}>
@@ -924,7 +934,7 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
           </View>
           {!nativeApp&&onboardingVisible === false && !settingsVisible ? (
             <SafeAreaView edges={['bottom']} style={{ backgroundColor: theme.nav }}>
-              <BottomNav tab={tab==='notifications'||tab==='pets'?'log':tab} onChange={navigateToTab} theme={theme} />
+              <BottomNav tab={tab==='notifications'||tab==='pets'||tab==='account'||tab==='sharing'||tab==='puppyProfile'?'log':tab} onChange={navigateToTab} theme={theme} />
             </SafeAreaView>
           ) : null}
           </SideNavigation>
@@ -942,12 +952,6 @@ export function PuptimeApp({conversationalOnboarding=false}:{conversationalOnboa
             onSelectLanguage={chooseLanguage}
             onClose={() => setPreferencePicker(null)}
           />
-          <Modal visible={accountVisible&&cloud.available} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={()=>setAccountVisible(false)}>
-            {accountVisible?<SafeAreaProvider><AccountScreen cloud={cloud} theme={theme} eventCount={eventCount} onBack={()=>setAccountVisible(false)} onOpenActivity={()=>{setAccountVisible(false);navigateToTab('log');}}/></SafeAreaProvider>:null}
-          </Modal>
-          <Modal visible={sharingKind!==null&&onboardingVisible===false} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={()=>setSharingKind(null)}>
-            {sharingKind?<SafeAreaProvider><SharePuppyScreen cloud={cloud} theme={theme} eventCount={eventCount} initialKind={sharingKind} onBack={()=>setSharingKind(null)}/></SafeAreaProvider>:null}
-          </Modal>
           <Modal visible={sharedView!==null} animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={()=>setSharedView(null)}>
             {sharedView?<SafeAreaProvider><SharedPuppiesScreen key={sharedView.id??"list"} cloud={cloud} theme={theme} initialShareId={sharedView.id} inviteToken={sharedView.token} onBack={()=>setSharedView(null)}/></SafeAreaProvider>:null}
           </Modal>

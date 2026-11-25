@@ -21,7 +21,7 @@ import {LearnScreen} from './LearnScreen';
 import {LogViewSwitch} from '../components/LogViewSwitch';
 import {LogScreen,type LogEditRequest} from './LogScreen';
 
-type PreviewTab=AppTab|'account';
+type PreviewTab=Exclude<AppTab,'sharing'|'puppyProfile'>;
 type IconName=keyof typeof MaterialCommunityIcons.glyphMap;
 const emptyActivities:string[]=[];
 // Body copy retains the existing 2× scale; large-text layouts reflow around it.

@@ -3,7 +3,7 @@ import test from 'node:test';
 import { translate, type AppLanguage } from './localization.ts';
 import { findSettings, type SettingSearchId } from './settings-search.ts';
 
-const available: SettingSearchId[] = ['appearance', 'language', 'notifications', 'widget', 'backups', 'csv', 'history', 'analytics', 'guide', 'privacy', 'account'];
+const available: SettingSearchId[] = ['appearance', 'language', 'notifications', 'widget', 'backups', 'csv', 'history', 'analytics', 'guide', 'privacy', 'account', 'pets'];
 const search = (query: string, language: AppLanguage = 'en', ids = available) => [...findSettings(query, key => translate(language, key), ids)];
 
 test('settings search finds labels, partial words, synonyms, and one-edit typos', () => {
@@ -18,6 +18,7 @@ test('settings search finds labels, partial words, synonyms, and one-edit typos'
   assert.ok(search('tutorial').includes('guide'));
   assert.ok(search('data collection').includes('analytics'));
   assert.ok(search('sign in').includes('account'));
+  assert.ok(search('puppy phoot').includes('pets'));
 });
 
 test('settings search respects language, accents, word order, and real availability', () => {

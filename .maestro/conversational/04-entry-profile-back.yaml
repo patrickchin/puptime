@@ -107,6 +107,8 @@ name: Email entry and profile edits reach the real app
     id: "nav.open"
 - tapOn:
     id: "nav.pets"
+- tapOn:
+    id: nav.puppy
 - assertVisible:
     id: "settings.puppy.name"
     text: ".*Biscuit.*"
