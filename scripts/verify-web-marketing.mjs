@@ -54,7 +54,7 @@ try {
     assert.equal(await page.locator('.site-brand img').getAttribute('src'), '/brand-icon.png');
     const heroBackground = await page.locator('.hero').evaluate(element => getComputedStyle(element).backgroundColor);
     assert.equal(heroBackground, 'rgb(23, 59, 48)', 'Keep the mascot forest green behind the hero.');
-    assert.equal(await page.locator('.app-chapter').evaluate(element => getComputedStyle(element).backgroundColor), heroBackground, 'The app preview should continue the dark green background.');
+    assert.equal(await page.locator('.app-chapter').evaluate(element => getComputedStyle(element).backgroundColor), 'rgb(248, 243, 232)', 'Use warm cream to separate the app preview from the green hero.');
 
     await page.mouse.move(width / 2, height / 2);
     await page.mouse.wheel(0, height);

@@ -39,7 +39,7 @@ body:has(.marketing-site){overflow-y:auto}
 .hero-art{position:relative;align-self:stretch;display:flex;align-items:center;justify-content:center;min-width:0}
 .hero-puppy{width:100%;max-width:520px;height:auto;aspect-ratio:1;object-fit:contain}
 .chapter{padding:80px var(--margin);scroll-margin-top:24px}
-.app-chapter{background:var(--deep);color:var(--paper);display:grid;grid-template-columns:1fr 1fr;gap:48px;min-height:0;align-items:center}
+.app-chapter{background:var(--paper);color:var(--ink);display:grid;grid-template-columns:1fr 1fr;gap:48px;min-height:0;align-items:center}
 .preview-copy{max-width:620px}
 .preview-choices{display:flex;flex-direction:column;align-items:stretch;margin:40px 0 28px;gap:4px}
 .preview-choices button{display:flex;align-items:center;justify-content:space-between;text-align:left;background:transparent;border:0;padding:10px 16px;font-size:var(--lead);min-height:52px}
