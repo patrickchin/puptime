@@ -257,5 +257,31 @@ class BetaCertificateBoundary(unittest.TestCase):
                 beta.verify_beta_signers(certificate, report, certificate_pem)
 
 
+class BetaWorkflowBoundary(unittest.TestCase):
+    def run_source_step(self, title, env):
+        import subprocess
+        workflow = (Path(__file__).parents[1] / '.github/workflows/android-apk.yml').read_text()
+        step = workflow.split('      - name: ' + title + '\n', 1)[1].split('      - ', 1)[0]
+        script = '\n'.join(line[10:] for line in step.split('        run: |\n', 1)[1].splitlines())
+        return subprocess.run(['/bin/bash', '--noprofile', '--norc', '-eo', 'pipefail', '-c', script],
+                              env=env, capture_output=True, timeout=10).returncode
+
+    def test_actual_source_admission_and_template_publication_guards(self):
+        valid = {'GITHUB_EVENT_NAME': 'workflow_dispatch', 'GITHUB_REF': 'refs/heads/main',
+                 'GITHUB_SHA': 'a' * 40, 'PUPTIME_EXPECTED_SOURCE': 'a' * 40,
+                 'PUPTIME_PUBLISH': 'false', 'PUPTIME_UPLOAD_CERT_SHA256': 'c' * 64}
+        title = 'Admit exact beta source before accessing signing credentials'
+        self.assertEqual(self.run_source_step(title, valid), 0)
+        for key, wrong in [('GITHUB_EVENT_NAME', 'pull_request'), ('GITHUB_REF', 'refs/heads/unreviewed'),
+                           ('PUPTIME_EXPECTED_SOURCE', 'b' * 40), ('PUPTIME_PUBLISH', 'true'),
+                           ('PUPTIME_UPLOAD_CERT_SHA256', ''), ('PUPTIME_UPLOAD_CERT_SHA256', 'f' * 63),
+                           ('PUPTIME_UPLOAD_CERT_SHA256', 'fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c')]:
+            with self.subTest(key=key, wrong=wrong):
+                self.assertNotEqual(self.run_source_step(title, {**valid, key: wrong}), 0)
+        title = 'Keep template QA artifacts out of public releases'
+        self.assertEqual(self.run_source_step(title, {'PUPTIME_PUBLISH': 'false'}), 0)
+        self.assertNotEqual(self.run_source_step(title, {'PUPTIME_PUBLISH': 'true'}), 0)
+
+
 if __name__ == '__main__':
     unittest.main()

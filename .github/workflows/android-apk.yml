@@ -38,6 +38,10 @@ jobs:
     # Configure this environment to admit main only and require owner approval
     # BEFORE adding its signing secrets. QA has no signing credentials.
     environment: ${{ inputs.signing == 'beta-upload' && 'android-beta-signing' || 'android-qa' }}
+    env:
+      EXPO_NO_DOTENV: "1"
+      EXPO_PUBLIC_CLOUD_API_URL: https://puptime.pages.dev
+      EXPO_PUBLIC_CLOUD_ALLOW_LOCAL: "0"
     outputs:
       tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
@@ -49,6 +53,15 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.sha }}
           persist-credentials: false
+      - name: Keep template QA artifacts out of public releases
+        if: ${{ inputs.signing != 'beta-upload' }}
+        env:
+          PUPTIME_PUBLISH: ${{ inputs.publish }}
+        run: |
+          if [[ "$PUPTIME_PUBLISH" == true ]]; then
+            echo 'Template-signed QA artifacts cannot be published as a release. Qualify the intended delivery and signing first.' >&2
+            exit 1
+          fi
       - name: Admit exact beta source before accessing signing credentials
         if: ${{ inputs.signing == 'beta-upload' }}
         env:
