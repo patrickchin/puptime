@@ -58,6 +58,7 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
       - name: Admit exact unsigned discovery source
+        id: notice_admission
         if: ${{ inputs.discovery_only == true }}
         env:
           PUPTIME_EXPECTED_SOURCE: ${{ inputs.expected_source }}
@@ -145,10 +146,13 @@ jobs:
           distribution: temurin
           java-version: 17
       - run: npm ci
+        id: notice_install
       - run: npx expo prebuild --platform android --no-install
+        id: notice_prebuild
         env:
           CI: "1"
       - name: Stage immutable notice discovery tools
+        id: notice_tools
         timeout-minutes: 5
         if: ${{ inputs.discovery_only == true }}
         shell: bash
@@ -181,6 +185,7 @@ jobs:
             git show "$puptime_tools_source:$puptime_file" > "$puptime_file"
           done
       - name: Resolve Android license dependencies without compiling
+        id: notice_gradle
         timeout-minutes: 20
         if: ${{ inputs.discovery_only == true }}
         shell: bash
@@ -188,20 +193,42 @@ jobs:
           set -euo pipefail
           umask 077
           if ! (cd android && ./gradlew -I "$PUPTIME_NOTICE_PRIVATE/tools/scripts/notices-runtime.init.gradle" :app:writeNoticeRuntimeInputs --no-daemon --no-configuration-cache --no-build-cache -PnoticeMainProjectRoot="$PWD" -PnoticeInputsOutput="$PUPTIME_NOTICE_PRIVATE/runtime-inputs.json") > "$PUPTIME_NOTICE_PRIVATE/gradle-private.log" 2>&1; then
-            echo 'Android dependency resolution failed; private output was not uploaded.' >&2
+            node "$PUPTIME_NOTICE_PRIVATE/tools/scripts/capture-app-notices.mjs" setup-failure android --phase gradle-resolution
+            echo 'Android dependency resolution failed; finite diagnostic only, no raw output uploaded.' >&2
             exit 1
           fi
-          node "$PUPTIME_NOTICE_PRIVATE/tools/scripts/capture-app-notices.mjs" collect android --gradle-input "$PUPTIME_NOTICE_PRIVATE/runtime-inputs.json"
-          node scripts/android-notice-discovery.mjs
+      - name: Collect locked Android Metro and notice inputs
+        id: notice_metro
+        timeout-minutes: 10
+        if: ${{ inputs.discovery_only == true }}
+        run: node "$PUPTIME_NOTICE_PRIVATE/tools/scripts/capture-app-notices.mjs" collect android --gradle-input "$PUPTIME_NOTICE_PRIVATE/runtime-inputs.json"
+      - name: Project bounded public Android dependency metadata
+        id: notice_projection
+        timeout-minutes: 2
+        if: ${{ inputs.discovery_only == true }}
+        run: node scripts/android-notice-discovery.mjs
+      - name: Record finite Android discovery diagnostics
+        timeout-minutes: 2
+        if: ${{ always() && inputs.discovery_only == true }}
+        env:
+          PUPTIME_NOTICE_SOURCE_ADMISSION: ${{ steps.notice_admission.outcome }}
+          PUPTIME_NOTICE_LOCKED_INSTALL: ${{ steps.notice_install.outcome }}
+          PUPTIME_NOTICE_PREBUILD: ${{ steps.notice_prebuild.outcome }}
+          PUPTIME_NOTICE_TOOL_STAGING: ${{ steps.notice_tools.outcome }}
+          PUPTIME_NOTICE_GRADLE_RESOLUTION: ${{ steps.notice_gradle.outcome }}
+          PUPTIME_NOTICE_METRO_COLLECTION: ${{ steps.notice_metro.outcome }}
+          PUPTIME_NOTICE_PUBLIC_PROJECTION: ${{ steps.notice_projection.outcome }}
+        run: python3 scripts/record-android-notice-failure.py
       - name: Upload public license discovery inputs only (INCOMPLETE)
         timeout-minutes: 3
-        if: ${{ success() && inputs.discovery_only == true }}
+        if: ${{ always() && inputs.discovery_only == true }}
         uses: actions/upload-artifact@v6
         with:
           name: puptime-android-notice-discovery-INCOMPLETE
           path: |
             build/notices/android/review/unreviewed-oss-notice-inputs.json
             build/notices/android/review/dependency-inventory.json
+            build/notices/android/review/failure.json
           if-no-files-found: error
           retention-days: 3
       - name: Remove owned private discovery inputs

@@ -23,6 +23,7 @@ jobs:
       - run: python3 scripts/android-permission-experiment.test.py
       - run: python3 scripts/test_android_release_custody.py
       - run: python3 scripts/test_android_engine_probe_copy.py
+      - run: python3 scripts/test_android_notice_failure.py
       - run: npm run typecheck
       - run: npm run typecheck:ios
       - run: npm test
