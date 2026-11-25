@@ -13,13 +13,14 @@ import {assertNumericUpgrade,digestBytes} from './native-upgrade-evidence.mjs';
 test('actual Git archive excludes nested dotenv/owner files before extracting exact executable blobs',()=>{
  const root=mkdtempSync(join(tmpdir(),'puptime-enrolled-source-')),prior=process.cwd(),repo=join(root,'repo');mkdirSync(repo);mkdirSync(join(repo,'nested'));
  try{
-  for(const name of ['.env','.env.example','owner.env','nested/.env.local','index.ts','package.json','package-lock.json'])writeFileSync(join(repo,name),name+'\n');
+  for(const name of ['.env','.env.example','owner.env','nested/.env.local','*',':(glob)*','index.ts','package.json','package-lock.json'])writeFileSync(join(repo,name),name+'\n');
   chmodSync(join(repo,'index.ts'),0o755);
   const git=args=>execFileSync('git',args,{cwd:repo,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
   git(['init','-q']);git(['add','.']);git(['-c','user.name=Synthetic QA','-c','user.email=qa@example.invalid','commit','-qm','Artificial archive control']);
   const source=git(['rev-parse','HEAD']);process.chdir(repo);
   const target=join(root,'source'),files=archiveHistoricalSource(source,target,join(root,'source.tar'));
-  assert.deepEqual(Object.keys(files).sort(),['index.ts','package-lock.json','package.json']);
+  assert.deepEqual(Object.keys(files).sort(),['*',':(glob)*','index.ts','package-lock.json','package.json']);
+  for(const excluded of ['.env','.env.example','owner.env','nested/.env.local'])assert.equal(existsSync(join(target,excluded)),false);
   assert.equal(files['index.ts'].mode,'100755');assert.ok(!existsSync(join(root,'source.tar')));
   assertArchivedSource(target,files);writeFileSync(join(target,'index.ts'),'substituted');assert.throws(()=>assertArchivedSource(target,files));
  }finally{process.chdir(prior);rmSync(root,{recursive:true,force:true});}
@@ -53,10 +54,27 @@ for name,items in cases.items():
   for path,data in items:z.writestr(path,data)
 with zipfile.ZipFile(root/'symlink.zip','w') as z:
  i=zipfile.ZipInfo('Puptime.app/escape');i.create_system=3;i.external_attr=(stat.S_IFLNK|0o777)<<16;z.writestr(i,'../../outside')
+with zipfile.ZipFile(root/'chain.zip','w') as z:
+ for name,target in [('a','.'),('b','a/../outside')]:
+  i=zipfile.ZipInfo('Puptime.app/'+name);i.create_system=3;i.external_attr=(stat.S_IFLNK|0o777)<<16;z.writestr(i,target)
 `,root]);
   for(const kind of ['baseline','host','inner'])assertRuntimeZip(join(root,kind+'.zip'),kind);
-  for(const [name,kind] of [['traversal','host'],['duplicate','host'],['symlink','inner']])assert.throws(()=>assertRuntimeZip(join(root,name+'.zip'),kind));
+  for(const [name,kind] of [['traversal','host'],['duplicate','host'],['symlink','inner'],['chain','inner']])assert.throws(()=>assertRuntimeZip(join(root,name+'.zip'),kind));
  }finally{rmSync(root,{recursive:true,force:true});}
+});
+
+test('actual beta child cleanup removes only its private inputs after process/DB closure on success and failure',async()=>{
+ const source=readFileSync(new URL('./verify-native-guest-account.mjs',import.meta.url),'utf8'),start=source.indexOf('const task=installTaskCleanup(async()=>{'),end=source.indexOf('\ntry{',start);assert.ok(start>=0&&end>start);
+ const body=source.slice(start,end)+';await task.run();',AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
+ for(const completed of [true,false])for(const denied of [false,true]){
+  const root=mkdtempSync(join(tmpdir(),'puptime-beta-child-cleanup-')),privateDir=join(root,'private'),output=join(root,'receipts'),order=[],status={};mkdirSync(privateDir);mkdirSync(output);
+  writeFileSync(join(privateDir,'auth.db'),'synthetic');writeFileSync(join(privateDir,'fixture.key'),'synthetic');mkdirSync(join(privateDir,'old-node_modules'));
+  const parameters={installTaskCleanup:run=>({run}),changeSockets:[],proxy:undefined,activeStops:[async()=>{order.push('processes');return true;}],stopWorker:undefined,auth:{close(){order.push('database');}},android:false,restoreNative:[],temporaryDevices:[],deleteOwnedSimulator:()=>{throw Error('No simulator belongs to this control.');},privateDir,completed,existsSync,betaEnrolled:true,rmSync:(path,options)=>{assert.equal(path,privateDir);assert.deepEqual(order,['processes','database']);if(denied)throw Error('Injected removal failure');rmSync(path,options);},writeFileSync,join,output,process:status};
+  try{
+   await new AsyncFunction(...Object.keys(parameters),body)(...Object.values(parameters));
+   const result=JSON.parse(readFileSync(join(output,'sdk-task-cleanup.json')));assert.equal(result.databaseClosed,true);assert.equal(result.privateDirectoryRemoved,!denied);assert.equal(result.status,denied?'failed':'passed');assert.equal(existsSync(privateDir),denied);assert.equal(status.exitCode,denied?1:undefined);
+  }finally{rmSync(root,{recursive:true,force:true});}
+ }
 });
 
 test('unbound beta target rejects enrolled preparation before filesystem, network or simulator execution',()=>{

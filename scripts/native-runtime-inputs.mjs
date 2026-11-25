@@ -26,7 +26,7 @@ export function historicalSourceFiles(source){
 export function archiveHistoricalSource(source,sourceRoot,archive){
  const files=historicalSourceFiles(source);assert.ok(Object.keys(files).length>0);
  mkdirSync(sourceRoot,{mode:0o700});const fd=openSync(archive,'wx',0o600);
- try{execFileSync('git',['archive','--format=tar',source,'--',...Object.keys(files)],{timeout:120000,stdio:['ignore',fd,'pipe']});}finally{closeSync(fd);}
+ try{execFileSync('git',['--literal-pathspecs','archive','--format=tar',source,'--',...Object.keys(files)],{timeout:120000,stdio:['ignore',fd,'pipe']});}finally{closeSync(fd);}
  try{command('tar',['-xf',archive,'-C',sourceRoot]);}finally{rmSync(archive,{force:true});}
  chmodSync(sourceRoot,0o700);assertArchivedSource(sourceRoot,files);return files;
 }
@@ -54,7 +54,7 @@ with zipfile.ZipFile(path) as z:
    if stat.S_ISLNK(mode):
     assert i.file_size<=4096
     target=z.read(i).decode('utf8');resolved=pathlib.PurePosixPath(posixpath.normpath(posixpath.join(str(p.parent),target)))
-    assert not pathlib.PurePosixPath(target).is_absolute() and resolved.parts[0]=='Puptime.app' and '..' not in resolved.parts
+    assert not pathlib.PurePosixPath(target).is_absolute() and '..' not in pathlib.PurePosixPath(target).parts and resolved.parts[0]=='Puptime.app' and '..' not in resolved.parts
   else: assert not stat.S_ISLNK(mode)
  assert z.testzip() is None
 `,path,kind]);

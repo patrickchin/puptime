@@ -584,13 +584,16 @@ const task=installTaskCleanup(async()=>{
  for(const socket of changeSockets)socket.destroy();
  proxy?.closeAllConnections();proxy?.close();
  const processesStopped=(await Promise.all([...activeStops,...(stopWorker?[stopWorker]:[])].map(stop=>stop()))).every(Boolean);
- try{auth?.close();}catch{}
+ let databaseClosed=true;try{auth?.close();}catch{databaseClosed=false;}
  if(android)try{adb('reverse','--remove','tcp:'+frontPort);}catch{}
  let nativeRestored=true;
  for(const [path,original] of restoreNative.reverse())try{if(original===null)rmSync(path,{force:true});else writeFileSync(path,original);}catch{nativeRestored=false;}
  const simulators=temporaryDevices.map(device=>deleteOwnedSimulator({device,privateDirectory:privateDir,preserve:!completed}));
- writeFileSync(join(output,'sdk-task-cleanup.json'),JSON.stringify({status:processesStopped&&nativeRestored&&simulators.every(value=>value.deleted)?'passed':'failed',processesStopped,nativeRestored,simulators},null,2)+'\n');
- if(!processesStopped||!nativeRestored||simulators.some(value=>!value.deleted))process.exitCode=1;
+ let privateDirectoryRemoved=!existsSync(privateDir);
+ if(betaEnrolled&&processesStopped&&databaseClosed&&nativeRestored&&simulators.every(value=>value.deleted))try{rmSync(privateDir,{recursive:true,force:true});privateDirectoryRemoved=!existsSync(privateDir);}catch{privateDirectoryRemoved=false;}
+ const passed=processesStopped&&nativeRestored&&simulators.every(value=>value.deleted)&&(!betaEnrolled||databaseClosed&&privateDirectoryRemoved);
+ writeFileSync(join(output,'sdk-task-cleanup.json'),JSON.stringify({status:passed?'passed':'failed',processesStopped,nativeRestored,simulators,...(betaEnrolled?{databaseClosed,privateDirectoryRemoved}:{})},null,2)+'\n');
+ if(!passed)process.exitCode=1;
 });
 try{
   markStartup('owned-port-preflight');
