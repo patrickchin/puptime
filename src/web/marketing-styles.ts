@@ -60,7 +60,7 @@ body:has(.marketing-site){overflow-y:auto}
 .phone-power{left:auto;right:-1cqi;top:25%;height:10%;border-radius:0 .6cqi .6cqi 0}
 .phone-frame img{display:block;width:100%;height:auto}
 .app-preview figcaption{font-size:var(--small);margin-top:16px;text-align:center}
-.rhythm-chapter{display:grid;grid-template-columns:1fr 1fr;gap:48px;background:var(--mint);align-items:start}
+.rhythm-chapter{display:grid;grid-template-columns:1fr 1fr;gap:48px;background:var(--deep);color:var(--paper);align-items:start}
 .rhythm-intro{position:sticky;top:48px}
 .rhythm-intro p{max-width:25ch;margin-top:32px;font-size:var(--lead);line-height:1.4}
 .rhythm-stories{display:flex;flex-direction:column;gap:100px}
