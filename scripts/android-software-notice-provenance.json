@@ -2,7 +2,7 @@
   "schema": 1,
   "status": "INCOMPLETE",
   "scope": "Source-curated actual Android resolved components and named source vendors. Final vendor fingerprints, selected runtime origin, packaged bytes and native UI acceptance remain unqualified.",
-  "payloadSHA256": "13b5eb3dafc0a965365ffef54835cc274791b212c64fa7fe6530b26d90d0016c",
+  "payloadSHA256": "f0a0b479f234ca77996b8e0ad1b4e370f88ccb6329af3295e54d64e7d45fd4f3",
   "sourceInputs": {
     "sourceCommit": "a38e14135fc2dc7a98f3ec78302a5ad868c47f02",
     "packageLockSHA256": "07436343496d75aa8a06baf170899b05a40786358f9dd4ac166e776bd8d3be7a",
@@ -11898,8 +11898,100 @@
       {
         "sectionId": "android-software-1a8f1058753f1ba890de984e",
         "sha256": "1a8f1058753f1ba890de984e48f0242a3a5c29a6a8f2ed9fd813f36985387e8d"
+      },
+      {
+        "sectionId": "android-software-b5efebcaca80879234098e52",
+        "sha256": "b5efebcaca80879234098e52d1725e6d9eb8fb96a19fce625d39184b705f7b6d"
       }
-    ]
+    ],
+    "publicNoticeWitness": {
+      "configuredNDK": "27.1.12297006",
+      "sourceHost": "darwin-x86_64",
+      "wholeSDKArchiveVerified": false,
+      "finalLinuxOriginQualified": false,
+      "files": [
+        {
+          "source": "NOTICE",
+          "bytes": 522923,
+          "sha256": "4d5224d1c0b54ffa88b0dc0088191638fdbb7227835095dfb98f7f66b416a323"
+        },
+        {
+          "source": "NOTICE.toolchain",
+          "bytes": 806124,
+          "sha256": "cbe3237be53c0a819f8df6aac5358fdee848eee3b6571b4e2ca20767ebd7465e"
+        },
+        {
+          "source": "toolchains/llvm/prebuilt/darwin-x86_64/NOTICE",
+          "bytes": 130424,
+          "sha256": "f96f763beb66a7ba7a667647fc64c0226ace875e590c831fdd9579ec1c1d91e1"
+        }
+      ],
+      "termMatches": [
+        {
+          "name": "libcxx",
+          "noticeSHA256": "539dd7aed86e8a4f12cbdd0e6c50c189c7d74847e4fecc64ce2c6ee3a01da38b",
+          "matches": [
+            {
+              "source": "NOTICE.toolchain",
+              "sourceSHA256": "cbe3237be53c0a819f8df6aac5358fdee848eee3b6571b4e2ca20767ebd7465e",
+              "byteOffset": 127769,
+              "byteLength": 16703
+            },
+            {
+              "source": "toolchains/llvm/prebuilt/darwin-x86_64/NOTICE",
+              "sourceSHA256": "f96f763beb66a7ba7a667647fc64c0226ace875e590c831fdd9579ec1c1d91e1",
+              "byteOffset": 31851,
+              "byteLength": 16703
+            }
+          ],
+          "status": "EXACT_PUBLIC_LICENSE_SUBSTRING"
+        },
+        {
+          "name": "libcxxabi",
+          "noticeSHA256": "e2b35be49f7284a45b7baca8fc7b3ab7440e7902392b2528a457816b5bb2a15c",
+          "matches": [
+            {
+              "source": "NOTICE.toolchain",
+              "sourceSHA256": "cbe3237be53c0a819f8df6aac5358fdee848eee3b6571b4e2ca20767ebd7465e",
+              "byteOffset": 144473,
+              "byteLength": 16706
+            },
+            {
+              "source": "toolchains/llvm/prebuilt/darwin-x86_64/NOTICE",
+              "sourceSHA256": "f96f763beb66a7ba7a667647fc64c0226ace875e590c831fdd9579ec1c1d91e1",
+              "byteOffset": 48555,
+              "byteLength": 16706
+            }
+          ],
+          "status": "EXACT_PUBLIC_LICENSE_SUBSTRING"
+        },
+        {
+          "name": "compiler-rt",
+          "noticeSHA256": "1a8f1058753f1ba890de984e48f0242a3a5c29a6a8f2ed9fd813f36985387e8d",
+          "matches": [
+            {
+              "source": "NOTICE.toolchain",
+              "sourceSHA256": "cbe3237be53c0a819f8df6aac5358fdee848eee3b6571b4e2ca20767ebd7465e",
+              "byteOffset": 111060,
+              "byteLength": 16708
+            },
+            {
+              "source": "toolchains/llvm/prebuilt/darwin-x86_64/NOTICE",
+              "sourceSHA256": "f96f763beb66a7ba7a667647fc64c0226ace875e590c831fdd9579ec1c1d91e1",
+              "byteOffset": 15142,
+              "byteLength": 16708
+            }
+          ],
+          "status": "EXACT_PUBLIC_LICENSE_SUBSTRING"
+        },
+        {
+          "name": "libunwind",
+          "noticeSHA256": "b5efebcaca80879234098e52d1725e6d9eb8fb96a19fce625d39184b705f7b6d",
+          "matches": [],
+          "status": "PRIMARY_SOURCE_CANDIDATE_ONLY"
+        }
+      ]
+    }
   },
   "texts": [
     {
@@ -13175,6 +13267,17 @@
       "upstreams": [
         {
           "upstream": "https://raw.githubusercontent.com/Dimezis/BlurView/version-3.1.0/LICENSE.md"
+        }
+      ]
+    },
+    {
+      "sectionId": "android-software-b5efebcaca80879234098e52",
+      "sha256": "b5efebcaca80879234098e52d1725e6d9eb8fb96a19fce625d39184b705f7b6d",
+      "kind": "notice",
+      "upstreams": [
+        {
+          "upstream": "https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-18.1.8/libunwind/LICENSE.TXT",
+          "source": "libunwind/LICENSE.TXT"
         }
       ]
     },
