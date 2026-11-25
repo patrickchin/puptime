@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {mkdtempSync,mkdirSync,writeFileSync,rmSync,symlinkSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,writeFileSync,rmSync,symlinkSync,readFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
@@ -33,4 +33,33 @@ test('artifact outside Gradle cache and absolute notice source are rejected',t=>
 test('native source symlink escaping installed modules is rejected',t=>{
  const f=fixture(t);writeFileSync(join(f.root,'outside.gradle'),'private synthetic sentinel');symlinkSync(join(f.root,'outside.gradle'),join(f.pkg,'escape.gradle'));
  f.input.components[0].projectBuildFile=join(f.pkg,'escape.gradle');assert.throws(()=>publicDiscovery(f.root,f.cache,f.input,f.discovery));
+});
+
+function localMaven(t){
+ const f=fixture(t),publication={groupId:'example.group',artifactId:'module',version:'1.2.3',repository:'local-maven-repo'};
+ const source='local-maven-repo/example/group/module/1.2.3/module-1.2.3.aar',artifact=join(f.pkg,source);
+ mkdirSync(join(f.pkg,'local-maven-repo/example/group/module/1.2.3'),{recursive:true});writeFileSync(artifact,'synthetic public local AAR');
+ writeFileSync(join(f.pkg,'expo-module.config.json'),JSON.stringify({android:{publication}}));
+ const lock=JSON.parse(readFileSync(join(f.root,'package-lock.json')));lock.packages['node_modules/example'].resolved='https://registry.npmjs.org/example/-/example-1.2.3.tgz';const encoded=JSON.stringify(lock);writeFileSync(join(f.root,'package-lock.json'),encoded);f.discovery.lockSHA256=hash(encoded);
+ f.input.components=[{group:publication.groupId,name:publication.artifactId,version:publication.version,artifacts:[{file:artifact,sha256:hash('synthetic public local AAR')}]}];
+ return {...f,publication,artifact,source};
+}
+test('declared locked npm local-Maven AAR records relative owner/SRI/config/file provenance',t=>{
+ const f=localMaven(t),value=publicDiscovery(f.root,f.cache,f.input,f.discovery),row=value.mavenArtifacts[0];
+ assert.equal(row.npmSource.component,'npm:example@1.2.3');assert.equal(row.npmSource.sourcePath,f.source);assert.equal(row.npmSource.sourceSHA256,row.sha256);assert.equal(row.npmSource.publicationConfigSHA256,hash(readFileSync(join(f.pkg,'expo-module.config.json'))));assert.equal(row.npmSource.integrity,'sha512-c3ludGhldGlj');assert.equal(row.npmSource.upstream,'https://registry.npmjs.org/example/-/example-1.2.3.tgz');assert.ok(!JSON.stringify(value).includes(f.root));
+});
+test('arbitrary package archives and publication coordinate/version mismatches are rejected',t=>{
+ const f=localMaven(t),selected=f.input.components[0],original=selected.artifacts[0].file;
+ writeFileSync(join(f.pkg,'arbitrary.aar'),'synthetic public local AAR');selected.artifacts[0].file=join(f.pkg,'arbitrary.aar');assert.throws(()=>publicDiscovery(f.root,f.cache,f.input,f.discovery));
+ selected.artifacts[0].file=original;selected.group='other.group';assert.throws(()=>publicDiscovery(f.root,f.cache,f.input,f.discovery));
+ selected.group=f.publication.groupId;selected.version='9.9.9';assert.throws(()=>publicDiscovery(f.root,f.cache,f.input,f.discovery));
+});
+test('local-Maven artifact, config and package-manifest symlink escapes fail closed',t=>{
+ const f=localMaven(t),outside=join(f.root,'outside.fixture');writeFileSync(outside,'synthetic private sentinel');
+ rmSync(f.artifact);symlinkSync(outside,f.artifact);assert.throws(()=>publicDiscovery(f.root,f.cache,f.input,f.discovery));
+ rmSync(f.artifact);writeFileSync(f.artifact,'synthetic public local AAR');const config=join(f.pkg,'expo-module.config.json');rmSync(config);symlinkSync(outside,config);assert.throws(()=>publicDiscovery(f.root,f.cache,f.input,f.discovery));
+ rmSync(config);writeFileSync(config,JSON.stringify({android:{publication:f.publication}}));const manifest=join(f.pkg,'package.json');rmSync(manifest);symlinkSync(outside,manifest);assert.throws(()=>publicDiscovery(f.root,f.cache,f.input,f.discovery));
+});
+test('local-Maven source requires a credential-free public locked upstream',t=>{
+ const f=localMaven(t),lock=JSON.parse(readFileSync(join(f.root,'package-lock.json')));lock.packages['node_modules/example'].resolved='https://private:secret@registry.npmjs.org/example.tgz';const encoded=JSON.stringify(lock);writeFileSync(join(f.root,'package-lock.json'),encoded);f.discovery.lockSHA256=hash(encoded);assert.throws(()=>publicDiscovery(f.root,f.cache,f.input,f.discovery));
 });
