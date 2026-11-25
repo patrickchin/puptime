@@ -1,0 +1,13 @@
+appId: com.patrickchin.puptime
+---
+- runFlow: csv-select-file.yaml
+- extendedWaitUntil:
+    visible: ^Import complete$
+    timeout: 30000
+- assertVisible: ^${ADDED} entries added[.] ${SKIPPED} existing entries skipped; your current edits were kept[.]$
+- tapOn: ^OK$
+- extendedWaitUntil:
+    visible:
+      id: settings.import
+      enabled: true
+    timeout: 30000

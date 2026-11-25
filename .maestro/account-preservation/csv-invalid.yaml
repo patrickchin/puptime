@@ -1,0 +1,13 @@
+appId: com.patrickchin.puptime
+---
+- runFlow: csv-select-file.yaml
+- extendedWaitUntil:
+    visible: ^Couldn’t import activity$
+    timeout: 30000
+- assertVisible: ^This file is not a valid Puptime activity CSV[.] Choose a fresh export and try again[.] No entries were imported[.]$
+- tapOn: ^OK$
+- extendedWaitUntil:
+    visible:
+      id: settings.import
+      enabled: true
+    timeout: 30000

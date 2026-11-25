@@ -5,11 +5,12 @@ import {spawn,execFileSync} from 'node:child_process';
 import {createServer,request} from 'node:http';
 import {createServer as secureServer,request as secureRequest} from 'node:https';
 import {connect} from 'node:net';
-import {cpSync,existsSync,mkdtempSync,mkdirSync,readFileSync,readdirSync,rmSync,statSync,realpathSync,symlinkSync,writeFileSync} from 'node:fs';
+import {cpSync,existsSync,lstatSync,mkdtempSync,mkdirSync,readFileSync,readdirSync,rmSync,statSync,realpathSync,symlinkSync,writeFileSync} from 'node:fs';
 import {tmpdir,homedir} from 'node:os';
 import {dirname,isAbsolute,join,resolve} from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
 import {eventSqlColumns,eventDataFromSql} from '../src/record-sql.ts';
+import {csvToEvents,CsvImportError} from '../src/export.ts';
 import {cloudRecordId,localRecordId} from '../src/cloud/record-identity.ts';
 import {createLocalDatabase} from '../src/local/database.ts';
 import {sqliteTestConnection} from '../src/local/sqlite-test-adapter.ts';
@@ -25,8 +26,9 @@ import {standardFixtureEnvironment,runStandardSuite} from './native-standard-sui
 const [platform,initialDevice,host,consent,destination='build/guest-account-'+platform,onboarding]=process.argv.slice(2);
 let device=initialDevice;
 assert.ok(['ios','android'].includes(platform));
-assert.ok(onboarding===undefined||['--onboarding-sign-in','--account-deletion','--puppy-comparison','--offline-lifecycle','--account-isolation','--photo-lifecycle','--deletion-faults','--enrolled-runtime-upgrade','--standard-csv','--standard-all'].includes(onboarding));
-const standard=onboarding==='--standard-csv'||onboarding==='--standard-all';
+assert.ok(onboarding===undefined||['--onboarding-sign-in','--account-deletion','--puppy-comparison','--offline-lifecycle','--account-isolation','--photo-lifecycle','--deletion-faults','--enrolled-runtime-upgrade','--standard-csv','--standard-all','--csv-recovery'].includes(onboarding));
+const csvRecovering=onboarding==='--csv-recovery';
+const standard=onboarding==='--standard-csv'||onboarding==='--standard-all'||csvRecovering;
 const android=platform==='android',deleting=onboarding==='--account-deletion',onboardingSignIn=onboarding==='--onboarding-sign-in',comparing=onboarding==='--puppy-comparison',offline=onboarding==='--offline-lifecycle',isolating=onboarding==='--account-isolation',photographing=onboarding==='--photo-lifecycle',deletionFaults=onboarding==='--deletion-faults',upgrading=onboarding==='--enrolled-runtime-upgrade';
 assert.ok(!(comparing||offline||isolating||photographing||deletionFaults||upgrading)||!android,'Extended lifecycle cases use the dedicated iOS verification path.');
 assert.ok(!standard||!android,'The fixed standard selections are iOS only.');
@@ -62,6 +64,8 @@ const wireAccepted=[],wirePages=[],wirePushes=[],wireFailures=[],photoTransfers=
 let fault='online',photoFault='online',deleteFault='online',failedDeletes=0,acceptedDeletes=0,failedPhotoUploads=0,corruptPhotoDownloads=0,activeForwarded=0,wireParseErrors=0;
 let certificate,activeFlow='startup',flowSequence=0,runtimePhase='older',newerSdkCookie='';
 const identityRequests={sendCode:0,verifyCode:0,signOut:0};
+let csvDownload;
+const invalidCsv=Buffer.from('"Date,Time,Activity\nunterminated'),csvDownloadHits={valid:0,invalid:0};
 let runtimeInputs;const runtimeBundles=new Map(),runtimeProvenance=[];
 const authResponses=[];
 const authRoutes={'/api/auth/get-session':'session','/api/auth/email-otp/send-verification-otp':'send-code','/api/auth/sign-in/email-otp':'verify-code','/api/auth/sign-out':'sign-out','/api/account':'account'};
@@ -101,10 +105,14 @@ async function flow(name,env={}){
     markStartup('case-assertions');
     if(name==='prepare')setupWindow={startedAt,finishedAt:Date.now()};
     const screenshots=['native-delete-confirmation.png','native-delete-verify.png','native-deleted-account.png','recovered-account-history.png','my-account-returned-log.png','my-account-signed-in.png','my-account-guest.png','my-account-config-retry.png','same-name-summary.png','same-name-confirmation.png','mismatched-name-summary.png','mismatched-name-confirmation.png','offline-preserved-history.png','pending-signout-cancelled.png','native-photo-saved.png'];
-    for(const path of readdirSync(artifacts,{recursive:true}).filter(path=>screenshots.some(name=>String(path).endsWith(name))))
+    for(const path of readdirSync(artifacts,{recursive:true}).filter(path=>!csvRecovering&&screenshots.some(name=>String(path).endsWith(name))))
       cpSync(join(artifacts,path),join(output,String(path).split('/').at(-1)));
     console.log('PASS native account phase: '+name);
   }catch(error){
+    if(csvRecovering){
+      try{writeFileSync(join(output,'csv-failed-command.json'),JSON.stringify({phase:name,flowSequence,...readNativeCommandState(artifacts)})+'\n',{mode:0o600});}catch{/* Preserve the original flow failure. */}
+      throw error;
+    }
     writeFileSync(join(output,'fixture-native-reach.json'),JSON.stringify({phase:name,configReached:requests.has('/api/config'),sessionReached:[...requests].some(path=>path.startsWith('/api/auth/get-session')),accountReached:requests.has('/api/account')},null,2)+'\n');
     // Raw auth hierarchy/screens stay private and are deleted in finally.
     const hierarchy=existsSync(artifacts)?readdirSync(artifacts,{recursive:true}).map(String).filter(path=>path.includes('hierarchy')&&path.endsWith('.json')).sort().at(-1):undefined;
@@ -184,6 +192,51 @@ async function freshIosRestoreDevice(){
   await run('xcrun',['simctl','bootstatus',device,'-b']);
   simctl('keychain',device,'add-root-cert',join(privateDir,'root.crt'));
   simctl('install',device,iosFixtureHost);
+}
+async function verifyNativeCsvRecovery(){
+ assert.ok(csvRecovering&&!android);
+ const phase=(stage,status='started')=>{try{writeFileSync(join(output,'csv-phase.json'),JSON.stringify({stage,status})+'\n',{mode:0o600});}catch{/* Never replace the actual case failure. */}};
+ assert.throws(()=>csvToEvents(invalidCsv.toString('utf8')),CsvImportError,'The malformed fixture must actually fail the production parser.');
+ phase('seed');
+ await flow('prepare');await flow('add-logs',{BATCHES:'4',EXPECTED_COUNT:'12'});
+ const original=snapshot();assert.equal(original.events.length,12);assert.equal(original.owner.length,0);assert.equal(original.pending,0);
+ phase('export');
+ await flow('csv-open-settings');await flow('csv-export');
+ phase('export-bytes');
+ const cache=join(simctl('get_app_container',device,app,'data'),'Library/Caches');
+ const names=readdirSync(cache).filter(name=>/^puptime-activity-\d{4}-\d\d-\d\d\.csv$/.test(name));assert.equal(names.length,1);
+ const file=join(cache,names[0]);assert.ok(lstatSync(file).isFile()&&statSync(file).size>0&&statSync(file).size<=2097152);
+ csvDownload=readFileSync(file);assert.equal(csvDownload.length,statSync(file).size);
+ const events=rows=>rows.map(({id,...row})=>({id,...eventDataFromSql(row)})).sort((a,b)=>Buffer.compare(Buffer.from(a.id),Buffer.from(b.id)));
+ assert.deepEqual(csvToEvents(csvDownload.toString('utf8')).sort((a,b)=>Buffer.compare(Buffer.from(a.id),Buffer.from(b.id))),events(original.events));
+ phase('fresh-device');
+ await freshIosRestoreDevice();await flow('prepare');emptyRestorePreflight();
+ for(const kind of ['valid','invalid']){
+  phase('download-'+kind);
+  const name=kind==='valid'?'puptime-qa-recovery.csv':'puptime-qa-invalid.csv';
+  simctl('openurl',device,front+'/'+name);await flow('csv-download');
+  await until(()=>csvDownloadHits[kind]>=1,'The platform download must receive the actual controlled CSV bytes.');
+ }
+ phase('import');
+ await flow('csv-open-settings');await flow('csv-import',{CSV_NAME:'puptime-qa-recovery',ADDED:'12',SKIPPED:'0'});
+ assert.deepEqual(snapshot().events,original.events,'The real picker/import must restore every exported activity field and ID.');
+ const meal=original.events.filter(row=>row.type==='meal').sort((a,b)=>b.at-a.at||Buffer.compare(Buffer.from(b.id),Buffer.from(a.id)))[0];assert.ok(meal);
+ phase('edit');
+ const editedNote='CSV recovery edited locally';await flow('csv-edit');
+ await until(()=>snapshot().events.find(row=>row.id===meal.id)?.note===editedNote,'The native editor must save its imported entry.');
+ const edited=original.events.map(row=>row.id===meal.id?{...row,note:editedNote}:row);assert.deepEqual(snapshot().events,edited);
+ phase('repeat-import');
+ await flow('csv-open-settings');await flow('csv-import',{CSV_NAME:'puptime-qa-recovery',ADDED:'0',SKIPPED:'12'});
+ assert.deepEqual(snapshot().events,edited,'Repeat import must retain the edited value, original IDs and exact count.');
+ phase('invalid-import');
+ const beforeInvalid=snapshot();await flow('csv-invalid',{CSV_NAME:'puptime-qa-invalid'});
+ assert.deepEqual(snapshot().tables,beforeInvalid.tables,'Malformed CSV must change none of the fourteen database tables.');
+ phase('restart');
+ await flow('reopen-guest',{EXPECTED_COUNT:'12',OFFLINE:'false'});assert.deepEqual(snapshot().events,edited);assert.equal(snapshot().owner.length,0);assert.equal(snapshot().pending,0);
+ const result={schemaVersion:1,exportedEvents:12,restoredEvents:12,exportedBytes:csvDownload.length,exportedSHA256:createHash('sha256').update(csvDownload).digest('hex'),realExport:true,platformDownload:true,realDocumentPicker:true,freshTaskDevice:true,editedIdPreserved:true,editedNotePreserved:true,repeatAdded:0,malformedCsvRejected:true,invalidImportExact14Tables:true,restartPreserved:true,noRawCsvUploaded:true,releaseQualified:false};
+ writeFileSync(join(output,'csv-recovery.json'),JSON.stringify(result,null,2)+'\n');
+ phase('complete','passed');
+ return {flows:['csv-export','csv-download','csv-import','csv-edit','csv-repeat-import','csv-invalid','csv-restart']};
 }
 async function remote({inspectBehindFault=false,sessionCookie=cookie,allKinds=false}={}){
   const changes=[];let after=0;
@@ -531,6 +584,12 @@ try{
   markStartup('fixture-certificate-trust');
   certificate=readFileSync(rootPath);if(!android)simctl('keychain',device,'add-root-cert',rootPath);
   const forward=(req,res)=>{
+    if(csvRecovering&&['/puptime-qa-recovery.csv','/puptime-qa-invalid.csv'].includes(req.url)){
+      const valid=req.url==='/puptime-qa-recovery.csv',data=valid?csvDownload:invalidCsv;
+      if(!data||!['GET','HEAD'].includes(req.method)){req.resume();res.writeHead(404).end();return;}
+      res.writeHead(200,{'content-type':'text/csv','content-disposition':`attachment; filename="${valid?'puptime-qa-recovery.csv':'puptime-qa-invalid.csv'}"`,'content-length':data.length,'cache-control':'no-store'});
+      if(req.method==='GET'){csvDownloadHits[valid?'valid':'invalid']++;res.end(data);}else res.end();return;
+    }
     requests.add(req.url);
     const pathname=new URL(req.url,front).pathname,route=Object.hasOwn(authRoutes,pathname)?authRoutes[pathname]:undefined;
     let authResponse;
@@ -676,7 +735,7 @@ try{
   if(standard){
    markStandardStage('standard-maestro');
    markStartup('maestro-process');
-   const scenario=onboarding.slice(2),result=await runStandardSuite({scenario,device,privateDirectory:privateDir,output,execute:run,environment:{...childEnv,MAESTRO_DRIVER_STARTUP_TIMEOUT:process.env.MAESTRO_DRIVER_STARTUP_TIMEOUT??'300000'}});
+   const scenario=onboarding.slice(2),result=csvRecovering?await verifyNativeCsvRecovery():await runStandardSuite({scenario,device,privateDirectory:privateDir,output,execute:run,environment:{...childEnv,MAESTRO_DRIVER_STARTUP_TIMEOUT:process.env.MAESTRO_DRIVER_STARTUP_TIMEOUT??'300000'}});
    markStartup('case-assertions');
    assert.ok(requests.has('/api/config'),'The production App must reach the isolated fixture.');
    assert.deepEqual(identityRequests,{sendCode:0,verifyCode:0,signOut:0});assert.deepEqual(requestCounts,{enroll:0,push:0});assert.equal(cookie,'');

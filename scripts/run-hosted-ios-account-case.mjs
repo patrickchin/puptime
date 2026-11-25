@@ -15,8 +15,9 @@ const repository=process.env.GITHUB_REPOSITORY,runId=process.env.PUPTIME_NATIVE_
 assert.equal(repository,'patrickchin/puptime','Run only in the intended repository.');
 assert.match(runId??'',/^\d+$/);
 const scenario=process.env.PUPTIME_ACCOUNT_SCENARIO;
-assert.ok(['baseline','comparison','offline','isolation','photos','deletion','enrolled-upgrade','standard-csv','standard-all','onboarding-sign-in'].includes(scenario));
-const standard=scenario==='standard-csv'||scenario==='standard-all';
+assert.ok(['baseline','comparison','offline','isolation','photos','deletion','enrolled-upgrade','standard-csv','standard-all','onboarding-sign-in','csv-recovery'].includes(scenario));
+const csvRecovering=scenario==='csv-recovery';
+const standard=scenario==='standard-csv'||scenario==='standard-all'||csvRecovering;
 const output=resolve('build/isolated-native-account',scenario);if(standard)assert.ok(!existsSync(output),'Use a fresh standard-case output.');mkdirSync(output,{recursive:true});
 const privateDirectory=mkdtempSync(join(tmpdir(),'puptime-native-host-'));
 const command=(binary,args,options={})=>execFileSync(binary,args,{encoding:'utf8',timeout:120000,stdio:['ignore','pipe','pipe'],...options}).trim();
@@ -95,10 +96,10 @@ try{
  }
  markStartup('host-install');
  command('xcrun',['simctl','install',device,initialHost]);
- const mode=standard?[standardSelection(scenario).mode]:{baseline:[],comparison:['--puppy-comparison'],offline:['--offline-lifecycle'],isolation:['--account-isolation'],photos:['--photo-lifecycle'],deletion:['--deletion-faults'],'enrolled-upgrade':['--enrolled-runtime-upgrade'],'onboarding-sign-in':['--onboarding-sign-in']}[scenario];
+ const mode=csvRecovering?['--csv-recovery']:standard?[standardSelection(scenario).mode]:{baseline:[],comparison:['--puppy-comparison'],offline:['--offline-lifecycle'],isolation:['--account-isolation'],photos:['--photo-lifecycle'],deletion:['--deletion-faults'],'enrolled-upgrade':['--enrolled-runtime-upgrade'],'onboarding-sign-in':['--onboarding-sign-in']}[scenario];
  const args=['scripts/verify-ios-guest-account.mjs',device,initialHost,'--replace-synthetic',output,...mode];
  markStartup('sdk-spawn');
- await new Promise((resolveCase,reject)=>{const child=spawn(process.execPath,args,{stdio:'inherit',detached:true,env:{...process.env,CI:'1'}});stopCaseChild=ownProcess(child,{graceMs:120000});child.once('spawn',()=>markStartup('sdk-process'));child.once('error',reject);child.once('close',async (code,signal)=>{const stopped=await stopCaseChild();code===0&&stopped?resolveCase():reject(Object.assign(new Error(`Native ${scenario} case failed (${code}).`),{status:code,signal}));});});
+ await new Promise((resolveCase,reject)=>{const child=spawn(process.execPath,args,{stdio:csvRecovering?['ignore','pipe','pipe']:'inherit',detached:true,env:{...process.env,CI:'1'}});if(csvRecovering){child.stdout.resume();child.stderr.resume();}stopCaseChild=ownProcess(child,{graceMs:120000});child.once('spawn',()=>markStartup('sdk-process'));child.once('error',reject);child.once('close',async (code,signal)=>{const stopped=await stopCaseChild();code===0&&stopped?resolveCase():reject(Object.assign(new Error(`Native ${scenario} case failed (${code}).`),{status:code,signal}));});});
  markStartup('case-result');
  assert.equal(JSON.parse(readFileSync(join(output,'verification.json'),'utf8')).status,'passed');assert.equal(task.signal,null);completed=true;markStartup('case-result','passed');
 }finally{await task.run();task.dispose();}

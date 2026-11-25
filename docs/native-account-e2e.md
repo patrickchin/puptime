@@ -66,6 +66,7 @@ Historical final shared iOS account reopens used [reopen.yaml](../.maestro/accou
 | `photos` | Real UIKit selection/crop and decoded JPEG, upload failures, exact transmitted bytes, corrupt-download rejection and byte-exact recovery on a fresh device. |
 | `deletion` | Pending-delete cancellation, pre-commit failure and explicit retry, accepted deletion with a lost response, continued local logging and the unresolved safety barrier across restart. |
 | `upgrade` | The separately pinned original-archive guest runtime replacement described below. |
+| `csv-recovery` | Prepared, not yet run: twelve native UI logs are exported through the real sharing flow, downloaded by Safari onto a fresh task device, selected through the real Files picker and imported into App storage. A native edit must survive repeat import; malformed CSV must leave all fourteen tables unchanged; an explicit-stop restart must preserve the recovered IDs and values. Only finite counts/digests are retained. |
 
 `all` selects the six account cases, excluding `upgrade`.
 

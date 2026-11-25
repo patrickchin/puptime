@@ -1,0 +1,35 @@
+appId: com.patrickchin.puptime
+---
+- tapOn:
+    id: settings.back
+- tapOn:
+    id: nav.open
+- tapOn:
+    id: nav.log
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: screen.today
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: event.meal.edit
+    direction: DOWN
+- tapOn:
+    id: event.meal.edit
+    index: 0
+- scrollUntilVisible:
+    element:
+      id: editor.note.input
+    direction: DOWN
+- tapOn:
+    id: editor.note.input
+- eraseText
+- setClipboard: CSV recovery edited locally
+- pasteText
+- scrollUntilVisible:
+    element:
+      id: editor.close
+    direction: UP
+- tapOn:
+    id: editor.close
