@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "driverSource": null,
+  "reviewSHA256": null,
+  "candidate": {
+    "source": null,
+    "run": null,
+    "attempt": null,
+    "artifact": null,
+    "artifactBytes": null,
+    "artifactDigest": null,
+    "sha256": null,
+    "bytes": null,
+    "certificateSHA256": null,
+    "manifestSHA256": null,
+    "custodySHA256": null,
+    "version": null,
+    "versionCode": null,
+    "minSdk": null,
+    "targetSdk": null
+  }
+}
