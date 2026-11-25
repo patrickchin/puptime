@@ -1,5 +1,21 @@
 # Puptime product operating plan
 
+## Current direction — November 26, 2026
+
+**iOS first: TestFlight, then the App Store.** The owner's priority supersedes the Android-first execution sequence preserved below. Keep local logging free and existing cloud access enabled. Preserve the reviewed Android work, but defer Android account setup, signing, builds and Play entry; Android-only gates and test periods do not set the iOS release schedule.
+
+The next three priorities are:
+
+1. **Qualify the integrated iOS runtime.** Include the completed navigation merge, identify and fix actual source-CI failures, then run loaded-engine, native account/offline/retry/cancellation, CSV recovery and populated guest/enrolled upgrade checks with artificial records. Preserve exact history, settings, pending payloads, backups and cold restart; keep local-service fixtures separate from production-provider evidence.
+2. **Qualify the exact iOS distribution build.** Inspect signing, App Group/keychain continuity, production endpoints, fixture/audio exclusion and applicable iOS notices/privacy manifests, then verify the specific TestFlight installation. Simulator build number `3` is a synthetic test tuple, not a selected production build number. Reconcile actual App Store Connect/EAS history and the applicable existing iOS installation baseline before choosing or signing the distribution candidate.
+3. **Prepare Apple store entry and the handoff.** Verify membership, App Store Connect access, agreements, enabled service/provider access, privacy/deletion, reviewer instructions and suitable approved media. Prepare concrete owner-only identity/legal/publication actions for approval. No upload, TestFlight availability or App Store acceptance is established by a successful simulator build.
+
+**Install verdict: Hold for iOS.** No new TestFlight build is qualified. Preserve the working installation and cloud history. The fresh source-built iOS 1.12.5/build 1 upgrade input is synthetic shared-storage evidence, not proof of an App Store upgrade or a published iOS baseline. Its archived input must remain unexpired and pass whole-byte, signature and source checks before use. The canonical route is one accepted iOS candidate, a bounded native acceptance batch, an inspected signed archive, TestFlight feedback and App Store review; store-controlled dates remain conditional.
+
+The November 25 Android source, signing/notices tooling and historic runtime receipts below retain their stated scope. Android native-origin/archive/UI and console obligations remain incomplete; preserving that work does not make it an iOS prerequisite. Shared iOS correctness, applicable iOS rights/privacy and enabled service access still require their own evidence. Reuse the approved PR #157 media only after checking candidate accuracy; prepare iOS website/listing changes when an actual approved access route exists.
+
+## Preserved operating plan and evidence — November 25
+
 Source checkpoint: November 25, 2026, preparation based on main `142a8da`. Runtime evidence retains its stated date and scope. The current execution target is a small free Android beta, starting with Play internal testing if the actual developer account permits it. Local logging stays free without an account, and existing cloud access remains enabled. Paid cloud remains a later phase; development access is not production billing.
 
 This plan supersedes the historical paid-app and single-pet roadmaps in [RELEASE_PLAN.md](../RELEASE_PLAN.md). Existing technical contracts and data-preservation requirements still apply.
