@@ -10,19 +10,19 @@ name: Account preservation verify
       id: account.code.input
     direction: DOWN
 - waitForAnimationToEnd
-- extendedWaitUntil:
-    visible:
-      id: account.code.input
-      enabled: true
-    timeout: 30000
-- tapOn:
-    id: account.code.input
-    retryTapIfNoChange: true
-- waitForAnimationToEnd
-- inputText: ${MAESTRO_TEST_CODE}
-- assertVisible:
-    id: account.code.input
-    text: ^[0-9]{6}$
+- retry:
+    maxRetries: 1
+    commands:
+      - tapOn:
+          id: account.code.input
+          enabled: true
+          retryTapIfNoChange: true
+      - waitForAnimationToEnd
+      - eraseText: 6
+      - inputText: ${MAESTRO_TEST_CODE}
+      - assertVisible:
+          id: account.code.input
+          text: ${MAESTRO_TEST_CODE}
 - tapOn: Sign-in code
 - scrollUntilVisible:
     element:
@@ -31,6 +31,7 @@ name: Account preservation verify
 - waitForAnimationToEnd
 - tapOn:
     id: account.verify
+    enabled: true
     retryTapIfNoChange: true
 - extendedWaitUntil:
     notVisible:
