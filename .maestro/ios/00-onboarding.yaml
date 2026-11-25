@@ -30,6 +30,8 @@ tags:
     element:
       id: settings.guide.open
     direction: DOWN
+    timeout: 60000
+    speed: 65
     centerElement: false
 - waitForAnimationToEnd
 - tapOn:
