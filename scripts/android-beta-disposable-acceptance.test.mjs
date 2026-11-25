@@ -4,8 +4,9 @@ import {readFileSync,writeFileSync,mkdtempSync,rmSync,chmodSync,symlinkSync,real
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
-import {spawnSync} from 'node:child_process';
-import {assertBoundPins,runDisposableAcceptance,validateReceipt,makeLinuxIO,recoverDisposableCleanup,PHASES,ENGINE,OLD125} from './android-beta-disposable-acceptance.mjs';
+import {spawn,spawnSync} from 'node:child_process';
+import {ownProcess} from './native-task-cleanup.mjs';
+import {assertBoundPins,runDisposableAcceptance,validateReceipt,makeLinuxIO,recoverDisposableCleanup,processGroupAbsent,PHASES,ENGINE,OLD125} from './android-beta-disposable-acceptance.mjs';
 import {reviewedOracleSource,installFailureProjection,preservationEquality,coldPreservationEquality,readSqliteEngineReceipt} from './android-beta-disposable-oracles.mjs';
 
 const digest=value=>createHash('sha256').update(value).digest('hex');
@@ -77,4 +78,21 @@ test('actual task signal handler writes CANCELLED after one cleanup, with later 
  const module=new URL('./android-beta-disposable-acceptance.mjs',import.meta.url).href;
  const script=`import {runDisposableAcceptance} from ${JSON.stringify(module)};const pins=${JSON.stringify(pins())};let cleaned=0;setInterval(()=>{},1000);const io={bind:async()=>{},artifacts:async()=>{},lease:()=>new Promise(()=>{}),cleanup:async()=>{cleaned++;return Object.fromEntries(['commandsStopped','emulatorStopped','adbStopped','avdDeleted','privateFilesDeleted','portsFree'].map(k=>[k,true]));},writeReceipt:async receipt=>console.log(JSON.stringify({receipt,cleaned}))};setTimeout(()=>process.kill(process.pid,'SIGTERM'),30);await runDisposableAcceptance(pins,()=>io);`;
  const result=spawnSync(process.execPath,['--disable-warning=MODULE_TYPELESS_PACKAGE_JSON','--input-type=module','-e',script],{encoding:'utf8',timeout:5000,maxBuffer:16384,stdio:['ignore','pipe','pipe']});assert.equal(result.status,143);assert.equal(result.stderr,'');const value=JSON.parse(result.stdout);assert.equal(value.cleaned,1);assert.equal(value.receipt.status,'CANCELLED');assert.equal(value.receipt.failure.phase,'lease');assert.equal(value.receipt.failure.class,'cancelled');assert.deepEqual(value.receipt.phases.map(row=>row.phase),['binding','artifact-identity','lease','cleanup']);validateReceipt(value.receipt);
+});
+
+test('actual adapter retains the private lease when an absent emulator leader leaves a live group',async t=>{
+ const source=readFileSync(new URL('./android-beta-disposable-acceptance.mjs',import.meta.url),'utf8'),start=source.indexOf('  async cleanup(){'),end=source.indexOf('  writeReceipt(',start);assert.ok(start>0&&end>start);const body=source.slice(start,end);
+ const tree="const{spawn}=require('node:child_process');const child=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});child.unref();console.log(child.pid);";
+ const child=spawn(process.execPath,['-e',tree],{detached:true,stdio:['ignore','pipe','ignore']}),stop=ownProcess(child,{graceMs:1000});t.after(()=>stop());const closed=new Promise(resolve=>child.once('close',resolve));
+ const descendant=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('Generated group did not start')),5000);child.stdout.once('data',value=>{clearTimeout(timer);resolve(Number(String(value).trim()));});});await closed;assert.equal(child.exitCode,0);assert.doesNotThrow(()=>process.kill(descendant,0));assert.equal(processGroupAbsent(child.pid),false);
+ async function actualCleanup(groupProbe){let deletions=0;const cleanup=Object.fromEntries(['commandsStopped','emulatorStopped','adbStopped','avdDeleted','privateFilesDeleted','portsFree'].map(name=>[name,false])),bindings={assert,ownedStops:[],cleanup,child:{pid:child.pid},stopEmulator:()=>true,hostIO:()=>({}),hostState:{},processGroupAbsent:groupProbe,inspectADB:()=>null,adbStart:undefined,ownedProcess:()=>false,adbServer:undefined,adbStop:undefined,lstatSync:()=>({dev:1,ino:2}),root:'/generated/private-lease',rootStat:{dev:1,ino:2},rmSync(){deletions++;},existsSync:()=>false,avdHome:'/generated/private-lease/avd',portsFree:async()=>{}};
+  const run=Function(...Object.keys(bindings),'return ({'+body+'}).cleanup;')(...Object.values(bindings)),result=await run();return{result,deletions};}
+ const alive=await actualCleanup(processGroupAbsent);assert.equal(alive.result.emulatorStopped,false);assert.equal(alive.result.privateFilesDeleted,false);assert.equal(alive.result.avdDeleted,false);assert.equal(alive.result.portsFree,true);assert.equal(alive.deletions,0);
+ const unknown=await actualCleanup(pid=>processGroupAbsent(pid,()=>{throw Object.assign(Error('PRIVATE'),{code:'EPERM'});}));assert.equal(unknown.result.emulatorStopped,false);assert.equal(unknown.deletions,0);
+ assert.equal(await stop(),true);assert.equal(processGroupAbsent(child.pid),true);const gone=await actualCleanup(processGroupAbsent);assert.equal(gone.result.emulatorStopped,true);assert.equal(gone.result.privateFilesDeleted,true);assert.equal(gone.deletions,1);
+});
+
+test('CLI distinguishes unbound pins from a bound adapter-construction failure without raw errors',t=>{
+ const root=mkdtempSync(join(tmpdir(),'puptime-beta-admission-generated-'));chmodSync(root,0o700);t.after(()=>rmSync(root,{recursive:true,force:true}));const path=join(root,'pins.json'),script=new URL('./android-beta-disposable-acceptance.mjs',import.meta.url),environment={...process.env,GITHUB_ACTIONS:'false'};
+ for(const bound of [false,true]){writeFileSync(path,JSON.stringify(bound?pins():JSON.parse(readFileSync(new URL('./android-beta-disposable-pins.json',import.meta.url)))),{mode:0o600});const result=spawnSync(process.execPath,['--disable-warning=MODULE_TYPELESS_PACKAGE_JSON',script.pathname,'--run',path],{encoding:'utf8',env:environment,timeout:5000,maxBuffer:4096,stdio:['ignore','pipe','pipe']});assert.equal(result.status,2);assert.equal(result.stderr,'');assert.deepEqual(JSON.parse(result.stdout),{schema:1,status:bound?'FAIL':'UNBOUND',category:bound?'adapter-construction-failed':'reviewed-source-and-artifact-binding-required'});}
 });

@@ -31,6 +31,9 @@ export function assertBoundPins(pins){
 }
 
 const cleanupKeys=['commandsStopped','emulatorStopped','adbStopped','avdDeleted','privateFilesDeleted','portsFree'];
+export function processGroupAbsent(pid,probe=(group,signal)=>process.kill(group,signal)){
+ positive(pid);try{probe(-pid,0);return false;}catch(error){return diagnosticFields(error,['code'])?.code==='ESRCH';}
+}
 async function assertTaskPortsFree(){for(const port of [5037,5588,5589])for(const host of ['127.0.0.1','::1'])assert.ok(await new Promise(done=>{const server=createServer();server.once('error',()=>done(false));server.listen({port,host,exclusive:true},()=>server.close(()=>done(true)));}));}
 export function validateReceipt(value){
  exactKeys(value,['schema','scope','status','source','admissionSHA256','reviewSHA256','custodySHA256','candidateSHA256','candidateCertificateSHA256','producer','phases','rejection','freshProduct','qaCopy','engine','failure','cleanup']);
@@ -228,7 +231,7 @@ print(json.dumps(result))
   },
   async cleanup(){
    let stopped=true;for(const stop of ownedStops)try{stopped=(await stop())&&stopped;}catch{stopped=false;}cleanup.commandsStopped=stopped;
-   try{cleanup.emulatorStopped=child?stopEmulator(hostIO(),hostState):true;}catch{cleanup.emulatorStopped=false;}
+   try{const stopped=child?stopEmulator(hostIO(),hostState):true;cleanup.emulatorStopped=stopped&&(!child?.pid||processGroupAbsent(child.pid));}catch{cleanup.emulatorStopped=false;}
    try{const value=inspectADB();if(value)assert.equal(value.start,adbStart);if(value?.alive)assert.ok(ownedProcess(value,adbStart));if(!value&&adbServer?.pid){try{process.kill(-adbServer.pid,0);throw Error('Absent leader with a live group is not cleanup proof.');}catch(error){if(error.code!=='ESRCH')throw error;}}cleanup.adbStopped=adbStop?await adbStop():true;}catch{cleanup.adbStopped=false;}
    cleanup.avdDeleted=false;cleanup.privateFilesDeleted=false;
    if(cleanup.commandsStopped&&cleanup.emulatorStopped&&cleanup.adbStopped){const current=lstatSync(root);assert.equal(current.dev,rootStat.dev);assert.equal(current.ino,rootStat.ino);rmSync(root,{recursive:true});cleanup.avdDeleted=!existsSync(avdHome);cleanup.privateFilesDeleted=!existsSync(root);}
@@ -252,9 +255,11 @@ export async function recoverDisposableCleanup(pins){
 }
 
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+ let admission='unbound';
  try{
   assert.equal(process.argv.length,4);assert.ok(['--run','--cleanup'].includes(process.argv[2]));
   const path=resolve(process.argv[3]),info=lstatSync(path);assert.ok(info.isFile()&&!info.isSymbolicLink()&&(info.mode&0o777)===0o600&&info.size<=16384);
-  const pins=JSON.parse(readFileSync(path,'utf8')),result=process.argv[2]==='--cleanup'?await recoverDisposableCleanup(pins):await runDisposableAcceptance(pins);console.log(JSON.stringify(result));if(!['PASS','CLEAN'].includes(result.status))process.exitCode=1;
- }catch{console.log('{"schema":1,"status":"UNBOUND","category":"reviewed-source-and-artifact-binding-required"}');process.exitCode=2;}
+  const pins=assertBoundPins(JSON.parse(readFileSync(path,'utf8')));admission=process.argv[2]==='--cleanup'?'cleanup-recovery':'adapter-construction';
+  const result=process.argv[2]==='--cleanup'?await recoverDisposableCleanup(pins):await runDisposableAcceptance(pins,async value=>{const io=await makeLinuxIO(value);admission='receipt-finalization';return io;});console.log(JSON.stringify(result));if(!['PASS','CLEAN'].includes(result.status))process.exitCode=1;
+ }catch{console.log(JSON.stringify({schema:1,status:admission==='unbound'?'UNBOUND':'FAIL',category:admission==='unbound'?'reviewed-source-and-artifact-binding-required':admission+'-failed'}));process.exitCode=2;}
 }
