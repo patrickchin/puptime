@@ -91,6 +91,16 @@ The optional archive path replaces only acquisition; metadata, digest, signature
 
 ## Original guest runtime replacement
 
+The prepared `upgrade_stage=beta` route uses a fresh iOS build from the shipped
+1.12.5 source tree and an ordinary 1.13.0/build 3 target. The old build has an
+explicit 1.12.5/build 1 test configuration; it is not a published iOS artifact.
+Its producer receipt binds that distinction, the old source/dependency graph,
+and the actual JavaScript/native bytes. Archive and target pins remain unbound
+until successful, unexpired inputs are reviewed, so execution currently refuses
+before any artifact access or simulator creation. Source self-checks are not an
+executed upgrade. This guest route does not qualify the separately required
+enrolled-account upgrade, Android signing or store delivery.
+
 `verify-ios-runtime-upgrade.mjs` pins two actual original archived apps, including the older PR build's compiled checkout tree. Inspection and execution have separate receipts:
 
 ```sh
