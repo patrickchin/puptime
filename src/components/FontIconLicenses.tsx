@@ -5,6 +5,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {Pressable} from './TelemetryPressable';
 import {SettingsRow} from './SettingsRow';
 import notices from '../font-icon-notices.json';
+import androidSoftwareNotices from '../android-software-notices.json';
 import {useLocalization} from '../localization-context';
 import {headingStyle,spacing,type Theme} from '../theme';
 
@@ -24,7 +25,7 @@ export function FontIconLicenses({theme}:{theme:Theme}) {
      </Pressable>
     </View>
     <ScrollView testID="fontLicenses.body" contentContainerStyle={styles.content}>
-     {notices.filter(section=>!section.androidOnly||Platform.OS==='android').map(section=><View key={section.id} style={styles.section}>
+     {[...notices,...(Platform.OS==='android'?androidSoftwareNotices:[])].filter(section=>!section.androidOnly||Platform.OS==='android').map(section=><View key={section.id} style={styles.section}>
       <Text testID={`fontLicenses.${section.id}`} accessibilityRole="header" style={[styles.sectionTitle,{color:theme.text}]}>{section.title}</Text>
       <Text selectable style={[styles.body,{color:theme.text}]}>{section.body}</Text>
      </View>)}

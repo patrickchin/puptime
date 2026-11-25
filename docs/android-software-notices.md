@@ -1,0 +1,7 @@
+# Android software notices
+
+The existing Settings → Open source licenses view reads `src/android-software-notices.json` on Android, after the separately reviewed font/icon notices. The Android prebuild plugin copies the identical JSON bytes into `assets/puptime/android-software-notices.json` in an APK and `base/assets/puptime/android-software-notices.json` in an AAB. Text is selectable and available offline.
+
+Current status: **INCOMPLETE**. The initial payload contains the 68 actual Android-selected components whose complete public license copies have been validated. Their MIT, ISC and BSD copyright notices, permission terms, redistribution conditions and disclaimers are retained verbatim. `scripts/android-software-notice-provenance.json` records exact source URLs, versions and text hashes; the source test checks the embedded text against those copies and the package lock. This subset does not establish the full component inventory or satisfy the release gate.
+
+Before the final build, reconcile the full actual Metro/Gradle inventory, bundled Maven LICENSE/NOTICE resources, native vendors and the actual compiler-runtime origin. Complete the stable payload and provenance, then verify its uncompressed bytes in both exact APK/AAB archives. Preserve already bundled required upstream notices. The final archive receipt must bind the actual resolved component inputs as well as the JSON bytes; a successful font-only scan is insufficient. The notices-screen runtime check and fresh screenshot wait for the matching integrated candidate host.

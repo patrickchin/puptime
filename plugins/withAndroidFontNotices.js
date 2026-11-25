@@ -5,7 +5,9 @@ const {join} = require('node:path');
 function copyNotices(projectRoot, androidRoot) {
   const directory = join(androidRoot, 'app/src/main/assets/puptime');
   mkdirSync(directory, {recursive:true});
-  copyFileSync(join(projectRoot, 'src/font-icon-notices.json'), join(directory, 'font-icon-notices.json'));
+  for (const name of ['font-icon-notices.json', 'android-software-notices.json']) {
+    copyFileSync(join(projectRoot, 'src', name), join(directory, name));
+  }
 }
 
 module.exports = config => withDangerousMod(config, ['android', async mod => {

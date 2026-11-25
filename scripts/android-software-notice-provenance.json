@@ -1,0 +1,1356 @@
+{
+  "schema": 1,
+  "status": "INCOMPLETE",
+  "scope": "Actual Android selected public license-text subset only. Full resolved component inventory, Maven artifacts, native vendors and compiler-runtime coverage remain pending.",
+  "payloadSHA256": "4b0b5c75744fd6b0f0704554ee1e707093ee773ec7e70ebc39b0708c47ab6516",
+  "components": [
+    {
+      "component": "npm:@babel/runtime@7.29.7",
+      "name": "@babel/runtime",
+      "version": "7.29.7",
+      "ecosystem": "npm",
+      "sectionId": "android-software-edf04d45834b4fbffb46cd90",
+      "sectionSHA256": "117da2af0d4ce0fe1c8e19b5cff9dcd806adf973d328d27b11d4448c4ff24f76",
+      "notices": [
+        {
+          "source": "node_modules/@babel/runtime/LICENSE",
+          "sha256": "117da2af0d4ce0fe1c8e19b5cff9dcd806adf973d328d27b11d4448c4ff24f76",
+          "upstream": "https://registry.npmjs.org/@babel/runtime/-/runtime-7.29.7.tgz"
+        }
+      ],
+      "packagePath": "node_modules/@babel/runtime",
+      "packageJSONSHA256": "8c4bf20c55e3f3a93df034b12746bf72185cf2acb0ef52847a3465d6e67c61e7",
+      "integrity": "sha512-Nq8OhGWiZIZGV6hLHoyAKLLcJihP/xFeBMGJoUrxTX2psI8dCifzLhZISFb+VWS3wFMRDmCGw5R+dOySCqPLhw=="
+    },
+    {
+      "component": "npm:@better-auth/core@1.7.12",
+      "name": "@better-auth/core",
+      "version": "1.7.12",
+      "ecosystem": "npm",
+      "sectionId": "android-software-118d31ef758f8da3964bd6c2",
+      "sectionSHA256": "7a07f7d9085cb3157e4377d944988c9712933141b0f7201955ceccfac92abde4",
+      "notices": [
+        {
+          "source": "node_modules/@better-auth/core/LICENSE.md",
+          "sha256": "7a07f7d9085cb3157e4377d944988c9712933141b0f7201955ceccfac92abde4",
+          "upstream": "https://registry.npmjs.org/@better-auth/core/-/core-1.7.12.tgz"
+        }
+      ],
+      "packagePath": "node_modules/@better-auth/core",
+      "packageJSONSHA256": "4f921bf41a3fdd686d966128e981ae3f0ef5892b65cddeb6ff77008e62504434",
+      "integrity": "sha512-SUStBGHJ13KnSO6+7U/1DSlfuOtln4jtOrFZqzQtxZVHZIrAoMjwHNGitlF+s7hvKbuC3Z14xjnqfLLqIqGfxw=="
+    },
+    {
+      "component": "npm:@better-auth/expo@1.7.12",
+      "name": "@better-auth/expo",
+      "version": "1.7.12",
+      "ecosystem": "npm",
+      "sectionId": "android-software-9aa04853170e2f6e4a04a129",
+      "sectionSHA256": "7a07f7d9085cb3157e4377d944988c9712933141b0f7201955ceccfac92abde4",
+      "notices": [
+        {
+          "source": "node_modules/@better-auth/expo/LICENSE.md",
+          "sha256": "7a07f7d9085cb3157e4377d944988c9712933141b0f7201955ceccfac92abde4",
+          "upstream": "https://registry.npmjs.org/@better-auth/expo/-/expo-1.7.12.tgz"
+        }
+      ],
+      "packagePath": "node_modules/@better-auth/expo",
+      "packageJSONSHA256": "81d129df1ff949abe3be8ed7828a3575d1538d442c19a1e1a5b7919dfc55714e",
+      "integrity": "sha512-2QIEoQ0wc2y3rGhc6tj8nvpx3MtPEregdfTcGQUKq0OqVdMmVxZwWORegLcEAb/j+ASoyE5VIboD9xn82p8NGQ=="
+    },
+    {
+      "component": "npm:@better-fetch/fetch@1.3.2",
+      "name": "@better-fetch/fetch",
+      "version": "1.3.2",
+      "ecosystem": "npm",
+      "sectionId": "android-software-5042fe65c96ef962b6ab6f59",
+      "sectionSHA256": "54d710e643b5fd218f0c29cddea92432b2c730dddd594c7047c97993dd9f9a59",
+      "notices": [
+        {
+          "source": "node_modules/@better-fetch/fetch/LICENSE",
+          "sha256": "54d710e643b5fd218f0c29cddea92432b2c730dddd594c7047c97993dd9f9a59",
+          "upstream": "https://registry.npmjs.org/@better-fetch/fetch/-/fetch-1.3.2.tgz"
+        }
+      ],
+      "packagePath": "node_modules/@better-fetch/fetch",
+      "packageJSONSHA256": "3222e3596da20941d19f2e767da1cd8094c554e8be24c4a8f51bb0c68b531cda",
+      "integrity": "sha512-Gs7n99b5tqUC6cQAPbV0uED3IraHB6xQbHLQ/C3l7ZFafHScOx9pQ+DYmP5blbLFShVWLqxNUlI9wi4xU/X+ow=="
+    },
+    {
+      "component": "npm:@expo/devtools@57.0.1",
+      "name": "@expo/devtools",
+      "version": "57.0.1",
+      "ecosystem": "npm",
+      "sectionId": "android-software-13b0840247977fd4d11ceb70",
+      "sectionSHA256": "16feb932ce2ba7bc7712657bb28afe409eaa4334f9f05d0e1b7a5f12bf6132f4",
+      "notices": [
+        {
+          "source": "node_modules/@expo/devtools/LICENSE",
+          "sha256": "16feb932ce2ba7bc7712657bb28afe409eaa4334f9f05d0e1b7a5f12bf6132f4",
+          "upstream": "https://registry.npmjs.org/@expo/devtools/-/devtools-57.0.1.tgz"
+        }
+      ],
+      "packagePath": "node_modules/@expo/devtools",
+      "packageJSONSHA256": "d6452f00876907a81ca2b193b560fca64579cc25426eebbf367606f33cadbff9",
+      "integrity": "sha512-GyUf+wFNkbttaX0jR7MZa9bm77U0IrLg6d2AjpxdyoXw/w4abHoXG0oFufwLMgP9zLTd5+Ct4X/ffNUTnlzZgg=="
+    },
+    {
+      "component": "npm:@expo/ui@57.0.25",
+      "name": "@expo/ui",
+      "version": "57.0.25",
+      "ecosystem": "npm",
+      "sectionId": "android-software-85e0256b4aafb9dd2ec34c52",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+      "notices": [
+        {
+          "source": "assets/notices/sources/expo-MIT.txt",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+          "upstream": "https://raw.githubusercontent.com/expo/expo/396da4641605bb19c1e6b3efff1cafaab8890a29/LICENSE",
+          "ownAttribution": {
+            "kind": "pinned-upstream-own-attribution",
+            "ownerNpmID": "npm:@expo/ui@57.0.25",
+            "packagePath": "node_modules/@expo/ui",
+            "packageJSONSource": "node_modules/@expo/ui/package.json",
+            "packageJSONSHA256": "ae8213d04de4e91cc31eae158fa665d0a54af316594d2bc65a8450efd8b18bf9",
+            "tarball": "https://registry.npmjs.org/@expo/ui/-/ui-57.0.25.tgz",
+            "integrity": "sha512-/BbxsKh/LSIFDnWAHRHfJdCcnqHY7WNcWXjld0soKnYXDUbImjvsFK7y5dqq2XZTbOMyf44BpgAWKUR/B8huCA==",
+            "publisher": {
+              "gitHead": "396da4641605bb19c1e6b3efff1cafaab8890a29",
+              "metadataURL": "https://registry.npmjs.org/%40expo%2Fui/57.0.25",
+              "metadataSHA256": "983242821b956a65cb3644a36f71a88f042aa7a509107ac066f52e7b9b2421c5"
+            },
+            "selectedSources": [
+              {
+                "source": "node_modules/@expo/ui/ios/ExpoUI.podspec",
+                "sha256": "40ccef94d3947a4b8c181459637f205c556f36ef028fa1cd6629b387f89aca6d"
+              }
+            ]
+          }
+        }
+      ],
+      "packagePath": "node_modules/@expo/ui",
+      "packageJSONSHA256": "ae8213d04de4e91cc31eae158fa665d0a54af316594d2bc65a8450efd8b18bf9",
+      "integrity": "sha512-/BbxsKh/LSIFDnWAHRHfJdCcnqHY7WNcWXjld0soKnYXDUbImjvsFK7y5dqq2XZTbOMyf44BpgAWKUR/B8huCA=="
+    },
+    {
+      "component": "npm:@react-native-async-storage/async-storage@2.2.0",
+      "name": "@react-native-async-storage/async-storage",
+      "version": "2.2.0",
+      "ecosystem": "npm",
+      "sectionId": "android-software-31383c48f0753bab5994b99c",
+      "sectionSHA256": "212dbf14b113759356207347826f21ac3c81151943fdb89ce25da5dc6214831c",
+      "notices": [
+        {
+          "source": "node_modules/@react-native-async-storage/async-storage/LICENSE",
+          "sha256": "212dbf14b113759356207347826f21ac3c81151943fdb89ce25da5dc6214831c",
+          "upstream": "https://registry.npmjs.org/@react-native-async-storage/async-storage/-/async-storage-2.2.0.tgz"
+        }
+      ],
+      "packagePath": "node_modules/@react-native-async-storage/async-storage",
+      "packageJSONSHA256": "6346a7c16602136ed46fc0aadd02c388ab160540dc32c1c5ad877d7152750d30",
+      "integrity": "sha512-gvRvjR5JAaUZF8tv2Kcq/Gbt3JHwbKFYfmb445rhOj6NUMx3qPLixmDx5pZAyb9at1bYvJ4/eTUipU5aki45xw=="
+    },
+    {
+      "component": "npm:@react-native-google-signin/google-signin@16.1.5",
+      "name": "@react-native-google-signin/google-signin",
+      "version": "16.1.5",
+      "ecosystem": "npm",
+      "sectionId": "android-software-8c044d04f1473f3f4b93a03d",
+      "sectionSHA256": "3680a16525f40f4115c71d7f229ed134afb6946e31ae2af83aa35ce0bc58d539",
+      "notices": [
+        {
+          "source": "node_modules/@react-native-google-signin/google-signin/LICENSE",
+          "sha256": "3680a16525f40f4115c71d7f229ed134afb6946e31ae2af83aa35ce0bc58d539",
+          "upstream": "https://registry.npmjs.org/@react-native-google-signin/google-signin/-/google-signin-16.1.5.tgz"
+        }
+      ],
+      "packagePath": "node_modules/@react-native-google-signin/google-signin",
+      "packageJSONSHA256": "8007e4f26f1b1a34a1621f713d8d4bb4a7170f2d976299e14721b74068989727",
+      "integrity": "sha512-9rmMwACzHK9Cbd0Yp7efg5uWgiYoLwmNAJh4gRCuMcSQH+qplpK7E4d1Q4tbsD8M9jvvVtRX2Z0AP9wwBKmPrQ=="
+    },
+    {
+      "component": "npm:@react-native/assets-registry@0.86.3",
+      "name": "@react-native/assets-registry",
+      "version": "0.86.3",
+      "ecosystem": "npm",
+      "sectionId": "android-software-7679de1ca6bac3dc02ca7542",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+      "notices": [
+        {
+          "source": "assets/notices/sources/react-native-MIT.txt",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+          "upstream": "https://raw.githubusercontent.com/react/react-native/4829a675c80e64f7c170b0f30d24b3808b7663d3/LICENSE",
+          "ownAttribution": {
+            "kind": "pinned-upstream-own-attribution",
+            "ownerNpmID": "npm:@react-native/assets-registry@0.86.3",
+            "packagePath": "node_modules/@react-native/assets-registry",
+            "packageJSONSource": "node_modules/@react-native/assets-registry/package.json",
+            "packageJSONSHA256": "89393bee843633fe8043019288736a8067382922c8e8bd3880ab23662ee72971",
+            "tarball": "https://registry.npmjs.org/@react-native/assets-registry/-/assets-registry-0.86.3.tgz",
+            "integrity": "sha512-TDhgCZA4wjJg84d5A9swiOQYPIWSKEEVdg9IwMFZDupQzW/F3QoLUrfAJOcalgqTDA9/buTB8awhE3Whwg6u9Q==",
+            "publisher": {
+              "gitHead": "4829a675c80e64f7c170b0f30d24b3808b7663d3",
+              "metadataURL": "https://registry.npmjs.org/%40react-native%2Fassets-registry/0.86.3",
+              "metadataSHA256": "e23123fa9493f8114e30e1ebad2f39eccebf401ce7d8f6dc396a0aa3fc46ee1d"
+            },
+            "selectedSources": [
+              {
+                "source": "node_modules/@react-native/assets-registry/registry.js",
+                "sha256": "4edff3064f1d79e8a0dd866b9163e13fbb48bec4d3a832ad7673b076d799bd7c"
+              }
+            ]
+          }
+        }
+      ],
+      "packagePath": "node_modules/@react-native/assets-registry",
+      "packageJSONSHA256": "89393bee843633fe8043019288736a8067382922c8e8bd3880ab23662ee72971",
+      "integrity": "sha512-TDhgCZA4wjJg84d5A9swiOQYPIWSKEEVdg9IwMFZDupQzW/F3QoLUrfAJOcalgqTDA9/buTB8awhE3Whwg6u9Q=="
+    },
+    {
+      "component": "npm:@react-native/js-polyfills@0.86.3",
+      "name": "@react-native/js-polyfills",
+      "version": "0.86.3",
+      "ecosystem": "npm",
+      "sectionId": "android-software-fc0492cb2625a29ff8604276",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+      "notices": [
+        {
+          "source": "assets/notices/sources/react-native-MIT.txt",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+          "upstream": "https://raw.githubusercontent.com/react/react-native/4829a675c80e64f7c170b0f30d24b3808b7663d3/LICENSE",
+          "ownAttribution": {
+            "kind": "pinned-upstream-own-attribution",
+            "ownerNpmID": "npm:@react-native/js-polyfills@0.86.3",
+            "packagePath": "node_modules/@react-native/js-polyfills",
+            "packageJSONSource": "node_modules/@react-native/js-polyfills/package.json",
+            "packageJSONSHA256": "86ff9ce670176a1f603e2b119f36893a7d824455f02ad639030ea05f8c6aaf33",
+            "tarball": "https://registry.npmjs.org/@react-native/js-polyfills/-/js-polyfills-0.86.3.tgz",
+            "integrity": "sha512-eYIJ0es967+tePBFQDnl/gidVFxLns3fnbiK6rxscQrGodvuUO6hwxpQnfNynJ8MjbbndImXihXjcnJdc7SzJg==",
+            "publisher": {
+              "gitHead": "4829a675c80e64f7c170b0f30d24b3808b7663d3",
+              "metadataURL": "https://registry.npmjs.org/%40react-native%2Fjs-polyfills/0.86.3",
+              "metadataSHA256": "05cd0c253463e680b4ce3d6e8f6726690be460a1da59ef30370a0dafbea7614d"
+            },
+            "selectedSources": [
+              {
+                "source": "node_modules/@react-native/js-polyfills/index.js",
+                "sha256": "da03cd1a85b6e7018fabba50ed243292947e041a56b44bfe56cc07e1e6fd7944"
+              }
+            ]
+          }
+        }
+      ],
+      "packagePath": "node_modules/@react-native/js-polyfills",
+      "packageJSONSHA256": "86ff9ce670176a1f603e2b119f36893a7d824455f02ad639030ea05f8c6aaf33",
+      "integrity": "sha512-eYIJ0es967+tePBFQDnl/gidVFxLns3fnbiK6rxscQrGodvuUO6hwxpQnfNynJ8MjbbndImXihXjcnJdc7SzJg=="
+    },
+    {
+      "component": "npm:@react-native/normalize-colors@0.86.3",
+      "name": "@react-native/normalize-colors",
+      "version": "0.86.3",
+      "ecosystem": "npm",
+      "sectionId": "android-software-48ec3746ca63e32d2098d963",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+      "notices": [
+        {
+          "source": "assets/notices/sources/react-native-MIT.txt",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+          "upstream": "https://raw.githubusercontent.com/react/react-native/4829a675c80e64f7c170b0f30d24b3808b7663d3/LICENSE",
+          "ownAttribution": {
+            "kind": "pinned-upstream-own-attribution",
+            "ownerNpmID": "npm:@react-native/normalize-colors@0.86.3",
+            "packagePath": "node_modules/@react-native/normalize-colors",
+            "packageJSONSource": "node_modules/@react-native/normalize-colors/package.json",
+            "packageJSONSHA256": "37b0b78d9f920a0adab84199667e388a06605acfbdc45c0a8f7562504b2bade1",
+            "tarball": "https://registry.npmjs.org/@react-native/normalize-colors/-/normalize-colors-0.86.3.tgz",
+            "integrity": "sha512-Cv3CDkprb67GrzuaS9BGbBJC/6G4lIw3nyKOHRKTqTTum4bn37y5+R0Z04L8mcbQN85eEohNrRwb7IOM4j6uvg==",
+            "publisher": {
+              "gitHead": "4829a675c80e64f7c170b0f30d24b3808b7663d3",
+              "metadataURL": "https://registry.npmjs.org/%40react-native%2Fnormalize-colors/0.86.3",
+              "metadataSHA256": "d1ebc04b795d05c61c928d5017e415079e1f251dd798f7c68f1c52c2d69533d8"
+            },
+            "selectedSources": [
+              {
+                "source": "node_modules/@react-native/normalize-colors/index.js",
+                "sha256": "2eef8bd869a6c11f2945ed9398aaeaaba6c9373b15e80a05ea43301a47d3847a"
+              }
+            ]
+          }
+        }
+      ],
+      "packagePath": "node_modules/@react-native/normalize-colors",
+      "packageJSONSHA256": "37b0b78d9f920a0adab84199667e388a06605acfbdc45c0a8f7562504b2bade1",
+      "integrity": "sha512-Cv3CDkprb67GrzuaS9BGbBJC/6G4lIw3nyKOHRKTqTTum4bn37y5+R0Z04L8mcbQN85eEohNrRwb7IOM4j6uvg=="
+    },
+    {
+      "component": "npm:@react-native/virtualized-lists@0.86.3",
+      "name": "@react-native/virtualized-lists",
+      "version": "0.86.3",
+      "ecosystem": "npm",
+      "sectionId": "android-software-48adfa4b57db12d0817517d0",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+      "notices": [
+        {
+          "source": "assets/notices/sources/react-native-MIT.txt",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+          "upstream": "https://raw.githubusercontent.com/react/react-native/4829a675c80e64f7c170b0f30d24b3808b7663d3/LICENSE",
+          "ownAttribution": {
+            "kind": "pinned-upstream-own-attribution",
+            "ownerNpmID": "npm:@react-native/virtualized-lists@0.86.3",
+            "packagePath": "node_modules/@react-native/virtualized-lists",
+            "packageJSONSource": "node_modules/@react-native/virtualized-lists/package.json",
+            "packageJSONSHA256": "454a1a9ded25f68ae9962db2929d8a5c08050a2346983c5354901bbfa22b4852",
+            "tarball": "https://registry.npmjs.org/@react-native/virtualized-lists/-/virtualized-lists-0.86.3.tgz",
+            "integrity": "sha512-1j44NEyNn05Ut40vHAmoSWbsIcybFkMAOBTwQt1PrESyfSS+qBoyU1LGIogNva0VIa0rQyEC5PzbA7R4/7Nhyw==",
+            "publisher": {
+              "gitHead": "4829a675c80e64f7c170b0f30d24b3808b7663d3",
+              "metadataURL": "https://registry.npmjs.org/%40react-native%2Fvirtualized-lists/0.86.3",
+              "metadataSHA256": "08c644e80b6fd0ef9cc8b962e564bf57a4ffcc3096bdd62628ad508eb719e60d"
+            },
+            "selectedSources": [
+              {
+                "source": "node_modules/@react-native/virtualized-lists/index.js",
+                "sha256": "8504b9c94898d7a8de8b20971a26232cc8287dee1a290954b2e302a881d7e69b"
+              }
+            ]
+          }
+        }
+      ],
+      "packagePath": "node_modules/@react-native/virtualized-lists",
+      "packageJSONSHA256": "454a1a9ded25f68ae9962db2929d8a5c08050a2346983c5354901bbfa22b4852",
+      "integrity": "sha512-1j44NEyNn05Ut40vHAmoSWbsIcybFkMAOBTwQt1PrESyfSS+qBoyU1LGIogNva0VIa0rQyEC5PzbA7R4/7Nhyw=="
+    },
+    {
+      "component": "npm:@ungap/structured-clone@1.4.0",
+      "name": "@ungap/structured-clone",
+      "version": "1.4.0",
+      "ecosystem": "npm",
+      "sectionId": "android-software-df8c865575ff117b2100c340",
+      "sectionSHA256": "dc6d4961d8b6ee747231582ae9c53ce1d66bf76bc9f5a28f554c0e97210953bf",
+      "notices": [
+        {
+          "source": "node_modules/@ungap/structured-clone/LICENSE",
+          "sha256": "dc6d4961d8b6ee747231582ae9c53ce1d66bf76bc9f5a28f554c0e97210953bf",
+          "upstream": "https://registry.npmjs.org/@ungap/structured-clone/-/structured-clone-1.4.0.tgz"
+        }
+      ],
+      "packagePath": "node_modules/@ungap/structured-clone",
+      "packageJSONSHA256": "8f931c21e4c0b37c35d5ffef35e0bc057f3cbd0224b026b21a5bdb82a98cbd8f",
+      "integrity": "sha512-1mEZtMKPM09vDmQt5y7YvmN2+DFTP7Tg0EWXdic8/C6VRnpb33e4ghisCIE3WZjsE2N8mf+QV1Zqh7ZFYLWInQ=="
+    },
+    {
+      "component": "npm:abort-controller@3.0.0",
+      "name": "abort-controller",
+      "version": "3.0.0",
+      "ecosystem": "npm",
+      "sectionId": "android-software-6dd4322b5d1352b7c384b310",
+      "sectionSHA256": "dbbf03317f0101fed5643cd87ca80fb769e358fa4f428445bf2315deeb23a154",
+      "notices": [
+        {
+          "source": "node_modules/abort-controller/LICENSE",
+          "sha256": "dbbf03317f0101fed5643cd87ca80fb769e358fa4f428445bf2315deeb23a154",
+          "upstream": "https://registry.npmjs.org/abort-controller/-/abort-controller-3.0.0.tgz"
+        }
+      ],
+      "packagePath": "node_modules/abort-controller",
+      "packageJSONSHA256": "3d64dcdcf9d0a1d045eb6bcaa5013d486f15527a3668e64b1155839a797da164",
+      "integrity": "sha512-h8lQ8tacZYnR3vNQTgibj+tODHI5/+l06Au2Pcriv/Gmet0eaj4TwWH41sO9wnHDiQsEj19q0drzdWdeAHtweg=="
+    },
+    {
+      "component": "npm:await-lock@2.2.2",
+      "name": "await-lock",
+      "version": "2.2.2",
+      "ecosystem": "npm",
+      "sectionId": "android-software-9be73f032c32fe958e1d36ea",
+      "sectionSHA256": "396eefd21683c5f4de3640e7627638d07be75126f896d3ee0cf924cbff64e0a2",
+      "notices": [
+        {
+          "source": "node_modules/await-lock/LICENSE",
+          "sha256": "396eefd21683c5f4de3640e7627638d07be75126f896d3ee0cf924cbff64e0a2",
+          "upstream": "https://registry.npmjs.org/await-lock/-/await-lock-2.2.2.tgz"
+        }
+      ],
+      "packagePath": "node_modules/await-lock",
+      "packageJSONSHA256": "646f3516dc035f0aef095b321eee009cefff46529813e4923e39e5579098205e",
+      "integrity": "sha512-aDczADvlvTGajTDjcjpJMqRkOF6Qdz3YbPZm/PyW6tKPkx2hlYBzxMhEywM/tU72HrVZjgl5VCdRuMlA7pZ8Gw=="
+    },
+    {
+      "component": "npm:base64-js@1.5.1",
+      "name": "base64-js",
+      "version": "1.5.1",
+      "ecosystem": "npm",
+      "sectionId": "android-software-c00344f5a0f0ad92febdbaa0",
+      "sectionSHA256": "5b37224c080cdcc97c871ada971c224e9926370fe74f11b539aa1cf9f3b1aca1",
+      "notices": [
+        {
+          "source": "node_modules/base64-js/LICENSE",
+          "sha256": "5b37224c080cdcc97c871ada971c224e9926370fe74f11b539aa1cf9f3b1aca1",
+          "upstream": "https://registry.npmjs.org/base64-js/-/base64-js-1.5.1.tgz"
+        }
+      ],
+      "packagePath": "node_modules/base64-js",
+      "packageJSONSHA256": "9758f3ab8c45e07bb9a368e32f9a8b3729623bbf47cbbb205b32d674ab2a91f0",
+      "integrity": "sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA=="
+    },
+    {
+      "component": "npm:better-auth@1.7.12",
+      "name": "better-auth",
+      "version": "1.7.12",
+      "ecosystem": "npm",
+      "sectionId": "android-software-1042a288410edee5dcdef8ef",
+      "sectionSHA256": "7a07f7d9085cb3157e4377d944988c9712933141b0f7201955ceccfac92abde4",
+      "notices": [
+        {
+          "source": "node_modules/better-auth/LICENSE.md",
+          "sha256": "7a07f7d9085cb3157e4377d944988c9712933141b0f7201955ceccfac92abde4",
+          "upstream": "https://registry.npmjs.org/better-auth/-/better-auth-1.7.12.tgz"
+        }
+      ],
+      "packagePath": "node_modules/better-auth",
+      "packageJSONSHA256": "5c0ca18ac97a49734d537e811a48b9ca4c4ce31d6072bf018e84ad3bb52f1330",
+      "integrity": "sha512-f1fEG0QdTslzbmFA+vOGFFW/XXCWkG4kBxLeH9n1vp1otTH9+ZzV6EJ6797GStWeiYYgS5Vnt9xqE12KwSyAAw=="
+    },
+    {
+      "component": "npm:better-call@1.4.4",
+      "name": "better-call",
+      "version": "1.4.4",
+      "ecosystem": "npm",
+      "sectionId": "android-software-21f3947f712726dc09887dfc",
+      "sectionSHA256": "ad800a5024c64adeb3eafa2b2b01893027a68631ff367a993020d1ec36e11266",
+      "notices": [
+        {
+          "source": "node_modules/better-call/LICENSE",
+          "sha256": "ad800a5024c64adeb3eafa2b2b01893027a68631ff367a993020d1ec36e11266",
+          "upstream": "https://registry.npmjs.org/better-call/-/better-call-1.4.4.tgz"
+        }
+      ],
+      "packagePath": "node_modules/better-call",
+      "packageJSONSHA256": "c044f4dcdb0597d3e6bed0c8fff3f1d8a3bcd9308e0cb006acab6c92b42c1b59",
+      "integrity": "sha512-Gq4XdGFy4dmUxFEAX2nj0ycFcFbD9ZWh8YROouZoyXeF1M11TpYbplk0pDByTFF8Wz+MYa6W9052c9m7dD+mfw=="
+    },
+    {
+      "component": "npm:defu@6.1.7",
+      "name": "defu",
+      "version": "6.1.7",
+      "ecosystem": "npm",
+      "sectionId": "android-software-d7af40ff8edd522e502a9da8",
+      "sectionSHA256": "46231df5a7733c3f52f11b71f3df61813007745b62b09031acfb45fb42d75082",
+      "notices": [
+        {
+          "source": "node_modules/defu/LICENSE",
+          "sha256": "46231df5a7733c3f52f11b71f3df61813007745b62b09031acfb45fb42d75082",
+          "upstream": "https://registry.npmjs.org/defu/-/defu-6.1.7.tgz"
+        }
+      ],
+      "packagePath": "node_modules/defu",
+      "packageJSONSHA256": "a2cf72e05920ca73e75922ddc8696cdc58c7d5dd6f3e013b5a494f4011bfbeb7",
+      "integrity": "sha512-7z22QmUWiQ/2d0KkdYmANbRUVABpZ9SNYyH5vx6PZ+nE5bcC0l7uFvEfHlyld/HcGBFTL536ClDt3DEcSlEJAQ=="
+    },
+    {
+      "component": "npm:event-target-shim@5.0.1",
+      "name": "event-target-shim",
+      "version": "5.0.1",
+      "ecosystem": "npm",
+      "sectionId": "android-software-f540dffaa30823ba8d778325",
+      "sectionSHA256": "97d87142793695cd73243de7258694abe85b3b6060fca7f247b0a2afa8219678",
+      "notices": [
+        {
+          "source": "node_modules/event-target-shim/LICENSE",
+          "sha256": "97d87142793695cd73243de7258694abe85b3b6060fca7f247b0a2afa8219678",
+          "upstream": "https://registry.npmjs.org/event-target-shim/-/event-target-shim-5.0.1.tgz"
+        }
+      ],
+      "packagePath": "node_modules/event-target-shim",
+      "packageJSONSHA256": "980bdd7706c72d04a4df2e3ee2c8ffccf3bc72bd8e7cd13ca38be00cafc6e8db",
+      "integrity": "sha512-i/2XbnSz/uxRCU6+NdVJgKWDTM427+MqYbkQzD321DuCQJUqOuJKIA0IM2+W2xtYHdKOmZ4dR6fExsd4SXL+WQ=="
+    },
+    {
+      "component": "npm:expo-apple-authentication@57.0.2",
+      "name": "expo-apple-authentication",
+      "version": "57.0.2",
+      "ecosystem": "npm",
+      "sectionId": "android-software-4a1fa05044dc28e671a1b970",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+      "notices": [
+        {
+          "source": "node_modules/expo-apple-authentication/LICENSE",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+          "upstream": "https://registry.npmjs.org/expo-apple-authentication/-/expo-apple-authentication-57.0.2.tgz"
+        }
+      ],
+      "packagePath": "node_modules/expo-apple-authentication",
+      "packageJSONSHA256": "b5fa503ebfa4512d1e325431a1d7e008339cb75b97db35e9bf2f7e41a1fd9a06",
+      "integrity": "sha512-00KnlyRceRKski+ljZz8q8JhJZ4D3ZScU+Y0RqS6ElJ8GaCWfd7Qh5tMr47yIU/dKDrOnkzkFUM+6vyHS5HI7Q=="
+    },
+    {
+      "component": "npm:expo-application@57.0.3",
+      "name": "expo-application",
+      "version": "57.0.3",
+      "ecosystem": "npm",
+      "sectionId": "android-software-70f120475314169164c7dd48",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+      "notices": [
+        {
+          "source": "node_modules/expo-application/LICENSE",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+          "upstream": "https://registry.npmjs.org/expo-application/-/expo-application-57.0.3.tgz"
+        }
+      ],
+      "packagePath": "node_modules/expo-application",
+      "packageJSONSHA256": "42a9ae6cde4c85860bd10ec69cea4aa1e74e67c7ea41b6605cc59de580ca51ba",
+      "integrity": "sha512-t/CxeLio0NjY9/cOak1tQp62/hAUjzJxmhR4rVUR7K5bb9YoEtfl1ZekTn+Iuh+dYOMYzF0l72ODMSmY3CR1NA=="
+    },
+    {
+      "component": "npm:expo-asset@57.0.18",
+      "name": "expo-asset",
+      "version": "57.0.18",
+      "ecosystem": "npm",
+      "sectionId": "android-software-fb3337e01a0ae1ee6e383559",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+      "notices": [
+        {
+          "source": "node_modules/expo-asset/LICENSE",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+          "upstream": "https://registry.npmjs.org/expo-asset/-/expo-asset-57.0.18.tgz"
+        }
+      ],
+      "packagePath": "node_modules/expo-asset",
+      "packageJSONSHA256": "39a3accfa83784f2c13b8bb69c28ab8d6feb1f0296c72f073c73f9bdc31b70aa",
+      "integrity": "sha512-zDIQkUr0NM2S7YRj98Zohf/OBuM1q0o4ctxLz1C1oe4/33lHNLjp+2v3qUtBWVwn0zKka8UGADmS8M+83Wi6pw=="
+    },
+    {
+      "component": "npm:expo-audio@57.0.5",
+      "name": "expo-audio",
+      "version": "57.0.5",
+      "ecosystem": "npm",
+      "sectionId": "android-software-1a4cd1cf9b0f5e075e80cb5d",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+      "notices": [
+        {
+          "source": "node_modules/expo-audio/LICENSE",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+          "upstream": "https://registry.npmjs.org/expo-audio/-/expo-audio-57.0.5.tgz"
+        }
+      ],
+      "packagePath": "node_modules/expo-audio",
+      "packageJSONSHA256": "414f4117da273107eb8617f99caa7e78769a490ff4ffc22412e86a8246fbd98c",
+      "integrity": "sha512-39fX5JC5zDvELB4/eDJPj2XAYRN0W9+K2DfDWm5N3aC5WZ7HRrhupWtT6hbH09NlfYpsRSqYOwEZnocFM42ynQ=="
+    },
+    {
+      "component": "npm:expo-blur@57.0.3",
+      "name": "expo-blur",
+      "version": "57.0.3",
+      "ecosystem": "npm",
+      "sectionId": "android-software-afed9132571cd8265a39770e",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+      "notices": [
+        {
+          "source": "node_modules/expo-blur/LICENSE",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+          "upstream": "https://registry.npmjs.org/expo-blur/-/expo-blur-57.0.3.tgz"
+        }
+      ],
+      "packagePath": "node_modules/expo-blur",
+      "packageJSONSHA256": "e4887ca7c2d5e0e4a5aca2dac31ef4a2b0fc0959b7264b8ff4ffd30960f81704",
+      "integrity": "sha512-uyBeJwxIuXzWXXNrnRub5pcF8VzQsiOz0VBTWDpMG2UztmaFyfAz6pI/GCwRtWpHhiOpLoJj79WLdg1GMB+9cg=="
+    },
+    {
+      "component": "npm:expo-constants@57.0.22",
+      "name": "expo-constants",
+      "version": "57.0.22",
+      "ecosystem": "npm",
+      "sectionId": "android-software-6f603a779fb1f71e0ef787bd",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+      "notices": [
+        {
+          "source": "node_modules/expo-constants/LICENSE",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+          "upstream": "https://registry.npmjs.org/expo-constants/-/expo-constants-57.0.22.tgz"
+        }
+      ],
+      "packagePath": "node_modules/expo-constants",
+      "packageJSONSHA256": "0a862025ddfd7f3ab72439208e4561c8a0c362bb0cca4d277968a56c53a8b22e",
+      "integrity": "sha512-+mBjnzMWMKIrQa7BP7LTDRC0W7cI+q12/sZns4HzVQJGzgGoAdRJSTEKiObxIw/3EswKXlESkRob8upiL95Q4A=="
+    },
+    {
+      "component": "npm:expo-crypto@57.0.4",
+      "name": "expo-crypto",
+      "version": "57.0.4",
+      "ecosystem": "npm",
+      "sectionId": "android-software-1fa9657eaa76c2e11ce702ea",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+      "notices": [
+        {
+          "source": "node_modules/expo-crypto/LICENSE",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+          "upstream": "https://registry.npmjs.org/expo-crypto/-/expo-crypto-57.0.4.tgz"
+        }
+      ],
+      "packagePath": "node_modules/expo-crypto",
+      "packageJSONSHA256": "c85d574f13742a3e47d84b7551108461814cfcec0ac82257cd852c205cc502c5",
+      "integrity": "sha512-LqMMs/N6wvwZyw4deVmcl3AgXgqMwCVQ9WyWf2eaWyrk99TXSKk5da3QspiLOOjnn5Qv9f8C50cDNuoyLThpdw=="
+    },
+    {
+      "component": "npm:expo-document-picker@57.0.3",
+      "name": "expo-document-picker",
+      "version": "57.0.3",
+      "ecosystem": "npm",
+      "sectionId": "android-software-f50cbd3161a482a329a79b6e",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+      "notices": [
+        {
+          "source": "node_modules/expo-document-picker/LICENSE",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+          "upstream": "https://registry.npmjs.org/expo-document-picker/-/expo-document-picker-57.0.3.tgz"
+        }
+      ],
+      "packagePath": "node_modules/expo-document-picker",
+      "packageJSONSHA256": "dfaeb89f6fa29ffc80b8a5694867f2a4ba3b0a9f0a0fcff95e101b9115b97ce7",
+      "integrity": "sha512-XlxdZ0zzv44JRD8O15DISgIO8FTaZ581oc4kQp6MJoR7vdahjcY+2qCuDt5k1J8/lc0YR+bXon/v81norciuxw=="
+    },
+    {
+      "component": "npm:expo-file-system@57.0.7",
+      "name": "expo-file-system",
+      "version": "57.0.7",
+      "ecosystem": "npm",
+      "sectionId": "android-software-153d64b34e15820d58acfb9d",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+      "notices": [
+        {
+          "source": "node_modules/expo-file-system/LICENSE",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+          "upstream": "https://registry.npmjs.org/expo-file-system/-/expo-file-system-57.0.7.tgz"
+        }
+      ],
+      "packagePath": "node_modules/expo-file-system",
+      "packageJSONSHA256": "db1d8ced7ce04e7daf4e55c3fd543bfbe42e32aa5e192bbb8ae4bda98de50069",
+      "integrity": "sha512-1vkZRadOsIputFDBcclqBa1pO3iXOO6iIsdqJipQWw4V5TSnWgmRTuOF7ro8IzrVue+PHbum++KCG3Tawem4cg=="
+    },
+    {
+      "component": "npm:expo-font@57.0.4",
+      "name": "expo-font",
+      "version": "57.0.4",
+      "ecosystem": "npm",
+      "sectionId": "android-software-ed32bff73604a72e09a5be6f",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+      "notices": [
+        {
+          "source": "node_modules/expo-font/LICENSE",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+          "upstream": "https://registry.npmjs.org/expo-font/-/expo-font-57.0.4.tgz"
+        }
+      ],
+      "packagePath": "node_modules/expo-font",
+      "packageJSONSHA256": "ad2dd07d792d6a6f3fd0f374e459356c2fbcc749645175743ab32bb4be56c5f7",
+      "integrity": "sha512-7WOMC2oA6xCfOm8bbofqWn2bIqyWFm7YLEnpc/gA1MJH0Ll0TfT/3+CqRkoW2eNRWMS8sxrz5WukUmSvmNquHA=="
+    },
+    {
+      "component": "npm:expo-haptics@57.0.3",
+      "name": "expo-haptics",
+      "version": "57.0.3",
+      "ecosystem": "npm",
+      "sectionId": "android-software-7f9b0d298e64757effdb6cd3",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+      "notices": [
+        {
+          "source": "node_modules/expo-haptics/LICENSE",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+          "upstream": "https://registry.npmjs.org/expo-haptics/-/expo-haptics-57.0.3.tgz"
+        }
+      ],
+      "packagePath": "node_modules/expo-haptics",
+      "packageJSONSHA256": "25df027b20e1889c5d7e8f4d261dead35d45cecf3c8a22e9da2df4aa2f7f336c",
+      "integrity": "sha512-qucUXtwtJdtECKSQK5D6TQBc/0SxKj7s5wQ4mrfSxhZsHrS9a4rcxINl/gbruMaY9spTXStco32ST4pV0vXmxw=="
+    },
+    {
+      "component": "npm:expo-image-manipulator@57.0.21",
+      "name": "expo-image-manipulator",
+      "version": "57.0.21",
+      "ecosystem": "npm",
+      "sectionId": "android-software-5a0af5f3d27dbd2f407a9a7d",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+      "notices": [
+        {
+          "source": "node_modules/expo-image-manipulator/LICENSE",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+          "upstream": "https://registry.npmjs.org/expo-image-manipulator/-/expo-image-manipulator-57.0.21.tgz"
+        }
+      ],
+      "packagePath": "node_modules/expo-image-manipulator",
+      "packageJSONSHA256": "8f0baca252fe2fdd5fa38c3b49b8f822bd179c07b11efa66fb8945d91db0033b",
+      "integrity": "sha512-NZeNvZxBNf/PK97Df5zORmtqRR/LovkA+lHdRLm1IJFiVKjs4xr+Ib6/jWhDxn04VOX3TJswCQyu4SCxkgMe4Q=="
+    },
+    {
+      "component": "npm:expo-image-picker@57.0.20",
+      "name": "expo-image-picker",
+      "version": "57.0.20",
+      "ecosystem": "npm",
+      "sectionId": "android-software-f5764cd5b40a89bdf39d4d6a",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+      "notices": [
+        {
+          "source": "node_modules/expo-image-picker/LICENSE",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+          "upstream": "https://registry.npmjs.org/expo-image-picker/-/expo-image-picker-57.0.20.tgz"
+        }
+      ],
+      "packagePath": "node_modules/expo-image-picker",
+      "packageJSONSHA256": "f0d275ca56b5ca770f8ebc8cebfd1e7bf2a2dfada9ce881a2c1f1fa51367004c",
+      "integrity": "sha512-plgcGuMZMWqDchjXQW6S/WepYLB5KqfbZOzwC6xe0+j5IhY4ipvVuRZcXeP/0NgKgU0Jiu/XoTK4Bi8crtZ+sQ=="
+    },
+    {
+      "component": "npm:expo-linking@57.0.13",
+      "name": "expo-linking",
+      "version": "57.0.13",
+      "ecosystem": "npm",
+      "sectionId": "android-software-0081fbbdae059d3b9a4e110c",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+      "notices": [
+        {
+          "source": "node_modules/expo-linking/LICENSE",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+          "upstream": "https://registry.npmjs.org/expo-linking/-/expo-linking-57.0.13.tgz"
+        }
+      ],
+      "packagePath": "node_modules/expo-linking",
+      "packageJSONSHA256": "4c701ffeba5cb9a1677944013c7a79782050fae28b32ce8adc18f1c9318ff216",
+      "integrity": "sha512-1cjN7Ely0FZqlZItfPYjl6jjrCFLRevrIE/H5XhA6tgDm9uhTaSyJQXyftgt2FvJZ7liheDft7WMnPB9Uktx+A=="
+    },
+    {
+      "component": "npm:expo-modules-core@57.0.18",
+      "name": "expo-modules-core",
+      "version": "57.0.18",
+      "ecosystem": "npm",
+      "sectionId": "android-software-3e3fa24f2480a1014e3521ae",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+      "notices": [
+        {
+          "source": "node_modules/expo-modules-core/LICENSE",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+          "upstream": "https://registry.npmjs.org/expo-modules-core/-/expo-modules-core-57.0.18.tgz"
+        }
+      ],
+      "packagePath": "node_modules/expo-modules-core",
+      "packageJSONSHA256": "e2041e04ed5a09e29d9d69eb28b4f216c88c65a8b222760076e7eadb50e8c73b",
+      "integrity": "sha512-ovB7C+GVQTlKAOIsOIHJVVXN9Mn0ljf2SYBS+afrRaGqq+HZEn1D3o+HReIVeH1NjCn/xDBb7I4HjldHs6luZA=="
+    },
+    {
+      "component": "npm:expo-network@57.0.2",
+      "name": "expo-network",
+      "version": "57.0.2",
+      "ecosystem": "npm",
+      "sectionId": "android-software-55cb91ec24245bc9b8d83b55",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+      "notices": [
+        {
+          "source": "node_modules/expo-network/LICENSE",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+          "upstream": "https://registry.npmjs.org/expo-network/-/expo-network-57.0.2.tgz"
+        }
+      ],
+      "packagePath": "node_modules/expo-network",
+      "packageJSONSHA256": "5e162f03c47f3ad359b6cdee6d97708d935e4013452649a90559ed4870be9b74",
+      "integrity": "sha512-BfK1kdftZcM6o9o1FAG7/y0l6vWX0n8td0M5lwkvaMeRXZ9LkRwOi9CQXwvsMTQGQiPwtQXgwiAze13cqjt75g=="
+    },
+    {
+      "component": "npm:expo-notifications@57.0.20",
+      "name": "expo-notifications",
+      "version": "57.0.20",
+      "ecosystem": "npm",
+      "sectionId": "android-software-4ea38931467dd1154c4e35c4",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+      "notices": [
+        {
+          "source": "node_modules/expo-notifications/LICENSE",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+          "upstream": "https://registry.npmjs.org/expo-notifications/-/expo-notifications-57.0.20.tgz"
+        }
+      ],
+      "packagePath": "node_modules/expo-notifications",
+      "packageJSONSHA256": "b58229e6f32c87f3246b18795c69cad42de6bbba318404871ab8a3d5cf5ab17f",
+      "integrity": "sha512-T1xaydHHlsOt6sA9DlSC74Kt+yQb9vwM79dBcac5U/5GPdU7e80LleDleQbMgUXO4c2W/ZKBCljDONyvOqteXQ=="
+    },
+    {
+      "component": "npm:expo-secure-store@57.0.4",
+      "name": "expo-secure-store",
+      "version": "57.0.4",
+      "ecosystem": "npm",
+      "sectionId": "android-software-e4407fa1588189b70d501bc2",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+      "notices": [
+        {
+          "source": "node_modules/expo-secure-store/LICENSE",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+          "upstream": "https://registry.npmjs.org/expo-secure-store/-/expo-secure-store-57.0.4.tgz"
+        }
+      ],
+      "packagePath": "node_modules/expo-secure-store",
+      "packageJSONSHA256": "de06e2429d623c0bc0120dedee1ce3285a9852a48cf3f70aa8ca6b47b1370a4b",
+      "integrity": "sha512-7zBA1RThURTXdP4w65kBzZNbcSsfArqVd+p+ETAnPRWXO8J296Qd0YaCVyRpJ0HSwlCnGdvOnqO+NgSreHsOhA=="
+    },
+    {
+      "component": "npm:expo-sharing@57.0.21",
+      "name": "expo-sharing",
+      "version": "57.0.21",
+      "ecosystem": "npm",
+      "sectionId": "android-software-0a99bc29cd3d4f8e8ccbb15d",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+      "notices": [
+        {
+          "source": "node_modules/expo-sharing/LICENSE",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+          "upstream": "https://registry.npmjs.org/expo-sharing/-/expo-sharing-57.0.21.tgz"
+        }
+      ],
+      "packagePath": "node_modules/expo-sharing",
+      "packageJSONSHA256": "dd9d2ad5192d320b6db304752951c186f44540ac3523cdec010f2b7983daa4dc",
+      "integrity": "sha512-7Kv3ai5kdSZ/3Ok05AOWUcXSfDrqeQ5rKpWztIvi86A4WxQCed+DV4AtnhfEwZ0ZeFxJj2Au/mjfQ06J4YK8HA=="
+    },
+    {
+      "component": "npm:expo-speech-recognition@57.0.0",
+      "name": "expo-speech-recognition",
+      "version": "57.0.0",
+      "ecosystem": "npm",
+      "sectionId": "android-software-eddeed703b5144e3ad55a644",
+      "sectionSHA256": "d3ee89fbcdb9592f396dcfe657aae382152ac50398f1261ff2ea215b7485ddc8",
+      "notices": [
+        {
+          "source": "node_modules/expo-speech-recognition/LICENSE",
+          "sha256": "d3ee89fbcdb9592f396dcfe657aae382152ac50398f1261ff2ea215b7485ddc8",
+          "upstream": "https://registry.npmjs.org/expo-speech-recognition/-/expo-speech-recognition-57.0.0.tgz"
+        }
+      ],
+      "packagePath": "node_modules/expo-speech-recognition",
+      "packageJSONSHA256": "fd093c3d2f102b13de0924def461c8fef68f324af4eb8c786acbe876ac16f233",
+      "integrity": "sha512-eUHnlNPhYemXIYi2y/bGigDjefE8y0hySAx+tAbaKwEVStYJxJKPHDYWll0z3ELHFLzdyx22V8qhZic9Q6yhNA=="
+    },
+    {
+      "component": "npm:expo-status-bar@57.0.1",
+      "name": "expo-status-bar",
+      "version": "57.0.1",
+      "ecosystem": "npm",
+      "sectionId": "android-software-69cfe19a4ed1745992b143b4",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+      "notices": [
+        {
+          "source": "node_modules/expo-status-bar/LICENSE",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+          "upstream": "https://registry.npmjs.org/expo-status-bar/-/expo-status-bar-57.0.1.tgz"
+        }
+      ],
+      "packagePath": "node_modules/expo-status-bar",
+      "packageJSONSHA256": "6de1bc73564a62d3786e25e9747f2170398bb0a6150b6183bed8ad3dad37b529",
+      "integrity": "sha512-Xwaq1gAoVRWx5dPG5VhT5RSbnI9OilhZnO5qoPBnUaBAa5VzRzfdS8q0/bsPt0jR2DKLtGuP0bQ6efMJ4RIMDg=="
+    },
+    {
+      "component": "npm:expo-web-browser@57.0.3",
+      "name": "expo-web-browser",
+      "version": "57.0.3",
+      "ecosystem": "npm",
+      "sectionId": "android-software-d06c1f9c51814f756f12a4e1",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+      "notices": [
+        {
+          "source": "node_modules/expo-web-browser/LICENSE",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+          "upstream": "https://registry.npmjs.org/expo-web-browser/-/expo-web-browser-57.0.3.tgz"
+        }
+      ],
+      "packagePath": "node_modules/expo-web-browser",
+      "packageJSONSHA256": "de9bdf86a6c1c290d193860b557ef0a6878396b5d6440df2949086655fe0273a",
+      "integrity": "sha512-+ecvhyS/PdWkpv4ai6FF1Trd6Y/4kn/eQ3O86mie2ecU3w+I8bKZh13kppY/jw1uSL7yikt03L5W/iiHojrFwQ=="
+    },
+    {
+      "component": "npm:expo-widgets@57.0.26",
+      "name": "expo-widgets",
+      "version": "57.0.26",
+      "ecosystem": "npm",
+      "sectionId": "android-software-a355f8f4f9d4e6db47c9a95f",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+      "notices": [
+        {
+          "source": "node_modules/expo-widgets/LICENSE",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+          "upstream": "https://registry.npmjs.org/expo-widgets/-/expo-widgets-57.0.26.tgz"
+        }
+      ],
+      "packagePath": "node_modules/expo-widgets",
+      "packageJSONSHA256": "fdf67faedfe6c0df6dd8f3ec776d7685ba5ce9bdf786534de35cd73801e53013",
+      "integrity": "sha512-gXVYxNeYR08QvohfnyyqTVxGgsF07PtK0Pg/i4vdFs2akT6mf/m4/vc3Co1F5lMDzbQSTpZyCDMxVOImv3F46g=="
+    },
+    {
+      "component": "npm:expo@57.0.24",
+      "name": "expo",
+      "version": "57.0.24",
+      "ecosystem": "npm",
+      "sectionId": "android-software-92313b2892dea255d064fd45",
+      "sectionSHA256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+      "notices": [
+        {
+          "source": "node_modules/expo/LICENSE",
+          "sha256": "fb3ca4a837f5779e83cef89b78253a8949cfb9429c340309f62d0465ec6610b4",
+          "upstream": "https://github.com/expo/expo/blob/sdk-57/LICENSE"
+        }
+      ],
+      "packagePath": "node_modules/expo",
+      "packageJSONSHA256": "d01199b51f5f9beca73e371e1893a360a0017fe8cbdc722a5f3ca86aee5d1273",
+      "integrity": "sha512-LxSnKMv7en/w4XDNxW3VOx7SbtQ2Bs4MyGhtoZCToDsEsBPO7pJXlv5GnQUCd7Wi8118QV/VDwsDLBKTB3Z3iQ=="
+    },
+    {
+      "component": "npm:flow-enums-runtime@0.0.6",
+      "name": "flow-enums-runtime",
+      "version": "0.0.6",
+      "ecosystem": "npm",
+      "sectionId": "android-software-c3682a641105b84957d3774f",
+      "sectionSHA256": "52412d7bc7ce4157ea628bbaacb8829e0a9cb3c58f57f99176126bc8cf2bfc85",
+      "notices": [
+        {
+          "source": "node_modules/flow-enums-runtime/LICENSE",
+          "sha256": "52412d7bc7ce4157ea628bbaacb8829e0a9cb3c58f57f99176126bc8cf2bfc85",
+          "upstream": "https://registry.npmjs.org/flow-enums-runtime/-/flow-enums-runtime-0.0.6.tgz"
+        }
+      ],
+      "packagePath": "node_modules/flow-enums-runtime",
+      "packageJSONSHA256": "a9d83154145ed1bf98a1bb5b52ec7cac031537f6e8e47e726aa0b6f16a551c8b",
+      "integrity": "sha512-3PYnM29RFXwvAN6Pc/scUfkI7RwhQ/xqyLUyPNlXUp9S40zI8nup9tUSrTLSVnWGBN38FNiGWbwZOB6uR4OGdw=="
+    },
+    {
+      "component": "npm:hoist-non-react-statics@3.3.2",
+      "name": "hoist-non-react-statics",
+      "version": "3.3.2",
+      "ecosystem": "npm",
+      "sectionId": "android-software-48959bb6d78ea4843f9deecc",
+      "sectionSHA256": "eb32ff0ec52b6ea86e3d3e06c6ad1b68ee03798b6729af13919f6d5c14b368f3",
+      "notices": [
+        {
+          "source": "node_modules/hoist-non-react-statics/LICENSE.md",
+          "sha256": "eb32ff0ec52b6ea86e3d3e06c6ad1b68ee03798b6729af13919f6d5c14b368f3",
+          "upstream": "https://registry.npmjs.org/hoist-non-react-statics/-/hoist-non-react-statics-3.3.2.tgz"
+        }
+      ],
+      "packagePath": "node_modules/hoist-non-react-statics",
+      "packageJSONSHA256": "9ec927bd187e21a4b3a62e053101963ef8673fc4502282a7755f26a9df8db32e",
+      "integrity": "sha512-/gGivxi8JPKWNm/W0jSmzcMPpfpPLc3dY/6GxhX2hQ9iGj3aDfklV4ET7NjKpSinLpJ5vafa9iiGIEZg10SfBw=="
+    },
+    {
+      "component": "npm:invariant@2.2.4",
+      "name": "invariant",
+      "version": "2.2.4",
+      "ecosystem": "npm",
+      "sectionId": "android-software-750729346d08c17ab0409ae8",
+      "sectionSHA256": "f657f99d3fb9647db92628e96007aabb46e5f04f33e49999075aab8e250ca7ce",
+      "notices": [
+        {
+          "source": "node_modules/invariant/LICENSE",
+          "sha256": "f657f99d3fb9647db92628e96007aabb46e5f04f33e49999075aab8e250ca7ce",
+          "upstream": "https://registry.npmjs.org/invariant/-/invariant-2.2.4.tgz"
+        }
+      ],
+      "packagePath": "node_modules/invariant",
+      "packageJSONSHA256": "ef0c08d9f91029e247bb570a04903f3a9bd646c1f2128d29e69ee171794cd2a3",
+      "integrity": "sha512-phJfQVBuaJM5raOpJjSfkiD6BpbCE4Ns//LaXl6wGYtUBY83nWS6Rf9tXm2e8VaK60JEjYldbPif/A2B1C2gNA=="
+    },
+    {
+      "component": "npm:memoize-one@5.2.1",
+      "name": "memoize-one",
+      "version": "5.2.1",
+      "ecosystem": "npm",
+      "sectionId": "android-software-f9290fd4c6b8810f48dbfe33",
+      "sectionSHA256": "b1c501095de70182748cb8e8d97ac5577701a4ef3b755ba30d59fd87b24bdb0f",
+      "notices": [
+        {
+          "source": "node_modules/memoize-one/LICENSE",
+          "sha256": "b1c501095de70182748cb8e8d97ac5577701a4ef3b755ba30d59fd87b24bdb0f",
+          "upstream": "https://registry.npmjs.org/memoize-one/-/memoize-one-5.2.1.tgz"
+        }
+      ],
+      "packagePath": "node_modules/memoize-one",
+      "packageJSONSHA256": "42f75cce8e78478ae86f07c881c8f52073c2698aaf17b2fdae916bea56fc3925",
+      "integrity": "sha512-zYiwtZUcYyXKo/np96AGZAckk+FWWsUdJ3cHGGmld7+AhvcWmQyGCYUh1hc4Q/pkOhb65dQR/pqCyK0cOaHz4Q=="
+    },
+    {
+      "component": "npm:nanostores@1.5.5",
+      "name": "nanostores",
+      "version": "1.5.5",
+      "ecosystem": "npm",
+      "sectionId": "android-software-edc35455a7426da4854fee23",
+      "sectionSHA256": "181bc2685f0cea9d1beb28352420e3a7fb382b38895d2b430ed1b3bc39572af6",
+      "notices": [
+        {
+          "source": "node_modules/nanostores/LICENSE",
+          "sha256": "181bc2685f0cea9d1beb28352420e3a7fb382b38895d2b430ed1b3bc39572af6",
+          "upstream": "https://registry.npmjs.org/nanostores/-/nanostores-1.5.5.tgz"
+        }
+      ],
+      "packagePath": "node_modules/nanostores",
+      "packageJSONSHA256": "8c4492163ccf614630da9ef3844e0f6f2d6e9e5d467b4449f62d652330f83857",
+      "integrity": "sha512-FixtE239Gl6Gz0ZGCK0WzvNwObNCIwVT+L7zQcf1QgcA6AzBxblzqe9OT88qiucNkhsjSOqiogSaF5jVbJiqSA=="
+    },
+    {
+      "component": "npm:nullthrows@1.1.1",
+      "name": "nullthrows",
+      "version": "1.1.1",
+      "ecosystem": "npm",
+      "sectionId": "android-software-14274849d3b523247d010a8a",
+      "sectionSHA256": "dd5f97aa25431e25fea6654f12f4ce167dc19b3148ab515cc271aa8efe6eb0be",
+      "notices": [
+        {
+          "source": "node_modules/nullthrows/LICENSE",
+          "sha256": "dd5f97aa25431e25fea6654f12f4ce167dc19b3148ab515cc271aa8efe6eb0be",
+          "upstream": "https://registry.npmjs.org/nullthrows/-/nullthrows-1.1.1.tgz"
+        }
+      ],
+      "packagePath": "node_modules/nullthrows",
+      "packageJSONSHA256": "e1baeb08c11213a4434f0e0001c4358c9b42f4efd1fc817d0b2185568b9f12a0",
+      "integrity": "sha512-2vPPEi+Z7WqML2jZYddDIfy5Dqb0r2fze2zTxNNknZaFpVHU3mFB3R+DWeJWGVx0ecvttSGlJTI+WG+8Z4cDWw=="
+    },
+    {
+      "component": "npm:posthog-react-native@4.84.1",
+      "name": "posthog-react-native",
+      "version": "4.84.1",
+      "ecosystem": "npm",
+      "sectionId": "android-software-b57b826c406fff74ab18d07e",
+      "sectionSHA256": "d3fb92ac01f0bef4078f89aac9f20f76da3383ad45becf6204abdf5495f43f8f",
+      "notices": [
+        {
+          "source": "node_modules/posthog-react-native/LICENSE",
+          "sha256": "d3fb92ac01f0bef4078f89aac9f20f76da3383ad45becf6204abdf5495f43f8f",
+          "upstream": "https://registry.npmjs.org/posthog-react-native/-/posthog-react-native-4.84.1.tgz"
+        }
+      ],
+      "packagePath": "node_modules/posthog-react-native",
+      "packageJSONSHA256": "391097c39838620e045a7af39b29f1af025835c5a064980409f24875ca772e9b",
+      "integrity": "sha512-AqPWpqnYhi2YnGFNB4pQVlQwKlkbHqJWD/bwsqWZ9/wYofcWel6Cy9DZmaWxdSQQIDJeV6JYZbdFYbRfYnts9g=="
+    },
+    {
+      "component": "npm:promise@8.3.0",
+      "name": "promise",
+      "version": "8.3.0",
+      "ecosystem": "npm",
+      "sectionId": "android-software-6d901b87584e15a378871f5d",
+      "sectionSHA256": "5e733eb92ed0c571da3f27c5da203e0a9f975b4f96e7692c9fa3660ca54820ec",
+      "notices": [
+        {
+          "source": "node_modules/promise/LICENSE",
+          "sha256": "5e733eb92ed0c571da3f27c5da203e0a9f975b4f96e7692c9fa3660ca54820ec",
+          "upstream": "https://registry.npmjs.org/promise/-/promise-8.3.0.tgz"
+        }
+      ],
+      "packagePath": "node_modules/promise",
+      "packageJSONSHA256": "28417b7401d8242ac8889384d1028326012e88ab131b0c8cda17b8b3e0aeb4b0",
+      "integrity": "sha512-rZPNPKTOYVNEEKFaq1HqTgOwZD+4/YHS5ukLzQCypkj+OkYx7iv0mA91lJlpPPZ8vMau3IIGj5Qlwrx+8iiSmg=="
+    },
+    {
+      "component": "npm:qrcode-generator@2.0.4",
+      "name": "qrcode-generator",
+      "version": "2.0.4",
+      "ecosystem": "npm",
+      "sectionId": "android-software-c836dd4c31626939d4c8d452",
+      "sectionSHA256": "3a850fa5f08101db6f40676c2786e10bd2cd5fff7b12ffdf1e0c434d4e49d90c",
+      "notices": [
+        {
+          "source": "assets/notices/sources/qrcode-generator-MIT.txt",
+          "sha256": "3a850fa5f08101db6f40676c2786e10bd2cd5fff7b12ffdf1e0c434d4e49d90c",
+          "upstream": "https://raw.githubusercontent.com/kazuhikoarase/qrcode-generator/83b7e8fe3fddd3b0368dbafd6ce56995bd25e3c8/LICENSE",
+          "ownAttribution": {
+            "kind": "pinned-upstream-own-attribution",
+            "ownerNpmID": "npm:qrcode-generator@2.0.4",
+            "packagePath": "node_modules/qrcode-generator",
+            "packageJSONSource": "node_modules/qrcode-generator/package.json",
+            "packageJSONSHA256": "0c8db18ad7f1b9dece93dd87dc0624be938f9b9b21e93c0f78e6e2d194ac10e9",
+            "tarball": "https://registry.npmjs.org/qrcode-generator/-/qrcode-generator-2.0.4.tgz",
+            "integrity": "sha512-mZSiP6RnbHl4xL2Ap5HfkjLnmxfKcPWpWe/c+5XxCuetEenqmNFf1FH/ftXPCtFG5/TDobjsjz6sSNL0Sr8Z9g==",
+            "publisher": {
+              "gitHead": "83b7e8fe3fddd3b0368dbafd6ce56995bd25e3c8",
+              "metadataURL": "https://registry.npmjs.org/qrcode-generator/2.0.4",
+              "metadataSHA256": "57bc334458e43210fde1afcb26dec1a4403c0374d1918a7751d83d58a5800792"
+            },
+            "selectedSources": [
+              {
+                "source": "node_modules/qrcode-generator/dist/qrcode.js",
+                "sha256": "79ec86f82856005b1c887905cfccfcfbec3821ca61c7fd5a952faa5f778f791c"
+              },
+              {
+                "source": "node_modules/qrcode-generator/dist/qrcode.mjs",
+                "sha256": "ea91d7118a5395289170da848b7c6758b996163bfbccf312591ab65a4911b7c0"
+              }
+            ]
+          }
+        }
+      ],
+      "packagePath": "node_modules/qrcode-generator",
+      "packageJSONSHA256": "0c8db18ad7f1b9dece93dd87dc0624be938f9b9b21e93c0f78e6e2d194ac10e9",
+      "integrity": "sha512-mZSiP6RnbHl4xL2Ap5HfkjLnmxfKcPWpWe/c+5XxCuetEenqmNFf1FH/ftXPCtFG5/TDobjsjz6sSNL0Sr8Z9g=="
+    },
+    {
+      "component": "npm:react-is@16.13.1",
+      "name": "react-is",
+      "version": "16.13.1",
+      "ecosystem": "npm",
+      "sectionId": "android-software-6a89229fd526bb866147a484",
+      "sectionSHA256": "52412d7bc7ce4157ea628bbaacb8829e0a9cb3c58f57f99176126bc8cf2bfc85",
+      "notices": [
+        {
+          "source": "node_modules/hoist-non-react-statics/node_modules/react-is/LICENSE",
+          "sha256": "52412d7bc7ce4157ea628bbaacb8829e0a9cb3c58f57f99176126bc8cf2bfc85",
+          "upstream": "https://registry.npmjs.org/react-is/-/react-is-16.13.1.tgz"
+        }
+      ],
+      "packagePath": "node_modules/hoist-non-react-statics/node_modules/react-is",
+      "packageJSONSHA256": "06784c4340af9853928c519791684487b83076b3c84e8de6ba5f240e33700b71",
+      "integrity": "sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ=="
+    },
+    {
+      "component": "npm:react-native-android-widget@0.22.1",
+      "name": "react-native-android-widget",
+      "version": "0.22.1",
+      "ecosystem": "npm",
+      "sectionId": "android-software-eda9f75610f470e1dfa2bcea",
+      "sectionSHA256": "1893949b5f982bd87b686eb21acb84d60ec64d7525226a39329c8e352f7e62f1",
+      "notices": [
+        {
+          "source": "node_modules/react-native-android-widget/LICENSE",
+          "sha256": "1893949b5f982bd87b686eb21acb84d60ec64d7525226a39329c8e352f7e62f1",
+          "upstream": "https://registry.npmjs.org/react-native-android-widget/-/react-native-android-widget-0.22.1.tgz"
+        }
+      ],
+      "packagePath": "node_modules/react-native-android-widget",
+      "packageJSONSHA256": "be9ecf5df116057ba835412f827e67263f4740ddaa60ec1356d24075d357f61a",
+      "integrity": "sha512-BBMuqShRrxV23Z09Rn5zNHJaPegCnH3DhhZQgXbhw2GMh45Gez0RbwKTIWHftuW4nLrqWy6esz8XwecUZLiZKA=="
+    },
+    {
+      "component": "npm:react-native-drawer-layout@4.2.12",
+      "name": "react-native-drawer-layout",
+      "version": "4.2.12",
+      "ecosystem": "npm",
+      "sectionId": "android-software-a96e5702eb3b910d03d9c4c4",
+      "sectionSHA256": "41f321b33afaa5cdaeb7c1aecd6fd5c21467ff910fb677aa47c941d05b5032c0",
+      "notices": [
+        {
+          "source": "node_modules/react-native-drawer-layout/LICENSE",
+          "sha256": "41f321b33afaa5cdaeb7c1aecd6fd5c21467ff910fb677aa47c941d05b5032c0",
+          "upstream": "https://registry.npmjs.org/react-native-drawer-layout/-/react-native-drawer-layout-4.2.12.tgz"
+        }
+      ],
+      "packagePath": "node_modules/react-native-drawer-layout",
+      "packageJSONSHA256": "5ff11dc7bfe28429d2fa2363fa9e380eb6ac972e268a3e331ce1f1d89c48df17",
+      "integrity": "sha512-qYmntEctkMSodN7pnC2llV21nswImLFPHJeT3PJXSJqZdU4jzDATR8iVi66sXkrtoOLJ2+EvXxgd7sMMpV4ViA=="
+    },
+    {
+      "component": "npm:react-native-is-edge-to-edge@1.3.1",
+      "name": "react-native-is-edge-to-edge",
+      "version": "1.3.1",
+      "ecosystem": "npm",
+      "sectionId": "android-software-ee13ab2129130f103422a3c1",
+      "sectionSHA256": "4efb635cc4fd67f738ce2af65f8b73514ee338d0d201b836ab3a823cfda771d1",
+      "notices": [
+        {
+          "source": "node_modules/react-native-is-edge-to-edge/LICENSE",
+          "sha256": "4efb635cc4fd67f738ce2af65f8b73514ee338d0d201b836ab3a823cfda771d1",
+          "upstream": "https://registry.npmjs.org/react-native-is-edge-to-edge/-/react-native-is-edge-to-edge-1.3.1.tgz"
+        }
+      ],
+      "packagePath": "node_modules/react-native-is-edge-to-edge",
+      "packageJSONSHA256": "4808c1cfb5e0c5d8d082c0d9e5efaf36eeb64da249fc65502d1a0333f3762a23",
+      "integrity": "sha512-NIXU/iT5+ORyCc7p0z2nnlkouYKX425vuU1OEm6bMMtWWR9yvb+Xg5AZmImTKoF9abxCPqrKC3rOZsKzUYgYZA=="
+    },
+    {
+      "component": "npm:react-native-safe-area-context@5.7.0",
+      "name": "react-native-safe-area-context",
+      "version": "5.7.0",
+      "ecosystem": "npm",
+      "sectionId": "android-software-926fa034eace83cde2be2bb5",
+      "sectionSHA256": "f5c7a4d527258e11fdfe3d84eb73cd14fe6d64224ef051e59f6ee21fe378800c",
+      "notices": [
+        {
+          "source": "node_modules/react-native-safe-area-context/LICENSE",
+          "sha256": "f5c7a4d527258e11fdfe3d84eb73cd14fe6d64224ef051e59f6ee21fe378800c",
+          "upstream": "https://registry.npmjs.org/react-native-safe-area-context/-/react-native-safe-area-context-5.7.0.tgz"
+        }
+      ],
+      "packagePath": "node_modules/react-native-safe-area-context",
+      "packageJSONSHA256": "752ca40cc831855a26fb9eda18ff6bad54986835d9aa42bba1129d53857f6131",
+      "integrity": "sha512-/9/MtQz8ODphjsLdZ+GZAIcC/RtoqW9EeShf7Uvnfgm/pzYrJ75y3PV/J1wuAV1T5Dye5ygq4EAW20RoBq0ABQ=="
+    },
+    {
+      "component": "npm:react-native-worklets@0.10.1",
+      "name": "react-native-worklets",
+      "version": "0.10.1",
+      "ecosystem": "npm",
+      "sectionId": "android-software-48fbbad74c6fdd9c7fe00d59",
+      "sectionSHA256": "92c22d327a6644efda43527bfa6f136f4382359f40bc288eda0764f67be9c269",
+      "notices": [
+        {
+          "source": "node_modules/react-native-worklets/LICENSE",
+          "sha256": "92c22d327a6644efda43527bfa6f136f4382359f40bc288eda0764f67be9c269",
+          "upstream": "https://registry.npmjs.org/react-native-worklets/-/react-native-worklets-0.10.1.tgz"
+        }
+      ],
+      "packagePath": "node_modules/react-native-worklets",
+      "packageJSONSHA256": "485883959fd6a9d6981fbf2dc9607aaf6c9d8ce380c5359f0dd82f27fda95628",
+      "integrity": "sha512-62mRM19bDpfpdI8HLkEErcdOsrAPDtE9lA/sw+5lLRpzBHNhxaoj9QyY2KjXqUmirelxkX4zuPGTC3VdA0feJA=="
+    },
+    {
+      "component": "npm:react-native@0.86.3",
+      "name": "react-native",
+      "version": "0.86.3",
+      "ecosystem": "npm",
+      "sectionId": "android-software-d09e24f5425789d25a01f07f",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+      "notices": [
+        {
+          "source": "node_modules/react-native/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+          "upstream": "https://github.com/react/react-native/blob/v0.86.3/LICENSE"
+        }
+      ],
+      "packagePath": "node_modules/react-native",
+      "packageJSONSHA256": "416224a4e7caf2ee1f8f9bead8508d0b608feed745371ce0a8f0e2cafa16d144",
+      "integrity": "sha512-JR5s3bM9ezud+Mw24GlNXNfthqPIKwrQgPPJcam+L97t2sKjjEavhCzBn+fyqZZRcM5+XlhYxpTxVkK7e1n38Q=="
+    },
+    {
+      "component": "npm:react@19.2.3",
+      "name": "react",
+      "version": "19.2.3",
+      "ecosystem": "npm",
+      "sectionId": "android-software-bde3171a9b680249d90affd3",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+      "notices": [
+        {
+          "source": "node_modules/react/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+          "upstream": "https://registry.npmjs.org/react/-/react-19.2.3.tgz"
+        }
+      ],
+      "packagePath": "node_modules/react",
+      "packageJSONSHA256": "c383aced6a67c8d06f02996015c0a163e78532a330a96dff1ccfd107b00ab326",
+      "integrity": "sha512-Ku/hhYbVjOQnXDZFv2+RibmLFGwFdeeKHFcOTlrt7xplBnya5OGn/hIRDsqDiSUcfORsDC7MPxwork8jBwsIWA=="
+    },
+    {
+      "component": "npm:regenerator-runtime@0.13.11",
+      "name": "regenerator-runtime",
+      "version": "0.13.11",
+      "ecosystem": "npm",
+      "sectionId": "android-software-e6349a827d0c5e158c3ffc7c",
+      "sectionSHA256": "51887a3d47051ac2fce1210562e5b9fe0830a8a8fabeb272c2d586eeb18a05fd",
+      "notices": [
+        {
+          "source": "node_modules/regenerator-runtime/LICENSE",
+          "sha256": "51887a3d47051ac2fce1210562e5b9fe0830a8a8fabeb272c2d586eeb18a05fd",
+          "upstream": "https://registry.npmjs.org/regenerator-runtime/-/regenerator-runtime-0.13.11.tgz"
+        }
+      ],
+      "packagePath": "node_modules/regenerator-runtime",
+      "packageJSONSHA256": "438ba14ad7859f5e16914e174e425afa8f5d9c21cf5ab208699a28454c4618ee",
+      "integrity": "sha512-kY1AZVr2Ra+t+piVaJ4gxaFaReZVH40AKNo7UCX6W+dEwBo/2oZJzqfuN1qLq1oL45o56cPaTXELwrTh8Fpggg=="
+    },
+    {
+      "component": "npm:scheduler@0.27.0",
+      "name": "scheduler",
+      "version": "0.27.0",
+      "ecosystem": "npm",
+      "sectionId": "android-software-aed13ea15c9f14a62cb1134f",
+      "sectionSHA256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+      "notices": [
+        {
+          "source": "node_modules/scheduler/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+          "upstream": "https://registry.npmjs.org/scheduler/-/scheduler-0.27.0.tgz"
+        }
+      ],
+      "packagePath": "node_modules/scheduler",
+      "packageJSONSHA256": "393bb96b7e481bf50189a1a02c7e0e7f4d01acba5abc6fbe7d214638624462fc",
+      "integrity": "sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q=="
+    },
+    {
+      "component": "npm:semver@7.8.5",
+      "name": "semver",
+      "version": "7.8.5",
+      "ecosystem": "npm",
+      "sectionId": "android-software-4d79765c35b5b7d567c05840",
+      "sectionSHA256": "4ec3d4c66cd87f5c8d8ad911b10f99bf27cb00cdfcff82621956e379186b016b",
+      "notices": [
+        {
+          "source": "node_modules/semver/LICENSE",
+          "sha256": "4ec3d4c66cd87f5c8d8ad911b10f99bf27cb00cdfcff82621956e379186b016b",
+          "upstream": "https://registry.npmjs.org/semver/-/semver-7.8.5.tgz"
+        }
+      ],
+      "packagePath": "node_modules/semver",
+      "packageJSONSHA256": "7c94cb7f2a53c27b20d76386ec144c062894dbcc909cfabd0f728c37874b1776",
+      "integrity": "sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA=="
+    },
+    {
+      "component": "npm:stacktrace-parser@0.1.11",
+      "name": "stacktrace-parser",
+      "version": "0.1.11",
+      "ecosystem": "npm",
+      "sectionId": "android-software-ab5f082f8c244a52742c6d51",
+      "sectionSHA256": "e1898814043cb5500483d9c8517edda824b352f696d35e5043fcfb537c221531",
+      "notices": [
+        {
+          "source": "node_modules/stacktrace-parser/LICENSE",
+          "sha256": "e1898814043cb5500483d9c8517edda824b352f696d35e5043fcfb537c221531",
+          "upstream": "https://registry.npmjs.org/stacktrace-parser/-/stacktrace-parser-0.1.11.tgz"
+        }
+      ],
+      "packagePath": "node_modules/stacktrace-parser",
+      "packageJSONSHA256": "e074abdd6fd9da17db51b0eacc14c7a1b7f4a069e9786e15e8069fedb833b430",
+      "integrity": "sha512-WjlahMgHmCJpqzU8bIBy4qtsZdU9lRlcZE3Lvyej6t4tuOuv1vk57OW3MBrj6hXBFx/nNoC9MPMTcr5YA7NQbg=="
+    },
+    {
+      "component": "npm:use-latest-callback@0.2.6",
+      "name": "use-latest-callback",
+      "version": "0.2.6",
+      "ecosystem": "npm",
+      "sectionId": "android-software-2ba48817de3207e8feafc880",
+      "sectionSHA256": "29de249ac0cee0d56924ff07bdabc8f708ad58432c7a357f6065000c49b12e11",
+      "notices": [
+        {
+          "source": "node_modules/use-latest-callback/LICENSE",
+          "sha256": "29de249ac0cee0d56924ff07bdabc8f708ad58432c7a357f6065000c49b12e11",
+          "upstream": "https://registry.npmjs.org/use-latest-callback/-/use-latest-callback-0.2.6.tgz"
+        }
+      ],
+      "packagePath": "node_modules/use-latest-callback",
+      "packageJSONSHA256": "24f5c88c068cb483792fb563ac0925b5dacbc4a0277cb6eb28e3360f9439b67a",
+      "integrity": "sha512-FvRG9i1HSo0wagmX63Vrm8SnlUU3LMM3WyZkQ76RnslpBrX694AdG4A0zQBx2B3ZifFA0yv/BaEHGBnEax5rZg=="
+    },
+    {
+      "component": "npm:whatwg-fetch@3.6.20",
+      "name": "whatwg-fetch",
+      "version": "3.6.20",
+      "ecosystem": "npm",
+      "sectionId": "android-software-129838daf76a3aafd09e7553",
+      "sectionSHA256": "c887d1c97797646dbb216925ab44a93c6b3e7f03bbe6ef6e0f92b8b8ade63014",
+      "notices": [
+        {
+          "source": "node_modules/whatwg-fetch/LICENSE",
+          "sha256": "c887d1c97797646dbb216925ab44a93c6b3e7f03bbe6ef6e0f92b8b8ade63014",
+          "upstream": "https://registry.npmjs.org/whatwg-fetch/-/whatwg-fetch-3.6.20.tgz"
+        }
+      ],
+      "packagePath": "node_modules/whatwg-fetch",
+      "packageJSONSHA256": "773f705e4e3f83dc4758188878c4db45478df953a10bceeb14e4aafbbe7847bc",
+      "integrity": "sha512-EqhiFU6daOA8kpjOWTL0olhVOF3i7OrFzSYiGsEMB8GcXS+RrzauAERX65xMeNWVqxA6HXH2m69Z9LaKKdisfg=="
+    },
+    {
+      "component": "npm:whatwg-url-minimum@0.1.2",
+      "name": "whatwg-url-minimum",
+      "version": "0.1.2",
+      "ecosystem": "npm",
+      "sectionId": "android-software-c57530561da6c92e7f6fe67a",
+      "sectionSHA256": "c2ecf83f830f226f662c99d003162002c78edd8b59f1105621bdcc2c44043a7d",
+      "notices": [
+        {
+          "source": "node_modules/whatwg-url-minimum/LICENSE.md",
+          "sha256": "c2ecf83f830f226f662c99d003162002c78edd8b59f1105621bdcc2c44043a7d",
+          "upstream": "https://registry.npmjs.org/whatwg-url-minimum/-/whatwg-url-minimum-0.1.2.tgz"
+        }
+      ],
+      "packagePath": "node_modules/whatwg-url-minimum",
+      "packageJSONSHA256": "866a1b66f98ff400a2b73b1dcb5cbbf4a358fc73dee84c84619bf2ce7aa352e4",
+      "integrity": "sha512-XPEm0XFQWNVG292lII1PrRRJl3sItrs7CettZ4ncYxuDVpLyy+NwlGyut2hXI0JswcJUxeCH+CyOJK0ZzAXD6A=="
+    }
+  ]
+}

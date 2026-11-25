@@ -11,13 +11,17 @@ test('Android prebuild copies the same offline notice bytes and replaces stale g
   try {
     mkdirSync(join(root, 'src'));
     const source = Buffer.from('[{"id":"synthetic","body":"License\\n"}]\n');
-    writeFileSync(join(root, 'src/font-icon-notices.json'), source);
+    for (const name of ['font-icon-notices.json', 'android-software-notices.json']) writeFileSync(join(root, 'src', name), source);
     copyNotices(root, join(root, 'android'));
     const target = join(root, 'android/app/src/main/assets/puptime/font-icon-notices.json');
+    const software = join(root, 'android/app/src/main/assets/puptime/android-software-notices.json');
     assert.deepEqual(readFileSync(target), source);
+    assert.deepEqual(readFileSync(software), source);
     writeFileSync(target, 'stale');
+    writeFileSync(software, 'stale');
     copyNotices(root, join(root, 'android'));
     assert.deepEqual(readFileSync(target), source);
+    assert.deepEqual(readFileSync(software), source);
   } finally {
     rmSync(root, {recursive:true, force:true});
   }
