@@ -47,6 +47,8 @@ Check actual account eligibility for internal testing. The 12-testers/14-days ru
 
 ## Concrete final-artifact checks
 
+The provisional source/test identity is version **1.13.0**, Android version code **1013000**, and iOS test build **3**. Check actual Play version-code occupancy before freezing or uploading the candidate. These committed fields do not establish an available build, signing authority or store acceptance; do not substitute an unrecorded generated version override.
+
 The Android lead qualifies the exact APK/AAB, signer/update route, package/version, manifest, native libraries/16 KB compatibility, production endpoints and absence of fixtures. Run the existing restricted-audio scanner against **both** archives. The source recording registry is empty; no purchase or regeneration is required.
 
 The font/icon payload and view are described in [Android font notices](android-font-notices.md). Its receipt deliberately does not claim complete software-library coverage. Resolve actual bundled Metro and release Gradle component LICENSE/NOTICE obligations before the final beta build; retain exact provenance and packaged-byte receipts. Historical iOS attribution work and all of PR #220's tooling are not prerequisites to identifying the Android components that actually ship.
