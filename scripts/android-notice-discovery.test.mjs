@@ -55,10 +55,10 @@ test('arbitrary package archives and publication coordinate/version mismatches a
  selected.group=f.publication.groupId;selected.version='9.9.9';assert.throws(()=>publicDiscovery(f.root,f.cache,f.input,f.discovery));
 });
 test('local-Maven artifact, config and package-manifest symlink escapes fail closed',t=>{
- const f=localMaven(t),outside=join(f.root,'outside.fixture');writeFileSync(outside,'synthetic private sentinel');
- rmSync(f.artifact);symlinkSync(outside,f.artifact);assert.throws(()=>publicDiscovery(f.root,f.cache,f.input,f.discovery));
- rmSync(f.artifact);writeFileSync(f.artifact,'synthetic public local AAR');const config=join(f.pkg,'expo-module.config.json');rmSync(config);symlinkSync(outside,config);assert.throws(()=>publicDiscovery(f.root,f.cache,f.input,f.discovery));
- rmSync(config);writeFileSync(config,JSON.stringify({android:{publication:f.publication}}));const manifest=join(f.pkg,'package.json');rmSync(manifest);symlinkSync(outside,manifest);assert.throws(()=>publicDiscovery(f.root,f.cache,f.input,f.discovery));
+ const f=localMaven(t),outside=join(f.root,'outside.fixture'),cacheTarget=join(f.cache,'same-local-artifact.aar');writeFileSync(cacheTarget,'synthetic public local AAR');
+ rmSync(f.artifact);symlinkSync(cacheTarget,f.artifact);assert.throws(()=>publicDiscovery(f.root,f.cache,f.input,f.discovery));
+ rmSync(f.artifact);writeFileSync(f.artifact,'synthetic public local AAR');const config=join(f.pkg,'expo-module.config.json');writeFileSync(outside,JSON.stringify({android:{publication:f.publication}}));rmSync(config);symlinkSync(outside,config);assert.throws(()=>publicDiscovery(f.root,f.cache,f.input,f.discovery));
+ rmSync(config);writeFileSync(config,JSON.stringify({android:{publication:f.publication}}));const manifest=join(f.pkg,'package.json');writeFileSync(outside,JSON.stringify({name:'example',version:'1.2.3'}));rmSync(manifest);symlinkSync(outside,manifest);assert.throws(()=>publicDiscovery(f.root,f.cache,f.input,f.discovery));
 });
 test('local-Maven source requires a credential-free public locked upstream',t=>{
  const f=localMaven(t),lock=JSON.parse(readFileSync(join(f.root,'package-lock.json')));lock.packages['node_modules/example'].resolved='https://private:secret@registry.npmjs.org/example.tgz';const encoded=JSON.stringify(lock);writeFileSync(join(f.root,'package-lock.json'),encoded);f.discovery.lockSHA256=hash(encoded);assert.throws(()=>publicDiscovery(f.root,f.cache,f.input,f.discovery));
