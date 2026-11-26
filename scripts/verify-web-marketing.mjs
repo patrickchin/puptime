@@ -111,6 +111,8 @@ try {
     const background = await page.locator('[data-testid="screen.learn"]').evaluate(element => getComputedStyle(element).backgroundColor);
     assert.equal(await page.locator('.site-header').evaluate(element => getComputedStyle(element).backgroundColor), background, 'Header and guide background should match.');
     await page.screenshot({ path: `${output}/${width}-care-library.png` });
+    assert.deepEqual(await page.getByTestId('learn.startHere').locator('a').evaluateAll(links => links.map(link => link.getAttribute('href'))), ['/puppy-care/bringing-puppy-home', '/puppy-care/getting-started'], 'The library should open with both first-read guides in order.');
+    assert.equal(await page.getByRole('heading', { level: 2 }).first().innerText(), 'Start here', 'Start here should be the first library group.');
     await page.getByTestId('learn.search').fill('zzzz-no-matching-guide');
     await page.getByRole('heading', { name: 'No matching guides', exact: true }).waitFor();
     assert.equal(await page.locator('[aria-live="polite"]').innerText(), 'No matching guides', 'Search should announce when nothing matches.');
