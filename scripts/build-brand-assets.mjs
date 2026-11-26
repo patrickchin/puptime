@@ -12,6 +12,7 @@ const favicon = await sharp(appIcon).ensureAlpha()
 
 await Promise.all([
   sharp(appIcon).resize(256, 256).png().toFile('public/brand-icon.png'),
+  sharp(appIcon).resize(180, 180).png().toFile('public/apple-touch-icon.png'),
   sharp(appIcon).resize(512, 512).png().toFile('public/social-preview.png'),
   sharp(favicon).resize(48, 48).png().toFile('assets/favicon.png'),
   sharp('assets/brand/adaptive-foreground.svg').resize(1024, 1024).png().toFile('assets/android-icon-foreground.png'),
