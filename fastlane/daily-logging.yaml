@@ -1,0 +1,28 @@
+appId: com.patrickchin.puptime
+name: Everyday potty logging
+---
+- launchApp
+- extendedWaitUntil:
+    visible: {id: screen.today}
+    timeout: 90000
+- waitForAnimationToEnd
+- takeScreenshot: 01-before-log
+- tapOn: {id: quick.pee}
+- extendedWaitUntil:
+    visible: {id: toast}
+    timeout: 30000
+- waitForAnimationToEnd
+- takeScreenshot: 02-logged
+- extendedWaitUntil:
+    notVisible: {id: toast}
+    timeout: 15000
+- tapOn: {id: nav.switch}
+- extendedWaitUntil:
+    visible: {id: screen.timeline}
+    timeout: 30000
+- extendedWaitUntil:
+    notVisible: {id: activity.loading}
+    timeout: 30000
+- waitForAnimationToEnd
+- takeScreenshot: 03-timeline
+- waitForAnimationToEnd

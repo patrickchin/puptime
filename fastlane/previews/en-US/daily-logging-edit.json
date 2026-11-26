@@ -1,0 +1,44 @@
+{
+  "seconds": 8.0,
+  "source": "Native iPhone simulator footage using the activity CSV capture fixture",
+  "raw_start": 8.8,
+  "raw_end": 19.0,
+  "speed": 1,
+  "segments": [
+    {
+      "raw_start": 8.8,
+      "raw_end": 11.55,
+      "speed": 1
+    },
+    {
+      "raw_start": 13.75,
+      "raw_end": 19.0,
+      "speed": 1
+    }
+  ],
+  "idle_removed_seconds": 2.2,
+  "native_transitions": true,
+  "editorial_effects": "Two aim/press/release tap indicators only",
+  "tap_indicators": [
+    {
+      "control": "quick.pee",
+      "raw_at": 9.93,
+      "press_at": 1.13,
+      "at": 0.53,
+      "duration": 1.2,
+      "x": 165,
+      "y": 426
+    },
+    {
+      "control": "nav.switch",
+      "raw_at": 15.75,
+      "press_at": 4.75,
+      "at": 4.15,
+      "duration": 1.2,
+      "x": 691,
+      "y": 1749
+    }
+  ],
+  "main_revision": "260c121f0c9d848766a90d4e0eec6d70e67f313c",
+  "sha256": "40409890df4adac23b4b9f96e47631d68b2388d95e67069d3a16a4b906190df4"
+}

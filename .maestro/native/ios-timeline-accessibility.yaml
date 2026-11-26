@@ -18,6 +18,8 @@ name: Timeline remains usable at maximum text size
     visible:
       id: timeline.filter.pee
     timeout: 30000
+- tapOn:
+    id: timeline.filter.pee
 - assertVisible:
     id: timeline.mark.point.*
 - takeScreenshot: timeline-largest-portrait

@@ -19,6 +19,7 @@ function fixture(){
  const modules:Record<string,any>={react,'react/jsx-runtime':{jsx,jsxs:jsx},'@expo/vector-icons':{MaterialCommunityIcons:'Icon'},
   'react-native':{...components,Alert:{alert:(...args:any[])=>alerts.push(args)},Keyboard:{dismiss:()=>{}},StyleSheet:{create:(value:unknown)=>value}},
   '../telemetry':{useTelemetryOverlay:()=>{}},'../components/TelemetryPressable':{Pressable:'Pressable'},
+  '../components/Motion':{SheetModal:'Modal'},
   '../analytics':{scheduleStatusesForDay:()=>[],suggestScheduleFromEvents:()=>({entries:[],daysAnalyzed:0})},
   '../activity-view':{activityWindowBounds:()=>({from:0,until:1}),useActivityWindow:()=>({events:[],loading:false,error:false})},
   '../components/ActivityLoadState':{ActivityLoadState:'ActivityLoadState'},'../components/RoutineTimeline':{RoutineTimeline:'RoutineTimeline',RoutineDayPreview:'RoutineDayPreview'},

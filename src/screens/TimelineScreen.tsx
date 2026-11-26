@@ -3,7 +3,6 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition 
 import {
   ActivityIndicator,
   FlatList,
-  Modal,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   ScrollView,
@@ -13,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { Pressable } from '../components/TelemetryPressable';
+import {SheetModal} from '../components/Motion';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -44,9 +44,10 @@ const LOAD_ROW_HEIGHT = 48;
 const ESTIMATE_OPACITY = 0.35;
 const AXIS_HOURS = Array.from({ length: 25 }, (_, index) => index);
 const GRID_HOURS = Array.from({ length: 23 }, (_, index) => index + 1);
+const POOP_MEAL_VIEW = { id: 'poop-meal', types: ['poop', 'meal'] } as const;
 const TIMELINE_VIEWS = [
   { id: 'pee', types: ['pee'] },
-  { id: 'poop-meal', types: ['poop', 'meal'] },
+  POOP_MEAL_VIEW,
 ] as const;
 const TIMELINE_TYPES: readonly ActivityKey[] = TIMELINE_VIEWS.flatMap((view) => [...view.types]);
 
@@ -428,7 +429,7 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
   const rowHeight = Math.round(52 * Math.min(fontScale, 1.5));
   const minimumHistoryDays = Math.max(INITIAL_DAYS + BEFORE_FIRST_LOG_DAYS, Math.ceil(height / rowHeight));
   const insets = useSafeAreaInsets();
-  const [selectedView, setSelectedView] = useState<(typeof TIMELINE_VIEWS)[number]>(TIMELINE_VIEWS[0]);
+  const [selectedView, setSelectedView] = useState<(typeof TIMELINE_VIEWS)[number]>(POOP_MEAL_VIEW);
   const selectedTypes: readonly ActivityKey[] = selectedView.types;
   const allExpectedWindows = useMemo(() => timelineExpectedWindows(schedule, TIMELINE_TYPES), [schedule]);
   const expectedWindows = useMemo(() => allExpectedWindows.filter(window => selectedTypes.includes(window.type)), [allExpectedWindows, selectedTypes]);
@@ -736,10 +737,10 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
           </View>
         ) : null}
       </View>
-      <Modal
+      <SheetModal
         visible={selectedEvents.length > 0}
+        backdropOpacity={.42}
         transparent
-        animationType="none"
         presentationStyle="overFullScreen"
         statusBarTranslucent
         navigationBarTranslucent
@@ -808,7 +809,7 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
             </ScrollView>
           </View>
         </View>
-      </Modal>
+      </SheetModal>
     </View>
   );
 }
@@ -910,7 +911,7 @@ const styles = StyleSheet.create({
   },
   loadEarlierText: { fontSize: 11, lineHeight: 16, fontWeight: '700' },
   detailsModal: { flex: 1, justifyContent: 'flex-end' },
-  detailsBackdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0, 0, 0, 0.42)' },
+  detailsBackdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   detailsSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden' },
   detailsHeading: { minHeight: 64, paddingVertical: spacing.sm, marginHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth },
   detailsHeadingCopy: { flex: 1, gap: spacing.xs },

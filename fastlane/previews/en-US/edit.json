@@ -1,0 +1,182 @@
+{
+  "seconds": 15.83,
+  "poster_seconds": 7,
+  "source": "Native simulator recording; original CSV history with personal notes omitted; one scripted logging/edit action",
+  "audio": "Silent stereo AAC",
+  "timing": "Slower interaction footage with idle waits removed",
+  "transition_seconds": 0.2,
+  "frozen_padding_seconds": 0,
+  "tap_indicators": [
+    {
+      "at": 1.034,
+      "tap_at": 1.634,
+      "x": 165,
+      "y": 426,
+      "duration": 1.2,
+      "control": "quick.pee"
+    },
+    {
+      "at": 3.945,
+      "tap_at": 4.545,
+      "x": 395,
+      "y": 1138,
+      "duration": 1.2,
+      "control": "editor.adjust.back.15"
+    },
+    {
+      "at": 5.644,
+      "tap_at": 6.244,
+      "x": 690,
+      "y": 1749,
+      "duration": 1.2,
+      "control": "nav.switch"
+    },
+    {
+      "at": 7.401,
+      "tap_at": 8.001,
+      "x": 262,
+      "y": 1215,
+      "duration": 1.2,
+      "control": "timeline.mark.point.2026-10-08.17"
+    },
+    {
+      "at": 13.041,
+      "tap_at": 13.641,
+      "x": 337,
+      "y": 1279,
+      "duration": 1.2,
+      "control": "schedule.editor.window.30"
+    }
+  ],
+  "step_labels": [
+    {
+      "step": 1,
+      "screen": "01-logged",
+      "title": "Log a potty break",
+      "at": 0.12,
+      "duration": 1.4
+    },
+    {
+      "step": 2,
+      "screen": "02-edited",
+      "title": "Correct the time",
+      "at": 2.787,
+      "duration": 1.4
+    },
+    {
+      "step": 3,
+      "screen": "03-timeline",
+      "title": "Compare days",
+      "at": 5.62,
+      "duration": 1.4
+    },
+    {
+      "step": 4,
+      "screen": "04-detail",
+      "title": "See the details",
+      "at": 7.487,
+      "duration": 1.4
+    },
+    {
+      "step": 5,
+      "screen": "05-insights",
+      "title": "Spot patterns",
+      "at": 9.587,
+      "duration": 1.4
+    },
+    {
+      "step": 6,
+      "screen": "06-routine",
+      "title": "Set your routine",
+      "at": 11.92,
+      "duration": 1.4
+    }
+  ],
+  "sha256": "8bd5470236af26290c3a3940fd31edbb3136a02251a9893b21f9db7968dcae08",
+  "scenes": [
+    {
+      "screen": "01-logged",
+      "source_recording": "preview/preview.raw.mov",
+      "raw_start": 19.18,
+      "raw_end": 21.52,
+      "segments": [
+        {
+          "raw_start": 19.18,
+          "raw_end": 21.52,
+          "speed": 0.82
+        }
+      ],
+      "edited_seconds": 2.866667
+    },
+    {
+      "screen": "02-edited",
+      "source_recording": "preview/preview.raw.mov",
+      "raw_start": 21.54,
+      "raw_end": 24.02,
+      "segments": [
+        {
+          "raw_start": 21.54,
+          "raw_end": 24.02,
+          "speed": 0.82
+        }
+      ],
+      "edited_seconds": 3.033333
+    },
+    {
+      "screen": "03-timeline",
+      "source_recording": "preview/preview.raw.mov",
+      "raw_start": 24.47,
+      "raw_end": 26.16,
+      "segments": [
+        {
+          "raw_start": 24.47,
+          "raw_end": 26.16,
+          "speed": 0.82
+        }
+      ],
+      "edited_seconds": 2.066667
+    },
+    {
+      "screen": "04-detail",
+      "source_recording": "preview/preview.raw.mov",
+      "raw_start": 26.18,
+      "raw_end": 28.06,
+      "segments": [
+        {
+          "raw_start": 26.18,
+          "raw_end": 28.06,
+          "speed": 0.82
+        }
+      ],
+      "edited_seconds": 2.3
+    },
+    {
+      "screen": "05-insights",
+      "source_recording": "preview/preview.raw.mov",
+      "raw_start": 30.45,
+      "raw_end": 32.56,
+      "segments": [
+        {
+          "raw_start": 30.45,
+          "raw_end": 32.56,
+          "speed": 0.82
+        }
+      ],
+      "edited_seconds": 2.533333
+    },
+    {
+      "screen": "06-routine",
+      "source_recording": "preview/preview.raw.mov",
+      "raw_start": 36.18,
+      "raw_end": 39.5,
+      "segments": [
+        {
+          "raw_start": 36.18,
+          "raw_end": 39.5,
+          "speed": 0.82
+        }
+      ],
+      "edited_seconds": 4.033333
+    }
+  ]
+}

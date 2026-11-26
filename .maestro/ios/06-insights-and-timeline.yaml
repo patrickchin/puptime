@@ -108,7 +108,7 @@ tags:
     timeout: 30000
 - assertVisible:
     id: timeline.filter.pee
-- tapOn:
+- assertVisible:
     id: timeline.filter.poop-meal
 - tapOn:
     id: timeline.mark.point.*

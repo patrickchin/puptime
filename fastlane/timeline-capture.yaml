@@ -1,0 +1,18 @@
+appId: com.patrickchin.puptime
+name: App Store Timeline default
+---
+- launchApp
+- extendedWaitUntil:
+    visible: {id: screen.today}
+    timeout: 90000
+- tapOn: {id: nav.switch}
+- extendedWaitUntil:
+    visible: {id: screen.timeline}
+    timeout: 30000
+- extendedWaitUntil:
+    visible: {id: timeline.mark.point.2026-10-08.*}
+    timeout: 30000
+- waitForAnimationToEnd
+- takeScreenshot: 02-timeline
+- tapOn: {id: timeline.mark.point.2026-10-08.*, index: 0}
+- assertVisible: {id: timeline.details.event.*, text: '.*(Poop|Eat).*'}
