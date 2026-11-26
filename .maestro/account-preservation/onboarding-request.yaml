@@ -14,9 +14,19 @@ name: Welcome sign-in requests a real email code
     id: account.email.open
 - assertVisible:
     id: preview.account
-- tapOn:
-    id: account.email.input
-- inputText: ${TEST_EMAIL}
+- retry:
+    maxRetries: 1
+    commands:
+      - tapOn:
+          id: account.email.input
+          enabled: true
+          retryTapIfNoChange: true
+      - waitForAnimationToEnd
+      - eraseText: 80
+      - inputText: ${TEST_EMAIL}
+      - assertVisible:
+          id: account.email.input
+          text: \A\Q${TEST_EMAIL}\E\z
 - scrollUntilVisible:
     element:
       id: account.sendCode

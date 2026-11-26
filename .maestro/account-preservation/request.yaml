@@ -17,11 +17,19 @@ name: Account preservation request
       id: account.email.input
     direction: DOWN
 - waitForAnimationToEnd
-- tapOn:
-    id: account.email.input
-    retryTapIfNoChange: true
-- eraseText: 80
-- inputText: ${TEST_EMAIL}
+- retry:
+    maxRetries: 1
+    commands:
+      - tapOn:
+          id: account.email.input
+          enabled: true
+          retryTapIfNoChange: true
+      - waitForAnimationToEnd
+      - eraseText: 80
+      - inputText: ${TEST_EMAIL}
+      - assertVisible:
+          id: account.email.input
+          text: \A\Q${TEST_EMAIL}\E\z
 - scrollUntilVisible:
     element:
       id: account.sendCode

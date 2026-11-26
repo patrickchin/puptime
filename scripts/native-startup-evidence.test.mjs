@@ -8,6 +8,7 @@ import {startupEvidence} from './native-startup-evidence.mjs';
 test('startup receipts retain only fixed stage/status and actual finite failure categories',()=>{
  assert.deepEqual(startupEvidence('simulator-boot','started'),{stage:'simulator-boot',status:'started'});
  assert.deepEqual(startupEvidence('case-result','passed'),{stage:'case-result',status:'passed'});
+ assert.deepEqual(startupEvidence('candidate-bundle-launch','passed'),{stage:'candidate-bundle-launch',status:'passed'});
  for(const [error,expected] of [[{code:'ETIMEDOUT'},'timeout'],[{code:'ERR_ASSERTION'},'assertion'],[new assert.AssertionError({message:'private detail'}),'assertion'],[{status:1},'process-exit'],[{status:0},'other'],[{signal:'SIGTERM'},'signal'],[{code:'EADDRINUSE'},'system-error'],[new Error('private cause'),'other']])assert.equal(startupEvidence('sdk-process','failed',error).failure.category,expected);
  assert.deepEqual(startupEvidence('sdk-process','failed',{status:1,signal:null}),{stage:'sdk-process',status:'failed',failure:{category:'process-exit',code:'other',exitStatus:1,signal:null}});
  for(const status of [undefined,NaN,256,-256,'1'])assert.equal(startupEvidence('sdk-process','failed',{status}).failure.exitStatus,null);
@@ -53,5 +54,18 @@ test('actual marker callbacks survive failed writes and actual catches preserve 
   const actualFinally=source.match(/finally\{await task\.run\(\);task\.dispose\(\);\}/)?.[0];assert.ok(actualFinally);
   const promise=runInNewContext('(async()=>{try{try{throw original;}'+actualFinally+'}'+failureCatch+'})()',context);
   await assert.rejects(promise,error=>error===original);assert.equal(cleanups,1);assert.equal(disposals,1);assert.equal(writes,file==='run-hosted-ios-account-case.mjs'||standard?2:1);
+ }
+});
+
+
+test('actual SDK assertion phases stay finite without exposing assertion details',()=>{
+ const source=readFileSync(new URL('./verify-native-guest-account.mjs',import.meta.url),'utf8');
+ const stages=[...source.matchAll(/markStartup\('(assert-[a-z-]+)'\)/g)].map(match=>match[1]);
+ assert.ok(stages.length>0);assert.equal(new Set(stages).size,stages.length);
+ const secret='private-note identity@example.invalid 654321 Bearer cookie';
+ for(const stage of stages){
+  const result=startupEvidence(stage,'failed',Object.assign(new assert.AssertionError({message:secret}),{actual:secret,expected:secret}));
+  assert.deepEqual(result,{stage,status:'failed',failure:{category:'assertion',code:'ERR_ASSERTION',exitStatus:null,signal:null}});
+  assert.ok(!JSON.stringify(result).includes(secret));assert.equal(startupEvidence(stage+':'+secret,'failed',{}).stage,'unknown');
  }
 });

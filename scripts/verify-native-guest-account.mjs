@@ -30,6 +30,9 @@ const standard=onboarding==='--standard-csv'||onboarding==='--standard-all';
 const android=platform==='android',deleting=onboarding==='--account-deletion',onboardingSignIn=onboarding==='--onboarding-sign-in',comparing=onboarding==='--puppy-comparison',offline=onboarding==='--offline-lifecycle',isolating=onboarding==='--account-isolation',photographing=onboarding==='--photo-lifecycle',deletionFaults=onboarding==='--deletion-faults',upgrading=onboarding==='--enrolled-runtime-upgrade';
 assert.ok(!(comparing||offline||isolating||photographing||deletionFaults||upgrading)||!android,'Extended lifecycle cases use the dedicated iOS verification path.');
 assert.ok(!standard||!android,'The fixed standard selections are iOS only.');
+const requestOnly=process.env.PUPTIME_ACCOUNT_REQUEST_ONLY==='1';
+assert.ok(process.env.PUPTIME_ACCOUNT_REQUEST_ONLY===undefined||requestOnly);assert.ok(!requestOnly||!android&&onboarding===undefined,'Request diagnostics use only the existing iOS baseline path.');
+if(requestOnly)assert.equal(process.env.PUPTIME_ACCOUNT_REQUEST_FRESH_DEVICE,initialDevice,'Request diagnostics require the simulator created by their owning runner.');
 assert.equal(consent,'--replace-synthetic','Use PLATFORM DEVICE HOST --replace-synthetic [OUTPUT].');
 const frontPort=Number(process.env.PUPTIME_ACCOUNT_PORT??8797),backPort=frontPort+2;assert.ok(Number.isInteger(frontPort)&&frontPort>1024&&frontPort<65533);
 const app='com.patrickchin.puptime',output=resolve(destination),front='https://127.0.0.1:'+frontPort;
@@ -111,7 +114,8 @@ async function flow(name,env={}){
     let ui={inspected:false};
     try{if(hierarchy&&statSync(join(artifacts,hierarchy)).size<=2097152)ui={inspected:true,fields:nativeAuthUiFlags(JSON.parse(readFileSync(join(artifacts,hierarchy),'utf8')),{email,code})};}catch{/* Keep the actual driver failure; record no unprojected value. */}
     writeFileSync(join(output,'fixture-auth-readiness.json'),JSON.stringify({phase:name,flowSequence,ui,responses:authResponses},null,2)+'\n');
-    if(name==='onboarding-request'||name==='onboarding-verify')try{writeFileSync(join(output,'fixture-onboarding-command.json'),JSON.stringify({phase:name,flowSequence,...readNativeCommandState(artifacts)},null,2)+'\n',{flag:'wx',mode:0o600});}catch{/* Preserve the original flow failure and existing cleanup. */}
+    if(name==='prepare')try{writeFileSync(join(output,'fixture-prepare-command.json'),JSON.stringify({phase:name,flowSequence,...readNativeCommandState(artifacts)},null,2)+'\n',{flag:'wx',mode:0o600});}catch{/* Preserve the original flow failure and existing cleanup. */}
+    if(name==='onboarding-request'||name==='onboarding-verify'||name==='request')try{writeFileSync(join(output,'fixture-onboarding-command.json'),JSON.stringify({phase:name,flowSequence,...readNativeCommandState(artifacts)},null,2)+'\n',{flag:'wx',mode:0o600});}catch{/* Preserve the original flow failure and existing cleanup. */}
     if(name==='add-logs')try{writeFileSync(join(output,'fixture-add-logs-command.json'),JSON.stringify({phase:'add-logs',flowSequence,...readNativeCommandState(artifacts)},null,2)+'\n',{mode:0o600});}catch{/* Preserve the original flow failure and existing cleanup. */}
     if(name==='comparison-preview'){
       try{writeFileSync(join(output,'fixture-comparison-command.json'),JSON.stringify({phase:'comparison-preview',flowSequence,...readNativeCommandState(artifacts)},null,2)+'\n',{mode:0o600});}catch{/* Preserve the original flow failure and existing cleanup. */}
@@ -207,8 +211,10 @@ async function assertCloud(events){
 }
 async function signIn({associated=false}={}){
   const before=snapshot();await flow('request');
+  markStartup('assert-sign-in-code');
   code=auth.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(email)?.code;
   assert.match(code??'',/^\d{6}$/);codes.add(code);await flow(associated?'verify-associated':'verify',{EXPECTED_COUNT:String(before.events.length)});code='';
+  markStartup('assert-sign-in-preservation');
   assert.deepEqual(snapshot(),before,'Sign-in itself must preserve every event and wait for explicit backup confirmation.');
 }
 function mutateAuth(statement){
@@ -259,34 +265,36 @@ function drainReceipt(before,acceptedStart,pageStart){
 }
 async function verifyOfflineLifecycle(){
  await flow('prepare');await flow('add-logs',{BATCHES:'4',EXPECTED_COUNT:'12'});await signIn();await flow('enable',{EXPECTED_COUNT:'12'});
+ markStartup('assert-offline-enrollment');
  assert.equal(snapshot().pending,0);await assertCloud(snapshot().events);
  await transport('offline');await flow('add-logs',{BATCHES:'1',EXPECTED_COUNT:'15'});
+ markStartup('assert-offline-pending');
  await until(()=>snapshot().pending===3,'Capture the three genuinely pending native writes.');
  const queued=snapshot(),acceptedStart=wireAccepted.length,pageStart=wirePages.length;
  assert.equal((await remote({inspectBehindFault:true})).length,12,'An outage cannot upload new native logs.');
- await flow('reopen-offline',{EXPECTED_COUNT:'15'});assertNativeTransition(queued.tables,snapshot().tables);
- await transport('online');await flow('resume-sync');const drained=drainReceipt(queued,acceptedStart,pageStart);await assertCloud(drained.events);
+ await flow('reopen-offline',{EXPECTED_COUNT:'15'});markStartup('assert-offline-restart');assertNativeTransition(queued.tables,snapshot().tables);
+ await transport('online');await flow('resume-sync');markStartup('assert-offline-drain');const drained=drainReceipt(queued,acceptedStart,pageStart);await assertCloud(drained.events);
  checks.push('Three enrolled offline writes survive a real native restart and drain with exact original operation/result receipts; all14 tables permit only observed mirrors, acknowledgements and pull cursor changes. Controlled transport outage, not OS airplane mode.');
 
  await transport('drop-push-response-once');const lostStart=wireAccepted.length,lostPages=wirePages.length,pushStart=wirePushes.length;
- await flow('add-logs',{BATCHES:'1',EXPECTED_COUNT:'18'});await until(()=>fault==='push-offline','Observe an actual server commit whose response is lost.');
+ await flow('add-logs',{BATCHES:'1',EXPECTED_COUNT:'18'});markStartup('assert-offline-committed-response');await until(()=>fault==='push-offline','Observe an actual server commit whose response is lost.');
  await transport('offline');const lost=snapshot(),committedLost=new Set(wireAccepted.slice(lostStart).map(result=>result.operationId));assert.equal(lost.pending,3);assert.ok(committedLost.size>0);assert.equal((await remote({inspectBehindFault:true})).length,15+committedLost.size);
- await transport('online');await flow('resume-sync');const replayed=drainReceipt(lost,lostStart,lostPages);await assertCloud(replayed.events);
+ await transport('online');await flow('resume-sync');markStartup('assert-offline-replay');const replayed=drainReceipt(lost,lostStart,lostPages);await assertCloud(replayed.events);
  const mutations=wirePushes.slice(pushStart).flatMap(item=>item.mutations),originals=new Map(lost.tables.local_sync_outbox.map(row=>[row.operation_id,JSON.parse(row.mutation_json)]));
  for(const [operationId,mutation] of originals){const attempts=mutations.filter(item=>item.operationId===operationId);assert.ok(attempts.length>=(committedLost.has(operationId)?2:1),'Retry every real committed operation after its lost acknowledgement.');for(const attempt of attempts)assert.deepEqual(attempt,mutation);}
  checks.push('Losing a real committed push response retries identical operation payloads, records one exact acknowledgement per operation and leaves cloud revisions at1 without duplicates.');
 
- await transport('offline');await flow('add-logs',{BATCHES:'1',EXPECTED_COUNT:'21'});await until(()=>snapshot().pending===3,'Capture unsent changes before pending logout.');
+ await transport('offline');await flow('add-logs',{BATCHES:'1',EXPECTED_COUNT:'21'});markStartup('assert-offline-pending-logout');await until(()=>snapshot().pending===3,'Capture unsent changes before pending logout.');
  const beforeCancel=snapshot(),cloudBefore=await remote({inspectBehindFault:true});
- await flow('sign-out-pending',{ACTION:'cancel',EXPECTED_PENDING:'3'});assertNativeTransition(beforeCancel.tables,snapshot().tables);assert.deepEqual(await remote({inspectBehindFault:true}),cloudBefore);
- await transport('push-offline');const oldSession=cookie;await flow('sign-out-pending',{ACTION:'confirm',EXPECTED_PENDING:'3'});assertNativeDetached(beforeCancel.tables,snapshot().tables);assert.deepEqual(snapshot().events,beforeCancel.events);assert.equal((await inspectSession(oldSession)).status,401,'The real backend must invalidate the old native SDK session when online logout succeeds.');
- await transport('online');await signIn();await flow('enable',{EXPECTED_COUNT:'21'});assert.deepEqual(snapshot().events,beforeCancel.events);assert.equal(snapshot().pending,0);await assertCloud(beforeCancel.events);
+ await flow('sign-out-pending',{ACTION:'cancel',EXPECTED_PENDING:'3'});markStartup('assert-offline-logout-cancel');assertNativeTransition(beforeCancel.tables,snapshot().tables);assert.deepEqual(await remote({inspectBehindFault:true}),cloudBefore);
+ await transport('push-offline');const oldSession=cookie;await flow('sign-out-pending',{ACTION:'confirm',EXPECTED_PENDING:'3'});markStartup('assert-offline-online-logout');assertNativeDetached(beforeCancel.tables,snapshot().tables);assert.deepEqual(snapshot().events,beforeCancel.events);assert.equal((await inspectSession(oldSession)).status,401,'The real backend must invalidate the old native SDK session when online logout succeeds.');
+ await transport('online');await signIn();await flow('enable',{EXPECTED_COUNT:'21'});markStartup('assert-offline-rejoin');assert.deepEqual(snapshot().events,beforeCancel.events);assert.equal(snapshot().pending,0);await assertCloud(beforeCancel.events);
  checks.push('Cancelling logout with three unsent writes preserves every table and remote event; explicit logout detaches only expected association rows, keeps all21 logs, and same-account rejoin uploads the missing history without rewriting existing cloud records.');
- await transport('offline');await flow('add-logs',{BATCHES:'1',EXPECTED_COUNT:'24'});const fullyOffline=snapshot(),unconfirmedCookie=cookie;assert.equal(fullyOffline.pending,3);
- await flow('sign-out-pending',{ACTION:'confirm',EXPECTED_PENDING:'3'});assertNativeDetached(fullyOffline.tables,snapshot().tables);assert.equal((await inspectSession(unconfirmedCookie)).status,200,'Offline local signout cannot claim server-side session revocation.');
- await flow('reopen-guest',{EXPECTED_COUNT:'24',OFFLINE:'true'});assertNativeDetached(fullyOffline.tables,snapshot().tables);
- const detached=snapshot(),afterOfflineLogoutRequests={...requestCounts};await transport('online');await flow('reopen-guest',{EXPECTED_COUNT:'24',OFFLINE:'false'});assertNativeTransition(detached.tables,snapshot().tables);assert.deepEqual(requestCounts,afterOfflineLogoutRequests,'Online cold restart must not recover credentials or restart the detached queue implicitly.');assert.equal((await inspectSession(unconfirmedCookie)).status,200);await signIn();await flow('enable',{EXPECTED_COUNT:'24'});assert.deepEqual(snapshot().events,fullyOffline.events);assert.deepEqual(snapshot().tables.local_revisions,fullyOffline.tables.local_revisions);assert.equal(snapshot().pending,0);await assertCloud(fullyOffline.events);
- const rejoined=snapshot();await flow('reopen',{EXPECTED_COUNT:'24'});assertNativeTransition(rejoined.tables,snapshot().tables);
+ await transport('offline');await flow('add-logs',{BATCHES:'1',EXPECTED_COUNT:'24'});markStartup('assert-offline-disconnected-writes');const fullyOffline=snapshot(),unconfirmedCookie=cookie;assert.equal(fullyOffline.pending,3);
+ await flow('sign-out-pending',{ACTION:'confirm',EXPECTED_PENDING:'3'});markStartup('assert-offline-disconnected-logout');assertNativeDetached(fullyOffline.tables,snapshot().tables);assert.equal((await inspectSession(unconfirmedCookie)).status,200,'Offline local signout cannot claim server-side session revocation.');
+ await flow('reopen-guest',{EXPECTED_COUNT:'24',OFFLINE:'true'});markStartup('assert-offline-guest-restart');assertNativeDetached(fullyOffline.tables,snapshot().tables);
+ const detached=snapshot(),afterOfflineLogoutRequests={...requestCounts};await transport('online');await flow('reopen-guest',{EXPECTED_COUNT:'24',OFFLINE:'false'});markStartup('assert-offline-online-guest-restart');assertNativeTransition(detached.tables,snapshot().tables);assert.deepEqual(requestCounts,afterOfflineLogoutRequests,'Online cold restart must not recover credentials or restart the detached queue implicitly.');assert.equal((await inspectSession(unconfirmedCookie)).status,200);await signIn();await flow('enable',{EXPECTED_COUNT:'24'});markStartup('assert-offline-disconnected-rejoin');assert.deepEqual(snapshot().events,fullyOffline.events);assert.deepEqual(snapshot().tables.local_revisions,fullyOffline.tables.local_revisions);assert.equal(snapshot().pending,0);await assertCloud(fullyOffline.events);
+ const rejoined=snapshot();await flow('reopen',{EXPECTED_COUNT:'24'});markStartup('assert-offline-final-restart');assertNativeTransition(rejoined.tables,snapshot().tables);
  receipts.push({phase:'fully-offline-logout',localCredentialsCleared:true,serverSessionExplicitlyUnconfirmed:true,retainedEvents:24,pendingBefore:3,sameAccountRejoined:true});
  checks.push('Fully disconnected native logout clears local credentials and detaches only expected association rows while preserving24logs/revisions; backend independently confirms remote session is still unrevoked, so no server-signout claim is made. Guest coldrestart and explicit same-account rejoin recover the unsent writes without duplicates.');
 }
@@ -505,6 +513,7 @@ try{
   else try{simctl('terminate',device,app);}catch{}
   markStartup('existing-store-check');
   const old=sqliteDirectory();
+  const requestStoreAbsent=requestOnly&&!existsSync(join(old,'puptime-v2.db'));if(requestOnly)assert.ok(requestStoreAbsent,'Request launch diagnostics require absent app storage before installation.');
   if(standard)assert.ok(!existsSync(join(old,'puptime-v2.db')),'Standard cases require a genuinely fresh task simulator.');
   if(upgrading){assert.ok(!existsSync(join(old,'puptime-v2.db')),'Start the historical case on a genuinely fresh owned simulator.');runtimeInputs=readEnrolledInputs();}
   if(existsSync(join(old,'puptime-v2.db'))){
@@ -533,12 +542,13 @@ try{
   const forward=(req,res)=>{
     requests.add(req.url);
     const pathname=new URL(req.url,front).pathname,route=Object.hasOwn(authRoutes,pathname)?authRoutes[pathname]:undefined;
-    let authResponse;
+    let authResponse,upstreamResponse;const startedAt=performance.now();
     if(req.method==='POST'){if(route==='send-code')identityRequests.sendCode++;if(route==='verify-code')identityRequests.verifyCode++;if(route==='sign-out')identityRequests.signOut++;}
     if(route&&['GET','POST'].includes(req.method)){
-      const entry=authResponse={phase:activeFlow,flowSequence,route,method:req.method,status:null,state:'pending',upstream:'pending'};
+      const entry=authResponse={phase:activeFlow,flowSequence,route,method:req.method,status:null,state:'pending',upstream:'pending',...(route==='send-code'?{elapsedBucket:'pending',upstreamCompleteAtClientClose:null}:{})};
       authResponses.push(entry);if(authResponses.length>64)authResponses.shift();
-      const record=completed=>{if(entry.state!=='pending')return;if(completed)entry.status=res.statusCode;entry.state=completed?'completed':'closed';};
+      // Freeze before downstream-close cleanup can induce an upstream error.
+      const record=completed=>{if(entry.state!=='pending')return;if(completed)entry.status=res.statusCode;if(route==='send-code'){const elapsed=performance.now()-startedAt;entry.elapsedBucket=elapsed<14000?'under-14s':elapsed<16000?'14-to-16s':'at-least-16s';if(!completed)entry.upstreamCompleteAtClientClose=upstreamResponse?.complete??null;}entry.state=completed?'completed':'closed';};
       res.once('finish',()=>record(true));res.once('close',()=>record(false));
     }
 
@@ -559,10 +569,10 @@ try{
     // Wrangler rewrites a matching Origin using the upstream scheme. Forwarding
     // the actual backend Host keeps the original HTTPS Origin intact.
     const outgoing=request('http://127.0.0.1:'+backPort+req.url,{method:req.method,headers:{...req.headers,host:'127.0.0.1:'+backPort}},incoming=>{
-      if(authResponse){authResponse.upstream='headers';authResponse.status=incoming.statusCode??null;}
+      upstreamResponse=incoming;if(authResponse&&authResponse.state==='pending'){authResponse.upstream='headers';authResponse.status=incoming.statusCode??null;}
       const chunks=[];if(pushing||pulling||photoRequest||deletingRequest)incoming.on('data',part=>chunks.push(part));
       incoming.on('end',()=>{
-        if(authResponse)authResponse.upstream='complete';
+        if(authResponse&&authResponse.state==='pending')authResponse.upstream='complete';
         if(newerNativePush&&incoming.statusCode===200&&typeof req.headers.cookie==='string')newerSdkCookie=req.headers.cookie;
         if(incoming.statusCode===200&&(pushing||pulling))try{const bytes=Buffer.concat(chunks),parsed=capturedJson(bytes,incoming.headers['content-encoding']);if(pushing)wireAccepted.push(...pushResponseSchema.parse(parsed).accepted);else wirePages.push(pullPageSchema.parse(parsed));}catch{wireFailure('response',pushing?'push':'pull',incoming.headers['content-encoding'],Buffer.concat(chunks).length);}
         if(photoRequest)photoTransfers.push({method:req.method,path:req.url,status:incoming.statusCode,...(req.method==='POST'?{requestSHA256:createHash('sha256').update(Buffer.concat(body)).digest('hex')}:{responseSHA256:createHash('sha256').update(Buffer.concat(chunks)).digest('hex')})});
@@ -571,11 +581,12 @@ try{
         else if(dropping){res.writeHead(incoming.statusCode,incoming.headers);res.end(Buffer.concat(chunks));}
         finish();
       });
-      incoming.on('error',()=>{if(authResponse)authResponse.upstream='response-error';finish();res.destroy();});
-      incoming.on('close',()=>{if(!incoming.complete){if(authResponse&&authResponse.upstream!=='response-error')authResponse.upstream='response-closed';res.destroy();}finish();});
+      incoming.on('error',()=>{if(authResponse&&authResponse.state==='pending')authResponse.upstream='response-error';finish();res.destroy();});
+      incoming.on('close',()=>{if(!incoming.complete){if(authResponse&&authResponse.state==='pending'&&authResponse.upstream!=='response-error')authResponse.upstream='response-closed';res.destroy();}finish();});
       if(!dropping){res.writeHead(incoming.statusCode,incoming.headers);incoming.pipe(res);}
     });
-    outgoing.on('error',()=>{if(authResponse?.upstream==='pending')authResponse.upstream='request-error';finish();if(!res.headersSent)res.writeHead(502);res.end();});req.pipe(outgoing);
+    res.once('close',()=>{if(!res.writableFinished){outgoing.destroy();finish();}});
+    outgoing.on('error',()=>{if(authResponse?.state==='pending'&&authResponse.upstream==='pending')authResponse.upstream='request-error';finish();if(!res.headersSent)res.writeHead(502);res.end();});req.pipe(outgoing);
   };
   proxy=secureServer({key:readFileSync(keyPath),cert:Buffer.concat([readFileSync(certPath),certificate])},forward);
   proxy.on('tlsClientError',error=>{if(standard){try{writeFileSync(join(output,'fixture-tls-error.json'),JSON.stringify({category:'tls-client-error'})+'\n');}catch{}}else writeFileSync(join(output,'fixture-tls-error.txt'),error.message);});
@@ -664,6 +675,12 @@ try{
   }
   markStartup('candidate-bundle-install');
   simctl('install',device,bundle);
+  if(requestOnly){
+   markStartup('candidate-bundle-launch');
+   await run('xcrun',['simctl','launch',device,app],childEnv,process.cwd(),120000);
+   writeFileSync(join(output,'fixture-launch-preflight.json'),JSON.stringify({stage:'candidate-bundle-launch',status:'passed',freshTaskSimulator:true,storageAbsentBeforeInstall:requestStoreAbsent,controlledBundleInstalled:true},null,2)+'\n');
+   markStartup('candidate-bundle-launch','passed');
+  }
   if(standard){
    const installed=simctl('get_app_container',device,app,'app'),hash=path=>createHash('sha256').update(readFileSync(path)).digest('hex');
    assert.equal(hash(join(installed,'main.jsbundle')),hash(join(bundle,'main.jsbundle')));
@@ -688,13 +705,24 @@ try{
   markStartup('case-assertions');
   if(onboardingSignIn){
     await flow('onboarding-request');
+    markStartup('assert-onboarding-code');
     code=auth.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(email)?.code;
     assert.match(code??'',/^\d{6}$/);codes.add(code);
     await flow('onboarding-verify');code='';
+    markStartup('assert-onboarding-session');
     assert.ok(cookie,'Welcome sign-in must persist the real SDK session.');
+    markStartup('assert-onboarding-local-state');
     assert.equal(snapshot().events.length,0);assert.equal(snapshot().owner.length,0);assert.equal(snapshot().pending,0);
+    markStartup('assert-onboarding-no-upload');
     assert.ok(!requests.has('/api/cloud/enroll')&&!requests.has('/api/sync/push'),'Sign-in must not enroll or upload.');
     checks.push('welcome email sign-in uses the real SDK, rejects a wrong code, resumes setup after verification and cold restart, and never enrolls or uploads');
+  }
+  if(requestOnly){
+   await flow('prepare',{REQUEST_PRELAUNCHED:'true'});const before=snapshot();await flow('request');
+   const preview=auth.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(email);assert.ok(typeof preview?.code==='string'&&/^\d{6}$/.test(preview.code),'The isolated request must deliver a valid local preview.');
+   assert.deepEqual(snapshot(),before);assert.equal(auth.prepare('SELECT id FROM user WHERE email=?').get(email),undefined);assert.equal(identityRequests.verifyCode,0);assert.equal(requestCounts.enroll,0);assert.equal(requestCounts.push,0);
+   writeFileSync(join(output,'fixture-auth-readiness.json'),JSON.stringify({phase:'request',flowSequence,ui:{inspected:false},responses:authResponses},null,2)+'\n');
+   checks.push('Request-only diagnostic: normal account email request reaches code entry and a real local preview without verification, account creation, enrollment, upload or local history changes.');
   }
   if(comparing)await verifyPuppyComparison();
   if(offline)await verifyOfflineLifecycle();
@@ -702,7 +730,7 @@ try{
   if(photographing)await verifyPhotoLifecycle();
   if(deletionFaults)await verifyDeletionFaults();
   if(upgrading)await verifyEnrolledRuntimeUpgrade();
-  if(!onboardingSignIn&&!deleting&&!comparing&&!offline&&!isolating&&!photographing&&!deletionFaults&&!upgrading){
+  if(!requestOnly&&!onboardingSignIn&&!deleting&&!comparing&&!offline&&!isolating&&!photographing&&!deletionFaults&&!upgrading){
   await flow('prepare');assert.equal(snapshot().events.length,0);
   assert.ok(requests.has('/api/config'),'The real app must reach this isolated backend before any sign-in attempt.');
   await flow('add-logs',{BATCHES:'4',EXPECTED_COUNT:'12'});const guest=snapshot();assert.equal(guest.events.length,12);assert.equal(guest.owner.length,0);
@@ -741,11 +769,12 @@ try{
    await flow('delete-confirm');assert.equal(auth.prepare('SELECT id FROM user WHERE id=?').all(owner).length,0);assert.deepEqual(snapshot().events,before.events);assert.equal(snapshot().owner.length,0);
    checks.push('native system confirmation cancels safely; stale auth uses real same-account OTP and a new confirmation; confirmed deletion removes the actual account, retains all 12 logs and offers manual Apple cleanup for a tokenless synthetic link');
   }
+  markStartup('assert-task-completion');
   assert.equal(task.signal,null);
   rmSync(join(output,'failure-redacted.log'),{force:true});
-  writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',checks,receipts,...(upgrading?{stage:'controlled-origin-enrolled-runtime-replacement',upgradeExecuted:true,originModified:true,originalInstalledBytes:false,runtimes:runtimeProvenance}:{}),scope:upgrading?'Exact historical source/native pairs with controlled-origin release JS and ad-hoc signing; actual native SDK and isolated local HTTPS Better Auth/D1/SQLite DO. No credential injection, owner data, provider OAuth, untouched-original, numeric store or final current-candidate qualification.':android?'Android Debug native host with normal embedded release JS and isolated local HTTPS Better Auth/D1/SQLite DO; actual native email SDK and Keystore. Its temporary CA is trusted only in the ignored Debug source set, restored after the run. Production onboarding is tested separately in the Release APK. No real email, production account, session injection or mocked sync.':'Release bundle and actual native email SDK with isolated local HTTPS Better Auth/D1/SQLite DO. Simulator trusts the fixture certificate. No real email, production account, session injection or mocked sync.'},null,2)+'\n');
+  writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',checks,receipts,...(requestOnly?{stage:'request-only-diagnostic',diagnosticOnly:true,releaseQualified:false}:{}),...(upgrading?{stage:'controlled-origin-enrolled-runtime-replacement',upgradeExecuted:true,originModified:true,originalInstalledBytes:false,runtimes:runtimeProvenance}:{}),scope:upgrading?'Exact historical source/native pairs with controlled-origin release JS and ad-hoc signing; actual native SDK and isolated local HTTPS Better Auth/D1/SQLite DO. No credential injection, owner data, provider OAuth, untouched-original, numeric store or final current-candidate qualification.':android?'Android Debug native host with normal embedded release JS and isolated local HTTPS Better Auth/D1/SQLite DO; actual native email SDK and Keystore. Its temporary CA is trusted only in the ignored Debug source set, restored after the run. Production onboarding is tested separately in the Release APK. No real email, production account, session injection or mocked sync.':'Release bundle and actual native email SDK with isolated local HTTPS Better Auth/D1/SQLite DO. Simulator trusts the fixture certificate. No real email, production account, session injection or mocked sync.'},null,2)+'\n');
   completed=true;markStartup('case-result','passed');
-  console.log('PASS '+(upgrading?'controlled-origin enrolled runtime replacement':deletionFaults?'pending native deletion cancellation, retries and lost response':photographing?'native profile photo failure, roundtrip and restore':isolating?'expired session and account isolation':offline?'offline writes, replay and pending logout':deleting?'native account deletion':comparing?'named puppy comparison':onboardingSignIn?'welcome sign-in and session recovery':android?'guest account preservation and empty-database recovery':'guest account preservation and inspected empty-device recovery')+': '+output);
+  console.log('PASS '+(requestOnly?'request-only diagnostic':upgrading?'controlled-origin enrolled runtime replacement':deletionFaults?'pending native deletion cancellation, retries and lost response':photographing?'native profile photo failure, roundtrip and restore':isolating?'expired session and account isolation':offline?'offline writes, replay and pending logout':deleting?'native account deletion':comparing?'named puppy comparison':onboardingSignIn?'welcome sign-in and session recovery':android?'guest account preservation and empty-database recovery':'guest account preservation and inspected empty-device recovery')+': '+output);
   }
 }catch(error){markStartup(startupStage,'failed',error);
  if(standard){

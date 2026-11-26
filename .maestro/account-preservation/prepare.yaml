@@ -1,10 +1,14 @@
 appId: com.patrickchin.puptime
 name: Account preservation prepare
 ---
-- launchApp:
-    clearState: true
-    permissions:
-      notifications: deny
+- runFlow:
+    when:
+      true: ${typeof REQUEST_PRELAUNCHED === 'undefined' || REQUEST_PRELAUNCHED !== 'true'}
+    commands:
+      - launchApp:
+          clearState: true
+          permissions:
+            notifications: deny
 - runFlow: ../helpers/skip-onboarding.yaml
 - assertVisible:
     id: screen.today
