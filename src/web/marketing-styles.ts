@@ -30,7 +30,14 @@ body:has(.marketing-site){overflow-y:auto}
 .hero-copy>p:first-of-type{font-size:var(--lead);line-height:1.4;max-width:33ch;margin-top:28px}
 .primary-action{background:var(--lime);color:var(--ink)!important;display:inline-flex;justify-content:space-between;align-items:center;gap:48px;padding:16px 24px;margin-top:32px;min-height:56px;font-weight:700;border-radius:0}
 .primary-action:hover{transform:translateY(-3px)}
+.hero-actions{scroll-margin-top:24px}
+.download-options{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:32px}
+.download-options .primary-action{margin-top:0;gap:40px}
+.ios-status{display:inline-flex;align-items:center;min-height:56px;padding:16px 22px;border:1px dashed color-mix(in srgb,currentColor 60%,transparent);font-weight:500}
+.apk-note{margin-top:16px;font-size:var(--small)}
 .hero-note{margin-top:20px;font-size:var(--small)}
+.apk-note+.hero-note{margin-top:4px}
+.hero-actions .text-action{margin-top:12px}
 .hero-art{position:relative;align-self:stretch;display:flex;align-items:center;justify-content:center;min-width:0}
 .hero-puppy{width:100%;max-width:520px;height:auto;aspect-ratio:1;object-fit:contain}
 .chapter{padding:80px var(--margin);scroll-margin-top:24px}
@@ -96,7 +103,7 @@ body:has(.marketing-site){overflow-y:auto}
   .marketing-site{--margin:20px;--lead:22px;--heading:clamp(42px,13.3vw,52px);--display:clamp(36px,10vw,56px)}
   .hero{display:flex;flex-direction:column;align-items:stretch;min-height:0;padding-top:38px;padding-bottom:0}
   .hero-copy{padding-bottom:0}.hero h1{max-width:none}.hero-copy>p:first-of-type{margin-top:28px;max-width:31ch;font-size:18px;line-height:1.45}
-  .primary-action{margin-top:24px;padding:13px 20px;min-height:52px}.hero-note{margin-top:16px}
+  .primary-action{margin-top:24px;padding:13px 20px;min-height:52px}.download-options{margin-top:24px}.ios-status{min-height:52px;padding:13px 20px}.hero-note{margin-top:16px}
   .hero-art{height:350px;align-self:center;width:100%;margin-top:-12px}.hero-puppy{width:370px;max-width:110%;margin:0}
   .chapter{padding-top:64px;padding-bottom:64px;display:flex;flex-direction:column;gap:40px;min-height:0}
   .app-chapter{gap:36px}.preview-choices{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:28px 0 24px}
@@ -111,7 +118,7 @@ ${siteChromeStyles}
 .site-page{min-height:100svh;display:flex;flex-direction:column}.site-page>main{flex:1 0 auto;width:100%}
 @media(prefers-reduced-motion:no-preference){
   .hero h1{animation:title-arrive 900ms var(--ease) both}.hero-copy>p:first-of-type{animation:text-arrive 900ms 80ms var(--ease) both}
-  .hero .primary-action{animation:text-arrive 900ms 160ms var(--ease) both}.hero-note{animation:text-arrive 900ms 240ms var(--ease) both}
+  .hero .download-options{animation:text-arrive 900ms 160ms var(--ease) both}.hero-actions>p,.hero-actions>.text-action{animation:text-arrive 900ms 240ms var(--ease) both}
   .hero-puppy{animation:puppy-arrive 1200ms var(--ease) both}
   [data-reveal].arrived{animation:text-arrive 850ms var(--ease) both}
   .phone-frame.arrived,.care-art.arrived{animation:picture-arrive 1100ms var(--ease) both}

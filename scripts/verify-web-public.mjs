@@ -32,7 +32,8 @@ try{
    await page.setViewportSize({width,height:width<600?844:900});await page.goto(origin+path);await page.locator('.site-footer').waitFor();
    const found=await page.evaluate(chrome);footer??=found.footer;
    assert.equal(found.brand,'/');assert.deepEqual(found.footer,footer,`Footer differs on ${path}`);assert.equal(found.analytics,analytics,`Analytics settings on ${path}`);
-   assert.deepEqual(found.header.map(item=>item.split('|').slice(0,2).join('|')),['The app|/#app','Puppy care|/puppy-care/']);
+   assert.deepEqual(found.header.map(item=>item.split('|').slice(0,2).join('|')),['The app|/#app','Puppy care|/puppy-care/','Get Puptime|/#get-puptime']);
+   assert.ok(await page.getByRole('link',{name:'Get Puptime',exact:true}).isVisible(),`Get Puptime hidden on ${path} at ${width}px`);
    assert.deepEqual(found.header.filter(item=>!item.endsWith('|null')).map(item=>item.split('|')[0]),current?[current]:[],`Current header item on ${path}`);
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`Overflow on ${path} at ${width}px`);
    assert.ok(await page.locator('.site-header').evaluate(element=>element.getBoundingClientRect().height<100),`Header wraps on ${path} at ${width}px`);
@@ -40,6 +41,24 @@ try{
  }
  assert.deepEqual(footer,['Product|null','The app|/#app','Puppy care|/puppy-care/','Download Android APK|/download/android.apk','Help|null','Support|/support','Privacy|/privacy','Delete cloud account|/delete-account','Source|null','GitHub\u00a0↗|https://github.com/patrickchin/puptime']);
  await page.goto(origin+'/delete-account');assert.equal(await page.locator('meta[name=referrer]').getAttribute('content'),'no-referrer');assert.match(await page.locator('meta[name=robots]').getAttribute('content'),/noindex/);
+ // Static HTML offers both platforms; hydration narrows the hero to the visitor's phone.
+ const staticHome=readFileSync(join(root,'index.html'),'utf8');assert.ok(staticHome.includes('Download for Android')&&staticHome.includes('iPhone app coming soon'));
+ for(const [device,userAgent,android,iphone] of [['android','Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Mobile Safari/537.36',1,0],['iphone','Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',0,1],['desktop','Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36',1,1]]){
+  for(const width of [1440,390,320]){
+   const visitor=await browser.newContext({viewport:{width,height:width<600?844:900},isMobile:width<600&&device!=='desktop',hasTouch:width<600&&device!=='desktop',userAgent});
+   await visitor.route('**/*',route=>{const url=new URL(route.request().url());if(url.origin!==origin){external.push(url.origin);return route.abort();}return route.continue();});
+   const home=await visitor.newPage();home.on('pageerror',error=>errors.push(error.message));await home.goto(origin);
+   const download=home.getByRole('link',{name:'Download for Android',exact:true}),ios=home.getByText('iPhone app coming soon',{exact:true});
+   await home.waitForFunction(([android,iphone])=>document.querySelectorAll('.download-options .primary-action').length===android&&document.querySelectorAll('.ios-status').length===iphone,[android,iphone]);
+   if(android){assert.equal(await download.getAttribute('href'),'/download/android.apk');await home.getByText('Installs from an APK file – allow installs from your browser when asked.',{exact:true}).waitFor();}
+   if(iphone)assert.equal(await home.locator('.ios-status').evaluate(element=>element.tagName),'P','iPhone status must not look like a download.');
+   await home.getByText('Free local logging. No account needed.',{exact:true}).waitFor();assert.equal(await home.getByRole('link',{name:'See the app',exact:true}).getAttribute('href'),'#app');
+   assert.ok(await home.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`Overflow for ${device} at ${width}px`);
+   await home.screenshot({path:join(screenshots,`download-${device}-${width}.png`)});
+   await home.evaluate(()=>scrollTo(0,document.body.scrollHeight));await home.getByRole('link',{name:'Get Puptime',exact:true}).click();await home.waitForFunction(()=>location.hash==='#get-puptime'&&Math.abs(document.getElementById('get-puptime').getBoundingClientRect().top)<innerHeight);
+   await visitor.close();
+  }
+ }
  const id='shr_'+'a'.repeat(32),token='inv_'+'b'.repeat(32);
  for(const [path,target,name] of [['/account','puptime://','account-handoff'],['/care','puptime://','care-handoff'],[`/care?invite=${id}#${token}`,`puptime://care?invite=${id}#${token}`,'invitation-handoff']]){
   await page.goto(origin+path);const link=page.getByRole('link',{name:'Open Puptime',exact:true});await link.waitFor();assert.equal(await link.getAttribute('href'),target);assert.equal(await page.locator('form,input').count(),0);assert.equal(await page.evaluate(()=>window.storageWrites.length),0);assert.equal(await page.locator('meta[name=referrer]').getAttribute('content'),'no-referrer');assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:join(screenshots,name+'.png'),fullPage:true});
@@ -53,6 +72,6 @@ try{
  await page.goto(origin+'/care?invite=bad#invalid');await page.getByRole('heading',{name:'Check your invitation',exact:true}).waitFor();assert.equal(await page.getByRole('link',{name:'Open Puptime',exact:true}).count(),0);
  assert.deepEqual(api,[]);assert.deepEqual(external,[]);assert.deepEqual(errors,[]);assert.ok(requests.every(url=>!url.includes(token)));
  writeFileSync(join(output,'verification.json'),JSON.stringify({passed:true,scope:'Local static website only; no backend, authentication, browser storage writes, external provider or private-data requests.',widths:[1440,390,320]},null,2));
- console.log('PASS shared header and footer on every template, public navigation, responsive handoffs, native invitation credentials, invalid-link recovery, and zero browser authentication/storage/private-data requests.');
+ console.log('PASS shared header and footer on every template, platform-aware download actions, public navigation, responsive handoffs, native invitation credentials, invalid-link recovery, and zero browser authentication/storage/private-data requests.');
  await context.close();
 }finally{await browser.close();await new Promise(done=>server.close(done));}

@@ -1,4 +1,5 @@
 import { privacyPath, supportPath } from '../public-site.ts';
+import type { WebsiteDestination } from './telemetry-policy.ts';
 
 // Shared by the React pages (SiteChrome.tsx) and the static privacy/support HTML (scripts/build-web-seo.ts).
 export const sourceUrl = 'https://github.com/patrickchin/puptime';
@@ -6,10 +7,12 @@ export const androidDownloadPath = '/download/android.apk';
 export const deleteAccountPath = '/delete-account';
 export const siteTagline = 'Potty training and puppy routines, one log at a time.';
 
-export type ChromeLink = { label: string; href: string; external?: boolean; event?: 'source' };
-export const headerLinks: ChromeLink[] = [{ label: 'The app', href: '/#app' }, { label: 'Puppy care', href: '/puppy-care/' }];
+export type ChromeLink = { label: string; href: string; external?: boolean; event?: WebsiteDestination; wide?: boolean };
+// Phones swap The app for the Get Puptime action so the header still fits at 320px.
+export const headerLinks: ChromeLink[] = [{ label: 'The app', href: '/#app', wide: true }, { label: 'Puppy care', href: '/puppy-care/' }];
+export const headerAction: ChromeLink = { label: 'Get Puptime', href: '/#get-puptime', event: 'get_puptime' };
 export const footerColumns: { title: string; links: ChromeLink[] }[] = [
-  { title: 'Product', links: [...headerLinks, { label: 'Download Android APK', href: androidDownloadPath }] },
+  { title: 'Product', links: [...headerLinks, { label: 'Download Android APK', href: androidDownloadPath, event: 'android_download' }] },
   { title: 'Help', links: [{ label: 'Support', href: supportPath }, { label: 'Privacy', href: privacyPath }, { label: 'Delete cloud account', href: deleteAccountPath }] },
   { title: 'Source', links: [{ label: 'GitHub', href: sourceUrl, external: true, event: 'source' }] },
 ];
@@ -24,10 +27,10 @@ export function headerCurrent(href: string, path: string): 'page' | 'true' | und
 export const footerCurrent = (href: string, path: string) => href === path || (href === '/puppy-care/' && path === '/puppy-care') ? 'page' as const : undefined;
 
 const attribute = (name: string, value?: string) => value ? ` ${name}="${value}"` : '';
-const linkHtml = ({ label, href, external }: ChromeLink, current?: string) => `<a href="${href}"${attribute('aria-current', current)}>${label}${external ? '&nbsp;<span aria-hidden="true">↗</span>' : ''}</a>`;
+const linkHtml = ({ label, href, external }: ChromeLink, current?: string, className?: string) => `<a${attribute('class', className)} href="${href}"${attribute('aria-current', current)}>${label}${external ? '&nbsp;<span aria-hidden="true">↗</span>' : ''}</a>`;
 
 export function siteHeaderHtml(path: string) {
-  return `<header class="site-header"><a class="site-brand" href="/" aria-label="Puptime home"><img src="/brand-icon.png" width="38" height="38" alt="">Puptime</a><nav aria-label="Website">${headerLinks.map((link) => linkHtml(link, headerCurrent(link.href, path))).join('')}</nav></header>`;
+  return `<header class="site-header"><a class="site-brand" href="/" aria-label="Puptime home"><img src="/brand-icon.png" width="38" height="38" alt=""><span class="brand-name">Puptime</span></a><nav aria-label="Website">${headerLinks.map((link) => linkHtml(link, headerCurrent(link.href, path), link.wide ? 'wide-only' : undefined)).join('')}${linkHtml(headerAction, undefined, 'header-cta')}</nav></header>`;
 }
 
 export function siteFooterHtml(path: string) {
@@ -48,6 +51,9 @@ export const siteChromeStyles = `
 .site-header nav a{display:flex;align-items:center;min-height:44px;white-space:nowrap;text-underline-offset:8px}
 .site-header nav a:hover{text-decoration:underline;text-decoration-thickness:1px}
 .site-header nav a[aria-current]{text-decoration:underline;text-decoration-thickness:3px}
+.site-header nav a.header-cta{padding:0 18px;background:var(--deep);color:var(--paper);font-size:.9em;font-weight:700;text-decoration:none;transition:transform 180ms ease}
+.site-header nav a.header-cta:hover{transform:translateY(-2px)}
+.site-header.dark nav a.header-cta{background:var(--lime);color:var(--ink)}
 .site-footer{background:var(--paper);padding:48px var(--chrome-margin) 40px;border-top:1px solid var(--border);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:40px 64px;align-items:start;overflow:clip}
 .site-footer :where(p,h2,ul,li){margin:0;padding:0}
 .site-footer .footer-wordmark{font-family:'Red Hat Display',sans-serif;font-size:32px;letter-spacing:-.065em;font-weight:900;line-height:.9;margin-left:-.04em}
@@ -66,8 +72,8 @@ export const siteChromeStyles = `
 @media(max-width:600px){
   .site-header,.site-footer{--chrome-margin:20px}
   .site-header{gap:12px;padding-top:16px;padding-bottom:16px}.site-header .site-brand{font-size:22px;gap:8px}.site-brand img{width:30px;height:30px;border-radius:8px}
-  .site-header nav{gap:20px;font-size:16px}
+  .site-header nav{gap:16px;font-size:16px}.site-header nav .wide-only{display:none}.site-header nav a.header-cta{padding:0 14px}
   .site-footer{padding-top:40px;gap:32px}.footer-columns{grid-template-columns:1fr 1fr;gap:24px 20px}.footer-columns :where(a,button){white-space:normal}
 }
-@media(max-width:360px){.site-header{gap:8px}.site-header .site-brand{font-size:20px;gap:6px}.site-brand img{width:28px;height:28px}.site-header nav{gap:14px;font-size:15px}}
+@media(max-width:360px){.site-header{gap:8px}.site-header .site-brand .brand-name{display:none}.site-brand img{width:32px;height:32px}.site-header nav{gap:12px;font-size:15px}.site-header nav a.header-cta{padding:0 10px}}
 `;

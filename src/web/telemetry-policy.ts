@@ -3,6 +3,9 @@ import { publicPaths } from './site.ts';
 export const consentKey = 'puptime.website.analytics';
 export const telemetryPaths=publicPaths;
 export type WebsiteEvent = 'website_page_view' | 'website_cta' | 'website_error';
+// Download and app-preview actions, the header's Get Puptime action, and source-code visits.
+export const websiteDestinations = ['android_download', 'app_preview', 'get_puptime', 'source'] as const;
+export type WebsiteDestination = typeof websiteDestinations[number];
 
 // The final boundary also strips SDK-added URLs, referrers, text and campaign values.
 export function sanitizeWebsiteEvent<T extends { event: string; properties: Record<string, unknown> }>(event: T): T | null {
@@ -13,7 +16,7 @@ export function sanitizeWebsiteEvent<T extends { event: string; properties: Reco
   for (const key of ['distinct_id', '$device_id', '$session_id', '$window_id', '$lib', '$lib_version', 'token']) {
     if (typeof input[key] === 'string') properties[key] = input[key];
   }
-  if (['android_download', 'source'].includes(String(input.destination))) properties.destination = input.destination;
+  if ((websiteDestinations as readonly unknown[]).includes(input.destination)) properties.destination = input.destination;
   if (['script', 'unhandled_rejection', 'render'].includes(String(input.error_kind))) properties.error_kind = input.error_kind;
   return { ...event, properties };
 }
