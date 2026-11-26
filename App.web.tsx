@@ -89,6 +89,7 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
           <p>Log potty breaks, spot your puppy’s patterns, and build a daily routine with Puptime.</p>
           <a className="primary-action" href="#app">See the app <span aria-hidden="true">↘</span></a>
           <p className="hero-note">Free local logging. No account needed.</p>
+          <a className="text-action" href="/download/android.apk">Download Android APK</a>
         </div>
         <div className="hero-art"><img className="hero-puppy" src={puppy} alt="Puptime’s scruffy terrier, ready for the day" width="1024" height="1024" fetchPriority="high" /></div>
       </section>
