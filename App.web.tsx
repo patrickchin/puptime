@@ -34,7 +34,7 @@ function PhoneFrame({ children, reveal = false }: { children: ReactNode; reveal?
 }
 
 function SourceLink({ className = '', children = 'View the source' }: { className?: string; children?: string }) {
-  return <a className={className} href={sourceUrl} onClick={() => captureWebsiteEvent('website_cta', { destination: 'source' })}>{children}</a>;
+  return <a className={className} href={sourceUrl} onClick={() => captureWebsiteEvent('website_cta', { destination: 'source' })}>{children}&nbsp;<span aria-hidden="true">↗</span></a>;
 }
 
 function Header({ learning = false }: { learning?: boolean }) {
@@ -87,7 +87,7 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
         <div className="hero-copy">
           <h1 id="hero-title">A little help with<br />potty training.</h1>
           <p>Log potty breaks, spot your puppy’s patterns, and build a daily routine with Puptime.</p>
-          <a className="primary-action" href="#app">See the app <span aria-hidden="true">↘</span></a>
+          <a className="primary-action" href="#app">See the app <span aria-hidden="true">↓</span></a>
           <p className="hero-note">Free local logging. No account needed.</p>
           <a className="text-action" href="/download/android.apk">Download Android APK</a>
         </div>
@@ -98,7 +98,7 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
         <div className="preview-copy">
           <h2 id="app-title" data-reveal>Log a break</h2>
           <div className="preview-choices" role="group" aria-label="App screens" data-reveal>
-            {previews.map((preview, index) => <button type="button" key={preview.name} aria-pressed={selected === index} aria-controls="app-preview" onClick={() => setSelected(index)}>{preview.name}<span aria-hidden="true">↗</span></button>)}
+            {previews.map((preview, index) => <button type="button" key={preview.name} aria-pressed={selected === index} aria-controls="app-preview" onClick={() => setSelected(index)}>{preview.name}</button>)}
           </div>
           <p className="preview-description" aria-live="polite" aria-atomic="true">{previews[selected].description}</p>
           <p className="small-copy">From the app, with example puppy logs.</p>

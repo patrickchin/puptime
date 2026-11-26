@@ -31,7 +31,7 @@ body:has(.marketing-site){overflow-y:auto}
 .marketing-site:not(.care-page) .site-header{background:var(--deep);color:var(--paper)}
 .hero{position:relative;display:grid;grid-template-columns:1.1fr 1fr;gap:24px;align-items:center;min-height:640px;padding:40px var(--margin) 64px;background:var(--deep);color:var(--paper);overflow:clip}
 .hero-copy{position:relative;z-index:1;padding-bottom:30px}
-.hero h1{font-size:var(--display);letter-spacing:-.045em;line-height:.94;max-width:10em}
+.hero h1{font-size:var(--display);letter-spacing:-.028em;line-height:.94;max-width:10em}
 .hero-copy>p:first-of-type{font-size:var(--lead);line-height:1.4;max-width:33ch;margin-top:28px}
 .primary-action{background:var(--lime);color:var(--ink)!important;display:inline-flex;justify-content:space-between;align-items:center;gap:48px;padding:16px 24px;margin-top:32px;min-height:56px;font-weight:700;border-radius:0}
 .primary-action:hover{transform:translateY(-3px)}
@@ -45,8 +45,6 @@ body:has(.marketing-site){overflow-y:auto}
 .preview-choices button{display:flex;align-items:center;justify-content:space-between;text-align:left;background:transparent;border:0;padding:10px 16px;font-size:var(--lead);min-height:52px}
 .preview-choices button[aria-pressed=true]{background:var(--mint);color:var(--ink);font-weight:900}
 .preview-choices button:hover{transform:translateX(5px)}
-.preview-choices button span{opacity:0}
-.preview-choices button[aria-pressed=true] span{opacity:1}
 .preview-description{max-width:36ch;min-height:4.5em}
 .small-copy{font-size:var(--small);margin-top:24px}
 .app-preview{justify-self:center;width:min(100%,360px);position:relative}
