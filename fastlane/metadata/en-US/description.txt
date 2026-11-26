@@ -18,3 +18,5 @@ Export your activities as a CSV, or import a backup to recover missing entries w
 Voice dictation uses your device’s speech-recognition service and may need an internet connection. The starter routine is an editable example. Adjust it with your veterinarian’s guidance.
 
 Usage analytics are optional and off by default. You can change this choice in Settings. Puptime does not include advertising.
+
+Usage analytics are optional and off by default. You can change this choice in Settings. Puptime does not include advertising.

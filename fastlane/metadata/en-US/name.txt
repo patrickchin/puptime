@@ -1,5 +1,1 @@
-<<<<<<< HEAD
 Puptime: Puppy Potty Log
-=======
-Puptime: Puppy Potty Tracker
->>>>>>> 4568ff4 (Prepare English App Store listing and native media assets)

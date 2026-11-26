@@ -1,8 +1,8 @@
 # English App Store presence
 
-Prepared October 27–28 and refreshed November 12, 2026 after rebasing onto
-`fb092d8`. These are candidate assets for Puptime 1.12.0, not a published listing
-or evidence of Apple approval. The broader localization work is deferred at the
+Prepared October 27–28 and refreshed November 12, 2026. The branch was rebased
+onto `260c121` on November 26 and the everyday logging video was recorded again.
+These are candidate assets for Puptime 1.12.0. The broader localization work is deferred at the
 owner's request. During the October preparation, App Store Connect required
 sign-in and Apple's
 US public lookup returned no record for 6813823575. Neither observation has been
@@ -12,9 +12,9 @@ rechecked in this refresh; neither establishes availability in other storefronts
 
 | Item | Candidate |
 | --- | --- |
-| Name | Puptime: Puppy Potty Tracker (28 characters) |
+| Name | Puptime: Puppy Potty Log (24 characters) |
 | Subtitle | Meals, routines & reminders (27 characters) |
-| Keywords | 92 characters; relevant terms, no repeats from name/subtitle/categories |
+| Keywords | 97 characters with no repeats from the title, subtitle, or categories |
 | Description | Leads with remembering the last potty break; retains offline, cloud, CSV, and dictation distinctions |
 | Promo text | 129 characters; a concrete reason to download |
 | Categories | Lifestyle / Utilities, retained because they fit the current product |
@@ -74,21 +74,23 @@ timeline. It demonstrates the primary quick-logging flow before secondary
 editing and routine features. This ordering reflects the product's core task,
 not measured usage analytics.
 
-This eight-second cut uses a fresh native recording with the new app animations.
-Actions run at normal speed. A 2.4-second unchanged-screen wait is removed; no
-screen transition is added. Two editorial aim/press/release cues identify the
+This eight-second cut uses a fresh recording from a local Release simulator
+build of the rebased branch and a capture-only clock. Actions run at normal
+speed, with 2.5 seconds of waiting trimmed. The app supplies the screen
+transition. Two editorial tap cues identify the
 actual taps, with positions taken from the captured control bounds. Source
 ranges, tap timings, and the video hash are in `daily-logging-edit.json` beside
 the video. The cut was reviewed at the taps, result, idle splice, and native
-screen fade. The capture replaced only the previous scripted demo event; all
-338 original CSV records remain unchanged and personal notes remain omitted.
+screen fade. The new simulator started with all 338 original activities.
+The run added a single demo pee and omitted personal notes. A database
+comparison and checksum verified the original activities and source CSV.
 
 This is the short opening-flow review cut, not a standalone App Store upload:
 it is below the store preview's 15-second minimum. The longer candidate listed
 above is unchanged. Use this common flow first when assembling the next store
 preview, then choose supporting features to meet the required duration.
 Native footage, screenshots, and visual checks are under
-`~/Pictures/Screenshots/Codex/puptime-app-store/20261112/daily-logging/`.
+`~/Pictures/Screenshots/Codex/puptime-app-store/20261126/daily-logging/`.
 To record this flow on the seeded task simulator:
 
 ```sh

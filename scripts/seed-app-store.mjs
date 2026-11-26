@@ -15,7 +15,7 @@ const [udid,csvPath]=process.argv.slice(2),app='com.patrickchin.puptime';
 assert.ok(csvPath,'Supply the original activity CSV; it stays outside version control.');
 const simctl=(...args)=>execFileSync('xcrun',['simctl',...args],{encoding:'utf8'}).trim();
 const devices=Object.values(JSON.parse(simctl('list','devices','available','-j')).devices).flat();
-assert.match(devices.find(device=>device.udid===udid)?.name??'',/^Puptime 459e App Store (iPhone|iPad) 20261112$/);
+assert.match(devices.find(device=>device.udid===udid)?.name??'',/^Puptime 459e App Store (iPhone|iPad) [0-9]{8}$/);
 try{simctl('terminate',udid,app);}catch{}
 const directory=join(simctl('get_app_container',udid,app,'data'),'Documents/SQLite');
 const target=join(directory,'puptime-v2.db');

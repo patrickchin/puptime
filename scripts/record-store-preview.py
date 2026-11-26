@@ -9,6 +9,7 @@ Then: python3 scripts/edit-store-preview.py NEW_CAPTURE_DIRECTORY/recording.json
 import json
 import os
 from pathlib import Path
+import re
 import signal
 import subprocess
 import sys
@@ -18,7 +19,8 @@ udid, directory, *flow_arguments = sys.argv[1:]
 assert len(flow_arguments) <= 1, 'Supply at most one capture flow.'
 flow = flow_arguments[0] if flow_arguments else 'fastlane/preview.yaml'
 devices = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', 'devices', 'available', '-j']))
-assert any(d['udid'] == udid and d['name'] == 'Puptime 459e App Store iPhone 20261112' for group in devices['devices'].values() for d in group)
+assert any(d['udid'] == udid and re.fullmatch(r'Puptime 459e App Store iPhone [0-9]{8}', d['name'])
+           for group in devices['devices'].values() for d in group), 'Use the dedicated App Store capture iPhone.'
 destination = Path(directory).expanduser().resolve()
 destination.mkdir(parents=True, exist_ok=False)
 raw = destination / 'preview.raw.mov'
