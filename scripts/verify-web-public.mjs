@@ -28,7 +28,7 @@ try{
  const chrome=()=>({header:[...document.querySelectorAll('.site-header nav a')].map(a=>`${a.textContent}|${a.getAttribute('href')}|${a.getAttribute('aria-current')}`),footer:[...document.querySelectorAll('.site-footer .footer-columns :is(h2,a)')].map(e=>`${e.textContent}|${e.getAttribute('href')}`),analytics:document.querySelectorAll('.site-footer button').length,brand:document.querySelector('.site-header .site-brand')?.getAttribute('href')});
  let footer;
  for(const [path,current,analytics] of [['/','The app',1],['/puppy-care/','Puppy care',1],['/puppy-care/feeding','Puppy care',1],['/privacy',null,0],['/support',null,0],['/delete-account',null,0],['/care',null,0],['/404',null,0]]){
-  for(const width of [1440,320]){
+  for(const width of [1440,430,390,360,320]){
    await page.setViewportSize({width,height:width<600?844:900});await page.goto(origin+path);await page.locator('.site-footer').waitFor();
    const found=await page.evaluate(chrome);footer??=found.footer;
    assert.equal(found.brand,'/');assert.deepEqual(found.footer,footer,`Footer differs on ${path}`);assert.equal(found.analytics,analytics,`Analytics settings on ${path}`);
@@ -37,6 +37,7 @@ try{
    assert.deepEqual(found.header.filter(item=>!item.endsWith('|null')).map(item=>item.split('|')[0]),current?[current]:[],`Current header item on ${path}`);
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`Overflow on ${path} at ${width}px`);
    assert.ok(await page.locator('.site-header').evaluate(element=>element.getBoundingClientRect().height<100),`Header wraps on ${path} at ${width}px`);
+   assert.ok(await page.evaluate(()=>document.querySelector('.site-header nav').getBoundingClientRect().left-document.querySelector('.site-brand').getBoundingClientRect().right>=24),`Header brand and nav crowd on ${path} at ${width}px`);
   }
  }
  assert.deepEqual(footer,['Product|null','The app|/#app','Puppy care|/puppy-care/','Download Android APK|/download/android.apk','Help|null','Support|/support','Privacy|/privacy','Delete cloud account|/delete-account','Source|null','GitHub\u00a0↗|https://github.com/patrickchin/puptime']);

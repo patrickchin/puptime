@@ -8,7 +8,7 @@ export const deleteAccountPath = '/delete-account';
 export const siteTagline = 'Potty training and puppy routines, one log at a time.';
 
 export type ChromeLink = { label: string; href: string; external?: boolean; event?: WebsiteDestination; wide?: boolean };
-// Phones swap The app for the Get Puptime action so the header still fits at 320px.
+// Phones swap The app for the Get Puptime action, and narrow phones show only the logo, so the header fits at 320px.
 export const headerLinks: ChromeLink[] = [{ label: 'The app', href: '/#app', wide: true }, { label: 'Puppy care', href: '/puppy-care/' }];
 export const headerAction: ChromeLink = { label: 'Get Puptime', href: '/#get-puptime', event: 'get_puptime' };
 export const footerColumns: { title: string; links: ChromeLink[] }[] = [
@@ -72,8 +72,10 @@ export const siteChromeStyles = `
 @media(max-width:600px){
   .site-header,.site-footer{--chrome-margin:20px}
   .site-header{gap:12px;padding-top:16px;padding-bottom:16px}.site-header .site-brand{font-size:22px;gap:8px}.site-brand img{width:30px;height:30px;border-radius:8px}
-  .site-header nav{gap:16px;font-size:16px}.site-header nav .wide-only{display:none}.site-header nav a.header-cta{padding:0 14px}
+  .site-header nav{gap:16px;font-size:16px}.site-header nav .wide-only{display:none}.site-header nav a.header-cta{padding:0 14px;font-size:15px}
   .site-footer{padding-top:40px;gap:32px}.footer-columns{grid-template-columns:1fr 1fr;gap:24px 20px}.footer-columns :where(a,button){white-space:normal}
 }
-@media(max-width:360px){.site-header{gap:8px}.site-header .site-brand .brand-name{display:none}.site-brand img{width:32px;height:32px}.site-header nav{gap:12px;font-size:15px}.site-header nav a.header-cta{padding:0 10px}}
+/* The link keeps its accessible name from aria-label when the wordmark is hidden. */
+@media(max-width:400px){.site-header .site-brand .brand-name{display:none}.site-brand img{width:34px;height:34px}}
+@media(max-width:340px){.site-header nav{gap:12px}.site-header nav a.header-cta{padding:0 12px}}
 `;
