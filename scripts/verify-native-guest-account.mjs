@@ -579,6 +579,7 @@ try{
       incoming.on('close',()=>{if(!incoming.complete){if(authResponse&&authResponse.upstream!=='response-error')authResponse.upstream='response-closed';res.destroy();}finish();});
       if(!dropping){res.writeHead(incoming.statusCode,incoming.headers);incoming.pipe(res);}
     });
+    res.once('close',()=>{if(!res.writableFinished){outgoing.destroy();finish();}});
     outgoing.on('error',()=>{if(authResponse?.upstream==='pending')authResponse.upstream='request-error';finish();if(!res.headersSent)res.writeHead(502);res.end();});req.pipe(outgoing);
   };
   proxy=secureServer({key:readFileSync(keyPath),cert:Buffer.concat([readFileSync(certPath),certificate])},forward);

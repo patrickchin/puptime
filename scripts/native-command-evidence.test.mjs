@@ -16,13 +16,13 @@ test('fixture proxy settles truncated upstream responses and records finite outc
  const unused=()=>{throw new Error('Unexpected synthetic proxy branch.');};
  const make=Function('request','front','backPort','upgrading','capturedJson','mutationSchema','wireFailure','pushResponseSchema','pullPageSchema',declarations+"\nactiveFlow='onboarding-request';flowSequence=1;\n"+source.slice(start,end)+'\nreturn {forward,read:()=>({activeForwarded,responses:authResponses})};');
  async function run(mode){
-  const servers=[],sockets=new Set(),timers=new Set();let observer,truncated=false,closed;const responseClosed=new Promise(resolve=>{closed=resolve;});
+  const servers=[],sockets=new Set(),timers=new Set();let observer,truncated=false,closed,upstreamClosed;const responseClosed=new Promise(resolve=>{closed=resolve;}),upstreamResponseClosed=new Promise(resolve=>{upstreamClosed=resolve;});
   const row={headers:false,bytes:0,status:null,terminal:null,settledBeforeDeadline:false,active:null,responses:null,cleanup:null};
   const own=server=>{servers.push(server);server.on('connection',socket=>sockets.add(socket));return server;};
   const listen=async server=>{await new Promise((yes,no)=>{server.once('error',no);server.listen(0,'127.0.0.1',yes);});return server.address().port;};
   try{
    const backend=own(createServer((req,res)=>{
-    assert.equal(req.method,'POST');assert.equal(req.url,'/api/auth/email-otp/send-verification-otp');req.resume();
+    assert.equal(req.method,'POST');assert.equal(req.url,'/api/auth/email-otp/send-verification-otp');req.resume();res.once('close',upstreamClosed);
     if(mode==='complete')res.writeHead(200,{'content-type':'application/json'}).end('{"synthetic":true}');
     else if(mode==='before-headers')req.socket.destroy();
     else{
@@ -42,7 +42,7 @@ test('fixture proxy settles truncated upstream responses and records finite outc
     req.once('error',()=>finish('request-error'));
     const timer=setTimeout(()=>{deadline=true;req.destroy();response?.destroy();setImmediate(()=>finish('control-cancel'));},1000);timers.add(timer);req.end('{"synthetic":true}');
    });
-   if(mode==='client-abandon')await Promise.race([responseClosed,new Promise((_,reject)=>{const timer=setTimeout(()=>reject(new Error('Synthetic downstream close deadline.')),1000);timers.add(timer);})]);
+   if(mode==='client-abandon')await Promise.race([Promise.all([responseClosed,upstreamResponseClosed]),new Promise((_,reject)=>{const timer=setTimeout(()=>reject(new Error('Synthetic proxy close deadline.')),1000);timers.add(timer);})]);
    await new Promise(setImmediate);const state=observer.read();row.active=state.activeForwarded;row.responses=state.responses.map(value=>({...value}));row.truncated=truncated;return row;
   }finally{
    for(const timer of timers)clearTimeout(timer);timers.clear();for(const socket of sockets)socket.destroy();
@@ -56,6 +56,7 @@ test('fixture proxy settles truncated upstream responses and records finite outc
  assert.equal(complete.responses[0].upstream,'complete');assert.ok(['response-error','response-closed'].includes(truncated.responses[0].upstream));
  const before=await run('before-headers');assert.equal(before.status,502);assert.equal(before.terminal,'end');assert.equal(before.settledBeforeDeadline,true);assert.equal(before.active,0);assert.equal(before.cleanup,true);assert.equal(before.responses[0].upstream,'request-error');
  const abandoned=await run('client-abandon');assert.equal(abandoned.headers,true);assert.equal(abandoned.status,302);assert.equal(abandoned.settledBeforeDeadline,true);assert.equal(abandoned.cleanup,true);
+ assert.equal(abandoned.active,0,'Client abandonment must close the owned upstream before the next fault transition.');
  assert.equal(abandoned.responses[0].state,'closed');assert.equal(abandoned.responses[0].status,302,'Retain the observed HTTP status after client abandonment; close is not completion.');
  assert.equal(complete.responses[0].state,'completed');assert.equal(complete.responses[0].status,200);assert.equal(before.responses[0].state,'completed');assert.equal(before.responses[0].status,502);
  for(const value of [complete,truncated,before,abandoned]){
