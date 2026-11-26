@@ -1,0 +1,6 @@
+{
+  "usingComponents": {
+    "event-row": "../../components/event-row/index",
+    "page-shell": "../../components/page-shell/index"
+  }
+}
