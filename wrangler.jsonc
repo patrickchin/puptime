@@ -39,8 +39,8 @@
       "placement": { "region": "aws:eu-central-1" },
       "vars": {
         "ENVIRONMENT": "staging",
-        "AUTH_BASE_URL": "https://puptime.pages.dev",
-        "WEB_ORIGINS": "https://puptime.pages.dev",
+        "AUTH_BASE_URL": "https://puptime.org",
+        "WEB_ORIGINS": "https://puptime.org",
         "ACCOUNT_JURISDICTION": "eu"
       },
       "durable_objects": {

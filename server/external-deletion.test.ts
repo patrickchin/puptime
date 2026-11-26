@@ -7,7 +7,7 @@ import { entityId } from '../src/entity-id';
 import { onRequest } from '../functions/api/[[path]]';
 import worker from './index';
 
-const origin='https://puptime.pages.dev';
+const origin='https://puptime.org';
 const settings={...env,ENVIRONMENT:'local' as const,AUTH_BASE_URL:origin,WEB_ORIGINS:origin,AUTH_SECRET:'synthetic-deletion-test-secret-at-least-thirty-two-characters'};
 beforeAll(()=>applyD1Migrations(env.AUTH_DB,inject('migrations')));
 let sequence=10;

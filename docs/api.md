@@ -21,7 +21,7 @@ establish that a particular server already runs it.
 
 | Environment | Resource API base |
 | --- | --- |
-| Hosted Puptime development backend | `https://puptime.pages.dev/api/v1` |
+| Hosted Puptime development backend | `https://puptime.org/api/v1` |
 | Default local Wrangler service | `http://localhost:8787/api/v1` |
 
 `GET /api/v1/openapi.json` is the public OpenAPI 3.1 document, generated from the
@@ -240,7 +240,7 @@ The examples assume `PUPTIME_API_KEY` is already populated privately. Resource
 IDs below are placeholders; copy the IDs returned by your account's own API.
 
 ```sh
-export PUPTIME_API_BASE='https://puptime.pages.dev/api/v1'
+export PUPTIME_API_BASE='https://puptime.org/api/v1'
 
 curl --fail-with-body "$PUPTIME_API_BASE/puppies" \
   -H "Authorization: Bearer $PUPTIME_API_KEY"

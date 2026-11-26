@@ -9,7 +9,7 @@ import {cloudRecordId} from '../src/cloud/record-identity';
 import worker from './index';
 
 beforeAll(()=>applyD1Migrations(env.AUTH_DB,inject('migrations')));
-const origin='https://puptime.pages.dev';
+const origin='https://puptime.org';
 const settings={...env,ENVIRONMENT:'local' as const,AUTH_BASE_URL:'https://puptime-api-staging.p-ch.workers.dev',WEB_ORIGINS:origin,AUTH_SECRET:'local-test-secret-with-at-least-32-characters'};
 const binding={fetch:async(request:Request)=>worker.fetch(request,settings)};
 

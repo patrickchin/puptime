@@ -5,6 +5,7 @@ import ts from 'typescript';
 import {darkTheme,lightTheme} from './theme.ts';
 import {starterPoopWindows,puppyAges,starterMealTimes,suggestedMealCount} from './onboarding-preview.ts';
 import {DEFAULT_NOTIFICATION_PREFERENCES} from './notification-config.ts';
+import * as publicSite from './public-site.ts';
 
 function guestScreen({effects=false,animated=false,throwingRecorder=false,omitRecorder=false}:{effects?:boolean;animated?:boolean;throwingRecorder?:boolean;omitRecorder?:boolean}={}){
  // Actual component/hook boundary, following native-provider-buttons.test.ts.
@@ -23,6 +24,7 @@ function guestScreen({effects=false,animated=false,throwingRecorder=false,omitRe
   'react-native-safe-area-context':{SafeAreaView:'SafeAreaView'},'../domain':{formatMinutes:()=>'',formatScheduleWindow:()=>''},'../entity-id':{entityId:()=>{throw new Error('Guest navigation must not create a record.');}},
   '../components/DateTimeSelector':{DateTimeSelector:'DateTimeSelector'},'../components/NotificationTimingControls':{NotificationTimingControls:'NotificationTimingControls'},
   '../notification-config':{DEFAULT_NOTIFICATION_PREFERENCES},'../onboarding-preview':{starterPoopWindows,puppyAges,starterMealTimes,suggestedMealCount},'../theme':{darkTheme,lightTheme},
+  '../public-site':publicSite,
   '../components/OnboardingPlanTimeline':{OnboardingPlanTimeline:'OnboardingPlanTimeline'},'../components/AccountSignIn':{AccountSignIn:'AccountSignIn'},'../cloud/use-account-snapshot':{useAccountSnapshot:()=>snapshot},'../reminders':{ExactReminderAccessError:class extends Error{}},'../localization':{translate:()=>''},
  };
  const source=readFileSync(new URL('./screens/OnboardingDesignPreview.tsx',import.meta.url),'utf8');

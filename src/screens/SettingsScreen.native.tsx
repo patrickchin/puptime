@@ -1,3 +1,4 @@
+import { siteUrl, privacyPath } from '../public-site';
 import { AnalyticsSettings } from '../components/AnalyticsSettings.native';
 import { useTelemetryOverlay } from '../telemetry';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -233,7 +234,7 @@ export function SettingsScreen({
       <SettingsGroup theme={theme} label={t('settings.helpPrivacy')} rows={[
         row('analytics', <AnalyticsSettings theme={theme}/>),
         row('guide', <SettingsRow testID="settings.guide.open" icon="compass-outline" label={t('settings.guide')} detail={t('settings.guideDetail')} onPress={onOpenGuide} theme={theme} wrap/>),
-        row('privacy', <SettingsRow testID="settings.privacy.open" icon="shield-outline" label={t('account.privacy')} detail={t('settings.privacyDetail')} onPress={()=>{void Linking.openURL('https://github.com/patrickchin/puptime/blob/main/PRIVACY.md').catch(()=>Alert.alert(t('learn.linkError'),t('learn.linkErrorBody')));}} theme={theme} wrap/>),
+        row('privacy', <SettingsRow testID="settings.privacy.open" icon="shield-outline" label={t('account.privacy')} detail={t('settings.privacyDetail')} onPress={()=>{void Linking.openURL(`${siteUrl}${privacyPath}`).catch(()=>Alert.alert(t('learn.linkError'),t('learn.linkErrorBody')));}} theme={theme} wrap/>),
       ]}/>
     </ScrollView>
     <Modal visible={widgetVisible} presentationStyle="pageSheet" animationType="slide" onRequestClose={()=>setWidgetVisible(false)}>

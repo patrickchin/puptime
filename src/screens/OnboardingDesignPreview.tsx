@@ -1,3 +1,4 @@
+import { siteUrl } from '../public-site';
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import {useFonts} from 'expo-font';
 import {StatusBar} from 'expo-status-bar';
@@ -200,7 +201,7 @@ function PreviewFlow({cloud,onFinish,onAllowNotifications,onDisableNotifications
       <Text style={styles.welcomeQuestion}>How would you like to begin?</Text>
       <Pressable testID="preview.guest" accessibilityRole="button" disabled={guestLocked} accessibilityState={{disabled:guestLocked}} onPressIn={()=>record('guest-press-in')} onPress={startWithoutAccount} style={[styles.secondary,{backgroundColor:theme.primary}]}><Text style={[styles.secondaryText,{color:theme.onPrimary}]}>Let’s start without an account</Text></Pressable>
       <AccountSignIn cloud={cloud} theme={welcomeAccountTheme} showIntro={false} onEmailPress={()=>go('account')}/>
-      <Pressable testID="preview.invited" accessibilityRole="button" onPress={()=>{if(onOpenShared)onOpenShared();else void Linking.openURL(`${cloud.sharingOrigin??'https://puptime.pages.dev'}/care`).catch(()=>setReminderError('Couldn’t open shared puppies. Open your invitation link in your browser.'));}} style={styles.secondary}><Text style={styles.secondaryText}>Already invited? Open shared puppies</Text></Pressable>
+      <Pressable testID="preview.invited" accessibilityRole="button" onPress={()=>{if(onOpenShared)onOpenShared();else void Linking.openURL(`${cloud.sharingOrigin??siteUrl}/care`).catch(()=>setReminderError('Couldn’t open shared puppies. Open your invitation link in your browser.'));}} style={styles.secondary}><Text style={styles.secondaryText}>Already invited? Open shared puppies</Text></Pressable>
       {reminderError?<Text accessibilityRole="alert" style={styles.error}>{reminderError}</Text>:null}
     </View>
   </ScrollView>;

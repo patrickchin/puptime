@@ -1,3 +1,4 @@
+import { siteUrl, supportPath } from '../public-site';
 import {useEffect,useRef,useState} from 'react';
 import {Alert,Keyboard,Linking,StyleSheet,Text,TextInput,View} from 'react-native';
 import type {AccountController,AccountSnapshot,AccountDeletionState} from '../cloud/account-controller';
@@ -32,7 +33,7 @@ export function AccountDeletionPanel({controller,state,theme}:{controller:Accoun
    <AccountButton theme={theme} testID="account.delete.sendCode" label={t(deletion.codeSent?'account.resend':'account.sendCode')} disabled={disabled} onPress={()=>{void controller.requestDeletionCode();}}/>
   </>:<AccountButton theme={theme} testID="account.delete.review" label={t(deletion.stage==='confirmed'?'account.delete.finish':deletion.stage==='unconfirmed'?'account.delete.retry':'account.delete.review')} disabled={disabled} onPress={()=>{void controller.prepareDeletion(deletion.accountId);}}/>}
   {deletion.stage==='confirm'||deletion.stage==='verify'?<AccountButton theme={theme} testID="account.delete.cancel" label={t('account.cancel')} disabled={state.busy} onPress={()=>{void controller.cancelDeletion();}}/>:null}
-  {deletion.unresolved?<AccountButton theme={theme} testID="account.delete.help" label={t('account.delete.help')} onPress={()=>{void Linking.openURL('https://github.com/patrickchin/puptime/issues').catch(()=>Alert.alert(t('learn.linkError'),t('learn.linkErrorBody')));}}/>:null}
+  {deletion.unresolved?<AccountButton theme={theme} testID="account.delete.help" label={t('account.delete.help')} onPress={()=>{void Linking.openURL(`${siteUrl}${supportPath}`).catch(()=>Alert.alert(t('learn.linkError'),t('learn.linkErrorBody')));}}/>:null}
  </View>;
 }
 const styles=StyleSheet.create({stack:{gap:12},heading:{fontSize:24,lineHeight:30,fontWeight:'700'},body:{fontSize:16,lineHeight:24},input:{minHeight:52,borderWidth:1,padding:14,fontSize:22}});
