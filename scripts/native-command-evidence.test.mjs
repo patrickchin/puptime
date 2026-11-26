@@ -14,35 +14,37 @@ test('fixture proxy settles truncated upstream responses and records finite outc
  const declarations=source.slice(source.indexOf('let worker,workerError,'),source.indexOf('function wireFailure('));
  const start=source.indexOf('  const forward=(req,res)=>{'),end=source.indexOf('\n  proxy=secureServer',start);assert.ok(start>0&&end>start);
  const unused=()=>{throw new Error('Unexpected synthetic proxy branch.');};
- const make=Function('request','front','backPort','upgrading','capturedJson','mutationSchema','wireFailure','pushResponseSchema','pullPageSchema',declarations+"\nactiveFlow='onboarding-request';flowSequence=1;\n"+source.slice(start,end)+'\nreturn {forward,read:()=>({activeForwarded,responses:authResponses})};');
- async function run(mode){
+ const make=Function('request','front','backPort','upgrading','capturedJson','mutationSchema','wireFailure','pushResponseSchema','pullPageSchema','performance',declarations+"\nactiveFlow='onboarding-request';flowSequence=1;\n"+source.slice(start,end)+'\nreturn {forward,read:()=>({activeForwarded,responses:authResponses})};');
+ async function run(mode,elapsed=0,abandonStatus=302){
   const servers=[],sockets=new Set(),timers=new Set();let observer,truncated=false,closed,upstreamClosed;const responseClosed=new Promise(resolve=>{closed=resolve;}),upstreamResponseClosed=new Promise(resolve=>{upstreamClosed=resolve;});
-  const row={headers:false,bytes:0,status:null,terminal:null,settledBeforeDeadline:false,active:null,responses:null,cleanup:null};
+  const row={headers:false,bytes:0,status:null,terminal:null,settledBeforeDeadline:false,active:null,responses:null,cleanup:null};let clock=0,ended;const upstreamEnded=new Promise(resolve=>{ended=resolve;});
   const own=server=>{servers.push(server);server.on('connection',socket=>sockets.add(socket));return server;};
   const listen=async server=>{await new Promise((yes,no)=>{server.once('error',no);server.listen(0,'127.0.0.1',yes);});return server.address().port;};
   try{
    const backend=own(createServer((req,res)=>{
     assert.equal(req.method,'POST');assert.equal(req.url,'/api/auth/email-otp/send-verification-otp');req.resume();res.once('close',upstreamClosed);
     if(mode==='complete')res.writeHead(200,{'content-type':'application/json'}).end('{"synthetic":true}');
+    else if(mode==='client-after-complete'){res.writeHead(200,{'content-type':'application/json'});res.flushHeaders();res.end('{"synthetic":true}');}
     else if(mode==='before-headers')req.socket.destroy();
     else{
-     res.writeHead(mode==='client-abandon'?302:200,{'content-type':'application/json','content-length':'64'});res.flushHeaders();res.write('{"synthetic":');
+     res.writeHead(mode==='client-abandon'?abandonStatus:200,{'content-type':'application/json','content-length':'64'});res.flushHeaders();res.write('{"synthetic":');
      if(mode!=='client-abandon'){const timer=setTimeout(()=>{truncated=true;res.socket?.destroy();timers.delete(timer);},50);timers.add(timer);}
     }
    }));
-   const backPort=await listen(backend),proxy=own(createServer((req,res)=>{res.once('close',closed);observer.forward(req,res);})),frontPort=await listen(proxy);
-   observer=make(request,'http://127.0.0.1:'+frontPort,backPort,false,unused,{parse:unused},unused,{parse:unused},{parse:unused});
+   const backPort=await listen(backend),proxy=own(createServer((req,res)=>{res.once('close',closed);if(mode==='client-after-complete')res.end=()=>{ended();return res;};observer.forward(req,res);})),frontPort=await listen(proxy);
+   observer=make(request,'http://127.0.0.1:'+frontPort,backPort,false,unused,{parse:unused},unused,{parse:unused},{parse:unused},{now:()=>clock});
    await new Promise(resolve=>{
     let settled=false,deadline=false,response;
     const finish=terminal=>{if(settled)return;settled=true;row.terminal=terminal;row.settledBeforeDeadline=!deadline;clearTimeout(timer);timers.delete(timer);resolve();};
     const req=request('http://127.0.0.1:'+frontPort+'/api/auth/email-otp/send-verification-otp',{method:'POST',agent:false,headers:{'content-type':'application/json'}},res=>{
      response=res;row.headers=true;row.status=res.statusCode;res.on('data',b=>{row.bytes+=b.length;});res.once('end',()=>finish('end'));res.once('aborted',()=>finish('aborted'));res.once('error',()=>finish('response-error'));res.once('close',()=>finish('close'));
-     if(mode==='client-abandon'){res.destroy();req.destroy();}
+     if(mode==='client-abandon'){clock=elapsed;res.destroy();req.destroy();}
+     if(mode==='client-after-complete')void upstreamEnded.then(()=>{res.destroy();req.destroy();});
     });
     req.once('error',()=>finish('request-error'));
     const timer=setTimeout(()=>{deadline=true;req.destroy();response?.destroy();setImmediate(()=>finish('control-cancel'));},1000);timers.add(timer);req.end('{"synthetic":true}');
    });
-   if(mode==='client-abandon')await Promise.race([Promise.all([responseClosed,upstreamResponseClosed]),new Promise((_,reject)=>{const timer=setTimeout(()=>reject(new Error('Synthetic proxy close deadline.')),1000);timers.add(timer);})]);
+   if(mode==='client-abandon'||mode==='client-after-complete')await Promise.race([Promise.all([responseClosed,upstreamResponseClosed]),new Promise((_,reject)=>{const timer=setTimeout(()=>reject(new Error('Synthetic proxy close deadline.')),1000);timers.add(timer);})]);
    await new Promise(setImmediate);const state=observer.read();row.active=state.activeForwarded;row.responses=state.responses.map(value=>({...value}));row.truncated=truncated;return row;
   }finally{
    for(const timer of timers)clearTimeout(timer);timers.clear();for(const socket of sockets)socket.destroy();
@@ -58,9 +60,15 @@ test('fixture proxy settles truncated upstream responses and records finite outc
  const abandoned=await run('client-abandon');assert.equal(abandoned.headers,true);assert.equal(abandoned.status,302);assert.equal(abandoned.settledBeforeDeadline,true);assert.equal(abandoned.cleanup,true);
  assert.equal(abandoned.active,0,'Client abandonment must close the owned upstream before the next fault transition.');
  assert.equal(abandoned.responses[0].state,'closed');assert.equal(abandoned.responses[0].status,302,'Retain the observed HTTP status after client abandonment; close is not completion.');
+ assert.equal(abandoned.responses[0].upstream,'headers','Cleanup after client closure must not replace the earlier upstream boundary with its own response error.');
+ assert.equal(abandoned.responses[0].upstreamCompleteAtClientClose,false);assert.equal(truncated.responses[0].upstreamCompleteAtClientClose,false);
+ const abandoned200=await run('client-abandon',15000,200);assert.equal(abandoned200.responses[0].status,200);assert.equal(abandoned200.responses[0].upstream,'headers');assert.equal(abandoned200.responses[0].elapsedBucket,'14-to-16s');assert.equal(abandoned200.responses[0].upstreamCompleteAtClientClose,false);assert.equal(abandoned200.cleanup,true);
+ // Hold only downstream EOF after the real upstream HTTP parser has completed.
+ const parsed=await run('client-after-complete');assert.equal(parsed.responses[0].state,'closed');assert.equal(parsed.responses[0].upstream,'complete');assert.equal(parsed.responses[0].upstreamCompleteAtClientClose,true);assert.equal(parsed.cleanup,true);assert.equal(parsed.active,0);
+ for(const [elapsed,bucket] of [[13999,'under-14s'],[14000,'14-to-16s'],[15999,'14-to-16s'],[16000,'at-least-16s']]){const timed=await run('client-abandon',elapsed);assert.equal(timed.responses[0].elapsedBucket,bucket);assert.equal(timed.responses[0].upstream,'headers');assert.equal(timed.responses[0].upstreamCompleteAtClientClose,false);assert.equal(timed.cleanup,true);assert.equal(timed.active,0);}
  assert.equal(complete.responses[0].state,'completed');assert.equal(complete.responses[0].status,200);assert.equal(before.responses[0].state,'completed');assert.equal(before.responses[0].status,502);
  for(const value of [complete,truncated,before,abandoned]){
-  assert.equal(value.responses.length,1);const response=value.responses[0];assert.deepEqual(Object.keys(response),['phase','flowSequence','route','method','status','state','upstream']);assert.ok(['pending','headers','complete','request-error','response-error','response-closed'].includes(response.upstream));
+  assert.equal(value.responses.length,1);const response=value.responses[0];assert.deepEqual(Object.keys(response),['phase','flowSequence','route','method','status','state','upstream','elapsedBucket','upstreamCompleteAtClientClose']);assert.equal(response.elapsedBucket,'under-14s');assert.ok(['pending','headers','complete','request-error','response-error','response-closed'].includes(response.upstream));if(response.state==='completed')assert.equal(response.upstreamCompleteAtClientClose,null);
  }
 });
 // End proxy regression.
