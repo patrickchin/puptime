@@ -17,11 +17,19 @@ const server = createServer((request, response) => {
   if (pathname.endsWith('/')) file += '/index.html';
   else if (!extname(file)) file += '.html';
   if (!existsSync(file)) { response.writeHead(404).end(); return; }
-  const type = { '.html': 'text/html', '.js': 'text/javascript', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.mp3': 'audio/mpeg', '.woff2': 'font/woff2' }[extname(file)];
+  const type = { '.html': 'text/html', '.js': 'text/javascript', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.mp3': 'audio/mpeg', '.woff2': 'font/woff2' }[extname(file)];
   response.writeHead(200, { 'Content-Type': type ?? 'application/octet-stream' }).end(readFileSync(file));
 });
 await new Promise(done => server.listen(0, '127.0.0.1', done));
 const origin = `http://127.0.0.1:${server.address().port}`;
+// Resized web copies keep the source proportions and cover the rendered size at up to 2x.
+const sharpCapture = async (image, ratio) => {
+  // srcset reports naturalWidth in CSS pixels, so measure the chosen file itself.
+  const file = new Image();
+  file.src = image.currentSrc;
+  await file.decode();
+  return Math.abs(file.naturalWidth / file.naturalHeight - ratio) < 0.005 && file.naturalWidth >= image.clientWidth * Math.min(devicePixelRatio, 2);
+};
 let browser, page;
 const passed = [];
 writeFileSync(`${output}/verification.json`, JSON.stringify({ status: 'running' }));
@@ -79,8 +87,7 @@ try {
       await button.click();
       assert.equal(await button.getAttribute('aria-pressed'), 'true');
       await page.getByRole('img', { name: `Puptime ${name} screen`, exact: true }).evaluate(image => image.decode());
-      const size = await page.getByRole('img', { name: `Puptime ${name} screen`, exact: true }).evaluate(image => ({ width: image.naturalWidth, height: image.naturalHeight }));
-      assert.deepEqual(size, { width: 1206, height: 2622 }, 'Use full-resolution native iPhone captures.');
+      assert.ok(await page.getByRole('img', { name: `Puptime ${name} screen`, exact: true }).evaluate(sharpCapture, 1206 / 2622), 'Use sharp, uncropped native iPhone captures.');
       assert.ok(await page.locator('.app-preview .phone-frame').evaluate(element => {
         const radius = getComputedStyle(element).borderTopLeftRadius;
         return (radius.endsWith('%') ? parseFloat(radius) * element.clientWidth / 100 : parseFloat(radius)) >= 28;
@@ -91,7 +98,7 @@ try {
     const concept = page.getByRole('img', { name: 'Illustrative Poop & Eat timeline concept with routine windows', exact: true });
     await concept.scrollIntoViewIfNeeded();
     await concept.evaluate(image => image.decode());
-    assert.deepEqual(await concept.evaluate(image => ({ width: image.naturalWidth, height: image.naturalHeight })), { width: 851, height: 1848 }, 'Keep the illustrative story image at its approved dimensions.');
+    assert.ok(await concept.evaluate(sharpCapture, 851 / 1848), 'Keep the illustrative story image sharp and uncropped.');
     assert.ok(await concept.evaluate(image => Math.abs(image.clientWidth / image.clientHeight - 851 / 1848) < 0.01), 'Preserve the concept image proportions.');
     await page.getByText('Illustrative timeline concept with routine windows.', { exact: true }).waitFor();
     await page.locator('.rhythm-story').first().screenshot({ path: `${output}/${width}-timeline-concept.png` });
