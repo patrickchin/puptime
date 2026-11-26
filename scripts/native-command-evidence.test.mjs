@@ -65,11 +65,11 @@ test('fixture proxy settles truncated upstream responses and records finite outc
 });
 // End proxy regression.
 
-test('actual onboarding and prepare failure catch emits only command flags and preserves the original failure and cleanup',async t=>{
+test('actual onboarding, sign-in and prepare failure catch emits only command flags and preserves the original failure and cleanup',async t=>{
  const {runInNewContext}=await import('node:vm');
  const source=readFileSync(new URL('./verify-native-guest-account.mjs',import.meta.url),'utf8'),start=source.indexOf('async function flow('),end=source.indexOf('\nlet email=',start);assert.ok(start>0&&end>start);
  const secret='PRIVATE identity@example.invalid 654321 cookie=private /private/path';
- for(const [phase,id] of [['onboarding-request','account.email.open'],['onboarding-request','preview.account'],['onboarding-verify','preview.name'],['prepare','screen.today']]){
+ for(const [phase,id] of [['onboarding-request','account.email.open'],['onboarding-request','preview.account'],['onboarding-verify','preview.name'],['prepare','screen.today'],['request','account.email.input']]){
   const commandFile=phase==='prepare'?'fixture-prepare-command.json':'fixture-onboarding-command.json';
   const yaml=readFileSync(new URL('../.maestro/account-preservation/'+phase+'.yaml',import.meta.url),'utf8');assert.ok(yaml.includes('id: '+id+'\n'));
   for(const mode of ['known','ambiguous','writer-fails']){
@@ -239,14 +239,14 @@ test('actual diagnostic flow catches preserve original errors and cleanup on rea
  const body=sdk.slice(start,end),secret='synthetic-identity@example.invalid 873921 cookie=private-session /private/auth/trace';
  const execute=Function('name','privateDir','run','writeFileSync','readNativeCommandState','rmSync','existsSync','readdirSync','join','resolve','process','android','simctl',`return (async()=>{let activeFlow='startup',flowSequence=0,setupWindow;const device='synthetic',output='/synthetic-output',email='synthetic-identity@example.invalid',code='',requests=new Set(['/api/config']),authResponses=[],homedir=()=>'/synthetic-home',Date={now:()=>42},markStartup=()=>{},console={log(){}};${body};await flow(name);})();`);
  for(const options of [{},{readerFails:true},{writerFails:true},{name:'request'},{name:'comparison-preview',android:false},{name:'comparison-preview',android:false,readerFails:true},{name:'comparison-preview',android:false,writerFails:true},{name:'comparison-preview',android:false,captureFails:true},{name:'comparison-preview',android:true},{name:'request',android:false},{name:'verify',android:false}]){
-  const name=options.name??'add-logs',file=name==='add-logs'?'fixture-add-logs-command.json':name==='comparison-preview'?'fixture-comparison-command.json':null,target=name==='comparison-preview'?'account.connection.phone.count':'account.local.count',root=mkdtempSync(join(tmpdir(),'puptime-flow-command-')),artifacts=join(root,'maestro-'+name+'-42'),writes=[],captures=[];let reads=0,cleaned=0;
+  const name=options.name??'add-logs',file=name==='add-logs'?'fixture-add-logs-command.json':name==='comparison-preview'?'fixture-comparison-command.json':name==='request'?'fixture-onboarding-command.json':null,target=name==='comparison-preview'?'account.connection.phone.count':'account.local.count',root=mkdtempSync(join(tmpdir(),'puptime-flow-command-')),artifacts=join(root,'maestro-'+name+'-42'),writes=[],captures=[];let reads=0,cleaned=0;
   try{
    mkdirSync(artifacts);writeFileSync(join(artifacts,'commands.json'),JSON.stringify([row('assertConditionCommand',{condition:{visible:{idRegex:target,textRegex:secret}}},'FAILED',12)]));
    const original=new Error(secret);for(const key of ['message','stack'])Object.defineProperty(original,key,{get(){throw new Error('Do not read raw Error fields');}});original.toJSON=()=>{throw new Error('Do not serialize the Error');};
    const promise=execute(name,root,async()=>{throw original;},(path,text,mode)=>{if(options.writerFails&&path.endsWith('/'+file))throw new Error('Synthetic writer failure');writes.push({path,value:JSON.parse(text),mode});},path=>{reads++;assert.equal(path,artifacts);if(options.readerFails)throw new Error('Synthetic reader failure');return readNativeCommandState(path);},(path,options)=>{cleaned++;assert.equal(path,artifacts);rmSync(path,options);},path=>path===artifacts&&existsSync(path),()=>['commands.json','synthetic-hierarchy.json'],join,resolve,{env:{}},options.android??true,(...args)=>{captures.push(args);if(options.captureFails)throw new Error(secret);});
    await assert.rejects(promise,error=>error===original);assert.equal(cleaned,1);assert.equal(existsSync(artifacts),false);assert.equal(reads,file?1:0);
    const evidence=writes.filter(row=>row.path.endsWith('/'+file));
-   if(file&&!options.readerFails&&!options.writerFails)assert.deepEqual(evidence,[{path:'/synthetic-output/'+file,value:{phase:name,flowSequence:1,status:'FAILED',kind:'assert',targetId:target,sequence:12},mode:{mode:0o600}}]);else assert.deepEqual(evidence,[]);
+   if(file&&!options.readerFails&&!options.writerFails)assert.deepEqual(evidence,[{path:'/synthetic-output/'+file,value:{phase:name,flowSequence:1,status:'FAILED',kind:'assert',targetId:target,sequence:12},mode:{...(name==='request'?{flag:'wx'}:{}),mode:0o600}}]);else assert.deepEqual(evidence,[]);
    assert.deepEqual(captures,name==='comparison-preview'&&options.android===false?[['io','synthetic','screenshot','/synthetic-output/failure-comparison-preview.png']]:[]);assert.ok(!writes.some(row=>row.path.endsWith('-hierarchy.txt')));
    assert.ok(!JSON.stringify(writes).includes(secret));assert.equal(writes.filter(row=>row.path.endsWith('/fixture-native-reach.json')).length,1);assert.equal(writes.filter(row=>row.path.endsWith('/fixture-auth-readiness.json')).length,1);
   }finally{rmSync(root,{recursive:true,force:true});}
