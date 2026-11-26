@@ -50,8 +50,6 @@ name: App Store action preview
     timeout: 30000
 - waitForAnimationToEnd
 - takeScreenshot: 03-timeline
-- tapOn: {id: timeline.filter.poop-meal, retryTapIfNoChange: true}
-- waitForAnimationToEnd
 - tapOn: {id: timeline.mark.point.2026-10-08.*, index: 0, retryTapIfNoChange: true}
 - waitForAnimationToEnd
 - assertVisible: {id: timeline.details}

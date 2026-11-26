@@ -26,8 +26,6 @@ name: Native app motion with populated history
     notVisible: {id: activity.loading}
     timeout: 30000
 - waitForAnimationToEnd
-- tapOn: {id: timeline.filter.poop-meal, retryTapIfNoChange: true}
-- waitForAnimationToEnd
 - tapOn: {id: timeline.mark.point.2026-10-08.*, index: 0, retryTapIfNoChange: true}
 - extendedWaitUntil:
     visible: {id: timeline.details}

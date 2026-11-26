@@ -44,9 +44,10 @@ const LOAD_ROW_HEIGHT = 48;
 const ESTIMATE_OPACITY = 0.35;
 const AXIS_HOURS = Array.from({ length: 25 }, (_, index) => index);
 const GRID_HOURS = Array.from({ length: 23 }, (_, index) => index + 1);
+const POOP_MEAL_VIEW = { id: 'poop-meal', types: ['poop', 'meal'] } as const;
 const TIMELINE_VIEWS = [
   { id: 'pee', types: ['pee'] },
-  { id: 'poop-meal', types: ['poop', 'meal'] },
+  POOP_MEAL_VIEW,
 ] as const;
 const TIMELINE_TYPES: readonly ActivityKey[] = TIMELINE_VIEWS.flatMap((view) => [...view.types]);
 
@@ -428,7 +429,7 @@ export function TimelineScreen({ events:projectedEvents,activity,refreshToken,sc
   const rowHeight = Math.round(52 * Math.min(fontScale, 1.5));
   const minimumHistoryDays = Math.max(INITIAL_DAYS + BEFORE_FIRST_LOG_DAYS, Math.ceil(height / rowHeight));
   const insets = useSafeAreaInsets();
-  const [selectedView, setSelectedView] = useState<(typeof TIMELINE_VIEWS)[number]>(TIMELINE_VIEWS[0]);
+  const [selectedView, setSelectedView] = useState<(typeof TIMELINE_VIEWS)[number]>(POOP_MEAL_VIEW);
   const selectedTypes: readonly ActivityKey[] = selectedView.types;
   const allExpectedWindows = useMemo(() => timelineExpectedWindows(schedule, TIMELINE_TYPES), [schedule]);
   const expectedWindows = useMemo(() => allExpectedWindows.filter(window => selectedTypes.includes(window.type)), [allExpectedWindows, selectedTypes]);

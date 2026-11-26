@@ -21,7 +21,7 @@ rechecked in this refresh; neither establishes availability in other storefronts
 | Icon | Existing 1024 × 1024 opaque PNG; retain the paw/clock identity |
 | iPhone screenshots | Six opaque 1206 × 2622 PNGs in `fastlane/screenshots/en-US/` |
 | iPad screenshots | Six opaque 2064 × 2752 PNGs in the same folder; actual tablet layout |
-| App preview | `fastlane/previews/en-US/iPhone-6.3-preview.mp4`, 17.37 seconds, 886 × 1920, 30 fps |
+| App preview | `fastlane/previews/en-US/iPhone-6.3-preview.mp4`, 15.83 seconds, 886 × 1920, 30 fps |
 | Poster frame | `fastlane/previews/en-US/poster.jpg`; select 7 seconds in Connect |
 | Optional header | `fastlane/creative-assets/en-US/header.png`, 3840 × 1646 |
 | Optional search art | `fastlane/creative-assets/en-US/search.png`, 1920 × 1280 |
@@ -32,14 +32,13 @@ visible feature. The old widget-only upload asset was removed because it did
 not represent the current screen sequence. Current widget footage can be added
 after verifying the exact release's extension on a device.
 
-The preview shows a quick log, a 15-minute correction, timeline filtering and
-log details, insights, and a routine-window adjustment. Five green touch cues
+The preview shows a quick log, a 15-minute correction, the default Poop & Eat
+Timeline, log details, insights, and a routine-window adjustment. Five green touch cues
 give viewers 0.6 seconds to locate each control before the press, then release
 in a fading ripple. They follow recorded control bounds and native footage.
-These are editorial overlays. This candidate predates the native motion changes
-described below and has not been replaced with a recording of them. Interaction footage
-is slowed selectively, idle waits are removed, and 0.2-second dissolves connect
-screens. Results remain visible long enough to read without adding frozen-frame
+The tap cues are editorial overlays. The recording shows the app’s native
+transitions. The edit slows interactions, removes waiting, and uses 0.2-second
+dissolves between scenes. Results remain visible long enough to read without adding frozen-frame
 padding. Numbered step labels slide in and fade out below the status bar at each
 screen change, giving the next action context without pausing the footage.
 They stay clear of the tap targets. It uses
@@ -76,7 +75,7 @@ not measured usage analytics.
 
 This eight-second cut uses a fresh recording from a local Release simulator
 build of the rebased branch and a capture-only clock. Actions run at normal
-speed, with 2.5 seconds of waiting trimmed. The app supplies the screen
+speed, with 2.2 seconds of waiting trimmed. The app supplies the screen
 transition. Two editorial tap cues identify the
 actual taps, with positions taken from the captured control bounds. Source
 ranges, tap timings, and the video hash are in `daily-logging-edit.json` beside
@@ -85,12 +84,10 @@ screen fade. The new simulator started with all 338 original activities.
 The run added a single demo pee and omitted personal notes. A database
 comparison and checksum verified the original activities and source CSV.
 
-This is the short opening-flow review cut, not a standalone App Store upload:
-it is below the store preview's 15-second minimum. The longer candidate listed
-above is unchanged. Use this common flow first when assembling the next store
-preview, then choose supporting features to meet the required duration.
-Native footage, screenshots, and visual checks are under
-`~/Pictures/Screenshots/Codex/puptime-app-store/20261126/daily-logging/`.
+The eight-second video is for review. Use the 15.83-second preview for App Store
+Connect. Both videos and the two Timeline screenshots were recaptured after
+Poop & Eat became the default. The new captures and visual checks are under
+`~/Pictures/Screenshots/Codex/puptime-app-store/poop-eat-default/`.
 To record this flow on the seeded task simulator:
 
 ```sh
@@ -144,8 +141,7 @@ jumps. `scripts/video_timing.py` now restores the original presentation clock
 before the preview editor normalizes frame rate and trims scenes. This preserves
 captured motion instead of dropping frames at those jumps. It does not synthesize
 animation. Reviewed source cut/tap times must use the original presentation
-clock; re-review older cut JSON before using it with the corrected editor. The
-committed 17.37-second candidate has not been regenerated with this fix.
+clock. The refreshed 15.83-second candidate uses this correction.
 
 For a read-only native animation capture on the seeded task simulator:
 

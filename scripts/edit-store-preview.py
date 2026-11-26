@@ -29,7 +29,7 @@ assert len(commands) == 1
 commands = json.loads(commands[0].read_text())
 assert all(c['metadata']['status'] == 'COMPLETED' for c in commands)
 sequence = [('01-logged', 'quick.pee'), ('02-edited', 'event.pee.edit'),
-            ('03-timeline', 'nav.switch'), ('04-detail', 'timeline.filter.poop-meal'),
+            ('03-timeline', 'nav.switch'), ('04-detail', 'timeline.mark.point.2026-10-08.*'),
             ('05-insights', 'nav.insights'),
             ('06-routine', 'nav.schedule')]
 step_titles = ['Log a potty break', 'Correct the time', 'Compare days',

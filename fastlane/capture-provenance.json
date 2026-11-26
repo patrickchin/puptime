@@ -20,5 +20,22 @@
     "2026-11-12"
   ],
   "base_revision": "fb092d892686cf36472a16762bbed77dd30346ec",
-  "capture_entry": "Generated from the CSV by scripts/seed-app-store.mjs at ignored output/app-store/capture-entry.js"
+  "capture_entry": "Generated from the CSV by scripts/seed-app-store.mjs at ignored output/app-store/capture-entry.js",
+  "timeline_default_refresh": {
+    "date": "2026-11-26",
+    "base_revision": "b3f6d2514fbb052566a7f57acbffd64ad03a9b9f",
+    "timeline_source_sha256": "94c55a317b2b33482eb62681d4bcdeb2672ce535712a12f275fb3af173947daa",
+    "bundle_sha256": "cfe33e23ac9abe74095abec77a9f9555b2d379b1005e932dca24ebdb998348fc",
+    "devices": [
+      "Puptime 459e App Store iPhone 20261126",
+      "Puptime 459e App Store iPad 20261126"
+    ],
+    "assets": [
+      "iPhone-6.3-02-timeline.png",
+      "iPad-13-02-timeline.png",
+      "iPhone-6.3-preview.mp4",
+      "daily-logging-review.mp4",
+      "poster.jpg"
+    ]
+  }
 }

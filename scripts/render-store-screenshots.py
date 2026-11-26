@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Compose real native captures for the store. Requires Pillow; no generated UI.
 
-Usage: python3 scripts/render-store-screenshots.py CAPTURE_ROOT
+Usage: python3 scripts/render-store-screenshots.py CAPTURE_ROOT [--timeline-only]
 CAPTURE_ROOT contains iphone/ and ipad/, each with one Maestro takeScreenshot/.
 """
 import hashlib
@@ -24,10 +24,15 @@ slides = [
     ('05-details', 'Add the details\nyou’ll want later'),
     ('06-dark', 'Keep track,\neven after dark'),
 ]
-manifest = []
+timeline_only = sys.argv[2:] == ['--timeline-only']
+assert not sys.argv[2:] or timeline_only
+manifest_path = root / 'fastlane/screenshot-manifest.json'
+manifest = {item['file']: item for item in json.loads(manifest_path.read_text())} if timeline_only else {}
 thumbnails = []
 for device, size, prefix in [('iphone', (1206, 2622), 'iPhone-6.3'), ('ipad', (2064, 2752), 'iPad-13')]:
     for stem, headline in slides:
+        if timeline_only and stem != '02-timeline':
+            continue
         matches = list((captures / device).rglob(f'takeScreenshot/{stem}.png'))
         assert len(matches) == 1, f'Expected one fresh capture for {device}/{stem}; got {len(matches)}'
         source = matches[0]
@@ -52,14 +57,18 @@ for device, size, prefix in [('iphone', (1206, 2622), 'iPhone-6.3'), ('ipad', (2
         canvas.paste(screen, (x, top), mask)
         name = f'{prefix}-{stem}.png'
         canvas.save(destination / name, optimize=True)
-        manifest.append(dict(file=name, dimensions=list(size), headline=headline,
+        manifest[name] = dict(file=name, dimensions=list(size), headline=headline,
                              source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
-                             sha256=hashlib.sha256((destination / name).read_bytes()).hexdigest()))
-        if device == 'iphone':
+                             sha256=hashlib.sha256((destination / name).read_bytes()).hexdigest())
+        if device == 'iphone' or timeline_only:
             thumb = canvas.copy(); thumb.thumbnail((241, 525)); thumbnails.append(thumb)
-contact = Image.new('RGB', (241 * 6, 525), '#F4F1E7')
+contact = Image.new('RGB', (241 * len(thumbnails), 525), '#F4F1E7')
 for index, thumbnail in enumerate(thumbnails): contact.paste(thumbnail, (241 * index, 0))
 contact.save(captures / 'store-contact.jpg', quality=92)
+manifest_path.write_text(json.dumps(list(manifest.values()), indent=2, ensure_ascii=False) + '\n')
+if timeline_only:
+    print(f'Updated both Timeline screenshots. Review {captures / "store-contact.jpg"}')
+    sys.exit(0)
 # Optional iOS 27 creative placements have different requirements from screenshots.
 creative = root / 'fastlane/creative-assets/en-US'
 creative.mkdir(parents=True, exist_ok=True)
@@ -80,5 +89,4 @@ for name, size, scale in [('header', (3840, 1646), 1), ('search', (1920, 1280), 
     screen.thumbnail((int(size[0] * .24), int(size[1] * .8)), Image.Resampling.LANCZOS)
     art.paste(screen, (int(size[0] * .64), (size[1] - screen.height) // 2))
     art.save(creative / f'{name}.png', optimize=True)
-(root / 'fastlane/screenshot-manifest.json').write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + '\n')
 print(f'Composed {len(manifest)} opaque store screenshots. Review {captures / "store-contact.jpg"}')
