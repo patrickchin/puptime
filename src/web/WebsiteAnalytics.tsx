@@ -4,16 +4,25 @@ import { useEffect, useRef, useState } from 'react';
 import { consentKey, privacySignalActive } from './telemetry-policy';
 import { captureWebsiteEvent, posthogConfigured, setAnalyticsEnabled, storedConsent } from './telemetry';
 
-export function openAnalyticsSettings() {
-  window.dispatchEvent(new Event('puptime:analytics-settings'));
+// Safari doesn't focus clicked buttons, so pass the clicked trigger along for focus return.
+export function openAnalyticsSettings(event?: { currentTarget: EventTarget | null }) {
+  window.dispatchEvent(new CustomEvent('puptime:analytics-settings', { detail: event?.currentTarget }));
 }
 
 export function WebsiteAnalytics({ path }: { path: string }) {
   const [open, setOpen] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [choice, setChoice] = useState<string | null>(null);
+  const [focusRequest, setFocusRequest] = useState(0);
   const declineButton = useRef<HTMLButtonElement>(null);
-  useEffect(() => { if (open) declineButton.current?.focus(); }, [open]);
+  const trigger = useRef<HTMLElement | null>(null);
+  // Only move focus when a visitor opens settings themselves; the automatic first-visit banner leaves focus alone.
+  useEffect(() => { if (open && focusRequest) declineButton.current?.focus(); }, [open, focusRequest]);
+  useEffect(() => {
+    if (open || !trigger.current) return;
+    if (trigger.current.isConnected) trigger.current.focus();
+    trigger.current = null;
+  }, [open]);
   useEffect(() => {
     const sync = () => {
       const value = storedConsent();
@@ -23,7 +32,12 @@ export function WebsiteAnalytics({ path }: { path: string }) {
       setOpen(value === null && posthogConfigured && !privacySignal);
       void setAnalyticsEnabled(value === 'yes', path);
     };
-    const show = () => setOpen(true);
+    const show = (event: Event) => {
+      const active = (event as CustomEvent<EventTarget | null | undefined>).detail ?? document.activeElement;
+      trigger.current = active instanceof HTMLElement && active !== document.body ? active : null;
+      setOpen(true);
+      setFocusRequest((count) => count + 1);
+    };
     const storageChanged = (event: StorageEvent) => { if (event.key === consentKey || event.key === null) sync(); };
     const onError = () => captureWebsiteEvent('website_error', { error_kind: 'script' });
     const onRejection = () => captureWebsiteEvent('website_error', { error_kind: 'unhandled_rejection' });
@@ -46,16 +60,17 @@ export function WebsiteAnalytics({ path }: { path: string }) {
     setOpen(false);
   };
   if (!open) return null;
-  return <section aria-label="Website analytics preferences" style={{ position: 'fixed', bottom: 16, left: 16, right: 16, margin: '0 auto', maxWidth: 640, padding: 22, border: `1px solid ${websiteTheme.border}`, borderRadius: 18, background: websiteTheme.surface, color: websiteTheme.text, boxShadow: '0 4px 32px #17231e22', zIndex: 1000, fontFamily: 'Red Hat Text, sans-serif', fontSize: 15, lineHeight: 1.5 }}>
-    <strong>Help improve Puptime?</strong>
-    <p style={{ margin: '8px 0 16px' }}>Optional PostHog analytics measure public website visits, source-code clicks, and browser error categories using an anonymous browser ID. No account details or session recordings. Cloudflare separately measures traffic and page speed. <a href={privacyPath}>Privacy policy</a></p>
-    {(blocked || !posthogConfigured) && <p>{blocked ? 'Your browser privacy signal keeps optional analytics off.' : 'Optional analytics are not configured.'}</p>}
-    {choice && !blocked && <p>Optional analytics are {choice === 'yes' ? 'on' : 'off'}.</p>}
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+  return <section aria-label="Website analytics preferences" style={{ position: 'fixed', bottom: 16, left: 16, right: 16, margin: '0 auto', maxWidth: 640, padding: 24, border: `1px solid ${websiteTheme.text}`, borderRadius: 0, background: websiteTheme.surface, color: websiteTheme.text, boxShadow: '0 8px 32px #17231e29', zIndex: 1000, fontFamily: "'Red Hat Text', sans-serif", fontSize: 15, lineHeight: 1.5 }}>
+    <strong style={{ display: 'block', fontFamily: "'Red Hat Display', sans-serif", fontWeight: 900, fontSize: 22, letterSpacing: '-.02em', lineHeight: 1.1 }}>Help improve Puptime?</strong>
+    <p style={{ margin: '10px 0 16px' }}>Optional PostHog analytics measure public website visits, source-code clicks, and browser error categories using an anonymous browser ID. No account details or session recordings. Cloudflare separately measures traffic and page speed. <a href={privacyPath} style={{ textDecoration: 'underline', textUnderlineOffset: 3 }}>Privacy policy</a></p>
+    {(blocked || !posthogConfigured) && <p style={{ margin: '0 0 16px' }}>{blocked ? 'Your browser privacy signal keeps optional analytics off.' : 'Optional analytics are not configured.'}</p>}
+    {choice && !blocked && <p style={{ margin: '0 0 16px' }}>Optional analytics are {choice === 'yes' ? 'on' : 'off'}.</p>}
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
       <button ref={declineButton} style={buttonStyle} onClick={() => choose(false)}>Decline analytics</button>
-      <button style={buttonStyle} disabled={blocked || !posthogConfigured} onClick={() => choose(true)}>Allow analytics</button>
+      <button style={blocked || !posthogConfigured ? { ...buttonStyle, opacity: 0.5, cursor: 'not-allowed' } : buttonStyle} disabled={blocked || !posthogConfigured} onClick={() => choose(true)}>Allow analytics</button>
     </div>
   </section>;
 }
 
-const buttonStyle = { minHeight: 44, padding: '10px 16px', border: `1px solid ${websiteTheme.primary}`, borderRadius: 10, color: websiteTheme.primary, background: websiteTheme.surface, font: 'inherit', cursor: 'pointer' };
+// Both choices share one style so neither is visually favoured.
+const buttonStyle = { flex: '1 1 140px', minHeight: 48, padding: '12px 8px', border: 0, borderRadius: 0, color: websiteTheme.text, background: 'var(--lime)', font: 'inherit', fontWeight: 700, cursor: 'pointer', outlineOffset: 2 };

@@ -71,12 +71,18 @@ try {
   const session = await context(), page = await session.newPage();
   await session.addCookies([{ name: 'synthetic-private-cookie', value: 'never-telemetry', url: origin }]);
   await page.goto(origin + '/?email=private-query#private-fragment');
+  const focused = () => page.evaluate(() => document.activeElement?.textContent ?? '');
+  await page.getByRole('region', { name: 'Website analytics preferences' }).waitFor();
+  assert.notEqual(await focused(), 'Decline analytics', 'The automatic banner must not take focus on page load.');
   await page.getByRole('button', { name: 'Decline analytics', exact: true }).click();
   await pause(); assert.equal(requests.length, 0);
   await page.reload(); await pause(); assert.equal(requests.length, 0);
   pass('Fresh visitor, decline and declined reload make no analytics requests.');
   await page.getByRole('button', { name: 'Analytics settings', exact: true }).click();
+  assert.equal(await focused(), 'Decline analytics', 'Opening settings from the footer moves focus into the banner.');
   await page.getByRole('button', { name: 'Allow analytics', exact: true }).click();
+  assert.equal(await focused(), 'Analytics settings', 'A choice returns focus to the footer trigger.');
+  pass('Banner leaves focus alone on load, takes it when opened from the footer, and returns it after a choice.');
   await until(() => events.some(event => event.event === 'website_page_view'));
   const originalId = events[0].properties.distinct_id;
   await page.goto(origin + '/puppy-care/toilet-training?email=private-query#private-fragment');
