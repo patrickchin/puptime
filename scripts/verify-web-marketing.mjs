@@ -119,10 +119,18 @@ try {
     await page.getByTestId('learn.image.toilet-training').waitFor();
     await page.evaluate(() => document.fonts.ready);
     const illustration = await page.getByTestId('learn.image.toilet-training').boundingBox();
-    assert.ok(illustration.width >= Math.min(width - 48, 600) && illustration.height >= 160, 'Article illustrations should have a prominent reading-width frame.');
+    assert.ok(illustration.height >= 100 && illustration.height <= 240, 'Article illustrations should stay visible without filling the first screen.');
+    assert.equal(await page.locator('h1').count(), 1, 'Guides should have one page heading.');
+    assert.equal(await page.locator('h1').innerText(), 'How often does a puppy need to go out?', 'Guide heading should answer the page title.');
+    assert.equal(await page.getByTestId('learn.glance').locator('[role="listitem"]').count(), 3, 'Guides should show every at-a-glance item.');
+    await page.getByTestId('learn.reviewed').waitFor();
+    const firstSection = await page.getByRole('heading', { level: 2, name: 'Start with frequent opportunities' }).boundingBox();
+    if (width >= 390) assert.ok(firstSection.y + firstSection.height <= (width < 600 ? 844 : 900), `First guide section should start above the fold at ${width}px.`);
+    assert.ok(await page.getByTestId('learn.sources').isVisible(), 'Guide sources should be visible without a toggle.');
+    assert.equal(await page.getByTestId('learn.appCard').getAttribute('href'), '/#app', 'Guides should link to the app once.');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `Guide overflow at ${width}px.`);
     await page.screenshot({ path: `${output}/${width}-care-article.png` });
-    passed.push(`${width}px: guide search, matching backgrounds, and large illustration.`);
+    passed.push(`${width}px: guide search, matching backgrounds, answer-first heading, glance, sources, and app link.`);
     console.log('PASS', passed.at(-1));
   }
   assert.deepEqual(errors, [], 'No browser errors.');

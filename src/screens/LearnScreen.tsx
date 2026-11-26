@@ -83,16 +83,42 @@ function ArticleRow({ article, theme, onOpen, featured = false, wide = false, pl
     : <Pressable {...props} accessibilityRole="button" onPress={() => onOpen(article.id)}>{content}</Pressable>;
 }
 
+function GuideGlance({ article, theme }: { article: CareArticle; theme: Theme }) {
+  const { t } = useLocalization();
+  return <View testID="learn.glance" style={[webStyles.glance, { backgroundColor: theme.primarySoft, borderRadius: theme.presentation.controlRadius }]}>
+    <Text accessibilityRole="header" aria-level={2} style={[webStyles.glanceHeading, { color: theme.text }]}>{t('learn.glance')}</Text>
+    <View role="list" style={webStyles.glanceItems}>
+      {article.glance.map((item) => <View key={item.label} role="listitem" style={webStyles.glanceItem}>
+        <Text style={[webStyles.glanceLabel, { color: theme.text }]}>{item.label}</Text>
+        <Text style={[webStyles.glanceValue, { color: article.image === 'urgent' ? theme.danger : theme.primary }]}>{item.value}</Text>
+      </View>)}
+    </View>
+  </View>;
+}
+
+const trackKeys = { potty: 'learn.track.potty', feeding: 'learn.track.meals', sleep: 'learn.track.sleep' } as const;
+
+function GuideAppCard({ article, theme }: { article: CareArticle; theme: Theme }) {
+  const { t } = useLocalization();
+  const key = trackKeys[article.image as keyof typeof trackKeys] ?? 'learn.track.default';
+  return <WebAnchor testID="learn.appCard" href="/#app" accessibilityRole="link" style={({ pressed }) => [webStyles.appCard, { borderColor: theme.border, backgroundColor: theme.surface, borderRadius: theme.presentation.controlRadius }, pressed && styles.pressed]}>
+    <Text style={[styles.linkText, webStyles.appCardText, { color: theme.primary }]}>{t(key)} →</Text>
+  </WebAnchor>;
+}
+
 function GuideReferences({ article, theme }: { article: CareArticle; theme: Theme }) {
   const { t } = useLocalization();
-  const [expanded, setExpanded] = useState(false);
+  const [toggled, setExpanded] = useState(false);
+  const expanded = toggled || Platform.OS === 'web';
   const sources = [...new Set(article.sections.flatMap((section) => section.sources))];
-  return <View style={[styles.references, { borderColor: theme.border }]}>
-    <Pressable testID="learn.sources.toggle" accessibilityRole="button" accessibilityState={{ expanded }} aria-expanded={expanded} onPress={() => setExpanded(!expanded)} style={({ pressed }) => [styles.referencesToggle, pressed && styles.pressed]}>
-      <Text style={[styles.referenceLabel, styles.rowCopy, { color: theme.textMuted }]}>{t('learn.sources')}</Text>
-      <Text aria-hidden style={[styles.referenceLabel, { color: theme.textMuted }]}>{expanded ? '−' : '+'}</Text>
-    </Pressable>
-    {(expanded || Platform.OS === 'web') && <View testID="learn.sources" style={[styles.referenceContent, !expanded && { display: 'none' }]}>
+  return <View style={[styles.references, { borderColor: theme.border }, Platform.OS === 'web' && webStyles.references]}>
+    {Platform.OS === 'web'
+      ? <Text accessibilityRole="header" aria-level={2} style={[webStyles.referencesHeading, { color: theme.text }]}>{t('learn.sources')}</Text>
+      : <Pressable testID="learn.sources.toggle" accessibilityRole="button" accessibilityState={{ expanded }} aria-expanded={expanded} onPress={() => setExpanded(!expanded)} style={({ pressed }) => [styles.referencesToggle, pressed && styles.pressed]}>
+          <Text style={[styles.referenceLabel, styles.rowCopy, { color: theme.textMuted }]}>{t('learn.sources')}</Text>
+          <Text aria-hidden style={[styles.referenceLabel, { color: theme.textMuted }]}>{expanded ? '−' : '+'}</Text>
+        </Pressable>}
+    {expanded && <View testID="learn.sources" style={styles.referenceContent}>
       {sources.map((id) => <SourceLink key={id} id={id} theme={theme} small />)}
       {!!article.videos?.length && <View style={styles.video}>
         <Text style={[styles.referenceLabel, { color: theme.textMuted }]}>{t('learn.watch')}</Text>
@@ -144,10 +170,11 @@ export function LearnScreen({ theme, articleId, onArticleChange, showHeader=true
   const results = findCareArticles(query);
   const sourceCount = Object.values(careSources).filter((source) => source.kind !== 'video').length;
   const videos = Object.keys(careSources).filter((id) => careSources[id].kind === 'video');
-  const title = article?.shortTitle ?? (invalidArticle ? t('learn.notFound') : t('learn.title'));
+  const webArticle = Platform.OS === 'web' && !!article;
+  const title = article ? (webArticle ? article.title : article.shortTitle) : invalidArticle ? t('learn.notFound') : t('learn.title');
 
   const content = (
-    <ScrollView key={selectedId ?? 'library'} testID="screen.learn" style={{ backgroundColor: theme.background }} contentContainerStyle={[styles.scrollContent, Platform.OS === 'web' && webStyles.scrollContent]} keyboardShouldPersistTaps="handled">
+    <ScrollView key={selectedId ?? 'library'} testID="screen.learn" style={{ backgroundColor: theme.background }} contentContainerStyle={[styles.scrollContent, Platform.OS === 'web' && [webStyles.scrollContent, article && width < 700 && webStyles.articleScrollCompact]]} keyboardShouldPersistTaps="handled">
       <View style={[styles.content, article && styles.articleContent, Platform.OS === 'web' && [webStyles.content, article && webStyles.articleContent]]}>
         {selectedId !== null && (Platform.OS === 'web'
           ? <WebAnchor testID="learn.back" href="/puppy-care/" accessibilityRole="link" style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
@@ -159,24 +186,31 @@ export function LearnScreen({ theme, articleId, onArticleChange, showHeader=true
               <Text style={[styles.linkText, { color: theme.primary }]}>{t('learn.back')}</Text>
             </Pressable>
         )}
-        <View style={[styles.headingRow, fontScale > 1.5 && styles.headingLargeText, Platform.OS === 'web' && article && webStyles.articleHeading]}>
-          <View style={[styles.rowCopy, fontScale > 1.5 && styles.columnCopy]}>
+        <View style={[styles.headingRow, fontScale > 1.5 && styles.headingLargeText, webArticle && [webStyles.articleHeading, wide && webStyles.articleHeadingWide]]}>
+          <View style={[styles.rowCopy, fontScale > 1.5 && styles.columnCopy, webArticle && !wide && styles.columnCopy]}>
             {showHeader && !article && Platform.OS !== 'web' && <Text style={[styles.eyebrow, { color: theme.primary }]}>{t('learn.eyebrow')}</Text>}
-            {(showHeader||selectedId!==null)&&<Text ref={heading} accessibilityRole="header" aria-level={1} style={[styles.title, { color: theme.text, fontSize: theme.presentation.titleSize, lineHeight: theme.presentation.titleLineHeight, fontWeight: theme.presentation.titleWeight }, !showHeader && {fontSize:22,lineHeight:28}, Platform.OS === 'web' && webStyles.title]}>{title}</Text>}
+            {webArticle && <Text style={[styles.eyebrow, webStyles.articleEyebrow, { color: theme.primary }]}>{article.category}</Text>}
+            {(showHeader||selectedId!==null)&&<Text ref={heading} accessibilityRole="header" aria-level={1} style={[styles.title, { color: theme.text, fontSize: theme.presentation.titleSize, lineHeight: theme.presentation.titleLineHeight, fontWeight: theme.presentation.titleWeight }, !showHeader && {fontSize:22,lineHeight:28}, Platform.OS === 'web' && webStyles.title, webArticle && [webStyles.articleTitle, width < 700 && webStyles.articleTitleCompact]]}>{title}</Text>}
             {!article && <Text style={[styles.intro, { color: theme.textMuted }]}>{invalidArticle ? t('learn.notFoundBody') : t('learn.intro')}</Text>}
+            {webArticle && <>
+              <Text style={[styles.intro, webStyles.lede, { color: theme.textMuted }]}>{article.summary}</Text>
+              <Text testID="learn.reviewed" style={[styles.meta, webStyles.reviewed, { color: theme.textMuted }]}>{t('learn.reviewed')} {careReviewedOn}</Text>
+            </>}
           </View>
-          {article && <GuideImage article={article} style={[styles.heroImage, width < 360 && styles.smallFeaturedImage, wide && styles.heroImageWide, Platform.OS === 'web' && webStyles.heroImage]} />}
+          {article && <GuideImage article={article} style={[styles.heroImage, width < 360 && styles.smallFeaturedImage, wide && styles.heroImageWide, Platform.OS === 'web' && (wide ? webStyles.heroImage : webStyles.heroImageCompact)]} />}
         </View>
         {language !== 'en' && <Text style={[styles.meta, { color: theme.textMuted }]}>{t('learn.english')}</Text>}
 
         {article ? (
           <>
+            {webArticle && <GuideGlance article={article} theme={theme} />}
             {article.sections.map((section) => (
               <View key={section.title} style={[styles.section, Platform.OS === 'web' && webStyles.section]}>
                 <Text accessibilityRole="header" aria-level={2} style={[styles.sectionTitle, { color: theme.text }]}>{section.title}</Text>
                 {section.paragraphs.map((paragraph) => <Text key={paragraph} selectable style={[styles.body, { color: theme.text }, Platform.OS === 'web' && webStyles.body]}>{paragraph}</Text>)}
               </View>
             ))}
+            {webArticle && <GuideAppCard article={article} theme={theme} />}
             <View style={[styles.section, styles.divided, { borderColor: theme.border }]}>
               <Text accessibilityRole="header" aria-level={2} style={[styles.sectionTitle, { color: theme.text }]}>{t('learn.next')}</Text>
               <View>{article.related.map((id) => <ArticleRow key={id} article={careArticles.find((item) => item.id === id)!} theme={theme} onOpen={open} plain />)}</View>
@@ -285,11 +319,29 @@ const webStyles = StyleSheet.create({
   backArrow: { fontSize: 20, lineHeight: 23 },
   search: { marginTop: 16 },
   scrollContent: { paddingHorizontal: 24, paddingTop: 40, paddingBottom: 64 },
+  articleScrollCompact: { paddingTop: 16 },
   content: { maxWidth: 1160 },
   articleContent: { maxWidth: 720 },
   title: { fontSize: 44, lineHeight: 49, fontWeight: '900', marginBottom: 16 },
-  articleHeading: { flexDirection: 'column', alignItems: 'stretch', gap: 12 },
-  heroImage: { width: '100%', height: 'auto', aspectRatio: 1.6, borderRadius: 16, marginTop: 8, marginBottom: 12 },
+  articleHeading: { flexDirection: 'column', alignItems: 'stretch', gap: 16 },
+  articleHeadingWide: { flexDirection: 'row', alignItems: 'center', gap: 32 },
+  articleEyebrow: { textTransform: 'uppercase', marginBottom: 10 },
+  articleTitle: { fontSize: 40, lineHeight: 46 },
+  articleTitleCompact: { fontSize: 31, lineHeight: 36 },
+  lede: { fontSize: 18, lineHeight: 27, marginTop: 14, marginBottom: 6 },
+  reviewed: { marginBottom: 0 },
+  heroImage: { width: 208, height: 208, borderRadius: 16 },
+  heroImageCompact: { width: '100%', height: 132, borderRadius: 16 },
+  glance: { marginTop: 24, paddingHorizontal: 20, paddingVertical: 16, gap: 10 },
+  glanceHeading: { fontSize: 13, lineHeight: 20, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase' },
+  glanceItems: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 24, rowGap: 12 },
+  glanceItem: { flexGrow: 1, flexShrink: 1, flexBasis: 176 },
+  glanceLabel: { fontSize: 14, lineHeight: 20 },
+  glanceValue: { fontSize: 20, lineHeight: 26, fontWeight: '800' },
+  appCard: { borderWidth: 1, marginTop: 36, paddingHorizontal: 18, paddingVertical: 14, minHeight: 48, justifyContent: 'center' },
+  appCardText: { fontSize: 16, lineHeight: 24 },
+  references: { paddingTop: 24 },
+  referencesHeading: { fontSize: 17, lineHeight: 24, fontWeight: '700', marginBottom: 8 },
   featuredImage: { width: 160, height: 160 },
   featuredImageCompact: { width: '100%', height: 'auto', aspectRatio: 1.6 },
   card: { padding: 16, gap: 12 },
