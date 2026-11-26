@@ -74,10 +74,16 @@ try {
     await page.waitForFunction(() => scrollY < 2, null, { timeout: 5000 });
     await page.getByRole('link', { name: 'See the app', exact: true }).click();
     assert.ok(await page.locator('#app').evaluate(element => Math.abs(element.getBoundingClientRect().top) < 60), 'The hero action should reach the product section.');
-    for (const name of ['Today', 'History', 'Insights', 'Routine']) {
+    assert.equal(await page.locator('#app-title').innerText(), 'Take a look inside');
+    for (const name of ['Today', 'History', 'Insights']) {
       const button = page.getByRole('button', { name, exact: true });
       await button.click();
       assert.equal(await button.getAttribute('aria-pressed'), 'true');
+      assert.equal(await page.locator('.app-preview img[data-active=true]').count(), 1, 'Show exactly one preview screen at a time.');
+      // Switching must visibly change the phone: beside the choices on wide screens, directly below them on phones.
+      const [choices, phone] = await Promise.all([page.locator('.preview-choices').boundingBox(), page.locator('.app-preview .phone-frame').boundingBox()]);
+      if (width <= 600) assert.ok(phone.y > choices.y + choices.height && phone.y + phone.height - choices.y <= height, `Keep the preview phone directly below its choices at ${width}px.`);
+      else assert.ok(phone.x > choices.x + choices.width, `Keep the preview phone beside its choices at ${width}px.`);
       await page.getByRole('img', { name: `Puptime ${name} screen`, exact: true }).evaluate(image => image.decode());
       assert.ok(await page.getByRole('img', { name: `Puptime ${name} screen`, exact: true }).evaluate(sharpCapture, 1206 / 2622), 'Use sharp, uncropped native iPhone captures.');
       assert.ok(await page.locator('.app-preview .phone-frame').evaluate(element => {
@@ -87,14 +93,17 @@ try {
     }
     await page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished)));
     await page.screenshot({ path: `${output}/${width}-app-preview.png` });
-    const concept = page.getByRole('img', { name: 'Illustrative Poop & Eat timeline concept with routine windows', exact: true });
-    await concept.scrollIntoViewIfNeeded();
-    await concept.evaluate(image => image.decode());
-    assert.ok(await concept.evaluate(sharpCapture, 851 / 1848), 'Keep the illustrative story image sharp and uncropped.');
-    assert.ok(await concept.evaluate(image => Math.abs(image.clientWidth / image.clientHeight - 851 / 1848) < 0.01), 'Preserve the concept image proportions.');
-    await page.getByText('Illustrative timeline concept with routine windows.', { exact: true }).waitFor();
-    await page.locator('.rhythm-story').first().screenshot({ path: `${output}/${width}-timeline-concept.png` });
-    passed.push(`${width}px: wheel, PageDown, footer, back to top, app anchor, all four native previews, and illustrative timeline story.`);
+    const timeline = page.getByRole('img', { name: 'Puptime Timeline showing pee breaks at similar times across recorded days', exact: true });
+    await timeline.scrollIntoViewIfNeeded();
+    await timeline.evaluate(image => image.decode());
+    assert.ok(await timeline.evaluate(sharpCapture, 1206 / 2622), 'Keep the Timeline story capture sharp and uncropped.');
+    const storyPhones = await page.locator('.rhythm-story .phone-frame').evaluateAll(frames => frames.map(frame => frame.getBoundingClientRect().width));
+    assert.equal(storyPhones.length, 2);
+    assert.ok(Math.abs(storyPhones[0] - storyPhones[1]) < 1, 'Show both rhythm stories at the same size.');
+    const shown = await page.locator('.app-preview img, .rhythm-story img').evaluateAll(images => images.map(image => image.currentSrc));
+    assert.equal(new Set(shown).size, shown.length, 'Do not repeat a capture between the preview and the stories.');
+    await page.locator('.rhythm-chapter').screenshot({ path: `${output}/${width}-rhythm.png` });
+    passed.push(`${width}px: wheel, PageDown, footer, back to top, app anchor, three native previews beside their choices, and native Timeline story.`);
     console.log('PASS', passed.at(-1));
   }
   await page.setViewportSize({ width: 390, height: 844 });

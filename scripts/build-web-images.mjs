@@ -10,7 +10,7 @@ const images = [
   { source: 'assets/screenshots/activity.png', name: 'activity', widths: [360, 720] },
   { source: 'assets/screenshots/insights-summary.png', name: 'insights-summary', widths: [360, 720] },
   { source: 'assets/screenshots/schedule.png', name: 'schedule', widths: [360, 720] },
-  { source: 'assets/screenshots/timeline-routine-concept.png', name: 'timeline-routine-concept', widths: [360, 720] },
+  { source: 'assets/screenshots/insights-timeline.png', name: 'insights-timeline', widths: [360, 720] },
   { source: 'assets/puppy-care/potty.jpg', name: 'potty', widths: [512] },
 ];
 

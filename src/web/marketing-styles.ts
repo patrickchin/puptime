@@ -60,15 +60,17 @@ body:has(.marketing-site){overflow-y:auto}
 .phone-power{left:auto;right:-1cqi;top:25%;height:10%;border-radius:0 .6cqi .6cqi 0}
 .phone-frame img{display:block;width:100%;height:auto}
 .app-preview figcaption{font-size:var(--small);margin-top:16px;text-align:center}
-.rhythm-chapter{display:grid;grid-template-columns:1fr 1fr;gap:48px;background:var(--deep);color:var(--paper);align-items:start}
-.rhythm-intro{position:sticky;top:48px}
-.rhythm-intro p{max-width:25ch;margin-top:32px;font-size:var(--lead);line-height:1.4}
-.rhythm-stories{display:flex;flex-direction:column;gap:100px}
+/* Stack every capture in one frame so switching screens can crossfade. */
+.app-preview .phone-screen{display:grid}
+.preview-shot{grid-area:1/1;transition:opacity 320ms ease}
+.preview-shot[data-active=false]{opacity:0}
+.rhythm-chapter{display:flex;flex-direction:column;gap:72px;background:var(--deep);color:var(--paper)}
+.rhythm-intro{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:end}
+.rhythm-intro p{max-width:30ch;font-size:var(--lead);line-height:1.4}
+.rhythm-stories{display:grid;grid-template-columns:1fr 1fr;gap:48px}
 .rhythm-story h3{margin-bottom:28px}
-.story-content{display:grid;grid-template-columns:1fr .9fr;gap:24px;align-items:center}
-.story-content.reverse .phone-frame{order:2}
-.story-content p{font-size:var(--body)}
-.story-caption{display:block;font-size:var(--small);margin-top:16px}
+.story-content{display:grid;grid-template-columns:minmax(0,260px) 1fr;gap:32px;align-items:center}
+.story-content p{font-size:var(--body);max-width:30ch}
 .care-chapter{background:var(--paper);display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center;min-height:0}
 .care-art{width:100%;min-width:0}
 .care-art img{display:block;width:100%;height:auto;aspect-ratio:1;object-fit:contain}
@@ -102,8 +104,8 @@ body:has(.marketing-site){overflow-y:auto}
   .hero{min-height:580px;grid-template-columns:1.15fr 1fr}
   .hero-copy>p:first-of-type{font-size:18px}.hero-puppy{width:100%}
   .chapter{padding-top:80px;padding-bottom:80px;gap:6%}.preview-choices{margin-top:28px}
-  .app-preview{width:min(100%,310px)}.story-content{grid-template-columns:1fr}.story-content .phone-frame{max-width:260px}
-  .story-content.reverse .phone-frame{order:0}.rhythm-stories{gap:72px}.guide-links{grid-template-columns:1fr;gap:0}
+  .app-preview{width:min(100%,310px)}.rhythm-chapter{gap:56px}.story-content{grid-template-columns:1fr;gap:24px;align-items:start}.story-content .phone-frame{max-width:260px}
+  .guide-links{grid-template-columns:1fr;gap:0}
 }
 @media(min-width:601px) and (max-width:700px){
   .hero{grid-template-columns:1fr;min-height:0;padding-top:32px;padding-bottom:32px;gap:16px}
@@ -117,11 +119,14 @@ body:has(.marketing-site){overflow-y:auto}
   .primary-action{margin-top:24px;padding:13px 20px;min-height:52px}.download-options{margin-top:24px}.ios-status{min-height:52px;padding:13px 20px}.hero-note{margin-top:16px}
   .hero-art{height:350px;align-self:center;width:100%;margin-top:-12px}.hero-puppy{width:370px;max-width:110%;margin:0}
   .chapter{padding-top:64px;padding-bottom:64px;display:flex;flex-direction:column;gap:40px;min-height:0}
-  .app-chapter{gap:36px}.preview-choices{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:28px 0 24px}
-  .preview-choices button{font-size:22px;padding:10px 12px}.preview-description{min-height:4.5em}.small-copy{margin-top:16px}
-  .app-preview{width:280px;max-width:100%;align-self:center}.rhythm-intro{position:static}.rhythm-intro p{font-size:var(--body);margin-top:24px}
-  .rhythm-stories{width:100%;gap:56px}.story-content{grid-template-columns:1fr;gap:20px;align-items:start}.story-content .phone-frame{max-width:280px;justify-self:center}.story-content p{max-width:36ch}.story-content .phone-frame{width:100%}
-  .story-content.reverse .phone-frame{order:0}.rhythm-story h3{margin-bottom:20px}.care-chapter{gap:32px}.care-art{order:2}.care-copy>p{margin:24px 0}
+  /* Keep the screen choices directly above the phone so each tap visibly changes it. */
+  .app-chapter{gap:0}.preview-copy{display:contents}.app-chapter h2{order:0}
+  .preview-choices{order:1;align-self:stretch;flex-direction:row;gap:4px;margin:28px 0 16px;padding:4px;border:1px solid var(--border);border-radius:12px}
+  .preview-choices button{flex:1;justify-content:center;font-size:17px;padding:8px;min-height:44px;border-radius:8px}.preview-choices button:hover{transform:none}
+  .preview-description{order:2;min-height:4.5em;margin-bottom:16px}.app-preview{order:3;width:250px;max-width:100%;align-self:center}.small-copy{order:4;margin-top:24px}
+  .rhythm-intro{display:flex;flex-direction:column;align-items:start;gap:24px}.rhythm-intro p{font-size:var(--body)}
+  .rhythm-stories{width:100%;grid-template-columns:1fr;gap:56px}.story-content{gap:20px}.story-content .phone-frame{max-width:280px;width:100%;justify-self:center}.story-content p{max-width:36ch}
+  .rhythm-story h3{margin-bottom:20px}.care-chapter{gap:32px}.care-art{order:2}.care-copy>p{margin:24px 0}
   .care-art img{max-width:420px}.guide-links{grid-template-columns:1fr 1fr;gap:0 12px}.local-chapter{gap:32px}.local-columns{display:flex;flex-direction:column;gap:40px}.local-columns p{font-size:var(--body)}
   .local-columns .text-action{margin-top:16px}.local-columns h3{margin-bottom:16px}.trust-list{gap:8px}.trust-list li{padding:6px 14px}.account-chapter{min-height:180px;padding-top:28px;padding-bottom:24px}.account-word{font-family:'Red Hat Display',sans-serif;font-size:56px}.account-arrow{font-size:52px;top:20px}
 }
