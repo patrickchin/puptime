@@ -8,6 +8,13 @@
       "android": {
         "buildType": "app-bundle"
       }
+    },
+    "testflight": {
+      "extends": "production",
+      "environment": "production",
+      "env": {
+        "EXPO_PUBLIC_CLOUD_API_URL": "https://puptime.pages.dev"
+      }
     }
   },
   "submit": {
