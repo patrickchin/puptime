@@ -149,13 +149,15 @@ export function LearnScreen({ theme, articleId, onArticleChange, showHeader=true
   const content = (
     <ScrollView key={selectedId ?? 'library'} testID="screen.learn" style={{ backgroundColor: theme.background }} contentContainerStyle={[styles.scrollContent, Platform.OS === 'web' && webStyles.scrollContent]} keyboardShouldPersistTaps="handled">
       <View style={[styles.content, article && styles.articleContent, Platform.OS === 'web' && [webStyles.content, article && webStyles.articleContent]]}>
-        {selectedId !== null && (
-          <Pressable testID="learn.back" accessibilityRole="button" onPress={() => open(null)} style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
-            {Platform.OS === 'web'
-              ? <Text aria-hidden style={{ fontSize: 24, color: theme.primary }}>←</Text>
-              : <MaterialCommunityIcons name="arrow-left" size={22} color={theme.primary} />}
-            <Text style={[styles.linkText, { color: theme.primary }]}>{t('learn.back')}</Text>
-          </Pressable>
+        {selectedId !== null && (Platform.OS === 'web'
+          ? <WebAnchor testID="learn.back" href="/puppy-care/" accessibilityRole="link" style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
+              <Text aria-hidden style={[webStyles.backArrow, { color: theme.primary }]}>←</Text>
+              <Text style={[styles.linkText, { color: theme.primary }]}>{t('learn.back')}</Text>
+            </WebAnchor>
+          : <Pressable testID="learn.back" accessibilityRole="button" onPress={() => open(null)} style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
+              <MaterialCommunityIcons name="arrow-left" size={22} color={theme.primary} />
+              <Text style={[styles.linkText, { color: theme.primary }]}>{t('learn.back')}</Text>
+            </Pressable>
         )}
         <View style={[styles.headingRow, fontScale > 1.5 && styles.headingLargeText, Platform.OS === 'web' && article && webStyles.articleHeading]}>
           <View style={[styles.rowCopy, fontScale > 1.5 && styles.columnCopy]}>
@@ -280,6 +282,7 @@ const styles = StyleSheet.create({
 // The website has room for illustrations and a comfortable reading measure.
 // Keep the compact native layout for the app's Learn tab.
 const webStyles = StyleSheet.create({
+  backArrow: { fontSize: 20, lineHeight: 23 },
   scrollContent: { paddingHorizontal: 24, paddingTop: 40, paddingBottom: 64 },
   content: { maxWidth: 1160 },
   articleContent: { maxWidth: 720 },
