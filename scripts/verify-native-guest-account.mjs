@@ -30,6 +30,8 @@ const standard=onboarding==='--standard-csv'||onboarding==='--standard-all';
 const android=platform==='android',deleting=onboarding==='--account-deletion',onboardingSignIn=onboarding==='--onboarding-sign-in',comparing=onboarding==='--puppy-comparison',offline=onboarding==='--offline-lifecycle',isolating=onboarding==='--account-isolation',photographing=onboarding==='--photo-lifecycle',deletionFaults=onboarding==='--deletion-faults',upgrading=onboarding==='--enrolled-runtime-upgrade';
 assert.ok(!(comparing||offline||isolating||photographing||deletionFaults||upgrading)||!android,'Extended lifecycle cases use the dedicated iOS verification path.');
 assert.ok(!standard||!android,'The fixed standard selections are iOS only.');
+const requestOnly=process.env.PUPTIME_ACCOUNT_REQUEST_ONLY==='1';
+assert.ok(process.env.PUPTIME_ACCOUNT_REQUEST_ONLY===undefined||requestOnly);assert.ok(!requestOnly||!android&&onboarding===undefined,'Request diagnostics use only the existing iOS baseline path.');
 assert.equal(consent,'--replace-synthetic','Use PLATFORM DEVICE HOST --replace-synthetic [OUTPUT].');
 const frontPort=Number(process.env.PUPTIME_ACCOUNT_PORT??8797),backPort=frontPort+2;assert.ok(Number.isInteger(frontPort)&&frontPort>1024&&frontPort<65533);
 const app='com.patrickchin.puptime',output=resolve(destination),front='https://127.0.0.1:'+frontPort;
@@ -707,13 +709,20 @@ try{
     assert.ok(!requests.has('/api/cloud/enroll')&&!requests.has('/api/sync/push'),'Sign-in must not enroll or upload.');
     checks.push('welcome email sign-in uses the real SDK, rejects a wrong code, resumes setup after verification and cold restart, and never enrolls or uploads');
   }
+  if(requestOnly){
+   await flow('prepare');const before=snapshot();await flow('request');
+   const preview=auth.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(email);assert.ok(typeof preview?.code==='string'&&/^\d{6}$/.test(preview.code),'The isolated request must deliver a valid local preview.');
+   assert.deepEqual(snapshot(),before);assert.equal(auth.prepare('SELECT id FROM user WHERE email=?').get(email),undefined);assert.equal(identityRequests.verifyCode,0);assert.equal(requestCounts.enroll,0);assert.equal(requestCounts.push,0);
+   writeFileSync(join(output,'fixture-auth-readiness.json'),JSON.stringify({phase:'request',flowSequence,ui:{inspected:false},responses:authResponses},null,2)+'\n');
+   checks.push('Request-only diagnostic: normal account email request reaches code entry and a real local preview without verification, account creation, enrollment, upload or local history changes.');
+  }
   if(comparing)await verifyPuppyComparison();
   if(offline)await verifyOfflineLifecycle();
   if(isolating)await verifyAccountIsolation();
   if(photographing)await verifyPhotoLifecycle();
   if(deletionFaults)await verifyDeletionFaults();
   if(upgrading)await verifyEnrolledRuntimeUpgrade();
-  if(!onboardingSignIn&&!deleting&&!comparing&&!offline&&!isolating&&!photographing&&!deletionFaults&&!upgrading){
+  if(!requestOnly&&!onboardingSignIn&&!deleting&&!comparing&&!offline&&!isolating&&!photographing&&!deletionFaults&&!upgrading){
   await flow('prepare');assert.equal(snapshot().events.length,0);
   assert.ok(requests.has('/api/config'),'The real app must reach this isolated backend before any sign-in attempt.');
   await flow('add-logs',{BATCHES:'4',EXPECTED_COUNT:'12'});const guest=snapshot();assert.equal(guest.events.length,12);assert.equal(guest.owner.length,0);
@@ -755,9 +764,9 @@ try{
   markStartup('assert-task-completion');
   assert.equal(task.signal,null);
   rmSync(join(output,'failure-redacted.log'),{force:true});
-  writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',checks,receipts,...(upgrading?{stage:'controlled-origin-enrolled-runtime-replacement',upgradeExecuted:true,originModified:true,originalInstalledBytes:false,runtimes:runtimeProvenance}:{}),scope:upgrading?'Exact historical source/native pairs with controlled-origin release JS and ad-hoc signing; actual native SDK and isolated local HTTPS Better Auth/D1/SQLite DO. No credential injection, owner data, provider OAuth, untouched-original, numeric store or final current-candidate qualification.':android?'Android Debug native host with normal embedded release JS and isolated local HTTPS Better Auth/D1/SQLite DO; actual native email SDK and Keystore. Its temporary CA is trusted only in the ignored Debug source set, restored after the run. Production onboarding is tested separately in the Release APK. No real email, production account, session injection or mocked sync.':'Release bundle and actual native email SDK with isolated local HTTPS Better Auth/D1/SQLite DO. Simulator trusts the fixture certificate. No real email, production account, session injection or mocked sync.'},null,2)+'\n');
+  writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',checks,receipts,...(requestOnly?{stage:'request-only-diagnostic',diagnosticOnly:true,releaseQualified:false}:{}),...(upgrading?{stage:'controlled-origin-enrolled-runtime-replacement',upgradeExecuted:true,originModified:true,originalInstalledBytes:false,runtimes:runtimeProvenance}:{}),scope:upgrading?'Exact historical source/native pairs with controlled-origin release JS and ad-hoc signing; actual native SDK and isolated local HTTPS Better Auth/D1/SQLite DO. No credential injection, owner data, provider OAuth, untouched-original, numeric store or final current-candidate qualification.':android?'Android Debug native host with normal embedded release JS and isolated local HTTPS Better Auth/D1/SQLite DO; actual native email SDK and Keystore. Its temporary CA is trusted only in the ignored Debug source set, restored after the run. Production onboarding is tested separately in the Release APK. No real email, production account, session injection or mocked sync.':'Release bundle and actual native email SDK with isolated local HTTPS Better Auth/D1/SQLite DO. Simulator trusts the fixture certificate. No real email, production account, session injection or mocked sync.'},null,2)+'\n');
   completed=true;markStartup('case-result','passed');
-  console.log('PASS '+(upgrading?'controlled-origin enrolled runtime replacement':deletionFaults?'pending native deletion cancellation, retries and lost response':photographing?'native profile photo failure, roundtrip and restore':isolating?'expired session and account isolation':offline?'offline writes, replay and pending logout':deleting?'native account deletion':comparing?'named puppy comparison':onboardingSignIn?'welcome sign-in and session recovery':android?'guest account preservation and empty-database recovery':'guest account preservation and inspected empty-device recovery')+': '+output);
+  console.log('PASS '+(requestOnly?'request-only diagnostic':upgrading?'controlled-origin enrolled runtime replacement':deletionFaults?'pending native deletion cancellation, retries and lost response':photographing?'native profile photo failure, roundtrip and restore':isolating?'expired session and account isolation':offline?'offline writes, replay and pending logout':deleting?'native account deletion':comparing?'named puppy comparison':onboardingSignIn?'welcome sign-in and session recovery':android?'guest account preservation and empty-database recovery':'guest account preservation and inspected empty-device recovery')+': '+output);
   }
 }catch(error){markStartup(startupStage,'failed',error);
  if(standard){

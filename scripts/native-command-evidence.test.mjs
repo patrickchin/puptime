@@ -73,6 +73,18 @@ test('fixture proxy settles truncated upstream responses and records finite outc
 });
 // End proxy regression.
 
+test('request-only diagnostics reject other paths and cannot count as baseline acceptance',()=>{
+ const sdk=readFileSync(new URL('./verify-native-guest-account.mjs',import.meta.url),'utf8'),wrapper=readFileSync(new URL('./run-hosted-ios-account-case.mjs',import.meta.url),'utf8');
+ const selectSdk=Function('assert','process',sdk.slice(sdk.indexOf('const [platform,'),sdk.indexOf('assert.equal(consent,'))+'return requestOnly;');
+ const selectHost=Function('assert','process',wrapper.slice(wrapper.indexOf('const repository='),wrapper.indexOf('const standard='))+'return requestOnly;');
+ const sdkMode=(flag,platform='ios',mode)=>selectSdk(assert,{env:{...(flag===undefined?{}:{PUPTIME_ACCOUNT_REQUEST_ONLY:flag})},argv:['node','fixture',platform,'owned-device','host','--replace-synthetic','output',mode]});
+ const hostMode=(flag,scenario='baseline')=>selectHost(assert,{env:{GITHUB_REPOSITORY:'patrickchin/puptime',PUPTIME_NATIVE_HOST_RUN_ID:'45721854726',PUPTIME_ACCOUNT_SCENARIO:scenario,...(flag===undefined?{}:{PUPTIME_ACCOUNT_REQUEST_ONLY:flag})}});
+ assert.equal(sdkMode(undefined),false);assert.equal(hostMode(undefined),false);assert.equal(sdkMode('1'),true);assert.equal(hostMode('1'),true);
+ for(const flag of ['0','true','']){assert.throws(()=>sdkMode(flag));assert.throws(()=>hostMode(flag));}assert.throws(()=>sdkMode('1','android'));assert.throws(()=>sdkMode('1','ios','--offline-lifecycle'));assert.throws(()=>hostMode('1','offline'));
+ const start=wrapper.indexOf("assert.equal(verification.status,'passed')"),end=wrapper.indexOf(';assert.equal(task.signal',start);assert.ok(start>0&&end>start);const accept=Function('assert','verification','requestOnly',wrapper.slice(start,end));
+ const normal={status:'passed'},diagnostic={status:'passed',stage:'request-only-diagnostic',diagnosticOnly:true};accept(assert,normal,false);accept(assert,diagnostic,true);assert.throws(()=>accept(assert,normal,true));assert.throws(()=>accept(assert,diagnostic,false));assert.throws(()=>accept(assert,{...diagnostic,stage:'standard-production-app'},true));
+});
+
 test('actual onboarding, sign-in and prepare failure catch emits only command flags and preserves the original failure and cleanup',async t=>{
  const {runInNewContext}=await import('node:vm');
  const source=readFileSync(new URL('./verify-native-guest-account.mjs',import.meta.url),'utf8'),start=source.indexOf('async function flow('),end=source.indexOf('\nlet email=',start);assert.ok(start>0&&end>start);
