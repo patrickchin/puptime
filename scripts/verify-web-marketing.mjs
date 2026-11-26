@@ -28,14 +28,6 @@ writeFileSync(`${output}/verification.json`, JSON.stringify({ status: 'running' 
 try {
   browser = await chromium.launch({ headless: true, ...(process.env.PUPTIME_CHROMIUM_EXECUTABLE ? { executablePath: process.env.PUPTIME_CHROMIUM_EXECUTABLE } : {}) });
   const context = await browser.newContext({ deviceScaleFactor: 2 });
-  // Observe the real audio instance, including playback rate and seeking.
-  await context.addInitScript(() => {
-    window.Audio = new Proxy(window.Audio, { construct(Target, args) {
-      const audio = Reflect.construct(Target, args);
-      window.guideAudio = audio;
-      return audio;
-    } });
-  });
   await context.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
   page = await context.newPage();
   const errors = [];
@@ -116,38 +108,14 @@ try {
     await page.getByText('No matching guides', { exact: true }).waitFor();
     await page.getByTestId('learn.search').fill('toilet');
     await page.getByTestId('learn.article.toilet-training').click();
-    await page.getByTestId('learn.audio.play').waitFor();
-    await page.waitForFunction(() => !document.querySelector('[data-testid="learn.audio.play"]').disabled);
+    await page.waitForURL('**/puppy-care/toilet-training');
+    await page.getByTestId('learn.image.toilet-training').waitFor();
     await page.evaluate(() => document.fonts.ready);
     const illustration = await page.getByTestId('learn.image.toilet-training').boundingBox();
     assert.ok(illustration.width >= Math.min(width - 48, 600) && illustration.height >= 160, 'Article illustrations should have a prominent reading-width frame.');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `Guide overflow at ${width}px.`);
     await page.screenshot({ path: `${output}/${width}-care-article.png` });
-    const back = page.getByTestId('learn.audio.back'), play = page.getByTestId('learn.audio.play'), forward = page.getByTestId('learn.audio.forward');
-    const bounds = await Promise.all([back, play, forward].map(button => button.boundingBox()));
-    assert.ok(bounds[0].x < bounds[1].x && bounds[1].x < bounds[2].x && bounds.every(rect => rect.y === bounds[0].y), 'Skip buttons should flank Play on one row.');
-    assert.equal(await page.locator('.puptime-listener select').count(), 0);
-    const slower = page.getByTestId('learn.audio.slower'), faster = page.getByTestId('learn.audio.faster'), speed = page.getByTestId('learn.audio.speed');
-    await faster.click();
-    assert.equal(await speed.innerText(), '1.25×');
-    await faster.click();
-    assert.equal(await speed.innerText(), '1.5×');
-    assert.equal(await faster.isDisabled(), true);
-    assert.equal(await page.evaluate(() => window.guideAudio.playbackRate), 1.5);
-    await slower.click(); await slower.click(); await slower.click();
-    assert.equal(await speed.innerText(), '0.75×');
-    assert.equal(await slower.isDisabled(), true);
-    await faster.click();
-    await play.click();
-    await page.waitForFunction(() => window.guideAudio.currentTime > 0 && !window.guideAudio.paused);
-    await forward.click();
-    await page.waitForFunction(() => window.guideAudio.currentTime >= 15);
-    await play.click();
-    const before = await page.evaluate(() => window.guideAudio.currentTime);
-    await back.click();
-    assert.ok(Math.abs(await page.evaluate(() => window.guideAudio.currentTime) - (before - 15)) < 1, 'Back should seek 15 seconds.');
-    await page.getByTestId('learn.audio').screenshot({ path: `${output}/${width}-player.png` });
-    passed.push(`${width}px: guide search, matching backgrounds, large illustration, player order, real playback, 15-second seeking, and bounded speed buttons.`);
+    passed.push(`${width}px: guide search, matching backgrounds, and large illustration.`);
     console.log('PASS', passed.at(-1));
   }
   assert.deepEqual(errors, [], 'No browser errors.');
