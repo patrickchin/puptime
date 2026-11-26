@@ -1,5 +1,5 @@
 import Head from 'expo-router/head';
-import { pageMetadata, siteUrl } from './site';
+import { pageMetadata, siteUrl, socialImage } from './site';
 
 export function WebsiteMetadata({ path }: { path: string }) {
   const { title, description, url, article } = pageMetadata(path);
@@ -21,9 +21,11 @@ export function WebsiteMetadata({ path }: { path: string }) {
     <meta property="og:description" content={description} />
     <meta property="og:url" content={url} />
     <meta property="og:type" content={article ? 'article' : 'website'} />
-    <meta property="og:image" content={`${siteUrl}/social-preview.png`} />
-    <meta property="og:image:alt" content="Puptime logo" />
-    <meta name="twitter:card" content="summary" />
+    <meta property="og:image" content={socialImage.url} />
+    <meta property="og:image:width" content={String(socialImage.width)} />
+    <meta property="og:image:height" content={String(socialImage.height)} />
+    <meta property="og:image:alt" content={socialImage.alt} />
+    <meta name="twitter:card" content="summary_large_image" />
     <script type="application/ld+json">{JSON.stringify(structuredData).replace(/</g, '\\u003c')}</script>
   </Head>;
 }
