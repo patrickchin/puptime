@@ -57,7 +57,7 @@ function ArticleRow({ article, theme, onOpen, featured = false, wide = false, pl
     <>
       <GuideImage article={article} style={featured ? [styles.featuredImage, width < 360 && styles.smallFeaturedImage, Platform.OS === 'web' && [webStyles.featuredImage, width < 700 && webStyles.featuredImageCompact]] : [styles.cardImage, largeText && styles.cardImageLargeText, Platform.OS === 'web' && webStyles.cardImage]} />
       <View style={featured ? [styles.rowCopy, largeText && styles.columnCopy] : undefined}>
-        {featured && article.id === 'getting-started' && <Text style={[styles.eyebrow, { color: theme.primary }]}>{t('learn.start')}</Text>}
+        {featured && article.id === 'getting-started' && Platform.OS !== 'web' && <Text style={[styles.eyebrow, { color: theme.primary }]}>{t('learn.start')}</Text>}
         <Text style={[styles.rowTitle, featured && styles.featuredTitle, { color: theme.text }, Platform.OS === 'web' && webStyles.rowTitle]}>{article.shortTitle}</Text>
         {featured
           ? <Text style={[styles.rowSummary, { color: theme.textMuted }, Platform.OS === 'web' && webStyles.rowSummary]}>{article.summary}</Text>
@@ -161,7 +161,7 @@ export function LearnScreen({ theme, articleId, onArticleChange, showHeader=true
         )}
         <View style={[styles.headingRow, fontScale > 1.5 && styles.headingLargeText, Platform.OS === 'web' && article && webStyles.articleHeading]}>
           <View style={[styles.rowCopy, fontScale > 1.5 && styles.columnCopy]}>
-            {showHeader && !article && <Text style={[styles.eyebrow, { color: theme.primary }]}>{t('learn.eyebrow')}</Text>}
+            {showHeader && !article && Platform.OS !== 'web' && <Text style={[styles.eyebrow, { color: theme.primary }]}>{t('learn.eyebrow')}</Text>}
             {(showHeader||selectedId!==null)&&<Text ref={heading} accessibilityRole="header" aria-level={1} style={[styles.title, { color: theme.text, fontSize: theme.presentation.titleSize, lineHeight: theme.presentation.titleLineHeight, fontWeight: theme.presentation.titleWeight }, !showHeader && {fontSize:22,lineHeight:28}, Platform.OS === 'web' && webStyles.title]}>{title}</Text>}
             {!article && <Text style={[styles.intro, { color: theme.textMuted }]}>{invalidArticle ? t('learn.notFoundBody') : t('learn.intro')}</Text>}
           </View>
@@ -186,8 +186,8 @@ export function LearnScreen({ theme, articleId, onArticleChange, showHeader=true
         ) : !invalidArticle ? (
           <>
             <Text style={[styles.meta, { color: theme.textMuted }]}>{t('learn.counts', { guides: careArticles.length, sources: sourceCount, videos: videos.length })}</Text>
-            <Text style={[styles.searchLabel, { color: theme.text }]}>{t('learn.search')}</Text>
-            <TextInput testID="learn.search" value={query} onChangeText={setQuery} accessibilityLabel={t('learn.search')} placeholder={t('learn.searchHint')} placeholderTextColor={theme.textMuted} autoCorrect={false} clearButtonMode="while-editing" style={[styles.search, { color: theme.text, backgroundColor: theme.surface, borderColor: theme.border, borderRadius: theme.presentation.controlRadius }]} />
+            {Platform.OS !== 'web' && <Text style={[styles.searchLabel, { color: theme.text }]}>{t('learn.search')}</Text>}
+            <TextInput testID="learn.search" value={query} onChangeText={setQuery} accessibilityLabel={t('learn.search')} placeholder={t('learn.searchHint')} placeholderTextColor={theme.textMuted} autoCorrect={false} clearButtonMode="while-editing" style={[styles.search, { color: theme.text, backgroundColor: theme.surface, borderColor: theme.border, borderRadius: theme.presentation.controlRadius }, Platform.OS === 'web' && webStyles.search]} />
             {!query.trim() && <ArticleRow article={careArticles[0]} theme={theme} onOpen={open} featured />}
             {results.filter((item) => item.id !== 'getting-started' || query.trim()).length === 0 ? (
               <View style={styles.section}>
@@ -283,6 +283,7 @@ const styles = StyleSheet.create({
 // Keep the compact native layout for the app's Learn tab.
 const webStyles = StyleSheet.create({
   backArrow: { fontSize: 20, lineHeight: 23 },
+  search: { marginTop: 16 },
   scrollContent: { paddingHorizontal: 24, paddingTop: 40, paddingBottom: 64 },
   content: { maxWidth: 1160 },
   articleContent: { maxWidth: 720 },
