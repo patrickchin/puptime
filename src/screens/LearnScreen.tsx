@@ -53,18 +53,25 @@ function ArticleRow({ article, theme, onOpen, featured = false, wide = false, pl
   const { t } = useLocalization();
   const { width, fontScale } = useScreenDimensions();
   const largeText = fontScale > 1.5;
+  const web = Platform.OS === 'web';
+  // Narrow website screens list guides as compact rows instead of full-width illustrations.
+  const compact = web && width < 700 && !largeText;
+  const takeawayColor = article.image === 'urgent' ? theme.danger : theme.primary;
   const content = plain ? <Text style={[styles.linkText, { color: theme.primary }]}>{article.shortTitle} →</Text> : (
     <>
-      <GuideImage article={article} style={featured ? [styles.featuredImage, width < 360 && styles.smallFeaturedImage, Platform.OS === 'web' && [webStyles.featuredImage, width < 700 && webStyles.featuredImageCompact]] : [styles.cardImage, largeText && styles.cardImageLargeText, Platform.OS === 'web' && webStyles.cardImage]} />
-      <View style={featured ? [styles.rowCopy, largeText && styles.columnCopy] : undefined}>
-        {featured && article.id === 'getting-started' && Platform.OS !== 'web' && <Text style={[styles.eyebrow, { color: theme.primary }]}>{t('learn.start')}</Text>}
-        <Text style={[styles.rowTitle, featured && styles.featuredTitle, { color: theme.text }, Platform.OS === 'web' && webStyles.rowTitle]}>{article.shortTitle}</Text>
+      <GuideImage article={article} style={featured ? [styles.featuredImage, width < 360 && styles.smallFeaturedImage, web && (compact ? webStyles.cardThumb : webStyles.featuredImage)] : [styles.cardImage, largeText && styles.cardImageLargeText, web && (compact ? webStyles.cardThumb : webStyles.cardImage)]} />
+      <View style={featured || compact ? [styles.rowCopy, largeText && styles.columnCopy] : undefined}>
+        {featured && article.id === 'getting-started' && !web && <Text style={[styles.eyebrow, { color: theme.primary }]}>{t('learn.start')}</Text>}
+        <Text style={[styles.rowTitle, featured && styles.featuredTitle, { color: theme.text }, web && (compact ? webStyles.rowTitleCompact : webStyles.rowTitle)]}>{article.shortTitle}</Text>
         {featured
-          ? <Text style={[styles.rowSummary, { color: theme.textMuted }, Platform.OS === 'web' && webStyles.rowSummary]}>{article.summary}</Text>
-          : <><Text style={[styles.cardTakeaway, { color: article.image === 'urgent' ? theme.danger : theme.primary }]}>{article.glance[0].value}</Text>
-              <Text style={[styles.cardContext, { color: theme.textMuted }]}>{article.glance[0].label}</Text></>}
+          ? <Text style={[styles.rowSummary, { color: theme.textMuted }, web && [webStyles.rowSummary, webStyles.featuredSummary, compact && webStyles.rowSummaryCompact]]}>{article.summary}</Text>
+          : web
+            ? <><Text style={[webStyles.cardContext, { color: theme.textMuted }]}>{article.glance[0].label}</Text>
+                <Text style={[styles.cardTakeaway, webStyles.cardTakeaway, { color: takeawayColor }]}>{article.glance[0].value}</Text></>
+            : <><Text style={[styles.cardTakeaway, { color: takeawayColor }]}>{article.glance[0].value}</Text>
+                <Text style={[styles.cardContext, { color: theme.textMuted }]}>{article.glance[0].label}</Text></>}
       </View>
-      {featured && <Text aria-hidden style={[styles.chevron, { color: theme.primary }]}>›</Text>}
+      {featured && !compact && <Text aria-hidden style={[styles.chevron, { color: theme.primary }]}>›</Text>}
     </>
   );
   const props = {
@@ -72,13 +79,13 @@ function ArticleRow({ article, theme, onOpen, featured = false, wide = false, pl
     accessibilityLabel: `${t('learn.read')}: ${article.shortTitle}`,
     style: ({ pressed }: { pressed: boolean }) => plain ? [styles.relatedLink, pressed && styles.pressed] : [
       styles.articleCard, featured ? styles.featured : wide ? styles.cardWide : styles.cardSmall,
-      Platform.OS === 'web' && [webStyles.card, featured ? [webStyles.featured, width < 700 && webStyles.featuredCompact] : width >= 700 ? webStyles.cardWide : webStyles.cardSmall],
+      web && [webStyles.card, featured && webStyles.featured, !featured && webStyles.cardFill, compact && webStyles.cardRow],
       largeText && (featured ? styles.featuredLargeText : styles.cardLargeText),
       { borderColor: theme.border, backgroundColor: featured ? theme.primarySoft : theme.surface, borderRadius: theme.presentation.controlRadius },
       pressed && styles.pressed,
     ],
   };
-  return Platform.OS === 'web'
+  return web
     ? <WebAnchor {...props} href={`/puppy-care/${article.id}`} accessibilityRole="link">{content}</WebAnchor>
     : <Pressable {...props} accessibilityRole="button" onPress={() => onOpen(article.id)}>{content}</Pressable>;
 }
@@ -104,6 +111,30 @@ function GuideAppCard({ article, theme }: { article: CareArticle; theme: Theme }
   return <WebAnchor testID="learn.appCard" href="/#app" accessibilityRole="link" style={({ pressed }) => [webStyles.appCard, { borderColor: theme.border, backgroundColor: theme.surface, borderRadius: theme.presentation.controlRadius }, pressed && styles.pressed]}>
     <Text style={[styles.linkText, webStyles.appCardText, { color: theme.primary }]}>{t(key)} →</Text>
   </WebAnchor>;
+}
+
+// Pick the widest grid that leaves no lone card in a group's last row.
+function gridColumns(count: number, width: number) {
+  if (width < 700) return 1;
+  for (let columns = width >= 1100 ? 4 : 3; columns > 1; columns--) {
+    const remainder = count % columns;
+    if (remainder === 0 || (columns > 2 && remainder === columns - 1)) return columns;
+  }
+  return 1;
+}
+
+function VideoItem({ id, theme, wide }: { id: string; theme: Theme; wide: boolean }) {
+  const source = careSources[id];
+  return <View role="listitem" style={[webStyles.videoItem, wide && webStyles.videoItemWide, { borderColor: theme.border }]}>
+    <Text style={[webStyles.videoPublisher, { color: theme.textMuted }]}>{source.publisher}</Text>
+    <WebAnchor testID={`learn.video.${id}`} href={source.url} accessibilityRole="link" style={({ pressed }) => [webStyles.videoLink, pressed && styles.pressed]}>
+      {(state) => {
+        const { hovered, focused } = state as { hovered?: boolean; focused?: boolean };
+        return <Text style={[webStyles.videoTitle, { color: theme.primary }, (hovered || focused) && webStyles.underline]}>{source.title} <Text aria-hidden>↗</Text></Text>;
+      }}
+    </WebAnchor>
+    <Text style={[webStyles.videoNote, { color: theme.textMuted }]}>{source.note}</Text>
+  </View>;
 }
 
 function GuideReferences({ article, theme }: { article: CareArticle; theme: Theme }) {
@@ -222,6 +253,9 @@ export function LearnScreen({ theme, articleId, onArticleChange, showHeader=true
             <Text style={[styles.meta, { color: theme.textMuted }]}>{t('learn.counts', { guides: careArticles.length, sources: sourceCount, videos: videos.length })}</Text>
             {Platform.OS !== 'web' && <Text style={[styles.searchLabel, { color: theme.text }]}>{t('learn.search')}</Text>}
             <TextInput testID="learn.search" value={query} onChangeText={setQuery} accessibilityLabel={t('learn.search')} placeholder={t('learn.searchHint')} placeholderTextColor={theme.textMuted} autoCorrect={false} clearButtonMode="while-editing" style={[styles.search, { color: theme.text, backgroundColor: theme.surface, borderColor: theme.border, borderRadius: theme.presentation.controlRadius }, Platform.OS === 'web' && webStyles.search]} />
+            {Platform.OS === 'web' && <View aria-live="polite" style={webStyles.visuallyHidden}>
+              <Text testID="learn.searchStatus">{query.trim() ? results.length ? results.length === 1 ? t('learn.matchOne') : t('learn.matchMany', { count: results.length }) : t('learn.noResults') : ''}</Text>
+            </View>}
             {!query.trim() && <ArticleRow article={careArticles[0]} theme={theme} onOpen={open} featured />}
             {results.filter((item) => item.id !== 'getting-started' || query.trim()).length === 0 ? (
               <View style={styles.section}>
@@ -230,13 +264,17 @@ export function LearnScreen({ theme, articleId, onArticleChange, showHeader=true
                 <Pressable accessibilityRole="button" onPress={() => setQuery('')} style={styles.back}><Text style={[styles.linkText, { color: theme.primary }]}>{t('learn.clear')}</Text></Pressable>
               </View>
             ) : (
-              <View style={styles.groups}>
+              <View style={[styles.groups, Platform.OS === 'web' && webStyles.groups]}>
                 {['Daily care', 'Training', 'Health', 'Basics'].map((category) => {
                   const group = results.filter((item) => item.category === category && (item.id !== 'getting-started' || query.trim()));
                   if (!group.length) return null;
                   return <View key={category} style={styles.group}>
                     <Text accessibilityRole="header" aria-level={2} style={[styles.sectionTitle, { color: theme.text }]}>{category}</Text>
-                    <View style={styles.cards}>{group.map((item) => <ArticleRow key={item.id} article={item} theme={theme} onOpen={open} wide={wide} featured={category === 'Basics'} />)}</View>
+                    {Platform.OS === 'web' && category !== 'Basics'
+                      ? <View style={[styles.cards, webStyles.cards]}>{group.map((item) => <View key={item.id} style={[webStyles.cell, { width: `${100 / gridColumns(group.length, width)}%` }]}>
+                          <ArticleRow article={item} theme={theme} onOpen={open} />
+                        </View>)}</View>
+                      : <View style={styles.cards}>{group.map((item) => <ArticleRow key={item.id} article={item} theme={theme} onOpen={open} wide={wide} featured={category === 'Basics'} />)}</View>}
                   </View>;
                 })}
               </View>
@@ -245,7 +283,9 @@ export function LearnScreen({ theme, articleId, onArticleChange, showHeader=true
             {!query.trim() && <View style={[styles.section, styles.divided, { borderColor: theme.border }]}>
               <Text accessibilityRole="header" aria-level={2} style={[styles.sectionTitle, { color: theme.text }]}>{t('learn.watch')}</Text>
               <Text style={[styles.body, { color: theme.textMuted }]}>{t('learn.videoIntro')}</Text>
-              {videos.map((id) => <View key={id} style={styles.video}><SourceLink id={id} theme={theme} /><Text style={[styles.rowSummary, { color: theme.textMuted }]}>{careSources[id].note}</Text></View>)}
+              {Platform.OS === 'web'
+                ? <View role="list" style={[webStyles.videos, wide && webStyles.videosWide]}>{videos.map((id) => <VideoItem key={id} id={id} theme={theme} wide={wide} />)}</View>
+                : videos.map((id) => <View key={id} style={styles.video}><SourceLink id={id} theme={theme} /><Text style={[styles.rowSummary, { color: theme.textMuted }]}>{careSources[id].note}</Text></View>)}
             </View>}
           </>
         ) : null}
@@ -343,15 +383,33 @@ const webStyles = StyleSheet.create({
   references: { paddingTop: 24 },
   referencesHeading: { fontSize: 17, lineHeight: 24, fontWeight: '700', marginBottom: 8 },
   featuredImage: { width: 160, height: 160 },
-  featuredImageCompact: { width: '100%', height: 'auto', aspectRatio: 1.6 },
   card: { padding: 16, gap: 12 },
   featured: { gap: 24, flexWrap: 'wrap' },
-  featuredCompact: { flexDirection: 'column', alignItems: 'stretch', gap: 12 },
-  cardWide: { width: '31.5%' },
-  cardSmall: { width: '100%' },
-  cardImage: { aspectRatio: 1.2 },
+  groups: { marginTop: 36 },
+  cards: { gap: 0, justifyContent: 'flex-start', marginHorizontal: -8, marginVertical: -8 },
+  cell: { padding: 8 },
+  cardFill: { width: '100%', flexGrow: 1 },
+  cardRow: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 12, marginTop: 0 },
+  cardThumb: { width: 88, height: 88, aspectRatio: 1, borderRadius: 10 },
+  cardImage: { height: 168, aspectRatio: undefined },
+  cardContext: { fontSize: 13, lineHeight: 18, marginTop: 2 },
+  cardTakeaway: { fontSize: 16, lineHeight: 22, fontWeight: '700' },
   rowTitle: { fontSize: 22, lineHeight: 28 },
+  rowTitleCompact: { fontSize: 18, lineHeight: 24, marginBottom: 2 },
   rowSummary: { fontSize: 16, lineHeight: 25 },
+  rowSummaryCompact: { fontSize: 14, lineHeight: 21 },
+  // websiteTheme.textMuted is 4.72:1 on primarySoft; this keeps small text above 5.5:1.
+  featuredSummary: { color: '#4A584C' },
+  visuallyHidden: { position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0 },
+  videos: { marginTop: 4 },
+  videosWide: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 32 },
+  videoItem: { borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 16, gap: 4 },
+  videoItemWide: { width: '47%', flexGrow: 1 },
+  videoPublisher: { fontSize: 12, lineHeight: 18, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase' },
+  videoLink: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center' },
+  videoTitle: { fontSize: 17, lineHeight: 24, fontWeight: '700' },
+  underline: { textDecorationLine: 'underline' },
+  videoNote: { fontSize: 15, lineHeight: 23 },
   section: { marginTop: 36, gap: 16 },
   body: { fontSize: 18, lineHeight: 30 },
 });

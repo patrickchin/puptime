@@ -112,8 +112,11 @@ try {
     assert.equal(await page.locator('.site-header').evaluate(element => getComputedStyle(element).backgroundColor), background, 'Header and guide background should match.');
     await page.screenshot({ path: `${output}/${width}-care-library.png` });
     await page.getByTestId('learn.search').fill('zzzz-no-matching-guide');
-    await page.getByText('No matching guides', { exact: true }).waitFor();
+    await page.getByRole('heading', { name: 'No matching guides', exact: true }).waitFor();
+    assert.equal(await page.locator('[aria-live="polite"]').innerText(), 'No matching guides', 'Search should announce when nothing matches.');
     await page.getByTestId('learn.search').fill('toilet');
+    assert.match(await page.locator('[aria-live="polite"]').innerText(), /^\d+ guides? match/, 'Search should announce the result count.');
+    if (width < 700) assert.ok((await page.getByTestId('learn.article.toilet-training').boundingBox()).height < 160, 'Narrow guide cards should be compact rows.');
     await page.getByTestId('learn.article.toilet-training').click();
     await page.waitForURL('**/puppy-care/toilet-training');
     await page.getByTestId('learn.image.toilet-training').waitFor();
@@ -130,7 +133,7 @@ try {
     assert.equal(await page.getByTestId('learn.appCard').getAttribute('href'), '/#app', 'Guides should link to the app once.');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `Guide overflow at ${width}px.`);
     await page.screenshot({ path: `${output}/${width}-care-article.png` });
-    passed.push(`${width}px: guide search, matching backgrounds, answer-first heading, glance, sources, and app link.`);
+    passed.push(`${width}px: guide search announcements, compact narrow cards, matching backgrounds, answer-first heading, glance, sources, and app link.`);
     console.log('PASS', passed.at(-1));
   }
   assert.deepEqual(errors, [], 'No browser errors.');
