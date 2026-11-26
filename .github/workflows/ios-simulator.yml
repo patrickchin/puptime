@@ -294,11 +294,31 @@ jobs:
           if [ "$PUPTIME_ACCOUNT_REQUEST_MODE" = 1 ]; then export PUPTIME_ACCOUNT_REQUEST_ONLY=1; fi
           node scripts/run-hosted-ios-account-case.mjs
       - name: Upload bounded synthetic account receipts
-        if: always()
+        if: always() && inputs.account_case != 'request'
         uses: actions/upload-artifact@v6
         with:
           name: native-account-${{ matrix.scenario }}-${{ github.run_id }}
           path: build/isolated-native-account/${{ matrix.scenario }}
+          if-no-files-found: warn
+          retention-days: 3
+      - name: Upload finite account request receipts
+        if: always() && inputs.account_case == 'request'
+        uses: actions/upload-artifact@v6
+        with:
+          name: native-account-request-${{ github.run_id }}
+          path: |
+            build/isolated-native-account/baseline/native-provenance.json
+            build/isolated-native-account/baseline/startup-stage.json
+            build/isolated-native-account/baseline/sdk-startup-stage.json
+            build/isolated-native-account/baseline/simulator-boot-failure.json
+            build/isolated-native-account/baseline/fixture-readiness.json
+            build/isolated-native-account/baseline/fixture-native-reach.json
+            build/isolated-native-account/baseline/fixture-auth-readiness.json
+            build/isolated-native-account/baseline/fixture-prepare-command.json
+            build/isolated-native-account/baseline/fixture-onboarding-command.json
+            build/isolated-native-account/baseline/task-cleanup.json
+            build/isolated-native-account/baseline/sdk-task-cleanup.json
+            build/isolated-native-account/baseline/verification.json
           if-no-files-found: warn
           retention-days: 3
 
