@@ -154,9 +154,22 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
       <section className="local-chapter chapter" aria-labelledby="local-title">
         <h2 id="local-title" data-reveal>Local first.<br />Yours always.</h2>
         <div className="local-columns">
-          <p data-reveal>Log for free, without an account. Keep notes, edit your history, and export your activity as CSV. The everyday record belongs to you.</p>
-          <div data-reveal><p>Cloud backup and device sync are optional and managed in the Puptime app. Your saved cloud data stays yours when sync is paused.</p><SourceLink className="text-action" /></div>
+          <div data-reveal>
+            <h3 id="cost-title">What it costs</h3>
+            <dl className="cost-list" aria-labelledby="cost-title">
+              <div><dt>Free</dt><dd>Logging, notes, history, insights, routines and reminders.</dd></div>
+              <div><dt>Free during beta</dt><dd>Optional cloud backup and device sync, managed in the app. Your saved cloud data stays yours when sync is paused.</dd></div>
+            </dl>
+          </div>
+          <div data-reveal>
+            <h3>Why Puptime exists</h3>
+            <p>I’m Patrick Chin, and I make Puptime. I built it as a simple way to see when a puppy last went and how their days are taking shape. Its routine suggestions come from plain statistics over your own logs, worked out on your phone.</p>
+            <SourceLink className="text-action" />
+          </div>
         </div>
+        <ul className="trust-list" aria-label="Your data" data-reveal>
+          <li>No ads</li><li>Works without an account</li><li>Public source code</li><li>Export your data as CSV</li>
+        </ul>
       </section>
 
     </main>}

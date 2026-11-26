@@ -80,6 +80,13 @@ body:has(.marketing-site){overflow-y:auto}
 .local-columns{display:grid;grid-template-columns:1fr 1fr;gap:48px}
 .local-columns p{font-size:var(--body);line-height:1.45;max-width:36ch}
 .local-columns .text-action{margin-top:28px}
+.local-columns h3{margin-bottom:24px}
+.cost-list{display:grid;gap:20px;margin:0}
+.cost-list div{border-top:1px solid rgba(248,243,232,.24);padding-top:16px}
+.cost-list dt{font-weight:700;color:var(--lime)}
+.cost-list dd{margin:4px 0 0;line-height:1.45;max-width:36ch}
+.trust-list{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:12px}
+.trust-list li{border:1px solid rgba(248,243,232,.4);border-radius:999px;padding:8px 18px;font-size:var(--small);font-weight:700}
 .learning-content{display:flex;flex-direction:column;min-height:70svh}
 .learning-content :where(div,input){font-family:inherit}
 .learning-content :where(h1,h2){font-family:'Red Hat Display',sans-serif;font-weight:900;letter-spacing:-.03em}
@@ -111,8 +118,8 @@ body:has(.marketing-site){overflow-y:auto}
   .app-preview{width:280px;max-width:100%;align-self:center}.rhythm-intro{position:static}.rhythm-intro p{font-size:var(--body);margin-top:24px}
   .rhythm-stories{width:100%;gap:56px}.story-content{grid-template-columns:1fr;gap:20px;align-items:start}.story-content .phone-frame{max-width:280px;justify-self:center}.story-content p{max-width:36ch}.story-content .phone-frame{width:100%}
   .story-content.reverse .phone-frame{order:0}.rhythm-story h3{margin-bottom:20px}.care-chapter{gap:32px}.care-art{order:2}.care-copy>p{margin:24px 0}
-  .care-art img{max-width:420px}.guide-links{grid-template-columns:1fr 1fr;gap:0 12px}.local-chapter{gap:32px}.local-columns{display:flex;flex-direction:column;gap:24px}.local-columns p{font-size:var(--body)}
-  .local-columns .text-action{margin-top:16px}.account-chapter{min-height:180px;padding-top:28px;padding-bottom:24px}.account-word{font-family:'Red Hat Display',sans-serif;font-size:56px}.account-arrow{font-size:52px;top:20px}
+  .care-art img{max-width:420px}.guide-links{grid-template-columns:1fr 1fr;gap:0 12px}.local-chapter{gap:32px}.local-columns{display:flex;flex-direction:column;gap:40px}.local-columns p{font-size:var(--body)}
+  .local-columns .text-action{margin-top:16px}.local-columns h3{margin-bottom:16px}.trust-list{gap:8px}.trust-list li{padding:6px 14px}.account-chapter{min-height:180px;padding-top:28px;padding-bottom:24px}.account-word{font-family:'Red Hat Display',sans-serif;font-size:56px}.account-arrow{font-size:52px;top:20px}
 }
 ${siteChromeStyles}
 .site-page{min-height:100svh;display:flex;flex-direction:column}.site-page>main{flex:1 0 auto;width:100%}
