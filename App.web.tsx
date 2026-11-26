@@ -12,14 +12,18 @@ const sourceUrl = 'https://github.com/patrickchin/puptime';
 // Metro supplies web images as URI objects; keep them in the asset pipeline.
 const assetUrl = (asset: string | { uri: string }): string => typeof asset === 'string' ? asset : asset.uri;
 const icon = '/brand-icon.png';
-const puppy = assetUrl(require('./assets/mascots/scruffy-terrier.png'));
-const careImage = assetUrl(require('./assets/puppy-care/potty.jpg'));
-const timingImage = assetUrl(require('./assets/screenshots/timeline-routine-concept.png'));
-const routineImage = assetUrl(require('./assets/screenshots/schedule.png'));
+// Serve resized WebP derivatives from scripts/build-web-images.mjs; the widest file is the fallback.
+type Asset = string | { uri: string };
+const webImage = (...sources: [number, Asset][]) => ({ src: assetUrl(sources[sources.length - 1][1]), srcSet: sources.map(([width, asset]) => `${assetUrl(asset)} ${width}w`).join(', ') });
+const screenSizes = '360px';
+const puppy = webImage([520, require('./assets/web/scruffy-terrier-520.webp')], [760, require('./assets/web/scruffy-terrier-760.webp')], [1040, require('./assets/web/scruffy-terrier-1040.webp')]);
+const careImage = assetUrl(require('./assets/web/potty-512.webp'));
+const timingImage = webImage([360, require('./assets/web/timeline-routine-concept-360.webp')], [720, require('./assets/web/timeline-routine-concept-720.webp')]);
+const routineImage = webImage([360, require('./assets/web/schedule-360.webp')], [720, require('./assets/web/schedule-720.webp')]);
 const previews = [
-  { name: 'Today', image: assetUrl(require('./assets/screenshots/today.png')), description: 'Keep potty breaks, meals, and notes together. Look back when you need to know what happened and when.' },
-  { name: 'History', image: assetUrl(require('./assets/screenshots/activity.png')), description: 'Look back through recorded days. Change a time, add a note, or export your activity as CSV.' },
-  { name: 'Insights', image: assetUrl(require('./assets/screenshots/insights-summary.png')), description: 'See recorded activity counts and timing patterns across days, with possible missing logs clearly marked.' },
+  { name: 'Today', image: webImage([360, require('./assets/web/today-360.webp')], [720, require('./assets/web/today-720.webp')]), description: 'Keep potty breaks, meals, and notes together. Look back when you need to know what happened and when.' },
+  { name: 'History', image: webImage([360, require('./assets/web/activity-360.webp')], [720, require('./assets/web/activity-720.webp')]), description: 'Look back through recorded days. Change a time, add a note, or export your activity as CSV.' },
+  { name: 'Insights', image: webImage([360, require('./assets/web/insights-summary-360.webp')], [720, require('./assets/web/insights-summary-720.webp')]), description: 'See recorded activity counts and timing patterns across days, with possible missing logs clearly marked.' },
   { name: 'Routine', image: routineImage, description: 'Build a routine around your puppy. Review suggested times, make them your own, and choose optional reminders.' },
 ];
 
@@ -91,7 +95,7 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
           <p className="hero-note">Free local logging. No account needed.</p>
           <a className="text-action" href="/download/android.apk">Download Android APK</a>
         </div>
-        <div className="hero-art"><img className="hero-puppy" src={puppy} alt="Puptime’s scruffy terrier, ready for the day" width="1024" height="1024" fetchPriority="high" /></div>
+        <div className="hero-art"><img className="hero-puppy" {...puppy} sizes="(max-width: 600px) 370px, (max-width: 700px) 340px, 520px" alt="Puptime’s scruffy terrier, ready for the day" width="1024" height="1024" fetchPriority="high" /></div>
       </section>
 
       <section className="app-chapter chapter" id="app" aria-labelledby="app-title">
@@ -104,7 +108,7 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
           <p className="small-copy">From the app, with example puppy logs.</p>
         </div>
         <figure className="app-preview" id="app-preview" data-reveal>
-          <PhoneFrame><img key={selected} src={previews[selected].image} alt={`Puptime ${previews[selected].name} screen`} width="1206" height="2622" /></PhoneFrame>
+          <PhoneFrame><img key={selected} {...previews[selected].image} sizes={screenSizes} alt={`Puptime ${previews[selected].name} screen`} width="1206" height="2622" /></PhoneFrame>
           <figcaption>{previews[selected].name} on Puptime</figcaption>
         </figure>
       </section>
@@ -118,14 +122,14 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
           <article className="rhythm-story">
             <h3 data-reveal>Spot the potty patterns</h3>
             <div className="story-content">
-              <PhoneFrame reveal><img src={timingImage} alt="Illustrative Poop & Eat timeline concept with routine windows" width="851" height="1848" loading="lazy" /></PhoneFrame>
+              <PhoneFrame reveal><img {...timingImage} sizes={screenSizes} alt="Illustrative Poop & Eat timeline concept with routine windows" width="851" height="1848" loading="lazy" /></PhoneFrame>
               <p data-reveal>Compare activity across recorded days. Look for recurring potty times.<small className="story-caption">Illustrative timeline concept with routine windows.</small></p>
             </div>
           </article>
           <article className="rhythm-story">
             <h3 data-reveal>A routine that fits</h3>
             <div className="story-content reverse">
-              <PhoneFrame reveal><img src={routineImage} alt="Editable daily routine with activity times and optional reminders" width="1206" height="2622" loading="lazy" /></PhoneFrame>
+              <PhoneFrame reveal><img {...routineImage} sizes={screenSizes} alt="Editable daily routine with activity times and optional reminders" width="1206" height="2622" loading="lazy" /></PhoneFrame>
               <p data-reveal>Review suggested times from your puppy’s history, then adjust each activity. Choose reminders for the routine you want to follow.</p>
             </div>
           </article>
