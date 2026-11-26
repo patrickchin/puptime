@@ -207,8 +207,10 @@ async function assertCloud(events){
 }
 async function signIn({associated=false}={}){
   const before=snapshot();await flow('request');
+  markStartup('assert-sign-in-code');
   code=auth.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(email)?.code;
   assert.match(code??'',/^\d{6}$/);codes.add(code);await flow(associated?'verify-associated':'verify',{EXPECTED_COUNT:String(before.events.length)});code='';
+  markStartup('assert-sign-in-preservation');
   assert.deepEqual(snapshot(),before,'Sign-in itself must preserve every event and wait for explicit backup confirmation.');
 }
 function mutateAuth(statement){
@@ -259,34 +261,36 @@ function drainReceipt(before,acceptedStart,pageStart){
 }
 async function verifyOfflineLifecycle(){
  await flow('prepare');await flow('add-logs',{BATCHES:'4',EXPECTED_COUNT:'12'});await signIn();await flow('enable',{EXPECTED_COUNT:'12'});
+ markStartup('assert-offline-enrollment');
  assert.equal(snapshot().pending,0);await assertCloud(snapshot().events);
  await transport('offline');await flow('add-logs',{BATCHES:'1',EXPECTED_COUNT:'15'});
+ markStartup('assert-offline-pending');
  await until(()=>snapshot().pending===3,'Capture the three genuinely pending native writes.');
  const queued=snapshot(),acceptedStart=wireAccepted.length,pageStart=wirePages.length;
  assert.equal((await remote({inspectBehindFault:true})).length,12,'An outage cannot upload new native logs.');
- await flow('reopen-offline',{EXPECTED_COUNT:'15'});assertNativeTransition(queued.tables,snapshot().tables);
- await transport('online');await flow('resume-sync');const drained=drainReceipt(queued,acceptedStart,pageStart);await assertCloud(drained.events);
+ await flow('reopen-offline',{EXPECTED_COUNT:'15'});markStartup('assert-offline-restart');assertNativeTransition(queued.tables,snapshot().tables);
+ await transport('online');await flow('resume-sync');markStartup('assert-offline-drain');const drained=drainReceipt(queued,acceptedStart,pageStart);await assertCloud(drained.events);
  checks.push('Three enrolled offline writes survive a real native restart and drain with exact original operation/result receipts; all14 tables permit only observed mirrors, acknowledgements and pull cursor changes. Controlled transport outage, not OS airplane mode.');
 
  await transport('drop-push-response-once');const lostStart=wireAccepted.length,lostPages=wirePages.length,pushStart=wirePushes.length;
- await flow('add-logs',{BATCHES:'1',EXPECTED_COUNT:'18'});await until(()=>fault==='push-offline','Observe an actual server commit whose response is lost.');
+ await flow('add-logs',{BATCHES:'1',EXPECTED_COUNT:'18'});markStartup('assert-offline-committed-response');await until(()=>fault==='push-offline','Observe an actual server commit whose response is lost.');
  await transport('offline');const lost=snapshot(),committedLost=new Set(wireAccepted.slice(lostStart).map(result=>result.operationId));assert.equal(lost.pending,3);assert.ok(committedLost.size>0);assert.equal((await remote({inspectBehindFault:true})).length,15+committedLost.size);
- await transport('online');await flow('resume-sync');const replayed=drainReceipt(lost,lostStart,lostPages);await assertCloud(replayed.events);
+ await transport('online');await flow('resume-sync');markStartup('assert-offline-replay');const replayed=drainReceipt(lost,lostStart,lostPages);await assertCloud(replayed.events);
  const mutations=wirePushes.slice(pushStart).flatMap(item=>item.mutations),originals=new Map(lost.tables.local_sync_outbox.map(row=>[row.operation_id,JSON.parse(row.mutation_json)]));
  for(const [operationId,mutation] of originals){const attempts=mutations.filter(item=>item.operationId===operationId);assert.ok(attempts.length>=(committedLost.has(operationId)?2:1),'Retry every real committed operation after its lost acknowledgement.');for(const attempt of attempts)assert.deepEqual(attempt,mutation);}
  checks.push('Losing a real committed push response retries identical operation payloads, records one exact acknowledgement per operation and leaves cloud revisions at1 without duplicates.');
 
- await transport('offline');await flow('add-logs',{BATCHES:'1',EXPECTED_COUNT:'21'});await until(()=>snapshot().pending===3,'Capture unsent changes before pending logout.');
+ await transport('offline');await flow('add-logs',{BATCHES:'1',EXPECTED_COUNT:'21'});markStartup('assert-offline-pending-logout');await until(()=>snapshot().pending===3,'Capture unsent changes before pending logout.');
  const beforeCancel=snapshot(),cloudBefore=await remote({inspectBehindFault:true});
- await flow('sign-out-pending',{ACTION:'cancel',EXPECTED_PENDING:'3'});assertNativeTransition(beforeCancel.tables,snapshot().tables);assert.deepEqual(await remote({inspectBehindFault:true}),cloudBefore);
- await transport('push-offline');const oldSession=cookie;await flow('sign-out-pending',{ACTION:'confirm',EXPECTED_PENDING:'3'});assertNativeDetached(beforeCancel.tables,snapshot().tables);assert.deepEqual(snapshot().events,beforeCancel.events);assert.equal((await inspectSession(oldSession)).status,401,'The real backend must invalidate the old native SDK session when online logout succeeds.');
- await transport('online');await signIn();await flow('enable',{EXPECTED_COUNT:'21'});assert.deepEqual(snapshot().events,beforeCancel.events);assert.equal(snapshot().pending,0);await assertCloud(beforeCancel.events);
+ await flow('sign-out-pending',{ACTION:'cancel',EXPECTED_PENDING:'3'});markStartup('assert-offline-logout-cancel');assertNativeTransition(beforeCancel.tables,snapshot().tables);assert.deepEqual(await remote({inspectBehindFault:true}),cloudBefore);
+ await transport('push-offline');const oldSession=cookie;await flow('sign-out-pending',{ACTION:'confirm',EXPECTED_PENDING:'3'});markStartup('assert-offline-online-logout');assertNativeDetached(beforeCancel.tables,snapshot().tables);assert.deepEqual(snapshot().events,beforeCancel.events);assert.equal((await inspectSession(oldSession)).status,401,'The real backend must invalidate the old native SDK session when online logout succeeds.');
+ await transport('online');await signIn();await flow('enable',{EXPECTED_COUNT:'21'});markStartup('assert-offline-rejoin');assert.deepEqual(snapshot().events,beforeCancel.events);assert.equal(snapshot().pending,0);await assertCloud(beforeCancel.events);
  checks.push('Cancelling logout with three unsent writes preserves every table and remote event; explicit logout detaches only expected association rows, keeps all21 logs, and same-account rejoin uploads the missing history without rewriting existing cloud records.');
- await transport('offline');await flow('add-logs',{BATCHES:'1',EXPECTED_COUNT:'24'});const fullyOffline=snapshot(),unconfirmedCookie=cookie;assert.equal(fullyOffline.pending,3);
- await flow('sign-out-pending',{ACTION:'confirm',EXPECTED_PENDING:'3'});assertNativeDetached(fullyOffline.tables,snapshot().tables);assert.equal((await inspectSession(unconfirmedCookie)).status,200,'Offline local signout cannot claim server-side session revocation.');
- await flow('reopen-guest',{EXPECTED_COUNT:'24',OFFLINE:'true'});assertNativeDetached(fullyOffline.tables,snapshot().tables);
- const detached=snapshot(),afterOfflineLogoutRequests={...requestCounts};await transport('online');await flow('reopen-guest',{EXPECTED_COUNT:'24',OFFLINE:'false'});assertNativeTransition(detached.tables,snapshot().tables);assert.deepEqual(requestCounts,afterOfflineLogoutRequests,'Online cold restart must not recover credentials or restart the detached queue implicitly.');assert.equal((await inspectSession(unconfirmedCookie)).status,200);await signIn();await flow('enable',{EXPECTED_COUNT:'24'});assert.deepEqual(snapshot().events,fullyOffline.events);assert.deepEqual(snapshot().tables.local_revisions,fullyOffline.tables.local_revisions);assert.equal(snapshot().pending,0);await assertCloud(fullyOffline.events);
- const rejoined=snapshot();await flow('reopen',{EXPECTED_COUNT:'24'});assertNativeTransition(rejoined.tables,snapshot().tables);
+ await transport('offline');await flow('add-logs',{BATCHES:'1',EXPECTED_COUNT:'24'});markStartup('assert-offline-disconnected-writes');const fullyOffline=snapshot(),unconfirmedCookie=cookie;assert.equal(fullyOffline.pending,3);
+ await flow('sign-out-pending',{ACTION:'confirm',EXPECTED_PENDING:'3'});markStartup('assert-offline-disconnected-logout');assertNativeDetached(fullyOffline.tables,snapshot().tables);assert.equal((await inspectSession(unconfirmedCookie)).status,200,'Offline local signout cannot claim server-side session revocation.');
+ await flow('reopen-guest',{EXPECTED_COUNT:'24',OFFLINE:'true'});markStartup('assert-offline-guest-restart');assertNativeDetached(fullyOffline.tables,snapshot().tables);
+ const detached=snapshot(),afterOfflineLogoutRequests={...requestCounts};await transport('online');await flow('reopen-guest',{EXPECTED_COUNT:'24',OFFLINE:'false'});markStartup('assert-offline-online-guest-restart');assertNativeTransition(detached.tables,snapshot().tables);assert.deepEqual(requestCounts,afterOfflineLogoutRequests,'Online cold restart must not recover credentials or restart the detached queue implicitly.');assert.equal((await inspectSession(unconfirmedCookie)).status,200);await signIn();await flow('enable',{EXPECTED_COUNT:'24'});markStartup('assert-offline-disconnected-rejoin');assert.deepEqual(snapshot().events,fullyOffline.events);assert.deepEqual(snapshot().tables.local_revisions,fullyOffline.tables.local_revisions);assert.equal(snapshot().pending,0);await assertCloud(fullyOffline.events);
+ const rejoined=snapshot();await flow('reopen',{EXPECTED_COUNT:'24'});markStartup('assert-offline-final-restart');assertNativeTransition(rejoined.tables,snapshot().tables);
  receipts.push({phase:'fully-offline-logout',localCredentialsCleared:true,serverSessionExplicitlyUnconfirmed:true,retainedEvents:24,pendingBefore:3,sameAccountRejoined:true});
  checks.push('Fully disconnected native logout clears local credentials and detaches only expected association rows while preserving24logs/revisions; backend independently confirms remote session is still unrevoked, so no server-signout claim is made. Guest coldrestart and explicit same-account rejoin recover the unsent writes without duplicates.');
 }
@@ -688,11 +692,15 @@ try{
   markStartup('case-assertions');
   if(onboardingSignIn){
     await flow('onboarding-request');
+    markStartup('assert-onboarding-code');
     code=auth.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(email)?.code;
     assert.match(code??'',/^\d{6}$/);codes.add(code);
     await flow('onboarding-verify');code='';
+    markStartup('assert-onboarding-session');
     assert.ok(cookie,'Welcome sign-in must persist the real SDK session.');
+    markStartup('assert-onboarding-local-state');
     assert.equal(snapshot().events.length,0);assert.equal(snapshot().owner.length,0);assert.equal(snapshot().pending,0);
+    markStartup('assert-onboarding-no-upload');
     assert.ok(!requests.has('/api/cloud/enroll')&&!requests.has('/api/sync/push'),'Sign-in must not enroll or upload.');
     checks.push('welcome email sign-in uses the real SDK, rejects a wrong code, resumes setup after verification and cold restart, and never enrolls or uploads');
   }
@@ -741,6 +749,7 @@ try{
    await flow('delete-confirm');assert.equal(auth.prepare('SELECT id FROM user WHERE id=?').all(owner).length,0);assert.deepEqual(snapshot().events,before.events);assert.equal(snapshot().owner.length,0);
    checks.push('native system confirmation cancels safely; stale auth uses real same-account OTP and a new confirmation; confirmed deletion removes the actual account, retains all 12 logs and offers manual Apple cleanup for a tokenless synthetic link');
   }
+  markStartup('assert-task-completion');
   assert.equal(task.signal,null);
   rmSync(join(output,'failure-redacted.log'),{force:true});
   writeFileSync(join(output,'verification.json'),JSON.stringify({status:'passed',checks,receipts,...(upgrading?{stage:'controlled-origin-enrolled-runtime-replacement',upgradeExecuted:true,originModified:true,originalInstalledBytes:false,runtimes:runtimeProvenance}:{}),scope:upgrading?'Exact historical source/native pairs with controlled-origin release JS and ad-hoc signing; actual native SDK and isolated local HTTPS Better Auth/D1/SQLite DO. No credential injection, owner data, provider OAuth, untouched-original, numeric store or final current-candidate qualification.':android?'Android Debug native host with normal embedded release JS and isolated local HTTPS Better Auth/D1/SQLite DO; actual native email SDK and Keystore. Its temporary CA is trusted only in the ignored Debug source set, restored after the run. Production onboarding is tested separately in the Release APK. No real email, production account, session injection or mocked sync.':'Release bundle and actual native email SDK with isolated local HTTPS Better Auth/D1/SQLite DO. Simulator trusts the fixture certificate. No real email, production account, session injection or mocked sync.'},null,2)+'\n');
