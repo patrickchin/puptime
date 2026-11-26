@@ -1,4 +1,4 @@
-import { lightTheme, type Theme } from '../theme';
+import { lightTheme, type Theme } from '../theme.ts';
 
 // Website colors follow the terrier's forest-green fur, cream coat, and ochre ears.
 export const websiteTheme: Theme = {

@@ -1,3 +1,4 @@
+import { siteUrl, privacyPath } from '../public-site';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect,useRef,useState } from 'react';
 import { Alert,KeyboardAvoidingView,Linking,ScrollView,StyleSheet,Text,View } from 'react-native';
@@ -120,7 +121,7 @@ export function AccountScreen({cloud,theme,eventCount,onBack,onOpenActivity}:{cl
           <Text style={[styles.body,bodyStyle]}>{t('account.diagnosticsDetail')}</Text>
           {diagnosticsFailed?<Text testID="account.diagnostics.error" accessibilityRole="alert" style={[styles.body,{color:theme.danger}]}>{t('account.diagnosticsError')}</Text>:null}
         </View>:null}
-        <Pressable accessibilityRole="link" accessibilityLabel={t('account.privacy')} onPress={()=>{void Linking.openURL('https://github.com/patrickchin/puptime/blob/main/PRIVACY.md').catch(()=>Alert.alert(t('learn.linkError'),t('learn.linkErrorBody')));}} style={styles.privacy}><Text style={[styles.body,{color:theme.primary,textDecorationLine:'underline'}]}>{t('account.privacy')}</Text></Pressable>
+        <Pressable accessibilityRole="link" accessibilityLabel={t('account.privacy')} onPress={()=>{void Linking.openURL(`${siteUrl}${privacyPath}`).catch(()=>Alert.alert(t('learn.linkError'),t('learn.linkErrorBody')));}} style={styles.privacy}><Text style={[styles.body,{color:theme.primary,textDecorationLine:'underline'}]}>{t('account.privacy')}</Text></Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
     <PuppyConnectionDialog proposal={proposal} theme={theme} disabled={busy||!state?.online||!account?.cloud.canSync} returnFocusRef={combineTrigger} onCancel={()=>setProposal(null)}/>

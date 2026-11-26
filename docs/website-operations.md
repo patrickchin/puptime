@@ -1,6 +1,6 @@
 # Website operations
 
-The public origin is `https://puptime.pages.dev`. Cloudflare Pages builds `npm run build:web` and publishes `dist-web` from `main`. Submit changes through a PR. The native entry remains `index.ts`; `index.web.ts` uses Expo Router for static marketing, care guides, and native-app handoff routes.
+The public origin is `https://puptime.org`. The Cloudflare-registered apex domain is attached to the existing `puptime` Pages project. Cloudflare Pages builds `npm run build:web` and publishes `dist-web` from `main`. Submit changes through a PR. The native entry remains `index.ts`; `index.web.ts` uses Expo Router for static marketing, care guides, and native-app handoff routes. The same build publishes `/privacy` from `PRIVACY.md` and `/support` with links to the public issue tracker and account deletion.
 
 The API Worker's staging environment uses explicit Frankfurt placement (`aws:eu-central-1`) near its EU auth database and account Durable Objects. Keep this placement with the backend deployment: running the database-heavy API at the visitor's edge adds repeated intercontinental database trips. Static Pages assets continue to be served near the visitor. Native account operations retain ownership fences and recent-authentication checks through the existing Worker.
 
@@ -26,7 +26,7 @@ The build renders the homepage, care library, and all 13 guides to HTML, includi
 
 Run `npm run build:web` to validate rendered metadata and headings for every public page; run `npm run test:web` for metadata and telemetry-boundary checks. Deploy previews should be checked at desktop and mobile widths, including direct guide loads, old hash links, search, back navigation, and audio playback.
 
-The Google Search Console URL-prefix property is `https://puptime.pages.dev/`. Its ownership file is committed under `public/`; keep that file deployed so verification remains valid. After deployment, verify ownership and submit `https://puptime.pages.dev/sitemap.xml`. Inspect the homepage and a guide with URL Inspection. Search Console reports indexing and search queries; adding a sitemap does not guarantee indexing or rankings. If the public domain changes, update `src/web/site.ts`, preview-header host patterns, server allowed origins, and the Search Console property together.
+Use the Google Search Console URL-prefix property `https://puptime.org/`. The ownership file is committed under `public/`. After deployment, verify ownership and submit `https://puptime.org/sitemap.xml`. Inspect the homepage and a guide with URL Inspection. Cloudflare preview hosts keep their `*.puptime.pages.dev` addresses and their noindex header.
 
 ## Cloudflare
 

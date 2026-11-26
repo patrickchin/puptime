@@ -31,7 +31,7 @@ async function fixture() {
   sql(`INSERT INTO user(id,name,email,emailVerified,createdAt,updatedAt) VALUES ('${id}','Staging fixture','${id}@example.invalid',1,'${now}','${now}');`);
   await issueSession(user);return user;
 }
-async function request(user, path, { method = 'GET', body, status = 200, origin = 'https://puptime.pages.dev' } = {}) {
+async function request(user, path, { method = 'GET', body, status = 200, origin = 'https://puptime.org' } = {}) {
   const response = await fetch(`${base}${path}`, { method, headers: {
     origin, ...(user ? { cookie: user.cookie } : {}), ...(body ? { 'content-type': 'application/json' } : {}),
   }, ...(body ? { body: JSON.stringify(body) } : {}), redirect:'error',signal:AbortSignal.timeout(15000) });

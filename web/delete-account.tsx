@@ -1,3 +1,4 @@
+import { privacyPath } from '../src/public-site';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import Head from 'expo-router/head';
 import { AccountDeletionError } from '../src/cloud/account-deletion';
@@ -51,7 +52,7 @@ export default function DeleteAccount(){
  return <div className="marketing-site care-page deletion-page">
   <Head><title>Delete your account | Puptime</title><meta name="robots" content="noindex, nofollow"/><meta name="referrer" content="no-referrer"/></Head>
   <style>{marketingStyles+css}</style>
-  <header className="site-header"><a className="site-brand" href="/"><img src="/brand-icon.png" width="38" height="38" alt=""/>Puptime</a><nav aria-label="Website"><a href="/">Home</a><a href="https://github.com/patrickchin/puptime/blob/main/PRIVACY.md">Privacy</a></nav></header>
+  <header className="site-header"><a className="site-brand" href="/"><img src="/brand-icon.png" width="38" height="38" alt=""/>Puptime</a><nav aria-label="Website"><a href="/">Home</a><a href={privacyPath}>Privacy</a></nav></header>
   <main className="deletion-content" aria-busy={busy}>
    <h1 ref={heading} tabIndex={-1}>{step==='done'?'Cloud account deleted':'Delete your Puptime account'}</h1>
    {step==='email'&&<>
@@ -89,7 +90,7 @@ export default function DeleteAccount(){
    </>}
    {operation&&<p role="status">{statusMessages[operation]}</p>}
    {error&&<p role="alert">{error}</p>}
-   {step!=='done'&&<aside><p>Deletion does not erase provider-managed recovery copies immediately. Cloudflare recovery copies can remain for up to 30 days; a non-content retirement marker prevents old clients from restoring the deleted account.</p><p>You can also delete your cloud account in Puptime’s My account screen after recent sign-in.</p><a href="https://github.com/patrickchin/puptime/blob/main/PRIVACY.md">Read the privacy policy</a></aside>}
+   {step!=='done'&&<aside><p>Deletion does not erase provider-managed recovery copies immediately. Cloudflare recovery copies can remain for up to 30 days; a non-content retirement marker prevents old clients from restoring the deleted account.</p><p>You can also delete your cloud account in Puptime’s My account screen after recent sign-in.</p><a href={privacyPath}>Read the privacy policy</a></aside>}
   </main>
  </div>;
 }

@@ -1,3 +1,4 @@
+import { siteUrl, privacyPath } from '../public-site';
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import {useEffect,useRef,useState} from 'react';
 import {AccessibilityInfo,ActivityIndicator,Alert,Image,Keyboard,KeyboardAvoidingView,Linking,Platform,ScrollView,StyleSheet,Text,TextInput,View,useWindowDimensions} from 'react-native';
@@ -141,7 +142,7 @@ export function FirstLaunchScreen({progress:initial,cloud,theme,notificationPerm
     <AccountSignIn cloud={cloud} theme={theme} showIntro={false}/>
     <View style={styles.space}/>
     {button('setup.local',t('setup.withoutAccount'),()=>{void local();},false)}
-    <Pressable accessibilityRole="link" onPress={()=>{void Linking.openURL('https://github.com/patrickchin/puptime/blob/main/PRIVACY.md').catch(()=>setError(t('learn.linkErrorBody')));}} style={styles.privacy}><Text style={[styles.caption,{color:theme.primary,textDecorationLine:'underline'}]}>{t('account.privacy')}</Text></Pressable>
+    <Pressable accessibilityRole="link" onPress={()=>{void Linking.openURL(`${siteUrl}${privacyPath}`).catch(()=>setError(t('learn.linkErrorBody')));}} style={styles.privacy}><Text style={[styles.caption,{color:theme.primary,textDecorationLine:'underline'}]}>{t('account.privacy')}</Text></Pressable>
    </>:null}
    {step==='cloud'?<>
     {cloudError?<Text testID="setup.cloud.error" accessibilityRole="alert" style={[styles.body,{color:theme.danger}]}>{t(cloudError)}</Text>:null}

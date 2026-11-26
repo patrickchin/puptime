@@ -102,9 +102,7 @@ Use Asia/Shanghai dates and conditional windows, not promises controlled by a st
 
 ## Name and positioning
 
-Keep **Puptime**. Proposed store name: **Puptime: Puppy Potty Log**. Preferred domain: **getpuptime.com**; fallback: **usepuptime.com**. Keep `puptime.pages.dev` for beta.
-
-November 12 Verisign checks returned no registration record for [getpuptime.com](https://rdap.verisign.com/com/v1/domain/getpuptime.com) and [usepuptime.com](https://rdap.verisign.com/com/v1/domain/usepuptime.com). This is not registrar availability/price, handle availability or trademark clearance. Recheck conflicts in launch markets before purchase. Do not pursue acquisition of `puptime.com`; consider a rename only for a substantive conflict. **PupCadence** remains an unvalidated rename fallback.
+Keep **Puptime**. The proposed store name is **Puptime: Puppy Potty Log**. Use the registered domain [puptime.org](https://puptime.org) for beta and launch. Consider a rename only for a substantive conflict. **PupCadence** remains an unvalidated rename fallback.
 
 Proposed promise: **A free puppy log for the first weeks at home.** Supporting message: **See when your puppy last went, and how their routine is taking shape.** Validate it with suitable testers. [Doggy Time](https://www.doggytime.app/), [Pup to Date](https://puptodate.com/) and [PupTempo](https://play.google.com/store/apps/details?hl=en&id=com.bilaal5279.puptempo) already cover reminders, widgets, sharing or local logging; avoid unsupported uniqueness claims or an AI/GPS feature race.
 

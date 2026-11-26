@@ -1,3 +1,4 @@
+import { siteUrl, privacyPath } from '../public-site';
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import {StatusBar} from 'expo-status-bar';
 import {memo,useCallback,useEffect,useMemo,useRef,useState} from 'react';
@@ -180,7 +181,7 @@ function Preview({onRowRender}:{onRowRender?:(key:string,phase:'mount'|'update')
       onImport={async()=>{Alert.alert('Import for '+pet.name,'The preview uses sample logs. Production imports must confirm the destination pet.');}}/>
     {section('Help & privacy')}
     <Action testID="preview.guide" label="Puppy care" icon="book-open-outline" theme={theme} onPress={()=>openTab('learn')}/>
-    <Action label="Privacy policy" icon="shield-outline" theme={theme} onPress={()=>{void Linking.openURL('https://github.com/patrickchin/puptime/blob/main/PRIVACY.md').catch(()=>Alert.alert(t('learn.linkError'),t('learn.linkErrorBody')));}}/>
+    <Action label="Privacy policy" icon="shield-outline" theme={theme} onPress={()=>{void Linking.openURL(`${siteUrl}${privacyPath}`).catch(()=>Alert.alert(t('learn.linkError'),t('learn.linkErrorBody')));}}/>
     <Text style={[s.small,{color:theme.textMuted}]}>Design preview · Sample data. Changes reset when the app restarts. System notifications, cloud sync and widget installation are not connected.</Text>
   </ScrollView>;}
 

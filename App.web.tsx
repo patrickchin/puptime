@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { LearnScreen } from './src/screens/LearnScreen';
 import { careArticles } from './src/puppy-care';
+import { privacyPath, supportPath } from './src/public-site';
 import { websiteTheme } from './src/web/brand';
 import { WebsiteMetadata } from './src/web/WebsiteMetadata';
 import { openAnalyticsSettings, WebsiteAnalytics } from './src/web/WebsiteAnalytics';
@@ -8,7 +9,6 @@ import { captureWebsiteEvent } from './src/web/telemetry';
 import { marketingStyles } from './src/web/marketing-styles';
 
 const sourceUrl = 'https://github.com/patrickchin/puptime';
-const privacyUrl = `${sourceUrl}/blob/main/PRIVACY.md`;
 // Metro supplies web images as URI objects; keep them in the asset pipeline.
 const assetUrl = (asset: string | { uri: string }): string => typeof asset === 'string' ? asset : asset.uri;
 const icon = '/brand-icon.png';
@@ -159,7 +159,7 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
       <p className="footer-wordmark" aria-hidden="true">Puptime</p>
       <div className="footer-bottom">
         <p>A little record of growing up.</p>
-        <nav aria-label="Footer"><SourceLink>GitHub</SourceLink><a href="/puppy-care/">Puppy care</a><a href={privacyUrl}>Privacy</a><a href="/delete-account">Delete cloud account</a><button type="button" onClick={openAnalyticsSettings}>Analytics settings</button><a href="#top">Back to top</a></nav>
+        <nav aria-label="Footer"><SourceLink>GitHub</SourceLink><a href="/puppy-care/">Puppy care</a><a href={privacyPath}>Privacy</a><a href={supportPath}>Support</a><a href="/delete-account">Delete cloud account</a><button type="button" onClick={openAnalyticsSettings}>Analytics settings</button><a href="#top">Back to top</a></nav>
       </div>
     </footer>
   </div>;

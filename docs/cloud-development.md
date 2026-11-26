@@ -214,7 +214,7 @@ These were administrative-session checks, separate from the current SDK proof.
 
 Run `node scripts/verify-cloud-clients.mjs staging` with staging Wrangler access
 and `PUPTIME_STAGING_AUTH_SECRET` supplied privately through the environment.
-The default origin is `https://puptime.pages.dev`, matching the app. The only
+The default origin is `https://puptime.org`, matching the app. The only
 optional origin is `https://puptime-api-staging.p-ch.workers.dev`, selected with
 `PUPTIME_STAGING_ORIGIN`. Invalid origins fail before credentials are read or
 fixtures are created. During the earlier direct-Worker check this host could

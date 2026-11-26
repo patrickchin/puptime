@@ -52,7 +52,7 @@ const simctl=(...args)=>command('xcrun',['simctl',...args]);
 const plist=path=>JSON.parse(command('plutil',['-convert','json','-o','-',path]));
 assert.equal(statSync(configFile).mode&0o077,0,'Private identity configuration must be0600.');
 const config=JSON.parse(readFileSync(configFile,'utf8'));createProductionAuthFence(config);
-assert.equal(config.origin,'https://puptime.pages.dev','Use the existing deployed app service, with no custom auth origin.');
+assert.equal(config.origin,'https://puptime.org','Use the Puptime account service at its canonical public origin.');
 const output=resolve(destination);assert.ok(!existsSync(output),'Use a new private output directory.');mkdirSync(output,{recursive:true,mode:0o700});
 assert.equal(statSync(output).mode&0o077,0);assert.ok(!output.startsWith(resolve('.')+'/'),'Keep private configuration, bundle and inventory outside the repository.');
 let device,server,timer,settled=false,before,ready=false,configReads=0,overlayHost,phase='host-attestation';

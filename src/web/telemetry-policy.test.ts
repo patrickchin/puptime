@@ -7,7 +7,7 @@ test('telemetry drops unknown events and strips sensitive properties and URL val
   assert.equal(sanitizeWebsiteEvent({ event: '$autocapture', properties: { text: 'private note' } }), null);
   const result = sanitizeWebsiteEvent({ event: 'website_cta', properties: {
     page: '/puppy-care/toilet-training', destination: 'android_download',
-    $current_url: 'https://puptime.pages.dev/?email=private#secret', $referrer: 'https://example.com/private',
+    $current_url: 'https://puptime.org/?email=private#secret', $referrer: 'https://example.com/private',
     email: 'private@example.com', note: 'private note', $set: { name: 'private' }, distinct_id: 'anonymous-id',
   } });
   assert.deepEqual(result?.properties, {
@@ -28,7 +28,7 @@ test('every public page has unique metadata and a clean canonical URL', () => {
     const meta = pageMetadata(path);
     assert.ok(meta.description.length > 30);
     assert.ok(!meta.url.includes('#'));
-    assert.ok(meta.url.startsWith('https://puptime.pages.dev/'));
+    assert.ok(meta.url.startsWith('https://puptime.org/'));
   }
 });
 

@@ -61,7 +61,7 @@ test('unconfigured social providers cannot issue sessions or authorization redir
 });
 
 test('browser OAuth uses the canonical origin, configured client and standard minimal scopes', async () => {
-  for (const base of ['https://puptime-api-staging.p-ch.workers.dev', 'https://puptime.pages.dev']) {
+  for (const base of ['https://puptime-api-staging.p-ch.workers.dev', 'https://puptime.org']) {
     const auth = createAuth({ ...socialSettings, AUTH_BASE_URL: base, WEB_ORIGINS: base });
     for (const provider of ['apple', 'google'] as const) {
       const { url } = await beginSocial(auth, provider, base);
