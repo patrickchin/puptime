@@ -15,6 +15,23 @@ export const websiteTheme: Theme = {
   nav: '#F8F3E8',
 };
 
+// The browser chrome matches the deep green site header.
+export const websiteThemeColor = websiteTheme.primaryPressed;
+
+export const websiteIconLinks = [
+  { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
+  { rel: 'manifest', href: '/site.webmanifest' },
+];
+
+export const websiteManifest = {
+  name: 'Puptime', short_name: 'Puptime', start_url: '/', display: 'browser',
+  theme_color: websiteThemeColor, background_color: websiteTheme.background,
+  icons: [
+    { src: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    { src: '/brand-icon.png', sizes: '256x256', type: 'image/png' },
+  ],
+};
+
 export const websiteStyles = `
 @font-face{font-family:'Red Hat Display';src:url('/fonts/RedHatDisplay-Latin.woff2') format('woff2');font-weight:900;font-style:normal;font-display:swap}
 @font-face{font-family:'Red Hat Text';src:url('/fonts/RedHatText-Latin.woff2') format('woff2');font-weight:400 700;font-style:normal;font-display:swap}

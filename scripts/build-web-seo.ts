@@ -1,7 +1,7 @@
 import { copyFileSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { marked } from 'marked';
 import { privacyPath, supportPath } from '../src/public-site.ts';
-import { websiteStyles } from '../src/web/brand.ts';
+import { websiteIconLinks, websiteManifest, websiteStyles, websiteThemeColor } from '../src/web/brand.ts';
 import { publicPaths, siteUrl } from '../src/web/site.ts';
 
 const resources = [
@@ -22,11 +22,14 @@ const resources = [
   },
 ];
 
+const iconHead = `<meta name="theme-color" content="${websiteThemeColor}">${websiteIconLinks.map(({ rel, href }) => `<link rel="${rel}" href="${href}">`).join('')}`;
+writeFileSync('dist-web/site.webmanifest', `${JSON.stringify(websiteManifest, null, 2)}\n`);
+
 for (const { path, title, description, body } of resources) {
   writeFileSync(`dist-web${path}.html`, `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title}</title><meta name="description" content="${description}">
-<link rel="canonical" href="${siteUrl}${path}"><link rel="icon" href="/brand-icon.png">
+<link rel="canonical" href="${siteUrl}${path}"><link rel="icon" href="/favicon.ico">${iconHead}
 <style>${websiteStyles}
 body{margin:0;background:var(--paper);color:var(--ink);font-size:17px;line-height:1.65}
 header{background:var(--deep);color:var(--paper);padding:12px max(20px,calc((100% - 720px)/2))}
