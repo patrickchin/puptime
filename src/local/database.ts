@@ -128,6 +128,10 @@ export async function initializeLocalDatabase(database: LocalDatabase, newId?: (
       if(required.some(name=>!tables.some(table=>table.name===name))||!pet||!identifierSchema.safeParse(pet.value).success||!onboarding||!['true','false'].includes(onboarding.value)
         ||!await sql.getFirstAsync('SELECT id FROM puppies WHERE id=?',pet.value)) throw new Error('The local database metadata or active puppy is incomplete.');
       await sql.execAsync(revisionChangesIndex);
+      // Released schema-4 journals can predate resumable setup and device delivery.
+      // Fill only absent metadata; never infer notification consent or replace a saved choice.
+      await sql.runAsync("INSERT OR IGNORE INTO metadata(key,value) VALUES ('first_launch_step',?)",onboarding.value==='false'?'done':'welcome');
+      await sql.runAsync("INSERT OR IGNORE INTO metadata(key,value) VALUES ('notify_on_device','false')");
       return { petId: pet.value };
     }
     if(await sql.getFirstAsync("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' LIMIT 1")) throw new Error('The existing local database is incomplete. The original data has been preserved.');
