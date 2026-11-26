@@ -1,4 +1,5 @@
 import { websiteStyles } from './brand';
+import { siteChromeStyles } from './site-chrome';
 
 export const marketingStyles = websiteStyles + `
 /* Expo’s native reset disables document scrolling; marketing pages use normal page flow. */
@@ -20,15 +21,9 @@ body:has(.marketing-site){overflow-y:auto}
 .marketing-site :where(a,button){touch-action:manipulation;transition:transform 180ms var(--ease),opacity 180ms ease}
 .marketing-site :where(a,button):focus-visible{outline:3px solid currentColor;outline-offset:6px}
 .marketing-site :where(a,button):active{transform:translateY(2px)}
-.marketing-site nav a:hover,.text-action:hover,.guide-links a:hover{text-decoration:underline;text-underline-offset:5px}
+.text-action:hover,.guide-links a:hover{text-decoration:underline;text-underline-offset:5px}
 .skip-link{position:fixed;top:12px;left:12px;transform:translateY(-180%);background:var(--white);color:var(--ink);padding:12px 20px;z-index:20}
 .skip-link:focus{transform:none}
-.site-header{padding:24px var(--margin);display:flex;justify-content:space-between;align-items:center;background:var(--paper);color:var(--ink);gap:24px}
-.site-brand{display:flex;align-items:center;gap:10px;font-size:var(--lead);font-weight:900;letter-spacing:-.04em}
-.site-brand img{border-radius:10px}
-.site-header nav{display:flex;align-items:center;gap:clamp(24px,3vw,48px)}
-.site-header nav a{display:flex;align-items:center;min-height:44px}
-.marketing-site:not(.care-page) .site-header{background:var(--deep);color:var(--paper)}
 .hero{position:relative;display:grid;grid-template-columns:1.1fr 1fr;gap:24px;align-items:center;min-height:640px;padding:40px var(--margin) 64px;background:var(--deep);color:var(--paper);overflow:clip}
 .hero-copy{position:relative;z-index:1;padding-bottom:30px}
 .hero h1{font-size:var(--display);letter-spacing:-.028em;line-height:.94;max-width:10em}
@@ -78,13 +73,6 @@ body:has(.marketing-site){overflow-y:auto}
 .local-columns{display:grid;grid-template-columns:1fr 1fr;gap:48px}
 .local-columns p{font-size:var(--body);line-height:1.45;max-width:36ch}
 .local-columns .text-action{margin-top:28px}
-.site-footer{background:var(--paper);padding:40px var(--margin) 32px;border-top:1px solid var(--border);overflow:clip}
-.footer-wordmark{font-family:'Red Hat Display',sans-serif;font-size:32px;letter-spacing:-.065em;font-weight:900;line-height:.9;margin-left:-.04em}
-.footer-bottom{display:grid;grid-template-columns:1fr 1fr;gap:48px;margin-top:24px;align-items:start}
-.footer-bottom nav{display:grid;grid-template-columns:1fr 1fr;gap:8px 28px}
-.footer-bottom nav :where(a,button){min-height:44px;display:flex;align-items:center}
-.footer-bottom button{border:0;background:none;padding:0;text-align:left;text-decoration:underline;text-underline-offset:4px}
-.care-page .site-header{background:var(--paper);color:var(--ink)}
 .learning-content{display:flex;flex-direction:column;min-height:70svh}
 .learning-content :where(div,input){font-family:inherit}
 .learning-content :where(h1,h2){font-family:'Red Hat Display',sans-serif;font-weight:900;letter-spacing:-.03em}
@@ -93,7 +81,7 @@ body:has(.marketing-site){overflow-y:auto}
 .care-art img,.learning-content [data-testid^="learn.image."]{mix-blend-mode:multiply}
 @media(max-width:1000px){
   .marketing-site{--heading:clamp(48px,7vw,76px);--display:clamp(48px,6.2vw,64px)}
-  .site-header{padding-top:18px;padding-bottom:18px}.hero{min-height:580px;grid-template-columns:1.15fr 1fr}
+  .hero{min-height:580px;grid-template-columns:1.15fr 1fr}
   .hero-copy>p:first-of-type{font-size:18px}.hero-puppy{width:100%}
   .chapter{padding-top:80px;padding-bottom:80px;gap:6%}.preview-choices{margin-top:28px}
   .app-preview{width:min(100%,310px)}.story-content{grid-template-columns:1fr}.story-content .phone-frame{max-width:260px}
@@ -106,8 +94,6 @@ body:has(.marketing-site){overflow-y:auto}
 }
 @media(max-width:600px){
   .marketing-site{--margin:20px;--lead:22px;--heading:clamp(42px,13.3vw,52px);--display:clamp(36px,10vw,56px)}
-  .site-header{gap:12px;padding-top:16px;padding-bottom:16px}.site-brand{font-size:22px;gap:8px}.site-brand img{width:30px;height:30px;border-radius:8px}
-  .site-header nav{gap:20px;font-size:16px}.site-header .product-nav{display:none}
   .hero{display:flex;flex-direction:column;align-items:stretch;min-height:0;padding-top:38px;padding-bottom:0}
   .hero-copy{padding-bottom:0}.hero h1{max-width:none}.hero-copy>p:first-of-type{margin-top:28px;max-width:31ch;font-size:18px;line-height:1.45}
   .primary-action{margin-top:24px;padding:13px 20px;min-height:52px}.hero-note{margin-top:16px}
@@ -120,8 +106,9 @@ body:has(.marketing-site){overflow-y:auto}
   .story-content.reverse .phone-frame{order:0}.rhythm-story h3{margin-bottom:20px}.care-chapter{gap:32px}.care-art{order:2}.care-copy>p{margin:24px 0}
   .care-art img{max-width:420px}.guide-links{grid-template-columns:1fr 1fr;gap:0 12px}.local-chapter{gap:32px}.local-columns{display:flex;flex-direction:column;gap:24px}.local-columns p{font-size:var(--body)}
   .local-columns .text-action{margin-top:16px}.account-chapter{min-height:180px;padding-top:28px;padding-bottom:24px}.account-word{font-family:'Red Hat Display',sans-serif;font-size:56px}.account-arrow{font-size:52px;top:20px}
-  .site-footer{padding-top:48px}.footer-bottom{display:flex;flex-direction:column;gap:28px;margin-top:36px}.footer-bottom nav{width:100%;gap:4px 20px}
 }
+${siteChromeStyles}
+.site-page{min-height:100svh;display:flex;flex-direction:column}.site-page>main{flex:1 0 auto;width:100%}
 @media(prefers-reduced-motion:no-preference){
   .hero h1{animation:title-arrive 900ms var(--ease) both}.hero-copy>p:first-of-type{animation:text-arrive 900ms 80ms var(--ease) both}
   .hero .primary-action{animation:text-arrive 900ms 160ms var(--ease) both}.hero-note{animation:text-arrive 900ms 240ms var(--ease) both}

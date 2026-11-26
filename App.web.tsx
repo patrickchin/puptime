@@ -1,17 +1,16 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { LearnScreen } from './src/screens/LearnScreen';
 import { careArticles } from './src/puppy-care';
-import { privacyPath, supportPath } from './src/public-site';
 import { websiteTheme } from './src/web/brand';
 import { WebsiteMetadata } from './src/web/WebsiteMetadata';
-import { openAnalyticsSettings, WebsiteAnalytics } from './src/web/WebsiteAnalytics';
+import { WebsiteAnalytics } from './src/web/WebsiteAnalytics';
 import { captureWebsiteEvent } from './src/web/telemetry';
 import { marketingStyles } from './src/web/marketing-styles';
+import { SiteFooter, SiteHeader } from './src/web/SiteChrome';
+import { sourceUrl } from './src/web/site-chrome';
 
-const sourceUrl = 'https://github.com/patrickchin/puptime';
 // Metro supplies web images as URI objects; keep them in the asset pipeline.
 const assetUrl = (asset: string | { uri: string }): string => typeof asset === 'string' ? asset : asset.uri;
-const icon = '/brand-icon.png';
 // Serve resized WebP derivatives from scripts/build-web-images.mjs; the widest file is the fallback.
 type Asset = string | { uri: string };
 const webImage = (...sources: [number, Asset][]) => ({ src: assetUrl(sources[sources.length - 1][1]), srcSet: sources.map(([width, asset]) => `${assetUrl(asset)} ${width}w`).join(', ') });
@@ -37,18 +36,8 @@ function PhoneFrame({ children, reveal = false }: { children: ReactNode; reveal?
   </div>;
 }
 
-function SourceLink({ className = '', children = 'View the source' }: { className?: string; children?: string }) {
-  return <a className={className} href={sourceUrl} onClick={() => captureWebsiteEvent('website_cta', { destination: 'source' })}>{children}&nbsp;<span aria-hidden="true">↗</span></a>;
-}
-
-function Header({ learning = false }: { learning?: boolean }) {
-  return <header className="site-header">
-    <a className="site-brand" href="/" aria-label="Puptime home"><img src={icon} width="38" height="38" alt="" />Puptime</a>
-    <nav aria-label="Website">
-      <a className="product-nav" href={learning ? '/#app' : '#app'}>The app</a>
-      <a href="/puppy-care/">Puppy care</a>
-    </nav>
-  </header>;
+function SourceLink({ className = '' }: { className?: string }) {
+  return <a className={className} href={sourceUrl} onClick={() => captureWebsiteEvent('website_cta', { destination: 'source' })}>View the source&nbsp;<span aria-hidden="true">↗</span></a>;
 }
 
 export default function MarketingSite({ path = '/' }: { path?: string }) {
@@ -85,7 +74,7 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
     <WebsiteMetadata path={path} />
     <WebsiteAnalytics path={path} />
     <a className="skip-link" href="#main">Skip to content</a>
-    <Header learning={learning} />
+    <SiteHeader path={path} dark={!learning} />
     {learning ? <main id="main" className="learning-content"><LearnScreen theme={websiteTheme} articleId={articleId} onArticleChange={(id) => { window.location.assign(id ? `/puppy-care/${id}` : '/puppy-care/'); }} /></main> : <main id="main">
       <section className="hero" aria-labelledby="hero-title">
         <div className="hero-copy">
@@ -160,12 +149,6 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
       </section>
 
     </main>}
-    <footer className="site-footer">
-      <p className="footer-wordmark" aria-hidden="true">Puptime</p>
-      <div className="footer-bottom">
-        <p>A little record of growing up.</p>
-        <nav aria-label="Footer"><SourceLink>GitHub</SourceLink><a href="/puppy-care/">Puppy care</a><a href={privacyPath}>Privacy</a><a href={supportPath}>Support</a><a href="/delete-account">Delete cloud account</a><button type="button" onClick={openAnalyticsSettings}>Analytics settings</button><a href="#top">Back to top</a></nav>
-      </div>
-    </footer>
+    <SiteFooter path={path} analytics backToTop />
   </div>;
 }
