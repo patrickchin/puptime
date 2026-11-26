@@ -6,10 +6,10 @@ export const androidDownloadPath = '/download/android.apk';
 export const deleteAccountPath = '/delete-account';
 export const siteTagline = 'Potty training and puppy routines, one log at a time.';
 
-export type ChromeLink = { label: string; href: string; external?: boolean; event?: 'android_download' | 'source' };
+export type ChromeLink = { label: string; href: string; external?: boolean; event?: 'source' };
 export const headerLinks: ChromeLink[] = [{ label: 'The app', href: '/#app' }, { label: 'Puppy care', href: '/puppy-care/' }];
 export const footerColumns: { title: string; links: ChromeLink[] }[] = [
-  { title: 'Product', links: [...headerLinks, { label: 'Download Android APK', href: androidDownloadPath, event: 'android_download' }] },
+  { title: 'Product', links: [...headerLinks, { label: 'Download Android APK', href: androidDownloadPath }] },
   { title: 'Help', links: [{ label: 'Support', href: supportPath }, { label: 'Privacy', href: privacyPath }, { label: 'Delete cloud account', href: deleteAccountPath }] },
   { title: 'Source', links: [{ label: 'GitHub', href: sourceUrl, external: true, event: 'source' }] },
 ];
