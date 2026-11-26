@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
 import test from 'node:test';
-import {existsSync,mkdirSync,mkdtempSync,readFileSync,rmSync,writeFileSync} from 'node:fs';
+import {existsSync,mkdirSync,mkdtempSync,readFileSync,readdirSync,rmSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {dirname,join} from 'node:path';
 import {createRequire} from 'node:module';
-import {runStandardSuite,standardFixtureEnvironment,standardResults,standardSelection} from './native-standard-suite.mjs';
+import {fileURLToPath} from 'node:url';
+import {conversationalFiles,conversationalResults,runStandardSuite,standardFixtureEnvironment,standardResults,standardSelection} from './native-standard-suite.mjs';
 
 const csv=standardSelection('standard-csv'),all=standardSelection('standard-all');
 // cli-2.11.0 c8c361be JUnitTestSuiteReporter: file/status/counts are attributes,
@@ -84,6 +86,29 @@ test('whole finalized XML envelope, exact nesting/counts and canonical producer 
  assert.equal(standardResults(report.replace('name="private-value"','unknown="private" name="private-value"'),csv.files).complete,true);
  assert.deepEqual(standardResults(report,['private@example.invalid']),{complete:false,flows:[]});
  const previousPath=process.env.PATH;try{process.env.PATH='';assert.deepEqual(standardResults(report,csv.files),{complete:false,flows:[]});}finally{if(previousPath===undefined)delete process.env.PATH;else process.env.PATH=previousPath;}
+});
+
+test('conversational results admit only the exact seventeen sources without expanding standard selections',()=>{
+ assert.equal(conversationalFiles.length,17);assert.equal(Object.isFrozen(conversationalFiles),true);
+ assert.deepEqual([...conversationalFiles],readdirSync('.maestro/conversational').filter(name=>name.endsWith('.yaml')).sort().map(name=>'.maestro/conversational/'+name));
+ const mixed=xml(conversationalFiles).replace('failures="0"','failures="1"').replace('status="SUCCESS"','status="ERROR"');
+ const result=conversationalResults(mixed);assert.equal(result.complete,true);assert.deepEqual(result.flows,conversationalFiles.map((flow,index)=>({flow,status:index===0?'ERROR':'SUCCESS'})));assert.ok(!JSON.stringify(result).includes('private'));
+ assert.equal(conversationalResults(xml(conversationalFiles)).complete,true);
+ assert.deepEqual(standardResults(xml(conversationalFiles),conversationalFiles),{complete:false,flows:[]});
+ assert.throws(()=>standardSelection('conversational-fixed17'));
+ const project=(files,mode=['--conversational-fixed17'])=>JSON.parse(execFileSync('python3',['-I',fileURLToPath(new URL('./native-standard-report.py',import.meta.url)),...mode,...files],{input:xml(files),encoding:'utf8'}));
+ assert.equal(project([...conversationalFiles]).complete,true);
+ for(const files of [[...conversationalFiles].reverse(),conversationalFiles.slice(1),[...conversationalFiles,conversationalFiles[0]],[...conversationalFiles.slice(0,-1),'private-flow'],all.files])assert.deepEqual(project(files),{complete:false,rows:[]});
+ assert.deepEqual(project([...conversationalFiles],[]),{complete:false,rows:[]});
+});
+
+test('the fixed seventeen mode preserves whole-report restrictions and unknown states without leaking report values',()=>{
+ const valid=xml(conversationalFiles),secret='private@example.invalid 123456 cookie=private /private/raw';
+ for(const report of [undefined,'',valid.slice(0,-13),valid+valid,valid.replace('tests="17"','tests="13"'),valid.replace('failures="0"','failures="1"'),valid.replace(conversationalFiles[0],'private-flow'),valid.replace('status="SUCCESS"','status="SUCCESS" status="ERROR"'),'<!DOCTYPE testsuites SYSTEM "file:///private/never-read">'+valid,valid.replace('</testcase>','<unknown>'+secret+'</unknown></testcase>'),' '.repeat(2*1024*1024+1)]){
+  const result=conversationalResults(report);assert.equal(result.complete,false);assert.ok(!JSON.stringify(result).includes('private'));
+ }
+ const pending=conversationalResults(valid.replace('status="SUCCESS"','status="RUNNING"'));assert.equal(pending.complete,false);assert.equal(pending.flows[0].status,'UNKNOWN');assert.equal(pending.flows.length,17);
+ const failed=conversationalResults(xml(conversationalFiles,'ERROR').replaceAll('private error/body/cookie',secret+' &lt;testcase status=&quot;SUCCESS&quot;/&gt;'));assert.equal(failed.complete,true);assert.ok(failed.flows.every(row=>row.status==='ERROR'));assert.ok(!JSON.stringify(failed).includes(secret));
 });
 
 for(const scenario of ['standard-csv','standard-all'])test('fixed '+scenario+' preserves CLI/config/bound and deletes raw producer artifacts',async()=>{

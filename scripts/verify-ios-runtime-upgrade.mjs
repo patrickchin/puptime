@@ -9,7 +9,7 @@ import {homedir,tmpdir} from 'node:os';
 import {basename,dirname,isAbsolute,join,relative,resolve,sep} from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
 import {nativeSnapshot,nativeTables} from './native-account-evidence.mjs';
-import {assertArchivedSource,nativeTextSection,nativeCodeFingerprint} from './native-runtime-inputs.mjs';
+import {assertArchivedSource,nativeTextSection,nativeCodeFingerprint,nativeHostInputs} from './native-runtime-inputs.mjs';
 import {deleteOwnedSimulator,installTaskCleanup,ownProcess} from './native-task-cleanup.mjs';
 
 const repository='patrickchin/puptime',app='com.patrickchin.puptime';
@@ -17,7 +17,7 @@ const cuts=[
  {name:'older',source:'008b4a0b7f4d8a77cc8c13d95f39001534d8fd70',event:'pull_request',branch:'codex/themed-puppy-confirmation',checkout:'4de8d80dd6f31f5b3fee7da09928cd24a0bdfe4e',tree:'7e3886c23141b4cb9843782a81566cd2aa714a84',run:43263326680,artifact:13982701381,digest:'eb3e73181cc0b8e816e5414afe613be5667a4a019a206e9f103268b24a066a09'},
  {name:'newer',source:'aacd58fd0a7102a629b92dbf8813496870aec21c',event:'push',branch:'main',checkout:'aacd58fd0a7102a629b92dbf8813496870aec21c',tree:'abb69c7d347964ad7a6cd9bcce80a8472544ab2e',run:43383649287,artifact:14029395865,digest:'2e889cd3b6eea1b0ce5b878665a8d259af002a68f54e1f77a3bdf7cf13003865'},
 ];
-const nativeInputs=['package.json','package-lock.json','app.json','app.config.*','eas.json','.npmrc','.env','plugins','patches','assets','ios'];
+const nativeInputs=[...nativeHostInputs,'.env'];
 const [mode='--inspect-only',destination=process.env.GITHUB_ACTIONS==='true'?'build/native-runtime-replacement':join(homedir(),'Pictures/Screenshots/Codex/puptime-runtime-replacement')]=process.argv.slice(2);
 assert.ok(['--inspect-only','--replace-synthetic','--prepare-enrolled','--self-check'].includes(mode));
 const preparing=mode==='--prepare-enrolled';
