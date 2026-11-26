@@ -151,24 +151,23 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
         </div>
       </section>
 
-      <section className="local-chapter chapter" aria-labelledby="local-title">
-        <h2 id="local-title" data-reveal>Local first.<br />Yours always.</h2>
+      <section className="local-chapter chapter" aria-labelledby="price-title">
+        <h2 id="price-title" data-reveal>Free to use.</h2>
         <div className="local-columns">
           <div data-reveal>
-            <h3 id="cost-title">What it costs</h3>
-            <dl className="cost-list" aria-labelledby="cost-title">
-              <div><dt>Free</dt><dd>Logging, notes, history, insights, routines and reminders.</dd></div>
-              <div><dt>Free during beta</dt><dd>Optional cloud backup and device sync, managed in the app. Your saved cloud data stays yours when sync is paused.</dd></div>
+            <dl className="cost-list" aria-labelledby="price-title">
+              <div><dt>In the app</dt><dd>Free. Logging, notes, history, insights, routines and reminders.</dd></div>
+              <div><dt>Cloud backup and sync</dt><dd>Optional, and free during the beta.</dd></div>
             </dl>
           </div>
           <div data-reveal>
             <h3>Why Puptime exists</h3>
-            <p>I’m Patrick Chin, and I make Puptime. I built it as a simple way to see when a puppy last went and how their days are taking shape. Its routine suggestions come from plain statistics over your own logs, worked out on your phone.</p>
+            <p>I’m Patrick Chin, and I make Puptime. I built it as a simple way to see when a puppy last went and how their days are taking shape. Its routine suggestions come from plain statistics over your own logs.</p>
             <SourceLink className="text-action" />
           </div>
         </div>
-        <ul className="trust-list" aria-label="Your data" data-reveal>
-          <li>No ads</li><li>Works without an account</li><li>Public source code</li><li>Export your data as CSV</li>
+        <ul className="trust-list" data-reveal>
+          <li>No ads</li><li>Public source code</li><li>Export your data as CSV</li>
         </ul>
       </section>
 
