@@ -6,13 +6,13 @@ export const marketingStyles = websiteStyles + `
 body:has(.marketing-site){overflow-y:auto}
 #root:has(.marketing-site){height:auto;min-height:100%}
 .marketing-site{
-  --body:clamp(17px,1.35vw,20px);--small:14px;--lead:clamp(22px,2vw,28px);--heading:clamp(42px,5.4vw,76px);--display:clamp(48px,5.5vw,80px);
+  --body:clamp(17px,1.35vw,20px);--small:14px;--lead:clamp(22px,2vw,28px);--heading:clamp(42px,5.4vw,76px);--display:clamp(48px,5.5vw,80px);--title:clamp(32px,3.9vw,56px);
   --margin:max(24px,calc((100% - 1160px)/2));--ease:cubic-bezier(.16,1,.3,1);
   background:var(--paper);color:var(--ink);font-family:'Red Hat Text',sans-serif;font-size:var(--body);line-height:1.5;min-height:100%;
 }
 .marketing-site *{box-sizing:border-box}
 .marketing-site :where(h1,h2,h3,p,figure){margin:0}
-.marketing-site :where(h1,h2,h3){font-family:'Red Hat Display',sans-serif;font-weight:900;letter-spacing:-.03em;text-wrap:balance;line-height:.98}
+.marketing-site :where(h1,h2,h3){letter-spacing:-.03em;text-wrap:balance;line-height:.98}
 .marketing-site:not(.care-page) h2{font-size:var(--heading)}
 .marketing-site:not(.care-page) h3{font-size:var(--lead);letter-spacing:-.02em;line-height:1.1}
 .marketing-site p{text-wrap:pretty}
@@ -71,7 +71,7 @@ body:has(.marketing-site){overflow-y:auto}
 .story-caption{display:block;font-size:var(--small);margin-top:16px}
 .care-chapter{background:var(--paper);display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center;min-height:0}
 .care-art{width:100%;min-width:0}
-.care-art img{display:block;width:100%;height:auto;aspect-ratio:1;object-fit:contain;border-radius:16px}
+.care-art img{display:block;width:100%;height:auto;aspect-ratio:1;object-fit:contain}
 .care-copy>p{margin:32px 0;max-width:34ch}
 .guide-links{display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;margin-bottom:28px}
 .guide-links a{padding:10px 0;min-height:44px;font-weight:500}
@@ -87,9 +87,13 @@ body:has(.marketing-site){overflow-y:auto}
 .cost-list dd{margin:4px 0 0;line-height:1.45;max-width:36ch}
 .trust-list{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:12px}
 .trust-list li{border:1px solid rgba(248,243,232,.4);border-radius:999px;padding:8px 18px;font-size:var(--small);font-weight:700}
-.learning-content{display:flex;flex-direction:column;min-height:70svh}
+.learning-content{display:flex;flex-direction:column;min-height:70svh;text-underline-offset:.25em}
 .learning-content :where(div,input){font-family:inherit}
-.learning-content :where(h1,h2){font-family:'Red Hat Display',sans-serif;font-weight:900;letter-spacing:-.03em}
+/* Care pages use the homepage type scale: page titles as section headings, guide sections as subheadings. */
+.learning-content h1{font-size:var(--heading);font-weight:900;letter-spacing:-.03em;line-height:.98;margin-bottom:16px}
+.learning-content:has([data-testid="learn.glance"]) h1{font-size:var(--title);line-height:1.02;margin-bottom:0}
+.learning-content h2{font-size:var(--lead);font-weight:700;letter-spacing:-.02em;line-height:1.1}
+.learning-content [data-testid="learn.glance"] h2{font-family:'Red Hat Text',sans-serif;font-size:13px;line-height:20px;letter-spacing:.09em}
 .learning-content h1:focus{outline:none}
 .learning-content input:focus-visible{outline:3px solid var(--green);outline-offset:3px}
 .care-art img,.learning-content [data-testid^="learn.image."]{mix-blend-mode:multiply}

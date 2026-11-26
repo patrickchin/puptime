@@ -26,7 +26,7 @@ const careImages = {
 };
 
 function GuideImage({ article, style }: { article: CareArticle; style: ComponentProps<typeof Image>['style'] }) {
-  return <View testID={`learn.image.${article.id}`} style={[style, styles.imageFrame, Platform.OS === 'web' && { backgroundColor: 'transparent' }]} pointerEvents="none" aria-hidden>
+  return <View testID={`learn.image.${article.id}`} style={[style, styles.imageFrame, Platform.OS === 'web' && webStyles.imageFrame]} pointerEvents="none" aria-hidden>
     <Image source={careImages[article.image]} style={styles.imageFill} resizeMode="contain" accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" />
   </View>;
 }
@@ -62,7 +62,7 @@ function ArticleRow({ article, theme, onOpen, featured = false, wide = false, pl
       <GuideImage article={article} style={featured ? [styles.featuredImage, width < 360 && styles.smallFeaturedImage, web && (compact ? webStyles.cardThumb : webStyles.featuredImage)] : [styles.cardImage, largeText && styles.cardImageLargeText, web && (compact ? webStyles.cardThumb : webStyles.cardImage)]} />
       <View style={featured || compact ? [styles.rowCopy, largeText && styles.columnCopy] : undefined}>
         {featured && article.id === 'getting-started' && !web && <Text style={[styles.eyebrow, { color: theme.primary }]}>{t('learn.start')}</Text>}
-        <Text style={[styles.rowTitle, featured && styles.featuredTitle, { color: theme.text }, web && (compact ? webStyles.rowTitleCompact : webStyles.rowTitle)]}>{article.shortTitle}</Text>
+        <Text style={[styles.rowTitle, featured && styles.featuredTitle, { color: theme.text }, web && [webHeadingFont, compact ? webStyles.rowTitleCompact : webStyles.rowTitle]]}>{article.shortTitle}</Text>
         {featured
           ? <Text style={[styles.rowSummary, { color: theme.textMuted }, web && [webStyles.rowSummary, webStyles.featuredSummary, compact && webStyles.rowSummaryCompact]]}>{article.summary}</Text>
           : web
@@ -247,7 +247,7 @@ export function LearnScreen({ theme, articleId, onArticleChange, showHeader=true
           <View style={[styles.rowCopy, fontScale > 1.5 && styles.columnCopy, webArticle && !wide && styles.columnCopy]}>
             {showHeader && !article && Platform.OS !== 'web' && <Text style={[styles.eyebrow, { color: theme.primary }]}>{t('learn.eyebrow')}</Text>}
             {webArticle && <Text style={[styles.eyebrow, webStyles.articleEyebrow, { color: theme.primary }]}>{article.category}</Text>}
-            {(showHeader||selectedId!==null)&&<Text ref={heading} accessibilityRole="header" aria-level={1} style={[styles.title, { color: theme.text, fontSize: theme.presentation.titleSize, lineHeight: theme.presentation.titleLineHeight, fontWeight: theme.presentation.titleWeight }, !showHeader && {fontSize:22,lineHeight:28}, Platform.OS === 'web' && webStyles.title, webArticle && [webStyles.articleTitle, width < 700 && webStyles.articleTitleCompact]]}>{title}</Text>}
+            {(showHeader||selectedId!==null)&&<Text ref={heading} accessibilityRole="header" aria-level={1} style={[styles.title, { color: theme.text }, Platform.OS !== 'web' && { fontSize: theme.presentation.titleSize, lineHeight: theme.presentation.titleLineHeight, fontWeight: theme.presentation.titleWeight }, !showHeader && {fontSize:22,lineHeight:28}]}>{title}</Text>}
             {!article && <Text style={[styles.intro, { color: theme.textMuted }]}>{invalidArticle ? t('learn.notFoundBody') : t('learn.intro')}</Text>}
             {webArticle && <>
               <Text style={[styles.intro, webStyles.lede, { color: theme.textMuted }]}>{article.summary}</Text>
@@ -381,25 +381,28 @@ const styles = StyleSheet.create({
   video: { marginTop: 8 },
 });
 
+// Inline, so it outranks the website's font-family reset for React Native Web text.
+const webHeadingFont = { fontFamily: 'Red Hat Display' };
+
 // The website has room for illustrations and a comfortable reading measure.
-// Keep the compact native layout for the app's Learn tab.
+// Keep the compact native layout for the app's Learn tab. Heading sizes come from the
+// homepage type scale in src/web/marketing-styles.ts.
 const webStyles = StyleSheet.create({
+  // Square, transparent frames match the homepage's editorial blocks.
+  imageFrame: { backgroundColor: 'transparent', borderRadius: 0 },
   backArrow: { fontSize: 20, lineHeight: 23 },
   search: { marginTop: 16 },
   scrollContent: { paddingHorizontal: 24, paddingTop: 40, paddingBottom: 64 },
   articleScrollCompact: { paddingTop: 16 },
   content: { maxWidth: 1160 },
   articleContent: { maxWidth: 720 },
-  title: { fontSize: 44, lineHeight: 49, fontWeight: '900', marginBottom: 16 },
   articleHeading: { flexDirection: 'column', alignItems: 'stretch', gap: 16 },
   articleHeadingWide: { flexDirection: 'row', alignItems: 'center', gap: 32 },
   articleEyebrow: { textTransform: 'uppercase', marginBottom: 10 },
-  articleTitle: { fontSize: 40, lineHeight: 46 },
-  articleTitleCompact: { fontSize: 31, lineHeight: 36 },
   lede: { fontSize: 18, lineHeight: 27, marginTop: 14, marginBottom: 6 },
   reviewed: { marginBottom: 0 },
-  heroImage: { width: 208, height: 208, borderRadius: 16 },
-  heroImageCompact: { width: '100%', height: 132, borderRadius: 16 },
+  heroImage: { width: 208, height: 208 },
+  heroImageCompact: { width: '100%', height: 132 },
   glance: { marginTop: 24, paddingHorizontal: 20, paddingVertical: 16, gap: 10 },
   glanceHeading: { fontSize: 13, lineHeight: 20, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase' },
   glanceItems: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 24, rowGap: 12 },
@@ -418,12 +421,12 @@ const webStyles = StyleSheet.create({
   cell: { padding: 8 },
   cardFill: { width: '100%', flexGrow: 1 },
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 12, marginTop: 0 },
-  cardThumb: { width: 88, height: 88, aspectRatio: 1, borderRadius: 10 },
+  cardThumb: { width: 88, height: 88, aspectRatio: 1 },
   cardImage: { height: 168, aspectRatio: undefined },
   cardContext: { fontSize: 13, lineHeight: 18, marginTop: 2 },
   cardTakeaway: { fontSize: 16, lineHeight: 22, fontWeight: '700' },
-  rowTitle: { fontSize: 22, lineHeight: 28 },
-  rowTitleCompact: { fontSize: 18, lineHeight: 24, marginBottom: 2 },
+  rowTitle: { fontSize: 22, lineHeight: 28, letterSpacing: -0.4 },
+  rowTitleCompact: { fontSize: 18, lineHeight: 24, letterSpacing: -0.3, marginBottom: 2 },
   rowSummary: { fontSize: 16, lineHeight: 25 },
   rowSummaryCompact: { fontSize: 14, lineHeight: 21 },
   // websiteTheme.textMuted is 4.72:1 on primarySoft; this keeps small text above 5.5:1.
