@@ -53,7 +53,7 @@ try{
    await home.waitForFunction(([android,iphone])=>document.querySelectorAll('.download-options .primary-action').length===android&&document.querySelectorAll('.ios-status').length===iphone,[android,iphone]);
    if(android){assert.equal(await download.getAttribute('href'),'/download/android.apk');await home.getByText('Installs from an APK file – allow installs from your browser when asked.',{exact:true}).waitFor();}
    if(iphone)assert.equal(await home.locator('.ios-status').evaluate(element=>element.tagName),'P','iPhone status must not look like a download.');
-   await home.getByText('Free local logging. No account needed.',{exact:true}).waitFor();assert.equal(await home.getByRole('link',{name:'See the app',exact:true}).getAttribute('href'),'#app');
+   await home.getByText('Free, with no account needed.',{exact:true}).waitFor();assert.equal(await home.getByRole('link',{name:'See the app',exact:true}).getAttribute('href'),'#app');
    assert.ok(await home.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`Overflow for ${device} at ${width}px`);
    await home.screenshot({path:join(screenshots,`download-${device}-${width}.png`)});
    await home.evaluate(()=>scrollTo(0,document.body.scrollHeight));await home.getByRole('link',{name:'Get Puptime',exact:true}).click();await home.waitForFunction(()=>location.hash==='#get-puptime'&&Math.abs(document.getElementById('get-puptime').getBoundingClientRect().top)<innerHeight);

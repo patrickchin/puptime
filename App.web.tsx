@@ -91,7 +91,7 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
               {device !== 'android' && <p className="ios-status">iPhone app coming soon</p>}
             </div>
             {device !== 'ios' && <p className="apk-note">Installs from an APK file – allow installs from your browser when asked.</p>}
-            <p className="hero-note">Free local logging. No account needed.</p>
+            <p className="hero-note">Free, with no account needed.</p>
             <a className="text-action" href="#app" onClick={() => captureWebsiteEvent('website_cta', { destination: 'app_preview' })}>See the app&nbsp;<span aria-hidden="true">↓</span></a>
           </div>
         </div>
