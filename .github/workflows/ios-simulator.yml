@@ -312,6 +312,7 @@ jobs:
             build/isolated-native-account/baseline/sdk-startup-stage.json
             build/isolated-native-account/baseline/simulator-boot-failure.json
             build/isolated-native-account/baseline/fixture-readiness.json
+            build/isolated-native-account/baseline/fixture-launch-preflight.json
             build/isolated-native-account/baseline/fixture-native-reach.json
             build/isolated-native-account/baseline/fixture-auth-readiness.json
             build/isolated-native-account/baseline/fixture-prepare-command.json

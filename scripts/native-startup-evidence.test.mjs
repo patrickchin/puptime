@@ -8,6 +8,7 @@ import {startupEvidence} from './native-startup-evidence.mjs';
 test('startup receipts retain only fixed stage/status and actual finite failure categories',()=>{
  assert.deepEqual(startupEvidence('simulator-boot','started'),{stage:'simulator-boot',status:'started'});
  assert.deepEqual(startupEvidence('case-result','passed'),{stage:'case-result',status:'passed'});
+ assert.deepEqual(startupEvidence('candidate-bundle-launch','passed'),{stage:'candidate-bundle-launch',status:'passed'});
  for(const [error,expected] of [[{code:'ETIMEDOUT'},'timeout'],[{code:'ERR_ASSERTION'},'assertion'],[new assert.AssertionError({message:'private detail'}),'assertion'],[{status:1},'process-exit'],[{status:0},'other'],[{signal:'SIGTERM'},'signal'],[{code:'EADDRINUSE'},'system-error'],[new Error('private cause'),'other']])assert.equal(startupEvidence('sdk-process','failed',error).failure.category,expected);
  assert.deepEqual(startupEvidence('sdk-process','failed',{status:1,signal:null}),{stage:'sdk-process',status:'failed',failure:{category:'process-exit',code:'other',exitStatus:1,signal:null}});
  for(const status of [undefined,NaN,256,-256,'1'])assert.equal(startupEvidence('sdk-process','failed',{status}).failure.exitStatus,null);

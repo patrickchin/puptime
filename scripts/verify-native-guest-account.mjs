@@ -32,6 +32,7 @@ assert.ok(!(comparing||offline||isolating||photographing||deletionFaults||upgrad
 assert.ok(!standard||!android,'The fixed standard selections are iOS only.');
 const requestOnly=process.env.PUPTIME_ACCOUNT_REQUEST_ONLY==='1';
 assert.ok(process.env.PUPTIME_ACCOUNT_REQUEST_ONLY===undefined||requestOnly);assert.ok(!requestOnly||!android&&onboarding===undefined,'Request diagnostics use only the existing iOS baseline path.');
+if(requestOnly)assert.equal(process.env.PUPTIME_ACCOUNT_REQUEST_FRESH_DEVICE,initialDevice,'Request diagnostics require the simulator created by their owning runner.');
 assert.equal(consent,'--replace-synthetic','Use PLATFORM DEVICE HOST --replace-synthetic [OUTPUT].');
 const frontPort=Number(process.env.PUPTIME_ACCOUNT_PORT??8797),backPort=frontPort+2;assert.ok(Number.isInteger(frontPort)&&frontPort>1024&&frontPort<65533);
 const app='com.patrickchin.puptime',output=resolve(destination),front='https://127.0.0.1:'+frontPort;
@@ -512,6 +513,7 @@ try{
   else try{simctl('terminate',device,app);}catch{}
   markStartup('existing-store-check');
   const old=sqliteDirectory();
+  const requestStoreAbsent=requestOnly&&!existsSync(join(old,'puptime-v2.db'));if(requestOnly)assert.ok(requestStoreAbsent,'Request launch diagnostics require absent app storage before installation.');
   if(standard)assert.ok(!existsSync(join(old,'puptime-v2.db')),'Standard cases require a genuinely fresh task simulator.');
   if(upgrading){assert.ok(!existsSync(join(old,'puptime-v2.db')),'Start the historical case on a genuinely fresh owned simulator.');runtimeInputs=readEnrolledInputs();}
   if(existsSync(join(old,'puptime-v2.db'))){
@@ -673,6 +675,12 @@ try{
   }
   markStartup('candidate-bundle-install');
   simctl('install',device,bundle);
+  if(requestOnly){
+   markStartup('candidate-bundle-launch');
+   await run('xcrun',['simctl','launch',device,app],childEnv,process.cwd(),120000);
+   writeFileSync(join(output,'fixture-launch-preflight.json'),JSON.stringify({stage:'candidate-bundle-launch',status:'passed',freshTaskSimulator:true,storageAbsentBeforeInstall:requestStoreAbsent,controlledBundleInstalled:true},null,2)+'\n');
+   markStartup('candidate-bundle-launch','passed');
+  }
   if(standard){
    const installed=simctl('get_app_container',device,app,'app'),hash=path=>createHash('sha256').update(readFileSync(path)).digest('hex');
    assert.equal(hash(join(installed,'main.jsbundle')),hash(join(bundle,'main.jsbundle')));
@@ -710,7 +718,7 @@ try{
     checks.push('welcome email sign-in uses the real SDK, rejects a wrong code, resumes setup after verification and cold restart, and never enrolls or uploads');
   }
   if(requestOnly){
-   await flow('prepare');const before=snapshot();await flow('request');
+   await flow('prepare',{REQUEST_PRELAUNCHED:'true'});const before=snapshot();await flow('request');
    const preview=auth.prepare('SELECT code FROM local_email_previews WHERE email=? ORDER BY expires_at DESC LIMIT 1').get(email);assert.ok(typeof preview?.code==='string'&&/^\d{6}$/.test(preview.code),'The isolated request must deliver a valid local preview.');
    assert.deepEqual(snapshot(),before);assert.equal(auth.prepare('SELECT id FROM user WHERE email=?').get(email),undefined);assert.equal(identityRequests.verifyCode,0);assert.equal(requestCounts.enroll,0);assert.equal(requestCounts.push,0);
    writeFileSync(join(output,'fixture-auth-readiness.json'),JSON.stringify({phase:'request',flowSequence,ui:{inspected:false},responses:authResponses},null,2)+'\n');
