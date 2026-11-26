@@ -6,7 +6,7 @@ The API Worker's staging environment uses explicit Frankfurt placement (`aws:eu-
 
 ## Native accounts and legacy web links
 
-The public website has no sign-in, account management, cloud-data editor, or app subdomain deployment. `/account` and `/care` are noindex handoff pages that only open the native app; they make no authentication or care API requests and do not mount analytics. An invitation keeps its validated identifier and secret fragment in the `puptime://care` link. No browser session storage or local storage is used for invitations. The secret is never sent in a web request.
+The public website has no sign-in, account management, cloud-data editor, or app subdomain deployment. `/account` and `/care` are noindex handoff pages that only open the native app; they make no authentication or care API requests and do not mount analytics. Desktop visitors are told to open the link on their phone; if the app has not opened about two seconds after a tap, the page shows install guidance. An invitation keeps its validated identifier and secret fragment in the `puptime://care` link. No browser session storage or local storage is used for invitations. The secret is never sent in a web request.
 
 The Pages `/api/*` service binding remains required by the native app. Removing website login does not retire the Worker, provider callbacks, accounts, export endpoints, or native authentication. Sign-in, provider linking, cloud export and cloud-account deletion are in the native account screen.
 
