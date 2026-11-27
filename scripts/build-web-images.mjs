@@ -9,8 +9,8 @@ const images = [
   { source: 'assets/screenshots/today.png', name: 'today', widths: [360, 720] },
   { source: 'assets/screenshots/activity.png', name: 'activity', widths: [360, 720] },
   { source: 'assets/screenshots/insights-summary.png', name: 'insights-summary', widths: [360, 720] },
-  { source: 'assets/screenshots/schedule.png', name: 'schedule', widths: [360, 720] },
-  { source: 'assets/screenshots/insights-timeline.png', name: 'insights-timeline', widths: [360, 720] },
+  { source: 'assets/screenshots/schedule-poop-eat.png', name: 'schedule-poop-eat', widths: [360, 720] },
+  { source: 'assets/screenshots/timeline-poop-eat.png', name: 'timeline-poop-eat', widths: [360, 720] },
   { source: 'assets/puppy-care/potty.jpg', name: 'potty', widths: [512] },
 ];
 

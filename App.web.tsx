@@ -18,8 +18,8 @@ const webImage = (...sources: [number, Asset][]) => ({ src: assetUrl(sources[sou
 const screenSizes = '360px';
 const puppy = webImage([520, require('./assets/web/scruffy-terrier-520.webp')], [760, require('./assets/web/scruffy-terrier-760.webp')], [1040, require('./assets/web/scruffy-terrier-1040.webp')]);
 const careImage = assetUrl(require('./assets/web/potty-512.webp'));
-const timingImage = webImage([360, require('./assets/web/insights-timeline-360.webp')], [720, require('./assets/web/insights-timeline-720.webp')]);
-const routineImage = webImage([360, require('./assets/web/schedule-360.webp')], [720, require('./assets/web/schedule-720.webp')]);
+const timingImage = webImage([360, require('./assets/web/timeline-poop-eat-360.webp')], [720, require('./assets/web/timeline-poop-eat-720.webp')]);
+const routineImage = webImage([360, require('./assets/web/schedule-poop-eat-360.webp')], [720, require('./assets/web/schedule-poop-eat-720.webp')]);
 const previews = [
   { name: 'Today', image: webImage([360, require('./assets/web/today-360.webp')], [720, require('./assets/web/today-720.webp')]), description: 'Keep potty breaks, meals, and notes together. Look back when you need to know what happened and when.' },
   { name: 'History', image: webImage([360, require('./assets/web/activity-360.webp')], [720, require('./assets/web/activity-720.webp')]), description: 'Look back through recorded days. Change a time, add a note, or export your activity as CSV.' },
@@ -121,14 +121,14 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
           <article className="rhythm-story">
             <h3 data-reveal>Spot the potty patterns</h3>
             <div className="story-content">
-              <PhoneFrame reveal><img {...timingImage} sizes={screenSizes} alt="Puptime Timeline showing pee breaks at similar times across recorded days" width="1206" height="2622" loading="lazy" /></PhoneFrame>
-              <p data-reveal>Compare activity across recorded days. Look for recurring potty times.</p>
+              <PhoneFrame reveal><img {...timingImage} sizes={screenSizes} alt="Puptime Poop & Eat timeline showing meals and poops at similar times across recorded days" width="1206" height="2622" loading="lazy" /></PhoneFrame>
+              <p data-reveal>Compare meals and poops across recorded days. Look for recurring potty times.</p>
             </div>
           </article>
           <article className="rhythm-story">
             <h3 data-reveal>A routine that fits</h3>
             <div className="story-content">
-              <PhoneFrame reveal><img {...routineImage} sizes={screenSizes} alt="Editable daily routine with activity times and optional reminders" width="1206" height="2622" loading="lazy" /></PhoneFrame>
+              <PhoneFrame reveal><img {...routineImage} sizes={screenSizes} alt="Editable daily routine with meal and poop times and optional reminders" width="1206" height="2622" loading="lazy" /></PhoneFrame>
               <p data-reveal>Review suggested times from your puppy’s history, then adjust each activity. Choose reminders for the routine you want to follow.</p>
             </div>
           </article>
