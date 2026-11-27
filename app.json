@@ -130,7 +130,11 @@
       [
         "expo-router",
         {
-          "root": "./web"
+          "root": "./web",
+          "asyncRoutes": {
+            "web": "production",
+            "default": false
+          }
         }
       ],
       [

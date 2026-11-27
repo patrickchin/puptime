@@ -2,6 +2,8 @@
 
 The public origin is `https://puptime.org`. The Cloudflare-registered apex domain is attached to the existing `puptime` Pages project. Cloudflare Pages builds `npm run build:web` and publishes `dist-web` from `main`. Submit changes through a PR. The native entry remains `index.ts`; `index.web.ts` uses Expo Router for static marketing, care guides, and native-app handoff routes. The same build publishes `/privacy` from `PRIVACY.md` and `/support` with links to the public issue tracker and account deletion.
 
+Web routes use Expo Router async routes (`asyncRoutes.web: "production"` in `app.json`; native builds don't use Expo Router). Each page loads the shared entry bundle, `__common-*.js` and its own small route chunk. `/delete-account` alone loads Zod and the auth client. Keep native-only code out of website imports: use `.web.tsx` splits or lazy imports, and import icon sets from their own module (for example `@expo/vector-icons/MaterialCommunityIcons`), not the `@expo/vector-icons` barrel. The public PostHog settings are inlined into `__common-*.js`, so inspect that chunk when verifying a deployed bundle.
+
 The API Worker's staging environment uses explicit Frankfurt placement (`aws:eu-central-1`) near its EU auth database and account Durable Objects. Keep this placement with the backend deployment: running the database-heavy API at the visitor's edge adds repeated intercontinental database trips. Static Pages assets continue to be served near the visitor. Native account operations retain ownership fences and recent-authentication checks through the existing Worker.
 
 ## Native accounts and legacy web links

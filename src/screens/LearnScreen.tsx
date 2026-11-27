@@ -1,5 +1,4 @@
 import { useTelemetryOverlay } from '../telemetry';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { type ComponentProps, type ComponentType, useEffect, useRef, useState } from 'react';
 import { Alert, BackHandler, Image, Linking, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Pressable } from '../components/TelemetryPressable';
@@ -7,6 +6,7 @@ import { Pressable } from '../components/TelemetryPressable';
 import { useScreenDimensions } from '../use-screen-dimensions';
 import { useLocalization } from '../localization-context';
 import { GuideListener } from '../components/GuideListener';
+import { LearnBackIcon } from '../components/LearnBackIcon';
 import { careArticles, careReviewedOn, careSources, findCareArticles, type CareArticle } from '../puppy-care';
 import { lightTheme, type Theme } from '../theme';
 
@@ -213,7 +213,7 @@ export function LearnScreen({ theme, articleId, onArticleChange, showHeader=true
               <Text style={[styles.linkText, { color: theme.primary }]}>{t('learn.back')}</Text>
             </WebAnchor>
           : <Pressable testID="learn.back" accessibilityRole="button" onPress={() => open(null)} style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
-              <MaterialCommunityIcons name="arrow-left" size={22} color={theme.primary} />
+              <LearnBackIcon color={theme.primary} />
               <Text style={[styles.linkText, { color: theme.primary }]}>{t('learn.back')}</Text>
             </Pressable>
         )}

@@ -12,7 +12,7 @@ const origin = 'http://127.0.0.1:8897', root = resolve('dist-web');
 const output = resolve('output/playwright/web-telemetry');
 mkdirSync(output, { recursive: true });
 writeFileSync(output + '/verification.json', JSON.stringify({ status: 'running', scope: 'Local collector only.' }));
-const bundle = readdirSync(root + '/_expo/static/js/web').filter(name => name.startsWith('index-') && name.endsWith('.js')).map(name => readFileSync(root + '/_expo/static/js/web/' + name, 'utf8')).join('');
+const bundle = readdirSync(root + '/_expo/static/js/web').filter(name => name.endsWith('.js')).map(name => readFileSync(root + '/_expo/static/js/web/' + name, 'utf8')).join('');
 assert.ok(bundle.includes('phc_synthetic_web_review') && bundle.includes(origin + '/telemetry'), 'Build with the documented synthetic token and localhost collector first.');
 const server = createServer((request, response) => {
   const pathname = decodeURIComponent(new URL(request.url, origin).pathname);

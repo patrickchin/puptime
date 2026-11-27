@@ -1,8 +1,9 @@
 import {z} from 'zod';
 import {cloudRecordSchema,identifierSchema,localIdSchema,recordPatchSchema} from './cloud/protocol.ts';
+import {inviteTokenPattern,shareIdPattern} from './share-link-format.ts';
 
-export const shareIdSchema=z.string().regex(/^shr_[a-f0-9]{32}$/);
-export const inviteTokenSchema=z.string().regex(/^inv_[a-f0-9]{32}$/);
+export const shareIdSchema=z.string().regex(shareIdPattern);
+export const inviteTokenSchema=z.string().regex(inviteTokenPattern);
 export const createShareSchema=z.strictObject({id:shareIdSchema,token:inviteTokenSchema,petId:identifierSchema,
   kind:z.enum(['household','temporary']),permission:z.enum(['contribute','view']),
   expiresAt:z.number().int().nullable(),label:z.string().trim().min(1).max(80),
