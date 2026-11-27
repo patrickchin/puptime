@@ -3,6 +3,7 @@ import { marked } from 'marked';
 import { privacyPath, supportPath } from '../src/public-site.ts';
 import { websiteIconLinks, websiteManifest, websiteStyles, websiteThemeColor } from '../src/web/brand.ts';
 import { publicPaths, siteUrl } from '../src/web/site.ts';
+import { siteChromeStyles, siteFooterHtml, siteHeaderHtml } from '../src/web/site-chrome.ts';
 
 const resources = [
   {
@@ -30,16 +31,15 @@ for (const { path, title, description, body } of resources) {
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title}</title><meta name="description" content="${description}">
 <link rel="canonical" href="${siteUrl}${path}"><link rel="icon" href="/favicon.ico">${iconHead}
-<style>${websiteStyles}
-body{margin:0;background:var(--paper);color:var(--ink);font-size:17px;line-height:1.65}
-header{background:var(--deep);color:var(--paper);padding:12px max(20px,calc((100% - 720px)/2))}
-header a{display:inline-flex;align-items:center;gap:10px;min-height:44px;text-decoration:none;font-weight:700}
-header img{border-radius:8px} main{max-width:720px;margin:0 auto;padding:40px 20px 64px;overflow-wrap:break-word}
-h1,h2{font-family:'Red Hat Display',sans-serif;line-height:1.15}h1{font-size:clamp(36px,6vw,56px);margin:0 0 20px}h2{font-size:clamp(24px,4vw,30px);margin:40px 0 12px}
-a{color:inherit;text-underline-offset:.15em}a:focus-visible{outline:2px solid currentColor;outline-offset:3px}
+<style>${websiteStyles}${siteChromeStyles}
+body{margin:0;min-height:100svh;display:flex;flex-direction:column;background:var(--paper);color:var(--ink);font-size:17px;line-height:1.65}
+main{flex:1 0 auto;width:100%;max-width:720px;margin:0 auto;padding:40px 20px 64px;overflow-wrap:break-word;box-sizing:border-box}
+main :where(h1,h2){font-family:'Red Hat Display',sans-serif;line-height:1.15}main h1{font-size:clamp(36px,6vw,56px);margin:0 0 20px}main h2{font-size:clamp(24px,4vw,30px);margin:40px 0 12px}
+main a{color:inherit;text-underline-offset:.15em}main a:focus-visible{outline:2px solid currentColor;outline-offset:3px}
 </style></head><body class="marketing-site">
-<header><a href="/"><img src="/brand-icon.png" width="34" height="34" alt="">Puptime</a></header>
-<main>${body}</main></body></html>`);
+${siteHeaderHtml(path)}
+<main>${body}</main>
+${siteFooterHtml(path)}</body></html>`);
 }
 
 const indexedPaths = [...publicPaths, ...resources.map(({ path }) => path)];
