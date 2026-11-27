@@ -20,9 +20,9 @@ const careImage = assetUrl(require('./assets/web/potty-512.webp'));
 const timingImage = webImage([360, require('./assets/web/timeline-poop-eat-360.webp')], [720, require('./assets/web/timeline-poop-eat-720.webp')]);
 const routineImage = webImage([360, require('./assets/web/schedule-poop-eat-360.webp')], [720, require('./assets/web/schedule-poop-eat-720.webp')]);
 const previews = [
-  { name: 'Today', image: webImage([360, require('./assets/web/today-360.webp')], [720, require('./assets/web/today-720.webp')]), description: 'Keep potty breaks, meals, and notes together. Look back when you need to know what happened and when.' },
-  { name: 'History', image: webImage([360, require('./assets/web/activity-360.webp')], [720, require('./assets/web/activity-720.webp')]), description: 'Look back through recorded days. Change a time, add a note, or export your activity as CSV.' },
-  { name: 'Insights', image: webImage([360, require('./assets/web/insights-summary-360.webp')], [720, require('./assets/web/insights-summary-720.webp')]), description: 'See recorded activity counts and timing patterns across days, with possible missing logs clearly marked.' },
+  { name: 'Today', image: webImage([360, require('./assets/web/today-360.webp')], [720, require('./assets/web/today-720.webp')]), description: 'Log a pee, poop or meal in one tap.' },
+  { name: 'History', image: webImage([360, require('./assets/web/activity-360.webp')], [720, require('./assets/web/activity-720.webp')]), description: 'Edit times, add notes, export CSV.' },
+  { name: 'Insights', image: webImage([360, require('./assets/web/insights-summary-360.webp')], [720, require('./assets/web/insights-summary-720.webp')]), description: 'See counts and timing across days.' },
 ];
 
 function PhoneFrame({ children, reveal = false }: { children: ReactNode; reveal?: boolean }) {
@@ -81,15 +81,13 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
       <section className="hero" aria-labelledby="hero-title">
         <div className="hero-copy">
           <h1 id="hero-title">A little help with<br />potty training.</h1>
-          <p>Log potty breaks, spot your puppy’s patterns, and build a daily routine with Puptime.</p>
+          <p>Log potty breaks, spot patterns, build a routine.</p>
           <div className="hero-actions" id="get-puptime">
             <div className="download-options">
               {device !== 'ios' && <a className="primary-action" href={androidDownloadPath} onClick={() => captureWebsiteEvent('website_cta', { destination: 'android_download' })}>Download for Android <span aria-hidden="true">↓</span></a>}
               {device !== 'android' && <p className="ios-status">iPhone app coming soon</p>}
             </div>
-            {device !== 'ios' && <p className="apk-note">Installs from an APK file – allow installs from your browser when asked.</p>}
-            <p className="hero-note">Free, with no account needed.</p>
-            <a className="text-action" href="#app" onClick={() => captureWebsiteEvent('website_cta', { destination: 'app_preview' })}>See the app&nbsp;<span aria-hidden="true">↓</span></a>
+            <p className="hero-note">Free · No account needed</p>
           </div>
         </div>
         <div className="hero-art"><img className="hero-puppy" {...puppy} sizes="(max-width: 600px) 370px, (max-width: 700px) 340px, 520px" alt="Puptime’s scruffy terrier, ready for the day" width="1024" height="1024" fetchPriority="high" /></div>
@@ -102,32 +100,27 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
             {previews.map((preview, index) => <button type="button" key={preview.name} aria-pressed={selected === index} aria-controls="app-preview" onClick={() => setSelected(index)}>{preview.name}</button>)}
           </div>
           <p className="preview-description" aria-live="polite" aria-atomic="true">{previews[selected].description}</p>
-          <p className="small-copy">From the app, with example puppy logs.</p>
         </div>
         <figure className="app-preview" id="app-preview" data-reveal>
-          <PhoneFrame>{previews.map((preview, index) => <img key={preview.name} className="preview-shot" data-active={selected === index} aria-hidden={selected !== index || undefined} {...preview.image} sizes={screenSizes} alt={selected === index ? `Puptime ${preview.name} screen` : ''} width="1206" height="2622" />)}</PhoneFrame>
-          <figcaption>{previews[selected].name} on Puptime</figcaption>
+          <PhoneFrame>{previews.map((preview, index) => <img key={preview.name} className="preview-shot" data-active={selected === index} aria-hidden={selected !== index || undefined} {...preview.image} sizes={screenSizes} alt={selected === index ? `Puptime ${preview.name} screen with example logs` : ''} width="1206" height="2622" />)}</PhoneFrame>
         </figure>
       </section>
 
       <section className="rhythm-chapter chapter" aria-labelledby="rhythm-title">
-        <div className="rhythm-intro">
-          <h2 id="rhythm-title" data-reveal>Find your<br />rhythm</h2>
-          <p data-reveal>See when your puppy usually needs to go, then make a routine you can adjust.</p>
-        </div>
+        <h2 id="rhythm-title" data-reveal>Find your rhythm</h2>
         <div className="rhythm-stories">
           <article className="rhythm-story">
             <h3 data-reveal>Spot the potty patterns</h3>
             <div className="story-content">
               <PhoneFrame reveal><img {...timingImage} sizes={screenSizes} alt="Puptime Poop & Eat timeline of recorded days where poops often follow breakfast and dinner" width="1206" height="2622" loading="lazy" /></PhoneFrame>
-              <p data-reveal>Compare meals and poops across recorded days. Look for recurring potty times.</p>
+              <p data-reveal>Meals and poops, day by day.</p>
             </div>
           </article>
           <article className="rhythm-story">
             <h3 data-reveal>A routine that fits</h3>
             <div className="story-content">
               <PhoneFrame reveal><img {...routineImage} sizes={screenSizes} alt="Editable daily routine with meal and poop times and optional reminders" width="1206" height="2622" loading="lazy" /></PhoneFrame>
-              <p data-reveal>Review suggested times from your puppy’s history, then adjust each activity. Choose reminders for the routine you want to follow.</p>
+              <p data-reveal>Suggested from your logs. Adjust any time.</p>
             </div>
           </article>
         </div>
@@ -137,7 +130,7 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
         <div className="care-art" data-reveal><img src={careImage} alt="A golden puppy outside an open garden door, ready for a potty break" width="1024" height="1024" loading="lazy" /></div>
         <div className="care-copy">
           <h2 id="care-title" data-reveal>Growing up<br />together</h2>
-          <p data-reveal>Toilet training is part of puppy life. Find practical guides on trips outside, meals, sleep, and settling in, with sources you can follow.</p>
+          <p data-reveal>Short, sourced guides for the first months.</p>
           <div className="guide-links" data-reveal>
             <a href="/puppy-care/toilet-training">Toilet training</a>
             <a href="/puppy-care/getting-started">Getting started</a>
@@ -150,22 +143,11 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
 
       <section className="local-chapter chapter" aria-labelledby="price-title">
         <h2 id="price-title" data-reveal>Free to use.</h2>
-        <div className="local-columns">
-          <div data-reveal>
-            <dl className="cost-list" aria-labelledby="price-title">
-              <div><dt>In the app</dt><dd>Free. Logging, notes, history, insights, routines and reminders.</dd></div>
-              <div><dt>Cloud backup and sync</dt><dd>Optional, and free during the beta.</dd></div>
-            </dl>
-          </div>
-          <div data-reveal>
-            <h3>Why Puptime exists</h3>
-            <p>I’m Patrick Chin, and I make Puptime. I built it as a simple way to see when a puppy last went and how their days are taking shape. Its routine suggestions come from plain statistics over your own logs.</p>
-            <SourceLink className="text-action" />
-          </div>
-        </div>
+        <p className="price-line" data-reveal>Logging, history, insights and routines are free. Cloud backup is free during the beta.</p>
         <ul className="trust-list" data-reveal>
-          <li>No ads</li><li>Public source code</li><li>Export your data as CSV</li>
+          <li>No ads</li><li>Export as CSV</li>
         </ul>
+        <p className="maker-line" data-reveal>Made by Patrick Chin · <SourceLink /></p>
       </section>
 
     </main>}
