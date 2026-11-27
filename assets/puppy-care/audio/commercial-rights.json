@@ -1,0 +1,88 @@
+{
+  "checkedOn": "2026-11-14",
+  "provider": "ElevenLabs",
+  "generationPlan": "Free (recorded in README.md)",
+  "commercialUseAllowed": false,
+  "scope": "Known original noncommercial narration; not comprehensive rights clearance. Keep original hashes when replacing assets.",
+  "policyUrl": "https://elevenlabs.io/docs/help-center/legal/can-i-publish-the-content-i-generate-on-the-platform",
+  "recordings": [
+    {
+      "filename": "getting-started.mp3",
+      "generatedOn": "2026-10-15",
+      "sha256": "0b62188742703bf7725eadb0afd1c47b61e141a5ea1354df8cbbadf279496f0a",
+      "bytes": 1342627
+    },
+    {
+      "filename": "bringing-puppy-home.mp3",
+      "generatedOn": "2026-10-15",
+      "sha256": "64deaa4ccb8104d216954699c7b0517d301d2cb43fa5a4001ecab56c12f0cd55",
+      "bytes": 1254438
+    },
+    {
+      "filename": "toilet-training.mp3",
+      "generatedOn": "2026-10-15",
+      "sha256": "e8f1727e6775d376b37cc4520baaf0e6e3873e2d2698fb96a4b16bc111dbd09b",
+      "bytes": 1543676
+    },
+    {
+      "filename": "feeding.mp3",
+      "generatedOn": "2026-10-15",
+      "sha256": "66f447313addd72cfca3b6f6f6df8005774b4ce208f512ada4663ca1cbda4d76",
+      "bytes": 1589655
+    },
+    {
+      "filename": "sleep-and-first-nights.mp3",
+      "generatedOn": "2026-10-15",
+      "sha256": "cf8219762984b8e2a32f4a67ccfadf52dd3e75d0642dfd252ef3bdfd18c79300",
+      "bytes": 1442531
+    },
+    {
+      "filename": "exercise-and-play.mp3",
+      "generatedOn": "2026-10-15",
+      "sha256": "0f6cd941edac22fccf67dd81d74211f17cbfe4e22dd2577bf51257cc91907b9e",
+      "bytes": 1437522
+    },
+    {
+      "filename": "socialisation.mp3",
+      "generatedOn": "2026-10-15",
+      "sha256": "1c032cbb2361d530dfbae52959a9ea89fc5cbb54b5a323cf9613db748b5b9b9e",
+      "bytes": 1624347
+    },
+    {
+      "filename": "training-basics.mp3",
+      "generatedOn": "2026-10-15",
+      "sha256": "c331f08a7ce5cc25a9f81bd40db4ce58801bd9d437f4c2ff97f4bb5e7468f17a",
+      "bytes": 1438749
+    },
+    {
+      "filename": "biting-and-chewing.mp3",
+      "generatedOn": "2026-10-15",
+      "sha256": "ad3a74bfaad30b68ceaedee5077429d8903ab229d00d6ea86a3cb6087cb21a9c",
+      "bytes": 1256947
+    },
+    {
+      "filename": "time-alone.mp3",
+      "generatedOn": "2026-10-15",
+      "sha256": "313a34291007e529f37918a608e2c9f01b9229105f9efe791d083169c4c222c0",
+      "bytes": 1295398
+    },
+    {
+      "filename": "handling-and-grooming.mp3",
+      "generatedOn": "2026-10-15",
+      "sha256": "2fa090a2b937a51711f2f7d279c678c52c63ddfd3583c7d7750c61da03b3ef93",
+      "bytes": 1217241
+    },
+    {
+      "filename": "first-vet-visits.mp3",
+      "generatedOn": "2026-10-15",
+      "sha256": "2b22ad21c31d381fa0078e9d79049006269f9420c2165dcd5d48bb374dd62af3",
+      "bytes": 1348905
+    },
+    {
+      "filename": "when-to-call-a-vet.mp3",
+      "generatedOn": "2026-10-15",
+      "sha256": "c3162e5d0819caad7ee19a11bc8124164a9fd3f6787d7b2dd34feb480e8a6aae",
+      "bytes": 1304165
+    }
+  ]
+}
