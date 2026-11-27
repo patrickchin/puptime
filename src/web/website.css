@@ -183,28 +183,6 @@ body:has(.marketing-site) {
 .primary-action:hover {
   transform: translateY(-3px);
 }
-.hero-actions {
-  scroll-margin-top: 24px;
-}
-.download-options {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  margin-top: 32px;
-}
-.download-options .primary-action {
-  margin-top: 0;
-  gap: 40px;
-}
-.ios-status {
-  display: inline-flex;
-  align-items: center;
-  min-height: 56px;
-  padding: 16px 22px;
-  border: 1px dashed color-mix(in srgb, currentColor 60%, transparent);
-  font-weight: 500;
-}
 .hero-note {
   margin-top: 20px;
   font-size: var(--small);
@@ -613,13 +591,6 @@ body:has(.marketing-site) {
     padding: 13px 20px;
     min-height: 52px;
   }
-  .download-options {
-    margin-top: 24px;
-  }
-  .ios-status {
-    min-height: 52px;
-    padding: 13px 20px;
-  }
   .hero-note {
     margin-top: 16px;
   }
@@ -812,22 +783,6 @@ body:has(.marketing-site) {
   text-decoration: underline;
   text-decoration-thickness: 3px;
 }
-.site-header nav a.header-cta {
-  padding: 0 18px;
-  background: var(--deep);
-  color: var(--paper);
-  font-size: 0.9em;
-  font-weight: 700;
-  text-decoration: none;
-  transition: transform 180ms ease;
-}
-.site-header nav a.header-cta:hover {
-  transform: translateY(-2px);
-}
-.site-header.dark nav a.header-cta {
-  background: var(--lime);
-  color: var(--ink);
-}
 .site-footer {
   background: var(--paper);
   padding: 48px var(--chrome-margin) 40px;
@@ -941,13 +896,6 @@ body:has(.marketing-site) {
     gap: 16px;
     font-size: 16px;
   }
-  .site-header nav .wide-only {
-    display: none;
-  }
-  .site-header nav a.header-cta {
-    padding: 0 14px;
-    font-size: 15px;
-  }
   .site-footer {
     padding-top: 40px;
     gap: 32px;
@@ -961,21 +909,13 @@ body:has(.marketing-site) {
   }
 }
 /* The link keeps its accessible name from aria-label when the wordmark is hidden. */
-@media (max-width: 400px) {
+@media (max-width: 350px) {
   .site-header .site-brand .brand-name {
     display: none;
   }
   .site-brand img {
     width: 34px;
     height: 34px;
-  }
-}
-@media (max-width: 340px) {
-  .site-header nav {
-    gap: 12px;
-  }
-  .site-header nav a.header-cta {
-    padding: 0 12px;
   }
 }
 
@@ -996,7 +936,7 @@ body:has(.marketing-site) {
   .hero-copy > p:first-of-type {
     animation: text-arrive 900ms 80ms var(--ease) both;
   }
-  .hero .download-options {
+  .hero-actions > .primary-action {
     animation: text-arrive 900ms 160ms var(--ease) both;
   }
   .hero-actions > p {
@@ -1114,6 +1054,99 @@ body:has(.marketing-site) {
 @media (max-width: 600px) {
   .app-handoff .handoff-content {
     margin-top: 48px;
+  }
+}
+
+/* -------- Download (/download) -------- */
+.download-content {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 72px 24px 96px;
+}
+.download-content h1 {
+  font-size: var(--title);
+  line-height: 1.05;
+  margin-bottom: 40px;
+}
+.download-platforms {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+.download-platform {
+  padding: 32px;
+  background: var(--white);
+  border: 1px solid var(--border);
+}
+.download-platform h2 {
+  font-size: var(--lead);
+  margin-bottom: 16px;
+}
+.download-platform p {
+  max-width: 34ch;
+}
+.secondary-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 24px;
+  min-height: 52px;
+  margin-top: 24px;
+  padding: 12px 20px;
+  border: 2px solid var(--ink);
+  font-weight: 700;
+}
+.secondary-action:hover {
+  background: var(--mint);
+}
+.install-steps {
+  margin: 24px 0 0;
+  padding-left: 1.4em;
+  font-size: var(--small);
+  line-height: 1.7;
+  color: var(--muted);
+}
+.release-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 12px;
+  font-size: var(--small);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.app-store-badge {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 52px;
+  padding: 6px 18px;
+  border-radius: 10px;
+  background: #000;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.05;
+}
+.app-store-badge small {
+  font-size: 12px;
+  font-weight: 500;
+}
+@media (max-width: 700px) {
+  .download-content {
+    padding: 40px 20px 64px;
+  }
+  .download-content h1 {
+    margin-bottom: 28px;
+  }
+  .download-platforms {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .download-platform {
+    padding: 24px 20px;
   }
 }
 

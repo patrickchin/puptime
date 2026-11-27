@@ -72,11 +72,8 @@ try {
 
     await page.keyboard.press('Home');
     await page.waitForFunction(() => scrollY < 2, null, { timeout: 5000 });
-    const appLink = page.locator('.site-header').getByRole('link', { name: 'The app', exact: true });
-    if (await appLink.isVisible()) {
-      await appLink.click();
-      await page.waitForFunction(() => Math.abs(document.querySelector('#app').getBoundingClientRect().top) < 60, null, { timeout: 5000 });
-    } else await page.locator('#app').scrollIntoViewIfNeeded();
+    await page.locator('.site-header').getByRole('link', { name: 'The app', exact: true }).click();
+    await page.waitForFunction(() => Math.abs(document.querySelector('#app').getBoundingClientRect().top) < 60, null, { timeout: 5000 });
     assert.equal(await page.locator('#app-title').innerText(), 'Take a look inside');
     for (const name of ['Today', 'History', 'Insights']) {
       const button = page.getByRole('button', { name, exact: true });

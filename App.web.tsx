@@ -6,8 +6,7 @@ import { WebsiteMetadata } from './src/web/WebsiteMetadata';
 import { WebsiteAnalytics } from './src/web/WebsiteAnalytics';
 import { captureWebsiteEvent } from './src/web/telemetry';
 import { SiteFooter, SiteHeader } from './src/web/SiteChrome';
-import { androidDownloadPath, sourceUrl } from './src/web/site-chrome';
-import { handoffDevice, type HandoffDevice } from './src/web/app-link';
+import { downloadPath, sourceUrl } from './src/web/site-chrome';
 
 // Metro supplies web images as URI objects; keep them in the asset pipeline.
 const assetUrl = (asset: string | { uri: string }): string => typeof asset === 'string' ? asset : asset.uri;
@@ -41,12 +40,8 @@ function SourceLink({ className = '' }: { className?: string }) {
 
 export default function MarketingSite({ path = '/' }: { path?: string }) {
   const [selected, setSelected] = useState(0);
-  // Static HTML offers every platform; narrow to the visitor's phone after hydration.
-  const [device, setDevice] = useState<HandoffDevice | null>(null);
   const learning = path === '/puppy-care' || path.startsWith('/puppy-care/');
   const articleId = path.startsWith('/puppy-care/') ? path.slice('/puppy-care/'.length) : null;
-
-  useEffect(() => { setDevice(handoffDevice(navigator.userAgent, navigator.maxTouchPoints)); }, []);
 
   useEffect(() => {
     const hash = window.location.hash;
@@ -82,11 +77,8 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
         <div className="hero-copy">
           <h1 id="hero-title">A little help with<br />potty training.</h1>
           <p>Log potty breaks, spot patterns, build a routine.</p>
-          <div className="hero-actions" id="get-puptime">
-            <div className="download-options">
-              {device !== 'ios' && <a className="primary-action" href={androidDownloadPath} onClick={() => captureWebsiteEvent('website_cta', { destination: 'android_download' })}>Download for Android <span aria-hidden="true">↓</span></a>}
-              {device !== 'android' && <p className="ios-status">iPhone app coming soon</p>}
-            </div>
+          <div className="hero-actions">
+            <a className="primary-action" href={downloadPath} onClick={() => captureWebsiteEvent('website_cta', { destination: 'get_puptime' })}>Get Puptime <span aria-hidden="true">→</span></a>
             <p className="hero-note">Free · No account needed</p>
           </div>
         </div>

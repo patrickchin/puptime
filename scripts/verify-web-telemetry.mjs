@@ -89,17 +89,25 @@ try {
   await until(() => events.some(event => event.properties.page === '/puppy-care/toilet-training'));
   await page.goto(origin + '/puppy-care/feeding?code=private-query#private-fragment');
   await until(() => events.some(event => event.properties.page === '/puppy-care/feeding'));
+  // Hold each click on the page so the CTA event is observed independently of navigation.
+  const holdNextClick = () => page.evaluate(() => document.addEventListener('click', event => event.preventDefault(), { once: true }));
+  await page.goto(origin + '/'); await holdNextClick(); await page.locator('.hero').getByRole('link', { name: 'Get Puptime', exact: true }).click();
+  await until(() => events.some(event => event.event === 'website_cta' && event.properties.destination === 'get_puptime' && event.properties.page === '/'));
+  await page.goto(origin + '/download');
+  await until(() => events.some(event => event.event === 'website_page_view' && event.properties.page === '/download'));
+  await holdNextClick(); await page.getByRole('link', { name: 'Download the APK', exact: true }).click();
+  await until(() => events.some(event => event.event === 'website_cta' && event.properties.destination === 'android_download' && event.properties.page === '/download'));
   await page.evaluate(() => window.dispatchEvent(new ErrorEvent('error', { message: 'private raw error', error: new Error('private raw error') })));
   await until(() => events.some(event => event.event === 'website_error'));
-  const keys = ['page', '$pathname', '$process_person_profile', '$geoip_disable', 'distinct_id', '$device_id', '$session_id', '$window_id', '$lib', '$lib_version', 'token', 'error_kind'];
+  const keys = ['page', '$pathname', '$process_person_profile', '$geoip_disable', 'distinct_id', '$device_id', '$session_id', '$window_id', '$lib', '$lib_version', 'token', 'error_kind', 'destination'];
   for (const event of events) {
-    assert.ok(['website_page_view', 'website_error'].includes(event.event));
+    assert.ok(['website_page_view', 'website_cta', 'website_error'].includes(event.event));
     assert.deepEqual(Object.keys(event.properties).filter(key => !keys.includes(key)), []);
     assert.equal(event.properties.$geoip_disable, true);
     assert.equal(event.properties.$process_person_profile, false);
     assert.doesNotMatch(JSON.stringify(event), /private-query|private-fragment|private raw error|https?:\/\//);
   }
-  pass('Installed SDK sends only allowlisted anonymous page/error events, with no URLs or private strings.');
+  pass('Installed SDK sends only allowlisted anonymous page, download-link and error events, with no URLs or private strings.');
   await page.getByRole('button', { name: 'Analytics settings', exact: true }).click();
   await page.getByRole('button', { name: 'Decline analytics', exact: true }).click();
   const stopped = requests.length;

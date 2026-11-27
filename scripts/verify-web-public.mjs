@@ -17,7 +17,7 @@ const origin=`http://127.0.0.1:${server.address().port}`,browser=await chromium.
 try{
  const context=await browser.newContext(),page=await context.newPage(),api=[],external=[],requests=[],errors=[];
  page.on('pageerror',error=>errors.push(error.message));
- await context.addInitScript(()=>{window.storageWrites=[];const original=Storage.prototype.setItem;Storage.prototype.setItem=function(key,value){window.storageWrites.push(key);return original.call(this,key,value);};});
+ const storageSpy=()=>{window.storageWrites=[];const original=Storage.prototype.setItem;Storage.prototype.setItem=function(key,value){window.storageWrites.push(key);return original.call(this,key,value);};};await context.addInitScript(storageSpy);
  await context.route('**/*',route=>{const url=new URL(route.request().url());requests.push(url.href);if(url.origin!==origin){external.push(url.origin);return route.abort();}if(url.pathname.startsWith('/api/')){api.push(url.pathname);return route.abort();}return route.continue();});
  for(const width of [1440,390,320]){
   await page.setViewportSize({width,height:width<600?844:900});await page.goto(origin);await page.evaluate(()=>document.fonts.ready);
@@ -27,36 +27,40 @@ try{
  // Every template shares one header and footer; only pages that mount the analytics banner offer its settings button.
  const chrome=()=>({header:[...document.querySelectorAll('.site-header nav a')].map(a=>`${a.textContent}|${a.getAttribute('href')}|${a.getAttribute('aria-current')}`),footer:[...document.querySelectorAll('.site-footer .footer-columns :is(h2,a)')].map(e=>`${e.textContent}|${e.getAttribute('href')}`),analytics:document.querySelectorAll('.site-footer button').length,brand:document.querySelector('.site-header .site-brand')?.getAttribute('href')});
  let footer;
- for(const [path,current,analytics] of [['/','The app',1],['/puppy-care/','Puppy care',1],['/puppy-care/feeding','Puppy care',1],['/privacy',null,0],['/support',null,0],['/delete-account',null,0],['/care',null,0],['/404',null,0]]){
+ for(const [path,current,analytics] of [['/','The app',1],['/puppy-care/','Puppy care',1],['/puppy-care/feeding','Puppy care',1],['/privacy',null,0],['/support',null,0],['/delete-account',null,0],['/download',null,1],['/care',null,0],['/404',null,0]]){
   for(const width of [1440,430,390,360,320]){
    await page.setViewportSize({width,height:width<600?844:900});await page.goto(origin+path);await page.locator('.site-footer').waitFor();
    const found=await page.evaluate(chrome);footer??=found.footer;
    assert.equal(found.brand,'/');assert.deepEqual(found.footer,footer,`Footer differs on ${path}`);assert.equal(found.analytics,analytics,`Analytics settings on ${path}`);
-   assert.deepEqual(found.header.map(item=>item.split('|').slice(0,2).join('|')),['The app|/#app','Puppy care|/puppy-care/','Get Puptime|/#get-puptime']);
-   assert.ok(await page.getByRole('link',{name:'Get Puptime',exact:true}).isVisible(),`Get Puptime hidden on ${path} at ${width}px`);
+   assert.deepEqual(found.header.map(item=>item.split('|').slice(0,2).join('|')),['The app|/#app','Puppy care|/puppy-care/']);
+   for(const name of ['The app','Puppy care'])assert.ok(await page.locator('.site-header').getByRole('link',{name,exact:true}).isVisible(),`${name} hidden on ${path} at ${width}px`);
    assert.deepEqual(found.header.filter(item=>!item.endsWith('|null')).map(item=>item.split('|')[0]),current?[current]:[],`Current header item on ${path}`);
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`Overflow on ${path} at ${width}px`);
    assert.ok(await page.locator('.site-header').evaluate(element=>element.getBoundingClientRect().height<100),`Header wraps on ${path} at ${width}px`);
    assert.ok(await page.evaluate(()=>document.querySelector('.site-header nav').getBoundingClientRect().left-document.querySelector('.site-brand').getBoundingClientRect().right>=24),`Header brand and nav crowd on ${path} at ${width}px`);
   }
  }
- assert.deepEqual(footer,['Product|null','The app|/#app','Puppy care|/puppy-care/','Download Android APK|/download/android.apk','Help|null','Support|/support','Privacy|/privacy','Delete cloud account|/delete-account','Source|null','GitHub\u00a0↗|https://github.com/patrickchin/puptime']);
+ assert.deepEqual(footer,['Product|null','The app|/#app','Puppy care|/puppy-care/','Download|/download','Help|null','Support|/support','Privacy|/privacy','Delete cloud account|/delete-account','Source|null','GitHub\u00a0↗|https://github.com/patrickchin/puptime']);
  await page.goto(origin+'/delete-account');assert.equal(await page.locator('meta[name=referrer]').getAttribute('content'),'no-referrer');assert.match(await page.locator('meta[name=robots]').getAttribute('content'),/noindex/);
- // Static HTML offers both platforms; hydration narrows the hero to the visitor's phone.
- const staticHome=readFileSync(join(root,'index.html'),'utf8');assert.ok(staticHome.includes('Download for Android')&&staticHome.includes('iPhone app coming soon'));
- for(const [device,userAgent,android,iphone] of [['android','Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Mobile Safari/537.36',1,0],['iphone','Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',0,1],['desktop','Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36',1,1]]){
+ // The homepage offers one Get Puptime action; only /download links to the APK, ordering platforms for the visitor's phone.
+ const staticDownload=readFileSync(join(root,'download.html'),'utf8');assert.ok(staticDownload.indexOf('id="iphone-title"')<staticDownload.indexOf('id="android-title"'),'Static /download lists iPhone first.');
+ for(const [device,userAgent,first] of [['android','Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Mobile Safari/537.36','Android'],['iphone','Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1','iPhone'],['desktop','Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36','iPhone']]){
   for(const width of [1440,390,320]){
    const visitor=await browser.newContext({viewport:{width,height:width<600?844:900},isMobile:width<600&&device!=='desktop',hasTouch:width<600&&device!=='desktop',userAgent});
-   await visitor.route('**/*',route=>{const url=new URL(route.request().url());if(url.origin!==origin){external.push(url.origin);return route.abort();}return route.continue();});
+   await visitor.addInitScript(storageSpy);await visitor.route('**/*',route=>{const url=new URL(route.request().url());if(url.origin!==origin){external.push(url.origin);return route.abort();}return route.continue();});
    const home=await visitor.newPage();home.on('pageerror',error=>errors.push(error.message));await home.goto(origin);
-   const download=home.getByRole('link',{name:'Download for Android',exact:true}),ios=home.getByText('iPhone app coming soon',{exact:true});
-   await home.waitForFunction(([android,iphone])=>document.querySelectorAll('.download-options .primary-action').length===android&&document.querySelectorAll('.ios-status').length===iphone,[android,iphone]);
-   if(android)assert.equal(await download.getAttribute('href'),'/download/android.apk');
-   if(iphone)assert.equal(await home.locator('.ios-status').evaluate(element=>element.tagName),'P','iPhone status must not look like a download.');
    await home.getByText('Free · No account needed',{exact:true}).waitFor();
+   assert.equal(await home.locator('main a[href*="android.apk"]').count(),0,'The homepage must not link straight to the APK.');
    assert.ok(await home.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`Overflow for ${device} at ${width}px`);
-   await home.screenshot({path:join(screenshots,`download-${device}-${width}.png`)});
-   await home.evaluate(()=>scrollTo(0,document.body.scrollHeight));await home.getByRole('link',{name:'Get Puptime',exact:true}).click();await home.waitForFunction(()=>location.hash==='#get-puptime'&&Math.abs(document.getElementById('get-puptime').getBoundingClientRect().top)<innerHeight);
+   await home.locator('.hero').getByRole('link',{name:'Get Puptime',exact:true}).click();await home.waitForURL(origin+'/download');
+   await home.getByRole('heading',{name:'Get Puptime',level:1}).waitFor();
+   await home.waitForFunction(first=>document.querySelector('.download-platform h2')?.textContent===first,first);
+   assert.equal(await home.getByRole('link',{name:'Download the APK',exact:true}).getAttribute('href'),'/download/android.apk');
+   assert.equal(await home.getByRole('link',{name:/Release notes and files on GitHub/}).getAttribute('href'),'https://github.com/patrickchin/puptime/releases/latest');
+   await home.getByText('Coming soon to the App Store.',{exact:true}).waitFor();assert.equal(await home.locator('a[href*="apps.apple.com"]').count(),0);
+   assert.equal(await home.evaluate(()=>window.storageWrites.length),0,'The download page must not write browser storage.');
+   assert.ok(await home.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`Download page overflow for ${device} at ${width}px`);
+   await home.screenshot({path:join(screenshots,`download-${device}-${width}.png`),fullPage:true});
    await visitor.close();
   }
  }
@@ -69,10 +73,10 @@ try{
  await phone.route('**/*',route=>{const url=new URL(route.request().url());requests.push(url.href);if(url.origin!==origin){external.push(url.origin);return route.abort();}if(url.pathname.startsWith('/api/')){api.push(url.pathname);return route.abort();}return route.continue();});
  const phonePage=await phone.newPage();phonePage.on('pageerror',error=>errors.push(error.message));await phonePage.goto(origin+`/care?invite=${id}#${token}`);
  assert.equal(await phonePage.getByText('Open this invitation link on your phone',{exact:false}).count(),0);await phonePage.getByRole('link',{name:'Open Puptime',exact:true}).click();
- await phonePage.getByText('Puptime didn’t open?').waitFor({timeout:5000});assert.equal(await phonePage.getByRole('link',{name:'Get the Android APK',exact:true}).getAttribute('href'),'/download/android.apk');await phonePage.screenshot({path:join(screenshots,'invitation-handoff-fallback.png'),fullPage:true});await phone.close();
+ await phonePage.getByText('Puptime didn’t open?').waitFor({timeout:5000});assert.equal(await phonePage.locator('.handoff-fallback').getByRole('link',{name:'Get Puptime',exact:true}).getAttribute('href'),'/download');await phonePage.screenshot({path:join(screenshots,'invitation-handoff-fallback.png'),fullPage:true});await phone.close();
  await page.goto(origin+'/care?invite=bad#invalid');await page.getByRole('heading',{name:'Check your invitation',exact:true}).waitFor();assert.equal(await page.getByRole('link',{name:'Open Puptime',exact:true}).count(),0);
  assert.deepEqual(api,[]);assert.deepEqual(external,[]);assert.deepEqual(errors,[]);assert.ok(requests.every(url=>!url.includes(token)));
  writeFileSync(join(output,'verification.json'),JSON.stringify({passed:true,scope:'Local static website only; no backend, authentication, browser storage writes, external provider or private-data requests.',widths:[1440,390,320]},null,2));
- console.log('PASS shared header and footer on every template, platform-aware download actions, public navigation, responsive handoffs, native invitation credentials, invalid-link recovery, and zero browser authentication/storage/private-data requests.');
+ console.log('PASS shared header and footer on every template, one homepage Get Puptime action, platform-ordered /download page, public navigation, responsive handoffs, native invitation credentials, invalid-link recovery, and zero browser authentication/storage/private-data requests.');
  await context.close();
 }finally{await browser.close();await new Promise(done=>server.close(done));}
