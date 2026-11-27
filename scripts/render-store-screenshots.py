@@ -72,7 +72,7 @@ if timeline_only:
 # Optional iOS 27 creative placements have different requirements from screenshots.
 creative = root / 'fastlane/creative-assets/en-US'
 creative.mkdir(parents=True, exist_ok=True)
-logo = Image.open(root / 'assets/puptime-icon.png').convert('RGB')
+logo = Image.open(root / 'public/brand-icon.png').convert('RGBA')
 source = next((captures / 'iphone').rglob('takeScreenshot/01-log.png'))
 for name, size, scale in [('header', (3840, 1646), 1), ('search', (1920, 1280), .64)]:
     art = Image.new('RGB', size, '#F4F1E7')
@@ -80,7 +80,7 @@ for name, size, scale in [('header', (3840, 1646), 1), ('search', (1920, 1280), 
     left = int(size[0] * .16)
     top = int(size[1] * .2)
     mark = logo.resize((int(170 * scale), int(170 * scale)), Image.Resampling.LANCZOS)
-    art.paste(mark, (left, top))
+    art.paste(mark, (left, top), mark)
     font = ImageFont.truetype(font_path, int(125 * scale))
     for line_number, line in enumerate(['Know when your', 'puppy last went.']):
         draw.text((left, top + int(250 * scale) + line_number * int(155 * scale)), line, font=font, fill='#173D30')
