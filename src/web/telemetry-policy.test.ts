@@ -14,6 +14,8 @@ test('telemetry drops unknown events and strips sensitive properties and URL val
     page: '/puppy-care/toilet-training',
     $pathname: '/puppy-care/toilet-training', $process_person_profile: false, $geoip_disable: true, destination: 'android_download', distinct_id: 'anonymous-id',
   });
+  for (const destination of ['app_preview', 'get_puptime', 'source']) assert.equal(sanitizeWebsiteEvent({ event: 'website_cta', properties: { page: '/', destination } })?.properties.destination, destination);
+  for (const destination of ['ios_download', 'https://puptime.org/download/android.apk']) assert.equal(sanitizeWebsiteEvent({ event: 'website_cta', properties: { page: '/', destination } })?.properties.destination, undefined);
   assert.equal(sanitizeWebsiteEvent({ event: 'website_error', properties: { page: '/private-token', error_kind: 'secret' } })?.properties.page, '/404');
   assert.equal(privacySignalActive({ doNotTrack: '1' }), true);
   assert.equal(privacySignalActive({ globalPrivacyControl: true }), true);

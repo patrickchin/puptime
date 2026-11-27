@@ -7,7 +7,8 @@ import { WebsiteAnalytics } from './src/web/WebsiteAnalytics';
 import { captureWebsiteEvent } from './src/web/telemetry';
 import { marketingStyles } from './src/web/marketing-styles';
 import { SiteFooter, SiteHeader } from './src/web/SiteChrome';
-import { sourceUrl } from './src/web/site-chrome';
+import { androidDownloadPath, sourceUrl } from './src/web/site-chrome';
+import { handoffDevice, type HandoffDevice } from './src/web/app-link';
 
 // Metro supplies web images as URI objects; keep them in the asset pipeline.
 const assetUrl = (asset: string | { uri: string }): string => typeof asset === 'string' ? asset : asset.uri;
@@ -42,8 +43,12 @@ function SourceLink({ className = '' }: { className?: string }) {
 
 export default function MarketingSite({ path = '/' }: { path?: string }) {
   const [selected, setSelected] = useState(0);
+  // Static HTML offers every platform; narrow to the visitor's phone after hydration.
+  const [device, setDevice] = useState<HandoffDevice | null>(null);
   const learning = path === '/puppy-care' || path.startsWith('/puppy-care/');
   const articleId = path.startsWith('/puppy-care/') ? path.slice('/puppy-care/'.length) : null;
+
+  useEffect(() => { setDevice(handoffDevice(navigator.userAgent, navigator.maxTouchPoints)); }, []);
 
   useEffect(() => {
     const hash = window.location.hash;
@@ -80,9 +85,15 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
         <div className="hero-copy">
           <h1 id="hero-title">A little help with<br />potty training.</h1>
           <p>Log potty breaks, spot your puppy’s patterns, and build a daily routine with Puptime.</p>
-          <a className="primary-action" href="#app">See the app <span aria-hidden="true">↓</span></a>
-          <p className="hero-note">Free local logging. No account needed.</p>
-          <a className="text-action" href="/download/android.apk">Download Android APK</a>
+          <div className="hero-actions" id="get-puptime">
+            <div className="download-options">
+              {device !== 'ios' && <a className="primary-action" href={androidDownloadPath} onClick={() => captureWebsiteEvent('website_cta', { destination: 'android_download' })}>Download for Android <span aria-hidden="true">↓</span></a>}
+              {device !== 'android' && <p className="ios-status">iPhone app coming soon</p>}
+            </div>
+            {device !== 'ios' && <p className="apk-note">Installs from an APK file – allow installs from your browser when asked.</p>}
+            <p className="hero-note">Free, with no account needed.</p>
+            <a className="text-action" href="#app" onClick={() => captureWebsiteEvent('website_cta', { destination: 'app_preview' })}>See the app&nbsp;<span aria-hidden="true">↓</span></a>
+          </div>
         </div>
         <div className="hero-art"><img className="hero-puppy" {...puppy} sizes="(max-width: 600px) 370px, (max-width: 700px) 340px, 520px" alt="Puptime’s scruffy terrier, ready for the day" width="1024" height="1024" fetchPriority="high" /></div>
       </section>

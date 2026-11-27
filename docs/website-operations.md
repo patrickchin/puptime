@@ -43,7 +43,7 @@ Optional PostHog analytics load only after consent and respect Do Not Track/Glob
 | Event | Properties | Use |
 | --- | --- | --- |
 | `website_page_view` | Known public `page` | Guide readership and entry pages |
-| `website_cta` | `page`, `destination`: `source` (legacy `android_download` remains accepted) | Source clicks; legacy download events remain readable |
+| `website_cta` | `page`, `destination`: `android_download`, `app_preview`, `get_puptime`, or `source` | Android APK download, See the app, the header’s Get Puptime action, and source clicks |
 | `website_error` | `page`, `error_kind`: `script`, `unhandled_rejection`, or `render` | Failure counts; no messages, stacks, or private contents |
 
 The exact shared property boundary is `page`, `$pathname` (both known route paths or `/404`), `$process_person_profile: false`, `$geoip_disable: true`, and SDK-generated string values for `distinct_id`, `$device_id`, `$session_id`, `$window_id`, `$lib`, `$lib_version`, and `token`. Event-specific properties are limited to the public-page values above. The SDK/provider delivery metadata includes event time/UUID, sent-at and ingestion timestamps. Received events also have service metadata such as team ID and propertyless person mode. The public `token` is the project ingestion token; it is never a personal API credential. Network requests still expose connection information to the provider. The SDK also sends anonymous IDs and library metadata. It creates no person profiles, and the app does not identify website visitors. Browser failure events are coarse counts, not full stack-trace error monitoring. Native/API diagnostics and Sentry remain separate cloud-rollout work.

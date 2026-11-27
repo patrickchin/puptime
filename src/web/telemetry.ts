@@ -1,5 +1,5 @@
 import type { PostHog } from 'posthog-js';
-import { consentKey, privacySignalActive, sanitizeWebsiteEvent, telemetryPaths, type WebsiteEvent } from './telemetry-policy';
+import { consentKey, privacySignalActive, sanitizeWebsiteEvent, telemetryPaths, type WebsiteDestination, type WebsiteEvent } from './telemetry-policy';
 
 export const posthogConfigured = Boolean(process.env.EXPO_PUBLIC_POSTHOG_KEY);
 let client: PostHog | undefined;
@@ -67,6 +67,6 @@ export async function setAnalyticsEnabled(enabled: boolean, path: string) {
   }
 }
 
-export function captureWebsiteEvent(event: WebsiteEvent, properties: { destination?: 'android_download' | 'source'; error_kind?: 'script' | 'unhandled_rejection' | 'render' } = {}) {
+export function captureWebsiteEvent(event: WebsiteEvent, properties: { destination?: WebsiteDestination; error_kind?: 'script' | 'unhandled_rejection' | 'render' } = {}) {
   if (allowed && !privacySignalActive(navigator)) client?.capture(event, { page, ...properties });
 }

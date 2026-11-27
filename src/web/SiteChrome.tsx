@@ -1,16 +1,16 @@
 import { openAnalyticsSettings } from './WebsiteAnalytics';
 import { captureWebsiteEvent } from './telemetry';
-import { footerColumns, footerCurrent, headerCurrent, headerLinks, siteTagline, type ChromeLink } from './site-chrome';
+import { footerColumns, footerCurrent, headerAction, headerCurrent, headerLinks, siteTagline, type ChromeLink } from './site-chrome';
 
-function ChromeLinkItem({ link, current }: { link: ChromeLink; current?: 'page' | 'true' }) {
+function ChromeLinkItem({ link, current, className }: { link: ChromeLink; current?: 'page' | 'true'; className?: string }) {
   const { label, href, external, event } = link;
-  return <a href={href} aria-current={current} onClick={event ? () => captureWebsiteEvent('website_cta', { destination: event }) : undefined}>{label}{external && <>&nbsp;<span aria-hidden="true">↗</span></>}</a>;
+  return <a className={className} href={href} aria-current={current} onClick={event ? () => captureWebsiteEvent('website_cta', { destination: event }) : undefined}>{label}{external && <>&nbsp;<span aria-hidden="true">↗</span></>}</a>;
 }
 
 export function SiteHeader({ path, dark = false }: { path: string; dark?: boolean }) {
   return <header className={`site-header${dark ? ' dark' : ''}`}>
-    <a className="site-brand" href="/" aria-label="Puptime home"><img src="/brand-icon.png" width="38" height="38" alt="" />Puptime</a>
-    <nav aria-label="Website">{headerLinks.map((link) => <ChromeLinkItem key={link.href} link={link} current={headerCurrent(link.href, path)} />)}</nav>
+    <a className="site-brand" href="/" aria-label="Puptime home"><img src="/brand-icon.png" width="38" height="38" alt="" /><span className="brand-name">Puptime</span></a>
+    <nav aria-label="Website">{headerLinks.map((link) => <ChromeLinkItem key={link.href} link={link} current={headerCurrent(link.href, path)} className={link.wide ? 'wide-only' : undefined} />)}<ChromeLinkItem link={headerAction} className="header-cta" /></nav>
   </header>;
 }
 

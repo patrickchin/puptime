@@ -1,6 +1,6 @@
 # Puptime Privacy Policy
 
-Last updated: November 16, 2026
+Last updated: November 26, 2026
 
 Puptime is a puppy routine tracker developed by Patrick Chin. Local logging works without an account. This policy explains optional cloud accounts, the native app, and the public website.
 
@@ -48,7 +48,7 @@ Entries exclude puppy records, names, emails, entered text, notes, photos, accou
 
 The website is hosted on Cloudflare Pages. Cloudflare handles network requests to serve and protect the website. Cloudflare Web Analytics measures aggregate traffic, page load performance, and Core Web Vitals without analytics cookies. See [Cloudflare Web Analytics](https://www.cloudflare.com/web-analytics/) and [Cloudflare's privacy policy](https://www.cloudflare.com/privacypolicy/).
 
-Optional product analytics use PostHog's EU cloud when a Puptime project is configured. PostHog is off until you choose **Allow analytics**. It measures public website visits, source-code clicks, and categories of browser failures. Browser account-action events are no longer captured. It uses an anonymous browser identifier stored in local storage. We do not send names, emails, account/provider identifiers, pet records, notes, email codes, authentication cookies, search terms, raw error messages, full URLs, query strings, URL fragments, or referrer URLs. Only known website route paths are included. Events request that PostHog disable GeoIP enrichment. Automatic click/text capture, person profiles, and session recordings are disabled. Network requests necessarily reach the analytics provider; see [PostHog's privacy policy](https://posthog.com/privacy) for its handling of service data.
+Optional product analytics use PostHog's EU cloud when a Puptime project is configured. PostHog is off until you choose **Allow analytics**. It measures public website visits, clicks on the website's download, app and source-code links, and categories of browser failures. Browser account-action events are no longer captured. It uses an anonymous browser identifier stored in local storage. We do not send names, emails, account/provider identifiers, pet records, notes, email codes, authentication cookies, search terms, raw error messages, full URLs, query strings, URL fragments, or referrer URLs. Only known website route paths are included. Events request that PostHog disable GeoIP enrichment. Automatic click/text capture, person profiles, and session recordings are disabled. Network requests necessarily reach the analytics provider; see [PostHog's privacy policy](https://posthog.com/privacy) for its handling of service data.
 
 Use **Analytics settings** in the website footer or guide header to withdraw consent. Declining stops PostHog capture and clears its stored browser identifier. The site also respects Do Not Track and Global Privacy Control for optional PostHog analytics. Your consent choice stays in this browser until changed or browser storage is cleared. Withdrawing consent does not erase events already received by PostHog. Cloudflare's aggregate traffic and performance measurement operates separately from this optional choice.
 
