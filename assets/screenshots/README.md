@@ -52,15 +52,21 @@ default Poop & Eat view) and `schedule-poop-eat` (the Routine screen). They were
 captured on November 27, 2026 with the same capture-only clock, status bar, and
 unedited 1206 × 2622 light-theme framing, from the app source of this branch on
 a dedicated iPhone 17 Pro simulator (iOS 26.5) named
-`Puptime Website Screenshots web-recapture`, which was deleted afterwards.
+`Puptime Website Screenshots web-realistic-capture`, which was deleted afterwards.
 
-Their journal is the seeder's `poop-eat` rhythm: 88 wholly artificial logs for
-Biscuit with three meals and three poops a day, no pee breaks, over 14 completed
-days and four activities today. The routine is the app's six suggestions from
-that history. Nothing is filled in after Today.
+Their journal is the seeder's `realistic` rhythm: 61 wholly artificial meal and
+poop logs for Biscuit, with no pee breaks or notes, over 14 completed days and
+two activities today. A fixed-seed generator models an untidy real week rather
+than a timetable. Breakfast is around 08:25–09:35 and dinner around 17:45–19:10,
+about 35 and 15 minutes later at weekends. Some days add a midday meal or leave
+a meal unlogged. Poops usually follow a meal by 15–70 minutes but sometimes come
+mid-afternoon, before dawn, or late at night, one to three a day. The routine is
+the app's four suggestions from that history: Eat 9:00, Poop 9:45, Eat 18:15,
+and Poop 19:00. Nothing is filled in after Today. The earlier `poop-eat` rhythm
+(three meals and three poops a day) remains available in the seeder.
 
 ```sh
-TZ=Asia/Shanghai node scripts/seed-website-screenshots.mjs SIMULATOR_UDID poop-eat
+TZ=Asia/Shanghai node scripts/seed-website-screenshots.mjs SIMULATOR_UDID realistic
 maestro --device SIMULATOR_UDID test scripts/capture-website-screenshots.yaml
 ```
 
@@ -72,7 +78,7 @@ unchanged since), artifact SHA-256
 JavaScript from the generated capture entry, with an unreachable loopback cloud
 origin and analytics unconfigured, was embedded into an ad-hoc re-signed copy;
 Info.plist was unchanged. The installed JavaScript SHA-256 is
-`171d1e527ea4f478f1d8c9cbda8129586ae08dc5aa9b21b33e2da0cd8ab93f25`.
+`a5ceb0e7ff49556479aee28cec6e8cb16930b8e42df4cc34489decd659b548ee`.
 
 ## Illustrative timeline concept
 
