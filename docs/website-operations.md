@@ -22,6 +22,10 @@ Native deletion acceptance extends the existing isolated account fixture: `PUPTI
 
 After `npm run build:web`, run `PUPTIME_PLAYWRIGHT_MODULE=/absolute/path/to/playwright PUPTIME_CHROMIUM_EXECUTABLE=/absolute/path/to/chromium node scripts/verify-web-marketing.mjs`. This serves the static export on a temporary localhost port and blocks external requests. It verifies real wheel and PageDown scrolling, footer reachability, back-to-top and product anchors, title wrapping, preview controls, and care-library scrolling at desktop and phone widths. Screenshots and results go to `output/playwright/web-marketing/`. Full-page screenshots and clicks that automatically scroll elements into view do not prove that ordinary page scrolling works.
 
+## Styles
+
+Website CSS lives in `src/web/website.css`, imported once in `web/_layout.tsx`. Expo emits it as one hashed stylesheet linked from each page's `<head>` (including the per-route async bundles), and `scripts/build-web-seo.ts` links the same file from `/privacy` and `/support`. The build fails if a page's static HTML gains a second stylesheet, an inline `<style>`, or the link moves out of `<head>`. Color tokens are CSS custom properties that mirror `websiteTheme` in `src/web/brand.ts`, which React Native styles still use; `npm run test:web` fails if they drift.
+
 ## Search
 
 The build renders the homepage, care library, and all 13 guides to HTML, including article text, headings, source links, titles, descriptions, canonical URLs, Open Graph/Twitter metadata, and JSON-LD. It generates `/sitemap.xml` and `/robots.txt`. Previously shared `/#puppy-care/...` links redirect in the browser to the corresponding clean URL. A top-level `404.html` prevents nonexistent pages from falling back to a successful homepage response. Preview hosts have `X-Robots-Tag: noindex`.

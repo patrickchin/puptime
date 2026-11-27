@@ -1,7 +1,6 @@
 import { supportPath } from '../public-site';
 import { useEffect, useRef, useState } from 'react';
 import Head from 'expo-router/head';
-import { marketingStyles } from './marketing-styles';
 import { SiteFooter, SiteHeader } from './SiteChrome';
 import { handoffDevice, nativeCareLink, type HandoffDevice } from './app-link';
 
@@ -23,7 +22,6 @@ export function AppHandoffPage({ invitation=false }: { invitation?:boolean }) {
  const invalid=ready&&!href,invite=!!href?.startsWith('puptime://care'),desktop=device==='desktop';
  return <div className="marketing-site care-page site-page app-handoff">
   <Head><title>{`${invitation?'Shared puppy care':'Your account'} | Puptime`}</title><meta name="robots" content="noindex, nofollow"/><meta name="referrer" content="no-referrer"/></Head>
-  <style>{marketingStyles+css}</style>
   <SiteHeader path={invitation?'/care':'/account'}/>
   <main className="handoff-content">
    <h1>{invalid?'Check your invitation':invite?'You’re invited to help care for a puppy.':invitation?'Shared puppies are in the app.':'Your account is in the app.'}</h1>
@@ -37,4 +35,3 @@ export function AppHandoffPage({ invitation=false }: { invitation?:boolean }) {
   <SiteFooter path={invitation?'/care':'/account'}/>
  </div>;
 }
-const css=`.app-handoff .handoff-content{max-width:680px;margin:72px auto;padding:0 24px 64px}.app-handoff h1{font-size:clamp(32px,5vw,48px);line-height:1.1;margin-bottom:24px}.app-handoff main>p{margin:0;max-width:48ch}.app-handoff .handoff-help{font-size:14px;margin-top:36px}.app-handoff .handoff-desktop{margin-top:20px;font-weight:700}.app-handoff .text-action{margin-top:12px}.app-handoff .handoff-fallback{margin-top:24px;padding:16px 20px;max-width:48ch;background:#fff;border-left:4px solid var(--lime)}.app-handoff .handoff-fallback a,.app-handoff .handoff-help a{text-decoration:underline;text-underline-offset:4px}@media(max-width:600px){.app-handoff .handoff-content{margin-top:48px}}`;

@@ -7,7 +7,7 @@ import sharp from 'sharp';
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PUPTIME_PLAYWRIGHT_MODULE ?? 'playwright');
 const dataUrl = (path, type) => `data:${type};base64,${readFileSync(path).toString('base64')}`;
-// Mirror websiteTheme and websiteStyles in src/web/brand.ts.
+// Mirror websiteTheme in src/web/brand.ts and the tokens in src/web/website.css.
 const deep = '#173B30', paper = '#F8F3E8', lime = '#D7EC98';
 const mascot = await sharp('assets/mascots/scruffy-terrier.png').resize(1040, 1040).png().toBuffer();
 

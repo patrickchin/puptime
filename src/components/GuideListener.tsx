@@ -112,7 +112,6 @@ function RecordingPlayer({ article, recording, theme }: { article: CareArticle; 
     };
     const silent = muted || volume === 0;
     return <section className="puptime-listener" data-testid="learn.audio" aria-label={t('learn.audioTitle')} style={{ background: theme.surface, borderColor: theme.border, color: theme.text, '--audio-accent': theme.primary, '--audio-soft': theme.primarySoft, '--audio-border': theme.border } as React.CSSProperties}>
-      <style>{webPlayerStyles}</style>
       <div className="puptime-listener-inner">
         <button className="puptime-listener-skip puptime-listener-back" data-testid="learn.audio.back" aria-label={t('learn.audioBack')} title={t('learn.audioBack')} disabled={disabled} onClick={() => void seek(-15)}>
           <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true" fill="none"><path d="M5 12a11 11 0 1 1 1 11M5 5v7h7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /><text x="17" y="22" textAnchor="middle" fill="currentColor">15</text></svg>
@@ -253,28 +252,3 @@ const styles = StyleSheet.create({
   sheetTitle: { flex: 1, fontSize: 20, lineHeight: 28, fontWeight: '700' },
   option: { minHeight: 48, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 8 },
 });
-
-const webPlayerStyles = `
-.puptime-listener{flex-shrink:0;border-top:1px solid;padding:14px 24px max(14px,env(safe-area-inset-bottom));font-family:inherit;z-index:2}
-.puptime-listener-inner{max-width:1280px;margin:0 auto;display:grid;grid-template-columns:44px 44px 44px minmax(100px,180px) minmax(100px,1fr) auto auto 116px;align-items:center;gap:12px}
-.puptime-listener button{font:inherit;color:inherit;cursor:pointer;border:0;background:transparent;min-height:44px;border-radius:8px}
-.puptime-listener button:hover:not(:disabled){opacity:.8}
-.puptime-listener button:active:not(:disabled){transform:scale(.96)}
-.puptime-listener button:disabled,.puptime-listener input:disabled{opacity:.45;cursor:default}
-.puptime-listener button:focus-visible,.puptime-listener input:focus-visible{outline:2px solid var(--audio-accent);outline-offset:3px}
-.puptime-listener .puptime-listener-play{width:44px;border-radius:50%;display:grid;place-items:center}
-.puptime-listener-copy{min-width:0}.puptime-listener-title{font-size:14px;line-height:21px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.puptime-listener-credit{font-size:12px;line-height:19px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.puptime-listener .puptime-listener-skip{width:44px;border-radius:50%;display:grid;place-items:center;background:var(--audio-soft);color:var(--audio-accent)}
-.puptime-listener-skip text{font:700 11px 'Red Hat Text',sans-serif}
-.puptime-listener input{accent-color:var(--audio-accent);cursor:pointer;min-width:0;margin:0;min-height:44px}
-.puptime-listener-progress{width:100%}.puptime-listener-time{font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
-.puptime-listener-speed-control{display:flex;align-items:center;gap:4px;white-space:nowrap;font-size:13px}
-.puptime-listener-speed-control button{padding:0 10px;background:var(--audio-soft);border-radius:8px}
-.puptime-listener-speed-control output{min-width:42px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums}
-.puptime-listener-volume{display:flex;align-items:center;gap:8px;min-width:0}.puptime-listener-volume button{width:44px;flex-shrink:0;display:grid;place-items:center}.puptime-listener-volume input{width:64px;flex:1}
-.puptime-listener-error{grid-column:1/-1;font-size:13px;line-height:20px}
-@media(max-width:1200px){.puptime-listener-inner{grid-template-columns:44px 44px 44px minmax(100px,1fr) auto auto;gap:10px}.puptime-listener-copy{grid-column:1/-1;grid-row:1;padding-right:140px}.puptime-listener-back{grid-column:1;grid-row:2}.puptime-listener-play{grid-column:2;grid-row:2}.puptime-listener-forward{grid-column:3;grid-row:2}.puptime-listener-progress{grid-column:4;grid-row:2}.puptime-listener-time{grid-column:5;grid-row:2}.puptime-listener-speed-control{grid-column:6;grid-row:2}.puptime-listener-volume{grid-column:4/-1;grid-row:1;justify-content:flex-end}.puptime-listener-volume input{max-width:80px}.puptime-listener-error{grid-row:3}}
-@media(max-width:700px){.puptime-listener{padding:12px 20px max(12px,env(safe-area-inset-bottom))}.puptime-listener-inner{grid-template-columns:44px 44px 44px minmax(0,1fr);gap:8px}.puptime-listener-copy{padding-right:52px}.puptime-listener-volume{grid-column:4;grid-row:1}.puptime-listener-volume input{display:none}.puptime-listener-progress{grid-column:1/-1;grid-row:3}.puptime-listener-time{grid-column:1/-1;grid-row:4;text-align:center}.puptime-listener-speed-control{grid-column:4;grid-row:2;justify-content:flex-end}.puptime-listener-speed-control button{font-size:12px;padding:0 6px}.puptime-listener-speed-control output{min-width:32px}.puptime-listener-error{grid-row:5}}
-@media(max-width:389px){.puptime-listener-inner{grid-template-columns:44px 44px 44px 1fr}.puptime-listener-back{grid-column:1;justify-self:center}.puptime-listener-play{grid-column:2}.puptime-listener-forward{grid-column:3}.puptime-listener-speed-control{grid-column:1/-1;grid-row:4;justify-content:center}.puptime-listener-time{grid-row:5}.puptime-listener-error{grid-row:6}}
-`;

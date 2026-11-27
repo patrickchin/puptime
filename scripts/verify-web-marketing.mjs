@@ -17,7 +17,7 @@ const server = createServer((request, response) => {
   if (pathname.endsWith('/')) file += '/index.html';
   else if (!extname(file)) file += '.html';
   if (!existsSync(file)) { response.writeHead(404).end(); return; }
-  const type = { '.html': 'text/html', '.js': 'text/javascript', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.mp3': 'audio/mpeg', '.woff2': 'font/woff2' }[extname(file)];
+  const type = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.mp3': 'audio/mpeg', '.woff2': 'font/woff2' }[extname(file)];
   response.writeHead(200, { 'Content-Type': type ?? 'application/octet-stream' }).end(readFileSync(file));
 });
 await new Promise(done => server.listen(0, '127.0.0.1', done));

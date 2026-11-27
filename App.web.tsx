@@ -5,7 +5,6 @@ import { websiteTheme } from './src/web/brand';
 import { WebsiteMetadata } from './src/web/WebsiteMetadata';
 import { WebsiteAnalytics } from './src/web/WebsiteAnalytics';
 import { captureWebsiteEvent } from './src/web/telemetry';
-import { marketingStyles } from './src/web/marketing-styles';
 import { SiteFooter, SiteHeader } from './src/web/SiteChrome';
 import { androidDownloadPath, sourceUrl } from './src/web/site-chrome';
 import { handoffDevice, type HandoffDevice } from './src/web/app-link';
@@ -74,7 +73,6 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
   }, [learning]);
 
   return <div className={`marketing-site${learning ? ' care-page' : ''}`} id="top">
-    <style>{marketingStyles}</style>
     <WebsiteMetadata path={path} />
     <WebsiteAnalytics path={path} />
     <a className="skip-link" href="#main">Skip to content</a>
