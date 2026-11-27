@@ -2,7 +2,7 @@ import { copyFileSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { marked } from 'marked';
 import { privacyPath, supportPath } from '../src/public-site.ts';
 import { websiteIconLinks, websiteManifest, websiteStyles, websiteThemeColor } from '../src/web/brand.ts';
-import { publicPaths, siteUrl } from '../src/web/site.ts';
+import { publicPaths, siteUrl, socialImage } from '../src/web/site.ts';
 import { siteChromeStyles, siteFooterHtml, siteHeaderHtml } from '../src/web/site-chrome.ts';
 
 const resources = [
@@ -31,6 +31,8 @@ for (const { path, title, description, body } of resources) {
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title}</title><meta name="description" content="${description}">
 <link rel="canonical" href="${siteUrl}${path}"><link rel="icon" href="/favicon.ico">${iconHead}
+<meta property="og:site_name" content="Puptime"><meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><meta property="og:url" content="${siteUrl}${path}"><meta property="og:type" content="website">
+<meta property="og:image" content="${socialImage.url}"><meta property="og:image:width" content="${socialImage.width}"><meta property="og:image:height" content="${socialImage.height}"><meta property="og:image:alt" content="${socialImage.alt}"><meta name="twitter:card" content="summary_large_image">
 <style>${websiteStyles}${siteChromeStyles}
 body{margin:0;min-height:100svh;display:flex;flex-direction:column;background:var(--paper);color:var(--ink);font-size:17px;line-height:1.65}
 main{flex:1 0 auto;width:100%;max-width:720px;margin:0 auto;padding:40px 20px 64px;overflow-wrap:break-word;box-sizing:border-box}
@@ -62,7 +64,7 @@ for(const html of [accountHtml,careHtml])if(html.includes('<form')||html.include
 for (const path of indexedPaths) {
   const filename = path === '/' ? 'index' : path === '/puppy-care/' ? 'puppy-care/index' : path.slice(1);
   const html = readFileSync(`dist-web/${filename}.html`, 'utf8');
-  if (!html.includes(`href="${siteUrl}${path}"`) || !html.includes('rel="canonical"') || !html.includes('<h1') || !html.includes('name="description"')) {
+  if (!html.includes(`href="${siteUrl}${path}"`) || !html.includes('rel="canonical"') || !html.includes('<h1') || !html.includes('name="description"') || !html.includes(`content="${socialImage.url}"`) || !html.includes('content="summary_large_image"')) {
     throw new Error(`Missing rendered SEO content: ${path}`);
   }
 }
