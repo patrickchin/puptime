@@ -42,6 +42,8 @@ const LOAD_DAYS = 14;
 const DATE_COLUMN_WIDTH = 56;
 const LOAD_ROW_HEIGHT = 48;
 const ESTIMATE_OPACITY = 0.35;
+const POINT_MARK_INSET = 3;
+const POINT_MARK_WIDTH = 6;
 const AXIS_HOURS = Array.from({ length: 25 }, (_, index) => index);
 const GRID_HOURS = Array.from({ length: 23 }, (_, index) => index + 1);
 const POOP_MEAL_VIEW = { id: 'poop-meal', types: ['poop', 'meal'] } as const;
@@ -186,6 +188,7 @@ function TimelineTrack({
   const recordedMarks = marks.filter((mark) => !mark.estimated);
   const interactiveMarks = marks.filter((mark) => !mark.estimated || savedEstimateIds.has(mark.id));
   const clusters = timelinePointClusters(interactiveMarks);
+  const pointMarkHeight = rowHeight - POINT_MARK_INSET * 2;
   const currentTimePosition = currentTime
     ? ((currentTime.getHours() * 60 + currentTime.getMinutes()) / (24 * 60)) * 100
     : undefined;
@@ -266,7 +269,7 @@ function TimelineTrack({
         const selectedMarks = timelineMarksForPointHit(interactiveMarks, cluster.startBucket, savedEstimateIds);
         const colors = [...new Set([...durationMarks, ...pointMarks].map((mark) => activityColors(theme, { type: mark.type, customLabel: mark.label }).color))];
         const durationCount = new Set(durationMarks.map((mark) => activityColors(theme, { type: mark.type, customLabel: mark.label }).color)).size;
-        const markWidth = colors.length > 1 ? Math.min(14, 6 + colors.length * 2) : 6;
+        const overlapsDuration = colors.length > 1 && durationCount > 0;
         const center = (cluster.startBucket + 0.5) * trackWidth / TIMELINE_BUCKETS;
         const previous = clusters[index - 1];
         const next = clusters[index + 1];
@@ -289,26 +292,28 @@ function TimelineTrack({
               },
             ]}
           >
-            {colors.length ? <View pointerEvents="none" style={[styles.pointMark, { left: center - left - markWidth / 2, backgroundColor: colors[0], top: 3, height: rowHeight - 6, width: markWidth }]}>
-              {colors.length > 1 ? colors.map((color, index) => {
-                const continuesHorizontally = index < durationCount;
+            {colors.length ? <View pointerEvents="none" style={[styles.pointStack, {
+              left: center - left - POINT_MARK_WIDTH / 2,
+              height: pointMarkHeight,
+              gap: Math.min(1.5, pointMarkHeight / (2 * colors.length)),
+            }]}>
+              {colors.map((color, index) => {
+                const isDuration = overlapsDuration && index < durationCount;
                 return (
                   <View
-                    key={`${color}-${index}`}
+                    key={color}
                     style={[
-                      styles.markStripe,
+                      styles.markSegment,
+                      !isDuration && styles.pointMark,
                       {
                         backgroundColor: color,
                         borderColor: theme.surfaceRaised,
-                        borderBottomWidth: index === colors.length - 1 && !continuesHorizontally ? 1 : 0,
-                        borderLeftWidth: continuesHorizontally ? 0 : 1,
-                        borderRightWidth: continuesHorizontally ? 0 : 1,
-                        borderTopWidth: index > 0 || !continuesHorizontally ? 1 : 0,
+                        borderWidth: overlapsDuration && !isDuration ? StyleSheet.hairlineWidth : 0,
                       },
                     ]}
                   />
                 );
-              }) : null}
+              })}
             </View> : null}
           </Pressable>
         );
@@ -879,7 +884,8 @@ const styles = StyleSheet.create({
   timelineTrack: { width: '100%', borderBottomWidth: StyleSheet.hairlineWidth, position: 'relative', overflow: 'hidden' },
   gridLine: { position: 'absolute', top: 0, bottom: 0, width: 1 },
   pointHitTarget: { position: 'absolute', top: 0, bottom: 0, justifyContent: 'center', zIndex: 2 },
-  pointMark: { position: 'absolute', top: 3, borderRadius: 999, overflow: 'hidden' },
+  pointStack: { position: 'absolute', top: POINT_MARK_INSET, width: POINT_MARK_WIDTH },
+  pointMark: { borderRadius: POINT_MARK_WIDTH / 2 },
   estimatedPointMark: { position: 'absolute', top: 3, bottom: 3, width: 6, marginLeft: -3, borderRadius: 999, zIndex: 2 },
   savedEstimateMark: { minWidth: 14, borderWidth: 1, borderStyle: 'dashed', borderRadius: 3, justifyContent: 'center' },
   savedEstimatePoint: { width: 14, marginLeft: -7 },
@@ -887,7 +893,7 @@ const styles = StyleSheet.create({
   estimateLegend: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   estimateLegendMark: { width: 6, height: 16, borderRadius: 3 },
   estimateLegendText: { fontSize: 11, lineHeight: 16, fontWeight: '600' },
-  markStripe: { flex: 1, width: '100%' },
+  markSegment: { flex: 1 },
   durationMark: { position: 'absolute', top: 3, bottom: 3, minWidth: 3, borderRadius: 999, zIndex: 1 },
   currentTimeMarker: {
     position: 'absolute',
