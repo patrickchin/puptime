@@ -113,6 +113,32 @@ function GuideAppCard({ article, theme }: { article: CareArticle; theme: Theme }
   </WebAnchor>;
 }
 
+// The website opens with both first-read guides, in the order a new owner needs them.
+const startSteps = { 'bringing-puppy-home': 'learn.beforeArrival', 'getting-started': 'learn.firstWeek' } as const;
+
+function StartHere({ articles, theme }: { articles: CareArticle[]; theme: Theme }) {
+  const { t } = useLocalization();
+  const { width } = useScreenDimensions();
+  const compact = width < 700;
+  const steps = (Object.keys(startSteps) as (keyof typeof startSteps)[]).flatMap((id) => articles.filter((article) => article.id === id));
+  if (!steps.length) return null;
+  return <View testID="learn.startHere" style={[webStyles.startPanel, compact && webStyles.startPanelCompact, { backgroundColor: theme.primarySoft, borderColor: theme.border, borderRadius: theme.presentation.controlRadius }]}>
+    <GuideImage article={steps[0]} style={[styles.featuredImage, compact ? webStyles.cardThumb : webStyles.featuredImage]} />
+    <View style={styles.rowCopy}>
+      {steps.map((article, index) => <WebAnchor key={article.id} testID={`learn.article.${article.id}`} href={`/puppy-care/${article.id}`} accessibilityRole="link"
+        style={({ pressed }) => [webStyles.startLink, compact && webStyles.startLinkCompact, index > 0 && [webStyles.startDivider, { borderColor: theme.border }], pressed && styles.pressed]}>
+        <View style={styles.rowCopy}>
+          <Text style={[webStyles.startStep, { color: theme.primary }]}>{t(startSteps[article.id as keyof typeof startSteps])}</Text>
+          <Text style={[styles.rowTitle, { color: theme.text }, compact ? webStyles.rowTitleCompact : webStyles.rowTitle]}>{article.shortTitle}</Text>
+          {/* The group heading already says "Start here", so drop the summary's matching prefix. */}
+          <Text style={[styles.rowSummary, webStyles.rowSummary, webStyles.featuredSummary, compact && webStyles.rowSummaryCompact]}>{article.summary.replace(/^Start here:\s*(.)/, (_, first: string) => first.toUpperCase())}</Text>
+        </View>
+        {!compact && <Text aria-hidden style={[styles.chevron, { color: theme.primary }]}>›</Text>}
+      </WebAnchor>)}
+    </View>
+  </View>;
+}
+
 // Pick the widest grid that leaves no lone card in a group's last row.
 function gridColumns(count: number, width: number) {
   if (width < 700) return 1;
@@ -256,8 +282,8 @@ export function LearnScreen({ theme, articleId, onArticleChange, showHeader=true
             {Platform.OS === 'web' && <View aria-live="polite" style={webStyles.visuallyHidden}>
               <Text testID="learn.searchStatus">{query.trim() ? results.length ? results.length === 1 ? t('learn.matchOne') : t('learn.matchMany', { count: results.length }) : t('learn.noResults') : ''}</Text>
             </View>}
-            {!query.trim() && <ArticleRow article={careArticles[0]} theme={theme} onOpen={open} featured />}
-            {results.filter((item) => item.id !== 'getting-started' || query.trim()).length === 0 ? (
+            {!query.trim() && Platform.OS !== 'web' && <ArticleRow article={careArticles[0]} theme={theme} onOpen={open} featured />}
+            {results.filter((item) => item.id !== 'getting-started' || query.trim() || Platform.OS === 'web').length === 0 ? (
               <View style={styles.section}>
                 <Text accessibilityRole="header" aria-level={2} style={[styles.sectionTitle, { color: theme.text }]}>{t('learn.noResults')}</Text>
                 <Text style={[styles.body, { color: theme.textMuted }]}>{t('learn.tryAnother')}</Text>
@@ -265,12 +291,14 @@ export function LearnScreen({ theme, articleId, onArticleChange, showHeader=true
               </View>
             ) : (
               <View style={[styles.groups, Platform.OS === 'web' && webStyles.groups]}>
-                {['Daily care', 'Training', 'Health', 'Basics'].map((category) => {
-                  const group = results.filter((item) => item.category === category && (item.id !== 'getting-started' || query.trim()));
+                {(Platform.OS === 'web' ? ['Basics', 'Daily care', 'Training', 'Health'] : ['Daily care', 'Training', 'Health', 'Basics']).map((category) => {
+                  const group = results.filter((item) => item.category === category && (item.id !== 'getting-started' || query.trim() || Platform.OS === 'web'));
                   if (!group.length) return null;
                   return <View key={category} style={styles.group}>
-                    <Text accessibilityRole="header" aria-level={2} style={[styles.sectionTitle, { color: theme.text }]}>{category}</Text>
-                    {Platform.OS === 'web' && category !== 'Basics'
+                    <Text accessibilityRole="header" aria-level={2} style={[styles.sectionTitle, { color: theme.text }]}>{Platform.OS === 'web' && category === 'Basics' ? t('learn.startHere') : category}</Text>
+                    {Platform.OS === 'web' && category === 'Basics'
+                      ? <StartHere articles={group} theme={theme} />
+                      : Platform.OS === 'web'
                       ? <View style={[styles.cards, webStyles.cards]}>{group.map((item) => <View key={item.id} style={[webStyles.cell, { width: `${100 / gridColumns(group.length, width)}%` }]}>
                           <ArticleRow article={item} theme={theme} onOpen={open} />
                         </View>)}</View>
@@ -385,7 +413,7 @@ const webStyles = StyleSheet.create({
   featuredImage: { width: 160, height: 160 },
   card: { padding: 16, gap: 12 },
   featured: { gap: 24, flexWrap: 'wrap' },
-  groups: { marginTop: 36 },
+  groups: { marginTop: 4 },
   cards: { gap: 0, justifyContent: 'flex-start', marginHorizontal: -8, marginVertical: -8 },
   cell: { padding: 8 },
   cardFill: { width: '100%', flexGrow: 1 },
@@ -400,6 +428,12 @@ const webStyles = StyleSheet.create({
   rowSummaryCompact: { fontSize: 14, lineHeight: 21 },
   // websiteTheme.textMuted is 4.72:1 on primarySoft; this keeps small text above 5.5:1.
   featuredSummary: { color: '#4A584C' },
+  startPanel: { borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 24, paddingVertical: 8, paddingHorizontal: 16 },
+  startPanelCompact: { alignItems: 'flex-start', gap: 14, padding: 12 },
+  startLink: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 16, paddingRight: 8 },
+  startLinkCompact: { paddingVertical: 10, paddingRight: 0 },
+  startDivider: { borderTopWidth: StyleSheet.hairlineWidth },
+  startStep: { fontSize: 12, lineHeight: 18, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 2 },
   visuallyHidden: { position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0 },
   videos: { marginTop: 4 },
   videosWide: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 32 },
