@@ -119,7 +119,7 @@ export default function MarketingSite({ path = '/' }: { path?: string }) {
           <article className="rhythm-story">
             <h3 data-reveal>Spot the potty patterns</h3>
             <div className="story-content">
-              <PhoneFrame reveal><img {...timingImage} sizes={screenSizes} alt="Puptime Poop & Eat timeline showing meals and poops at similar times across recorded days" width="1206" height="2622" loading="lazy" /></PhoneFrame>
+              <PhoneFrame reveal><img {...timingImage} sizes={screenSizes} alt="Puptime Poop & Eat timeline of recorded days where poops often follow breakfast and dinner" width="1206" height="2622" loading="lazy" /></PhoneFrame>
               <p data-reveal>Compare meals and poops across recorded days. Look for recurring potty times.</p>
             </div>
           </article>

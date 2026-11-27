@@ -93,7 +93,7 @@ try {
     }
     await page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished)));
     await page.screenshot({ path: `${output}/${width}-app-preview.png` });
-    const timeline = page.getByRole('img', { name: 'Puptime Poop & Eat timeline showing meals and poops at similar times across recorded days', exact: true });
+    const timeline = page.getByRole('img', { name: 'Puptime Poop & Eat timeline of recorded days where poops often follow breakfast and dinner', exact: true });
     await timeline.scrollIntoViewIfNeeded();
     await timeline.evaluate(image => image.decode());
     assert.ok(await timeline.evaluate(sharpCapture, 1206 / 2622), 'Keep the Timeline story capture sharp and uncropped.');
