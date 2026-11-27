@@ -3,16 +3,17 @@ import type { WebsiteDestination } from './telemetry-policy.ts';
 
 // Shared by the React pages (SiteChrome.tsx) and the static privacy/support HTML (scripts/build-web-seo.ts).
 export const sourceUrl = 'https://github.com/patrickchin/puptime';
+export const downloadPath = '/download';
 export const androidDownloadPath = '/download/android.apk';
+export const androidReleasesUrl = 'https://github.com/patrickchin/puptime/releases/latest';
 export const deleteAccountPath = '/delete-account';
 export const siteTagline = 'Potty training and puppy routines, one log at a time.';
 
-export type ChromeLink = { label: string; href: string; external?: boolean; event?: WebsiteDestination; wide?: boolean };
-// Phones swap The app for the Get Puptime action, and narrow phones show only the logo, so the header fits at 320px.
-export const headerLinks: ChromeLink[] = [{ label: 'The app', href: '/#app', wide: true }, { label: 'Puppy care', href: '/puppy-care/' }];
-export const headerAction: ChromeLink = { label: 'Get Puptime', href: '/#get-puptime', event: 'get_puptime' };
+export type ChromeLink = { label: string; href: string; external?: boolean; event?: WebsiteDestination };
+// Narrow phones show only the logo, so the header fits at 320px.
+export const headerLinks: ChromeLink[] = [{ label: 'The app', href: '/#app' }, { label: 'Puppy care', href: '/puppy-care/' }];
 export const footerColumns: { title: string; links: ChromeLink[] }[] = [
-  { title: 'Product', links: [...headerLinks, { label: 'Download Android APK', href: androidDownloadPath, event: 'android_download' }] },
+  { title: 'Product', links: [...headerLinks, { label: 'Download', href: downloadPath, event: 'get_puptime' }] },
   { title: 'Help', links: [{ label: 'Support', href: supportPath }, { label: 'Privacy', href: privacyPath }, { label: 'Delete cloud account', href: deleteAccountPath }] },
   { title: 'Source', links: [{ label: 'GitHub', href: sourceUrl, external: true, event: 'source' }] },
 ];
@@ -30,7 +31,7 @@ const attribute = (name: string, value?: string) => value ? ` ${name}="${value}"
 const linkHtml = ({ label, href, external }: ChromeLink, current?: string, className?: string) => `<a${attribute('class', className)} href="${href}"${attribute('aria-current', current)}>${label}${external ? '&nbsp;<span aria-hidden="true">↗</span>' : ''}</a>`;
 
 export function siteHeaderHtml(path: string) {
-  return `<header class="site-header"><a class="site-brand" href="/" aria-label="Puptime home"><img src="/brand-icon.png" width="38" height="38" alt=""><span class="brand-name">Puptime</span></a><nav aria-label="Website">${headerLinks.map((link) => linkHtml(link, headerCurrent(link.href, path), link.wide ? 'wide-only' : undefined)).join('')}${linkHtml(headerAction, undefined, 'header-cta')}</nav></header>`;
+  return `<header class="site-header"><a class="site-brand" href="/" aria-label="Puptime home"><img src="/brand-icon.png" width="38" height="38" alt=""><span class="brand-name">Puptime</span></a><nav aria-label="Website">${headerLinks.map((link) => linkHtml(link, headerCurrent(link.href, path))).join('')}</nav></header>`;
 }
 
 export function siteFooterHtml(path: string) {

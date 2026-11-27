@@ -183,41 +183,9 @@ body:has(.marketing-site) {
 .primary-action:hover {
   transform: translateY(-3px);
 }
-.hero-actions {
-  scroll-margin-top: 24px;
-}
-.download-options {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  margin-top: 32px;
-}
-.download-options .primary-action {
-  margin-top: 0;
-  gap: 40px;
-}
-.ios-status {
-  display: inline-flex;
-  align-items: center;
-  min-height: 56px;
-  padding: 16px 22px;
-  border: 1px dashed color-mix(in srgb, currentColor 60%, transparent);
-  font-weight: 500;
-}
-.apk-note {
-  margin-top: 16px;
-  font-size: var(--small);
-}
 .hero-note {
   margin-top: 20px;
   font-size: var(--small);
-}
-.apk-note + .hero-note {
-  margin-top: 4px;
-}
-.hero-actions .text-action {
-  margin-top: 12px;
 }
 .hero-art {
   position: relative;
@@ -278,11 +246,7 @@ body:has(.marketing-site) {
 }
 .preview-description {
   max-width: 36ch;
-  min-height: 4.5em;
-}
-.small-copy {
-  font-size: var(--small);
-  margin-top: 24px;
+  min-height: 3em;
 }
 .app-preview {
   justify-self: center;
@@ -367,11 +331,6 @@ body:has(.marketing-site) {
   width: 100%;
   height: auto;
 }
-.app-preview figcaption {
-  font-size: var(--small);
-  margin-top: 16px;
-  text-align: center;
-}
 /* Stack every capture in one frame so switching screens can crossfade. */
 .app-preview .phone-screen {
   display: grid;
@@ -389,17 +348,6 @@ body:has(.marketing-site) {
   gap: 72px;
   background: var(--deep);
   color: var(--paper);
-}
-.rhythm-intro {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 48px;
-  align-items: end;
-}
-.rhythm-intro p {
-  max-width: 30ch;
-  font-size: var(--lead);
-  line-height: 1.4;
 }
 .rhythm-stories {
   display: grid;
@@ -468,41 +416,20 @@ body:has(.marketing-site) {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 56px;
+  gap: 32px;
 }
-.local-columns {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 48px;
+.price-line {
+  font-size: var(--lead);
+  line-height: 1.4;
+  max-width: 32ch;
 }
-.local-columns p {
-  font-size: var(--body);
-  line-height: 1.45;
-  max-width: 36ch;
+.maker-line {
+  font-size: var(--small);
 }
-.local-columns .text-action {
-  margin-top: 28px;
-}
-.local-columns h3 {
-  margin-bottom: 24px;
-}
-.cost-list {
-  display: grid;
-  gap: 20px;
-  margin: 0;
-}
-.cost-list div {
-  border-top: 1px solid rgba(248, 243, 232, 0.24);
-  padding-top: 16px;
-}
-.cost-list dt {
+.maker-line a {
+  text-decoration: underline;
+  text-underline-offset: 4px;
   font-weight: 700;
-  color: var(--lime);
-}
-.cost-list dd {
-  margin: 4px 0 0;
-  line-height: 1.45;
-  max-width: 36ch;
 }
 .trust-list {
   list-style: none;
@@ -593,6 +520,9 @@ body:has(.marketing-site) {
   .rhythm-chapter {
     gap: 56px;
   }
+  .local-chapter {
+    gap: 32px;
+  }
   .story-content {
     grid-template-columns: 1fr;
     gap: 24px;
@@ -661,13 +591,6 @@ body:has(.marketing-site) {
     padding: 13px 20px;
     min-height: 52px;
   }
-  .download-options {
-    margin-top: 24px;
-  }
-  .ios-status {
-    min-height: 52px;
-    padding: 13px 20px;
-  }
   .hero-note {
     margin-top: 16px;
   }
@@ -723,7 +646,7 @@ body:has(.marketing-site) {
   }
   .preview-description {
     order: 2;
-    min-height: 4.5em;
+    min-height: 3em;
     margin-bottom: 16px;
   }
   .app-preview {
@@ -731,19 +654,6 @@ body:has(.marketing-site) {
     width: 250px;
     max-width: 100%;
     align-self: center;
-  }
-  .small-copy {
-    order: 4;
-    margin-top: 24px;
-  }
-  .rhythm-intro {
-    display: flex;
-    flex-direction: column;
-    align-items: start;
-    gap: 24px;
-  }
-  .rhythm-intro p {
-    font-size: var(--body);
   }
   .rhythm-stories {
     width: 100%;
@@ -781,21 +691,7 @@ body:has(.marketing-site) {
     gap: 0 12px;
   }
   .local-chapter {
-    gap: 32px;
-  }
-  .local-columns {
-    display: flex;
-    flex-direction: column;
-    gap: 40px;
-  }
-  .local-columns p {
-    font-size: var(--body);
-  }
-  .local-columns .text-action {
-    margin-top: 16px;
-  }
-  .local-columns h3 {
-    margin-bottom: 16px;
+    gap: 24px;
   }
   .trust-list {
     gap: 8px;
@@ -886,22 +782,6 @@ body:has(.marketing-site) {
 .site-header nav a[aria-current] {
   text-decoration: underline;
   text-decoration-thickness: 3px;
-}
-.site-header nav a.header-cta {
-  padding: 0 18px;
-  background: var(--deep);
-  color: var(--paper);
-  font-size: 0.9em;
-  font-weight: 700;
-  text-decoration: none;
-  transition: transform 180ms ease;
-}
-.site-header nav a.header-cta:hover {
-  transform: translateY(-2px);
-}
-.site-header.dark nav a.header-cta {
-  background: var(--lime);
-  color: var(--ink);
 }
 .site-footer {
   background: var(--paper);
@@ -1016,13 +896,6 @@ body:has(.marketing-site) {
     gap: 16px;
     font-size: 16px;
   }
-  .site-header nav .wide-only {
-    display: none;
-  }
-  .site-header nav a.header-cta {
-    padding: 0 14px;
-    font-size: 15px;
-  }
   .site-footer {
     padding-top: 40px;
     gap: 32px;
@@ -1036,21 +909,13 @@ body:has(.marketing-site) {
   }
 }
 /* The link keeps its accessible name from aria-label when the wordmark is hidden. */
-@media (max-width: 400px) {
+@media (max-width: 350px) {
   .site-header .site-brand .brand-name {
     display: none;
   }
   .site-brand img {
     width: 34px;
     height: 34px;
-  }
-}
-@media (max-width: 340px) {
-  .site-header nav {
-    gap: 12px;
-  }
-  .site-header nav a.header-cta {
-    padding: 0 12px;
   }
 }
 
@@ -1071,11 +936,10 @@ body:has(.marketing-site) {
   .hero-copy > p:first-of-type {
     animation: text-arrive 900ms 80ms var(--ease) both;
   }
-  .hero .download-options {
+  .hero-actions > .primary-action {
     animation: text-arrive 900ms 160ms var(--ease) both;
   }
-  .hero-actions > p,
-  .hero-actions > .text-action {
+  .hero-actions > p {
     animation: text-arrive 900ms 240ms var(--ease) both;
   }
   .hero-puppy {
@@ -1190,6 +1054,99 @@ body:has(.marketing-site) {
 @media (max-width: 600px) {
   .app-handoff .handoff-content {
     margin-top: 48px;
+  }
+}
+
+/* -------- Download (/download) -------- */
+.download-content {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 72px 24px 96px;
+}
+.download-content h1 {
+  font-size: var(--title);
+  line-height: 1.05;
+  margin-bottom: 40px;
+}
+.download-platforms {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+.download-platform {
+  padding: 32px;
+  background: var(--white);
+  border: 1px solid var(--border);
+}
+.download-platform h2 {
+  font-size: var(--lead);
+  margin-bottom: 16px;
+}
+.download-platform p {
+  max-width: 34ch;
+}
+.secondary-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 24px;
+  min-height: 52px;
+  margin-top: 24px;
+  padding: 12px 20px;
+  border: 2px solid var(--ink);
+  font-weight: 700;
+}
+.secondary-action:hover {
+  background: var(--mint);
+}
+.install-steps {
+  margin: 24px 0 0;
+  padding-left: 1.4em;
+  font-size: var(--small);
+  line-height: 1.7;
+  color: var(--muted);
+}
+.release-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 12px;
+  font-size: var(--small);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.app-store-badge {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 52px;
+  padding: 6px 18px;
+  border-radius: 10px;
+  background: #000;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.05;
+}
+.app-store-badge small {
+  font-size: 12px;
+  font-weight: 500;
+}
+@media (max-width: 700px) {
+  .download-content {
+    padding: 40px 20px 64px;
+  }
+  .download-content h1 {
+    margin-bottom: 28px;
+  }
+  .download-platforms {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .download-platform {
+    padding: 24px 20px;
   }
 }
 

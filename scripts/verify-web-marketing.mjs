@@ -72,8 +72,8 @@ try {
 
     await page.keyboard.press('Home');
     await page.waitForFunction(() => scrollY < 2, null, { timeout: 5000 });
-    await page.getByRole('link', { name: 'See the app', exact: true }).click();
-    assert.ok(await page.locator('#app').evaluate(element => Math.abs(element.getBoundingClientRect().top) < 60), 'The hero action should reach the product section.');
+    await page.locator('.site-header').getByRole('link', { name: 'The app', exact: true }).click();
+    await page.waitForFunction(() => Math.abs(document.querySelector('#app').getBoundingClientRect().top) < 60, null, { timeout: 5000 });
     assert.equal(await page.locator('#app-title').innerText(), 'Take a look inside');
     for (const name of ['Today', 'History', 'Insights']) {
       const button = page.getByRole('button', { name, exact: true });
@@ -84,8 +84,8 @@ try {
       const [choices, phone] = await Promise.all([page.locator('.preview-choices').boundingBox(), page.locator('.app-preview .phone-frame').boundingBox()]);
       if (width <= 600) assert.ok(phone.y > choices.y + choices.height && phone.y + phone.height - choices.y <= height, `Keep the preview phone directly below its choices at ${width}px.`);
       else assert.ok(phone.x > choices.x + choices.width, `Keep the preview phone beside its choices at ${width}px.`);
-      await page.getByRole('img', { name: `Puptime ${name} screen`, exact: true }).evaluate(image => image.decode());
-      assert.ok(await page.getByRole('img', { name: `Puptime ${name} screen`, exact: true }).evaluate(sharpCapture, 1206 / 2622), 'Use sharp, uncropped native iPhone captures.');
+      await page.getByRole('img', { name: `Puptime ${name} screen with example logs`, exact: true }).evaluate(image => image.decode());
+      assert.ok(await page.getByRole('img', { name: `Puptime ${name} screen with example logs`, exact: true }).evaluate(sharpCapture, 1206 / 2622), 'Use sharp, uncropped native iPhone captures.');
       assert.ok(await page.locator('.app-preview .phone-frame').evaluate(element => {
         const radius = getComputedStyle(element).borderTopLeftRadius;
         return (radius.endsWith('%') ? parseFloat(radius) * element.clientWidth / 100 : parseFloat(radius)) >= 28;
