@@ -386,7 +386,7 @@ const webHeadingFont = { fontFamily: 'Red Hat Display' };
 
 // The website has room for illustrations and a comfortable reading measure.
 // Keep the compact native layout for the app's Learn tab. Heading sizes come from the
-// homepage type scale in src/web/marketing-styles.ts.
+// homepage type scale in src/web/website.css.
 const webStyles = StyleSheet.create({
   // Square, transparent frames match the homepage's editorial blocks.
   imageFrame: { backgroundColor: 'transparent', borderRadius: 0 },
