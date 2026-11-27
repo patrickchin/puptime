@@ -4,7 +4,7 @@ The app and website use the same large-paw mark. The website supplies its forest
 cream and ochre colour direction; the established app icon supplies its shape,
 proportions and restrained paper finish. App interface/theme colours are separate.
 
-`../puptime-icon.png` is the opaque 1024 px master. Its colour-only revision was
+`../puptime-icon.png` is the opaque, full-bleed 1024 px master used by the native launcher. Its colour-only revision was
 made with the built-in ImageGen tool on November 13, 2026, using the previous app
 icon as the edit target. Final prompt:
 
@@ -16,7 +16,7 @@ icon as the edit target. Final prompt:
 > ochre anchored at #EBAD43. Keep subtle shading within those colour families.
 > No added shapes, text, teal, coral, red, blue, outlines, drop shadows or 3D depth.
 
-The website header, favicon and social preview are size-only master derivatives.
+The green field now extends to the corners so native launchers can apply their own masks. The website header and favicon get transparent corners. The social preview and Apple touch icon are sized from the full-bleed master.
 The two editable SVGs provide clean Android layers with matching paw proportions.
 The monochrome clock is a transparent knockout, so a single system tint retains
 the clock. Artwork stays within Android's central 66/108 safe zone; Android supplies
